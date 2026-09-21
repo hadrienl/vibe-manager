@@ -110,10 +110,13 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
 
 public struct SessionAgentConfiguration: Hashable, Codable, Sendable {
   public var providerID: String
-  public var modelID: String
+  /// `nil` is "whatever the agent is configured to use", which is a real state: neither CLI
+  /// guarantees a model catalogue, and a sentinel such as `"default"` would eventually be passed
+  /// to `--model` as if it named a model.
+  public var modelID: String?
   public var resumeIdentifier: String?
 
-  public init(providerID: String, modelID: String, resumeIdentifier: String? = nil) {
+  public init(providerID: String, modelID: String? = nil, resumeIdentifier: String? = nil) {
     self.providerID = providerID
     self.modelID = modelID
     self.resumeIdentifier = resumeIdentifier
@@ -304,7 +307,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       throw WorkSessionValidationError.emptyName
     }
     if let agent {
-      guard !agent.providerID.isEmpty, !agent.modelID.isEmpty else {
+      guard !agent.providerID.isEmpty, agent.modelID.map({ !$0.isEmpty }) ?? true else {
         throw WorkSessionValidationError.emptyAgentIdentifier
       }
     }
