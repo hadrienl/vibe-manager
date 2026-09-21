@@ -30,15 +30,37 @@ version and uses persistence-only DTOs rather than encoding domain values direct
 V0-to-V1 migration for the minimal model created with the project foundation. Unknown future
 versions are rejected without modifying the file.
 
+Every mutation of an existing session goes through `SessionRepository.mutate(id:_:)`. Pairing a
+read with a write would cross two suspension points, so two concurrent transitions would read the
+same snapshot and the later write would discard the earlier one.
+
+Dates are persisted as ISO-8601 strings with millisecond precision. Domain values are normalized
+to that precision when they enter the model, so a reloaded session compares equal to the one it
+was built from instead of differing by a fraction of a millisecond. Lifecycle timestamps are also
+clamped to the session's last update: a system clock stepping backwards must not prevent the user
+from closing or archiving a session.
+
 Writes are serialized by the repository actor. Data is written and synchronized to a unique
 temporary file in the destination directory, then atomically moved or replaced. Before replacing
-an existing primary file, its bytes are atomically copied to `sessions.backup.json`. The directory
-uses mode `0700` and files use `0600`.
+an existing primary file, its bytes are atomically copied to `sessions.backup.json`. Files use
+mode `0600`, and a store directory created by the application uses `0700`. A directory that
+already exists keeps its own permissions: the store location is caller-provided and may sit inside
+a directory the application does not own.
+
+Reading a legacy document migrates it in memory and writes it back on a best-effort basis, so a
+read never fails because of the rewrite. A mutation loads without rewriting and commits once,
+which leaves the pre-migration document as the backup rather than an already migrated copy of it.
 
 A malformed or invalid primary document produces a typed error. If the backup decodes and
-validates, recovery is reported as available but is never automatic. Explicit restoration first
-preserves the damaged bytes in a uniquely named quarantine file and then writes a current-schema
-document from the backup.
+validates, recovery is reported as available but is never automatic. Explicit restoration re-checks
+that recovery is still needed, preserves the damaged bytes in a uniquely named quarantine file, and
+only then writes a current-schema document from the backup. Failing to preserve those bytes aborts
+the restoration.
+
+Two states are reported as explicitly non-restorable rather than as damage: a document written by
+an unknown future version, which an older backup would silently downgrade, and a store whose bytes
+cannot be read at all, which cannot be quarantined and whose replacement would destroy the only
+diagnostic evidence left.
 
 The persisted schema is an allowlist. It contains no terminal output, command history, process
 environment, access token, credential-bearing remote URL or runtime adapter. Prompts, notes and

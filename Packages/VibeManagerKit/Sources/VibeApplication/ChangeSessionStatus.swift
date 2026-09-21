@@ -40,8 +40,12 @@ public struct ChangeSessionStatus: Sendable {
     id: SessionID,
     action: SessionLifecycleAction
   ) async throws -> WorkSession {
-    let date = clock.now()
+    let now = clock.now()
     let updated = try await repository.mutate(id: id) { session in
+      // The wall clock can step backwards (an NTP correction, a manual change). Refusing the
+      // transition would strand the user until real time catches up, so the timestamp is clamped
+      // instead: `updatedAt` stays monotonic, which is what the ordering relies on.
+      let date = max(now, session.updatedAt)
       switch action {
       case .close:
         try session.close(at: date)

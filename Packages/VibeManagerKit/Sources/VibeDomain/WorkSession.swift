@@ -38,13 +38,31 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
     archivedAt: Date? = nil
   ) {
     self.status = status
-    self.createdAt = createdAt
-    self.updatedAt = updatedAt
-    self.closedAt = closedAt
-    self.archivedAt = archivedAt
+    self.createdAt = createdAt.storageRounded
+    self.updatedAt = updatedAt.storageRounded
+    self.closedAt = closedAt?.storageRounded
+    self.archivedAt = archivedAt?.storageRounded
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case status, createdAt, updatedAt, closedAt, archivedAt
+  }
+
+  /// Decoding routes through the designated initializer so that a value read back from any
+  /// encoded form carries the same precision as one built in memory.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      status: try container.decode(SessionStatus.self, forKey: .status),
+      createdAt: try container.decode(Date.self, forKey: .createdAt),
+      updatedAt: try container.decode(Date.self, forKey: .updatedAt),
+      closedAt: try container.decodeIfPresent(Date.self, forKey: .closedAt),
+      archivedAt: try container.decodeIfPresent(Date.self, forKey: .archivedAt)
+    )
   }
 
   public mutating func close(at date: Date) throws {
+    let date = date.storageRounded
     try transition(from: .active, to: .closed, at: date)
     closedAt = date
     archivedAt = nil
@@ -57,6 +75,7 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
   }
 
   public mutating func archive(at date: Date) throws {
+    let date = date.storageRounded
     let effectiveClosedAt = closedAt ?? updatedAt
     try transition(from: .closed, to: .archived, at: date)
     closedAt = effectiveClosedAt
@@ -69,6 +88,7 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
   }
 
   public mutating func touch(at date: Date) throws {
+    let date = date.storageRounded
     guard date >= updatedAt else {
       throw SessionTransitionError.datePrecedesLastUpdate
     }
@@ -140,7 +160,9 @@ public struct GitSnapshot: Hashable, Codable, Sendable {
   public var branchName: String?
   public var headRevision: String?
   public var isDirty: Bool
-  public var capturedAt: Date
+  public var capturedAt: Date {
+    didSet { capturedAt = capturedAt.storageRounded }
+  }
 
   public init(
     repositoryRootPath: String,
@@ -155,7 +177,25 @@ public struct GitSnapshot: Hashable, Codable, Sendable {
     self.branchName = branchName
     self.headRevision = headRevision
     self.isDirty = isDirty
-    self.capturedAt = capturedAt
+    self.capturedAt = capturedAt.storageRounded
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case repositoryRootPath, worktreePath, branchName, headRevision, isDirty, capturedAt
+  }
+
+  /// See `SessionLifecycle.init(from:)`: a synthesized decode would write `capturedAt` directly,
+  /// bypassing both the initializer and the property observer.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      repositoryRootPath: try container.decode(String.self, forKey: .repositoryRootPath),
+      worktreePath: try container.decodeIfPresent(String.self, forKey: .worktreePath),
+      branchName: try container.decodeIfPresent(String.self, forKey: .branchName),
+      headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision),
+      isDirty: try container.decode(Bool.self, forKey: .isDirty),
+      capturedAt: try container.decode(Date.self, forKey: .capturedAt)
+    )
   }
 }
 

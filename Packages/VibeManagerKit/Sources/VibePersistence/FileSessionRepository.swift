@@ -9,6 +9,7 @@ public enum SessionStoreError: Error, Equatable, LocalizedError, Sendable {
   case unsupportedSchemaVersion(Int)
   case recoveryUnavailable
   case recoveryNotNeeded
+  case recoveryRefusedForNewerStore
 
   public var errorDescription: String? {
     switch self {
@@ -26,6 +27,11 @@ public enum SessionStoreError: Error, Equatable, LocalizedError, Sendable {
       return "No valid session backup is available."
     case .recoveryNotNeeded:
       return "The session store is healthy, so there is nothing to restore."
+    case .recoveryRefusedForNewerStore:
+      return """
+        The session store was created by a newer version of Vibe Manager and must not be replaced \
+        by an older backup. Update Vibe Manager to open it.
+        """
     }
   }
 }
@@ -61,17 +67,17 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   }
 
   public func sessions() throws -> [WorkSession] {
-    try loadSessions().sorted(by: Self.sessionOrdering)
+    try loadSessions(persistingMigration: true).sorted(by: Self.sessionOrdering)
   }
 
   public func session(id: SessionID) throws -> WorkSession? {
-    try loadSessions().first { $0.id == id }
+    try loadSessions(persistingMigration: true).first { $0.id == id }
   }
 
   public func save(_ session: WorkSession) throws {
     do {
       try session.validate()
-      var current = try loadSessions()
+      var current = try loadSessions(persistingMigration: false)
       if let index = current.firstIndex(where: { $0.id == session.id }) {
         current[index] = session
       } else {
@@ -89,7 +95,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   ) async throws -> WorkSession? {
     var current: [WorkSession]
     do {
-      current = try loadSessions()
+      current = try loadSessions(persistingMigration: false)
     } catch {
       throw mapStoreError(error)
     }
@@ -109,10 +115,17 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   }
 
   public func recoveryStatus() -> SessionStoreRecoveryStatus {
-    guard FileManager.default.fileExists(atPath: storeURL.path), !storeIsReadable() else {
+    guard FileManager.default.fileExists(atPath: storeURL.path) else { return .notNeeded }
+    guard let data = try? Data(contentsOf: storeURL) else { return .storeUnreadable }
+    do {
+      _ = try codec.decode(data)
       return .notNeeded
+    } catch SessionStoreCodecError.unsupportedSchemaVersion {
+      // A document from a newer version decodes as a failure here, but it is not damage.
+      return .unsupportedVersion
+    } catch {
+      return backupIsValid() ? .backupAvailable : .unavailable
     }
-    return backupIsValid() ? .backupAvailable : .unavailable
   }
 
   public func restoreBackup() throws {
@@ -123,6 +136,10 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       throw SessionStoreError.recoveryNotNeeded
     case .unavailable:
       throw SessionStoreError.recoveryUnavailable
+    case .unsupportedVersion:
+      throw SessionStoreError.recoveryRefusedForNewerStore
+    case .storeUnreadable:
+      throw SessionStoreError.cannotAccessStore
     case .backupAvailable:
       break
     }
@@ -134,11 +151,12 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     }
 
     do {
-      if let damagedData = try? Data(contentsOf: storeURL) {
-        let quarantineURL = storeURL.deletingPathExtension()
-          .appendingPathExtension("corrupt-\(UUID().uuidString).json")
-        try atomicWrite(damagedData, to: quarantineURL, invokingInterruption: false)
-      }
+      // The damaged bytes are the only diagnostic evidence left, so failing to preserve them
+      // aborts the restoration rather than silently discarding them.
+      let damagedData = try Data(contentsOf: storeURL)
+      let quarantineURL = storeURL.deletingPathExtension()
+        .appendingPathExtension("corrupt-\(UUID().uuidString).json")
+      try atomicWrite(damagedData, to: quarantineURL, invokingInterruption: false)
       let recoveredData = try codec.encode(sessions: decoded.sessions)
       try commit(recoveredData, preservingCurrentAsBackup: false)
     } catch let error as SessionStoreError {
@@ -148,7 +166,11 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     }
   }
 
-  private func loadSessions() throws -> [WorkSession] {
+  /// - Parameter persistingMigration: when `true`, a migrated legacy document is written back on a
+  ///   best-effort basis. A caller that is about to commit itself passes `false`, so that the
+  ///   single backup it produces holds the original pre-migration bytes rather than an already
+  ///   migrated copy of them.
+  private func loadSessions(persistingMigration: Bool) throws -> [WorkSession] {
     guard FileManager.default.fileExists(atPath: storeURL.path) else { return [] }
 
     let data: Data
@@ -160,7 +182,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
 
     do {
       let decoded = try codec.decode(data)
-      if decoded.requiresRewrite {
+      if decoded.requiresRewrite, persistingMigration {
         // Reading must succeed even when the migrated document cannot be written
         // back, for instance on a full disk or a read-only container.
         if let migratedData = try? codec.encode(sessions: decoded.sessions) {
@@ -230,6 +252,12 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
   }
 
+  /// Creates the store directory with owner-only permissions.
+  ///
+  /// A directory that already exists keeps its own permissions: the store URL is caller-provided,
+  /// so it may point inside a directory the application does not own, and tightening that one to
+  /// `0700` on every write would silently restrict unrelated content. The files themselves are
+  /// always written as `0600`.
   private func ensureStoreDirectory() throws {
     let directory = storeURL.deletingLastPathComponent()
     let manager = FileManager.default
@@ -240,13 +268,6 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
         attributes: [.posixPermissions: 0o700]
       )
     }
-    try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-  }
-
-  private func storeIsReadable() -> Bool {
-    guard FileManager.default.fileExists(atPath: storeURL.path) else { return false }
-    guard let data = try? Data(contentsOf: storeURL) else { return false }
-    return (try? codec.decode(data)) != nil
   }
 
   private func backupIsValid() -> Bool {

@@ -54,3 +54,26 @@ func lifecycleUseCasePersistsTransition() async throws {
   #expect(updated.closedAt == closedAt)
   #expect(await repository.session(id: session.id) == updated)
 }
+
+@Test("A transition still applies when the system clock has stepped backwards")
+func lifecycleUseCaseToleratesAClockRegression() async throws {
+  let updatedAt = Date(timeIntervalSince1970: 1000)
+  let rewoundClock = Date(timeIntervalSince1970: 400)
+  let session = WorkSession(
+    name: "Running",
+    status: .active,
+    createdAt: Date(timeIntervalSince1970: 100),
+    updatedAt: updatedAt
+  )
+  let repository = StatusSessionRepository(value: session)
+  let changeStatus = ChangeSessionStatus(
+    repository: repository,
+    clock: FixedSessionClock(value: rewoundClock)
+  )
+
+  let updated = try await changeStatus(id: session.id, action: .close)
+
+  #expect(updated.status == .closed)
+  #expect(updated.updatedAt == updatedAt)
+  #expect(updated.closedAt == updatedAt)
+}
