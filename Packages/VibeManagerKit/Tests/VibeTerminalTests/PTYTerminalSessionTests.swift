@@ -283,3 +283,24 @@ func ignoresOperationsAfterCompletion() async throws {
 
   #expect(await session.state() == .exited(code: 0))
 }
+
+@Test("End of file while the process is still alive reclaims it instead of reporting a clean exit")
+func sessionReclaimsAProcessThatOutlivesItsTerminal() async throws {
+  // The shell drops every descriptor onto the pseudo terminal, so the master reports the end while
+  // the process tree is still running. Reporting `exited(code: 0)` here would both mislabel the
+  // outcome and release the process group from the shutdown guard while it is alive.
+  let session = try TerminalTestSupport.makeSession(
+    script: "exec 0<&- 1>&- 2>&-; sleep 30"
+  )
+  let processIdentifier = await session.processIdentifierForTesting
+
+  let outcome = await runToCompletion(session, timeout: .seconds(20))
+
+  #expect(outcome.state == .terminated(signal: SIGKILL))
+
+  let deadline = ContinuousClock.now + .seconds(2)
+  while isProcessAlive(processIdentifier), ContinuousClock.now < deadline {
+    try? await Task.sleep(for: .milliseconds(20))
+  }
+  #expect(!isProcessAlive(processIdentifier))
+}

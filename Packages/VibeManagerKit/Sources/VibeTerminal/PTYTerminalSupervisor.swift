@@ -28,6 +28,9 @@ public actor PTYTerminalSupervisor: TerminalSupervisor {
   public func stop(id: SessionID, gracePeriod: Duration) async {
     guard let session = sessions[id] else { return }
     await session.stop(gracePeriod: gracePeriod)
+    // The grace period is long enough for a replacement session to have been registered under the
+    // same identifier; only the session this call stopped may be evicted.
+    guard sessions[id] === session else { return }
     sessions[id] = nil
   }
 

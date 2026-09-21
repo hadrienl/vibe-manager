@@ -105,6 +105,7 @@ public enum TerminalError: Error, Hashable, LocalizedError, Sendable {
   case resourceLimitReached(code: Int32)
   case spawnFailed(code: Int32)
   case sessionAlreadyRunning(SessionID)
+  case processOutcomeUnknown(processIdentifier: Int32)
 
   public var errorDescription: String? {
     switch self {
@@ -124,6 +125,8 @@ public enum TerminalError: Error, Hashable, LocalizedError, Sendable {
       return "The terminal process could not be started."
     case .sessionAlreadyRunning:
       return "A terminal is already running for this work session."
+    case .processOutcomeUnknown:
+      return "The terminal process stopped responding and its outcome is unknown."
     }
   }
 
@@ -143,6 +146,8 @@ public enum TerminalError: Error, Hashable, LocalizedError, Sendable {
       return "Try again, and report the failure if it persists."
     case .sessionAlreadyRunning:
       return "Stop the running terminal before starting a new one."
+    case .processOutcomeUnknown:
+      return "Check Activity Monitor for a leftover process, then start a new terminal."
     }
   }
 
@@ -152,6 +157,8 @@ public enum TerminalError: Error, Hashable, LocalizedError, Sendable {
     case .pseudoTerminalUnavailable(let code), .resourceLimitReached(let code),
       .spawnFailed(let code):
       return "errno \(code)"
+    case .processOutcomeUnknown(let processIdentifier):
+      return "pid \(processIdentifier)"
     case .executableNotFound, .executableNotPermitted, .notExecutable,
       .workingDirectoryUnavailable, .sessionAlreadyRunning:
       return nil

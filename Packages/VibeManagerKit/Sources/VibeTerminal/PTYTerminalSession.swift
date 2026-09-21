@@ -8,12 +8,18 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private static let exitDrainTimeout = Duration.milliseconds(500)
   private static let forcedStopTimeout = Duration.seconds(2)
   private static let statePollInterval = Duration.milliseconds(20)
+  private static let exitPollAttempts = 50
+  // A subscriber that stops draining its stream must not grow the application's memory without
+  // bound. Each queued event holds at most one coalescing window of output, so this caps a stalled
+  // subscriber at a few seconds of backlog; beyond that the oldest output is dropped and the gap is
+  // reported, exactly as the bounded history does.
+  private static let subscriberBufferLimit = 512
 
   public nonisolated let id: SessionID
 
   private let terminal: PseudoTerminal
   private let reader: TerminalOutputReader
-  private let writer: TerminalInputWriter
+  private nonisolated let writer: TerminalInputWriter
   private let exitQueue: DispatchQueue
 
   private var historyBuffer: TerminalHistory
@@ -27,7 +33,12 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   public static func start(id: SessionID, spec: TerminalSpec) throws -> PTYTerminalSession {
     let terminal = try PseudoTerminalLauncher.launch(spec)
     let session = PTYTerminalSession(id: id, terminal: terminal, spec: spec)
-    Task { await session.begin(initialInput: spec.initialInput) }
+    // The initial input is enqueued before the session handle is handed out, so a caller that
+    // writes immediately cannot get its bytes in front of it: the writer queue keeps the order.
+    if let initialInput = spec.initialInput, !initialInput.isEmpty {
+      session.writer.write([UInt8](initialInput.utf8))
+    }
+    Task { await session.begin() }
     return session
   }
 
@@ -43,7 +54,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     TerminalProcessGroupGuard.register(terminal.processGroupIdentifier)
   }
 
-  private func begin(initialInput: String?) {
+  private func begin() {
     transition(to: .running(processIdentifier: terminal.processIdentifier))
     observeProcessExit()
 
@@ -54,16 +65,14 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
         await self.consume(event)
       }
     }
-
-    if let initialInput, !initialInput.isEmpty {
-      writer.write([UInt8](initialInput.utf8))
-    }
   }
 
   public func attach() -> TerminalAttachment {
     let subscriberID = UUID()
     var continuation: AsyncStream<TerminalEvent>.Continuation?
-    let stream = AsyncStream<TerminalEvent> { continuation = $0 }
+    let stream = AsyncStream<TerminalEvent>(
+      bufferingPolicy: .bufferingNewest(Self.subscriberBufferLimit)
+    ) { continuation = $0 }
 
     if let continuation {
       if isFinalized {
@@ -109,15 +118,19 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     if await waitForCompletion(within: Self.forcedStopTimeout) { return }
 
     // The process is unreachable — a zombie parent or a stuck kernel wait. The session must
-    // still release its descriptors and report an outcome.
-    finalize(with: .terminated(signal: SIGKILL))
+    // still release its descriptors and report an outcome, but the group may well be alive.
+    finalize(with: .terminated(signal: SIGKILL), didReapProcess: false)
   }
 
   public func kill() async {
     guard !currentState.isFinished else { return }
     terminal.signalProcessGroup(SIGKILL)
     if await waitForCompletion(within: Self.forcedStopTimeout) { return }
-    finalize(with: .terminated(signal: SIGKILL))
+    finalize(with: .terminated(signal: SIGKILL), didReapProcess: false)
+  }
+
+  var processIdentifierForTesting: pid_t {
+    terminal.processIdentifier
   }
 
   private func consume(_ event: TerminalReadEvent) async {
@@ -163,26 +176,67 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     await reapProcess()
   }
 
+  private enum ReapOutcome {
+    case reaped(status: Int32)
+    case alreadyReaped
+    case stillRunning
+  }
+
   private func reapProcess() async {
     guard !isFinalized else { return }
 
-    var status: Int32 = 0
-    var result = waitpid(terminal.processIdentifier, &status, WNOHANG)
-    var attempts = 0
-    while result == 0, attempts < 50 {
-      try? await Task.sleep(for: Self.statePollInterval)
+    switch await pollForExit() {
+    case .reaped(let status):
       guard !isFinalized else { return }
-      result = waitpid(terminal.processIdentifier, &status, WNOHANG)
-      attempts += 1
+      finalize(with: Self.state(forWaitStatus: status), didReapProcess: true)
+    case .alreadyReaped:
+      // The child is gone but its status was collected elsewhere; the terminal reported the end.
+      guard !isFinalized, isReaderFinished else { return }
+      finalize(with: .exited(code: 0), didReapProcess: true)
+    case .stillRunning:
+      guard !isFinalized, isReaderFinished else { return }
+      await reclaimRunningProcess()
     }
+  }
 
-    guard result == terminal.processIdentifier else {
-      // The child is gone but its status is unreachable; the pseudo terminal reported the end.
-      guard isReaderFinished else { return }
-      finalize(with: .exited(code: 0))
-      return
+  // The pseudo terminal reached end of file while the child is still alive — it closed its tty
+  // descriptors, or a grandchild kept the slave open. Reclaiming the group is the only honest
+  // outcome: reporting a clean exit here would both mislabel a crash and release the process
+  // group from the shutdown guard while it is still running.
+  private func reclaimRunningProcess() async {
+    terminal.signalProcessGroup(SIGKILL)
+
+    switch await pollForExit() {
+    case .reaped(let status):
+      guard !isFinalized else { return }
+      finalize(with: Self.state(forWaitStatus: status), didReapProcess: true)
+    case .alreadyReaped:
+      guard !isFinalized else { return }
+      finalize(with: .terminated(signal: SIGKILL), didReapProcess: true)
+    case .stillRunning:
+      guard !isFinalized else { return }
+      finalize(
+        with: .failed(.processOutcomeUnknown(processIdentifier: terminal.processIdentifier)),
+        didReapProcess: false
+      )
     }
-    finalize(with: Self.state(forWaitStatus: status))
+  }
+
+  private func pollForExit() async -> ReapOutcome {
+    var status: Int32 = 0
+    var attempts = 0
+
+    while true {
+      errno = 0
+      let result = waitpid(terminal.processIdentifier, &status, WNOHANG)
+      if result == terminal.processIdentifier { return .reaped(status: status) }
+      if result < 0 { return errno == ECHILD ? .alreadyReaped : .stillRunning }
+
+      attempts += 1
+      guard attempts < Self.exitPollAttempts else { return .stillRunning }
+      try? await Task.sleep(for: Self.statePollInterval)
+      guard !isFinalized else { return .stillRunning }
+    }
   }
 
   // The wait status macros are not imported into Swift: the low seven bits hold the terminating
@@ -210,7 +264,10 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     broadcast(.stateChanged(state))
   }
 
-  private func finalize(with state: TerminalProcessState) {
+  // The process group stays registered with the shutdown guard until the child's status has
+  // actually been collected: an unreaped group may still be alive, and dropping it here would
+  // hide it from the `atexit` net that keeps orphans from surviving the application.
+  private func finalize(with state: TerminalProcessState, didReapProcess: Bool) {
     guard !isFinalized else { return }
     isFinalized = true
 
@@ -220,7 +277,9 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     // The writer is drained before the reader closes the descriptor it shares.
     writer.close()
     reader.finish()
-    TerminalProcessGroupGuard.unregister(terminal.processGroupIdentifier)
+    if didReapProcess {
+      TerminalProcessGroupGuard.unregister(terminal.processGroupIdentifier)
+    }
 
     for continuation in subscribers.values {
       continuation.finish()
@@ -234,7 +293,14 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
 
   private func broadcast(_ event: TerminalEvent) {
     for continuation in subscribers.values {
-      continuation.yield(event)
+      guard case .dropped(let discarded) = continuation.yield(event) else { continue }
+      // The subscriber fell far enough behind that its oldest event was evicted. Tell it how much
+      // output it lost so it can show the gap rather than silently rendering a corrupt stream. A
+      // dropped state change needs no notice: the current state is always readable from `state()`,
+      // and the subscriber re-reads it when the stream ends.
+      if case .output(let bytes) = discarded {
+        _ = continuation.yield(.historyTruncated(droppedByteCount: bytes.count))
+      }
     }
   }
 }
