@@ -113,6 +113,7 @@ public actor AgentAvailabilityProbe {
     userDefinedPath: String?,
     now: @Sendable () -> Date
   ) async -> AgentAvailability {
+    let hints = AgentRemediationHints(specification: specification)
     let searchPlan = ExecutableSearchPlan(
       binaryName: specification.binaryName,
       candidateDirectories: specification.candidateDirectories,
@@ -127,7 +128,8 @@ public actor AgentAvailabilityProbe {
         state: .notFound,
         installation: nil,
         detail: "No \(specification.binaryName) executable was found.",
-        at: now()
+        at: now(),
+        hints: hints
       )
     case .notExecutable(let path, let source):
       let installation = AgentInstallation(
@@ -141,7 +143,8 @@ public actor AgentAvailabilityProbe {
         state: .notExecutable,
         installation: installation,
         detail: "The file exists but is not executable.",
-        at: now()
+        at: now(),
+        hints: hints
       )
     case .found(let path, let source):
       return await versionState(
@@ -165,6 +168,7 @@ public actor AgentAvailabilityProbe {
     source: AgentDetectionSource,
     now: @Sendable () -> Date
   ) async -> AgentAvailability {
+    let hints = AgentRemediationHints(specification: specification)
     let result: ProbeResult
     do {
       result = try await probe.run(
@@ -183,7 +187,8 @@ public actor AgentAvailabilityProbe {
         state: .probeFailed(reason: .cancelled),
         installation: located(path: path, source: source, now: now),
         detail: nil,
-        at: now()
+        at: now(),
+        hints: hints
       )
     } catch {
       return AgentDiagnosticFactory.availability(
@@ -191,7 +196,8 @@ public actor AgentAvailabilityProbe {
         state: .probeFailed(reason: .failed(exitCode: -1)),
         installation: located(path: path, source: source, now: now),
         detail: "The executable could not be started.",
-        at: now()
+        at: now(),
+        hints: hints
       )
     }
 
@@ -202,7 +208,8 @@ public actor AgentAvailabilityProbe {
         // The path is kept: an export of a failing probe is useless without it.
         installation: located(path: path, source: source, now: now),
         detail: "\(specification.binaryName) did not answer --version in time.",
-        at: now()
+        at: now(),
+        hints: hints
       )
     }
     guard result.exitCode == 0 else {
@@ -211,7 +218,8 @@ public actor AgentAvailabilityProbe {
         state: .probeFailed(reason: .failed(exitCode: result.exitCode)),
         installation: located(path: path, source: source, now: now),
         detail: "Version probe exited with code \(result.exitCode).",
-        at: now()
+        at: now(),
+        hints: hints
       )
     }
 
@@ -233,7 +241,8 @@ public actor AgentAvailabilityProbe {
         state: .outdated(found: version, required: minimum),
         installation: installation,
         detail: nil,
-        at: now()
+        at: now(),
+        hints: hints
       )
     }
 
@@ -250,7 +259,8 @@ public actor AgentAvailabilityProbe {
         state: .unauthenticated,
         installation: installation,
         detail: detail,
-        at: now()
+        at: now(),
+        hints: hints
       )
     }
 
@@ -259,7 +269,8 @@ public actor AgentAvailabilityProbe {
       state: .available,
       installation: installation,
       detail: detail,
-      at: now()
+      at: now(),
+      hints: hints
     )
   }
 
@@ -299,13 +310,35 @@ public actor AgentAvailabilityProbe {
   }
 }
 
+/// What a remediation needs in order to be actionable rather than a bare label.
+///
+/// A provider declares them once in its specification: "install Codex" without a link and
+/// "sign in" without the command to type are not remediations, they are restatements.
+struct AgentRemediationHints: Sendable {
+  var documentationURL: URL?
+  var authenticationCommandLine: String?
+
+  init(documentationURL: URL? = nil, authenticationCommandLine: String? = nil) {
+    self.documentationURL = documentationURL
+    self.authenticationCommandLine = authenticationCommandLine
+  }
+
+  init(specification: CommandLineAgentSpecification) {
+    self.init(
+      documentationURL: specification.documentationURL,
+      authenticationCommandLine: specification.authenticationCommandLine
+    )
+  }
+}
+
 enum AgentDiagnosticFactory {
   static func availability(
     descriptor: AgentDescriptor,
     state: AgentAvailabilityState,
     installation: AgentInstallation?,
     detail: String?,
-    at date: Date
+    at date: Date,
+    hints: AgentRemediationHints = AgentRemediationHints()
   ) -> AgentAvailability {
     let diagnostic = AgentDiagnostic(
       providerID: descriptor.id,
@@ -315,7 +348,7 @@ enum AgentDiagnosticFactory {
       detail: detail,
       installation: installation,
       probedAt: date,
-      remediations: remediations(for: state, descriptor: descriptor)
+      remediations: remediations(for: state, hints: hints)
     )
     return AgentAvailability(state: state, installation: installation, diagnostic: diagnostic)
   }
@@ -342,19 +375,24 @@ enum AgentDiagnosticFactory {
 
   private static func remediations(
     for state: AgentAvailabilityState,
-    descriptor: AgentDescriptor
+    hints: AgentRemediationHints
   ) -> [AgentRemediation] {
     switch state {
     case .available:
       return [.retryDetection]
     case .outdated(_, let required):
-      return [.update(minimumVersion: required, documentationURL: nil), .retryDetection]
+      return [
+        .update(minimumVersion: required, documentationURL: hints.documentationURL),
+        .retryDetection,
+      ]
     case .notFound:
-      return [.install(documentationURL: nil), .defineExecutablePath, .retryDetection]
+      return [
+        .install(documentationURL: hints.documentationURL), .defineExecutablePath, .retryDetection,
+      ]
     case .notExecutable:
       return [.defineExecutablePath, .retryDetection]
     case .unauthenticated:
-      return [.authenticate(command: nil), .retryDetection]
+      return [.authenticate(command: hints.authenticationCommandLine), .retryDetection]
     case .probeFailed:
       return [.defineExecutablePath, .retryDetection]
     }
