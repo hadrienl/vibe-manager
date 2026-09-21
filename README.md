@@ -65,6 +65,12 @@ diagnostics, the registry and the built-in mock agent are documented in
 mock provider is registered in Debug builds; set `VIBE_DISABLE_MOCK_AGENT` to hide it, or
 `VIBE_ENABLE_MOCK_AGENT` to expose it in a Release build.
 
+Two real agents ship with the application, each documented with the choices its CLI forced:
+[`docs/architecture/0005-codex-provider.md`](docs/architecture/0005-codex-provider.md) and
+[`docs/architecture/0006-claude-code-provider.md`](docs/architecture/0006-claude-code-provider.md).
+Neither reads a credential, injects an API key, or passes a flag that lowers the permissions the
+user configured for their own CLI.
+
 ## Configuration
 
 Shared, Debug and Release build settings live in `Configuration/*.xcconfig`. Local signing
