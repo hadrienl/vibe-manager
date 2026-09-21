@@ -1,20 +1,16 @@
 import Foundation
 
-public enum CodexHome {
-  static let overrideKey = "CODEX_HOME"
+public enum ClaudeCodeHome {
+  static let overrideKey = "CLAUDE_CONFIG_DIR"
 
   public static func directory(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> URL {
     AgentHomeDirectory.directory(
       overrideKey: overrideKey,
-      defaultComponent: ".codex",
+      defaultComponent: ".claude",
       environment: environment
     )
-  }
-
-  public static func resolvedOverride(_ value: String?, home: String) -> String? {
-    AgentHomeDirectory.resolvedOverride(value, home: home)
   }
 
   public static func sanitized(
@@ -23,15 +19,20 @@ public enum CodexHome {
     AgentHomeDirectory.sanitized(overrideKey: overrideKey, environment: environment)
   }
 
-  public static func sessionsDirectory(
+  /// Where the CLI caches the model catalog of the signed in account.
+  /// Where the CLI writes a conversation's transcript, one directory per working directory.
+  public static func projectsDirectory(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> URL {
-    directory(environment: environment).appendingPathComponent("sessions", isDirectory: true)
+    directory(environment: environment)
+      .appendingPathComponent("projects", isDirectory: true)
   }
 
-  public static func modelsCacheURL(
+  public static func modelCatalogDirectory(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> URL {
-    directory(environment: environment).appendingPathComponent("models_cache.json")
+    directory(environment: environment)
+      .appendingPathComponent("cache", isDirectory: true)
+      .appendingPathComponent("model-catalog", isDirectory: true)
   }
 }

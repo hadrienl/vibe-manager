@@ -36,7 +36,10 @@ final class AppEnvironment {
 
   /// The only place a provider is registered. Adding an agent stops here.
   private static func providers() -> [any AgentProvider] {
-    var providers: [any AgentProvider] = [CodexAgentProvider.make()]
+    var providers: [any AgentProvider] = [
+      ClaudeCodeAgentProvider.make(),
+      CodexAgentProvider.make(),
+    ]
     if MockAgentProvider.isEnabled() {
       providers.append(MockAgentProvider())
     }
