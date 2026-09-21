@@ -3,9 +3,8 @@
 Vibe Manager is a native macOS application for running several coding-agent sessions while keeping
 their terminals, repositories and tasks organized in one place.
 
-The project is currently at its foundation stage. The application launches an empty SwiftUI state
-backed by an in-memory session repository; Claude, Codex, terminal and Git integrations are tracked
-as separate V1 issues.
+The application launches a SwiftUI state backed by an atomic, versioned local session store.
+Claude, Codex, terminal and live Git integrations are tracked as separate V1 issues.
 
 ## Requirements
 
@@ -56,9 +55,12 @@ dependencies directed toward the application and domain layers. See
 [`docs/architecture/0001-project-foundation.md`](docs/architecture/0001-project-foundation.md)
 for the decision record and rationale.
 
+Session metadata is stored in the user's Application Support directory. The format, migration,
+backup and privacy decisions are documented in
+[`docs/architecture/0002-session-persistence.md`](docs/architecture/0002-session-persistence.md).
+
 ## Configuration
 
 Shared, Debug and Release build settings live in `Configuration/*.xcconfig`. Local signing
 identities and team IDs must be supplied through Xcode user settings or an untracked local override;
 never commit them. The V1 is intended for direct distribution and does not enable App Sandbox.
-

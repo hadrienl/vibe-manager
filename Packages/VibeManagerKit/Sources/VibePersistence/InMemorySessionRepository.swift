@@ -9,10 +9,29 @@ public actor InMemorySessionRepository: SessionRepository {
   }
 
   public func sessions() -> [WorkSession] {
-    Array(storage.values)
+    storage.values.sorted { lhs, rhs in
+      if lhs.updatedAt == rhs.updatedAt {
+        return lhs.id.description < rhs.id.description
+      }
+      return lhs.updatedAt > rhs.updatedAt
+    }
+  }
+
+  public func session(id: SessionID) -> WorkSession? {
+    storage[id]
   }
 
   public func save(_ session: WorkSession) {
     storage[session.id] = session
+  }
+
+  public func mutate(
+    id: SessionID,
+    _ transform: @Sendable (inout WorkSession) throws -> Void
+  ) async throws -> WorkSession? {
+    guard var session = storage[id] else { return nil }
+    try transform(&session)
+    storage[id] = session
+    return session
   }
 }

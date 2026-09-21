@@ -26,12 +26,22 @@ public struct RootView: View {
           systemImage: "hammer",
           description: Text("Loaded \(sessions.count) work sessions.")
         )
-      case .failed(let message):
-        ContentUnavailableView(
-          "Sessions unavailable",
-          systemImage: "exclamationmark.triangle",
-          description: Text(message)
-        )
+      case .failed(let message, let canRestoreBackup):
+        ContentUnavailableView {
+          Label("Sessions unavailable", systemImage: "exclamationmark.triangle")
+        } description: {
+          Text(message)
+        } actions: {
+          if canRestoreBackup {
+            Button("Restore Backup") {
+              Task { await model.restoreBackup() }
+            }
+            .buttonStyle(.borderedProminent)
+          }
+          Button("Try Again") {
+            Task { await model.reload() }
+          }
+        }
       }
     }
     .frame(minWidth: 760, minHeight: 480)
