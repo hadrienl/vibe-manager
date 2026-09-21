@@ -15,6 +15,10 @@ private actor FakeSessionRepository: SessionRepository {
     values
   }
 
+  func session(id: SessionID) -> WorkSession? {
+    values.first { $0.id == id }
+  }
+
   func save(_ session: WorkSession) {
     values.append(session)
   }

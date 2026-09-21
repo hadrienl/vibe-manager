@@ -6,7 +6,7 @@ final class AppEnvironment {
   let appModel: AppModel
 
   init() {
-    let repository = InMemorySessionRepository()
+    let repository = FileSessionRepository()
     appModel = AppModel(repository: repository)
   }
 }

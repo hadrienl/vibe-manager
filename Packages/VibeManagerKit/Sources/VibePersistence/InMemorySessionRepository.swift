@@ -9,7 +9,16 @@ public actor InMemorySessionRepository: SessionRepository {
   }
 
   public func sessions() -> [WorkSession] {
-    Array(storage.values)
+    storage.values.sorted { lhs, rhs in
+      if lhs.updatedAt == rhs.updatedAt {
+        return lhs.id.description < rhs.id.description
+      }
+      return lhs.updatedAt > rhs.updatedAt
+    }
+  }
+
+  public func session(id: SessionID) -> WorkSession? {
+    storage[id]
   }
 
   public func save(_ session: WorkSession) {
