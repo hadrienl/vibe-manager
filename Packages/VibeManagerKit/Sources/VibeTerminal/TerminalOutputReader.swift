@@ -52,18 +52,18 @@ final class TerminalOutputReader: @unchecked Sendable {
     source.resume()
   }
 
+  // Every suspend, resume and cancel of the dispatch source happens while the lock is
+  // held, so the source can never be resumed before the matching suspend has landed.
+  // None of those calls blocks or runs a handler inline, and the reader queue never
+  // takes the lock around them, so holding it here cannot deadlock.
   func didConsume(byteCount: Int) {
     lock.lock()
     outstandingByteCount = max(0, outstandingByteCount - byteCount)
-    let shouldResume = isSuspended && outstandingByteCount <= Self.lowWaterMark && !isFinished
-    if shouldResume {
+    if isSuspended, outstandingByteCount <= Self.lowWaterMark, !isFinished {
       isSuspended = false
-    }
-    lock.unlock()
-
-    if shouldResume {
       source.resume()
     }
+    lock.unlock()
   }
 
   func finish() {
@@ -73,15 +73,14 @@ final class TerminalOutputReader: @unchecked Sendable {
       return
     }
     isFinished = true
-    let wasSuspended = isSuspended
-    isSuspended = false
-    lock.unlock()
-
     // A suspended source never runs its cancel handler, and the descriptor would leak.
-    if wasSuspended {
+    if isSuspended {
+      isSuspended = false
       source.resume()
     }
     source.cancel()
+    lock.unlock()
+
     continuation.finish()
   }
 
@@ -152,24 +151,27 @@ final class TerminalOutputReader: @unchecked Sendable {
     let bytes = pending
     pending.removeAll(keepingCapacity: true)
     isFlushScheduled = false
-    outstandingByteCount += bytes.count
-    let shouldSuspend =
-      !isSuspended && !isFinished && outstandingByteCount > Self.highWaterMark && !endOfFile
-    if shouldSuspend {
-      isSuspended = true
-    }
     let hasFinished = isFinished
-    lock.unlock()
-
-    if !bytes.isEmpty, !hasFinished {
-      continuation.yield(.bytes(bytes))
+    // Bytes that are never yielded are never acknowledged either, so they must not
+    // raise the outstanding count.
+    if !hasFinished {
+      outstandingByteCount += bytes.count
     }
     // Suspending stops draining the kernel buffer, which blocks the writing process instead of
-    // letting the application accumulate unbounded output in memory.
-    if shouldSuspend {
+    // letting the application accumulate unbounded output in memory. It has to happen before the
+    // bytes leave the lock: the consumer acknowledges them on another thread and would otherwise
+    // resume a source that is not suspended yet.
+    if !isSuspended, !hasFinished, !endOfFile, outstandingByteCount > Self.highWaterMark {
+      isSuspended = true
       source.suspend()
     }
-    if endOfFile, !hasFinished {
+    lock.unlock()
+
+    guard !hasFinished else { return }
+    if !bytes.isEmpty {
+      continuation.yield(.bytes(bytes))
+    }
+    if endOfFile {
       continuation.yield(.endOfFile)
     }
   }
