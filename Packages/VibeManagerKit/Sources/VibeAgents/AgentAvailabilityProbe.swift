@@ -54,36 +54,50 @@ public actor AgentAvailabilityProbe {
   }
 
   public func availability(forceRefresh: Bool) async -> AgentAvailability {
-    if !forceRefresh, let cached, let cachedAt, !isExpired(cachedAt) {
-      return cached
-    }
-    if let inFlight, !forceRefresh {
-      return await inFlight.value
+    if forceRefresh {
+      // A forced refresh supersedes the detection in flight. Letting both run would leave the
+      // cache to whichever finishes last, so a slow probe started before the user installed the
+      // agent could overwrite the fresh result that found it.
+      invalidate()
     }
 
-    let path = userDefinedPath
-    let startedGeneration = generation
-    let task = Task { [specification, locator, probe, environment, descriptor, now] in
-      await Self.detect(
-        descriptor: descriptor,
-        specification: specification,
-        locator: locator,
-        probe: probe,
-        environment: environment,
-        userDefinedPath: path,
-        now: now
-      )
-    }
-    inFlight = task
-    let availability = await task.value
+    while true {
+      if let cached, let cachedAt, !isExpired(cachedAt) {
+        return cached
+      }
 
-    // The actor can be re-entered while the detection runs: only the task that still
-    // represents the current configuration is allowed to publish its result.
-    guard startedGeneration == generation else { return availability }
-    inFlight = nil
-    cached = availability
-    cachedAt = now()
-    return availability
+      let startedGeneration = generation
+      if let inFlight {
+        let availability = await inFlight.value
+        // An invalidation while waiting means this result describes a configuration that no
+        // longer applies — including the cancellation it caused, which is not a real failure.
+        guard startedGeneration == generation else { continue }
+        return availability
+      }
+
+      let path = userDefinedPath
+      let task = Task { [specification, locator, probe, environment, descriptor, now] in
+        await Self.detect(
+          descriptor: descriptor,
+          specification: specification,
+          locator: locator,
+          probe: probe,
+          environment: environment,
+          userDefinedPath: path,
+          now: now
+        )
+      }
+      inFlight = task
+      let availability = await task.value
+
+      // The actor can be re-entered while the detection runs: only the task that still
+      // represents the current configuration is allowed to publish its result.
+      guard startedGeneration == generation else { continue }
+      inFlight = nil
+      cached = availability
+      cachedAt = now()
+      return availability
+    }
   }
 
   private func isExpired(_ date: Date) -> Bool {

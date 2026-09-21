@@ -99,6 +99,28 @@ final class CountingLocator: ExecutableLocator, @unchecked Sendable {
 }
 
 /// A clock the test moves forward by hand, to exercise cache expiry deterministically.
+/// Returns a different location on each call, optionally after a delay, so that a slow detection
+/// can be observed racing against a fresher one.
+final class ScriptedLocator: ExecutableLocator, @unchecked Sendable {
+  private let lock = NSLock()
+  private var responses: [(location: ExecutableLocation, delay: Duration)]
+  private var last: (location: ExecutableLocation, delay: Duration)
+
+  init(responses: [(location: ExecutableLocation, delay: Duration)]) {
+    precondition(!responses.isEmpty)
+    self.responses = responses
+    last = responses[responses.count - 1]
+  }
+
+  func locate(_ plan: ExecutableSearchPlan) async -> ExecutableLocation {
+    let response = lock.withLock { responses.isEmpty ? last : responses.removeFirst() }
+    if response.delay != .zero {
+      try? await Task.sleep(for: response.delay)
+    }
+    return response.location
+  }
+}
+
 final class MutableClock: @unchecked Sendable {
   private let lock = NSLock()
   private var current: Date

@@ -29,23 +29,41 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
       return inspect(path: userDefinedPath, source: .userDefined)
     }
 
+    // A file that exists but cannot be run must not shadow a working installation further down
+    // the search order: a leftover from a failed install would otherwise mask the real binary.
+    // It is only reported when nothing else matches.
+    var shadowed: ExecutableLocation?
+
+    func consider(path: String, source: AgentDetectionSource) -> ExecutableLocation? {
+      let location = inspect(path: path, source: source)
+      switch location {
+      case .found:
+        return location
+      case .notExecutable:
+        shadowed = shadowed ?? location
+        return nil
+      case .notFound:
+        return nil
+      }
+    }
+
     for directory in plan.candidateDirectories {
       let path = expand(directory) + "/" + plan.binaryName
       guard fileSystem.fileExists(atPath: path) else { continue }
-      return inspect(path: path, source: .candidateDirectory)
+      if let location = consider(path: path, source: .candidateDirectory) { return location }
     }
 
     for directory in (environment["PATH"] ?? "").split(separator: ":") {
       let path = expand(String(directory)) + "/" + plan.binaryName
       guard fileSystem.fileExists(atPath: path) else { continue }
-      return inspect(path: path, source: .processPath)
+      if let location = consider(path: path, source: .processPath) { return location }
     }
 
     guard plan.allowsLoginShellFallback, let path = await loginShellPath(for: plan.binaryName)
     else {
-      return .notFound
+      return shadowed ?? .notFound
     }
-    return inspect(path: path, source: .loginShell)
+    return consider(path: path, source: .loginShell) ?? shadowed ?? .notFound
   }
 
   private func inspect(path: String, source: AgentDetectionSource) -> ExecutableLocation {

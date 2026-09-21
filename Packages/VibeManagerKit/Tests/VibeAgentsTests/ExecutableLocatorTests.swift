@@ -30,6 +30,43 @@ struct ExecutableLocatorTests {
     #expect(location == .found(path: "/custom/stub-agent", source: .userDefined))
   }
 
+  @Test("A non executable candidate does not shadow a working installation")
+  func nonExecutableCandidateDoesNotShadow() async {
+    let fileSystem = StubFileSystem(
+      executables: ["/usr/bin/stub-agent"],
+      nonExecutableFiles: ["/opt/homebrew/bin/stub-agent"]
+    )
+    let locator = FileSystemExecutableLocator(fileSystem: fileSystem, environment: environment)
+
+    let location = await locator.locate(
+      ExecutableSearchPlan(
+        binaryName: "stub-agent",
+        candidateDirectories: ["/opt/homebrew/bin"],
+        allowsLoginShellFallback: false
+      )
+    )
+
+    #expect(location == .found(path: "/usr/bin/stub-agent", source: .processPath))
+  }
+
+  @Test("A non executable file is still reported when nothing else matches")
+  func nonExecutableIsReportedAsALastResort() async {
+    let fileSystem = StubFileSystem(nonExecutableFiles: ["/opt/homebrew/bin/stub-agent"])
+    let locator = FileSystemExecutableLocator(fileSystem: fileSystem, environment: environment)
+
+    let location = await locator.locate(
+      ExecutableSearchPlan(
+        binaryName: "stub-agent",
+        candidateDirectories: ["/opt/homebrew/bin"],
+        allowsLoginShellFallback: false
+      )
+    )
+
+    #expect(
+      location == .notExecutable(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)
+    )
+  }
+
   @Test("Candidate directories are probed before the inherited PATH")
   func candidateDirectoriesBeforePath() async {
     let fileSystem = StubFileSystem(

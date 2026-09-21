@@ -340,6 +340,52 @@ struct AgentAvailabilityProbeTests {
 
     #expect(locator.invocationCount == 2)
   }
+
+  @Test("A forced refresh is not overwritten by the slower detection it supersedes")
+  func forcedRefreshSupersedesTheDetectionInFlight() async throws {
+    let locator = ScriptedLocator(responses: [
+      (.notFound, .milliseconds(300)),
+      (.found(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory), .zero),
+    ])
+    let subject = probe(
+      locator: locator,
+      processProbe: StubProcessProbe(
+        defaultResponse: .success(ProbeResult(exitCode: 0, standardOutput: "stub-agent 2.4.1"))
+      )
+    )
+
+    async let pending = subject.availability(forceRefresh: false)
+    try await Task.sleep(for: .milliseconds(50))
+    let refreshed = await subject.availability(forceRefresh: true)
+    _ = await pending
+
+    #expect(refreshed.state == .available)
+    // The slow detection landed last; it must not have repopulated the cache with its result.
+    #expect(await subject.availability(forceRefresh: false).state == .available)
+  }
+
+  @Test("A caller waiting on an invalidated detection is re-probed, not handed its cancellation")
+  func waiterIsReprobedAfterAnInvalidation() async throws {
+    let locator = ScriptedLocator(responses: [
+      (.notFound, .milliseconds(300)),
+      (.found(path: "/custom/bin/stub-agent", source: .userDefined), .zero),
+    ])
+    let subject = probe(
+      locator: locator,
+      processProbe: StubProcessProbe(
+        defaultResponse: .success(ProbeResult(exitCode: 0, standardOutput: "stub-agent 2.4.1"))
+      )
+    )
+
+    async let owner = subject.availability(forceRefresh: false)
+    try await Task.sleep(for: .milliseconds(50))
+    async let waiter = subject.availability(forceRefresh: false)
+    try await Task.sleep(for: .milliseconds(50))
+    await subject.setUserDefinedPath("/custom/bin/stub-agent")
+
+    let results = await [owner, waiter]
+    #expect(results.allSatisfy { $0.state == .available })
+  }
 }
 
 /// Answers the version probe and the authentication probe differently.
@@ -359,4 +405,5 @@ private struct StubAuthenticationProbe: ProcessProbe {
     }
     return ProbeResult(exitCode: 0, standardOutput: versionOutput)
   }
+
 }
