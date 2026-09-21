@@ -52,7 +52,10 @@ let package = Package(
     ),
     .testTarget(
       name: "VibeAgentsTests",
-      dependencies: ["VibeAgents", "VibeApplication", "VibeDomain"]
+      // VibeTerminal is a test only dependency: the Codex integration test runs the launch
+      // plan through the real supervisor, which is the only way to prove that no escaping
+      // happens between a provider and a process.
+      dependencies: ["VibeAgents", "VibeApplication", "VibeDomain", "VibeTerminal"]
     ),
     .testTarget(
       name: "VibeTerminalTests",

@@ -14,6 +14,10 @@ public struct CommandLineAgentSpecification: Sendable {
   public let authenticationArguments: [String]?
   /// Extra environment keys this CLI needs on top of the shared allow list.
   public let additionalEnvironmentKeys: Set<String>
+  /// Where a user can read how to install or update this CLI.
+  public let documentationURL: URL?
+  /// The command a user types to sign in, shown by the authentication remediation.
+  public let authenticationCommandLine: String?
 
   public init(
     binaryName: String,
@@ -21,7 +25,9 @@ public struct CommandLineAgentSpecification: Sendable {
     versionArguments: [String] = ["--version"],
     versionTimeout: Duration = .seconds(5),
     authenticationArguments: [String]? = nil,
-    additionalEnvironmentKeys: Set<String> = []
+    additionalEnvironmentKeys: Set<String> = [],
+    documentationURL: URL? = nil,
+    authenticationCommandLine: String? = nil
   ) {
     self.binaryName = binaryName
     self.candidateDirectories = candidateDirectories
@@ -29,6 +35,8 @@ public struct CommandLineAgentSpecification: Sendable {
     self.versionTimeout = versionTimeout
     self.authenticationArguments = authenticationArguments
     self.additionalEnvironmentKeys = additionalEnvironmentKeys
+    self.documentationURL = documentationURL
+    self.authenticationCommandLine = authenticationCommandLine
   }
 
   /// Where developer tools usually land on macOS, including version manager shims.
