@@ -33,14 +33,46 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 }
 
+// Input and resizes reach the session through one serial channel. Unstructured tasks have no
+// ordering guarantee between them, so a task per delegate callback would let fast typing, a pasted
+// chunk split across several callbacks, or two resizes during a window drag arrive out of order.
+private enum TerminalCommand: Sendable {
+  case write([UInt8])
+  case resize(TerminalSize)
+}
+
 @MainActor
 public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   private let session: any TerminalSession
   private weak var view: TerminalView?
   private var eventTask: Task<Void, Never>?
+  private let commands: AsyncStream<TerminalCommand>.Continuation
+  private let commandTask: Task<Void, Never>
 
   init(session: any TerminalSession) {
     self.session = session
+
+    var continuation: AsyncStream<TerminalCommand>.Continuation?
+    let stream = AsyncStream<TerminalCommand> { continuation = $0 }
+    guard let continuation else {
+      preconditionFailure("AsyncStream did not provide a continuation")
+    }
+    commands = continuation
+    commandTask = Task { [session] in
+      for await command in stream {
+        switch command {
+        case .write(let bytes):
+          await session.write(bytes)
+        case .resize(let size):
+          await session.resize(to: size)
+        }
+      }
+    }
+  }
+
+  deinit {
+    commands.finish()
+    commandTask.cancel()
   }
 
   func bind(to view: TerminalView) {
@@ -72,16 +104,11 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   }
 
   nonisolated public func send(source: TerminalView, data: ArraySlice<UInt8>) {
-    let bytes = [UInt8](data)
-    Task { [session] in
-      await session.write(bytes)
-    }
+    commands.yield(.write([UInt8](data)))
   }
 
   nonisolated public func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
-    Task { [session] in
-      await session.resize(to: TerminalSize(columns: newCols, rows: newRows))
-    }
+    commands.yield(.resize(TerminalSize(columns: newCols, rows: newRows)))
   }
 
   nonisolated public func scrolled(source: TerminalView, position: Double) {}

@@ -27,6 +27,7 @@ public final class TerminalPaneModel {
   private let supervisor: any TerminalSupervisor
   private let spec: TerminalSpec
   private var stateTask: Task<Void, Never>?
+  private var isStarting = false
 
   public init(sessionID: SessionID, supervisor: any TerminalSupervisor, spec: TerminalSpec) {
     self.sessionID = sessionID
@@ -34,9 +35,16 @@ public final class TerminalPaneModel {
     self.spec = spec
   }
 
+  // A pane whose process has finished can be started again: the guard keys on whether a session is
+  // still running, not on whether one was ever created.
   public func start() async {
-    guard session == nil else { return }
+    guard !isStarting, session == nil || !status.isRunning else { return }
+    isStarting = true
+    defer { isStarting = false }
 
+    stateTask?.cancel()
+    stateTask = nil
+    session = nil
     status = .starting
     failure = nil
     do {
@@ -58,6 +66,11 @@ public final class TerminalPaneModel {
 
   public func stop() async {
     await supervisor.stop(id: sessionID, gracePeriod: .seconds(3))
+    // The supervisor has dropped the session; make sure the pane reports the outcome even if the
+    // final state change never reached the event stream.
+    if let session {
+      apply(await session.state())
+    }
   }
 
   private func observe(_ session: any TerminalSession) {
@@ -69,6 +82,10 @@ public final class TerminalPaneModel {
         guard case .stateChanged(let state) = event else { continue }
         self?.apply(state)
       }
+      // The stream ends when the session finalises, and a stalled subscriber may have missed the
+      // last state change, so read the settled state rather than trusting the events alone.
+      guard !Task.isCancelled else { return }
+      self?.apply(await session.state())
     }
   }
 

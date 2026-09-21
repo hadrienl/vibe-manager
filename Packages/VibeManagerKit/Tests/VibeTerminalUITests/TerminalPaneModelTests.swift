@@ -46,6 +46,7 @@ private actor FakeTerminalSession: TerminalSession {
 private actor FakeSupervisor: TerminalSupervisor {
   private let failure: TerminalError?
   private var sessions: [SessionID: FakeTerminalSession] = [:]
+  private(set) var startCount = 0
 
   init(failure: TerminalError? = nil) {
     self.failure = failure
@@ -53,6 +54,7 @@ private actor FakeSupervisor: TerminalSupervisor {
 
   func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
     if let failure { throw failure }
+    startCount += 1
     let session = FakeTerminalSession(id: id)
     sessions[id] = session
     return session
@@ -117,4 +119,41 @@ func paneReportsLaunchFailure() async {
   #expect(model.failure?.message.contains("/bin/nope") == true)
   #expect(model.failure?.suggestion?.isEmpty == false)
   #expect(model.status == .failed(message: model.failure?.message ?? ""))
+}
+
+@MainActor
+@Test("A pane whose process has finished can be started again")
+func paneRestartsAfterItsProcessFinished() async throws {
+  let id = SessionID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(sessionID: id, supervisor: supervisor, spec: makeSpec())
+
+  await model.start()
+  #expect(model.session != nil)
+
+  await supervisor.emit(.exited(code: 0), for: id)
+  try await Task.sleep(for: .milliseconds(50))
+  #expect(model.status == .exited(code: 0))
+
+  await model.start()
+  #expect(await supervisor.startCount == 2)
+  #expect(model.session != nil)
+  #expect(model.status == .starting)
+}
+
+@MainActor
+@Test("Starting a pane that is already running changes nothing")
+func paneIgnoresRedundantStart() async throws {
+  let id = SessionID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(sessionID: id, supervisor: supervisor, spec: makeSpec())
+
+  await model.start()
+  await supervisor.emit(.running(processIdentifier: 42), for: id)
+  try await Task.sleep(for: .milliseconds(50))
+
+  await model.start()
+
+  #expect(await supervisor.startCount == 1)
+  #expect(model.status == .running)
 }

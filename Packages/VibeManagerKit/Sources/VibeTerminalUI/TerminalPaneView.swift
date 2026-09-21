@@ -32,9 +32,11 @@ public struct TerminalPaneView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       Divider()
-      TerminalStatusBar(status: model.status) {
-        Task { await model.stop() }
-      }
+      TerminalStatusBar(
+        status: model.status,
+        stop: { Task { await model.stop() } },
+        restart: { Task { await model.start() } }
+      )
     }
     .task {
       await model.start()
@@ -45,6 +47,7 @@ public struct TerminalPaneView: View {
 private struct TerminalStatusBar: View {
   let status: TerminalPaneModel.Status
   let stop: () -> Void
+  let restart: () -> Void
 
   var body: some View {
     HStack(spacing: 8) {
@@ -56,6 +59,9 @@ private struct TerminalStatusBar: View {
       Spacer()
       if status.isRunning {
         Button("Stop", action: stop)
+          .controlSize(.small)
+      } else {
+        Button("Restart", action: restart)
           .controlSize(.small)
       }
     }
