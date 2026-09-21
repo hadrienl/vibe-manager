@@ -8,6 +8,7 @@ public enum SessionStoreError: Error, Equatable, LocalizedError, Sendable {
   case invalidSession
   case unsupportedSchemaVersion(Int)
   case recoveryUnavailable
+  case recoveryNotNeeded
 
   public var errorDescription: String? {
     switch self {
@@ -23,6 +24,8 @@ public enum SessionStoreError: Error, Equatable, LocalizedError, Sendable {
       return "The session store was created by a newer version of Vibe Manager."
     case .recoveryUnavailable:
       return "No valid session backup is available."
+    case .recoveryNotNeeded:
+      return "The session store is healthy, so there is nothing to restore."
     }
   }
 }
@@ -46,7 +49,13 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   }
 
   public static func defaultStoreURL() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    let applicationSupport =
+      FileManager.default
+      .urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+      ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+      .appendingPathComponent("Library/Application Support", isDirectory: true)
+    return
+      applicationSupport
       .appendingPathComponent("com.hadrienl.VibeManager", isDirectory: true)
       .appendingPathComponent("sessions.json", isDirectory: false)
   }
@@ -68,32 +77,56 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       } else {
         current.append(session)
       }
-      let data = try codec.encode(sessions: current.sorted(by: Self.sessionOrdering))
-      try commit(data, preservingCurrentAsBackup: true)
-    } catch let error as SessionStoreError {
-      throw error
-    } catch let error as SessionStoreCodecError {
-      throw mapCodecError(error)
-    } catch is WorkSessionValidationError {
-      throw SessionStoreError.invalidSession
+      try persist(current)
     } catch {
-      throw SessionStoreError.cannotAccessStore
+      throw mapStoreError(error)
     }
+  }
+
+  public func mutate(
+    id: SessionID,
+    _ transform: @Sendable (inout WorkSession) throws -> Void
+  ) async throws -> WorkSession? {
+    var current: [WorkSession]
+    do {
+      current = try loadSessions()
+    } catch {
+      throw mapStoreError(error)
+    }
+
+    guard let index = current.firstIndex(where: { $0.id == id }) else { return nil }
+    var session = current[index]
+    try transform(&session)
+
+    do {
+      try session.validate()
+      current[index] = session
+      try persist(current)
+    } catch {
+      throw mapStoreError(error)
+    }
+    return session
   }
 
   public func recoveryStatus() -> SessionStoreRecoveryStatus {
-    let manager = FileManager.default
-    guard manager.fileExists(atPath: storeURL.path) else { return .notNeeded }
-    do {
-      let data = try Data(contentsOf: storeURL)
-      _ = try codec.decode(data)
+    guard FileManager.default.fileExists(atPath: storeURL.path), !storeIsReadable() else {
       return .notNeeded
-    } catch {
-      return backupIsValid() ? .backupAvailable : .unavailable
     }
+    return backupIsValid() ? .backupAvailable : .unavailable
   }
 
   public func restoreBackup() throws {
+    // Restoring rewinds the store to its previous state and quarantines the current
+    // document, so it must never run against a store that is still readable.
+    switch recoveryStatus() {
+    case .notNeeded:
+      throw SessionStoreError.recoveryNotNeeded
+    case .unavailable:
+      throw SessionStoreError.recoveryUnavailable
+    case .backupAvailable:
+      break
+    }
+
     guard let backupData = try? Data(contentsOf: backupURL),
       let decoded = try? codec.decode(backupData)
     else {
@@ -128,22 +161,25 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     do {
       let decoded = try codec.decode(data)
       if decoded.requiresRewrite {
-        let migratedData = try codec.encode(sessions: decoded.sessions)
-        try commit(migratedData, preservingCurrentAsBackup: true)
+        // Reading must succeed even when the migrated document cannot be written
+        // back, for instance on a full disk or a read-only container.
+        if let migratedData = try? codec.encode(sessions: decoded.sessions) {
+          try? commit(migratedData, preservingCurrentAsBackup: true)
+        }
       }
       return decoded.sessions
     } catch let error as SessionStoreCodecError {
-      switch error {
-      case .unsupportedSchemaVersion(let version):
-        throw SessionStoreError.unsupportedSchemaVersion(version)
-      case .invalidStore:
-        throw SessionStoreError.corruptedStore(backupAvailable: backupIsValid())
-      }
+      throw mapCodecError(error)
     } catch let error as SessionStoreError {
       throw error
     } catch {
       throw SessionStoreError.cannotAccessStore
     }
+  }
+
+  private func persist(_ sessions: [WorkSession]) throws {
+    let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
+    try commit(data, preservingCurrentAsBackup: true)
   }
 
   private func commit(_ data: Data, preservingCurrentAsBackup: Bool) throws {
@@ -174,8 +210,13 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       throw SessionStoreError.cannotAccessStore
     }
     let handle = try FileHandle(forWritingTo: temporaryURL)
-    try handle.write(contentsOf: data)
-    try handle.synchronize()
+    do {
+      try handle.write(contentsOf: data)
+      try handle.synchronize()
+    } catch {
+      try? handle.close()
+      throw error
+    }
     try handle.close()
 
     if invokingInterruption {
@@ -202,9 +243,28 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
   }
 
+  private func storeIsReadable() -> Bool {
+    guard FileManager.default.fileExists(atPath: storeURL.path) else { return false }
+    guard let data = try? Data(contentsOf: storeURL) else { return false }
+    return (try? codec.decode(data)) != nil
+  }
+
   private func backupIsValid() -> Bool {
     guard let data = try? Data(contentsOf: backupURL) else { return false }
     return (try? codec.decode(data)) != nil
+  }
+
+  private func mapStoreError(_ error: Error) -> Error {
+    switch error {
+    case let error as SessionStoreError:
+      return error
+    case let error as SessionStoreCodecError:
+      return mapCodecError(error)
+    case is WorkSessionValidationError:
+      return SessionStoreError.invalidSession
+    default:
+      return SessionStoreError.cannotAccessStore
+    }
   }
 
   private func mapCodecError(_ error: SessionStoreCodecError) -> SessionStoreError {

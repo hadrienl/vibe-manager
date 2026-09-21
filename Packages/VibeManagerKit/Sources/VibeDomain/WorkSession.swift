@@ -186,7 +186,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   public var initialPrompt: String
   public var agent: SessionAgentConfiguration?
   public var appearance: SessionAppearance
-  public var lifecycle: SessionLifecycle
+  public private(set) var lifecycle: SessionLifecycle
   public var repositories: [RepositoryContext]
   public var notes: String?
   public var template: PromptTemplateReference?

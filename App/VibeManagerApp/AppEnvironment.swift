@@ -7,6 +7,6 @@ final class AppEnvironment {
 
   init() {
     let repository = FileSessionRepository()
-    appModel = AppModel(repository: repository)
+    appModel = AppModel(repository: repository, recovery: repository)
   }
 }

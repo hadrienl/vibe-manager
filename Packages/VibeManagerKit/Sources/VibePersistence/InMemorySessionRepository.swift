@@ -24,4 +24,14 @@ public actor InMemorySessionRepository: SessionRepository {
   public func save(_ session: WorkSession) {
     storage[session.id] = session
   }
+
+  public func mutate(
+    id: SessionID,
+    _ transform: @Sendable (inout WorkSession) throws -> Void
+  ) async throws -> WorkSession? {
+    guard var session = storage[id] else { return nil }
+    try transform(&session)
+    storage[id] = session
+    return session
+  }
 }

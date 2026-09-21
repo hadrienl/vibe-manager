@@ -201,3 +201,74 @@ func duplicateIdentifiersAreRejected() async throws {
   }
   #expect(try Data(contentsOf: storeURL) == duplicateData)
 }
+
+@Test("A healthy store refuses to be rewound to its backup")
+func restoreIsRefusedOnHealthyStore() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let repository = FileSessionRepository(storeURL: storeURL)
+  let original = makeCompleteSession(name: "Original")
+  var updated = original
+  updated.name = "Updated"
+
+  try await repository.save(original)
+  try await repository.save(updated)
+
+  await #expect(throws: SessionStoreError.recoveryNotNeeded) {
+    try await repository.restoreBackup()
+  }
+  #expect(try await repository.sessions() == [updated])
+}
+
+@Test("A migration that cannot be written back still returns its sessions")
+func migrationSurvivesUnwritableStore() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let legacy = """
+    {
+      "schemaVersion": 0,
+      "savedAt": "2026-09-21T10:00:00.000Z",
+      "sessions": [
+        {
+          "id": "88E8C16B-2824-4CCC-8EF4-C7A1C16EA3AD",
+          "name": "Legacy session",
+          "status": "closed",
+          "createdAt": "2026-09-21T09:00:00.000Z",
+          "updatedAt": "2026-09-21T10:00:00.000Z"
+        }
+      ]
+    }
+    """
+  let legacyData = Data(legacy.utf8)
+  try legacyData.write(to: storeURL)
+  let repository = FileSessionRepository(storeURL: storeURL) {
+    throw TestWriteError.interrupted
+  }
+
+  let sessions = try await repository.sessions()
+
+  #expect(sessions.map(\.name) == ["Legacy session"])
+  #expect(try Data(contentsOf: storeURL) == legacyData)
+}
+
+@Test("Concurrent mutations are serialized by the store")
+func concurrentMutationsAreSerialized() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let repository = FileSessionRepository(storeURL: storeURL)
+  let session = makeCompleteSession()
+  try await repository.save(session)
+
+  await withTaskGroup(of: Void.self) { group in
+    for _ in 0..<10 {
+      group.addTask {
+        _ = try? await repository.mutate(id: session.id) { stored in
+          stored.notes = (stored.notes ?? "") + "x"
+        }
+      }
+    }
+  }
+
+  let reloaded = try await repository.session(id: session.id)
+  #expect(reloaded?.notes == "A user-authored note" + String(repeating: "x", count: 10))
+}

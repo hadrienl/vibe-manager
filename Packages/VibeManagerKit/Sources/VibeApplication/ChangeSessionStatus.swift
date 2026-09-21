@@ -40,22 +40,23 @@ public struct ChangeSessionStatus: Sendable {
     id: SessionID,
     action: SessionLifecycleAction
   ) async throws -> WorkSession {
-    guard var session = try await repository.session(id: id) else {
-      throw ChangeSessionStatusError.sessionNotFound(id)
+    let date = clock.now()
+    let updated = try await repository.mutate(id: id) { session in
+      switch action {
+      case .close:
+        try session.close(at: date)
+      case .reopen:
+        try session.reopen(at: date)
+      case .archive:
+        try session.archive(at: date)
+      case .restore:
+        try session.restore(at: date)
+      }
     }
 
-    let date = clock.now()
-    switch action {
-    case .close:
-      try session.close(at: date)
-    case .reopen:
-      try session.reopen(at: date)
-    case .archive:
-      try session.archive(at: date)
-    case .restore:
-      try session.restore(at: date)
+    guard let updated else {
+      throw ChangeSessionStatusError.sessionNotFound(id)
     }
-    try await repository.save(session)
-    return session
+    return updated
   }
 }
