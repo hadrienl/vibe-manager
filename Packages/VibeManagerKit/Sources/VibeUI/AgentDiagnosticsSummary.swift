@@ -16,8 +16,14 @@ struct AgentDiagnosticsSummary: View {
             .foregroundStyle(tint(for: diagnostic.state))
           Text(diagnostic.summary)
           if let path = diagnostic.installation?.executablePath {
+            // Kept on one line and truncated in the middle: the full path belongs to the
+            // copied diagnostic, not to the window.
             Text(AgentDiagnostic.redact(path: path))
               .foregroundStyle(.tertiary)
+              .lineLimit(1)
+              .truncationMode(.middle)
+              .frame(maxWidth: 280, alignment: .leading)
+              .help(AgentDiagnostic.redact(path: path))
           }
           Button {
             copy(diagnostic)
@@ -35,6 +41,8 @@ struct AgentDiagnosticsSummary: View {
     }
     .font(.caption)
     .foregroundStyle(.secondary)
+    // Leaves room for the build version label in the opposite corner.
+    .frame(maxWidth: 520, alignment: .leading)
   }
 
   private func copy(_ diagnostic: AgentDiagnostic) {
