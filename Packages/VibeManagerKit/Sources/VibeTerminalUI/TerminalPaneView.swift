@@ -5,9 +5,13 @@ import VibeApplication
 // knows nothing of process identifiers or descriptors.
 public struct TerminalPaneView: View {
   @State private var model: TerminalPaneModel
+  /// A pane whose process someone else owns must not be started again when the view appears:
+  /// re-showing a finished session would silently launch a second agent.
+  private let autoStart: Bool
 
-  public init(model: TerminalPaneModel) {
+  public init(model: TerminalPaneModel, autoStart: Bool = true) {
     _model = State(initialValue: model)
+    self.autoStart = autoStart
   }
 
   public var body: some View {
@@ -39,6 +43,7 @@ public struct TerminalPaneView: View {
       )
     }
     .task {
+      guard autoStart else { return }
       await model.start()
     }
   }

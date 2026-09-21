@@ -1,15 +1,14 @@
 import Foundation
 import SwiftUI
 import VibeApplication
+import VibeDomain
 import VibeTerminalUI
 
 public struct RootView: View {
   @State private var model: AppModel
-  private let terminal: TerminalPaneModel
 
-  public init(model: AppModel, terminal: TerminalPaneModel) {
+  public init(model: AppModel) {
     _model = State(initialValue: model)
-    self.terminal = terminal
   }
 
   public var body: some View {
@@ -19,9 +18,7 @@ public struct RootView: View {
         ProgressView("Loading sessions…")
           .controlSize(.large)
       case .loaded:
-        // Session creation arrives with #7; until then the pane runs a login shell so the
-        // terminal can be exercised end to end.
-        TerminalPaneView(model: terminal)
+        workspace
       case .failed(let message, let canRestoreBackup):
         ContentUnavailableView {
           Label("Sessions unavailable", systemImage: "exclamationmark.triangle")
@@ -41,6 +38,47 @@ public struct RootView: View {
       }
     }
     .frame(minWidth: 760, minHeight: 480)
+    .task {
+      await model.load()
+    }
+    .sheet(
+      isPresented: Binding(
+        get: { model.isPresentingNewSession },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelNewSession()
+        }
+      )
+    ) {
+      if let sheetModel = model.newSessionModel {
+        NewSessionSheet(
+          model: sheetModel,
+          defaultWorkingDirectoryPath: model.newSessionDefaultWorkingDirectoryPath,
+          created: { creation in Task { await model.complete(creation) } },
+          cancelled: { model.cancelNewSession() }
+        )
+      }
+    }
+  }
+
+  private var workspace: some View {
+    NavigationSplitView {
+      SessionSidebar(model: model)
+        .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
+    } detail: {
+      detail
+        .toolbar {
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              model.beginNewSession()
+            } label: {
+              Label("New Session", systemImage: "plus")
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(!model.canCreateSession)
+          }
+        }
+    }
     .overlay(alignment: .bottomLeading) {
       AgentDiagnosticsSummary(
         diagnostics: model.agentDiagnostics,
@@ -49,29 +87,101 @@ public struct RootView: View {
       )
       .padding()
     }
-    .overlay(alignment: .bottomTrailing) {
-      Text(buildVersion)
-        .font(.caption)
-        .foregroundStyle(.tertiary)
-        .padding()
-        .accessibilityLabel("Vibe Manager \(buildVersion)")
-    }
-    .task {
-      await model.load()
-    }
   }
 
-  private var buildVersion: String {
-    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+  @ViewBuilder
+  private var detail: some View {
+    if let session = model.selectedSession {
+      if let pane = model.pane(for: session.id) {
+        // The pane is started by the launcher, so switching sessions never restarts an agent.
+        TerminalPaneView(model: pane, autoStart: false)
+      } else {
+        ContentUnavailableView {
+          Label(session.name, systemImage: session.appearance.symbolName)
+        } description: {
+          Text(
+            model.launchFailure(for: session.id)?.message
+              ?? "This session has no running terminal in this window."
+          )
+        } actions: {
+          if let suggestion = model.launchFailure(for: session.id)?.suggestion {
+            Text(suggestion)
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+    } else {
+      ContentUnavailableView {
+        Label("No session yet", systemImage: "square.stack.3d.up")
+      } description: {
+        Text("Create one to start a terminal and its coding agent.")
+      } actions: {
+        Button("New Session") {
+          model.beginNewSession()
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!model.canCreateSession)
+      }
+    }
+  }
+}
 
-    switch (version, build) {
-    case (.some(let version), .some(let build)):
-      return "Version \(version) (\(build))"
-    case (.some(let version), .none):
-      return "Version \(version)"
-    default:
-      return "Development build"
+private struct SessionSidebar: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    List(selection: Binding(get: { model.selectedSessionID }, set: { model.select($0) })) {
+      ForEach(model.sessions) { session in
+        SessionRow(session: session, isRunning: model.pane(for: session.id)?.status == .running)
+          .tag(session.id)
+      }
+    }
+    .listStyle(.sidebar)
+    .overlay {
+      if model.sessions.isEmpty {
+        ContentUnavailableView(
+          "No sessions",
+          systemImage: "square.stack.3d.up",
+          description: Text("Press ⌘N to create one.")
+        )
+      }
+    }
+  }
+}
+
+private struct SessionRow: View {
+  let session: WorkSession
+  let isRunning: Bool
+
+  var body: some View {
+    HStack(spacing: 10) {
+      SessionBadge(appearance: session.appearance)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(session.name)
+          .fontWeight(.medium)
+          .lineLimit(1)
+        if let agent = session.agent {
+          Text(agent.providerID)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        // Status is written out, never carried by colour alone.
+        Label(isRunning ? "Running" : session.status.rawValue.capitalized, systemImage: symbolName)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(.vertical, 4)
+    .accessibilityElement(children: .combine)
+  }
+
+  private var symbolName: String {
+    if isRunning { return "play.circle" }
+    switch session.status {
+    case .active: return "play.circle"
+    case .closed: return "pause.circle"
+    case .archived: return "archivebox"
     }
   }
 }

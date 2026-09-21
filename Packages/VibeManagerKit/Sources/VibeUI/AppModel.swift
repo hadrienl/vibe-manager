@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import VibeApplication
 import VibeDomain
+import VibeTerminalUI
 
 @MainActor
 @Observable
@@ -14,23 +15,49 @@ public final class AppModel {
   }
 
   public private(set) var state: State = .idle
-  /// Provider diagnostics in registration order. An empty list simply means no agent is
-  /// registered, which is a displayable state and never an error.
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   public private(set) var isRefreshingAgents = false
+  public private(set) var selectedSessionID: SessionID?
+  public private(set) var isPresentingNewSession = false
+  public private(set) var newSessionModel: NewSessionModel?
 
+  private let repository: any SessionRepository
   private let loadSessions: LoadSessions
   private let recovery: (any SessionStoreRecovery)?
   private let agents: (any AgentProviderResolving)?
+  private let launcher: SessionLauncher?
+  private let defaultWorkingDirectoryPath: String?
 
   public init(
     repository: any SessionRepository,
     recovery: (any SessionStoreRecovery)? = nil,
-    agents: (any AgentProviderResolving)? = nil
+    agents: (any AgentProviderResolving)? = nil,
+    launcher: SessionLauncher? = nil,
+    defaultWorkingDirectoryPath: String? = nil
   ) {
+    self.repository = repository
     loadSessions = LoadSessions(repository: repository)
     self.recovery = recovery
     self.agents = agents
+    self.launcher = launcher
+    self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
+  }
+
+  public var sessions: [WorkSession] {
+    guard case .loaded(let sessions) = state else { return [] }
+    return sessions
+  }
+
+  public var selectedSession: WorkSession? {
+    sessions.first { $0.id == selectedSessionID }
+  }
+
+  public var canCreateSession: Bool {
+    agents != nil && launcher != nil
+  }
+
+  public var newSessionDefaultWorkingDirectoryPath: String? {
+    defaultWorkingDirectoryPath
   }
 
   public func load() async {
@@ -72,19 +99,63 @@ public final class AppModel {
     }
   }
 
-  /// Whether a stored session can be handed back to its agent.
   public func resolution(for session: WorkSession) async -> SessionAgentResolution {
     guard let agents else { return .unassigned }
     return await ResolveSessionAgent(registry: agents)(for: session)
   }
 
-  /// Retries a load that failed; transient store failures are recoverable.
+  public func select(_ id: SessionID?) {
+    selectedSessionID = id
+  }
+
+  public func pane(for id: SessionID) -> TerminalPaneModel? {
+    launcher?.pane(for: id)
+  }
+
+  public func launchFailure(for id: SessionID) -> TerminalPaneModel.Failure? {
+    launcher?.failure(for: id)
+  }
+
+  /// The sheet's model lives here, not in the sheet: SwiftUI may evaluate the presentation
+  /// closure more than once, and a draft must survive that without being typed twice.
+  public func beginNewSession() {
+    guard let agents, canCreateSession else { return }
+    newSessionModel = NewSessionModel(
+      create: CreateSession(repository: repository, agents: agents),
+      registry: agents
+    )
+    isPresentingNewSession = true
+  }
+
+  /// Cancelling leaves nothing behind: no session, no process, and no draft either.
+  public func cancelNewSession() {
+    isPresentingNewSession = false
+    newSessionModel = nil
+  }
+
+  /// The order the ticket asks for: the session is already stored, so it is published and
+  /// selected first, and only then does anything get started. A launch that fails leaves a
+  /// session the user can see and retry, never a disappearing one.
+  public func complete(_ creation: SessionCreation) async {
+    isPresentingNewSession = false
+    newSessionModel = nil
+    await reload()
+    select(creation.session.id)
+    guard let launcher else { return }
+    await launcher.launch(session: creation.session, plan: creation.plan)
+    await reload()
+  }
+
   public func reload() async {
     guard state != .loading else { return }
 
+    let previousSelection = selectedSessionID
     state = .loading
     do {
-      state = .loaded(try await loadSessions())
+      let sessions = try await loadSessions()
+      state = .loaded(sessions)
+      selectedSessionID =
+        sessions.contains { $0.id == previousSelection } ? previousSelection : sessions.first?.id
     } catch {
       state = await failure(for: error)
     }
