@@ -12,7 +12,13 @@ let package = Package(
     .library(name: "VibeAgents", targets: ["VibeAgents"]),
     .library(name: "VibeTerminal", targets: ["VibeTerminal"]),
     .library(name: "VibeGit", targets: ["VibeGit"]),
+    .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
+  ],
+  dependencies: [
+    // Pinned exactly: the emulator parses untrusted output, so its version is a deliberate
+    // choice rather than whatever a range resolves to.
+    .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.20.0")
   ],
   targets: [
     .target(name: "VibeDomain"),
@@ -23,9 +29,18 @@ let package = Package(
       dependencies: ["VibeApplication", "VibeDomain"],
       resources: [.copy("Resources/mock-agent.sh")]
     ),
-    .target(name: "VibeTerminal", dependencies: ["VibeApplication"]),
+    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain"]),
     .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain"]),
-    .target(name: "VibeUI", dependencies: ["VibeApplication", "VibeDomain"]),
+    .target(
+      name: "VibeTerminalUI",
+      dependencies: [
+        "VibeApplication", "VibeDomain", .product(name: "SwiftTerm", package: "SwiftTerm"),
+      ]
+    ),
+    .target(
+      name: "VibeUI",
+      dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"]
+    ),
     .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
     .testTarget(
       name: "VibeApplicationTests",
@@ -38,6 +53,14 @@ let package = Package(
     .testTarget(
       name: "VibeAgentsTests",
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain"]
+    ),
+    .testTarget(
+      name: "VibeTerminalTests",
+      dependencies: ["VibeTerminal", "VibeApplication", "VibeDomain"]
+    ),
+    .testTarget(
+      name: "VibeTerminalUITests",
+      dependencies: ["VibeTerminalUI", "VibeApplication", "VibeDomain"]
     ),
     .testTarget(
       name: "VibeUITests",
