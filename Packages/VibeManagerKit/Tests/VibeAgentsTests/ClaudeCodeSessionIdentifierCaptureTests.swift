@@ -64,6 +64,16 @@ private actor NeverRepository: SessionRepository {
   func save(_ session: WorkSession) {}
 }
 
+/// A conversation the CLI wrote down right away.
+private struct WrittenTranscript: ClaudeCodeTranscriptWatching {
+  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool { true }
+}
+
+/// A launch that never reached a first exchange.
+private struct NoTranscript: ClaudeCodeTranscriptWatching {
+  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool { false }
+}
+
 private func claudeSession() -> WorkSession {
   WorkSession(
     name: "Refonte du parseur",
@@ -92,12 +102,13 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     let repository = ClaudeCaptureRepository(stored: session)
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
-      record: RecordAgentResumeIdentifier(repository: repository)
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: WrittenTranscript()
     )
 
     await capture.record(plan: plan(arguments: ["--session-id", identifier]))
 
-    #expect(await capture.identifier == identifier)
+    #expect(await capture.settled() == identifier)
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
   }
 
@@ -108,7 +119,8 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     let repository = ClaudeCaptureRepository(stored: session)
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
-      record: RecordAgentResumeIdentifier(repository: repository)
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: WrittenTranscript()
     )
 
     let recorded = await capture.record(plan: plan(arguments: ["--resume", identifier]))
@@ -124,14 +136,15 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     let repository = ClaudeCaptureRepository(stored: session)
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
-      record: RecordAgentResumeIdentifier(repository: repository)
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: WrittenTranscript()
     )
     let second = "8c1d0b7e-1111-4222-8333-444455556666"
 
     await capture.record(plan: plan(arguments: ["--session-id", identifier]))
     await capture.record(plan: plan(arguments: ["--session-id", second]))
 
-    #expect(await capture.identifier == second)
+    #expect(await capture.settled() == second)
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == second)
   }
 
@@ -141,7 +154,8 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     let repository = ClaudeCaptureRepository(stored: session)
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
-      record: RecordAgentResumeIdentifier(repository: repository)
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: WrittenTranscript()
     )
 
     await capture.record(plan: plan(arguments: ["--model", "claude-opus-5"]))
@@ -157,6 +171,7 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
       record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: WrittenTranscript(),
       persistenceWindow: .seconds(5)
     )
 
@@ -168,12 +183,32 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
   }
 
+  @Test("A conversation the CLI never wrote leaves no identifier to resume")
+  func waitsForTheConversationToExist() async {
+    let session = claudeSession()
+    let repository = ClaudeCaptureRepository(stored: session)
+    let capture = ClaudeCodeSessionIdentifierCapture(
+      sessionID: session.id,
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: NoTranscript()
+    )
+
+    let assigned = await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+
+    #expect(assigned == identifier)
+    #expect(await capture.settled() == nil)
+    #expect(await capture.unstoredIdentifier == nil)
+    #expect(await repository.saveCount == 0)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == nil)
+  }
+
   @Test("An identifier that could never be stored is surfaced, not dropped")
   func reportsUnstoredIdentifier() async {
     let session = claudeSession()
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
       record: RecordAgentResumeIdentifier(repository: NeverRepository()),
+      transcripts: WrittenTranscript(),
       persistenceWindow: .milliseconds(400)
     )
 
@@ -184,5 +219,38 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     // The conversation exists on disk; saying nothing would lose it silently.
     #expect(await capture.unstoredIdentifier == identifier)
     #expect(await capture.assignedIdentifier == identifier)
+  }
+}
+
+@Suite("Claude Code transcript watcher")
+struct ClaudeCodeTranscriptWatcherTests {
+  private let identifier = "3f2b6c1e-8a4d-4f7b-9c2e-5d1a7b3c9e04"
+
+  @Test("A transcript is recognised whatever project directory the CLI filed it under")
+  func findsTheTranscript() async throws {
+    let projects = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+      .appendingPathComponent("claude-projects-\(UUID().uuidString)", isDirectory: true)
+    let project = projects.appendingPathComponent("-Users-test-app", isDirectory: true)
+    try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: projects) }
+
+    let watcher = ClaudeCodeTranscriptWatcher(
+      projectsDirectory: projects, pollInterval: .milliseconds(20))
+    #expect(
+      await watcher.awaitTranscript(identifier: identifier, timeout: .milliseconds(100)) == false)
+
+    try Data("{}\n".utf8).write(
+      to: project.appendingPathComponent("\(identifier).jsonl", isDirectory: false))
+    #expect(await watcher.awaitTranscript(identifier: identifier, timeout: .milliseconds(100)))
+  }
+
+  @Test("A missing projects directory is simply no conversation yet")
+  func missingDirectoryIsNotAnError() async {
+    let watcher = ClaudeCodeTranscriptWatcher(
+      projectsDirectory: URL(fileURLWithPath: "/nowhere/claude/projects", isDirectory: true),
+      pollInterval: .milliseconds(20)
+    )
+    #expect(
+      await watcher.awaitTranscript(identifier: identifier, timeout: .milliseconds(60)) == false)
   }
 }

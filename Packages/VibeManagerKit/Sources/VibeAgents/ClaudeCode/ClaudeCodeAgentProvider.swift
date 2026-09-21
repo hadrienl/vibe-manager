@@ -82,11 +82,15 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
   public func identifierCapture(
     for sessionID: SessionID,
     repository: any SessionRepository,
+    transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
+    transcriptTimeout: Duration = ClaudeCodeSessionIdentifierCapture.defaultTranscriptTimeout,
     persistenceWindow: Duration = ClaudeCodeSessionIdentifierCapture.defaultPersistenceWindow
   ) -> ClaudeCodeSessionIdentifierCapture {
     ClaudeCodeSessionIdentifierCapture(
       sessionID: sessionID,
       record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: transcripts,
+      transcriptTimeout: transcriptTimeout,
       persistenceWindow: persistenceWindow
     )
   }

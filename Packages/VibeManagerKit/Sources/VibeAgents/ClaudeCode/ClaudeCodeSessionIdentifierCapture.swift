@@ -2,68 +2,100 @@ import Foundation
 import VibeApplication
 import VibeDomain
 
-/// Keeps the identifier a launch plan assigned to a Claude Code conversation.
+/// Stores the identifier a launch assigned to a Claude Code conversation — but only once the
+/// CLI has written that conversation down.
 ///
-/// There is nothing to discover: the plan already names the conversation, so the only work left
-/// is to store that name on the work session. That store can still fail — the session row may
-/// not exist yet, or may not carry its agent configuration when the pane starts — so it is
-/// retried inside a bounded window, and what it never managed to write is exposed rather than
-/// dropped.
+/// The identifier exists before the conversation does: this app generates it and passes it as
+/// `--session-id`. Persisting it at plan time would leave a resume identifier behind on a run
+/// that never got as far as a first exchange — a process that failed to start, a pane closed
+/// at the trust prompt — and the next launch would then ask the CLI to resume a conversation
+/// it has never heard of. So, as for Codex, nothing is written until the transcript proves the
+/// conversation is real.
 public actor ClaudeCodeSessionIdentifierCapture {
   public static let defaultPersistenceWindow: Duration = .seconds(10)
+  public static let defaultTranscriptTimeout: Duration = .seconds(30)
   static let retryInterval: Duration = .milliseconds(200)
 
   private let sessionID: SessionID
   private let record: RecordAgentResumeIdentifier
+  private let transcripts: any ClaudeCodeTranscriptWatching
+  private let transcriptTimeout: Duration
   private let persistenceWindow: Duration
 
   private var assigned: String?
   private var captured: String?
   private var unstored: String?
+  private var watcher: Task<Void, Never>?
   private var persister: Task<Void, Never>?
 
   public init(
     sessionID: SessionID,
     record: RecordAgentResumeIdentifier,
+    transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
+    transcriptTimeout: Duration = ClaudeCodeSessionIdentifierCapture.defaultTranscriptTimeout,
     persistenceWindow: Duration = ClaudeCodeSessionIdentifierCapture.defaultPersistenceWindow
   ) {
     self.sessionID = sessionID
     self.record = record
+    self.transcripts = transcripts
+    self.transcriptTimeout = transcriptTimeout
     self.persistenceWindow = persistenceWindow
   }
 
-  /// The identifier the launched process was started with, stored or not.
   public var assignedIdentifier: String? {
     assigned
   }
 
-  /// The identifier the session actually carries.
   public var identifier: String? {
     captured
   }
 
-  /// Assigned, but never written to the session: the conversation exists and this application
-  /// can no longer point at it. Worth surfacing, never worth pretending away.
   public var unstoredIdentifier: String? {
     unstored
   }
 
-  /// Records the identifier the plan carries. A resume plan carries none — it reuses the one
-  /// already stored — so it changes nothing.
   @discardableResult
-  public func record(plan: AgentLaunchPlan) async -> String? {
+  public func record(plan: AgentLaunchPlan) -> String? {
     guard let identifier = ClaudeCodeArgumentBuilder.assignedSessionIdentifier(in: plan.arguments)
     else {
       return nil
     }
 
-    // A new launch of the same work session is a new conversation, and replaces the previous
-    // identifier on purpose.
+    watcher?.cancel()
     persister?.cancel()
+    watcher = nil
     persister = nil
     assigned = identifier
     captured = nil
     unstored = nil
+
+    watcher = Task { [weak self] in await self?.storeOnceWritten(identifier) }
+    return identifier
+  }
+
+  public func settled() async -> String? {
+    await watcher?.value
+    await persister?.value
+    return captured
+  }
+
+  public func stop() {
+    watcher?.cancel()
+    persister?.cancel()
+    watcher = nil
+    persister = nil
+  }
+
+  /// Waits for the conversation to exist, then writes its identifier down.
+  ///
+  /// A conversation that never appears is a conversation there is nothing to resume, so the
+  /// identifier is dropped rather than surfaced: unlike a write that failed, nothing was lost.
+  private func storeOnceWritten(_ identifier: String) async {
+    let exists = await transcripts.awaitTranscript(
+      identifier: identifier,
+      timeout: transcriptTimeout
+    )
+    guard !Task.isCancelled, exists, assigned == identifier else { return }
 
     switch await persist(identifier) {
     case .kept, .rejected:
@@ -71,18 +103,6 @@ public actor ClaudeCodeSessionIdentifierCapture {
     case .retry:
       persister = Task { [weak self] in await self?.keepTrying(identifier) }
     }
-    return identifier
-  }
-
-  /// Waits for a pending write to settle and returns what the session carries.
-  public func settled() async -> String? {
-    await persister?.value
-    return captured
-  }
-
-  public func stop() {
-    persister?.cancel()
-    persister = nil
   }
 
   private func keepTrying(_ identifier: String) async {

@@ -1,24 +1,38 @@
 import Foundation
 import VibeApplication
 
-/// Reads the sign in state out of `claude auth status --json`, and nothing else.
-///
-/// That answer also carries the account's email address, organization and subscription type.
-/// None of them is decoded: the application has no business knowing who the user is, and a
-/// field that is never read cannot leak into a log or an exported diagnostic.
 public enum ClaudeCodeAuthenticationStatus {
-  /// `nil` means unknown, which never blocks a launch: the CLI asks for itself, in the
-  /// terminal, where the user can answer.
   public static func isSignedIn(in result: ProbeResult) -> Bool? {
     let output = result.standardOutput.isEmpty ? result.combinedOutput : result.standardOutput
-    guard let data = output.data(using: .utf8), !data.isEmpty else {
-      return result.exitCode == 0 ? nil : false
+    if let status = decodeStatus(in: output) {
+      return status.loggedIn
     }
-    guard let status = try? JSONDecoder().decode(Status.self, from: data) else {
-      // An unreadable answer says nothing about the account, only about the format.
-      return result.exitCode == 0 ? nil : false
+    return result.exitCode == 0 ? nil : false
+  }
+
+  /// The answer as JSON, wherever it sits in the stream.
+  ///
+  /// Anything else the run put on the way — a Node deprecation warning, a proxy or certificate
+  /// notice, an update banner — is noise around the answer, not part of it, so the whole stream
+  /// failing to decode says nothing on its own. The object is looked for on its own first, then
+  /// line by line, then as the span between the outermost braces.
+  private static func decodeStatus(in output: String) -> Status? {
+    if let status = decode(output) { return status }
+    for line in output.split(whereSeparator: \.isNewline) {
+      if let status = decode(String(line)) { return status }
     }
-    return status.loggedIn
+    guard let start = output.firstIndex(of: "{"), let end = output.lastIndex(of: "}"),
+      start < end
+    else {
+      return nil
+    }
+    return decode(String(output[start...end]))
+  }
+
+  private static func decode(_ text: String) -> Status? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let data = trimmed.data(using: .utf8), !data.isEmpty else { return nil }
+    return try? JSONDecoder().decode(Status.self, from: data)
   }
 
   private struct Status: Decodable {

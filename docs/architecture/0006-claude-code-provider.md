@@ -28,17 +28,23 @@ Codex had to be watched — a rollout file, the terminal output, a race between 
 their false positives. Here Vibe Manager generates a UUID and passes `--session-id <uuid>`. The
 conversation is named before it exists.
 
-This removes a whole machinery, and it removes a failure mode with it: a session is resumable
-the instant it is launched, even if the process dies in its first second, because nothing has to
-be observed for the identifier to be known.
+This removes a whole machinery: the identifier never has to be *found*, only confirmed.
 
-`ClaudeCodeSessionIdentifierCapture` reads that identifier back out of the plan's arguments and
-stores it through `RecordAgentResumeIdentifier`, so the value written to the session is the one
-the process was actually started with, never a value guessed in parallel. The identifier is a
-property of the *plan*: `launchPlan(for:)` can be called for a preview without consequence, only
-the plan that is executed is recorded.
+`ClaudeCodeSessionIdentifierCapture` reads that identifier back out of the plan's arguments, so
+the value written to the session is the one the process was actually started with, never a value
+guessed in parallel. The identifier is a property of the *plan*: `launchPlan(for:)` can be called
+for a preview without consequence, only the plan that is executed is recorded.
 
-Knowing the identifier is not the same as keeping it. The session row may not exist yet, or may
+Being named is not the same as existing. A run that never reaches a first exchange — a process
+that fails to start, a pane closed at the trust prompt — writes no transcript, and an identifier
+stored for it would make the next launch ask the CLI to resume a conversation it has never heard
+of. So, as for Codex, the write waits for evidence: `ClaudeCodeTranscriptWatcher` polls
+`<config>/projects/**/<uuid>.jsonl` until the CLI has filed the conversation, and only then does
+`RecordAgentResumeIdentifier` run. What Codex needs discovery for, this needs only confirmation
+for — the file name is known in advance, so there is no matching, no race between sources, and no
+false positive. A conversation that never appears leaves nothing behind.
+
+Keeping it is a third thing again. The session row may not exist yet, or may
 not carry its agent configuration, when a pane starts, so the write is retried inside a bounded
 window and what it never managed to store is exposed as `unstoredIdentifier` rather than
 dropped. The conversation exists on the user's disk either way; staying silent about it would
@@ -164,9 +170,11 @@ verified rather than what it assumes.
   `AppEnvironment`.
 - The identifier can no longer be missed on the launch side, which was ADR 0005's main residual
   risk. It can still fail to be stored, which the retry window narrows and `unstoredIdentifier`
-  reports; and it can still be useless: a session that dies before its transcript exists carries
-  an identifier that resume will not find, and the CLI says so itself — *No conversation found
-  with session ID: …* — in the terminal, where the user can act.
+  reports. A session that dies before its transcript exists now stores nothing at all, so a
+  restart opens a new conversation instead of resuming one the CLI would refuse.
+- The identifier is therefore not resumable *instantly*: between the launch and the first
+  exchange the session carries none. That window belongs to a conversation that does not exist
+  yet, so nothing is lost by it.
 - Reading the catalog is still blocking file access inside an `async` function, now bounded to
   one read in the normal case. If a model picker ever reads it on every keystroke it wants a
   cache, not a smaller bound.
@@ -177,9 +185,13 @@ verified rather than what it assumes.
 
 ## Rejected alternatives
 
-- Discovering the identifier the way Codex does — watching `<config>/projects/<cwd>/*.jsonl`, or
-  reading the terminal output — was rejected: the CLI accepts being told, so observing it would be
-  guessing an answer we already have.
+- Discovering the identifier the way Codex does — reading it out of the transcript or the terminal
+  output — was rejected: the CLI accepts being told, so observing it would be guessing an answer we
+  already have. The transcript is still watched, but only to confirm the conversation exists.
+- Storing the identifier at plan time and letting resume fail on its own — the CLI does say *No
+  conversation found with session ID: …* — was rejected: it puts a value the app knows to be
+  doubtful into the session row, and makes the user read an error to learn what the app could
+  have known.
 - `--print` with a JSON stream was rejected for the same reason as `codex exec`: it removes the
   interactive session that is the point of the product.
 - Shipping the model aliases (`opus`, `sonnet`, `haiku`) as a fallback list was rejected: they are

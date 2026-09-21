@@ -79,8 +79,8 @@ public struct ClaudeCodeModelCatalog: ClaudeCodeModelCatalogSource {
 
     for url in candidateURLs() {
       guard reads < Self.maximumReadCount else { break }
-      guard let data = readCache(at: url) else { continue }
       reads += 1
+      guard let data = readCache(at: url) else { continue }
       guard let cache = try? JSONDecoder().decode(Cache.self, from: data), !cache.models.isEmpty
       else {
         continue

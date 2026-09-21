@@ -279,6 +279,25 @@ struct ClaudeCodeAuthenticationStatusTests {
     )
   }
 
+  @Test("Warnings around the answer do not hide it")
+  func readsThroughNoise() {
+    #expect(
+      ClaudeCodeAuthenticationStatus.isSignedIn(
+        in: ProbeResult(
+          exitCode: 1,
+          standardOutput: """
+            (node:4242) [DEP0040] DeprecationWarning: punycode is deprecated
+            {"loggedIn":true}
+            """)) == true
+    )
+    #expect(
+      ClaudeCodeAuthenticationStatus.isSignedIn(
+        in: ProbeResult(
+          exitCode: 0,
+          standardOutput: #"warning: proxy in use {"loggedIn":false} done"#)) == false
+    )
+  }
+
   @Test("Standard error is read only when standard output says nothing")
   func fallsBackToStandardError() {
     #expect(
