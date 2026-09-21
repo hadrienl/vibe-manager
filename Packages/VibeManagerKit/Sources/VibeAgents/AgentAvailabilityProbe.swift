@@ -1,0 +1,348 @@
+import Foundation
+import VibeApplication
+
+/// Detects one agent CLI, caches the result and never lets a slow binary block a caller.
+///
+/// Concurrent callers share a single in flight detection instead of spawning one process each.
+public actor AgentAvailabilityProbe {
+  private let descriptor: AgentDescriptor
+  private let specification: CommandLineAgentSpecification
+  private let locator: any ExecutableLocator
+  private let probe: any ProcessProbe
+  private let environment: [String: String]
+  private let timeToLive: Duration
+  private let now: @Sendable () -> Date
+
+  private var cached: AgentAvailability?
+  private var cachedAt: Date?
+  private var inFlight: Task<AgentAvailability, Never>?
+  private var userDefinedPath: String?
+  /// Bumped by every invalidation, so a detection started earlier cannot publish its result.
+  private var generation: UInt64 = 0
+
+  public init(
+    descriptor: AgentDescriptor,
+    specification: CommandLineAgentSpecification,
+    locator: any ExecutableLocator,
+    probe: any ProcessProbe,
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    timeToLive: Duration = .seconds(300),
+    now: @escaping @Sendable () -> Date = Date.init
+  ) {
+    self.descriptor = descriptor
+    self.specification = specification
+    self.locator = locator
+    self.probe = probe
+    self.environment = environment
+    self.timeToLive = timeToLive
+    self.now = now
+  }
+
+  public func setUserDefinedPath(_ path: String?) {
+    userDefinedPath = path
+    invalidate()
+  }
+
+  public func invalidate() {
+    cached = nil
+    cachedAt = nil
+    // Any detection started before this point describes a configuration that no longer
+    // applies, so its result must not repopulate the cache when it lands.
+    generation &+= 1
+    inFlight?.cancel()
+    inFlight = nil
+  }
+
+  public func availability(forceRefresh: Bool) async -> AgentAvailability {
+    if !forceRefresh, let cached, let cachedAt, !isExpired(cachedAt) {
+      return cached
+    }
+    if let inFlight, !forceRefresh {
+      return await inFlight.value
+    }
+
+    let path = userDefinedPath
+    let startedGeneration = generation
+    let task = Task { [specification, locator, probe, environment, descriptor, now] in
+      await Self.detect(
+        descriptor: descriptor,
+        specification: specification,
+        locator: locator,
+        probe: probe,
+        environment: environment,
+        userDefinedPath: path,
+        now: now
+      )
+    }
+    inFlight = task
+    let availability = await task.value
+
+    // The actor can be re-entered while the detection runs: only the task that still
+    // represents the current configuration is allowed to publish its result.
+    guard startedGeneration == generation else { return availability }
+    inFlight = nil
+    cached = availability
+    cachedAt = now()
+    return availability
+  }
+
+  private func isExpired(_ date: Date) -> Bool {
+    now().timeIntervalSince(date) >= timeToLive.seconds
+  }
+
+  private static func detect(
+    descriptor: AgentDescriptor,
+    specification: CommandLineAgentSpecification,
+    locator: any ExecutableLocator,
+    probe: any ProcessProbe,
+    environment: [String: String],
+    userDefinedPath: String?,
+    now: @Sendable () -> Date
+  ) async -> AgentAvailability {
+    let searchPlan = ExecutableSearchPlan(
+      binaryName: specification.binaryName,
+      candidateDirectories: specification.candidateDirectories,
+      userDefinedPath: userDefinedPath,
+      allowsLoginShellFallback: true
+    )
+
+    switch await locator.locate(searchPlan) {
+    case .notFound:
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .notFound,
+        installation: nil,
+        detail: "No \(specification.binaryName) executable was found.",
+        at: now()
+      )
+    case .notExecutable(let path, let source):
+      let installation = AgentInstallation(
+        executablePath: path,
+        version: nil,
+        source: source,
+        detectedAt: now()
+      )
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .notExecutable,
+        installation: installation,
+        detail: "The file exists but is not executable.",
+        at: now()
+      )
+    case .found(let path, let source):
+      return await versionState(
+        descriptor: descriptor,
+        specification: specification,
+        probe: probe,
+        environment: environment,
+        path: path,
+        source: source,
+        now: now
+      )
+    }
+  }
+
+  private static func versionState(
+    descriptor: AgentDescriptor,
+    specification: CommandLineAgentSpecification,
+    probe: any ProcessProbe,
+    environment: [String: String],
+    path: String,
+    source: AgentDetectionSource,
+    now: @Sendable () -> Date
+  ) async -> AgentAvailability {
+    let result: ProbeResult
+    do {
+      result = try await probe.run(
+        executablePath: path,
+        arguments: specification.versionArguments,
+        environment: AgentEnvironmentPolicy.environment(
+          base: environment,
+          additionalKeys: specification.additionalEnvironmentKeys
+        ),
+        workingDirectoryPath: nil,
+        timeout: specification.versionTimeout
+      )
+    } catch is CancellationError, ProbeError.cancelled {
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .probeFailed(reason: .cancelled),
+        installation: located(path: path, source: source, now: now),
+        detail: nil,
+        at: now()
+      )
+    } catch {
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .probeFailed(reason: .failed(exitCode: -1)),
+        installation: located(path: path, source: source, now: now),
+        detail: "The executable could not be started.",
+        at: now()
+      )
+    }
+
+    guard !result.didTimeOut else {
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .probeFailed(reason: .timedOut),
+        // The path is kept: an export of a failing probe is useless without it.
+        installation: located(path: path, source: source, now: now),
+        detail: "\(specification.binaryName) did not answer --version in time.",
+        at: now()
+      )
+    }
+    guard result.exitCode == 0 else {
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .probeFailed(reason: .failed(exitCode: result.exitCode)),
+        installation: located(path: path, source: source, now: now),
+        detail: "Version probe exited with code \(result.exitCode).",
+        at: now()
+      )
+    }
+
+    // Standard error often carries unrelated warnings, so it is only a fallback.
+    let output = result.standardOutput.isEmpty ? result.combinedOutput : result.standardOutput
+    // An unreadable version never disables the agent: CLIs do change their output format.
+    let version = AgentVersion(parsing: output, anchor: specification.binaryName)
+    let installation = AgentInstallation(
+      executablePath: path,
+      version: version,
+      rawVersionOutput: output.isEmpty ? nil : output,
+      source: source,
+      detectedAt: now()
+    )
+
+    if let minimum = descriptor.minimumVersion, let version, version < minimum {
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .outdated(found: version, required: minimum),
+        installation: installation,
+        detail: nil,
+        at: now()
+      )
+    }
+
+    let detail = version == nil ? "The reported version could not be parsed." : nil
+    let authenticated = await authenticationState(
+      specification: specification,
+      probe: probe,
+      environment: environment,
+      path: path
+    )
+    guard authenticated != false else {
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .unauthenticated,
+        installation: installation,
+        detail: detail,
+        at: now()
+      )
+    }
+
+    return AgentDiagnosticFactory.availability(
+      descriptor: descriptor,
+      state: .available,
+      installation: installation,
+      detail: detail,
+      at: now()
+    )
+  }
+
+  /// A located but unusable binary, so a failing diagnostic still says where it is.
+  private static func located(
+    path: String,
+    source: AgentDetectionSource,
+    now: @Sendable () -> Date
+  ) -> AgentInstallation {
+    AgentInstallation(executablePath: path, version: nil, source: source, detectedAt: now())
+  }
+
+  /// Best effort only: `nil` means "unknown", and unknown never blocks a launch.
+  ///
+  /// No token, credential file or keychain item is ever read; only the exit code of the
+  /// command the provider declares is considered.
+  private static func authenticationState(
+    specification: CommandLineAgentSpecification,
+    probe: any ProcessProbe,
+    environment: [String: String],
+    path: String
+  ) async -> Bool? {
+    guard let arguments = specification.authenticationArguments else { return nil }
+
+    let result = try? await probe.run(
+      executablePath: path,
+      arguments: arguments,
+      environment: AgentEnvironmentPolicy.environment(
+        base: environment,
+        additionalKeys: specification.additionalEnvironmentKeys
+      ),
+      workingDirectoryPath: nil,
+      timeout: specification.versionTimeout
+    )
+    guard let result, !result.didTimeOut else { return nil }
+    return result.exitCode == 0
+  }
+}
+
+enum AgentDiagnosticFactory {
+  static func availability(
+    descriptor: AgentDescriptor,
+    state: AgentAvailabilityState,
+    installation: AgentInstallation?,
+    detail: String?,
+    at date: Date
+  ) -> AgentAvailability {
+    let diagnostic = AgentDiagnostic(
+      providerID: descriptor.id,
+      providerName: descriptor.displayName,
+      state: state,
+      summary: summary(for: state, descriptor: descriptor),
+      detail: detail,
+      installation: installation,
+      probedAt: date,
+      remediations: remediations(for: state, descriptor: descriptor)
+    )
+    return AgentAvailability(state: state, installation: installation, diagnostic: diagnostic)
+  }
+
+  private static func summary(
+    for state: AgentAvailabilityState,
+    descriptor: AgentDescriptor
+  ) -> String {
+    switch state {
+    case .available:
+      return "\(descriptor.displayName) is ready."
+    case .outdated(let found, let required):
+      return "\(descriptor.displayName) \(found) is older than the required \(required)."
+    case .notFound:
+      return "\(descriptor.displayName) was not found on this Mac."
+    case .notExecutable:
+      return "The \(descriptor.displayName) command exists but cannot be run."
+    case .unauthenticated:
+      return "\(descriptor.displayName) is installed but not signed in."
+    case .probeFailed:
+      return "\(descriptor.displayName) could not be inspected."
+    }
+  }
+
+  private static func remediations(
+    for state: AgentAvailabilityState,
+    descriptor: AgentDescriptor
+  ) -> [AgentRemediation] {
+    switch state {
+    case .available:
+      return [.retryDetection]
+    case .outdated(_, let required):
+      return [.update(minimumVersion: required, documentationURL: nil), .retryDetection]
+    case .notFound:
+      return [.install(documentationURL: nil), .defineExecutablePath, .retryDetection]
+    case .notExecutable:
+      return [.defineExecutablePath, .retryDetection]
+    case .unauthenticated:
+      return [.authenticate(command: nil), .retryDetection]
+    case .probeFailed:
+      return [.defineExecutablePath, .retryDetection]
+    }
+  }
+}

@@ -12,6 +12,8 @@
 		A00000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Assets.xcassets */; };
 		A00000000000000000000004 /* VibeUI in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000001 /* VibeUI */; };
 		A00000000000000000000005 /* VibePersistence in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000002 /* VibePersistence */; };
+		A00000000000000000000006 /* VibeAgents in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000003 /* VibeAgents */; };
+		A00000000000000000000007 /* VibeApplication in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000004 /* VibeApplication */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +33,8 @@
 			files = (
 				A00000000000000000000004 /* VibeUI in Frameworks */,
 				A00000000000000000000005 /* VibePersistence in Frameworks */,
+				A00000000000000000000006 /* VibeAgents in Frameworks */,
+				A00000000000000000000007 /* VibeApplication in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,6 +105,8 @@
 			packageProductDependencies = (
 				J00000000000000000000001 /* VibeUI */,
 				J00000000000000000000002 /* VibePersistence */,
+				J00000000000000000000003 /* VibeAgents */,
+				J00000000000000000000004 /* VibeApplication */,
 			);
 			productName = VibeManager;
 			productReference = B00000000000000000000004 /* Vibe Manager.app */;
@@ -297,6 +303,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
 			productName = VibePersistence;
+		};
+		J00000000000000000000003 /* VibeAgents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
+			productName = VibeAgents;
+		};
+		J00000000000000000000004 /* VibeApplication */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
+			productName = VibeApplication;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
