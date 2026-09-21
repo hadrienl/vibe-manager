@@ -12,14 +12,14 @@ struct SessionStoreDecodeResult {
 }
 
 struct SessionStoreCodec {
-  static let currentSchemaVersion = 1
+  static let currentSchemaVersion = 2
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV1(
+    let envelope = StoreEnvelopeV2(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV1.init)
+      sessions: sessions.map(StoredSessionV2.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -40,8 +40,12 @@ struct SessionStoreCodec {
         let legacy = try Self.makeDecoder().decode(StoreEnvelopeV0.self, from: data)
         sessions = legacy.sessions.map(\.workSession)
         requiresRewrite = true
+      case 1:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV1.self, from: data)
+        sessions = previous.sessions.map(\.workSession)
+        requiresRewrite = true
       case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV1.self, from: data)
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
         sessions = current.sessions.map(\.workSession)
         requiresRewrite = false
       default:
@@ -107,33 +111,33 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-private struct StoreEnvelopeV1: Codable {
+private struct StoreEnvelopeV2: Codable {
   let schemaVersion: Int
   let savedAt: Date
-  let sessions: [StoredSessionV1]
+  let sessions: [StoredSessionV2]
 }
 
-private struct StoredSessionV1: Codable {
+private struct StoredSessionV2: Codable {
   let id: UUID
   let name: String
   let initialPrompt: String
-  let agent: StoredAgentV1?
-  let appearance: StoredAppearanceV1
-  let lifecycle: StoredLifecycleV1
-  let repositories: [StoredRepositoryV1]
+  let agent: StoredAgentV2?
+  let appearance: StoredAppearanceV2
+  let lifecycle: StoredLifecycleV2
+  let repositories: [StoredRepositoryV2]
   let notes: String?
-  let template: StoredTemplateV1?
+  let template: StoredTemplateV2?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
     name = session.name
     initialPrompt = session.initialPrompt
-    agent = session.agent.map(StoredAgentV1.init)
-    appearance = StoredAppearanceV1(session.appearance)
-    lifecycle = StoredLifecycleV1(session.lifecycle)
-    repositories = session.repositories.map(StoredRepositoryV1.init)
+    agent = session.agent.map(StoredAgentV2.init)
+    appearance = StoredAppearanceV2(session.appearance)
+    lifecycle = StoredLifecycleV2(session.lifecycle)
+    repositories = session.repositories.map(StoredRepositoryV2.init)
     notes = session.notes
-    template = session.template.map(StoredTemplateV1.init)
+    template = session.template.map(StoredTemplateV2.init)
   }
 
   var workSession: WorkSession {
@@ -155,9 +159,9 @@ private struct StoredSessionV1: Codable {
   }
 }
 
-private struct StoredAgentV1: Codable {
+private struct StoredAgentV2: Codable {
   let providerID: String
-  let modelID: String
+  let modelID: String?
   let resumeIdentifier: String?
 
   init(_ agent: SessionAgentConfiguration) {
@@ -175,7 +179,63 @@ private struct StoredAgentV1: Codable {
   }
 }
 
-private struct StoredAppearanceV1: Codable {
+/// The schema v1 document, kept only to be read.
+///
+/// Every part of a session but its agent block is unchanged, so only that block has a v1 shape:
+/// v1 required a model identifier where v2 makes it optional.
+private struct StoreEnvelopeV1: Decodable {
+  let schemaVersion: Int
+  let savedAt: Date
+  let sessions: [StoredSessionV1]
+}
+
+private struct StoredSessionV1: Decodable {
+  let id: UUID
+  let name: String
+  let initialPrompt: String
+  let agent: StoredAgentV1?
+  let appearance: StoredAppearanceV2
+  let lifecycle: StoredLifecycleV2
+  let repositories: [StoredRepositoryV2]
+  let notes: String?
+  let template: StoredTemplateV2?
+
+  var workSession: WorkSession {
+    WorkSession(
+      id: SessionID(rawValue: id),
+      name: name,
+      initialPrompt: initialPrompt,
+      agent: agent?.domainValue,
+      appearance: appearance.domainValue,
+      status: lifecycle.status,
+      createdAt: lifecycle.createdAt,
+      updatedAt: lifecycle.updatedAt,
+      closedAt: lifecycle.closedAt,
+      archivedAt: lifecycle.archivedAt,
+      repositories: repositories.map(\.domainValue),
+      notes: notes,
+      template: template?.domainValue
+    )
+  }
+}
+
+private struct StoredAgentV1: Decodable {
+  let providerID: String
+  let modelID: String
+  let resumeIdentifier: String?
+
+  var domainValue: SessionAgentConfiguration {
+    // A v1 document could not mean "no model" — the field was required — but an empty string
+    // written by hand must not come back as a model name and end up after `--model`.
+    SessionAgentConfiguration(
+      providerID: providerID,
+      modelID: modelID.isEmpty ? nil : modelID,
+      resumeIdentifier: resumeIdentifier
+    )
+  }
+}
+
+private struct StoredAppearanceV2: Codable {
   let symbolName: String
   let colorHex: String
 
@@ -189,7 +249,7 @@ private struct StoredAppearanceV1: Codable {
   }
 }
 
-private struct StoredLifecycleV1: Codable {
+private struct StoredLifecycleV2: Codable {
   let status: SessionStatus
   let createdAt: Date
   let updatedAt: Date
@@ -205,15 +265,15 @@ private struct StoredLifecycleV1: Codable {
   }
 }
 
-private struct StoredRepositoryV1: Codable {
+private struct StoredRepositoryV2: Codable {
   let id: UUID
   let path: String
-  let git: StoredGitSnapshotV1?
+  let git: StoredGitSnapshotV2?
 
   init(_ repository: RepositoryContext) {
     id = repository.id.rawValue
     path = repository.path
-    git = repository.git.map(StoredGitSnapshotV1.init)
+    git = repository.git.map(StoredGitSnapshotV2.init)
   }
 
   var domainValue: RepositoryContext {
@@ -225,7 +285,7 @@ private struct StoredRepositoryV1: Codable {
   }
 }
 
-private struct StoredGitSnapshotV1: Codable {
+private struct StoredGitSnapshotV2: Codable {
   let repositoryRootPath: String
   let worktreePath: String?
   let branchName: String?
@@ -254,7 +314,7 @@ private struct StoredGitSnapshotV1: Codable {
   }
 }
 
-private struct StoredTemplateV1: Codable {
+private struct StoredTemplateV2: Codable {
   let id: String
   let name: String
   let revision: String?
