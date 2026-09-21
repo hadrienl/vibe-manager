@@ -36,5 +36,6 @@ xcodebuild \
   -destination 'platform=macOS' \
   -derivedDataPath "$derived_data_path" \
   -clonedSourcePackagesDirPath "$source_packages_path" \
+  -skipPackagePluginValidation \
   CODE_SIGNING_ALLOWED=NO \
   build

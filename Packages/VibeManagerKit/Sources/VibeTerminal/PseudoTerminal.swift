@@ -42,17 +42,9 @@ enum PseudoTerminalLauncher {
   static func launch(_ spec: TerminalSpec) throws -> PseudoTerminal {
     try validate(spec)
 
-    let master = posix_openpt(O_RDWR | O_NOCTTY)
-    guard master >= 0 else {
-      throw TerminalError.pseudoTerminalUnavailable(code: errno)
-    }
+    let (master, slavePath) = try allocateMaster()
 
     do {
-      guard grantpt(master) == 0, unlockpt(master) == 0, let name = ptsname(master) else {
-        throw TerminalError.pseudoTerminalUnavailable(code: errno)
-      }
-      let slavePath = String(cString: name)
-
       // The reader never blocks a dispatch queue, and the descriptor must not survive into any
       // other process the application spawns.
       _ = fcntl(master, F_SETFL, fcntl(master, F_GETFL, 0) | O_NONBLOCK)
@@ -74,6 +66,35 @@ enum PseudoTerminalLauncher {
       close(master)
       throw error
     }
+  }
+
+  // Allocating a pseudo terminal is a system-wide resource request: under pressure it fails
+  // transiently, so a few attempts are made before the failure is reported to the user.
+  private static func allocateMaster(attempts: Int = 3) throws -> (Int32, String) {
+    var lastCode: Int32 = 0
+
+    for attempt in 0..<attempts {
+      errno = 0
+      let master = posix_openpt(O_RDWR | O_NOCTTY)
+      if master >= 0 {
+        errno = 0
+        if grantpt(master) == 0, unlockpt(master) == 0, let name = ptsname(master) {
+          return (master, String(cString: name))
+        }
+        lastCode = errno
+        close(master)
+      } else {
+        lastCode = errno
+      }
+
+      if attempt + 1 < attempts {
+        usleep(20_000)
+      }
+    }
+
+    // Some of these calls fail without setting errno; reporting a stale value would be worse
+    // than reporting none.
+    throw TerminalError.pseudoTerminalUnavailable(code: max(0, lastCode))
   }
 
   private static func validate(_ spec: TerminalSpec) throws {

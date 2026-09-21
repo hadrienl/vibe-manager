@@ -1,12 +1,15 @@
 import Foundation
 import SwiftUI
 import VibeApplication
+import VibeTerminalUI
 
 public struct RootView: View {
   @State private var model: AppModel
+  private let terminal: TerminalPaneModel
 
-  public init(model: AppModel) {
+  public init(model: AppModel, terminal: TerminalPaneModel) {
     _model = State(initialValue: model)
+    self.terminal = terminal
   }
 
   public var body: some View {
@@ -15,18 +18,10 @@ public struct RootView: View {
       case .idle, .loading:
         ProgressView("Loading sessions…")
           .controlSize(.large)
-      case .loaded(let sessions) where sessions.isEmpty:
-        ContentUnavailableView {
-          Label("No work sessions", systemImage: "terminal")
-        } description: {
-          Text("Create a session to start working with your coding agent.")
-        }
-      case .loaded(let sessions):
-        ContentUnavailableView(
-          "Foundation ready",
-          systemImage: "hammer",
-          description: Text("Loaded \(sessions.count) work sessions.")
-        )
+      case .loaded:
+        // Session creation arrives with #7; until then the pane runs a login shell so the
+        // terminal can be exercised end to end.
+        TerminalPaneView(model: terminal)
       case .failed(let message, let canRestoreBackup):
         ContentUnavailableView {
           Label("Sessions unavailable", systemImage: "exclamationmark.triangle")
