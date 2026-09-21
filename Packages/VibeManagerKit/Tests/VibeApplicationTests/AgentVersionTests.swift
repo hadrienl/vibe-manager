@@ -51,7 +51,9 @@ struct AgentVersionTests {
     #expect(AgentVersion(major: 1, minor: 9, patch: 9) < AgentVersion(major: 2))
     #expect(AgentVersion(major: 2, minor: 0, patch: 1) > AgentVersion(major: 2))
     #expect(AgentVersion(major: 2, minor: 10) > AgentVersion(major: 2, minor: 9))
-    #expect(
-      AgentVersion(major: 1, minor: 2, patch: 3) == AgentVersion(major: 1, minor: 2, patch: 3))
+    let reference = AgentVersion(major: 1, minor: 2, patch: 3)
+    #expect(reference == AgentVersion(major: 1, minor: 2, patch: 3))
+    #expect(reference != AgentVersion(major: 1, minor: 2, patch: 4))
+    #expect(reference != AgentVersion(major: 1, minor: 3, patch: 3))
   }
 }
