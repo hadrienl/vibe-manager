@@ -78,7 +78,9 @@ matches.
 `CodexResumeIdentifierExtractor` also reads the terminal output, but only accepts a well
 formed identifier on a line naming a session: the output echoes the prompt, and a prompt can
 contain a UUID of its own. `CodexTerminalIdentifierAccumulator` holds the unterminated tail of
-the stream, bounded, because a pseudo terminal read cuts wherever the kernel buffer ended.
+the stream, bounded, because a pseudo terminal read cuts wherever the kernel buffer ended. The
+capture queues the reads and drains them one at a time, in the order they arrived: splicing a
+tail onto the wrong half would lose the identifier for the whole launch.
 
 `CodexSessionIdentifierCapture` races the two sources for one launch: the first to answer
 wins and nothing overwrites it afterwards, so a false positive read from the screen cannot

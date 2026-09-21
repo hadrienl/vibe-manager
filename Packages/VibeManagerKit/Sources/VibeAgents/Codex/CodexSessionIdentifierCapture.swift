@@ -14,11 +14,18 @@ public actor CodexTerminalIdentifierAccumulator {
   static let maximumTailByteCount = 8 * 1024
 
   private let extractor: CodexResumeIdentifierExtractor
+  private let willConsume: (@Sendable () async -> Void)?
   private var tail = ""
   private var found: String?
 
-  public init(extractor: CodexResumeIdentifierExtractor = CodexResumeIdentifierExtractor()) {
+  /// - Parameter willConsume: awaited before each read is accumulated. It exists so a test can
+  ///   hold a read in flight and check what the caller does with the ones arriving meanwhile.
+  public init(
+    extractor: CodexResumeIdentifierExtractor = CodexResumeIdentifierExtractor(),
+    willConsume: (@Sendable () async -> Void)? = nil
+  ) {
     self.extractor = extractor
+    self.willConsume = willConsume
   }
 
   public var identifier: String? {
@@ -27,7 +34,8 @@ public actor CodexTerminalIdentifierAccumulator {
 
   /// - Returns: the identifier the first time one is recognised, `nil` afterwards.
   @discardableResult
-  public func consume(_ text: String) -> String? {
+  public func consume(_ text: String) async -> String? {
+    await willConsume?()
     guard found == nil else { return nil }
 
     let combined = tail + text
@@ -66,6 +74,8 @@ public actor CodexTerminalIdentifierAccumulator {
 public actor CodexSessionIdentifierCapture {
   public static let defaultTimeout: Duration = .seconds(30)
   public static let defaultPersistenceWindow: Duration = .seconds(30)
+  /// How much terminal output may wait to be accumulated before the oldest read is dropped.
+  static let maximumQueuedByteCount = 256 * 1024
 
   private enum Source {
     case rollout
@@ -91,6 +101,9 @@ public actor CodexSessionIdentifierCapture {
   private var pending: String?
   private var watcher: Task<Void, Never>?
   private var persister: Task<Void, Never>?
+  private var queued: [String] = []
+  private var queuedByteCount = 0
+  private var draining = false
 
   /// The identifier this launch revealed but could not store, once retrying gave up.
   ///
@@ -131,10 +144,32 @@ public actor CodexSessionIdentifierCapture {
     }
   }
 
+  /// Feeds one decoded read of the terminal to the identifier accumulator, in order.
+  ///
+  /// The reads are queued before anything suspends, and a single drain consumes them: the
+  /// accumulator splices an identifier straddling two reads, so handing it the second read
+  /// first would splice the wrong halves and lose the identifier for the whole launch.
   public func observe(output text: String) async {
     guard captured == nil, pending == nil else { return }
-    guard let identifier = await accumulator.consume(text) else { return }
-    await store(identifier, from: .terminal)
+    queued.append(text)
+    queuedByteCount += text.utf8.count
+    // A pane can write faster than the accumulator drains. Older reads go first: the
+    // accumulator only ever keeps a tail of them anyway.
+    while queuedByteCount > Self.maximumQueuedByteCount, queued.count > 1 {
+      queuedByteCount -= queued.removeFirst().utf8.count
+    }
+    guard !draining else { return }
+
+    draining = true
+    defer { draining = false }
+    while !queued.isEmpty, captured == nil, pending == nil {
+      let next = queued.removeFirst()
+      queuedByteCount -= next.utf8.count
+      guard let identifier = await accumulator.consume(next) else { continue }
+      await store(identifier, from: .terminal)
+    }
+    queued.removeAll()
+    queuedByteCount = 0
   }
 
   /// Stops looking for an identifier. A write already under way is left to finish: the pane may

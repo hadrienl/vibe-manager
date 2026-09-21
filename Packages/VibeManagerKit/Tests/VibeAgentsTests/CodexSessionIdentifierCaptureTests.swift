@@ -232,6 +232,36 @@ struct CodexSessionIdentifierCaptureTests {
     #expect(await capture.unstoredIdentifier == nil)
   }
 
+  @Test("A read arriving while another is being accumulated is not consumed out of order")
+  func keepsTerminalOutputOrdered() async throws {
+    // The pseudo terminal cuts wherever the kernel buffer ended, and its reader hands each
+    // read over without waiting for the previous one: consuming the second half first would
+    // splice the wrong halves and lose the identifier for the whole launch.
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let gate = Gate()
+    let capture = CodexSessionIdentifierCapture(
+      sessionID: session.id,
+      workingDirectoryPath: "/Users/test/app",
+      discovery: StubDiscovery(identifier: nil),
+      record: RecordAgentResumeIdentifier(repository: repository),
+      accumulator: CodexTerminalIdentifierAccumulator(willConsume: { await gate.wait() }),
+      timeout: .milliseconds(50)
+    )
+
+    // The first read is held inside the accumulator…
+    let first = Task { await capture.observe(output: "  session id: 019ee0a1-06d9") }
+    try await waitUntil { await gate.isWaiting }
+    // …while the second arrives and finds the capture busy.
+    let second = Task { await capture.observe(output: "-7e52-957b-d61a982d6b43\r\n") }
+    try await Task.sleep(for: .milliseconds(20))
+    await gate.open()
+
+    _ = await (first.value, second.value)
+    #expect(await capture.identifier == identifier)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+  }
+
   @Test("An identifier that can never be stored is reported, not swallowed")
   func reportsAnIdentifierItCouldNotStore() async throws {
     let session = WorkSession(name: "Refonte du parseur")
@@ -252,6 +282,24 @@ struct CodexSessionIdentifierCaptureTests {
 
     #expect(await capture.identifier == nil)
     #expect(await capture.unstoredIdentifier == identifier)
+  }
+}
+
+/// Holds the first consumption until the test lets it through, and reports when it is held.
+private actor Gate {
+  private var opened = false
+  private(set) var isWaiting = false
+
+  func open() {
+    opened = true
+  }
+
+  func wait() async {
+    guard !opened, !isWaiting else { return }
+    isWaiting = true
+    while !opened {
+      try? await Task.sleep(for: .milliseconds(5))
+    }
   }
 }
 
