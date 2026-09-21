@@ -71,10 +71,6 @@ public struct CodexArgumentBuilder: CommandLineAgentArgumentBuilder {
   }
 
   private static func isWellFormed(_ value: String) -> Bool {
-    guard !value.isEmpty, !value.hasPrefix("-") else { return false }
-    return !value.unicodeScalars.contains { scalar in
-      CharacterSet.whitespacesAndNewlines.contains(scalar)
-        || CharacterSet.controlCharacters.contains(scalar)
-    }
+    AgentArgumentToken.isWellFormed(value)
   }
 }

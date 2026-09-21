@@ -306,7 +306,8 @@ public actor AgentAvailabilityProbe {
       timeout: specification.versionTimeout
     )
     guard let result, !result.didTimeOut else { return nil }
-    return result.exitCode == 0
+    guard let outcome = specification.authenticationOutcome else { return result.exitCode == 0 }
+    return outcome(result)
   }
 }
 

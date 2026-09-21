@@ -18,6 +18,12 @@ public struct CommandLineAgentSpecification: Sendable {
   public let documentationURL: URL?
   /// The command a user types to sign in, shown by the authentication remediation.
   public let authenticationCommandLine: String?
+  /// Reads the sign in state out of the authentication command's result.
+  ///
+  /// `nil` keeps the default, which is the exit code alone. A CLI that exits with `0` whether
+  /// or not anybody is signed in has to say so in its own terms, and it is the provider — not
+  /// the probe — that knows how to read that answer, and which parts of it to refuse to read.
+  public let authenticationOutcome: (@Sendable (ProbeResult) -> Bool?)?
 
   public init(
     binaryName: String,
@@ -27,8 +33,10 @@ public struct CommandLineAgentSpecification: Sendable {
     authenticationArguments: [String]? = nil,
     additionalEnvironmentKeys: Set<String> = [],
     documentationURL: URL? = nil,
-    authenticationCommandLine: String? = nil
+    authenticationCommandLine: String? = nil,
+    authenticationOutcome: (@Sendable (ProbeResult) -> Bool?)? = nil
   ) {
+    self.authenticationOutcome = authenticationOutcome
     self.binaryName = binaryName
     self.candidateDirectories = candidateDirectories
     self.versionArguments = versionArguments
