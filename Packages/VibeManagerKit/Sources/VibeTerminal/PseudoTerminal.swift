@@ -124,22 +124,21 @@ enum PseudoTerminalLauncher {
   }
 
   private static func spawn(_ spec: TerminalSpec, slavePath: String) throws -> pid_t {
+    // The posix_spawn family returns its error code directly and leaves errno untouched, so the
+    // returned value is the only meaningful diagnostic.
     var fileActions: posix_spawn_file_actions_t?
-    guard posix_spawn_file_actions_init(&fileActions) == 0 else {
-      throw TerminalError.spawnFailed(code: errno)
+    let fileActionsResult = posix_spawn_file_actions_init(&fileActions)
+    guard fileActionsResult == 0 else {
+      throw TerminalError.spawnFailed(code: fileActionsResult)
     }
     defer { posix_spawn_file_actions_destroy(&fileActions) }
 
-    // Opening the slave by path, without O_NOCTTY, inside a brand new session makes it the
-    // controlling terminal of the child. Duplicating an inherited descriptor would not.
-    posix_spawn_file_actions_addopen(&fileActions, 0, slavePath, O_RDWR, 0)
-    posix_spawn_file_actions_adddup2(&fileActions, 0, 1)
-    posix_spawn_file_actions_adddup2(&fileActions, 0, 2)
-    posix_spawn_file_actions_addchdir_np(&fileActions, spec.workingDirectoryURL.path)
+    try configureFileActions(&fileActions, spec: spec, slavePath: slavePath)
 
     var attributes: posix_spawnattr_t?
-    guard posix_spawnattr_init(&attributes) == 0 else {
-      throw TerminalError.spawnFailed(code: errno)
+    let attributesResult = posix_spawnattr_init(&attributes)
+    guard attributesResult == 0 else {
+      throw TerminalError.spawnFailed(code: attributesResult)
     }
     defer { posix_spawnattr_destroy(&attributes) }
 
@@ -172,6 +171,35 @@ enum PseudoTerminalLauncher {
       throw launchError(forSpawnResult: result, executablePath: executablePath)
     }
     return processIdentifier
+  }
+
+  // An incomplete action list would start the child with no standard descriptors at all, under
+  // POSIX_SPAWN_CLOEXEC_DEFAULT, and it would die with an opaque status instead of a usable error.
+  // Every action is checked.
+  private static func configureFileActions(
+    _ fileActions: inout posix_spawn_file_actions_t?,
+    spec: TerminalSpec,
+    slavePath: String
+  ) throws {
+    // Opening the slave by path, without O_NOCTTY, inside a brand new session makes it the
+    // controlling terminal of the child. Duplicating an inherited descriptor would not.
+    let openResult = posix_spawn_file_actions_addopen(&fileActions, 0, slavePath, O_RDWR, 0)
+    guard openResult == 0 else {
+      throw TerminalError.pseudoTerminalUnavailable(code: openResult)
+    }
+
+    for descriptor in Int32(1)...Int32(2) {
+      let duplicateResult = posix_spawn_file_actions_adddup2(&fileActions, 0, descriptor)
+      guard duplicateResult == 0 else {
+        throw TerminalError.pseudoTerminalUnavailable(code: duplicateResult)
+      }
+    }
+
+    let workingDirectoryPath = spec.workingDirectoryURL.path
+    let chdirResult = posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectoryPath)
+    guard chdirResult == 0 else {
+      throw TerminalError.workingDirectoryUnavailable(path: workingDirectoryPath)
+    }
   }
 
   // posix_spawn reports the failure of the exec itself, so a missing or unrunnable binary is
