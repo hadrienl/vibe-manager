@@ -1,0 +1,158 @@
+import Foundation
+import VibeApplication
+import VibeDomain
+
+@testable import VibeTerminal
+
+enum TerminalTestSupport {
+  static func spec(
+    script: String,
+    size: TerminalSize = .default,
+    initialInput: String? = nil,
+    scrollback: TerminalScrollbackLimits = .default,
+    workingDirectory: URL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+  ) -> TerminalSpec {
+    TerminalSpec(
+      executableURL: URL(fileURLWithPath: "/bin/sh"),
+      arguments: ["-c", script],
+      environment: TerminalEnvironment.make(),
+      workingDirectoryURL: workingDirectory,
+      initialSize: size,
+      initialInput: initialInput,
+      scrollback: scrollback
+    )
+  }
+
+  static func makeSession(
+    script: String,
+    size: TerminalSize = .default,
+    initialInput: String? = nil,
+    scrollback: TerminalScrollbackLimits = .default
+  ) throws -> PTYTerminalSession {
+    try PTYTerminalSession.start(
+      id: SessionID(),
+      spec: spec(
+        script: script,
+        size: size,
+        initialInput: initialInput,
+        scrollback: scrollback
+      )
+    )
+  }
+}
+
+struct TerminalOutcome: Sendable {
+  var state: TerminalProcessState
+  var bytes: [UInt8]
+
+  var text: String {
+    String(decoding: bytes, as: UTF8.self)
+  }
+}
+
+// Collects every event until the session finalizes. A watchdog kills the process so that a
+// regression fails the test instead of hanging the suite.
+func runToCompletion(
+  _ session: PTYTerminalSession,
+  timeout: Duration = .seconds(15)
+) async -> TerminalOutcome {
+  let attachment = await session.attach()
+  let watchdog = Task {
+    try? await Task.sleep(for: timeout)
+    await session.kill()
+  }
+  defer { watchdog.cancel() }
+
+  var outcome = TerminalOutcome(state: attachment.state, bytes: attachment.history.bytes)
+  for await event in attachment.events {
+    switch event {
+    case .output(let chunk):
+      outcome.bytes.append(contentsOf: chunk)
+    case .stateChanged(let state):
+      outcome.state = state
+    case .historyTruncated:
+      break
+    }
+  }
+  return outcome
+}
+
+actor TerminalObserver {
+  private var bytes: [UInt8] = []
+  private var lastState: TerminalProcessState
+  private var isFinished = false
+  private var consumer: Task<Void, Never>?
+
+  init(state: TerminalProcessState) {
+    lastState = state
+  }
+
+  static func attach(to session: PTYTerminalSession) async -> TerminalObserver {
+    let attachment = await session.attach()
+    let observer = TerminalObserver(state: attachment.state)
+    await observer.consume(attachment.events)
+    return observer
+  }
+
+  private func consume(_ events: AsyncStream<TerminalEvent>) {
+    consumer = Task { [weak self] in
+      for await event in events {
+        await self?.ingest(event)
+      }
+      await self?.markFinished()
+    }
+  }
+
+  private func ingest(_ event: TerminalEvent) {
+    switch event {
+    case .output(let chunk):
+      bytes.append(contentsOf: chunk)
+    case .stateChanged(let state):
+      lastState = state
+    case .historyTruncated:
+      break
+    }
+  }
+
+  private func markFinished() {
+    isFinished = true
+  }
+
+  var text: String {
+    String(decoding: bytes, as: UTF8.self)
+  }
+
+  var state: TerminalProcessState {
+    lastState
+  }
+
+  func waitForText(
+    _ needle: String,
+    occurrences: Int = 1,
+    timeout: Duration = .seconds(10)
+  ) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+      if text.components(separatedBy: needle).count > occurrences { return true }
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+    return text.components(separatedBy: needle).count > occurrences
+  }
+
+  func waitForCompletion(timeout: Duration = .seconds(10)) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+      if isFinished { return true }
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+    return isFinished
+  }
+
+  func cancel() {
+    consumer?.cancel()
+  }
+}
+
+func isProcessAlive(_ processIdentifier: pid_t) -> Bool {
+  kill(processIdentifier, 0) == 0 || errno == EPERM
+}

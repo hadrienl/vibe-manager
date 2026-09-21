@@ -23,7 +23,7 @@ let package = Package(
       dependencies: ["VibeApplication", "VibeDomain"],
       resources: [.copy("Resources/mock-agent.sh")]
     ),
-    .target(name: "VibeTerminal", dependencies: ["VibeApplication"]),
+    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain"]),
     .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain"]),
     .target(name: "VibeUI", dependencies: ["VibeApplication", "VibeDomain"]),
     .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
@@ -38,6 +38,10 @@ let package = Package(
     .testTarget(
       name: "VibeAgentsTests",
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain"]
+    ),
+    .testTarget(
+      name: "VibeTerminalTests",
+      dependencies: ["VibeTerminal", "VibeApplication", "VibeDomain"]
     ),
     .testTarget(
       name: "VibeUITests",
