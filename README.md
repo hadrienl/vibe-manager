@@ -59,6 +59,12 @@ Session metadata is stored in the user's Application Support directory. The form
 backup and privacy decisions are documented in
 [`docs/architecture/0002-session-persistence.md`](docs/architecture/0002-session-persistence.md).
 
+Coding agents are reached through providers that only describe how to launch a CLI. Detection,
+diagnostics, the registry and the built-in mock agent are documented in
+[`docs/architecture/0003-agent-providers.md`](docs/architecture/0003-agent-providers.md). The
+mock provider is registered in Debug builds; set `VIBE_DISABLE_MOCK_AGENT` to hide it, or
+`VIBE_ENABLE_MOCK_AGENT` to expose it in a Release build.
+
 ## Configuration
 
 Shared, Debug and Release build settings live in `Configuration/*.xcconfig`. Local signing

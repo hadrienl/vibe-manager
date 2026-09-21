@@ -1,0 +1,126 @@
+import Foundation
+import Testing
+import VibeApplication
+import VibeDomain
+
+@testable import VibeUI
+
+private actor EmptyRepository: SessionRepository {
+  func sessions() -> [WorkSession] { [] }
+  func session(id: SessionID) -> WorkSession? { nil }
+  func save(_: WorkSession) {}
+}
+
+private struct StubAgentProvider: AgentProvider {
+  let descriptor: AgentDescriptor
+  let state: AgentAvailabilityState
+
+  init(id: String, state: AgentAvailabilityState) {
+    descriptor = AgentDescriptor(id: AgentProviderID(id), displayName: id.capitalized)
+    self.state = state
+  }
+
+  func availability(forceRefresh: Bool) async -> AgentAvailability {
+    AgentAvailability(
+      state: state,
+      installation: nil,
+      diagnostic: AgentDiagnostic(
+        providerID: descriptor.id,
+        providerName: descriptor.displayName,
+        state: state,
+        summary: "\(descriptor.displayName) state",
+        probedAt: Date(timeIntervalSince1970: 0),
+        remediations: [.retryDetection]
+      )
+    )
+  }
+
+  func models() async -> [AgentModel] { [] }
+
+  func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
+    throw AgentLaunchError.unavailable(state)
+  }
+}
+
+private struct StubAgentRegistry: AgentProviderResolving {
+  let providers: [StubAgentProvider]
+
+  func descriptors() async -> [AgentDescriptor] { providers.map(\.descriptor) }
+
+  func provider(id: AgentProviderID) async -> (any AgentProvider)? {
+    providers.first { $0.descriptor.id == id }
+  }
+
+  func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] {
+    var result: [AgentProviderID: AgentAvailability] = [:]
+    for provider in providers {
+      result[provider.descriptor.id] = await provider.availability(forceRefresh: forceRefresh)
+    }
+    return result
+  }
+}
+
+@MainActor
+@Test("Loading exposes the agent diagnostics in registration order")
+func appModelExposesAgentDiagnostics() async {
+  let model = AppModel(
+    repository: EmptyRepository(),
+    agents: StubAgentRegistry(providers: [
+      StubAgentProvider(id: "claude", state: .available),
+      StubAgentProvider(id: "codex", state: .notFound),
+    ])
+  )
+
+  await model.load()
+
+  #expect(model.agentDiagnostics.map(\.providerID.rawValue) == ["claude", "codex"])
+  #expect(model.agentDiagnostics.last?.state == .notFound)
+}
+
+@MainActor
+@Test("An unavailable agent never turns the application into a failed state")
+func unavailableAgentDoesNotFailTheApp() async {
+  let model = AppModel(
+    repository: EmptyRepository(),
+    agents: StubAgentRegistry(providers: [
+      StubAgentProvider(id: "codex", state: .probeFailed(reason: .timedOut))
+    ])
+  )
+
+  await model.load()
+
+  #expect(model.state == .loaded([]))
+  #expect(model.agentDiagnostics.count == 1)
+}
+
+@MainActor
+@Test("A session whose provider disappeared is reported as not resumable")
+func sessionWithRetiredProviderIsNotResumable() async {
+  let model = AppModel(
+    repository: EmptyRepository(),
+    agents: StubAgentRegistry(providers: [StubAgentProvider(id: "claude", state: .available)])
+  )
+
+  let retired = WorkSession(
+    name: "Old session",
+    agent: SessionAgentConfiguration(providerID: "retired", modelID: "whatever")
+  )
+  let current = WorkSession(
+    name: "Current session",
+    agent: SessionAgentConfiguration(providerID: "claude", modelID: "sonnet")
+  )
+
+  #expect(await model.resolution(for: retired) == .unknownProvider("retired"))
+  #expect(await model.resolution(for: current).isResumable)
+}
+
+@MainActor
+@Test("Without a registry the application still loads")
+func appModelWorksWithoutRegistry() async {
+  let model = AppModel(repository: EmptyRepository())
+
+  await model.load()
+
+  #expect(model.state == .loaded([]))
+  #expect(model.agentDiagnostics.isEmpty)
+}

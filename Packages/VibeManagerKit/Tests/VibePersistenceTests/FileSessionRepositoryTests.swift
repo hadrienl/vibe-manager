@@ -64,18 +64,21 @@ func fileRepositoryRoundTrip() async throws {
 func filePermissionsAndAllowlist() async throws {
   let storeURL = try makeStoreURL()
   defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
-  let repository = FileSessionRepository(storeURL: storeURL)
+  // The repository creates its own container here, which is the directory it is allowed to
+  // restrict; a caller-provided directory that already exists keeps its own permissions.
+  let containerURL = storeURL.deletingLastPathComponent()
+    .appendingPathComponent("container", isDirectory: true)
+  let containedStoreURL = containerURL.appendingPathComponent("sessions.json")
+  let repository = FileSessionRepository(storeURL: containedStoreURL)
 
   try await repository.save(makeCompleteSession())
 
-  let fileAttributes = try FileManager.default.attributesOfItem(atPath: storeURL.path)
-  let directoryAttributes = try FileManager.default.attributesOfItem(
-    atPath: storeURL.deletingLastPathComponent().path
-  )
+  let fileAttributes = try FileManager.default.attributesOfItem(atPath: containedStoreURL.path)
+  let directoryAttributes = try FileManager.default.attributesOfItem(atPath: containerURL.path)
   #expect((fileAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
   #expect((directoryAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o700)
 
-  let contents = try String(contentsOf: storeURL, encoding: .utf8)
+  let contents = try String(contentsOf: containedStoreURL, encoding: .utf8)
   #expect(!contents.contains("terminalOutput"))
   #expect(!contents.contains("environment"))
   #expect(!contents.contains("accessToken"))
@@ -271,4 +274,118 @@ func concurrentMutationsAreSerialized() async throws {
 
   let reloaded = try await repository.session(id: session.id)
   #expect(reloaded?.notes == "A user-authored note" + String(repeating: "x", count: 10))
+}
+
+@Test("A store from a newer version is never rewound to an older backup")
+func futureSchemaIsNotRecoverable() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
+  let repository = FileSessionRepository(storeURL: storeURL)
+
+  try await repository.save(makeCompleteSession(name: "Stale"))
+  try FileManager.default.copyItem(at: storeURL, to: backupURL)
+  let future = Data("{\"schemaVersion\":99,\"savedAt\":\"future\",\"sessions\":[]}".utf8)
+  try future.write(to: storeURL)
+
+  #expect(await repository.recoveryStatus() == .unsupportedVersion)
+  await #expect(throws: SessionStoreError.recoveryRefusedForNewerStore) {
+    try await repository.restoreBackup()
+  }
+  #expect(try Data(contentsOf: storeURL) == future)
+}
+
+@Test("An unreadable store is never restored over")
+func unreadableStoreIsNotRestorable() async throws {
+  let storeURL = try makeStoreURL()
+  defer {
+    try? FileManager.default.setAttributes(
+      [.posixPermissions: 0o600],
+      ofItemAtPath: storeURL.path
+    )
+    try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent())
+  }
+  let backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
+  let repository = FileSessionRepository(storeURL: storeURL)
+
+  try await repository.save(makeCompleteSession(name: "Stale"))
+  try FileManager.default.copyItem(at: storeURL, to: backupURL)
+  try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: storeURL.path)
+
+  #expect(await repository.recoveryStatus() == .storeUnreadable)
+  await #expect(throws: SessionStoreError.cannotAccessStore) {
+    try await repository.restoreBackup()
+  }
+}
+
+@Test("Saving over a legacy store keeps the pre-migration document as backup")
+func savingALegacyStoreBacksUpTheOriginalDocument() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
+  let legacy = """
+    {
+      "schemaVersion": 0,
+      "savedAt": "2026-09-21T10:00:00.000Z",
+      "sessions": [
+        {
+          "id": "88E8C16B-2824-4CCC-8EF4-C7A1C16EA3AD",
+          "name": "Legacy session",
+          "status": "closed",
+          "createdAt": "2026-09-21T09:00:00.000Z",
+          "updatedAt": "2026-09-21T10:00:00.000Z"
+        }
+      ]
+    }
+    """
+  try Data(legacy.utf8).write(to: storeURL)
+  let repository = FileSessionRepository(storeURL: storeURL)
+
+  try await repository.save(makeCompleteSession(name: "New"))
+
+  // A mutation commits once, so the backup still holds the document the migration replaced
+  // rather than an already migrated copy of it.
+  let backupObject = try #require(
+    try JSONSerialization.jsonObject(with: Data(contentsOf: backupURL)) as? [String: Any]
+  )
+  #expect(backupObject["schemaVersion"] as? Int == 0)
+  #expect(try await repository.sessions().map(\.name).sorted() == ["Legacy session", "New"])
+}
+
+@Test("A caller-provided directory keeps its own permissions")
+func existingDirectoryPermissionsAreLeftAlone() async throws {
+  let storeURL = try makeStoreURL()
+  let directory = storeURL.deletingLastPathComponent()
+  defer { try? FileManager.default.removeItem(at: directory) }
+  try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+
+  try await FileSessionRepository(storeURL: storeURL).save(makeCompleteSession())
+
+  let attributes = try FileManager.default.attributesOfItem(atPath: directory.path)
+  #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o755)
+}
+
+@Test("Sub-millisecond timestamps survive a round trip")
+func subMillisecondDatesRoundTrip() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let repository = FileSessionRepository(storeURL: storeURL)
+  var saved: [WorkSession] = []
+
+  for index in 0..<50 {
+    let now = Date()
+    var session = makeCompleteSession(name: "Session \(index)")
+    session = WorkSession(
+      id: session.id,
+      name: session.name,
+      status: .active,
+      createdAt: now,
+      updatedAt: now
+    )
+    try await repository.save(session)
+    saved.append(session)
+  }
+
+  let reloaded = try await repository.sessions()
+  #expect(Set(reloaded) == Set(saved))
 }

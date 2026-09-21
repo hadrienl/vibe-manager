@@ -32,6 +32,12 @@ public enum SessionStoreRecoveryStatus: Equatable, Sendable {
   case notNeeded
   case backupAvailable
   case unavailable
+  /// The store was written by a newer version of the application. Restoring an older backup over
+  /// it would silently downgrade it and lose that version's data, so it must be left untouched.
+  case unsupportedVersion
+  /// The store exists but its bytes cannot be read, so the damaged document cannot be quarantined
+  /// either. Restoring would destroy the only diagnostic evidence left.
+  case storeUnreadable
 }
 
 public protocol SessionStoreRecovery: Sendable {

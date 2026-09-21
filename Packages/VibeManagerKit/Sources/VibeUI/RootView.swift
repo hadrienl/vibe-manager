@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import VibeApplication
 
 public struct RootView: View {
   @State private var model: AppModel
@@ -45,6 +46,14 @@ public struct RootView: View {
       }
     }
     .frame(minWidth: 760, minHeight: 480)
+    .overlay(alignment: .bottomLeading) {
+      AgentDiagnosticsSummary(
+        diagnostics: model.agentDiagnostics,
+        isRefreshing: model.isRefreshingAgents,
+        refresh: { Task { await model.refreshAgents(forceRefresh: true) } }
+      )
+      .padding()
+    }
     .overlay(alignment: .bottomTrailing) {
       Text(buildVersion)
         .font(.caption)
