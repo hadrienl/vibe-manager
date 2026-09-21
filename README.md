@@ -65,6 +65,11 @@ diagnostics, the registry and the built-in mock agent are documented in
 mock provider is registered in Debug builds; set `VIBE_DISABLE_MOCK_AGENT` to hide it, or
 `VIBE_ENABLE_MOCK_AGENT` to expose it in a Release build.
 
+Sessions are created from a validated draft, then persisted, published and launched in that
+order. The rules of that sequence — why Cancel creates nothing, why a failed launch keeps the
+session, and why a model is optional — are documented in
+[`docs/architecture/0007-session-creation.md`](docs/architecture/0007-session-creation.md).
+
 Two real agents ship with the application, each documented with the choices its CLI forced:
 [`docs/architecture/0005-codex-provider.md`](docs/architecture/0005-codex-provider.md) and
 [`docs/architecture/0006-claude-code-provider.md`](docs/architecture/0006-claude-code-provider.md).
