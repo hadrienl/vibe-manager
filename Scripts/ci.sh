@@ -21,6 +21,9 @@ xcrun swift-format lint --recursive \
   Packages/VibeManagerKit/Package.swift
 
 echo "Running package tests"
+# Validate package sources with warnings promoted to errors here. Do not pass the equivalent
+# build setting globally to xcodebuild: Xcode 16.4 suppresses warnings for package dependencies,
+# and combining that inherited flag with warnings-as-errors makes the compiler reject both.
 swift test \
   --package-path "$package_path" \
   -Xswiftc -warnings-as-errors
@@ -34,6 +37,4 @@ xcodebuild \
   -derivedDataPath "$derived_data_path" \
   -clonedSourcePackagesDirPath "$source_packages_path" \
   CODE_SIGNING_ALLOWED=NO \
-  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-  GCC_TREAT_WARNINGS_AS_ERRORS=YES \
   build
