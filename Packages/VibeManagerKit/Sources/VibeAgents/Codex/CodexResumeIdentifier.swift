@@ -80,6 +80,32 @@ extension Character {
 }
 
 /// Finds the identifier of the Codex session a terminal just started.
+/// The Codex sessions already attributed to a pane in this process.
+///
+/// Two panes started seconds apart in the same repository see the same rollout files. Creation
+/// time alone cannot tell them apart — a slow pane would happily adopt the session of the pane
+/// that started just before it — so a session is claimed once and never handed out twice.
+public actor CodexSessionClaims {
+  public static let shared = CodexSessionClaims()
+
+  private var claimed: Set<String> = []
+
+  public init() {}
+
+  /// Claims a session for the caller. `false` means another pane already owns it.
+  public func claim(_ identifier: String) -> Bool {
+    claimed.insert(identifier).inserted
+  }
+
+  public func release(_ identifier: String) {
+    claimed.remove(identifier)
+  }
+
+  public func isClaimed(_ identifier: String) -> Bool {
+    claimed.contains(identifier)
+  }
+}
+
 public protocol CodexSessionDiscovering: Sendable {
   /// Identifier of the session created after `since` for that working directory, or `nil`
   /// when none appears before the deadline.
@@ -101,27 +127,31 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
   /// The first line carries the session metadata and the base instructions, which are large
   /// but bounded. A file without a newline within that window is simply not written yet.
   static let maximumFirstLineByteCount = 4 * 1024 * 1024
-  /// A rollout file is created a moment before or after the application notes the launch
-  /// date, and file timestamps have their own granularity. Kept small: every extra second
-  /// widens the window in which a previous session can be mistaken for this one.
-  static let creationTolerance: TimeInterval = 2
 
   private let sessionsDirectory: URL
   private let pollInterval: Duration
+  private let claims: CodexSessionClaims
 
   public init(
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    pollInterval: Duration = .milliseconds(500)
+    pollInterval: Duration = .milliseconds(500),
+    claims: CodexSessionClaims = .shared
   ) {
     self.init(
       sessionsDirectory: CodexHome.sessionsDirectory(environment: environment),
-      pollInterval: pollInterval
+      pollInterval: pollInterval,
+      claims: claims
     )
   }
 
-  public init(sessionsDirectory: URL, pollInterval: Duration = .milliseconds(500)) {
+  public init(
+    sessionsDirectory: URL,
+    pollInterval: Duration = .milliseconds(500),
+    claims: CodexSessionClaims = .shared
+  ) {
     self.sessionsDirectory = sessionsDirectory
     self.pollInterval = pollInterval
+    self.claims = claims
   }
 
   public func discoverSessionIdentifier(
@@ -135,7 +165,7 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
     let workingDirectory = Self.canonicalPath(workingDirectoryPath)
 
     while !Task.isCancelled {
-      if let identifier = identifier(matching: workingDirectory, since: since) {
+      if let identifier = await identifier(matching: workingDirectory, since: since) {
         return identifier
       }
       guard ContinuousClock.now < deadline else { return nil }
@@ -148,12 +178,14 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
     return nil
   }
 
-  private func identifier(matching workingDirectory: String, since: Date) -> String? {
+  private func identifier(matching workingDirectory: String, since: Date) async -> String? {
     let candidates = rollouts(since: since)
     for candidate in candidates {
       guard let meta = sessionMeta(at: candidate.url) else { continue }
       guard Self.canonicalPath(meta.cwd) == workingDirectory else { continue }
       guard UUID(uuidString: meta.sessionID) != nil else { continue }
+      // A session another pane already took is not ours, however well it matches.
+      guard await claims.claim(meta.sessionID) else { continue }
       return meta.sessionID
     }
     return nil
@@ -172,7 +204,9 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
       return []
     }
 
-    let floor = since.addingTimeInterval(-Self.creationTolerance)
+    // Strictly after the launch: a rollout created before it belongs to an earlier pane, and
+    // admitting it would let a pane started second adopt the session of the pane started first.
+    let floor = since
     var found: [(url: URL, createdAt: Date)] = []
     for case let url as URL in enumerator {
       // Rollouts are filed under year/month/day. A heavy user keeps years of them, so whole

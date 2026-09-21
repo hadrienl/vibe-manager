@@ -64,7 +64,7 @@ func storesIdentifier() async throws {
     identifier: "019ee0a1-06d9-7e52-957b-d61a982d6b43"
   )
 
-  #expect(changed)
+  #expect(changed == .recorded)
   let saved = await repository.session(id: stored.id)
   #expect(saved?.agent?.resumeIdentifier == "019ee0a1-06d9-7e52-957b-d61a982d6b43")
 }
@@ -76,7 +76,7 @@ func idempotentWrite() async throws {
   let repository = RecordingRepository(stored: stored)
   let record = RecordAgentResumeIdentifier(repository: repository)
 
-  #expect(try await record(sessionID: stored.id, identifier: identifier) == false)
+  #expect(try await record(sessionID: stored.id, identifier: identifier) == .unchanged)
   #expect(await repository.saveCount == 0)
 }
 
@@ -89,20 +89,24 @@ func ignoresBlankIdentifier() async throws {
     try await RecordAgentResumeIdentifier(repository: repository)(
       sessionID: stored.id,
       identifier: "  \n "
-    ) == false)
+    ) == .rejected)
   #expect(await repository.saveCount == 0)
 }
 
-@Test("A session without an agent gains no identifier")
+@Test("A session without an agent gains no identifier, and says so")
 func ignoresSessionWithoutAgent() async throws {
   let stored = session(hasAgent: false)
   let repository = RecordingRepository(stored: stored)
 
-  #expect(
-    try await RecordAgentResumeIdentifier(repository: repository)(
-      sessionID: stored.id,
-      identifier: "019ee0a1-06d9-7e52-957b-d61a982d6b43"
-    ) == false)
+  let outcome = try await RecordAgentResumeIdentifier(repository: repository)(
+    sessionID: stored.id,
+    identifier: "019ee0a1-06d9-7e52-957b-d61a982d6b43"
+  )
+
+  // Retryable: the configuration may simply not be attached yet.
+  #expect(outcome == .agentMissing)
+  #expect(outcome.isRetryable)
+  #expect(!outcome.isPersisted)
   #expect(await repository.saveCount == 0)
 }
 
@@ -114,7 +118,7 @@ func ignoresUnknownSession() async throws {
     try await RecordAgentResumeIdentifier(repository: repository)(
       sessionID: SessionID(),
       identifier: "019ee0a1-06d9-7e52-957b-d61a982d6b43"
-    ) == false)
+    ) == .sessionMissing)
   #expect(await repository.saveCount == 0)
 }
 
@@ -128,7 +132,7 @@ func replacesPreviousIdentifier() async throws {
     identifier: "019ee0a1-06d9-7e52-957b-d61a982d6b43"
   )
 
-  #expect(changed)
+  #expect(changed == .recorded)
   let saved = await repository.session(id: stored.id)
   #expect(saved?.agent?.resumeIdentifier == "019ee0a1-06d9-7e52-957b-d61a982d6b43")
 }
@@ -139,7 +143,7 @@ func concurrentChangeIsPreserved() async throws {
   let repository = RecordingRepository(stored: stored)
   let identifier = "019ee0a1-06d9-7e52-957b-d61a982d6b43"
 
-  async let recorded: Bool = RecordAgentResumeIdentifier(repository: repository)(
+  async let recorded: RecordAgentResumeIdentifierOutcome = RecordAgentResumeIdentifier(repository: repository)(
     sessionID: stored.id,
     identifier: identifier
   )

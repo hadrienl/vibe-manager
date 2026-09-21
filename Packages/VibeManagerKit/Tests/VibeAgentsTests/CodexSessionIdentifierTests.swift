@@ -95,8 +95,15 @@ struct CodexRolloutSessionDiscoveryTests {
     return url
   }
 
-  private func discovery(_ root: URL) -> CodexRolloutSessionDiscovery {
-    CodexRolloutSessionDiscovery(sessionsDirectory: root, pollInterval: .milliseconds(10))
+  private func discovery(
+    _ root: URL,
+    claims: CodexSessionClaims = CodexSessionClaims()
+  ) -> CodexRolloutSessionDiscovery {
+    CodexRolloutSessionDiscovery(
+      sessionsDirectory: root,
+      pollInterval: .milliseconds(10),
+      claims: claims
+    )
   }
 
   @Test("The rollout of the session just started is found")
@@ -246,6 +253,77 @@ struct CodexRolloutSessionDiscoveryTests {
       timeout: .seconds(1)
     )
     #expect(found == Self.identifier)
+  }
+
+  @Test("A pane started second does not adopt the session of the pane started first")
+  func doesNotAdoptEarlierPane() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let claims = CodexSessionClaims()
+
+    // The first pane launches and its rollout appears half a second later.
+    let firstLaunch = Date()
+    try writeRollout(
+      in: day,
+      cwd: "/Users/test/app",
+      createdAt: firstLaunch.addingTimeInterval(0.5)
+    )
+    #expect(
+      await discovery(root, claims: claims).discoverSessionIdentifier(
+        workingDirectoryPath: "/Users/test/app",
+        since: firstLaunch,
+        timeout: .seconds(1)
+      ) == Self.identifier)
+
+    // A second pane, same repository, a second later: that rollout is not its own.
+    let secondPane = "019ee0a1-9999-7e52-957b-d61a982d6b43"
+    let secondLaunch = firstLaunch.addingTimeInterval(1)
+    #expect(
+      await discovery(root, claims: claims).discoverSessionIdentifier(
+        workingDirectoryPath: "/Users/test/app",
+        since: secondLaunch,
+        timeout: .milliseconds(100)
+      ) == nil)
+
+    // It waits for the rollout it did create.
+    try writeRollout(
+      in: day,
+      identifier: secondPane,
+      cwd: "/Users/test/app",
+      createdAt: secondLaunch.addingTimeInterval(0.5),
+      name: "rollout-second-\(secondPane).jsonl"
+    )
+    #expect(
+      await discovery(root, claims: claims).discoverSessionIdentifier(
+        workingDirectoryPath: "/Users/test/app",
+        since: secondLaunch,
+        timeout: .seconds(1)
+      ) == secondPane)
+  }
+
+  @Test("A session already claimed by another pane is never handed out twice")
+  func claimsAreExclusive() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let claims = CodexSessionClaims()
+    let launchedAt = Date()
+    try writeRollout(in: day, cwd: "/Users/test/app", createdAt: launchedAt)
+
+    #expect(await claims.claim(Self.identifier))
+    #expect(
+      await discovery(root, claims: claims).discoverSessionIdentifier(
+        workingDirectoryPath: "/Users/test/app",
+        since: launchedAt,
+        timeout: .milliseconds(100)
+      ) == nil)
+
+    await claims.release(Self.identifier)
+    #expect(
+      await discovery(root, claims: claims).discoverSessionIdentifier(
+        workingDirectoryPath: "/Users/test/app",
+        since: launchedAt,
+        timeout: .seconds(1)
+      ) == Self.identifier)
   }
 
   @Test("A missing sessions directory times out instead of failing")

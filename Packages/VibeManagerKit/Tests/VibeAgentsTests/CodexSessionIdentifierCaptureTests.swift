@@ -201,6 +201,58 @@ struct CodexSessionIdentifierCaptureTests {
     #expect(await capture.identifier == nil)
     #expect(await repository.saveCount == 0)
   }
+
+  @Test("An identifier found before the session carries its agent is kept, not dropped")
+  func retriesUntilTheSessionCanCarryIt() async throws {
+    // The rollout file can appear before the creation flow has attached the agent
+    // configuration: a single failed write would make this session unresumable for good.
+    let session = WorkSession(name: "Refonte du parseur")
+    let repository = CaptureRepository(stored: session)
+    let capture = CodexSessionIdentifierCapture(
+      sessionID: session.id,
+      workingDirectoryPath: "/Users/test/app",
+      discovery: StubDiscovery(identifier: identifier),
+      record: RecordAgentResumeIdentifier(repository: repository),
+      timeout: .milliseconds(200),
+      persistenceWindow: .seconds(2),
+      retryInterval: .milliseconds(10)
+    )
+
+    await capture.start()
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await capture.identifier == nil)
+    #expect(await repository.session(id: session.id)?.agent == nil)
+
+    var ready = session
+    ready.agent = SessionAgentConfiguration(providerID: "codex", modelID: "gpt-6-astra")
+    await repository.save(ready)
+
+    try await waitUntil { await capture.identifier == identifier }
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+    #expect(await capture.unstoredIdentifier == nil)
+  }
+
+  @Test("An identifier that can never be stored is reported, not swallowed")
+  func reportsAnIdentifierItCouldNotStore() async throws {
+    let session = WorkSession(name: "Refonte du parseur")
+    let repository = CaptureRepository(stored: session)
+    let capture = CodexSessionIdentifierCapture(
+      sessionID: session.id,
+      workingDirectoryPath: "/Users/test/app",
+      discovery: StubDiscovery(identifier: nil),
+      record: RecordAgentResumeIdentifier(repository: repository),
+      timeout: .milliseconds(50),
+      persistenceWindow: .milliseconds(100),
+      retryInterval: .milliseconds(10)
+    )
+
+    await capture.start()
+    await capture.observe(output: "session id: \(identifier)\n")
+    _ = await capture.settled()
+
+    #expect(await capture.identifier == nil)
+    #expect(await capture.unstoredIdentifier == identifier)
+  }
 }
 
 /// Polls a condition instead of sleeping for a fixed time, so the suite stays fast and does

@@ -68,6 +68,13 @@ depend on how the interface renders. It keeps the *oldest* rollout created after
 not the newest: a pane started a second later in the same repository would otherwise be
 handed this pane's identifier, and both sessions would resume the same conversation.
 
+Two rules keep that attribution honest in both directions. The creation date is compared
+strictly against the launch, with no tolerance: a rollout older than the launch belongs to an
+earlier pane, and admitting it would let the pane started *second* adopt the session of the
+pane started first — the same confusion, mirrored. And `CodexSessionClaims` hands a session
+out once per process: a rollout another pane already took is not ours, however well it
+matches.
+
 `CodexResumeIdentifierExtractor` also reads the terminal output, but only accepts a well
 formed identifier on a line naming a session: the output echoes the prompt, and a prompt can
 contain a UUID of its own. `CodexTerminalIdentifierAccumulator` holds the unterminated tail of
@@ -78,7 +85,12 @@ wins and nothing overwrites it afterwards, so a false positive read from the scr
 replace what the rollout established, nor the other way round. A later launch of the same work
 session does replace it — that is a new conversation. `RecordAgentResumeIdentifier` stores the
 result through `SessionRepository.mutate`, after a read that keeps the steady state free of
-writes. No transcript is persisted: ADR 0002 excludes them and this ADR does not widen it.
+writes, and answers with *why* it did or did not write. The capture only considers an
+identifier acquired once that write landed: a rollout can appear before the creation flow has
+attached the agent configuration, and a single dropped write would make the session
+unresumable for good. A refusal that a later state could lift is retried within a bounded
+window; one that no state can lift is reported as `unstoredIdentifier` rather than passed off
+as a session that never revealed one. No transcript is persisted: ADR 0002 excludes them and this ADR does not widen it.
 
 The capture object is built by the provider and handed the session, its directory and the
 repository. Nothing starts an agent yet — the creation flow is #7 — so this ticket delivers
