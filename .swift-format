@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "lineLength": 100,
+  "indentation": {
+    "spaces": 2
+  },
+  "respectsExistingLineBreaks": true,
+  "rules": {
+    "AllPublicDeclarationsHaveDocumentation": false,
+    "AlwaysUseLowerCamelCase": true,
+    "DoNotUseSemicolons": true,
+    "FileScopedDeclarationPrivacy": true,
+    "FullyIndirectEnum": true,
+    "NeverForceUnwrap": true,
+    "NeverUseForceTry": true,
+    "OrderedImports": true,
+    "UseEarlyExits": true,
+    "UseLetInEveryBoundCaseVariable": true,
+    "UseShorthandTypeNames": true
+  }
+}
+
