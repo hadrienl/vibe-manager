@@ -67,7 +67,7 @@ let package = Package(
     ),
     .testTarget(
       name: "VibeUITests",
-      dependencies: ["VibeUI", "VibeApplication", "VibeDomain"]
+      dependencies: ["VibeUI", "VibeApplication", "VibeDomain", "VibeTerminalUI"]
     ),
   ]
 )
