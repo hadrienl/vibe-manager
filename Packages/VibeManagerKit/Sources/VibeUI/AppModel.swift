@@ -27,7 +27,6 @@ public final class AppModel {
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   public private(set) var isRefreshingAgents = false
-  private var isReloading = false
   public private(set) var selectedSessionID: SessionID?
   public private(set) var isPresentingNewSession = false
   public private(set) var newSessionModel: NewSessionModel?
@@ -44,13 +43,28 @@ public final class AppModel {
 
   /// A stop that could not be confirmed.
   public struct DetachWarning: Equatable {
+    /// What the user actually asked for. Closing and archiving both stop a process, and a
+    /// warning that named the wrong one would report an archive that never happened.
+    public enum Action: Equatable {
+      case closed
+      case archived
+
+      var verb: String {
+        switch self {
+        case .closed: return "closed"
+        case .archived: return "archived"
+        }
+      }
+    }
+
+    public let action: Action
     public let sessionName: String
     public let processIdentifier: Int32
 
     public var message: String {
       """
-      \(sessionName) was archived, but its process (pid \(processIdentifier)) did not answer the \
-      stop and may still be running.
+      \(sessionName) was \(action.verb), but its process (pid \(processIdentifier)) did not \
+      answer the stop and may still be running.
       """
     }
 
@@ -62,6 +76,7 @@ public final class AppModel {
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
   private var preferredSelection: SessionID?
   private var resolutionTask: Task<Void, Never>?
+  private var reloadTask: Task<Void, Never>?
 
   public let layout: WorkspaceLayoutController
 
@@ -142,15 +157,14 @@ public final class AppModel {
     change(&updated)
     guard updated != filter else { return }
     layout.setFilter(updated)
+  }
+
+  /// Changing scope moves the user somewhere else, so the selection follows.
+  public func setScope(_ scope: SessionScope) {
+    update { $0.scope = scope }
     reconcileSelection()
   }
 
-  public func setScope(_ scope: SessionScope) {
-    update { $0.scope = scope }
-  }
-
-  /// Walks Current → Archived → All. One shortcut rather than three: the scopes are an order,
-  /// and a key per scope would crowd the menu for a control that is one click away.
   public func cycleScope() {
     let scopes = SessionScope.allCases
     guard let index = scopes.firstIndex(of: filter.scope) else { return }
@@ -187,9 +201,15 @@ public final class AppModel {
     }
   }
 
-  /// Keeps the selection on something the user can actually see. A session archived out of the
-  /// current scope, or filtered away by a search, hands the selection to its neighbour rather
-  /// than leaving the detail column pointing at a row that is no longer listed.
+  /// Keeps the selection on something the user can actually see.
+  ///
+  /// Called when their place genuinely moved — a scope change, an archive, a reload — and never
+  /// while they type. Search narrows the list as the query grows, and handing the detail column
+  /// to another session on every keystroke would swap the terminal they are reading out from
+  /// under them, then leave it swapped once the query is cleared.
+  ///
+  /// With nothing visible the selection is left alone rather than cleared: a load caught
+  /// mid-write comes back short, and persisting a fallback there would lose their place for good.
   private func reconcileSelection() {
     let visible = visibleSessions
     guard let first = visible.first else { return }
@@ -214,8 +234,12 @@ public final class AppModel {
   /// Stops the agent and keeps everything else. The pane stays mounted so the last thing the
   /// agent said is still on screen.
   public func close(_ id: SessionID) async {
-    guard let closure = try? await closeSession(id: id) else { return }
-    report(closure.detachment, for: closure.session)
+    do {
+      let closure = try await closeSession(id: id)
+      report(closure.detachment, for: closure.session, action: .closed)
+    } catch {
+      await report(error)
+    }
     await reload()
   }
 
@@ -237,8 +261,14 @@ public final class AppModel {
   /// clears `pendingArchive`. Reading it here made Archive do nothing at all.
   public func archive(_ id: SessionID) async {
     pendingArchive = nil
-    guard let archival = try? await archiveSession(id: id) else { return }
-    report(archival.detachment, for: archival.session)
+    do {
+      let archival = try await archiveSession(id: id)
+      report(archival.detachment, for: archival.session, action: .archived)
+    } catch {
+      // An archive that failed is not a silent no-op. The dialog is already gone, so the banner
+      // is the only thing left that can say the session is still where it was.
+      await report(error)
+    }
     await reload()
     reconcileSelection()
   }
@@ -246,7 +276,11 @@ public final class AppModel {
   /// Brings a session back among the current ones, and starts nothing: it comes back closed,
   /// which is what Restart works from.
   public func restore(_ id: SessionID) async {
-    guard (try? await restoreSession(id: id)) != nil else { return }
+    do {
+      _ = try await restoreSession(id: id)
+    } catch {
+      await report(error)
+    }
     await reload()
     reconcileSelection()
   }
@@ -255,9 +289,14 @@ public final class AppModel {
     detachWarning = nil
   }
 
-  private func report(_ detachment: SessionDetachOutcome, for session: WorkSession) {
+  private func report(
+    _ detachment: SessionDetachOutcome,
+    for session: WorkSession,
+    action: DetachWarning.Action
+  ) {
     guard case .unreachable(let processIdentifier) = detachment else { return }
     detachWarning = DetachWarning(
+      action: action,
       sessionName: session.name,
       processIdentifier: processIdentifier
     )
@@ -441,11 +480,23 @@ public final class AppModel {
     await reload()
   }
 
+  /// Reloads, after any reload already under way rather than instead of it.
+  ///
+  /// Dropping a concurrent request was worse than it looked: a caller that had just written to
+  /// the store — archiving a session, say — would return from `reload()` immediately while an
+  /// older read, started before that write, went on to commit its stale list. The archive was
+  /// done and invisible. Chaining costs one extra read and makes "reload once I am done" true.
   public func reload() async {
-    guard !isReloading else { return }
-    isReloading = true
-    defer { isReloading = false }
+    let previous = reloadTask
+    let task = Task { @MainActor [weak self] in
+      await previous?.value
+      await self?.performReload()
+    }
+    reloadTask = task
+    await task.value
+  }
 
+  private func performReload() async {
     // A refresh over something already on screen never blanks it. The spinner belongs to the
     // first load, when there is genuinely nothing to show.
     if sessions.isEmpty {
@@ -478,6 +529,10 @@ public final class AppModel {
       } else if let first = visibleSessions.first {
         apply(selection: first.id)
       }
+      // A selection restored from a previous run can name a session this scope does not list —
+      // one archived since, or simply closed while the sidebar opens on Active. It falls back to
+      // a row the user can actually see, rather than to one the sidebar cannot show as selected.
+      reconcileSelection()
       // Not awaited: the sidebar draws perfectly well without knowing what each agent can do,
       // and on a cold cache this is a detection the first frame would otherwise wait for.
       resolutionTask?.cancel()
