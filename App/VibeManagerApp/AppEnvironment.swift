@@ -30,11 +30,15 @@ final class AppEnvironment {
       recovery: repository,
       agents: registry,
       launcher: launcher,
-      defaultWorkingDirectoryPath: AppEnvironment.defaultWorkingDirectory().path
+      defaultWorkingDirectoryPath: AppEnvironment.defaultWorkingDirectory().path,
+      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore())
     )
   }
 
   func stopAllTerminals() async {
+    // The pending layout is written first: quitting is exactly when the delayed save that keeps
+    // a separator drag cheap would otherwise be thrown away.
+    await appModel.layout.flush()
     await launcher.stopAll()
     await terminalSupervisor.stopAll(gracePeriod: .seconds(3))
   }

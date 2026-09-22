@@ -6,6 +6,10 @@ import VibeTerminalUI
 
 public struct RootView: View {
   private let model: AppModel
+  /// The widths the columns open at, taken once the stored layout has been read and then left
+  /// alone. Handing the measured width back as the column's ideal width would close the loop —
+  /// measure, store, propose again, resize — and fight the drag the user is in the middle of.
+  @State private var idealWidths: IdealColumnWidths?
 
   public init(model: AppModel) {
     self.model = model
@@ -37,9 +41,15 @@ public struct RootView: View {
         }
       }
     }
-    .frame(minWidth: 760, minHeight: 480)
+    // Narrower than the two sidebars plus a usable terminal on purpose: below the layout
+    // thresholds the columns fold, and the window is still worth opening.
+    .frame(minWidth: 640, minHeight: 480)
     .task {
       await model.load()
+      idealWidths = IdealColumnWidths(
+        sidebar: model.layout.intent.sidebarWidth,
+        inspector: model.layout.intent.inspectorWidth
+      )
     }
     .sheet(
       isPresented: Binding(
@@ -62,9 +72,14 @@ public struct RootView: View {
   }
 
   private var workspace: some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: sidebarVisibility) {
       SessionSidebar(model: model)
-        .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
+        .navigationSplitViewColumnWidth(
+          min: WorkspaceLayout.sidebarWidthRange.lowerBound,
+          ideal: idealWidths?.sidebar ?? model.layout.intent.sidebarWidth,
+          max: WorkspaceLayout.sidebarWidthRange.upperBound
+        )
+        .background(WidthReporter { model.layout.sidebarWidthChanged(to: $0) })
     } detail: {
       VStack(spacing: 0) {
         if let failure = model.refreshFailure {
@@ -89,8 +104,58 @@ public struct RootView: View {
           }
           .disabled(!model.canCreateSession)
         }
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            model.layout.toggleInspector()
+          } label: {
+            Label("Context", systemImage: "sidebar.right")
+          }
+          .disabled(model.selectedSession == nil)
+        }
+      }
+      .inspector(isPresented: inspectorPresented) {
+        Group {
+          if let session = model.selectedSession {
+            SessionContextInspector(
+              session: session,
+              resolution: model.resolution(forID: session.id)
+            )
+          } else {
+            // The inspector is only reachable with a selection, but a session can disappear
+            // under it: the column stays rather than snapping shut mid-refresh.
+            ContentUnavailableView(
+              "No session selected",
+              systemImage: "sidebar.right",
+              description: Text("Select a session to see its repositories and notes.")
+            )
+          }
+        }
+        .inspectorColumnWidth(
+          min: WorkspaceLayout.inspectorWidthRange.lowerBound,
+          ideal: idealWidths?.inspector ?? model.layout.intent.inspectorWidth,
+          max: WorkspaceLayout.inspectorWidthRange.upperBound
+        )
+        .background(WidthReporter { model.layout.inspectorWidthChanged(to: $0) })
       }
     }
+    // Measured on the whole split view: which columns fit is a question about the window, and
+    // the answer has to be known before either column decides whether to draw itself.
+    .background(WidthReporter { model.layout.windowWidthChanged(to: $0) })
+  }
+
+  /// `.detailOnly` is the only hidden state worth recording; the others all show the sidebar.
+  private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+    Binding(
+      get: { model.layout.columns.isSidebarVisible ? .all : .detailOnly },
+      set: { model.layout.setSidebarVisible($0 != .detailOnly) }
+    )
+  }
+
+  private var inspectorPresented: Binding<Bool> {
+    Binding(
+      get: { model.layout.columns.isInspectorVisible },
+      set: { model.layout.setInspectorVisible($0) }
+    )
   }
 
   @ViewBuilder
@@ -185,14 +250,44 @@ private struct RefreshFailureBanner: View {
   }
 }
 
+/// The widths the two columns open at, frozen once so that measuring them cannot move them.
+private struct IdealColumnWidths: Equatable {
+  let sidebar: Double
+  let inspector: Double
+}
+
+/// Reports the width of whatever it is placed behind, because SwiftUI never reports back the
+/// width a split view was actually dragged to.
+private struct WidthReporter: View {
+  let report: (Double) -> Void
+
+  var body: some View {
+    GeometryReader { proxy in
+      Color.clear
+        .onChange(of: proxy.size.width, initial: true) { _, width in
+          report(Double(width))
+        }
+    }
+  }
+}
+
 private struct SessionSidebar: View {
   @Bindable var model: AppModel
 
   var body: some View {
     List(selection: Binding(get: { model.selectedSessionID }, set: { model.select($0) })) {
-      ForEach(model.sessions) { session in
-        SessionRow(session: session, isRunning: model.pane(for: session.id)?.status == .running)
-          .tag(session.id)
+      ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
+        SessionRow(
+          session: session,
+          status: SessionStatusPresentation.make(
+            session: session,
+            paneStatus: model.pane(for: session.id)?.status,
+            resolution: model.resolution(forID: session.id)
+          ),
+          // Only the first nine rows can be reached by a shortcut, so only they claim one.
+          shortcutPosition: index < 9 ? index + 1 : nil
+        )
+        .tag(session.id)
       }
     }
     .listStyle(.sidebar)
@@ -210,7 +305,8 @@ private struct SessionSidebar: View {
 
 private struct SessionRow: View {
   let session: WorkSession
-  let isRunning: Bool
+  let status: SessionStatusPresentation
+  let shortcutPosition: Int?
 
   var body: some View {
     HStack(spacing: 10) {
@@ -224,22 +320,31 @@ private struct SessionRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        // Status is written out, never carried by colour alone.
-        Label(isRunning ? "Running" : session.status.rawValue.capitalized, systemImage: symbolName)
+        // Symbol, words and colour, in that order: the state survives a colour nobody can
+        // tell apart, and the identity colour of the session stays free to mean identity.
+        Label(status.label, systemImage: status.symbolName)
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(tint)
+          .lineLimit(1)
+      }
+      Spacer(minLength: 4)
+      if let shortcutPosition {
+        Text("⌘\(shortcutPosition)")
+          .font(.caption2)
+          .foregroundStyle(.tertiary)
+          .accessibilityHidden(true)
       }
     }
     .padding(.vertical, 4)
     .accessibilityElement(children: .combine)
+    .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
   }
 
-  private var symbolName: String {
-    if isRunning { return "play.circle" }
-    switch session.status {
-    case .active: return "play.circle"
-    case .closed: return "pause.circle"
-    case .archived: return "archivebox"
+  private var tint: Color {
+    switch status.severity {
+    case .normal: return .secondary
+    case .attention: return .orange
+    case .error: return .red
     }
   }
 }

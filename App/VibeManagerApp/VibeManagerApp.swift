@@ -23,6 +23,32 @@ struct VibeManagerApp: App {
         .keyboardShortcut("n", modifiers: .command)
         .disabled(!environment.appModel.canCreateSession)
       }
+
+      // In the menus rather than bound to the views: a shortcut that only works while a
+      // particular view holds focus is a shortcut nobody can rely on, and the menu is also
+      // where VoiceOver and the keyboard-only user find these actions at all.
+      CommandGroup(after: .sidebar) {
+        Button("Show Context") {
+          environment.appModel.layout.toggleInspector()
+        }
+        .keyboardShortcut("i", modifiers: [.command, .option])
+
+        Divider()
+
+        Button("Next Session") {
+          environment.appModel.selectNext()
+        }
+        .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+
+        Button("Previous Session") {
+          environment.appModel.selectPrevious()
+        }
+        .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+
+        SessionPositionCommands(model: environment.appModel)
+
+        Divider()
+      }
     }
 
     Settings {
@@ -32,6 +58,23 @@ struct VibeManagerApp: App {
       }
       .padding()
       .frame(width: 420)
+    }
+  }
+}
+
+/// One menu item per listed session, for ⌘1…⌘9.
+///
+/// Ten and beyond get no shortcut rather than a second modifier nobody would guess: past nine
+/// parallel tasks, the sidebar and its arrow keys are the honest way around.
+private struct SessionPositionCommands: View {
+  let model: AppModel
+
+  var body: some View {
+    ForEach(Array(model.sessions.prefix(9).enumerated()), id: \.element.id) { index, session in
+      Button(session.name) {
+        model.select(position: index + 1)
+      }
+      .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
     }
   }
 }

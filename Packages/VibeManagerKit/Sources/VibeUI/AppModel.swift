@@ -31,6 +31,14 @@ public final class AppModel {
   public private(set) var selectedSessionID: SessionID?
   public private(set) var isPresentingNewSession = false
   public private(set) var newSessionModel: NewSessionModel?
+  /// What each session's agent can do right now, refreshed with the detections. Held here so
+  /// that the sidebar and the inspector read the same answer instead of each probing again.
+  public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
+
+  /// The selection restored from the layout, kept until a load can tell whether it still exists.
+  private var preferredSelection: SessionID?
+
+  public let layout: WorkspaceLayoutController
 
   private let repository: any SessionRepository
   private let loadSessions: LoadSessions
@@ -44,7 +52,8 @@ public final class AppModel {
     recovery: (any SessionStoreRecovery)? = nil,
     agents: (any AgentProviderResolving)? = nil,
     launcher: SessionLauncher? = nil,
-    defaultWorkingDirectoryPath: String? = nil
+    defaultWorkingDirectoryPath: String? = nil,
+    layout: WorkspaceLayoutController = WorkspaceLayoutController()
   ) {
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
@@ -52,6 +61,7 @@ public final class AppModel {
     self.agents = agents
     self.launcher = launcher
     self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
+    self.layout = layout
   }
 
   public var sessions: [WorkSession] {
@@ -73,6 +83,9 @@ public final class AppModel {
 
   public func load() async {
     guard state == .idle else { return }
+    // The stored selection is read before the sessions, so the first list that arrives can be
+    // asked whether that session still exists instead of selecting its first row and losing it.
+    preferredSelection = await layout.restore()
     await reload()
     await refreshAgents()
   }
@@ -108,6 +121,10 @@ public final class AppModel {
         agentDiagnostics = descriptors.compactMap { diagnostics[$0.id] }
       }
     }
+
+    // A detection that just landed may have turned a session's agent from missing to ready, or
+    // the other way round, and the sidebar says so.
+    await refreshResolutions()
   }
 
   public func resolution(for session: WorkSession) async -> SessionAgentResolution {
@@ -117,6 +134,49 @@ public final class AppModel {
 
   public func select(_ id: SessionID?) {
     selectedSessionID = id
+    layout.select(id)
+  }
+
+  /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
+  /// wrapping: a repeated shortcut should not silently loop back to where it started.
+  public func selectNext() {
+    guard let index = selectedIndex else {
+      select(sessions.first?.id)
+      return
+    }
+    guard index + 1 < sessions.count else { return }
+    select(sessions[index + 1].id)
+  }
+
+  public func selectPrevious() {
+    guard let index = selectedIndex, index > 0 else { return }
+    select(sessions[index - 1].id)
+  }
+
+  /// Selects the session at a one-based position, for the ⌘1…⌘9 shortcuts.
+  public func select(position: Int) {
+    let index = position - 1
+    guard sessions.indices.contains(index) else { return }
+    select(sessions[index].id)
+  }
+
+  private var selectedIndex: Int? {
+    sessions.firstIndex { $0.id == selectedSessionID }
+  }
+
+  public func resolution(forID id: SessionID) -> SessionAgentResolution? {
+    resolutions[id]
+  }
+
+  /// Asks each listed session what its agent can do. Nothing here starts a detection of its own:
+  /// `ResolveSessionAgent` reads the availability the registry already holds.
+  public func refreshResolutions() async {
+    guard agents != nil else { return }
+    var resolved: [SessionID: SessionAgentResolution] = [:]
+    for session in sessions {
+      resolved[session.id] = await resolution(for: session)
+    }
+    resolutions = resolved
   }
 
   public func pane(for id: SessionID) -> TerminalPaneModel? {
@@ -172,13 +232,19 @@ public final class AppModel {
       state = .loading
     }
 
-    let previousSelection = selectedSessionID
+    let previousSelection = selectedSessionID ?? preferredSelection
     do {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
       refreshFailure = nil
-      selectedSessionID =
+      // A selection restored from a previous run may name a session that has been archived out
+      // of the list, or that never came back at all. It falls back instead of blocking the
+      // launch on a session that no longer exists.
+      select(
         sessions.contains { $0.id == previousSelection } ? previousSelection : sessions.first?.id
+      )
+      preferredSelection = nil
+      await refreshResolutions()
     } catch {
       await report(error)
     }
