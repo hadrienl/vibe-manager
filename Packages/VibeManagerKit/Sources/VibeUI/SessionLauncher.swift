@@ -115,9 +115,18 @@ public final class SessionLauncher {
     outputTasks[session.id]?.cancel()
     outputTasks[session.id] = Task {
       let attachment = await terminal.attach()
+      // One decoder for the whole stream: a read can end in the middle of a character, and the
+      // identifiers the observer looks for would be broken by a replacement character.
+      var decoder = UTF8StreamDecoder()
       for await event in attachment.events {
         guard case .output(let bytes) = event else { continue }
-        await observer.observe(output: String(decoding: bytes, as: UTF8.self))
+        let text = decoder.decode(bytes)
+        guard !text.isEmpty else { continue }
+        await observer.observe(output: text)
+      }
+      let tail = decoder.flush()
+      if !tail.isEmpty {
+        await observer.observe(output: tail)
       }
       await observer.finished()
     }
