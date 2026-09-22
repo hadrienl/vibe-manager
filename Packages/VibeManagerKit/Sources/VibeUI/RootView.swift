@@ -78,6 +78,8 @@ public struct RootView: View {
         }
         detail
       }
+      // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
+      // whole application. Repeating it bound the same key twice, under two conditions.
       .toolbar {
         ToolbarItem(placement: .primaryAction) {
           Button {
@@ -85,7 +87,6 @@ public struct RootView: View {
           } label: {
             Label("New Session", systemImage: "plus")
           }
-          .keyboardShortcut("n", modifiers: .command)
           .disabled(!model.canCreateSession)
         }
       }
@@ -95,37 +96,42 @@ public struct RootView: View {
   @ViewBuilder
   private var detail: some View {
     if let session = model.selectedSession {
-      if model.pane(for: session.id) != nil {
-        // Every terminal stays mounted, and changing session only changes which one is shown.
-        // Rebuilding the selected one instead meant a fresh, empty terminal for the frame it
-        // took to replay the history — and it threw away the scroll position with it.
-        ZStack {
-          ForEach(model.sessions) { listed in
-            if let pane = model.pane(for: listed.id) {
-              let isActive = listed.id == session.id
-              // Started by the launcher, so switching sessions never restarts an agent.
-              TerminalPaneView(model: pane, autoStart: false, isActive: isActive)
-                .id(listed.id)
-                .opacity(isActive ? 1 : 0)
-                .allowsHitTesting(isActive)
-                .accessibilityHidden(!isActive)
-            }
+      // Every terminal stays mounted, and changing session only changes which one is shown.
+      // Rebuilding the selected one instead meant a fresh, empty terminal for the frame it
+      // took to replay the history — and it threw away the scroll position with it.
+      //
+      // The panes stay mounted even when the selected session has none: selecting a session
+      // restored from the store without a terminal used to take the whole stack down with it,
+      // and its neighbours came back scrolled to the bottom.
+      ZStack {
+        ForEach(model.sessions) { listed in
+          if let pane = model.pane(for: listed.id) {
+            let isActive = listed.id == session.id
+            // Started by the launcher, so switching sessions never restarts an agent.
+            TerminalPaneView(model: pane, autoStart: false, isActive: isActive)
+              .id(listed.id)
+              .opacity(isActive ? 1 : 0)
+              .allowsHitTesting(isActive)
+              .accessibilityHidden(!isActive)
           }
         }
-      } else {
-        ContentUnavailableView {
-          Label(session.name, systemImage: session.appearance.symbolName)
-        } description: {
-          Text(
-            model.launchFailure(for: session.id)?.message
-              ?? "This session has no running terminal in this window."
-          )
-        } actions: {
-          if let suggestion = model.launchFailure(for: session.id)?.suggestion {
-            Text(suggestion)
-              .font(.callout)
-              .foregroundStyle(.secondary)
+
+        if model.pane(for: session.id) == nil {
+          ContentUnavailableView {
+            Label(session.name, systemImage: session.appearance.symbolName)
+          } description: {
+            Text(
+              model.launchFailure(for: session.id)?.message
+                ?? "This session has no running terminal in this window."
+            )
+          } actions: {
+            if let suggestion = model.launchFailure(for: session.id)?.suggestion {
+              Text(suggestion)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
           }
+          .background(.background)
         }
       }
     } else {

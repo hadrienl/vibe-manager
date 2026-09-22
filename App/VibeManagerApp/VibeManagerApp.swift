@@ -21,6 +21,7 @@ struct VibeManagerApp: App {
           environment.appModel.beginNewSession()
         }
         .keyboardShortcut("n", modifiers: .command)
+        .disabled(!environment.appModel.canCreateSession)
       }
     }
 
