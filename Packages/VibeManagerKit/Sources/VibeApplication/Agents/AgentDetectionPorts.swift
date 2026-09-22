@@ -25,6 +25,12 @@ public struct ExecutableSearchPlan: Hashable, Sendable {
 public enum ExecutableLocation: Hashable, Sendable {
   case found(path: String, source: AgentDetectionSource)
   case notExecutable(path: String, source: AgentDetectionSource)
+  /// The search could not be completed: the login shell never answered where the binary is.
+  ///
+  /// Distinct from `notFound`, which is an answer. A shell still sourcing its configuration has
+  /// said nothing about the installation, and reporting it as missing sends the user off to
+  /// install a CLI they already have.
+  case timedOut
   case notFound
 }
 

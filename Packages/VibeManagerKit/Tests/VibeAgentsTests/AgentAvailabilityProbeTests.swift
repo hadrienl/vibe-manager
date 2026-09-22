@@ -225,6 +225,19 @@ struct AgentAvailabilityProbeTests {
     #expect(processProbe.invocations.isEmpty)
   }
 
+  @Test("A login shell that never answered is not a missing agent")
+  func aSilentLoginShellIsNotAMissingAgent() async {
+    let availability = await probe(
+      locator: StubLocator(location: .timedOut),
+      processProbe: StubProcessProbe()
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .probeFailed(reason: .timedOut))
+    #expect(availability.diagnostic.remediations.first == .retryDetection)
+    // Being told to install a CLI that is already there is the verdict this avoids.
+    #expect(!availability.diagnostic.remediations.contains(.install(documentationURL: nil)))
+  }
+
   @Test("Concurrent callers share a single detection and the cache avoids further probes")
   func cachesAndCoalesces() async {
     let locator = CountingLocator(

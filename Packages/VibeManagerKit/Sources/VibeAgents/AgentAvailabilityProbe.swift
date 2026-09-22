@@ -140,6 +140,17 @@ public actor AgentAvailabilityProbe {
         at: now(),
         hints: hints
       )
+    case .timedOut:
+      // The search itself never completed, so nothing here says the agent is missing.
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .probeFailed(reason: .timedOut),
+        installation: nil,
+        detail:
+          "The login shell did not say where \(specification.binaryName) is, twice.",
+        at: now(),
+        hints: hints
+      )
     case .notExecutable(let path, let source):
       let installation = AgentInstallation(
         executablePath: path,
