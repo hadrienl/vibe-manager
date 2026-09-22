@@ -47,6 +47,56 @@ struct WorkspaceRefreshTests {
     #expect(model.state != .loading)
   }
 
+  @Test("A refresh that fails over a listed workspace keeps it, and says so in a banner")
+  func failedRefreshKeepsTheWorkspace() async {
+    let existing = WorkSession(name: "Already there")
+    let repository = FailingRepository(sessions: [existing])
+    let model = AppModel(repository: repository)
+    await model.reload()
+    #expect(model.state == .loaded([existing]))
+
+    await repository.startFailing()
+    await model.reload()
+
+    #expect(model.state == .loaded([existing]))
+    #expect(model.refreshFailure?.message.isEmpty == false)
+
+    model.dismissRefreshFailure()
+    #expect(model.refreshFailure == nil)
+  }
+
+  @Test("A first load that fails is the whole screen: there is nothing else to show")
+  func failedFirstLoadIsTheScreen() async {
+    let repository = FailingRepository(sessions: [])
+    await repository.startFailing()
+    let model = AppModel(repository: repository)
+
+    await model.reload()
+
+    #expect(model.refreshFailure == nil)
+    guard case .failed = model.state else {
+      Issue.record("expected a failed state, got \(model.state)")
+      return
+    }
+  }
+
+  @Test("A refresh that succeeds again clears the banner")
+  func recoveredRefreshClearsTheBanner() async {
+    let existing = WorkSession(name: "Already there")
+    let repository = FailingRepository(sessions: [existing])
+    let model = AppModel(repository: repository)
+    await model.reload()
+    await repository.startFailing()
+    await model.reload()
+    #expect(model.refreshFailure != nil)
+
+    await repository.stopFailing()
+    await model.reload()
+
+    #expect(model.refreshFailure == nil)
+    #expect(model.state == .loaded([existing]))
+  }
+
   private func plan() -> AgentLaunchPlan {
     AgentLaunchPlan(
       providerID: AgentProviderID("stub"),
@@ -98,4 +148,39 @@ private actor GatedRepository: SessionRepository {
       stored.append(session)
     }
   }
+}
+
+/// A store that can be made to refuse reads, to fail a refresh on demand.
+private actor FailingRepository: SessionRepository {
+  private var stored: [WorkSession]
+  private var isFailing = false
+
+  init(sessions: [WorkSession]) {
+    stored = sessions
+  }
+
+  func startFailing() { isFailing = true }
+  func stopFailing() { isFailing = false }
+
+  func sessions() throws -> [WorkSession] {
+    if isFailing { throw StoreUnavailable() }
+    return stored
+  }
+
+  func session(id: SessionID) throws -> WorkSession? {
+    try sessions().first { $0.id == id }
+  }
+
+  func save(_ session: WorkSession) throws {
+    if isFailing { throw StoreUnavailable() }
+    if let index = stored.firstIndex(where: { $0.id == session.id }) {
+      stored[index] = session
+    } else {
+      stored.append(session)
+    }
+  }
+}
+
+private struct StoreUnavailable: Error, LocalizedError {
+  var errorDescription: String? { "The session store could not be read." }
 }

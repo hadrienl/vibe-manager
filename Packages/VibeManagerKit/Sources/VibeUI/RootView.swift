@@ -66,18 +66,29 @@ public struct RootView: View {
       SessionSidebar(model: model)
         .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
     } detail: {
-      detail
-        .toolbar {
-          ToolbarItem(placement: .primaryAction) {
-            Button {
-              model.beginNewSession()
-            } label: {
-              Label("New Session", systemImage: "plus")
-            }
-            .keyboardShortcut("n", modifiers: .command)
-            .disabled(!model.canCreateSession)
-          }
+      VStack(spacing: 0) {
+        if let failure = model.refreshFailure {
+          RefreshFailureBanner(
+            failure: failure,
+            retry: { Task { await model.reload() } },
+            restore: { Task { await model.restoreBackup() } },
+            dismiss: { model.dismissRefreshFailure() }
+          )
+          Divider()
         }
+        detail
+      }
+      .toolbar {
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            model.beginNewSession()
+          } label: {
+            Label("New Session", systemImage: "plus")
+          }
+          .keyboardShortcut("n", modifiers: .command)
+          .disabled(!model.canCreateSession)
+        }
+      }
     }
   }
 
@@ -130,6 +141,41 @@ public struct RootView: View {
         .disabled(!model.canCreateSession)
       }
     }
+  }
+}
+
+/// A store failure shown over a workspace that keeps working.
+private struct RefreshFailureBanner: View {
+  let failure: AppModel.RefreshFailure
+  let retry: () -> Void
+  let restore: () -> Void
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+      Text(failure.message)
+        .font(.callout)
+        .lineLimit(2)
+      Spacer(minLength: 8)
+      if failure.canRestoreBackup {
+        Button("Restore Backup", action: restore)
+          .controlSize(.small)
+      }
+      Button("Try Again", action: retry)
+        .controlSize(.small)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
   }
 }
 

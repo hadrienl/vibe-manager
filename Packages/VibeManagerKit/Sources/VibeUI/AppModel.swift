@@ -14,7 +14,17 @@ public final class AppModel {
     case failed(message: String, canRestoreBackup: Bool)
   }
 
+  /// A failure that struck while something was already on screen.
+  ///
+  /// Kept apart from `State.failed`: that state is the whole screen, which is right for a first
+  /// load that found nothing, and wrong for a refresh over a workspace the user is working in.
+  public struct RefreshFailure: Equatable {
+    public let message: String
+    public let canRestoreBackup: Bool
+  }
+
   public private(set) var state: State = .idle
+  public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   public private(set) var isRefreshingAgents = false
   private var isReloading = false
@@ -166,11 +176,18 @@ public final class AppModel {
     do {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
+      refreshFailure = nil
       selectedSessionID =
         sessions.contains { $0.id == previousSelection } ? previousSelection : sessions.first?.id
     } catch {
-      state = await failure(for: error)
+      await report(error)
     }
+  }
+
+  /// Dismisses the banner. The sessions on screen are the ones the application already holds,
+  /// so there is nothing to reload before letting the user get back to work.
+  public func dismissRefreshFailure() {
+    refreshFailure = nil
   }
 
   private func insert(_ session: WorkSession) {
@@ -192,16 +209,26 @@ public final class AppModel {
     do {
       try await recovery.restoreBackup()
     } catch {
-      state = await failure(for: error)
+      await report(error)
       return
     }
     await reload()
   }
 
-  private func failure(for error: Error) async -> State {
-    .failed(
-      message: (error as? LocalizedError)?.errorDescription ?? "Unable to load work sessions.",
-      canRestoreBackup: await recovery?.recoveryStatus() == .backupAvailable
-    )
+  /// A store failure never takes the workspace away.
+  ///
+  /// With nothing on screen the failure *is* the screen — there is no other way to offer the
+  /// backup. With sessions already listed, and possibly an agent running in one of them, it is
+  /// a banner over them: a transient read error must not dismantle the terminals or lose the
+  /// user's place.
+  private func report(_ error: Error) async {
+    let message = (error as? LocalizedError)?.errorDescription ?? "Unable to load work sessions."
+    let canRestoreBackup = await recovery?.recoveryStatus() == .backupAvailable
+
+    if sessions.isEmpty {
+      state = .failed(message: message, canRestoreBackup: canRestoreBackup)
+    } else {
+      refreshFailure = RefreshFailure(message: message, canRestoreBackup: canRestoreBackup)
+    }
   }
 }
