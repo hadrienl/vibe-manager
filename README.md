@@ -102,6 +102,18 @@ the locks against a double launch and what happens when a resumed conversation t
 are documented in
 [`docs/architecture/0010-session-restart.md`](docs/architecture/0010-session-restart.md).
 
+Quitting is not a way to lose a day of context. On the way out, every running session is stopped,
+closed in the store and left behind as the intention to resume it; at the next launch those
+sessions come back with their provider's own resume, and nothing is asked again. A session the
+store still calls running is closed before the first list is drawn, because nothing can be running
+when the application has just started — and that state is how an unexpected stop is recognised. A
+crash is not an intention, so it offers the sessions instead of taking them; a second copy of the
+application is named and nothing is touched; a leftover process is signalled only when its
+identity is confirmed. The sessions come back one at a time, with progress and a way to cancel that
+stops nothing already running, and a restoration that sends a text to an agent is never automatic.
+The runtime document, the four verdicts and the bounded exit are documented in
+[`docs/architecture/0011-session-restoration.md`](docs/architecture/0011-session-restoration.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the
