@@ -16,9 +16,9 @@ therefore not a form to fill in again but a plan to rebuild from what is stored.
 
 ## Decisions
 
-### One verb, three answers
+### One verb, four answers
 
-The user presses **Restart**. Underneath, `SessionRestartMode` records which of three things that
+The user presses **Restart**. Underneath, `SessionRestartMode` records which of four things that
 turned out to be:
 
 - `firstLaunch` — the session was created and never ran (`closedAt == nil`). Nothing to resume,
@@ -63,12 +63,17 @@ means, and the user is told which of the four reasons applied
 
 `SessionContextBrief` is built from the name, the dates, the agent, the folders with their recorded
 `GitSnapshot`, the notes and the initial prompt — quoted as history, not restated as an order. No
-disk is read, no model is called, and the same session always yields the same text: a summary the
-user cannot predict is one they cannot check, and they are shown it before it is sent, in an
-editable field.
+disk is read, no model is called, and the same session always yields the same text on a given Mac:
+a summary the user cannot predict is one they cannot check, and they are shown it before it is
+sent, in an editable field. Only the time zone follows the reader — "closed at 18:40" is about the
+afternoon they remember, not about UTC — while the shape of every date is fixed.
 
 Every dated fact says when it was recorded. A three-day-old branch written in the present tense
 would have the agent reason about a branch that may no longer exist.
+
+Clearing the field is a real answer — start it again, tell it nothing — so an emptied summary
+becomes `freshWithoutContext` rather than a `freshWithContext` carrying nothing: the sheet and the
+terminal's separator both claim a summary was handed over, and neither may say so falsely.
 
 It is bounded by `AgentPromptLimits.argumentByteLimit` (16 KiB), because both CLIs refuse a prompt
 on the standard input — in a pseudo terminal, the standard input is the keyboard. Over the limit,
@@ -85,12 +90,37 @@ released, and a truncated transcript passed off as a report would be worse than 
 The window that matters is between the command and the first process — a detection plus a plan —
 and neither the launcher nor the domain has anything to say inside it. So:
 
-1. **Intent** — `AppModel.restartingSessionIDs` covers the whole round trip; the button, the menu
-   item and the accessibility action are disabled for as long as it lasts.
-2. **Execution** — `SessionLauncher.launch` already leaves alone a session whose pane is running,
-   and the restart goes through it: there is no second road to a process.
+1. **Intent** — `AppModel.restartingSessionIDs` covers the round trip, and `pendingRestart` covers
+   the wait for an answer. They are two states, not one: a summary on screen is not work in
+   flight, and holding the work lock for the life of a sheet would have been a lie that eventually
+   leaks. Both are consulted by `canRestart`, so the button, the menu item and the accessibility
+   action are withheld in either case — without which ⌃⌘R re-asked the question and left the text
+   the user had started editing attached to a plan nobody would send.
+2. **Execution** — `SessionLauncher.launch` leaves alone a session whose pane is running. For that
+   to be true, a pane must call itself `starting` from the moment `start` is entered, not once it
+   has measured itself: it waits up to 500 ms for a layout pass, and for that whole window it used
+   to still report the previous run's exit code. A second launch arriving there passed the guard,
+   was dropped silently by the pane's own re-entrancy check, and then wired its exit watch to the
+   dead terminal.
 3. **Truth** — `reopen` is legal only from `closed`, so a restart that got past the first two
    writes nothing rather than recording two openings for one closing.
+
+### Archiving and launching can cross, and only one of them may win
+
+`restartingSessionIDs` does not stop the user from archiving, and a restart holds a value read
+before a detection and a launch plan — seconds, on a cold cache. The store is therefore asked twice:
+once before the process is spawned, and once when `reopen` comes back refused. A refusal means the
+session moved while the launch was under way, and archived is the case that cannot be let through —
+the pane is disposed and the process stopped, because "nothing stays attached to an archived
+session" is worth nothing if a launch a moment too late can break it in silence. Any other refusal
+leaves the process alone: a session stored active with nothing running is #11's problem, and killing
+an agent to tidy a status would be the worse mistake.
+
+### A separator that was never earned is thrown away
+
+The notice is queued on the pane and consumed by the surface when it attaches to a terminal. A
+launch that never reaches one therefore has to drop it: kept, it would be drawn above the *next*
+process, announcing a restart that did not happen, at a time that is not that process's.
 
 The separator line travels *with* the launch rather than being posted beforehand, and that is not a
 detail: posting it meant creating the pane first, and a pane that exists but has never started
@@ -113,12 +143,17 @@ beforehand without reading the CLI's own store. When a **native** restart ends i
 Resuming** and does nothing else. Relaunching automatically would put an agent to work on a summary
 nobody has read.
 
+The window is measured against an injected `SessionClock`, which is the only reason its far side
+can be tested at all: the rule "past the probation, it is an ordinary close" would otherwise cost
+eight seconds of sleep per assertion. The attempt is consumed only once it has been judged, never
+before, so a pane that has not yet caught up with its process cannot swallow the offer for good.
+
 ### Failures leave the session exactly as it was
 
 The order is the one #7 set — plan, then process, then status — so everything that fails before the
 process leaves the session `closed`, with its notes and, above all, its `resumeIdentifier` intact: a
-session must not become unresumable by being restarted unsuccessfully. Each refusal carries a
-sentence and a remedy, shown as a banner rather than a dialog, because the workspace behind it keeps
+session must not become unresumable by being restarted unsuccessfully. A store that cannot be read is its own refusal, apart from "this session is gone": a failed read
+establishes nothing about what the store holds. Each refusal carries a sentence and a remedy, shown as a banner rather than a dialog, because the workspace behind it keeps
 working.
 
 ## Consequences

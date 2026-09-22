@@ -9,10 +9,13 @@ import VibeDomain
 /// safe to show to the user before it is sent — a summary they cannot predict is one they cannot
 /// check.
 public struct SessionContextBrief: Hashable, Sendable {
-  /// The parts a brief is made of, in the order they are given up when it has to shrink.
+  /// The parts a brief is made of, in the order they are written.
   ///
-  /// `heading`, `agent` and `instruction` are never dropped: a summary without them would not
-  /// say which work is being resumed, which is the one thing the agent cannot infer.
+  /// They are given up in a different order — the initial instruction first, then the notes, then
+  /// the folders — because the older a section is, the less of it still holds: an instruction
+  /// written days ago against files that have moved has aged more than the folder it was given in.
+  /// `heading`, `agent` and `instruction` are never dropped: a summary without them would not say
+  /// which work is being resumed, which is the one thing the agent cannot infer.
   public enum Section: String, Hashable, Sendable, CaseIterable {
     case heading
     case agent
@@ -202,10 +205,12 @@ public struct SessionContextBriefBuilder: Sendable {
     return result
   }
 
-  /// One fixed, locale-independent spelling of a date.
+  /// One fixed, locale-independent spelling of a date, in the reader's own time zone.
   ///
-  /// The brief is read by an agent and compared by tests; a date that changed shape with the
-  /// user's region would make both of those harder for no gain to anyone.
+  /// The brief is read by an agent and compared by tests, so its *shape* must not follow the
+  /// user's region. Its time zone does: "closed at 18:40" is about the afternoon the user
+  /// remembers, not about UTC. Two Macs in different zones therefore render the same session
+  /// differently, which is the one thing the summary is not identical about, and the right one.
   static func date(_ date: Date) -> String {
     formatter.string(from: date)
   }

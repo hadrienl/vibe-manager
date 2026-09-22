@@ -62,6 +62,9 @@ public enum SessionRestartExplanation: Equatable, Sendable {
 /// Everything that can stop a restart before anything is launched or written.
 public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
   case sessionMissing
+  /// The store itself could not be asked. Kept apart from `sessionMissing`, which claims the
+  /// session is gone — a statement about the store that a failed read has not established.
+  case storeUnreadable
   case notRestartable(SessionStatus)
   case agentUnassigned
   case agentUnknown(String)
@@ -74,6 +77,8 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
     switch self {
     case .sessionMissing:
       return "This session is no longer in the store."
+    case .storeUnreadable:
+      return "The session store could not be read."
     case .notRestartable(.active):
       return "This session is already running."
     case .notRestartable(.archived):
@@ -103,6 +108,8 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
     switch self {
     case .sessionMissing:
       return "Reload the workspace."
+    case .storeUnreadable:
+      return "Try again, and restore a backup if it persists."
     case .notRestartable(.archived):
       return "Unarchive it first, then restart it."
     case .notRestartable(.active):
@@ -192,7 +199,7 @@ public struct RestartSession: Sendable {
     } catch let refusal as SessionRestartRefusal {
       return refusal
     } catch {
-      return .sessionMissing
+      return .storeUnreadable
     }
   }
 
@@ -327,6 +334,27 @@ public struct RestartSession: Sendable {
     explanation: SessionRestartExplanation
   ) async throws -> SessionRestart {
     guard provider.descriptor.capabilities.supportsInitialPrompt else {
+      let plan = try await launchPlan(
+        from: provider,
+        request: AgentLaunchRequest(
+          workingDirectoryPath: path,
+          modelID: session.agent?.modelID,
+          initialPrompt: nil,
+          resume: .none
+        )
+      )
+      return SessionRestart(
+        session: session,
+        plan: plan,
+        mode: .freshWithoutContext,
+        explanation: explanation
+      )
+    }
+
+    // An emptied summary is a real answer — "start it again, tell it nothing" — but it must not
+    // be announced as a summary: the terminal's separator and the sheet both say one was sent.
+    if let contextOverride, contextOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
       let plan = try await launchPlan(
         from: provider,
         request: AgentLaunchRequest(

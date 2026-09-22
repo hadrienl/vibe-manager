@@ -132,6 +132,18 @@ struct RestartSessionTests {
     #expect(outcome.needsConfirmation)
   }
 
+  @Test("An emptied summary starts a process with nothing, and says so")
+  func emptiedSummaryIsNotAnnouncedAsOne() async throws {
+    let (restart, repository) = makeSubject(session: session(resumeIdentifier: nil))
+
+    let outcome = try await restart(id: repository.stored[0].id, contextOverride: "   \n  ")
+
+    // Clearing the field is a real answer — start it again, tell it nothing — but the mode must
+    // not keep claiming a summary was handed over.
+    #expect(outcome.mode == .freshWithoutContext)
+    #expect(outcome.plan.promptDelivery == .none)
+  }
+
   @Test("An edited summary is what gets sent, within the same ceiling")
   func editedSummaryIsUsed() async throws {
     let (restart, repository) = makeSubject(session: session(resumeIdentifier: nil))
@@ -185,6 +197,7 @@ struct RestartSessionTests {
     let (restart, repository) = makeSubject(session: session(status: .active, closedAt: nil))
 
     #expect(await restart.problem(for: repository.stored[0].id) == .notRestartable(.active))
+    #expect(await repository.writes == 0)
   }
 
   @Test("An agent that is not installed any more stops the restart, with its name")
@@ -192,6 +205,7 @@ struct RestartSessionTests {
     let (restart, repository) = makeSubject(session: session(providerID: "gone"))
 
     #expect(await restart.problem(for: repository.stored[0].id) == .agentUnknown("gone"))
+    #expect(await repository.writes == 0)
   }
 
   @Test("An agent that cannot run right now stops the restart, with its remedy")
@@ -205,6 +219,7 @@ struct RestartSessionTests {
       Issue.record("An unusable agent must refuse the restart")
       return
     }
+    #expect(await repository.writes == 0)
   }
 
   @Test("A folder that disappeared is caught before a terminal is ever opened")
@@ -215,6 +230,7 @@ struct RestartSessionTests {
       await restart.problem(for: repository.stored[0].id)
         == .workingDirectoryUnusable(path: "/work/app", status: .missing)
     )
+    #expect(await repository.writes == 0)
   }
 
   @Test("A session without a folder is refused rather than started somewhere arbitrary")
@@ -222,6 +238,7 @@ struct RestartSessionTests {
     let (restart, repository) = makeSubject(session: session(repositories: []))
 
     #expect(await restart.problem(for: repository.stored[0].id) == .noRepository)
+    #expect(await repository.writes == 0)
   }
 
   @Test("A session that is gone from the store is refused")

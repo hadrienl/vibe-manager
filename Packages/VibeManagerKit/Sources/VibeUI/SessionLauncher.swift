@@ -81,6 +81,12 @@ public final class SessionLauncher: SessionRuntime {
     // to remember the rule — and it is how "no process stays attached" survives their arrival.
     guard session.status != .archived else { return false }
     guard !isRunning(session.id) else { return true }
+    // Asked of the store rather than of the value the caller holds. Between the moment a restart
+    // read its session and the moment it gets here there is a detection and a launch plan, and a
+    // session archived in that window would otherwise be handed a brand new process.
+    if let current = try? await repository.session(id: session.id), current.status == .archived {
+      return false
+    }
 
     // The pane a session already has is reused rather than replaced. The view that renders it
     // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
@@ -91,14 +97,27 @@ public final class SessionLauncher: SessionRuntime {
     }
     await pane.start(spec: .agent(plan: plan))
 
-    guard let terminal = pane.session else { return false }
+    guard let terminal = pane.session else {
+      // The separator announced a process that never started. Left queued it would be shown above
+      // the *next* one, dating a restart that did not happen.
+      _ = pane.takePendingNotice()
+      return false
+    }
 
     // The session becomes active before anything is armed on it: it is stored closed until a
     // process exists, so a launch that never reached one leaves a session the user can retry
     // rather than a lie about a running agent — and a watch armed first would have nothing to
     // close. A process that has already ended by now would run its watch during the observer's
     // own await, find the session still closed, and leave it listed as running for good.
-    _ = try? await changeStatus(id: session.id, action: .reopen)
+    let reopened = try? await changeStatus(id: session.id, action: .reopen)
+    // `reopen` is legal only from `closed`, so its refusal is how the store says the session went
+    // somewhere else while this launch was under way. Archived is the one case that cannot be let
+    // through: the promise is that nothing stays attached to an archived session, and a process
+    // spawned a moment too late would break it in silence.
+    if reopened == nil, (try? await repository.session(id: session.id))??.status == .archived {
+      await dispose(session.id)
+      return false
+    }
     watchForExit(id: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     return true

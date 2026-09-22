@@ -254,6 +254,9 @@ public struct RootView: View {
           restart: { text in Task { await model.confirmRestart(text) } },
           cancel: { model.cancelRestart() }
         )
+        // Keyed on the session: the editor holds its text in `@State`, seeded once, so a sheet
+        // re-presented for another session would open on the previous session's summary.
+        .id(pending.sessionID)
       }
     }
   }

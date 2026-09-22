@@ -64,15 +64,20 @@ public final class TerminalPaneModel {
       self.spec = spec
     }
 
-    if viewportSize == nil {
-      await waitForViewport()
-    }
-
+    // The pane says it is starting *before* it waits for its size, not after. Waiting can take a
+    // layout pass, and a pane that still reported the previous run's exit code for that long read
+    // as idle to everything that asks `isRunning` — so a second launch arriving in the window got
+    // through, was dropped by the `isStarting` guard above, and then wired itself to the dead
+    // terminal this line is about to release.
     stateTask?.cancel()
     stateTask = nil
     session = nil
     status = .starting
     failure = nil
+
+    if viewportSize == nil {
+      await waitForViewport()
+    }
 
     var launchSpec = self.spec
     if let viewportSize {

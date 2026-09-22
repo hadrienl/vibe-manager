@@ -56,7 +56,8 @@ struct SessionRestartTests {
   private func makeWorkspace(
     session: WorkSession,
     supervisor: SpySupervisor = SpySupervisor(),
-    provider: StubProvider = StubProvider()
+    provider: StubProvider = StubProvider(),
+    clock: SessionClock = SystemSessionClock()
   ) -> (AppModel, SessionLauncher, SpySupervisor, MutableRepository) {
     let repository = MutableRepository(sessions: [session])
     let registry = StubRegistry(providers: [provider])
@@ -66,7 +67,12 @@ struct SessionRestartTests {
       agents: registry,
       viewportTimeout: .zero
     )
-    let model = AppModel(repository: repository, agents: registry, launcher: launcher)
+    let model = AppModel(
+      repository: repository,
+      agents: registry,
+      launcher: launcher,
+      clock: clock
+    )
     return (model, launcher, supervisor, repository)
   }
 
@@ -135,6 +141,87 @@ struct SessionRestartTests {
 
     #expect(!restarted)
     #expect(await supervisor.startCount == 1)
+  }
+
+  @Test("A launch that failed leaves no separator behind for the next one to show")
+  func failedLaunchDropsItsSeparator() async {
+    let path = folder()
+    let subject = session(path: path)
+    let (_, launcher, _, _) = makeWorkspace(
+      session: subject,
+      supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35))
+    )
+
+    let restarted = await launcher.restart(
+      SessionRestart(
+        session: subject,
+        plan: plan(path: path),
+        mode: .native(identifier: "kept-identifier"),
+        explanation: nil
+      )
+    )
+
+    #expect(!restarted)
+    // Kept, it would be drawn above the next process, dating a restart that never happened.
+    #expect(launcher.pane(for: subject.id)?.takePendingNotice().isEmpty == true)
+  }
+
+  @Test("A session archived while its restart was being prepared is not started")
+  func archivedDuringPreparationIsNotStarted() async {
+    let path = folder()
+    let subject = session(path: path)
+    let repository = MutableRepository(sessions: [subject])
+    // Archived after the restart read it, which is the whole of the window this guards.
+    await repository.archive(subject.id)
+    let supervisor = SpySupervisor()
+    let launcher = SessionLauncher(
+      supervisor: supervisor,
+      repository: repository,
+      agents: StubRegistry(providers: [StubProvider()]),
+      viewportTimeout: .zero
+    )
+
+    let restarted = await launcher.restart(
+      SessionRestart(
+        session: subject,
+        plan: plan(path: path),
+        mode: .native(identifier: "kept-identifier"),
+        explanation: nil
+      )
+    )
+
+    #expect(!restarted)
+    #expect(await supervisor.startCount == 0)
+  }
+
+  @Test("A session archived mid-launch keeps no process and no pane")
+  func archivedMidLaunchLeavesNothingAttached() async {
+    let path = folder()
+    let subject = session(path: path)
+    // Closed when the launch checks, archived by the time it writes: the one ordering in which a
+    // process could survive an archive.
+    let repository = RacingRepository(session: subject, archiveAfterReads: 1)
+    let supervisor = SpySupervisor()
+    let launcher = SessionLauncher(
+      supervisor: supervisor,
+      repository: repository,
+      agents: StubRegistry(providers: [StubProvider()]),
+      viewportTimeout: .zero
+    )
+
+    let restarted = await launcher.restart(
+      SessionRestart(
+        session: subject,
+        plan: plan(path: path),
+        mode: .native(identifier: "kept-identifier"),
+        explanation: nil
+      )
+    )
+
+    #expect(!restarted)
+    #expect(launcher.pane(for: subject.id) == nil)
+    #expect(await supervisor.session(for: subject.id) == nil)
+    #expect(await repository.session(id: subject.id)?.status == .archived)
   }
 
   // MARK: - What the workspace offers
@@ -229,6 +316,23 @@ struct SessionRestartTests {
     #expect(await supervisor.startCount == 0)
   }
 
+  @Test("A session waiting on its summary is not restarted a second time")
+  func pendingRestartHoldsTheCommand() async {
+    let path = folder()
+    let subject = session(resumeIdentifier: nil, path: path)
+    let (model, _, supervisor, _) = makeWorkspace(session: subject)
+    await model.reload()
+    await model.restart(subject.id)
+    let asked = model.pendingRestart
+
+    // ⌃⌘R again, while the sheet is open.
+    await model.restart(subject.id)
+
+    #expect(model.pendingRestart == asked)
+    #expect(model.canRestart(subject) == false)
+    #expect(await supervisor.startCount == 0)
+  }
+
   @Test("Confirming sends the summary the user read, and clears the question")
   func confirmingStartsTheFreshProcess() async {
     let path = folder()
@@ -313,6 +417,24 @@ struct SessionRestartTests {
     #expect(await supervisor.startCount == 1)
   }
 
+  @Test("An agent worked in for a while and quit is not a refused resume")
+  func exitAfterTheProbationIsOrdinary() async {
+    let path = folder()
+    let subject = session(path: path)
+    let clock = SteppableClock(Date(timeIntervalSince1970: 1_700_000_000))
+    let supervisor = SpySupervisor()
+    let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor, clock: clock)
+    await model.reload()
+    await model.restart(subject.id)
+
+    // Twenty seconds of work, then the agent exits with an error of its own.
+    clock.advance(by: 20)
+    await supervisor.finish(id: subject.id, state: .exited(code: 1))
+    await waitUntil { model.sessions.first?.status == .closed }
+
+    #expect(model.resumeFailure == nil)
+  }
+
   @Test("A clean exit right after a resume is an agent that finished, not a refused resume")
   func cleanExitIsNotAGhostResume() async {
     let path = folder()
@@ -340,6 +462,66 @@ struct SessionRestartTests {
 
 // MARK: - Doubles
 
+/// A clock a test moves by hand, for the one rule measured in seconds of real time.
+private final class SteppableClock: SessionClock, @unchecked Sendable {
+  private let lock = NSLock()
+  private var time: Date
+
+  init(_ time: Date) {
+    self.time = time
+  }
+
+  func now() -> Date {
+    lock.withLock { time }
+  }
+
+  func advance(by seconds: TimeInterval) {
+    lock.withLock { time += seconds }
+  }
+}
+
+/// A store that archives the session under the launch, after it has been read `archiveAfterReads`
+/// times. It reproduces the only ordering in which an archive and a launch can cross.
+private actor RacingRepository: SessionRepository {
+  private var stored: WorkSession
+  private var reads = 0
+  private let archiveAfterReads: Int
+
+  init(session: WorkSession, archiveAfterReads: Int) {
+    stored = session
+    self.archiveAfterReads = archiveAfterReads
+  }
+
+  func sessions() -> [WorkSession] { [stored] }
+
+  func session(id: SessionID) -> WorkSession? {
+    guard stored.id == id else { return nil }
+    defer {
+      reads += 1
+      if reads == archiveAfterReads {
+        try? stored.archive(at: stored.updatedAt)
+      }
+    }
+    return stored
+  }
+
+  func save(_ session: WorkSession) {
+    guard stored.id == session.id else { return }
+    stored = session
+  }
+
+  func mutate(
+    id: SessionID,
+    _ transform: @Sendable (inout WorkSession) throws -> Void
+  ) throws -> WorkSession? {
+    guard stored.id == id else { return nil }
+    var session = stored
+    try transform(&session)
+    stored = session
+    return session
+  }
+}
+
 private actor MutableRepository: SessionRepository {
   private var stored: [WorkSession]
 
@@ -359,6 +541,13 @@ private actor MutableRepository: SessionRepository {
     } else {
       stored.append(session)
     }
+  }
+
+  /// Archives the stored session the way the archiving use case would, for a test that needs the
+  /// store to disagree with the value a caller is holding.
+  func archive(_ id: SessionID) {
+    guard let index = stored.firstIndex(where: { $0.id == id }) else { return }
+    try? stored[index].archive(at: stored[index].updatedAt)
   }
 
   func mutate(
@@ -400,7 +589,9 @@ private actor SpySupervisor: TerminalSupervisor {
   func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
 
   func stop(id: SessionID, gracePeriod: Duration) async {
-    await sessions[id]?.finish(state: .exited(code: 0))
+    // Released as well as finished, exactly as `PTYTerminalSupervisor` does: a double that kept
+    // the entry would let a test claim nothing is attached while the supervisor still holds it.
+    await sessions.removeValue(forKey: id)?.finish(state: .exited(code: 0))
   }
 
   func stopAll(gracePeriod: Duration) {}

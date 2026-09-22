@@ -147,6 +147,7 @@ public final class AppModel {
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
   private let restartSession: RestartSession?
+  private let clock: any SessionClock
 
   public init(
     repository: any SessionRepository,
@@ -155,8 +156,12 @@ public final class AppModel {
     launcher: SessionLauncher? = nil,
     defaultWorkingDirectoryPath: String? = nil,
     layout: WorkspaceLayoutController = WorkspaceLayoutController(),
-    permissions: PermissionsModel? = nil
+    permissions: PermissionsModel? = nil,
+    // Only the resume probation reads it, and it is the one rule here measured in seconds of real
+    // time: without a clock to move, its far side could only be tested by waiting eight seconds.
+    clock: any SessionClock = SystemSessionClock()
   ) {
+    self.clock = clock
     self.permissions = permissions
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
@@ -375,6 +380,10 @@ public final class AppModel {
     guard restartSession != nil, launcher != nil else { return false }
     guard session.status == .closed else { return false }
     guard !restartingSessionIDs.contains(session.id) else { return false }
+    // A session whose summary is on screen waiting for an answer is still mid-restart: pressing
+    // ⌃⌘R again would build a second plan and replace the question under the user, leaving the
+    // text they had started editing attached to nothing.
+    guard pendingRestart?.sessionID != session.id else { return false }
     return launcher?.isRunning(session.id) != true
   }
 
@@ -429,6 +438,10 @@ public final class AppModel {
     confirmed: Bool = false
   ) async {
     guard let launcher, let restartSession else { return }
+    // A question already asked about this session is not asked twice; answering it is what moves
+    // it forward. `restartingSessionIDs` cannot carry this on its own, because the wait for an
+    // answer is not work in flight and would hold the lock for as long as the sheet is open.
+    guard confirmed || pendingRestart?.sessionID != id else { return }
     // The lock is taken before the first await, and it is what makes a second command — a second
     // click, a shortcut pressed twice — a no-op rather than a second agent.
     guard restartingSessionIDs.insert(id).inserted else { return }
@@ -454,7 +467,7 @@ public final class AppModel {
       }
 
       if case .native = restart.mode {
-        resumeAttempts[id] = Date()
+        resumeAttempts[id] = clock.now()
       } else {
         resumeAttempts[id] = nil
       }
@@ -490,18 +503,29 @@ public final class AppModel {
   /// two, and starting a fresh agent on a summary nobody has read would double the work behind
   /// the user's back; the offer is made instead.
   private func noteProcessDidFinish(_ id: SessionID) {
-    guard let startedAt = resumeAttempts.removeValue(forKey: id) else { return }
-    guard Date().timeIntervalSince(startedAt) < Self.resumeProbation else { return }
+    guard let startedAt = resumeAttempts[id] else { return }
+    guard clock.now().timeIntervalSince(startedAt) < Self.resumeProbation else {
+      // Out of the window: an agent that was worked in and quit, which is not this offer's
+      // business. The attempt is dropped so a later close cannot be judged against it.
+      resumeAttempts[id] = nil
+      return
+    }
+    // The attempt is only consumed once it has actually been judged. A pane that has not caught
+    // up with its process yet would otherwise swallow the offer for good.
     guard let status = launcher?.pane(for: id)?.status else { return }
     switch status {
     case .exited(let code):
       // A clean exit is an agent that finished, whatever it was handed.
-      guard code != 0 else { return }
+      guard code != 0 else {
+        resumeAttempts[id] = nil
+        return
+      }
     case .terminated, .failed:
       break
     case .running, .starting:
       return
     }
+    resumeAttempts[id] = nil
     guard let session = sessions.first(where: { $0.id == id }) else { return }
     resumeFailure = ResumeFailure(sessionID: id, sessionName: session.name)
   }
