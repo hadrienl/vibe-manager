@@ -118,15 +118,23 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     if await waitForCompletion(within: Self.forcedStopTimeout) { return }
 
     // The process is unreachable — a zombie parent or a stuck kernel wait. The session must
-    // still release its descriptors and report an outcome, but the group may well be alive.
-    finalize(with: .terminated(signal: SIGKILL), didReapProcess: false)
+    // still release its descriptors and report an outcome, but the group may well be alive, so
+    // the outcome says it is unknown rather than claiming a kill that was never confirmed.
+    // Closing and archiving read this state to warn instead of promising nothing is left.
+    finalize(
+      with: .failed(.processOutcomeUnknown(processIdentifier: terminal.processIdentifier)),
+      didReapProcess: false
+    )
   }
 
   public func kill() async {
     guard !currentState.isFinished else { return }
     terminal.signalProcessGroup(SIGKILL)
     if await waitForCompletion(within: Self.forcedStopTimeout) { return }
-    finalize(with: .terminated(signal: SIGKILL), didReapProcess: false)
+    finalize(
+      with: .failed(.processOutcomeUnknown(processIdentifier: terminal.processIdentifier)),
+      didReapProcess: false
+    )
   }
 
   var processIdentifierForTesting: pid_t {
