@@ -183,7 +183,7 @@ public struct RootView: View {
     let agent = isRunning ? "Its running agent will be stopped. " : ""
     return """
       \(agent)Nothing is deleted: notes, repositories and Git metadata are kept, and the session \
-      stays readable under Archived.
+      stays readable under Closed. It can no longer be reopened until it is unarchived.
       """
   }
 
@@ -345,7 +345,7 @@ private struct ArchivedSessionDetail: View {
       HStack(spacing: 10) {
         Image(systemName: "archivebox.fill")
           .foregroundStyle(.secondary)
-        Text("This session is archived. Nothing was deleted.")
+        Text("This session is archived: nothing was deleted, and it cannot be reopened.")
           .font(.callout)
         Spacer(minLength: 8)
         Button("Unarchive", action: restore)
@@ -387,8 +387,8 @@ private struct ArchivedSessionDetail: View {
           Text(
             """
             Repositories, Git metadata, notes and the initial prompt are kept, and are listed in \
-            the context column. Unarchiving brings the session back as closed; restarting its \
-            agent stays a separate, deliberate step.
+            the context column. An archived session stays in Closed, but cannot be reopened: \
+            unarchive it first, then restarting its agent is a separate, deliberate step.
             """
           )
           .font(.callout)
@@ -488,24 +488,27 @@ private struct SessionSidebar: View {
       } actions: {
         Button("Clear Filter") { model.clearNarrowing() }
       }
-    } else if model.filter.scope == .archived {
+    } else if model.filter.scope == .closed {
       ContentUnavailableView(
-        "No archived session",
-        systemImage: "archivebox",
-        description: Text("Archived sessions are kept here, and can be unarchived at any time.")
+        "No closed session",
+        systemImage: "stop.circle",
+        description: Text("Sessions land here when their agent stops. Nothing is ever deleted.")
       )
     } else {
       ContentUnavailableView(
-        "No sessions",
+        "No active session",
         systemImage: "square.stack.3d.up",
-        description: Text("Press ⌘N to create one.")
+        description: Text("Press ⌘N to start one, or look under Closed for earlier work.")
       )
     }
   }
 }
 
-/// The archive is never a trapdoor: its tab carries how much is in it, so a session put away is
-/// still something the user knows is there.
+/// Two tabs, split on whether something is running — not on whether it was archived.
+///
+/// An archived session is a closed session that may not be reopened, so it belongs in Closed
+/// beside the others rather than in a list of its own: the user looking for past work should
+/// find all of it in one place, and only then discover which of it is still resumable.
 private struct ScopePicker: View {
   let model: AppModel
 
@@ -515,7 +518,7 @@ private struct ScopePicker: View {
       selection: Binding(get: { model.filter.scope }, set: { model.setScope($0) })
     ) {
       ForEach(SessionScope.allCases, id: \.self) { scope in
-        Text(label(for: scope)).tag(scope)
+        Text(scope.label).tag(scope)
       }
     }
     .pickerStyle(.segmented)
@@ -523,11 +526,6 @@ private struct ScopePicker: View {
     .padding(.horizontal, 10)
     .padding(.vertical, 8)
     .accessibilityLabel("Sessions shown")
-  }
-
-  private func label(for scope: SessionScope) -> String {
-    guard scope == .archived, model.archivedSessionCount > 0 else { return scope.label }
-    return "\(scope.label) (\(model.archivedSessionCount))"
   }
 }
 

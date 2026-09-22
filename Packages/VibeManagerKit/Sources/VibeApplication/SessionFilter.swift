@@ -2,25 +2,29 @@ import Foundation
 import VibeDomain
 
 /// Which part of the history a view is looking at.
+///
+/// The split is "is something running here", not "has this been archived". Those are two
+/// different questions: the first is what the user is doing right now, the second is whether a
+/// finished session may be picked up again. Archiving therefore does not move a session between
+/// the two — a closed session and an archived one are both done — it decides whether the one in
+/// the closed list can be reopened.
 public enum SessionScope: String, Codable, CaseIterable, Sendable {
-  /// Everything that has not been archived: what the user is working on, running or not.
-  case current
-  case archived
-  case all
+  /// Sessions with a live agent.
+  case active
+  /// Everything that is finished, archived or not.
+  case closed
 
   public var label: String {
     switch self {
-    case .current: return "Current"
-    case .archived: return "Archived"
-    case .all: return "All"
+    case .active: return "Active"
+    case .closed: return "Closed"
     }
   }
 
   public func includes(_ status: SessionStatus) -> Bool {
     switch self {
-    case .current: return status != .archived
-    case .archived: return status == .archived
-    case .all: return true
+    case .active: return status == .active
+    case .closed: return status != .active
     }
   }
 }
@@ -54,7 +58,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
   public var repositoryPath: String?
 
   public init(
-    scope: SessionScope = .current,
+    scope: SessionScope = .active,
     sort: SessionSort = .lastActivity,
     searchText: String = "",
     agentProviderIDs: Set<String> = [],
@@ -73,12 +77,16 @@ public struct SessionFilter: Equatable, Sendable, Codable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    // Each field is decoded on its own terms, and a value this build does not know falls back
+    // rather than throwing. A scope written by a later version must cost the user their sort
+    // order at worst — thrown from here, it would take the whole layout down with it, columns,
+    // widths and selection included.
     self.init(
-      scope: try container.decodeIfPresent(SessionScope.self, forKey: .scope) ?? .current,
-      sort: try container.decodeIfPresent(SessionSort.self, forKey: .sort) ?? .lastActivity,
-      agentProviderIDs: try container.decodeIfPresent(
-        Set<String>.self, forKey: .agentProviderIDs) ?? [],
-      repositoryPath: try container.decodeIfPresent(String.self, forKey: .repositoryPath)
+      scope: (try? container.decodeIfPresent(SessionScope.self, forKey: .scope)) ?? .active,
+      sort: (try? container.decodeIfPresent(SessionSort.self, forKey: .sort)) ?? .lastActivity,
+      agentProviderIDs: (try? container.decodeIfPresent(
+        Set<String>.self, forKey: .agentProviderIDs)) ?? [],
+      repositoryPath: try? container.decodeIfPresent(String.self, forKey: .repositoryPath)
     )
   }
 

@@ -7,7 +7,8 @@ import VibeDomain
 private func session(
   id: SessionID = SessionID(),
   name: String,
-  status: SessionStatus = .closed,
+  // Active by default, so a test that says nothing about scope lands in the default one.
+  status: SessionStatus = .active,
   providerID: String? = "claude-code",
   repositoryPaths: [String] = ["/work/api"],
   prompt: String = "",
@@ -38,21 +39,26 @@ struct SessionFilterScopeTests {
     session(name: "Archived", status: .archived),
   ]
 
-  @Test("Current shows everything that has not been archived")
-  func currentHidesArchivedOnly() {
-    let visible = SessionFilter(scope: .current).apply(to: sessions)
-    #expect(visible.map(\.name).sorted() == ["Closed", "Running"])
+  @Test("Active shows only the sessions with a live agent")
+  func activeShowsOnlyRunningSessions() {
+    let visible = SessionFilter(scope: .active).apply(to: sessions)
+    #expect(visible.map(\.name) == ["Running"])
   }
 
-  @Test("Archived shows only the archive")
-  func archivedShowsTheArchive() {
-    let visible = SessionFilter(scope: .archived).apply(to: sessions)
-    #expect(visible.map(\.name) == ["Archived"])
+  /// The split is running / finished, not archived / not. An archived session is a closed one
+  /// that may not be reopened, so it is listed with the others rather than hidden away.
+  @Test("Closed shows every finished session, archived ones included")
+  func closedShowsArchivedToo() {
+    let visible = SessionFilter(scope: .closed).apply(to: sessions)
+    #expect(visible.map(\.name).sorted() == ["Archived", "Closed"])
   }
 
-  @Test("All shows everything")
-  func allShowsEverything() {
-    #expect(SessionFilter(scope: .all).apply(to: sessions).count == 3)
+  @Test("A session is in exactly one scope")
+  func scopesPartitionTheStore() {
+    for session in sessions {
+      let scopes = SessionScope.allCases.filter { $0.includes(session.status) }
+      #expect(scopes.count == 1)
+    }
   }
 }
 
@@ -83,13 +89,13 @@ struct SessionFilterSearchTests {
   @Test("Search and scope narrow together")
   func searchAppliesWithinTheScope() {
     let sessions = [
-      session(name: "Refactor", status: .archived),
+      session(name: "Refactor", status: .active),
       session(name: "Refactor", status: .closed),
     ]
 
-    let filter = SessionFilter(scope: .archived, searchText: "refactor")
+    let filter = SessionFilter(scope: .closed, searchText: "refactor")
 
-    #expect(filter.apply(to: sessions).map(\.status) == [.archived])
+    #expect(filter.apply(to: sessions).map(\.status) == [.closed])
   }
 }
 
@@ -199,7 +205,7 @@ struct SessionFilterCodingTests {
   @Test("Scope, sort and facets are stored; the search text is not")
   func searchTextIsNeverPersisted() throws {
     let filter = SessionFilter(
-      scope: .archived,
+      scope: .closed,
       sort: .name,
       searchText: "half-typed query",
       agentProviderIDs: ["codex"],
@@ -209,7 +215,7 @@ struct SessionFilterCodingTests {
     let data = try JSONEncoder().encode(filter)
     let restored = try JSONDecoder().decode(SessionFilter.self, from: data)
 
-    #expect(restored.scope == .archived)
+    #expect(restored.scope == .closed)
     #expect(restored.sort == .name)
     #expect(restored.agentProviderIDs == ["codex"])
     #expect(restored.repositoryPath == "/work/api")
@@ -223,6 +229,19 @@ struct SessionFilterCodingTests {
     let restored = try JSONDecoder().decode(SessionFilter.self, from: data)
 
     #expect(restored == SessionFilter())
-    #expect(restored.scope == .current)
+    #expect(restored.scope == .active)
+  }
+
+  /// A filter is a preference, and a preference cannot be allowed to take the whole layout down
+  /// with it: decoding a scope a later build introduced must cost the user their sort order at
+  /// worst, not their columns, their widths and their selection.
+  @Test("A value written by a later build falls back instead of throwing")
+  func unknownRawValuesFallBack() throws {
+    let data = Data(#"{"scope":"someFutureScope","sort":"byVibes"}"#.utf8)
+
+    let restored = try JSONDecoder().decode(SessionFilter.self, from: data)
+
+    #expect(restored.scope == .active)
+    #expect(restored.sort == .lastActivity)
   }
 }

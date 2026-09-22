@@ -25,7 +25,7 @@ struct WorkspaceSelectionTests {
 
   @Test("A stored selection that no longer exists does not block the launch")
   func missingSelectionFallsBack() async {
-    let listed = WorkSession(name: "Still here")
+    let listed = WorkSession(name: "Still here", status: .active)
     let store = RecordingLayoutStore(layout: WorkspaceLayout(selectedSessionID: SessionID()))
     let model = AppModel(
       repository: StubRepository(sessions: [listed]),
@@ -91,9 +91,12 @@ struct WorkspaceSelectionTests {
 
   @Test("The shortcuts walk the sidebar in the order it is drawn, and stop at its ends")
   func keyboardNavigationWalksTheList() async {
-    let first = WorkSession(name: "First", updatedAt: Date(timeIntervalSince1970: 300))
-    let second = WorkSession(name: "Second", updatedAt: Date(timeIntervalSince1970: 200))
-    let third = WorkSession(name: "Third", updatedAt: Date(timeIntervalSince1970: 100))
+    let first = WorkSession(
+      name: "First", status: .active, updatedAt: Date(timeIntervalSince1970: 300))
+    let second = WorkSession(
+      name: "Second", status: .active, updatedAt: Date(timeIntervalSince1970: 200))
+    let third = WorkSession(
+      name: "Third", status: .active, updatedAt: Date(timeIntervalSince1970: 100))
     let model = AppModel(repository: StubRepository(sessions: [first, second, third]))
     await model.load()
     #expect(model.selectedSessionID == first.id)

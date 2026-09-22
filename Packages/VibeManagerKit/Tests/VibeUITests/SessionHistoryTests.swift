@@ -195,18 +195,17 @@ struct SessionHistoryTests {
     model.requestArchive(archived.id)
     await model.archive(archived.id)
 
-    #expect(model.visibleSessions.map(\.name) == ["Still working"])
     #expect(model.archivedSessionCount == 1)
-    // The selection never stays on a row that is no longer listed.
-    #expect(model.selectedSessionID == kept.id)
 
-    model.setScope(.archived)
-    #expect(model.visibleSessions.map(\.name) == ["Done with this"])
+    // Both are finished, so both are under Closed; only their status tells them apart.
+    model.setScope(.closed)
+    #expect(model.visibleSessions.count == 2)
+    #expect(
+      model.visibleSessions.filter { $0.status == .archived }.map(\.name)
+        == ["Done with this"])
 
     await model.restore(archived.id)
-    #expect(model.visibleSessions.isEmpty)
-    model.setScope(.current)
-    #expect(model.visibleSessions.count == 2)
+    #expect(model.visibleSessions.allSatisfy { $0.status == .closed })
     #expect(await repository.session(id: archived.id)?.status == .closed)
   }
 
@@ -241,7 +240,9 @@ struct SessionHistoryTests {
     await model.archive(stored.id)
 
     #expect(model.detachWarning?.processIdentifier == 4242)
+    #expect(model.detachWarning?.action == .archived)
     #expect(model.detachWarning?.message.contains(stored.name) == true)
+    #expect(model.detachWarning?.message.contains("archived") == true)
     model.dismissDetachWarning()
     #expect(model.detachWarning == nil)
   }
@@ -249,12 +250,13 @@ struct SessionHistoryTests {
   @Test("Narrowing the list never unmounts a terminal")
   func filteringLeavesThePanesAlone() async {
     let stored = session(name: "Refactor")
-    let other = session(name: "Documentation")
+    let other = session(name: "Documentation", status: .active)
     let repository = MutableRepository(sessions: [stored, other])
     let launcher = launcher(supervisor: SpySupervisor(), repository: repository)
     let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
     await model.load()
     await launcher.launch(session: stored, plan: plan())
+    await model.reload()
     let pane = model.pane(for: stored.id)
 
     model.setSearchText("documentation")
@@ -288,7 +290,7 @@ struct SessionHistoryTests {
       layout: WorkspaceLayoutController(store: store, saveDelay: .zero)
     )
     await first.load()
-    first.setScope(.all)
+    first.setScope(.closed)
     first.setSort(.name)
     first.setSearchText("webhook")
     await first.layout.flush()
@@ -300,29 +302,47 @@ struct SessionHistoryTests {
     )
     await second.load()
 
-    #expect(second.filter.scope == .all)
+    #expect(second.filter.scope == .closed)
     #expect(second.filter.sort == .name)
     #expect(second.filter.searchText.isEmpty)
   }
 
   @Test("⌘1…⌘9 and the arrows walk the list the user is looking at")
   func navigationFollowsTheFilter() async {
-    let visible = session(name: "Visible")
-    let archived = session(name: "Archived", status: .archived)
-    let repository = MutableRepository(sessions: [visible, archived])
+    let running = session(name: "Running", status: .active)
+    let finished = session(name: "Finished", status: .closed)
+    let repository = MutableRepository(sessions: [running, finished])
     let model = AppModel(repository: repository, agents: EmptyRegistry())
     await model.load()
 
     model.select(position: 1)
-    #expect(model.selectedSessionID == visible.id)
+    #expect(model.selectedSessionID == running.id)
 
-    // There is only one row in the current scope, so there is nowhere to step to.
+    // There is only one row in the active scope, so there is nowhere to step to.
     model.selectNext()
-    #expect(model.selectedSessionID == visible.id)
+    #expect(model.selectedSessionID == running.id)
 
-    model.setScope(.archived)
+    model.setScope(.closed)
     model.select(position: 1)
-    #expect(model.selectedSessionID == archived.id)
+    #expect(model.selectedSessionID == finished.id)
+  }
+
+  /// Search narrows as the query grows. Handing the detail column to another session on every
+  /// keystroke would swap the terminal being read out from under the user, and leave it swapped
+  /// once the query was cleared.
+  @Test("Typing a search never moves the selection")
+  func searchLeavesTheSelectionAlone() async {
+    let first = session(name: "Refactor", status: .active)
+    let second = session(name: "Documentation", status: .active)
+    let repository = MutableRepository(sessions: [first, second])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.select(first.id)
+
+    model.setSearchText("documentation")
+
+    #expect(model.visibleSessions.map(\.name) == ["Documentation"])
+    #expect(model.selectedSessionID == first.id)
   }
 
   private func waitUntil(

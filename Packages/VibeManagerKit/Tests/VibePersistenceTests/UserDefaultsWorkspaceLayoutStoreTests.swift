@@ -46,7 +46,7 @@ struct UserDefaultsWorkspaceLayoutStoreTests {
     let store = UserDefaultsWorkspaceLayoutStore(suiteName: suite)
     let layout = WorkspaceLayout(
       sessionFilter: SessionFilter(
-        scope: .archived,
+        scope: .closed,
         sort: .name,
         searchText: "half-typed query",
         agentProviderIDs: ["codex"],
@@ -57,7 +57,7 @@ struct UserDefaultsWorkspaceLayoutStoreTests {
     await store.save(layout)
     let loaded = await UserDefaultsWorkspaceLayoutStore(suiteName: suite).load()
 
-    #expect(loaded.sessionFilter.scope == .archived)
+    #expect(loaded.sessionFilter.scope == .closed)
     #expect(loaded.sessionFilter.sort == .name)
     #expect(loaded.sessionFilter.agentProviderIDs == ["codex"])
     #expect(loaded.sessionFilter.repositoryPath == "/work/api")
