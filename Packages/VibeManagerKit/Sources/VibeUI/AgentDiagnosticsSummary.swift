@@ -67,9 +67,11 @@ struct AgentDiagnosticsSummary: View {
     switch state {
     case .available: return .green
     case .unauthenticated, .outdated: return .orange
-    // A pending answer is worth an eye, not an alarm; a real failure keeps the quiet grey of
-    // something the user has to go and fix.
-    case .probeFailed(let reason): return reason.isTransient ? .orange : .secondary
+    // Every probe failure is worth an eye, whatever its reason: tinting the silent agent and
+    // leaving the broken one grey would rank a transient problem above a real one. The symbol
+    // tells them apart, the colour only says that something happened.
+    case .probeFailed: return .orange
+    // Nothing to be alarmed about: there is simply nothing installed here yet.
     case .notFound, .notExecutable: return .secondary
     }
   }
