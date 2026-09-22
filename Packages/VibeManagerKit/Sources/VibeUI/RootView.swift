@@ -69,6 +69,24 @@ public struct RootView: View {
         )
       }
     }
+    // Shown at launch and nowhere else. The alerts it exists to replace fall in the middle of
+    // creating a session, which is precisely where this question must never be asked.
+    .sheet(
+      isPresented: Binding(
+        get: { model.permissions?.isPresentingStep == true },
+        set: { isPresented in
+          guard !isPresented, let permissions = model.permissions else { return }
+          Task { await permissions.skipStep() }
+        }
+      )
+    ) {
+      if let permissions = model.permissions {
+        FullDiskAccessSheet(
+          openSystemSettings: { Task { await permissions.openSystemSettings() } },
+          skip: { Task { await permissions.skipStep() } }
+        )
+      }
+    }
   }
 
   private var workspace: some View {

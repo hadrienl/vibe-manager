@@ -10,6 +10,9 @@ import VibeUI
 @MainActor
 final class AppEnvironment {
   let appModel: AppModel
+  /// Held here as well as inside the model: the settings window is a scene of its own, and it
+  /// must read the same status the workspace read rather than probe the system a second time.
+  let permissions: PermissionsModel
 
   private let terminalSupervisor: PTYTerminalSupervisor
   private let launcher: SessionLauncher
@@ -25,13 +28,23 @@ final class AppEnvironment {
       repository: repository,
       agents: registry
     )
+    // The only permission the application ever asks for, wired to the system that answers it:
+    // the TCC witness for the status, the user defaults for the answer already given.
+    let permissions = PermissionsModel(
+      gate: FullDiskAccessGate(
+        probe: TCCFullDiskAccessProbe(),
+        preferences: UserDefaultsPermissionPreferences()
+      )
+    )
+    self.permissions = permissions
     appModel = AppModel(
       repository: repository,
       recovery: repository,
       agents: registry,
       launcher: launcher,
       defaultWorkingDirectoryPath: AppEnvironment.defaultWorkingDirectory().path,
-      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore())
+      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore()),
+      permissions: permissions
     )
   }
 
