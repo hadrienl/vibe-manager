@@ -70,6 +70,12 @@ order. The rules of that sequence — why Cancel creates nothing, why a failed l
 session, and why a model is optional — are documented in
 [`docs/architecture/0007-session-creation.md`](docs/architecture/0007-session-creation.md).
 
+Sessions are then worked in from a three-column workspace: the sessions on the left, the selected
+terminal in the middle, the context of that session on the right. Changing session changes what
+is shown and nothing else — no process is restarted and no scrollback is lost. The layout, the
+folding thresholds of the columns and what is restored at launch are documented in
+[`docs/architecture/0008-workspace-layout.md`](docs/architecture/0008-workspace-layout.md).
+
 Two real agents ship with the application, each documented with the choices its CLI forced:
 [`docs/architecture/0005-codex-provider.md`](docs/architecture/0005-codex-provider.md) and
 [`docs/architecture/0006-claude-code-provider.md`](docs/architecture/0006-claude-code-provider.md).
