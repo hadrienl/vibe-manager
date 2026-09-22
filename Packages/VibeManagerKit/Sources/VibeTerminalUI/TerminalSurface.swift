@@ -140,6 +140,9 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     eventTask?.cancel()
     eventTask = Task { [session] in
       let attachment = await session.attach()
+      // Before the history of the new session, and in the same task, so a restart's separator
+      // cannot race the first bytes of the process it announces.
+      feed(pane.takePendingNotice())
       feed(attachment.history.bytes)
       for await event in attachment.events {
         guard !Task.isCancelled else { return }

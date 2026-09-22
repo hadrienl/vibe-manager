@@ -27,12 +27,20 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     self.severity = severity
   }
 
+  /// - Parameter wasStoppedOnPurpose: the application asked this process to end — Close or
+  ///   Archive. An agent killed that way reports the signal it was killed with (143 for
+  ///   `SIGTERM`), which is not a crash and must not be shown as one: the session says "Closed",
+  ///   which is what the user just did to it.
   public static func make(
     session: WorkSession,
     paneStatus: TerminalPaneModel.Status?,
-    resolution: SessionAgentResolution? = nil
+    resolution: SessionAgentResolution? = nil,
+    wasStoppedOnPurpose: Bool = false
   ) -> SessionStatusPresentation {
-    let process = paneStatus.flatMap(process)
+    let process = wasStoppedOnPurpose ? nil : paneStatus.flatMap(process)
+    if wasStoppedOnPurpose, let paneStatus, hasEnded(paneStatus) {
+      return stored(session)
+    }
 
     // A terminal that is live, or that ended badly, says more than a detection: it reports what
     // just happened here. Only once nothing is running, and nothing went wrong, does a missing
@@ -49,6 +57,11 @@ public struct SessionStatusPresentation: Equatable, Sendable {
       return process
     }
 
+    return stored(session)
+  }
+
+  /// What the store says, for a session with nothing to report about a process.
+  private static func stored(_ session: WorkSession) -> SessionStatusPresentation {
     switch session.status {
     case .active:
       // Stored as active with nothing running here: the session is real, its terminal is not.
@@ -88,6 +101,15 @@ public struct SessionStatusPresentation: Equatable, Sendable {
   /// stored status is left to speak.
   /// Whether a terminal's own state is worth more than what its agent can do: it is running, or
   /// it ended badly. A clean exit is neither, and steps aside for a missing agent.
+  private static func hasEnded(_ status: TerminalPaneModel.Status) -> Bool {
+    switch status {
+    case .starting, .running:
+      return false
+    case .exited, .terminated, .failed:
+      return true
+    }
+  }
+
   private static func outranksResolution(_ status: TerminalPaneModel.Status) -> Bool {
     switch status {
     case .starting, .running, .terminated, .failed:

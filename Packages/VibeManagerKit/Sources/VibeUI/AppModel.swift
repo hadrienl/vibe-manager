@@ -73,6 +73,59 @@ public final class AppModel {
     }
   }
 
+  /// Restarts under way, from the moment the command is pressed to the moment a process exists
+  /// or the attempt has failed.
+  ///
+  /// This is the lock that matters. The launcher already refuses to start a session whose pane
+  /// is running, and the domain refuses to reopen anything but a closed session — but between
+  /// the command and the first process there is a window where neither has anything to say, and
+  /// it is exactly as long as a detection plus a plan.
+  public private(set) var restartingSessionIDs: Set<SessionID> = []
+  /// A restart waiting on the user, because it is about to start a second conversation.
+  public private(set) var pendingRestart: PendingRestart?
+  /// A restart that never reached a process.
+  public private(set) var restartFailure: RestartFailure?
+  /// Sessions whose conversation the agent gave up on within seconds of being handed it.
+  ///
+  /// Kept, and acted on at the *next* restart rather than announced when it happens. The news
+  /// that a conversation is gone is only useful to someone asking for that session back; as a
+  /// banner it arrived over a session the user had just finished with, interrupting them to
+  /// report something they had not asked for.
+  ///
+  /// Held for this run of the application only. A lock left behind by a killed CLI is often gone
+  /// by the next launch, and a session refused today deserves one more honest try tomorrow.
+  public private(set) var resumeRefusals: Set<SessionID> = []
+
+  /// When each resumed conversation was handed to its agent, kept only for as long as it takes
+  /// to tell a refused resume from an ordinary exit.
+  private var resumeAttempts: [SessionID: Date] = [:]
+
+  /// How long after a resume an exit still counts as the resume being refused.
+  ///
+  /// Long enough for a CLI to start, fail to find the conversation and say so; short enough that
+  /// an agent someone worked in for a minute and quit is never mistaken for one.
+  static let resumeProbation: TimeInterval = 8
+
+  /// A restart the user has to confirm, and the summary it would send.
+  public struct PendingRestart: Equatable {
+    public let sessionID: SessionID
+    public let sessionName: String
+    /// Why the agent's own conversation is not being resumed.
+    public let explanation: String
+    /// The generated summary, which the user may edit before it is sent.
+    public let briefText: String
+    public let isTruncated: Bool
+    /// `false` when this agent takes no initial prompt at all: there is then nothing to edit,
+    /// and saying so is more honest than showing an empty box.
+    public let carriesContext: Bool
+  }
+
+  public struct RestartFailure: Equatable {
+    public let sessionName: String
+    public let message: String
+    public let suggestion: String?
+  }
+
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
   private var preferredSelection: SessionID?
   private var resolutionTask: Task<Void, Never>?
@@ -92,6 +145,8 @@ public final class AppModel {
   private let closeSession: CloseSession
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
+  private let restartSession: RestartSession?
+  private let clock: any SessionClock
 
   public init(
     repository: any SessionRepository,
@@ -100,8 +155,12 @@ public final class AppModel {
     launcher: SessionLauncher? = nil,
     defaultWorkingDirectoryPath: String? = nil,
     layout: WorkspaceLayoutController = WorkspaceLayoutController(),
-    permissions: PermissionsModel? = nil
+    permissions: PermissionsModel? = nil,
+    // Only the resume probation reads it, and it is the one rule here measured in seconds of real
+    // time: without a clock to move, its far side could only be tested by waiting eight seconds.
+    clock: any SessionClock = SystemSessionClock()
   ) {
+    self.clock = clock
     self.permissions = permissions
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
@@ -117,10 +176,15 @@ public final class AppModel {
     closeSession = CloseSession(repository: repository, runtime: runtime)
     archiveSession = ArchiveSession(repository: repository, runtime: runtime)
     restoreSession = RestoreSession(repository: repository)
+    // A workspace without agents cannot build a launch plan, so it cannot restart anything —
+    // and saying that with an optional is clearer than a use case that would refuse every call.
+    restartSession = agents.map { RestartSession(repository: repository, agents: $0) }
 
-    launcher?.sessionDidClose = { [weak self] _ in
+    launcher?.sessionDidClose = { [weak self] id, state in
+      guard let self else { return }
+      self.noteProcessDidFinish(id, state: state)
       // The store already says the session is closed; the list on screen is what has to catch up.
-      Task { await self?.reload() }
+      Task { await self.reload() }
     }
   }
 
@@ -225,6 +289,25 @@ public final class AppModel {
   ///
   /// With nothing visible the selection is left alone rather than cleared: a load caught
   /// mid-write comes back short, and persisting a fallback there would lose their place for good.
+  /// Keeps the user with a session whose new status has moved it to the other tab.
+  ///
+  /// The sidebar is split on whether an agent is running, so a session put back to work leaves
+  /// Closed the moment it starts. Left alone, the session the user just restarted would vanish
+  /// from the list under their pointer and the selection would fall to whatever row took its
+  /// place. The scope follows the session instead, and the session stays selected.
+  ///
+  /// Only the scope is moved. A search or a facet that also hides it is a narrowing the user
+  /// typed themselves, and clearing it would undo work they can see.
+  private func follow(_ id: SessionID) {
+    guard let session = sessions.first(where: { $0.id == id }) else { return }
+    if !filter.scope.includes(session.status),
+      let scope = SessionScope.allCases.first(where: { $0.includes(session.status) })
+    {
+      update { $0.scope = scope }
+    }
+    select(id)
+  }
+
   private func reconcileSelection() {
     let visible = visibleSessions
     guard let first = visible.first else { return }
@@ -302,6 +385,210 @@ public final class AppModel {
 
   public func dismissDetachWarning() {
     detachWarning = nil
+  }
+
+  // MARK: - Restart
+
+  /// Whether Restart is offered for this session.
+  ///
+  /// Only a closed session has something to restart: a running one has nothing to resume, and an
+  /// archived one has to be unarchived first, deliberately. The command is also withheld from a
+  /// session whose restart is already on its way, which is the first of the three locks.
+  public func canRestart(_ session: WorkSession) -> Bool {
+    guard restartSession != nil, launcher != nil else { return false }
+    guard session.status == .closed else { return false }
+    guard !restartingSessionIDs.contains(session.id) else { return false }
+    // A session whose summary is on screen waiting for an answer is still mid-restart: pressing
+    // ⌃⌘R again would build a second plan and replace the question under the user, leaving the
+    // text they had started editing attached to nothing.
+    guard pendingRestart?.sessionID != session.id else { return false }
+    // An agent that cannot run has nothing to restart into, and the ticket asks for the command to
+    // be withheld rather than offered and then refused. The answer is the one the detections
+    // already left here, so no probe is run to draw a row: a session whose agent has not been
+    // resolved yet keeps the command, because "not asked yet" is not "unusable".
+    if let resolution = resolutions[session.id], !resolution.isResumable { return false }
+    return launcher?.isRunning(session.id) != true
+  }
+
+  /// What Restart will do to this session, as far as can be told without building a plan.
+  ///
+  /// Read from the session and the cached resolution, so a row can say it; the real decision is
+  /// `RestartSession`'s, and the two agree because they read the same two facts.
+  public func expectedRestartMode(for session: WorkSession) -> String {
+    guard case .ready(let descriptor, _) = resolutions[session.id] else {
+      return restartTitle(for: session)
+    }
+    // A session that has never run has nothing to resume and nothing to summarise: it gets its
+    // own prompt, and the sentence says only that it is being started.
+    if !session.hasEverStarted {
+      return restartTitle(for: session)
+    }
+    // Trimmed, exactly as `RestartSession` trims it: an identifier of whitespace is not one, and
+    // promising a resume this row cannot deliver is worse than saying nothing.
+    let identifier = session.agent?.resumeIdentifier?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    if identifier?.isEmpty == false, descriptor.capabilities.supportsResume,
+      !resumeRefusals.contains(session.id)
+    {
+      return "\(restartTitle(for: session)), resuming its \(descriptor.displayName) conversation"
+    }
+    return "\(restartTitle(for: session)) in a new process, with a summary"
+  }
+
+  /// A session that was created and never ran is started, not restarted. Promising a restart
+  /// there would be a false sentence on the very first use.
+  public func restartTitle(for session: WorkSession) -> String {
+    session.hasEverStarted ? "Restart Session" : "Start Session"
+  }
+
+  /// Restarts a closed session: resumes its conversation when the agent can, and otherwise asks
+  /// before starting a second one.
+  public func restart(_ id: SessionID) async {
+    await performRestart(id: id)
+  }
+
+
+  /// Sends the summary the user has read, and possibly edited.
+  public func confirmRestart(_ text: String) async {
+    guard let pending = pendingRestart else { return }
+    pendingRestart = nil
+    await performRestart(
+      id: pending.sessionID,
+      contextOverride: pending.carriesContext ? text : nil,
+      // The conversation was already found unresumable when this dialog was built; asking the
+      // agent again would only offer it a second chance to be refused.
+      skippingResume: .alreadyAnswered,
+      confirmed: true
+    )
+  }
+
+  public func cancelRestart() {
+    pendingRestart = nil
+  }
+
+  public func dismissRestartFailure() {
+    restartFailure = nil
+  }
+
+
+  private func performRestart(
+    id: SessionID,
+    contextOverride: String? = nil,
+    skippingResume: SessionResumeSkip? = nil,
+    confirmed: Bool = false
+  ) async {
+    guard let launcher, let restartSession else { return }
+    // A question already asked about this session is not asked twice; answering it is what moves
+    // it forward. `restartingSessionIDs` cannot carry this on its own, because the wait for an
+    // answer is not work in flight and would hold the lock for as long as the sheet is open.
+    guard confirmed || pendingRestart?.sessionID != id else { return }
+    // The lock is taken before the first await, and it is what makes a second command — a second
+    // click, a shortcut pressed twice — a no-op rather than a second agent.
+    guard restartingSessionIDs.insert(id).inserted else { return }
+    defer { restartingSessionIDs.remove(id) }
+
+    restartFailure = nil
+    do {
+      let restart = try await restartSession(
+        id: id,
+        contextOverride: contextOverride,
+        // A conversation this agent already dropped is not handed back. The user is told so in
+        // the summary they are about to read, which is where the news belongs: at the moment
+        // they ask for the session again, not as a banner over the one they just closed.
+        skippingResume: skippingResume ?? (resumeRefusals.contains(id) ? .failedLastTime : nil)
+      )
+      guard !restart.needsConfirmation || confirmed else {
+        pendingRestart = PendingRestart(
+          sessionID: id,
+          sessionName: restart.session.name,
+          explanation: restart.explanation?.sentence ?? "",
+          briefText: restart.mode.brief?.text ?? "",
+          isTruncated: restart.mode.brief?.isTruncated ?? false,
+          carriesContext: restart.mode.brief != nil
+        )
+        return
+      }
+
+      if case .native = restart.mode {
+        resumeAttempts[id] = clock.now()
+      } else {
+        resumeAttempts[id] = nil
+      }
+
+      switch await launcher.restart(restart) {
+      case .started:
+        // The refusal has been acted on, and this process starts a conversation of its own. Kept
+        // any longer it would skip the resume of an identifier that has since been replaced.
+        resumeRefusals.remove(id)
+      case .alreadyRunning:
+        // The agent the user asked for is up; another path got there first. Nothing was handed a
+        // conversation here, so the attempt is dropped — and no failure is reported over a
+        // session that is running perfectly well.
+        resumeAttempts[id] = nil
+      case .failed(let reason):
+        // No process was handed the conversation, so there is no resume to judge: leaving the
+        // attempt recorded would let an unrelated close, later on, be read as a refused resume.
+        resumeAttempts[id] = nil
+        // The launcher's own reason first — it knows about a store that refused, which the pane
+        // cannot say — and the pane's next, for a terminal that would not open.
+        let failure = launcher.failure(for: id)
+        restartFailure = RestartFailure(
+          sessionName: restart.session.name,
+          message: reason ?? failure?.message ?? "This session could not be restarted.",
+          suggestion: reason == nil ? failure?.suggestion : nil
+        )
+      }
+    } catch let refusal as SessionRestartRefusal {
+      restartFailure = RestartFailure(
+        sessionName: sessions.first { $0.id == id }?.name ?? "This session",
+        message: refusal.errorDescription ?? "This session could not be restarted.",
+        suggestion: refusal.recoverySuggestion
+      )
+    } catch {
+      await report(error)
+    }
+    await reload()
+    // Whether it started or not: a restart that succeeded moved the session to Active, and one
+    // that failed left it where it was, which this simply confirms.
+    follow(id)
+  }
+
+  /// Tells a resumed conversation the agent refused from an ordinary end of work.
+  ///
+  /// Nothing is relaunched, and nothing is announced. The fact is kept, and the next restart of
+  /// that session is what acts on it: a CLI that cannot find the conversation exits in a second
+  /// or two, but the person watching has just finished with that session, and a banner there
+  /// interrupts them with news they can do nothing useful with yet.
+  private func noteProcessDidFinish(_ id: SessionID, state: TerminalProcessState) {
+    guard let startedAt = resumeAttempts[id] else { return }
+    resumeAttempts[id] = nil
+    guard clock.now().timeIntervalSince(startedAt) < Self.resumeProbation else {
+      // Out of the window: an agent that was worked in and quit, which is not this offer's
+      // business.
+      return
+    }
+    if let pane = launcher?.pane(for: id) {
+      // An agent somebody typed into resumed its conversation perfectly well, and an agent this
+      // application killed was answering Close, not refusing anything. Either way the exit says
+      // nothing about the resume — and calling it a refused one told the user their session had
+      // lost its conversation when they had simply closed it.
+      guard !pane.hasReceivedInput, !pane.wasStoppedOnPurpose else { return }
+    }
+    // The state the process actually ended in, handed over by the launcher. Read back from the
+    // pane it was a race: the pane is driven by its own attachment, and one that had not caught
+    // up yet answered "still running" about a process that had already exited — and the offer
+    // was then dropped for good.
+    switch state {
+    case .exited(let code):
+      // A clean exit is an agent that finished, whatever it was handed.
+      guard code != 0 else { return }
+    case .terminated, .failed:
+      break
+    case .running, .starting:
+      // Not an ending at all, so there is nothing to judge.
+      return
+    }
+    resumeRefusals.insert(id)
   }
 
   private func report(
@@ -498,6 +785,9 @@ public final class AppModel {
     guard let launcher else { return }
     await launcher.launch(session: creation.session, plan: creation.plan)
     await reload()
+    // A session created while the sidebar was on Closed is running by now, and it is the one the
+    // user is looking at: the tab follows it rather than hiding what they just made.
+    follow(creation.session.id)
   }
 
   /// Reloads, after any reload already under way rather than instead of it.

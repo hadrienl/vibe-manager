@@ -45,6 +45,20 @@ struct SessionStoreMigrationTests {
     """
   }
 
+  @Test("A session stored before the first launch was recorded is not read as never launched")
+  func v1SessionIsReadAsHavingRun() async throws {
+    let storeURL = try makeStoreURL()
+    defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+    try Data(document(modelID: "gpt-6-astra").utf8).write(to: storeURL)
+
+    let sessions = try await FileSessionRepository(storeURL: storeURL).sessions()
+
+    // Closed an hour after it was created, so it ran. Read as never started it would be offered
+    // a first launch, and handed its own creation prompt in place of its conversation.
+    let session = try #require(sessions.first)
+    #expect(session.hasEverStarted)
+  }
+
   @Test("A v1 session keeps its model, its resume identifier and its repositories")
   func v1SessionIsPreserved() async throws {
     let storeURL = try makeStoreURL()

@@ -29,23 +29,64 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
   public private(set) var updatedAt: Date
   public private(set) var closedAt: Date?
   public private(set) var archivedAt: Date?
+  /// When an agent first ran for this session, and `nil` for one that has never run.
+  ///
+  /// Recorded rather than derived: a created session is stored closed, with its whole lifecycle
+  /// sitting on its creation date, so `closedAt` on its own cannot tell a session that was never
+  /// started from one that was worked in and closed.
+  public private(set) var startedAt: Date?
 
   public init(
     status: SessionStatus = .closed,
     createdAt: Date = Date(),
     updatedAt: Date = Date(),
     closedAt: Date? = nil,
-    archivedAt: Date? = nil
+    archivedAt: Date? = nil,
+    startedAt: Date? = nil
   ) {
     self.status = status
-    self.createdAt = createdAt.storageRounded
-    self.updatedAt = updatedAt.storageRounded
-    self.closedAt = closedAt?.storageRounded
+    let createdAt = createdAt.storageRounded
+    let updatedAt = updatedAt.storageRounded
+    let closedAt = closedAt?.storageRounded
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.closedAt = closedAt
     self.archivedAt = archivedAt?.storageRounded
+    self.startedAt =
+      startedAt?.storageRounded
+      ?? Self.inferredStartedAt(
+        status: status,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        closedAt: closedAt
+      )
+  }
+
+  /// What a lifecycle written before this date was kept says about it.
+  ///
+  /// Every stored session would otherwise read as never started, and be offered a first launch
+  /// with its initial prompt in place of the restart it is owed. Only one shape means "never
+  /// launched" — stored at creation, closed on the same instant, untouched since — and every
+  /// other one has run at least once.
+  private static func inferredStartedAt(
+    status: SessionStatus,
+    createdAt: Date,
+    updatedAt: Date,
+    closedAt: Date?
+  ) -> Date? {
+    switch status {
+    case .active:
+      return createdAt
+    case .closed:
+      if closedAt == createdAt, updatedAt == createdAt { return nil }
+      return closedAt ?? createdAt
+    case .archived:
+      return closedAt ?? createdAt
+    }
   }
 
   private enum CodingKeys: String, CodingKey {
-    case status, createdAt, updatedAt, closedAt, archivedAt
+    case status, createdAt, updatedAt, closedAt, archivedAt, startedAt
   }
 
   /// Decoding routes through the designated initializer so that a value read back from any
@@ -57,7 +98,8 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
       createdAt: try container.decode(Date.self, forKey: .createdAt),
       updatedAt: try container.decode(Date.self, forKey: .updatedAt),
       closedAt: try container.decodeIfPresent(Date.self, forKey: .closedAt),
-      archivedAt: try container.decodeIfPresent(Date.self, forKey: .archivedAt)
+      archivedAt: try container.decodeIfPresent(Date.self, forKey: .archivedAt),
+      startedAt: try container.decodeIfPresent(Date.self, forKey: .startedAt)
     )
   }
 
@@ -69,9 +111,13 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
   }
 
   public mutating func reopen(at date: Date) throws {
+    let date = date.storageRounded
     try transition(from: .closed, to: .active, at: date)
     closedAt = nil
     archivedAt = nil
+    // The first agent this session ever ran is what this records, so a later restart never
+    // overwrites it.
+    if startedAt == nil { startedAt = date }
   }
 
   public mutating func archive(at date: Date) throws {
@@ -254,6 +300,16 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     lifecycle.archivedAt
   }
 
+  public var startedAt: Date? {
+    lifecycle.startedAt
+  }
+
+  /// Whether an agent has ever run for this session. A session that has not is started, not
+  /// restarted, and it is handed the prompt it was created with rather than a summary.
+  public var hasEverStarted: Bool {
+    lifecycle.startedAt != nil
+  }
+
   public init(
     id: SessionID = SessionID(),
     name: String,
@@ -265,6 +321,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     updatedAt: Date = Date(),
     closedAt: Date? = nil,
     archivedAt: Date? = nil,
+    startedAt: Date? = nil,
     repositories: [RepositoryContext] = [],
     notes: String? = nil,
     template: PromptTemplateReference? = nil
@@ -279,7 +336,8 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       createdAt: createdAt,
       updatedAt: updatedAt,
       closedAt: closedAt,
-      archivedAt: archivedAt
+      archivedAt: archivedAt,
+      startedAt: startedAt
     )
     self.repositories = repositories
     self.notes = notes
@@ -334,6 +392,14 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
 
   private static func isValidLifecycle(_ lifecycle: SessionLifecycle) -> Bool {
     guard lifecycle.updatedAt >= lifecycle.createdAt else { return false }
+    if let startedAt = lifecycle.startedAt {
+      guard startedAt >= lifecycle.createdAt, startedAt <= lifecycle.updatedAt else {
+        return false
+      }
+    } else if lifecycle.status == .active {
+      // A running session has an agent, and an agent means it was started.
+      return false
+    }
     switch lifecycle.status {
     case .active:
       return lifecycle.closedAt == nil && lifecycle.archivedAt == nil

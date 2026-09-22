@@ -24,6 +24,17 @@ public final class TerminalPaneModel {
   public private(set) var failure: Failure?
   /// The size the surface last measured, in character cells.
   public private(set) var viewportSize: TerminalSize?
+  /// Whether this process ended because the application asked it to.
+  ///
+  /// An agent stopped by Close or Archive is killed, and reports the signal it was killed with —
+  /// 143 for a `SIGTERM`. Read as a bare exit code that is an alarming red row about a session
+  /// the user closed themselves on purpose.
+  public private(set) var wasStoppedOnPurpose = false
+  /// Whether anything was ever typed into this process.
+  ///
+  /// An agent that refused the conversation it was handed exits before a key is pressed. One the
+  /// user actually worked in did not refuse anything, whatever it exits with afterwards.
+  public private(set) var hasReceivedInput = false
 
   private let sessionID: SessionID
   private let supervisor: any TerminalSupervisor
@@ -32,6 +43,7 @@ public final class TerminalPaneModel {
   private var stateTask: Task<Void, Never>?
   private var isStarting = false
   private var viewportWaiters: [ViewportWaiter] = []
+  private var pendingNotice: [UInt8] = []
 
   public init(
     sessionID: SessionID,
@@ -63,15 +75,23 @@ public final class TerminalPaneModel {
       self.spec = spec
     }
 
-    if viewportSize == nil {
-      await waitForViewport()
-    }
-
+    // The pane says it is starting *before* it waits for its size, not after. Waiting can take a
+    // layout pass, and a pane that still reported the previous run's exit code for that long read
+    // as idle to everything that asks `isRunning` — so a second launch arriving in the window got
+    // through, was dropped by the `isStarting` guard above, and then wired itself to the dead
+    // terminal this line is about to release.
     stateTask?.cancel()
     stateTask = nil
     session = nil
     status = .starting
     failure = nil
+    // A new process: whatever ended the previous one says nothing about how this one will end.
+    wasStoppedOnPurpose = false
+    hasReceivedInput = false
+
+    if viewportSize == nil {
+      await waitForViewport()
+    }
 
     var launchSpec = self.spec
     if let viewportSize {
@@ -94,6 +114,22 @@ public final class TerminalPaneModel {
     }
   }
 
+  /// Holds a line the application itself writes into the terminal, above the next process.
+  ///
+  /// It is kept rather than fed straight to the view because the pane is the only thing that
+  /// exists at this point in a restart: the surface may not be mounted yet, and the terminal
+  /// session the line belongs above has not been started. The surface takes it when it attaches,
+  /// so the line always lands before the first byte of the new process and never twice.
+  public func post(notice text: String) {
+    pendingNotice.append(contentsOf: Array(text.utf8))
+  }
+
+  /// The pending notice, handed over once.
+  public func takePendingNotice() -> [UInt8] {
+    defer { pendingNotice = [] }
+    return pendingNotice
+  }
+
   /// Called by the surface whenever it has measured itself, before and after the process exists.
   public func reportViewportSize(_ size: TerminalSize) async {
     guard size.isUsable else { return }
@@ -110,10 +146,13 @@ public final class TerminalPaneModel {
 
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
+    guard !bytes.isEmpty else { return }
+    hasReceivedInput = true
     await session?.write(bytes)
   }
 
   public func stop() async {
+    wasStoppedOnPurpose = true
     await supervisor.stop(id: sessionID, gracePeriod: .seconds(3))
     if let session {
       apply(await session.state())

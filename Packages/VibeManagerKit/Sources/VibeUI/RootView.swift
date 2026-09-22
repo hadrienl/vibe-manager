@@ -79,6 +79,19 @@ public struct RootView: View {
             cancelled: { model.cancelNewSession() }
           )
         }
+      case .restartContext:
+        // A fresh start is the one restart that sends something: the text is shown before it
+        // goes, and the sheet is where it can still be changed or called off.
+        if let pending = model.pendingRestart {
+          RestartContextSheet(
+            pending: pending,
+            restart: { text in Task { await model.confirmRestart(text) } },
+            cancel: { model.cancelRestart() }
+          )
+          // Keyed on the session: the editor holds its text in `@State`, seeded once, so a sheet
+          // re-presented for another session would open on the previous session's summary.
+          .id(pending.sessionID)
+        }
       }
     }
   }
@@ -92,6 +105,7 @@ public struct RootView: View {
   private var presentedSheet: RootSheet? {
     if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
     if model.isPresentingNewSession { return .newSession }
+    if model.pendingRestart != nil { return .restartContext }
     return nil
   }
 
@@ -105,6 +119,8 @@ public struct RootView: View {
       Task { await permissions.skipStep() }
     case .newSession:
       model.cancelNewSession()
+    case .restartContext:
+      model.cancelRestart()
     case nil:
       break
     }
@@ -115,6 +131,10 @@ public struct RootView: View {
   private enum RootSheet: Identifiable {
     case fullDiskAccess
     case newSession
+    /// Presented from the root rather than from the workspace: attached to the loaded column it
+    /// was torn down by a refresh that failed, leaving a pending restart nobody could answer or
+    /// call off — and a session whose Restart command stayed withheld.
+    case restartContext
 
     var id: Self { self }
   }
@@ -141,6 +161,15 @@ public struct RootView: View {
         }
         if let warning = model.detachWarning {
           DetachWarningBanner(warning: warning) { model.dismissDetachWarning() }
+          Divider()
+        }
+        if let failure = model.restartFailure {
+          RestartFailureBanner(
+            failure: failure,
+            detect: { Task { await model.refreshAgents(forceRefresh: true) } },
+            isDetecting: model.isRefreshingAgents,
+            dismiss: { model.dismissRestartFailure() }
+          )
           Divider()
         }
         detail
@@ -260,43 +289,19 @@ public struct RootView: View {
       // The panes stay mounted even when the selected session has none: selecting a session
       // restored from the store without a terminal used to take the whole stack down with it,
       // and its neighbours came back scrolled to the bottom.
-      ZStack {
-        ForEach(model.sessions) { listed in
-          if let pane = model.pane(for: listed.id) {
-            let isActive = listed.id == session.id
-            // Started by the launcher, so switching sessions never restarts an agent.
-            TerminalPaneView(model: pane, autoStart: false, isActive: isActive)
-              .id(listed.id)
-              .opacity(isActive ? 1 : 0)
-              .allowsHitTesting(isActive)
-              .accessibilityHidden(!isActive)
-          }
+      VStack(spacing: 0) {
+        // A closed session keeps its terminal on screen, so the way back to work has to be on
+        // screen too — next to what the agent said last, not only in a menu.
+        if session.status == .closed {
+          ClosedSessionBar(
+            title: model.restartTitle(for: session),
+            isRestarting: model.restartingSessionIDs.contains(session.id),
+            canRestart: model.canRestart(session),
+            restart: { Task { await model.restart(session.id) } }
+          )
+          Divider()
         }
-
-        // An archived session has no pane by construction — archiving released it — so its own
-        // card is what the column shows, rather than the "no terminal" message of a session
-        // that simply has not been started.
-        if session.status == .archived {
-          ArchivedSessionDetail(session: session) {
-            Task { await model.restore(session.id) }
-          }
-        } else if model.pane(for: session.id) == nil {
-          ContentUnavailableView {
-            Label(session.name, systemImage: session.appearance.symbolName)
-          } description: {
-            Text(
-              model.launchFailure(for: session.id)?.message
-                ?? "This session has no running terminal in this window."
-            )
-          } actions: {
-            if let suggestion = model.launchFailure(for: session.id)?.suggestion {
-              Text(suggestion)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            }
-          }
-          .background(.background)
-        }
+        terminalStack(for: session)
       }
     } else {
       ContentUnavailableView {
@@ -311,6 +316,201 @@ public struct RootView: View {
         .disabled(!model.canCreateSession)
       }
     }
+  }
+
+  @ViewBuilder
+  private func terminalStack(for session: WorkSession) -> some View {
+    ZStack {
+      ForEach(model.sessions) { listed in
+        if let pane = model.pane(for: listed.id) {
+          let isActive = listed.id == session.id
+          // Started by the launcher, so switching sessions never restarts an agent.
+          TerminalPaneView(model: pane, autoStart: false, isActive: isActive)
+            .id(listed.id)
+            .opacity(isActive ? 1 : 0)
+            .allowsHitTesting(isActive)
+            .accessibilityHidden(!isActive)
+        }
+      }
+
+      // An archived session has no pane by construction — archiving released it — so its own
+      // card is what the column shows, rather than the "no terminal" message of a session
+      // that simply has not been started.
+      if session.status == .archived {
+        ArchivedSessionDetail(session: session) {
+          Task { await model.restore(session.id) }
+        }
+      } else if model.pane(for: session.id) == nil {
+        ContentUnavailableView {
+          Label(session.name, systemImage: session.appearance.symbolName)
+        } description: {
+          Text(
+            model.launchFailure(for: session.id)?.message
+              ?? "This session has no running terminal in this window."
+          )
+        } actions: {
+          if let suggestion = model.launchFailure(for: session.id)?.suggestion {
+            Text(suggestion)
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+        }
+        .background(.background)
+      }
+    }
+    // Takes the whole column even with nothing mounted in it. A terminal fills it on its own,
+    // but a window where no session has a pane yet — every one of them closed, straight after a
+    // relaunch — left this stack at the size of its "no terminal" card, and the bar above it was
+    // then centred in the column instead of sitting under the toolbar.
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+/// What a closed session offers above its terminal: the way back to work.
+private struct ClosedSessionBar: View {
+  let title: String
+  let isRestarting: Bool
+  let canRestart: Bool
+  let restart: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "stop.circle")
+        .foregroundStyle(.secondary)
+      Text("This session is closed. Everything it carries is kept.")
+        .font(.callout)
+      Spacer(minLength: 8)
+      if isRestarting {
+        ProgressView()
+          .controlSize(.small)
+        Text("Starting…")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+      Button(title, action: restart)
+        .controlSize(.small)
+        // Disabled for as long as the restart is on its way: the window between the command and
+        // the first process is exactly where a second click would have forked a second agent.
+        .disabled(!canRestart)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// A restart that never reached a process. It names the session, because the banner outlives the
+/// selection that started it.
+private struct RestartFailureBanner: View {
+  let failure: AppModel.RestartFailure
+  let detect: () -> Void
+  let isDetecting: Bool
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(failure.sessionName): \(failure.message)")
+          .font(.callout)
+        if let suggestion = failure.suggestion {
+          Text(suggestion)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      Spacer(minLength: 8)
+      // Most of these failures are an agent the Mac cannot run right now, and detecting again is
+      // what turns that around without leaving the workspace.
+      Button("Detect Again", action: detect)
+        .controlSize(.small)
+        .disabled(isDetecting)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// The one restart that sends something, shown before it is sent.
+///
+/// The text is editable because the user is the only one who can tell whether a fact recorded
+/// days ago still holds. The edit applies to this launch alone: a lasting account of a session
+/// is what its notes are for.
+private struct RestartContextSheet: View {
+  let pending: AppModel.PendingRestart
+  let restart: (String) -> Void
+  let cancel: () -> Void
+
+  @State private var text: String
+
+  init(
+    pending: AppModel.PendingRestart,
+    restart: @escaping (String) -> Void,
+    cancel: @escaping () -> Void
+  ) {
+    self.pending = pending
+    self.restart = restart
+    self.cancel = cancel
+    _text = State(initialValue: pending.briefText)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Restart “\(pending.sessionName)” in a new process?")
+        .font(.headline)
+      Text(explanation)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      if pending.carriesContext {
+        TextEditor(text: $text)
+          .font(.system(.callout, design: .monospaced))
+          .frame(minHeight: 220)
+          .overlay(
+            RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
+          )
+          .accessibilityLabel("Summary sent to the agent")
+        if pending.isTruncated {
+          Text("This summary was shortened to fit what the agent accepts.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      HStack {
+        Spacer()
+        Button("Cancel", role: .cancel, action: cancel)
+          .keyboardShortcut(.cancelAction)
+        Button("Restart") { restart(text) }
+          .keyboardShortcut(.defaultAction)
+          .buttonStyle(.borderedProminent)
+      }
+    }
+    .padding(20)
+    .frame(width: 560)
+  }
+
+  private var explanation: String {
+    guard pending.carriesContext else {
+      return """
+        \(pending.explanation) This agent takes no initial prompt either, so the new process \
+        starts without any summary of the session.
+        """
+    }
+    return """
+      \(pending.explanation) A new process will be started instead, and given this summary of \
+      what the session carries. You can edit it before it is sent.
+      """
   }
 }
 
@@ -507,7 +707,8 @@ private struct SessionSidebar: View {
           status: SessionStatusPresentation.make(
             session: session,
             paneStatus: model.pane(for: session.id)?.status,
-            resolution: model.resolution(forID: session.id)
+            resolution: model.resolution(forID: session.id),
+            wasStoppedOnPurpose: model.pane(for: session.id)?.wasStoppedOnPurpose == true
           ),
           // Only the rows a shortcut can reach claim one.
           shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,
@@ -663,16 +864,24 @@ struct SessionCommands {
   var canClose: Bool { model.canClose(session) }
   var canArchive: Bool { model.canArchive(session) }
   var canRestore: Bool { model.canRestore(session) }
+  var canRestart: Bool { model.canRestart(session) }
+  var restartTitle: String { model.restartTitle(for: session) }
+  /// Spoken rather than read, so it says what the command will actually do.
+  var restartAnnouncement: String { model.expectedRestartMode(for: session) }
 
   func close() { Task { await model.close(session.id) } }
   func requestArchive() { model.requestArchive(session.id) }
   func restore() { Task { await model.restore(session.id) } }
+  func restart() { Task { await model.restart(session.id) } }
 }
 
 private struct SessionCommandButtons: View {
   let commands: SessionCommands
 
   var body: some View {
+    if commands.canRestart {
+      Button(commands.restartTitle) { commands.restart() }
+    }
     if commands.canClose {
       Button("Close Session") { commands.close() }
     }
@@ -724,7 +933,11 @@ private struct SessionRow: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
-    // The same three commands, reachable without a pointer and without the menu bar.
+    // The same commands, reachable without a pointer and without the menu bar.
+    .accessibilityAction(named: Text(commands.restartAnnouncement)) {
+      guard commands.canRestart else { return }
+      commands.restart()
+    }
     .accessibilityAction(named: "Close Session") {
       guard commands.canClose else { return }
       commands.close()

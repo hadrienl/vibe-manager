@@ -92,6 +92,16 @@ one place. No session is ever deleted, and the list is searchable, filterable an
 order that survives a relaunch. The rules are documented in
 [`docs/architecture/0009-session-history-and-archive.md`](docs/architecture/0009-session-history-and-archive.md).
 
+A closed session goes back to work with one command. When the agent can resume its own
+conversation, it does, and it is handed no prompt; when it cannot — no identifier was ever kept,
+or the CLI would refuse the one that was — the application says so and offers a new process with a
+summary of what the session carries, shown and editable before it is sent. The plan is rebuilt from
+the stored session, so the same agent, model, folder and worktree come back untouched, and a
+restart that fails leaves the session closed with everything it had. The three modes, the summary,
+the locks against a double launch and what happens when a resumed conversation turns out to be gone
+are documented in
+[`docs/architecture/0010-session-restart.md`](docs/architecture/0010-session-restart.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the

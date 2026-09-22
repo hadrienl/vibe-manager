@@ -93,15 +93,27 @@ private struct SessionPositionCommands: View {
   }
 }
 
-/// Closing, archiving and unarchiving the selected session, in their own menu.
+/// Restarting, closing, archiving and unarchiving the selected session, in their own menu.
 ///
 /// ⌃⌘W rather than ⌘W: closing a session and closing the window must not be one modifier apart,
-/// because one of them ends an agent's work and the other only puts a window away.
+/// because one of them ends an agent's work and the other only puts a window away. ⌃⌘R joins the
+/// same series, so every verb that moves a session through its life shares one modifier.
 private struct SessionHistoryCommands: Commands {
   let model: AppModel
 
   var body: some Commands {
     CommandMenu("Session") {
+      // The label follows the session: one that was created and never ran is started, not
+      // restarted, and the menu is where a keyboard-only user reads which of the two this is.
+      Button(model.selectedSession.map(model.restartTitle) ?? "Restart Session") {
+        guard let session = model.selectedSession else { return }
+        Task { await model.restart(session.id) }
+      }
+      .keyboardShortcut("r", modifiers: [.command, .control])
+      .disabled(!(model.selectedSession.map(model.canRestart) ?? false))
+
+      Divider()
+
       Button("Close Session") {
         guard let session = model.selectedSession else { return }
         Task { await model.close(session.id) }
