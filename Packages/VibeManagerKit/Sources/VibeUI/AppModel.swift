@@ -79,6 +79,9 @@ public final class AppModel {
   private var reloadTask: Task<Void, Never>?
 
   public let layout: WorkspaceLayoutController
+  /// Absent in a workspace assembled without the system around it — tests and previews. The
+  /// application always has one.
+  public let permissions: PermissionsModel?
 
   private let repository: any SessionRepository
   private let loadSessions: LoadSessions
@@ -96,8 +99,10 @@ public final class AppModel {
     agents: (any AgentProviderResolving)? = nil,
     launcher: SessionLauncher? = nil,
     defaultWorkingDirectoryPath: String? = nil,
-    layout: WorkspaceLayoutController = WorkspaceLayoutController()
+    layout: WorkspaceLayoutController = WorkspaceLayoutController(),
+    permissions: PermissionsModel? = nil
   ) {
+    self.permissions = permissions
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
     self.recovery = recovery
@@ -325,6 +330,10 @@ public final class AppModel {
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
+    // Before the sessions, and never from the creation flow: the point of the whole step is that
+    // pressing Create leaves nothing left to ask. Reading the store first left a window in which
+    // ⌘N opened a sheet that did not yet know whether the access was there, and warned anyway.
+    await permissions?.refresh()
     await reload()
     await refreshAgents()
   }
@@ -462,7 +471,8 @@ public final class AppModel {
     guard let agents, canCreateSession else { return }
     newSessionModel = NewSessionModel(
       create: CreateSession(repository: repository, agents: agents),
-      registry: agents
+      registry: agents,
+      fullDiskAccess: permissions?.status
     )
     isPresentingNewSession = true
   }

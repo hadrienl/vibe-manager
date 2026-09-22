@@ -13,7 +13,8 @@ struct NewSessionModelTests {
     folder: WorkingDirectoryStatus = .usable,
     repository: SpyRepository = SpyRepository(),
     folders: (any WorkingDirectoryProbe)? = nil,
-    revalidationDelay: Duration = .milliseconds(250)
+    revalidationDelay: Duration = .milliseconds(250),
+    fullDiskAccess: FullDiskAccessStatus? = .notGranted
   ) -> NewSessionModel {
     let registry = StubRegistry(providers: providers)
     return NewSessionModel(
@@ -23,7 +24,8 @@ struct NewSessionModelTests {
         folders: folders ?? StubFolders(status: folder)
       ),
       registry: registry,
-      revalidationDelay: revalidationDelay
+      revalidationDelay: revalidationDelay,
+      fullDiskAccess: fullDiskAccess
     )
   }
 
@@ -123,11 +125,14 @@ struct NewSessionModelTests {
 
   @Test("A burst of keystrokes is checked once, when the typing stops")
   func revalidationIsDebounced() async throws {
-    let folders = CountingFolders()
-    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(40))
+    let plans = PlanCounter()
+    let model = makeModel(
+      providers: [StubProvider(id: "claude-code", state: .available, plans: plans)],
+      revalidationDelay: .milliseconds(40)
+    )
     await model.load(defaultWorkingDirectoryPath: "/workspace")
     _ = await model.submit()
-    await folders.reset()
+    let beforeTyping = await plans.count
 
     for character in "Refactor the webhook" {
       model.draft.name.append(character)
@@ -135,7 +140,137 @@ struct NewSessionModelTests {
     }
     try await Task.sleep(for: .milliseconds(300))
 
+    #expect(await plans.count == beforeTyping + 1)
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("Typing a path never opens it: that is what raises a system alert")
+  func typingAPathDoesNotReadTheDisk() async throws {
+    let folders = CountingFolders()
+    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(40))
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor the webhook"
+    model.draft.workingDirectoryPath = "/workspace"
+    _ = await model.submit()
+    await folders.reset()
+
+    for character in "/Documents/notes" {
+      model.draft.workingDirectoryPath?.append(character)
+      model.draftChanged()
+    }
+    try await Task.sleep(for: .milliseconds(300))
+
+    #expect(await folders.count == 0)
+  }
+
+  @Test("The folder designated in the open panel is the one that gets checked")
+  func choosingAFolderChecksIt() async {
+    let folders = CountingFolders()
+    let model = makeModel(folders: folders)
+    await model.load(defaultWorkingDirectoryPath: nil)
+
+    await model.folderChosen("/workspace")
+
+    #expect(model.draft.workingDirectoryPath == "/workspace")
     #expect(await folders.count == 1)
+  }
+
+  @Test("A folder that cannot be read is said at once, and nothing else is")
+  func chosenFolderReportsItsOwnProblem() async {
+    let model = makeModel(folder: .missing)
+    await model.load(defaultWorkingDirectoryPath: nil)
+
+    await model.folderChosen("/gone")
+
+    #expect(model.issues == [.workingDirectoryNotFound])
+    // The name has not been typed yet, and the sheet does not turn red over it.
+    #expect(model.issues(for: .name).isEmpty)
+  }
+
+  @Test("Editing the path afterwards drops a verdict that no longer judges it")
+  func editingThePathClearsTheChosenFolderVerdict() async {
+    let model = makeModel(folder: .missing)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.folderChosen("/gone")
+    #expect(!model.issues.isEmpty)
+
+    model.draft.workingDirectoryPath = "/gone/elsewhere"
+    model.draftChanged()
+
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("A folder macOS guards is remarked upon, and never blocks creation")
+  func protectedFolderIsARemark() async {
+    let model = makeModel()
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor the webhook"
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
+
+    #expect(model.protectedLocationNotice != nil)
+    #expect(model.canSubmit)
+
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Code/vibe-manager"
+    #expect(model.protectedLocationNotice == nil)
+  }
+
+  @Test("With the access granted, there is nothing left to remark upon")
+  func grantedAccessSaysNothing() async {
+    let model = makeModel(fullDiskAccess: .granted)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
+
+    #expect(model.protectedLocationNotice == nil)
+  }
+
+  @Test("An access not probed yet says nothing rather than guessing")
+  func unknownAccessSaysNothing() async {
+    // Warning someone who granted the access long ago would be worse than staying quiet: the
+    // sheet only remarks on what the application positively knows.
+    let model = makeModel(fullDiskAccess: nil)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
+
+    #expect(model.protectedLocationNotice == nil)
+  }
+
+  @Test("A folder that disappeared stays reported while the next field is fixed")
+  func folderVerdictSurvivesTheNextEdit() async throws {
+    // The folder was opened by Create, so re-checking it raises nothing new. Skipping the check
+    // instead made the problem vanish as soon as the name was edited, and come back at the next
+    // Create — a form that contradicts itself.
+    let model = makeModel(folder: .missing, revalidationDelay: .milliseconds(10))
+    await model.load(defaultWorkingDirectoryPath: "/gone")
+    _ = await model.submit()
+    #expect(model.issues.contains(.workingDirectoryNotFound))
+
+    model.draft.name = "Refactor the webhook"
+    model.draftChanged()
+    try await Task.sleep(for: .milliseconds(200))
+
+    #expect(model.issues.contains(.workingDirectoryNotFound))
+    #expect(model.issues(for: .name).isEmpty)
+  }
+
+  @Test("A folder chosen while the form is already red does not republish a stale verdict")
+  func chosenFolderDoesNotRestoreAStaleVerdict() async throws {
+    // A folder on a network volume takes long enough to check for a name to be typed under it.
+    // The answer that comes back describes the older draft, so only the part of it that was
+    // asked about — the folder — is kept.
+    let folders = GatedFolders()
+    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(10))
+    await model.load(defaultWorkingDirectoryPath: nil)
+    _ = await model.submit()
+    #expect(model.issues.contains(.nameMissing))
+
+    let choosing = Task { await model.folderChosen("/workspace") }
+    await Task.yield()
+    model.draft.name = "Refactor the webhook"
+    model.draftChanged()
+    await folders.open()
+    await choosing.value
+    try await Task.sleep(for: .milliseconds(200))
+
     #expect(model.issues.isEmpty)
   }
 
@@ -143,12 +278,16 @@ struct NewSessionModelTests {
   func staleVerdictIsNotShown() async {
     // The checks cross actors, so they can finish in an order the typing never had. A verdict
     // that arrives late must not contradict the form the user is looking at.
-    let folders = GatedFolders()
+    let folders = GatedFolders(open: true)
     let model = makeModel(folders: folders)
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    await model.load(defaultWorkingDirectoryPath: nil)
+    // Designated through the panel first, so the check that follows really reads the folder — and
+    // really does wait at the gate, rather than counting on the scheduler to be slow enough.
+    await model.folderChosen("/workspace")
+    await folders.close()
 
     let checking = Task { await model.revalidate() }
-    await Task.yield()
+    await folders.waitForCheck()
     model.draft.name = "Refactor the webhook"
     await folders.open()
     await checking.value
@@ -226,12 +365,26 @@ private actor SpyRepository: SessionRepository {
   }
 }
 
+/// Counts the checks that reach the agent, which is what a revalidation costs now that the
+/// working folder is left alone until the user designates one.
+private actor PlanCounter {
+  private(set) var count = 0
+
+  func record() { count += 1 }
+}
+
 private struct StubProvider: AgentProvider {
   let descriptor: AgentDescriptor
   let state: AgentAvailabilityState
   let catalog: [AgentModel]
+  let plans: PlanCounter?
 
-  init(id: String, state: AgentAvailabilityState, models: [AgentModel] = []) {
+  init(
+    id: String,
+    state: AgentAvailabilityState,
+    models: [AgentModel] = [],
+    plans: PlanCounter? = nil
+  ) {
     descriptor = AgentDescriptor(
       id: AgentProviderID(id),
       displayName: id,
@@ -243,6 +396,7 @@ private struct StubProvider: AgentProvider {
     )
     self.state = state
     catalog = models
+    self.plans = plans
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
@@ -263,7 +417,8 @@ private struct StubProvider: AgentProvider {
   func models() async -> [AgentModel] { catalog }
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    AgentLaunchPlan(
+    await plans?.record()
+    return AgentLaunchPlan(
       providerID: descriptor.id,
       executablePath: "/usr/bin/true",
       arguments: [],
@@ -306,8 +461,14 @@ private actor CountingFolders: WorkingDirectoryProbe {
 
 /// A probe that holds a check open, so the draft can change while it is in flight.
 private actor GatedFolders: WorkingDirectoryProbe {
-  private var isOpen = false
+  private var isOpen: Bool
   private var waiters: [CheckedContinuation<Void, Never>] = []
+  private var isChecking = false
+  private var arrivals: [CheckedContinuation<Void, Never>] = []
+
+  init(open: Bool = false) {
+    isOpen = open
+  }
 
   func open() {
     isOpen = true
@@ -316,10 +477,26 @@ private actor GatedFolders: WorkingDirectoryProbe {
     waiters.forEach { $0.resume() }
   }
 
+  func close() {
+    isOpen = false
+  }
+
+  /// Returns once a check is actually waiting at the gate, so a test never has to guess whether
+  /// the scheduler has started it yet.
+  func waitForCheck() async {
+    guard !isChecking else { return }
+    await withCheckedContinuation { arrivals.append($0) }
+  }
+
   func inspect(path: String) async -> WorkingDirectoryStatus {
+    isChecking = true
+    let arrivals = self.arrivals
+    self.arrivals = []
+    arrivals.forEach { $0.resume() }
     while !isOpen {
       await withCheckedContinuation { waiters.append($0) }
     }
+    isChecking = false
     return .usable
   }
 }

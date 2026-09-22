@@ -99,6 +99,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = H00000000000000000000002 /* Build configuration list for PBXNativeTarget "VibeManager" */;
 			buildPhases = (
+				D00000000000000000000004 /* Check the signing identity */,
 				D00000000000000000000003 /* Sources */,
 				D00000000000000000000001 /* Frameworks */,
 				D00000000000000000000002 /* Resources */,
@@ -168,6 +169,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D00000000000000000000004 /* Check the signing identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Check the signing identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# An ad-hoc signature gets a new code identity at every build, and macOS keys privacy\n# permissions to that identity: Full Disk Access, and every folder ever allowed, are asked for\n# again after each compilation. Warned rather than failed: a fresh clone must still build.\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -z \"${DEVELOPMENT_TEAM}\" ]; then\n  echo \"warning: No DEVELOPMENT_TEAM, so this build is signed ad hoc and macOS will forget every permission granted to it at the next build. Copy Configuration/Local.xcconfig.example to Configuration/Local.xcconfig and put your team in it.\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D00000000000000000000003 /* Sources */ = {

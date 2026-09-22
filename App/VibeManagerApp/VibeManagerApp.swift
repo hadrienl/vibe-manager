@@ -62,12 +62,7 @@ struct VibeManagerApp: App {
     }
 
     Settings {
-      Form {
-        Text("Settings will be available in a future version.")
-          .foregroundStyle(.secondary)
-      }
-      .padding()
-      .frame(width: 420)
+      SettingsView(permissions: environment.permissions)
     }
   }
 }

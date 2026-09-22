@@ -23,6 +23,14 @@ does not accidentally adopt APIs newer than the documented baseline.
 
 No external package or secret is required for the foundation build.
 
+The session sheet proposes no working folder: it is always chosen through the open panel, which is
+also what grants access to it. Before the first run, copy `Configuration/Local.xcconfig.example` to
+`Configuration/Local.xcconfig` and put your own `DEVELOPMENT_TEAM` in it. That file is not
+versioned, and it is not cosmetic: without it Xcode signs the application ad hoc, macOS then
+identifies it by a hash that changes at every build, and every privacy permission granted — Full
+Disk Access included — is asked for again after the next compilation. See
+[`docs/architecture/0010-file-access-permissions.md`](docs/architecture/0010-file-access-permissions.md).
+
 ## Build and test
 
 Run the same checks as CI:
@@ -84,6 +92,14 @@ one place. No session is ever deleted, and the list is searchable, filterable an
 order that survives a relaunch. The rules are documented in
 [`docs/architecture/0009-session-history-and-archive.md`](docs/architecture/0009-session-history-and-archive.md).
 
+The agents run as children of the application, so macOS asks *the application* for permission
+whenever one of them reads a protected folder. That question is asked once, at launch, as a single
+step explaining Full Disk Access and opening the right pane of System Settings — never in the
+middle of creating a session. Refusing is a working answer: repositories are rarely in a protected
+location, nothing is disabled, and the question stays reachable in Settings. The detection, the
+build signature it depends on, and what the application deliberately does not do are documented in
+[`docs/architecture/0010-file-access-permissions.md`](docs/architecture/0010-file-access-permissions.md).
+
 Two real agents ship with the application, each documented with the choices its CLI forced:
 [`docs/architecture/0005-codex-provider.md`](docs/architecture/0005-codex-provider.md) and
 [`docs/architecture/0006-claude-code-provider.md`](docs/architecture/0006-claude-code-provider.md).
@@ -93,5 +109,5 @@ user configured for their own CLI.
 ## Configuration
 
 Shared, Debug and Release build settings live in `Configuration/*.xcconfig`. Local signing
-identities and team IDs must be supplied through Xcode user settings or an untracked local override;
-never commit them. The V1 is intended for direct distribution and does not enable App Sandbox.
+identities and team IDs are supplied through `Configuration/Local.xcconfig`, which
+`Shared.xcconfig` includes when it exists and which is never committed. The V1 is intended for direct distribution and does not enable App Sandbox.

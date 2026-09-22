@@ -10,6 +10,9 @@ import VibeUI
 @MainActor
 final class AppEnvironment {
   let appModel: AppModel
+  /// Held here as well as inside the model: the settings window is a scene of its own, and it
+  /// must read the same status the workspace read rather than probe the system a second time.
+  let permissions: PermissionsModel
 
   private let terminalSupervisor: PTYTerminalSupervisor
   private let launcher: SessionLauncher
@@ -25,13 +28,27 @@ final class AppEnvironment {
       repository: repository,
       agents: registry
     )
+    // The only permission the application ever asks for, wired to the system that answers it:
+    // the TCC witness for the status, the user defaults for the answer already given.
+    let permissions = PermissionsModel(
+      gate: FullDiskAccessGate(
+        probe: TCCFullDiskAccessProbe(),
+        preferences: UserDefaultsPermissionPreferences()
+      )
+    )
+    self.permissions = permissions
     appModel = AppModel(
       repository: repository,
       recovery: repository,
       agents: registry,
       launcher: launcher,
-      defaultWorkingDirectoryPath: AppEnvironment.defaultWorkingDirectory().path,
-      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore())
+      // No folder is proposed. The home directory used to be, and it is the one place that
+      // contains Desktop, Documents and Downloads without being guarded itself: accepting the
+      // default let an agent walk straight into them, with nothing said beforehand. Choosing is
+      // now always a gesture, and the open panel is what grants the access along the way.
+      defaultWorkingDirectoryPath: nil,
+      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore()),
+      permissions: permissions
     )
   }
 
@@ -52,9 +69,5 @@ final class AppEnvironment {
       providers.append(MockAgentProvider())
     }
     return providers
-  }
-
-  private static func defaultWorkingDirectory() -> URL {
-    URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
   }
 }

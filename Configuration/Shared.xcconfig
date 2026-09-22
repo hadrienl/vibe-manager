@@ -15,3 +15,18 @@ SWIFT_STRICT_CONCURRENCY = complete
 SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 GCC_TREAT_WARNINGS_AS_ERRORS = YES
 CODE_SIGN_STYLE = Automatic
+
+// Why the application asks, in each alert macOS can raise on its behalf. The agents it launches
+// run as its children, so every protected folder they read is requested in its name.
+INFOPLIST_KEY_NSDesktopFolderUsageDescription = Vibe Manager lets the coding agent you launched read the folder you chose.
+INFOPLIST_KEY_NSDocumentsFolderUsageDescription = Vibe Manager lets the coding agent you launched read the folder you chose.
+INFOPLIST_KEY_NSDownloadsFolderUsageDescription = Vibe Manager lets the coding agent you launched read the folder you chose.
+INFOPLIST_KEY_NSRemovableVolumesUsageDescription = Vibe Manager opens the working folder you chose on this volume.
+INFOPLIST_KEY_NSNetworkVolumesUsageDescription = Vibe Manager opens the working folder you chose on this volume.
+INFOPLIST_KEY_NSFileProviderDomainUsageDescription = Vibe Manager opens the working folder you chose in iCloud Drive.
+
+// Signing is per-machine, and it is not cosmetic: macOS keys a privacy grant to the code identity
+// of the application, so an ad-hoc signature — the fallback when no team is set — gets a new
+// identity at every build, and every permission granted the day before is asked for again. Copy
+// Configuration/Local.xcconfig.example to Configuration/Local.xcconfig and put your own team in it.
+#include? "Local.xcconfig"
