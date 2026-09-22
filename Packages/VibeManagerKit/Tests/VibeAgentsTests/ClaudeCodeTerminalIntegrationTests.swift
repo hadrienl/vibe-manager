@@ -49,17 +49,8 @@ struct ClaudeCodeTerminalIntegrationTests {
     let probe = SystemProcessProbe()
     // The real specification, narrowed to the directory holding the stand in, so detection is
     // exercised for real without any chance of finding the developer's own installation.
-    let reference = ClaudeCodeAgentProvider.specification
-    let specification = CommandLineAgentSpecification(
-      binaryName: reference.binaryName,
-      candidateDirectories: [directory.path],
-      versionArguments: reference.versionArguments,
-      versionTimeout: reference.versionTimeout,
-      authenticationArguments: reference.authenticationArguments,
-      additionalEnvironmentKeys: reference.additionalEnvironmentKeys,
-      documentationURL: reference.documentationURL,
-      authenticationCommandLine: reference.authenticationCommandLine,
-      authenticationOutcome: reference.authenticationOutcome
+    let specification = ClaudeCodeAgentProvider.specification.narrowed(
+      toCandidateDirectories: [directory.path]
     )
 
     return ClaudeCodeAgentProvider(

@@ -47,15 +47,8 @@ struct CodexTerminalIntegrationTests {
     let probe = SystemProcessProbe()
     // The real specification, narrowed to the directory holding the stand in, so detection is
     // exercised for real without any chance of finding the developer's own installation.
-    let specification = CommandLineAgentSpecification(
-      binaryName: CodexAgentProvider.specification.binaryName,
-      candidateDirectories: [directory.path],
-      versionArguments: CodexAgentProvider.specification.versionArguments,
-      versionTimeout: CodexAgentProvider.specification.versionTimeout,
-      authenticationArguments: CodexAgentProvider.specification.authenticationArguments,
-      additionalEnvironmentKeys: CodexAgentProvider.specification.additionalEnvironmentKeys,
-      documentationURL: CodexAgentProvider.specification.documentationURL,
-      authenticationCommandLine: CodexAgentProvider.specification.authenticationCommandLine
+    let specification = CodexAgentProvider.specification.narrowed(
+      toCandidateDirectories: [directory.path]
     )
 
     return CodexAgentProvider(

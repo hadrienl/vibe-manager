@@ -59,6 +59,26 @@ public struct CommandLineAgentSpecification: Sendable {
   }
 
   /// Where developer tools usually land on macOS, including version manager shims.
+  /// The same specification, restricted to the given directories.
+  ///
+  /// Rebuilding a specification field by field is how a field added later gets silently dropped:
+  /// the copy keeps compiling, falls back to the default, and whoever claimed to be exercising
+  /// the real specification no longer is, without a single test failing.
+  public func narrowed(toCandidateDirectories directories: [String]) -> Self {
+    CommandLineAgentSpecification(
+      binaryName: binaryName,
+      candidateDirectories: directories,
+      versionArguments: versionArguments,
+      versionTimeout: versionTimeout,
+      versionRetryTimeout: versionRetryTimeout,
+      authenticationArguments: authenticationArguments,
+      additionalEnvironmentKeys: additionalEnvironmentKeys,
+      documentationURL: documentationURL,
+      authenticationCommandLine: authenticationCommandLine,
+      authenticationOutcome: authenticationOutcome
+    )
+  }
+
   public static let defaultCandidateDirectories = [
     "/opt/homebrew/bin",
     "/usr/local/bin",
