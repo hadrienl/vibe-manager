@@ -91,6 +91,10 @@ public struct RootView: View {
           )
           Divider()
         }
+        if let warning = model.detachWarning {
+          DetachWarningBanner(warning: warning) { model.dismissDetachWarning() }
+          Divider()
+        }
         detail
       }
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
@@ -146,6 +150,38 @@ public struct RootView: View {
     // Measured on the whole split view: which columns fit is a question about the window, and
     // the answer has to be known before either column decides whether to draw itself.
     .background(WidthReporter { model.layout.windowWidthChanged(to: $0) })
+    // Archiving is reversible, so the question is short and says what actually happens. Cancel
+    // is the default button: the pointer slip that opened this must not also answer it.
+    .confirmationDialog(
+      model.pendingArchive.map { "Archive “\($0.name)”?" } ?? "Archive this session?",
+      isPresented: Binding(
+        get: { model.pendingArchive != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelArchive()
+        }
+      ),
+      titleVisibility: .visible
+    ) {
+      Button("Archive") {
+        Task { await model.confirmArchive() }
+      }
+      Button("Cancel", role: .cancel) {
+        model.cancelArchive()
+      }
+    } message: {
+      Text(archiveConfirmationMessage)
+    }
+  }
+
+  private var archiveConfirmationMessage: String {
+    let isRunning =
+      model.pendingArchive.map { model.pane(for: $0.id)?.status == .running } ?? false
+    let agent = isRunning ? "Its running agent will be stopped. " : ""
+    return """
+      \(agent)Nothing is deleted: notes, repositories and Git metadata are kept, and the session \
+      stays readable under Archived.
+      """
   }
 
   /// `.detailOnly` is the only hidden state worth recording; the others all show the sidebar.
@@ -186,7 +222,14 @@ public struct RootView: View {
           }
         }
 
-        if model.pane(for: session.id) == nil {
+        // An archived session has no pane by construction — archiving released it — so its own
+        // card is what the column shows, rather than the "no terminal" message of a session
+        // that simply has not been started.
+        if session.status == .archived {
+          ArchivedSessionDetail(session: session) {
+            Task { await model.restore(session.id) }
+          }
+        } else if model.pane(for: session.id) == nil {
           ContentUnavailableView {
             Label(session.name, systemImage: session.appearance.symbolName)
           } description: {
@@ -255,6 +298,117 @@ private struct RefreshFailureBanner: View {
   }
 }
 
+/// A stop the system would not confirm, shown over a workspace that keeps working.
+private struct DetachWarningBanner: View {
+  let warning: AppModel.DetachWarning
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(warning.message)
+          .font(.callout)
+        Text(warning.suggestion)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// What an archived session shows where its terminal used to be.
+///
+/// It is deliberately a card and not an error: archiving is a decision the user made, so the
+/// column states the facts, says plainly that nothing was deleted, and offers the way back.
+private struct ArchivedSessionDetail: View {
+  let session: WorkSession
+  let restore: () -> Void
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack(spacing: 10) {
+        Image(systemName: "archivebox.fill")
+          .foregroundStyle(.secondary)
+        Text("This session is archived. Nothing was deleted.")
+          .font(.callout)
+        Spacer(minLength: 8)
+        Button("Unarchive", action: restore)
+          .controlSize(.small)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 8)
+      .background(.quaternary)
+
+      Divider()
+
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          HStack(spacing: 10) {
+            SessionBadge(appearance: session.appearance)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(session.name)
+                .font(.title3)
+                .fontWeight(.semibold)
+              if let agent = session.agent {
+                Text([agent.providerID, agent.modelID].compactMap { $0 }.joined(separator: " · "))
+                  .font(.callout)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+
+          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+            dateRow("Created", session.createdAt)
+            if let closedAt = session.closedAt {
+              dateRow("Closed", closedAt)
+            }
+            if let archivedAt = session.archivedAt {
+              dateRow("Archived", archivedAt)
+            }
+          }
+          .font(.callout)
+
+          Text(
+            """
+            Repositories, Git metadata, notes and the initial prompt are kept, and are listed in \
+            the context column. Unarchiving brings the session back as closed; restarting its \
+            agent stays a separate, deliberate step.
+            """
+          )
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 520, alignment: .leading)
+        .padding(24)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    .background(.background)
+  }
+
+  private func dateRow(_ label: String, _ date: Date) -> some View {
+    GridRow {
+      Text(label)
+        .foregroundStyle(.secondary)
+      Text(date.formatted(date: .abbreviated, time: .shortened))
+    }
+  }
+}
+
 /// The widths the two columns open at, frozen once so that measuring them cannot move them.
 private struct IdealColumnWidths: Equatable {
   let sidebar: Double
@@ -280,8 +434,23 @@ private struct SessionSidebar: View {
   @Bindable var model: AppModel
 
   var body: some View {
+    VStack(spacing: 0) {
+      ScopePicker(model: model)
+      Divider()
+      list
+      Divider()
+      SidebarFooter(model: model)
+    }
+    .searchable(
+      text: Binding(get: { model.filter.searchText }, set: { model.setSearchText($0) }),
+      placement: .sidebar,
+      prompt: "Search sessions"
+    )
+  }
+
+  private var list: some View {
     List(selection: Binding(get: { model.selectedSessionID }, set: { model.select($0) })) {
-      ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
+      ForEach(Array(model.visibleSessions.enumerated()), id: \.element.id) { index, session in
         SessionRow(
           session: session,
           status: SessionStatusPresentation.make(
@@ -290,20 +459,179 @@ private struct SessionSidebar: View {
             resolution: model.resolution(forID: session.id)
           ),
           // Only the rows a shortcut can reach claim one.
-          shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil
+          shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,
+          commands: SessionCommands(model: model, session: session)
         )
         .tag(session.id)
       }
     }
     .listStyle(.sidebar)
     .overlay {
-      if model.sessions.isEmpty {
-        ContentUnavailableView(
-          "No sessions",
-          systemImage: "square.stack.3d.up",
-          description: Text("Press ⌘N to create one.")
-        )
+      if model.visibleSessions.isEmpty {
+        emptyState
       }
+    }
+  }
+
+  /// Three different silences, told apart. "Nothing here" and "nothing matched what you typed"
+  /// look identical on screen and mean opposite things, and only one of them has a way out.
+  @ViewBuilder
+  private var emptyState: some View {
+    if model.filter.isNarrowing {
+      ContentUnavailableView {
+        Label("No matching session", systemImage: "line.3.horizontal.decrease.circle")
+      } description: {
+        Text("No session in \(model.filter.scope.label.lowercased()) matches this filter.")
+      } actions: {
+        Button("Clear Filter") { model.clearNarrowing() }
+      }
+    } else if model.filter.scope == .archived {
+      ContentUnavailableView(
+        "No archived session",
+        systemImage: "archivebox",
+        description: Text("Archived sessions are kept here, and can be unarchived at any time.")
+      )
+    } else {
+      ContentUnavailableView(
+        "No sessions",
+        systemImage: "square.stack.3d.up",
+        description: Text("Press ⌘N to create one.")
+      )
+    }
+  }
+}
+
+/// The archive is never a trapdoor: its tab carries how much is in it, so a session put away is
+/// still something the user knows is there.
+private struct ScopePicker: View {
+  let model: AppModel
+
+  var body: some View {
+    Picker(
+      "Scope",
+      selection: Binding(get: { model.filter.scope }, set: { model.setScope($0) })
+    ) {
+      ForEach(SessionScope.allCases, id: \.self) { scope in
+        Text(label(for: scope)).tag(scope)
+      }
+    }
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .padding(.horizontal, 10)
+    .padding(.vertical, 8)
+    .accessibilityLabel("Sessions shown")
+  }
+
+  private func label(for scope: SessionScope) -> String {
+    guard scope == .archived, model.archivedSessionCount > 0 else { return scope.label }
+    return "\(scope.label) (\(model.archivedSessionCount))"
+  }
+}
+
+/// Sort and facets live at the foot of the column rather than above the list: they are consulted
+/// rarely, and the rows are what the column is for.
+private struct SidebarFooter: View {
+  let model: AppModel
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Menu {
+        Picker(
+          "Sort By",
+          selection: Binding(get: { model.filter.sort }, set: { model.setSort($0) })
+        ) {
+          ForEach(SessionSort.allCases, id: \.self) { sort in
+            Text(sort.label).tag(sort)
+          }
+        }
+        .pickerStyle(.inline)
+
+        if !model.availableProviderIDs.isEmpty {
+          Divider()
+          Section("Agent") {
+            ForEach(model.availableProviderIDs, id: \.self) { providerID in
+              Toggle(
+                providerID,
+                isOn: Binding(
+                  get: { model.filter.agentProviderIDs.contains(providerID) },
+                  set: { _ in model.toggleProviderFacet(providerID) }
+                )
+              )
+            }
+          }
+        }
+
+        if !model.availableRepositoryPaths.isEmpty {
+          Divider()
+          Section("Folder") {
+            Button("Any folder") { model.setRepositoryFacet(nil) }
+            ForEach(model.availableRepositoryPaths, id: \.self) { path in
+              Button(displayPath(path)) { model.setRepositoryFacet(path) }
+            }
+          }
+        }
+
+        if model.filter.isNarrowing {
+          Divider()
+          Button("Clear Filter") { model.clearNarrowing() }
+        }
+      } label: {
+        Label(model.filter.sort.label, systemImage: "arrow.up.arrow.down")
+      }
+      .menuStyle(.borderlessButton)
+      .fixedSize()
+
+      Spacer(minLength: 0)
+
+      if model.filter.isNarrowing {
+        Button {
+          model.clearNarrowing()
+        } label: {
+          Image(systemName: "line.3.horizontal.decrease.circle.fill")
+        }
+        .buttonStyle(.borderless)
+        .help("Filtering is on. Click to clear it.")
+        .accessibilityLabel("Clear filter")
+      }
+    }
+    .font(.caption)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 6)
+  }
+
+  private func displayPath(_ path: String) -> String {
+    (path as NSString).abbreviatingWithTildeInPath
+  }
+}
+
+/// The three history commands for one session, in the single place that decides whether each of
+/// them applies. The menu, the context menu and the accessibility actions all read this.
+@MainActor
+struct SessionCommands {
+  let model: AppModel
+  let session: WorkSession
+
+  var canClose: Bool { model.canClose(session) }
+  var canArchive: Bool { model.canArchive(session) }
+  var canRestore: Bool { model.canRestore(session) }
+
+  func close() { Task { await model.close(session.id) } }
+  func requestArchive() { model.requestArchive(session.id) }
+  func restore() { Task { await model.restore(session.id) } }
+}
+
+private struct SessionCommandButtons: View {
+  let commands: SessionCommands
+
+  var body: some View {
+    if commands.canClose {
+      Button("Close Session") { commands.close() }
+    }
+    if commands.canArchive {
+      Button("Archive…") { commands.requestArchive() }
+    }
+    if commands.canRestore {
+      Button("Unarchive") { commands.restore() }
     }
   }
 }
@@ -312,6 +640,7 @@ private struct SessionRow: View {
   let session: WorkSession
   let status: SessionStatusPresentation
   let shortcutPosition: Int?
+  let commands: SessionCommands
 
   var body: some View {
     HStack(spacing: 10) {
@@ -341,8 +670,24 @@ private struct SessionRow: View {
       }
     }
     .padding(.vertical, 4)
+    .contextMenu {
+      SessionCommandButtons(commands: commands)
+    }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
+    // The same three commands, reachable without a pointer and without the menu bar.
+    .accessibilityAction(named: "Close Session") {
+      guard commands.canClose else { return }
+      commands.close()
+    }
+    .accessibilityAction(named: "Archive") {
+      guard commands.canArchive else { return }
+      commands.requestArchive()
+    }
+    .accessibilityAction(named: "Unarchive") {
+      guard commands.canRestore else { return }
+      commands.restore()
+    }
   }
 
   private var tint: Color {

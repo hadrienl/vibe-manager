@@ -10,7 +10,7 @@ import VibeTerminalUI
 /// scroll, and an agent must never be restarted just because the user looked at another session.
 @MainActor
 @Observable
-public final class SessionLauncher {
+public final class SessionLauncher: SessionRuntime {
   private let supervisor: any TerminalSupervisor
   private let repository: any SessionRepository
   private let agents: any AgentProviderResolving
@@ -19,6 +19,11 @@ public final class SessionLauncher {
   private var panes: [SessionID: TerminalPaneModel] = [:]
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
+  private var exitTasks: [SessionID: Task<Void, Never>] = [:]
+
+  /// Called once a session's own process has ended and the store has been told. The workspace
+  /// uses it to refresh: an agent that typed `exit` must not leave a session listed as running.
+  public var sessionDidClose: (@MainActor (SessionID) -> Void)?
 
   /// How long a launch waits for the pane to measure itself before falling back to the spec's
   /// own size. Long enough for one layout pass, short enough never to feel like a delay.
@@ -52,6 +57,10 @@ public final class SessionLauncher {
   /// Create twice, or restoring a session that is already up, must not fork a second agent.
   @discardableResult
   public func launch(session: WorkSession, plan: AgentLaunchPlan) async -> Bool {
+    // An archived session is out of reach by design. Refusing here, rather than only hiding the
+    // command, is what lets #10's Restart and #11's restore walk the whole store without having
+    // to remember the rule — and it is how "no process stays attached" survives their arrival.
+    guard session.status != .archived else { return false }
     guard !isRunning(session.id) else { return true }
 
     // The pane a session already has is reused rather than replaced. The view that renders it
@@ -62,6 +71,7 @@ public final class SessionLauncher {
 
     guard let terminal = pane.session else { return false }
 
+    watchForExit(id: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     // The session becomes active only now: it is stored closed, so a launch that never reached
     // a process leaves a session the user can retry rather than a lie about a running agent.
@@ -85,6 +95,10 @@ public final class SessionLauncher {
   }
 
   public func stopAll(gracePeriod: Duration = .seconds(3)) async {
+    for task in exitTasks.values {
+      task.cancel()
+    }
+    exitTasks.removeAll()
     for task in outputTasks.values {
       task.cancel()
     }
@@ -94,6 +108,87 @@ public final class SessionLauncher {
     }
     observers.removeAll()
     await supervisor.stopAll(gracePeriod: gracePeriod)
+  }
+
+  // MARK: - SessionRuntime
+
+  /// Lets go of everything this session was attached to: its exit watch, its output reader, its
+  /// agent observer and its process. The pane stays, so a closed session is still readable.
+  ///
+  /// The outcome is read back from the terminal rather than assumed. A process group the kernel
+  /// would not let go of leaves the session in `processOutcomeUnknown`, and saying "stopped"
+  /// there would be exactly the lie the archive is not allowed to tell.
+  public func detach(_ id: SessionID) async -> SessionDetachOutcome {
+    exitTasks.removeValue(forKey: id)?.cancel()
+    outputTasks.removeValue(forKey: id)?.cancel()
+    if let observer = observers.removeValue(forKey: id) {
+      await observer.finished()
+    }
+
+    let pane = panes[id]
+    var terminal = pane?.session
+    if terminal == nil {
+      terminal = await supervisor.session(for: id)
+    }
+
+    var wasRunning = false
+    if let terminal {
+      wasRunning = !(await terminal.state().isFinished)
+    }
+
+    if let pane {
+      await pane.stop()
+    } else {
+      await supervisor.stop(id: id, gracePeriod: .seconds(3))
+    }
+
+    guard wasRunning else { return .wasNotRunning }
+
+    if let terminal,
+      case .failed(.processOutcomeUnknown(let processIdentifier)) =
+        await terminal.state()
+    {
+      return .unreachable(processIdentifier: processIdentifier)
+    }
+    return .stopped
+  }
+
+  /// Releases the pane itself, and with it the terminal's replay buffer. Only archiving does it.
+  public func dispose(_ id: SessionID) async {
+    _ = await detach(id)
+    panes.removeValue(forKey: id)
+  }
+
+  /// A process that ends on its own closes its session, exactly as the command would.
+  ///
+  /// Without this, an agent that exits leaves a session stored `active` with nothing behind it:
+  /// the sidebar would keep calling it running, and #11 would try to resume a session that has
+  /// already had its say.
+  private func watchForExit(id: SessionID, terminal: any TerminalSession) {
+    exitTasks[id]?.cancel()
+    exitTasks[id] = Task { [weak self] in
+      let attachment = await terminal.attach()
+      if !attachment.state.isFinished {
+        for await event in attachment.events {
+          guard case .stateChanged(let state) = event, state.isFinished else { continue }
+          break
+        }
+      }
+      guard !Task.isCancelled else { return }
+      await self?.processDidFinish(id)
+    }
+  }
+
+  private func processDidFinish(_ id: SessionID) async {
+    exitTasks[id] = nil
+    outputTasks.removeValue(forKey: id)?.cancel()
+    if let observer = observers.removeValue(forKey: id) {
+      await observer.finished()
+    }
+    // A session that was never marked active — a launch that failed — has nothing to close, and
+    // `close` says so by refusing the transition rather than by inventing a second rule here.
+    _ = try? await changeStatus(id: id, action: .close)
+    sessionDidClose?(id)
   }
 
   private func startObserver(

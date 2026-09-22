@@ -35,6 +35,30 @@ public final class AppModel {
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
 
+  /// The session the user asked to archive, held until they confirm. Archiving is reversible,
+  /// but it moves a session out of sight, and a slip of the pointer must not do that.
+  public private(set) var pendingArchive: WorkSession?
+  /// A process the system would not let go of. Reported rather than swallowed: the promise that
+  /// nothing stays attached to an archived session is only worth making if its failure is said.
+  public private(set) var detachWarning: DetachWarning?
+
+  /// A stop that could not be confirmed.
+  public struct DetachWarning: Equatable {
+    public let sessionName: String
+    public let processIdentifier: Int32
+
+    public var message: String {
+      """
+      \(sessionName) was archived, but its process (pid \(processIdentifier)) did not answer the \
+      stop and may still be running.
+      """
+    }
+
+    public var suggestion: String {
+      "Check Activity Monitor for a leftover process."
+    }
+  }
+
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
   private var preferredSelection: SessionID?
   private var resolutionTask: Task<Void, Never>?
@@ -47,6 +71,9 @@ public final class AppModel {
   private let agents: (any AgentProviderResolving)?
   private let launcher: SessionLauncher?
   private let defaultWorkingDirectoryPath: String?
+  private let closeSession: CloseSession
+  private let archiveSession: ArchiveSession
+  private let restoreSession: RestoreSession
 
   public init(
     repository: any SessionRepository,
@@ -63,6 +90,18 @@ public final class AppModel {
     self.launcher = launcher
     self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
     self.layout = layout
+
+    // A workspace without a launcher has nothing running, so the use cases are handed a runtime
+    // that says exactly that rather than an optional they would each have to second-guess.
+    let runtime: any SessionRuntime = launcher ?? DetachedSessionRuntime()
+    closeSession = CloseSession(repository: repository, runtime: runtime)
+    archiveSession = ArchiveSession(repository: repository, runtime: runtime)
+    restoreSession = RestoreSession(repository: repository)
+
+    launcher?.sessionDidClose = { [weak self] _ in
+      // The store already says the session is closed; the list on screen is what has to catch up.
+      Task { await self?.reload() }
+    }
   }
 
   public var sessions: [WorkSession] {
@@ -72,6 +111,152 @@ public final class AppModel {
 
   public var selectedSession: WorkSession? {
     sessions.first { $0.id == selectedSessionID }
+  }
+
+  // MARK: - History and filtering
+
+  public var filter: SessionFilter {
+    layout.filter
+  }
+
+  /// What the sidebar lists. Every session is still held — and every terminal still mounted —
+  /// so narrowing the list never stops an agent or throws away what one has already said.
+  public var visibleSessions: [WorkSession] {
+    filter.apply(to: sessions)
+  }
+
+  public var archivedSessionCount: Int {
+    sessions.filter { $0.status == .archived }.count
+  }
+
+  public var availableProviderIDs: [String] {
+    SessionFilter.availableProviderIDs(in: sessions)
+  }
+
+  public var availableRepositoryPaths: [String] {
+    SessionFilter.availableRepositoryPaths(in: sessions)
+  }
+
+  public func update(filter change: (inout SessionFilter) -> Void) {
+    var updated = filter
+    change(&updated)
+    guard updated != filter else { return }
+    layout.setFilter(updated)
+    reconcileSelection()
+  }
+
+  public func setScope(_ scope: SessionScope) {
+    update { $0.scope = scope }
+  }
+
+  /// Walks Current → Archived → All. One shortcut rather than three: the scopes are an order,
+  /// and a key per scope would crowd the menu for a control that is one click away.
+  public func cycleScope() {
+    let scopes = SessionScope.allCases
+    guard let index = scopes.firstIndex(of: filter.scope) else { return }
+    setScope(scopes[(index + 1) % scopes.count])
+  }
+
+  public func setSort(_ sort: SessionSort) {
+    update { $0.sort = sort }
+  }
+
+  public func setSearchText(_ text: String) {
+    update { $0.searchText = text }
+  }
+
+  public func toggleProviderFacet(_ providerID: String) {
+    update {
+      if $0.agentProviderIDs.contains(providerID) {
+        $0.agentProviderIDs.remove(providerID)
+      } else {
+        $0.agentProviderIDs.insert(providerID)
+      }
+    }
+  }
+
+  public func setRepositoryFacet(_ path: String?) {
+    update { $0.repositoryPath = path }
+  }
+
+  public func clearNarrowing() {
+    update {
+      $0.searchText = ""
+      $0.agentProviderIDs = []
+      $0.repositoryPath = nil
+    }
+  }
+
+  /// Keeps the selection on something the user can actually see. A session archived out of the
+  /// current scope, or filtered away by a search, hands the selection to its neighbour rather
+  /// than leaving the detail column pointing at a row that is no longer listed.
+  private func reconcileSelection() {
+    let visible = visibleSessions
+    guard let first = visible.first else { return }
+    if let selectedSessionID, visible.contains(where: { $0.id == selectedSessionID }) { return }
+    apply(selection: first.id)
+  }
+
+  // MARK: - Lifecycle commands
+
+  public func canClose(_ session: WorkSession) -> Bool {
+    session.status == .active || launcher?.isRunning(session.id) == true
+  }
+
+  public func canArchive(_ session: WorkSession) -> Bool {
+    session.status != .archived
+  }
+
+  public func canRestore(_ session: WorkSession) -> Bool {
+    session.status == .archived
+  }
+
+  /// Stops the agent and keeps everything else. The pane stays mounted so the last thing the
+  /// agent said is still on screen.
+  public func close(_ id: SessionID) async {
+    guard let closure = try? await closeSession(id: id) else { return }
+    report(closure.detachment, for: closure.session)
+    await reload()
+  }
+
+  /// Opens the confirmation rather than archiving. The command is reversible, but it takes a
+  /// session out of the view it was in, and that is worth one deliberate answer.
+  public func requestArchive(_ id: SessionID) {
+    guard let session = sessions.first(where: { $0.id == id }), canArchive(session) else { return }
+    pendingArchive = session
+  }
+
+  public func cancelArchive() {
+    pendingArchive = nil
+  }
+
+  public func confirmArchive() async {
+    guard let session = pendingArchive else { return }
+    pendingArchive = nil
+    guard let archival = try? await archiveSession(id: session.id) else { return }
+    report(archival.detachment, for: archival.session)
+    await reload()
+    reconcileSelection()
+  }
+
+  /// Brings a session back among the current ones, and starts nothing: it comes back closed,
+  /// which is what Restart works from.
+  public func restore(_ id: SessionID) async {
+    guard (try? await restoreSession(id: id)) != nil else { return }
+    await reload()
+    reconcileSelection()
+  }
+
+  public func dismissDetachWarning() {
+    detachWarning = nil
+  }
+
+  private func report(_ detachment: SessionDetachOutcome, for session: WorkSession) {
+    guard case .unreachable(let processIdentifier) = detachment else { return }
+    detachWarning = DetachWarning(
+      sessionName: session.name,
+      processIdentifier: processIdentifier
+    )
   }
 
   public var canCreateSession: Bool {
@@ -148,32 +333,35 @@ public final class AppModel {
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
   /// wrapping: a repeated shortcut should not silently loop back to where it started.
   public func selectNext() {
+    let visible = visibleSessions
     guard let index = selectedIndex else {
-      select(sessions.first?.id)
+      select(visible.first?.id)
       return
     }
-    guard index + 1 < sessions.count else { return }
-    select(sessions[index + 1].id)
+    guard index + 1 < visible.count else { return }
+    select(visible[index + 1].id)
   }
 
   public func selectPrevious() {
     guard let index = selectedIndex, index > 0 else { return }
-    select(sessions[index - 1].id)
+    select(visibleSessions[index - 1].id)
   }
 
   /// How many sessions a shortcut can reach. Past that, the sidebar and its arrow keys are the
   /// honest way around, rather than a second modifier nobody would guess.
   public static let shortcutPositionLimit = 9
 
-  /// Selects the session at a one-based position, for the ⌘1…⌘9 shortcuts.
+  /// Selects the session at a one-based position, for the ⌘1…⌘9 shortcuts. The position is the
+  /// row the user is looking at, so it follows the filter rather than the whole store.
   public func select(position: Int) {
     let index = position - 1
-    guard sessions.indices.contains(index) else { return }
-    select(sessions[index].id)
+    let visible = visibleSessions
+    guard visible.indices.contains(index) else { return }
+    select(visible[index].id)
   }
 
   private var selectedIndex: Int? {
-    sessions.firstIndex { $0.id == selectedSessionID }
+    visibleSessions.firstIndex { $0.id == selectedSessionID }
   }
 
   public func resolution(forID id: SessionID) -> SessionAgentResolution? {
@@ -272,11 +460,19 @@ public final class AppModel {
       // The fallback keeps the restored selection in hand rather than resolving it away: a load
       // that came back empty or short — a store caught mid-write — would otherwise persist the
       // fallback and lose the user's place for good.
+      // A facet restored from a previous run can name an agent that has since been uninstalled,
+      // or a folder no session uses any more. Dropping it is the difference between an empty
+      // sidebar with a reason and one that reads as a lost store.
+      let reconciled = layout.filter.reconciled(with: sessions)
+      if reconciled != layout.filter {
+        layout.setFilter(reconciled)
+      }
+
       if let previousSelection, sessions.contains(where: { $0.id == previousSelection }) {
         preferredSelection = nil
         apply(selection: previousSelection)
-      } else if !sessions.isEmpty {
-        apply(selection: sessions.first?.id)
+      } else if let first = visibleSessions.first {
+        apply(selection: first.id)
       }
       // Not awaited: the sidebar draws perfectly well without knowing what each agent can do,
       // and on a cold cache this is a detection the first frame would otherwise wait for.
