@@ -92,12 +92,23 @@ public struct RootView: View {
   @ViewBuilder
   private var detail: some View {
     if let session = model.selectedSession {
-      if let pane = model.pane(for: session.id) {
-        // The pane is started by the launcher, so switching sessions never restarts an agent.
-        // The identity is the session's: the terminal view owns an AppKit view and a coordinator
-        // bound to one session, and reusing them for another shows the wrong terminal.
-        TerminalPaneView(model: pane, autoStart: false)
-          .id(session.id)
+      if model.pane(for: session.id) != nil {
+        // Every terminal stays mounted, and changing session only changes which one is shown.
+        // Rebuilding the selected one instead meant a fresh, empty terminal for the frame it
+        // took to replay the history — and it threw away the scroll position with it.
+        ZStack {
+          ForEach(model.sessions) { listed in
+            if let pane = model.pane(for: listed.id) {
+              let isActive = listed.id == session.id
+              // Started by the launcher, so switching sessions never restarts an agent.
+              TerminalPaneView(model: pane, autoStart: false, isActive: isActive)
+                .id(listed.id)
+                .opacity(isActive ? 1 : 0)
+                .allowsHitTesting(isActive)
+                .accessibilityHidden(!isActive)
+            }
+          }
+        }
       } else {
         ContentUnavailableView {
           Label(session.name, systemImage: session.appearance.symbolName)

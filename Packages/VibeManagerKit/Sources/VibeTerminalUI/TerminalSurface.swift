@@ -10,10 +10,13 @@ import VibeDomain
 public struct TerminalSurface: NSViewRepresentable {
   private let pane: TerminalPaneModel
   private let session: (any TerminalSession)?
+  /// Panes that are not on screen stay mounted, so they must not keep the keyboard.
+  private let isActive: Bool
 
-  public init(pane: TerminalPaneModel, session: (any TerminalSession)?) {
+  public init(pane: TerminalPaneModel, session: (any TerminalSession)?, isActive: Bool = true) {
     self.pane = pane
     self.session = session
+    self.isActive = isActive
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
@@ -29,8 +32,22 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 
   public func updateNSView(_ nsView: TerminalView, context: Context) {
-    guard let session else { return }
-    context.coordinator.attachIfNeeded(to: session)
+    if let session {
+      context.coordinator.attachIfNeeded(to: session)
+    }
+    updateResponder(nsView)
+  }
+
+  /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
+  /// that kept the first responder would quietly receive what was typed for its neighbour.
+  private func updateResponder(_ view: TerminalView) {
+    guard let window = view.window else { return }
+    let holdsKeyboard = window.firstResponder === view
+    if isActive, !holdsKeyboard {
+      window.makeFirstResponder(view)
+    } else if !isActive, holdsKeyboard {
+      window.makeFirstResponder(nil)
+    }
   }
 
   public static func dismantleNSView(
