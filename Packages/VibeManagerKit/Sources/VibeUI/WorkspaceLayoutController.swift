@@ -58,8 +58,8 @@ public final class WorkspaceLayoutController {
     intent.sessionFilter
   }
 
-  /// The scope, the sort and the facets are kept; the search text rides along in memory and is
-  /// dropped by the filter's own encoding, so a delayed save costs nothing while the user types.
+  /// The scope, the sort and the facets are kept. The search text never reaches here — the
+  /// workspace holds it in memory — so typing never restarts the delay this save waits out.
   public func setFilter(_ filter: SessionFilter) {
     updateIntent { $0.sessionFilter = filter }
   }

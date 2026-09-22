@@ -130,8 +130,15 @@ public final class AppModel {
 
   // MARK: - History and filtering
 
+  /// What the user is typing in the search field. Held here rather than in the stored layout:
+  /// every keystroke would otherwise restart that save's delay and starve the write waiting it
+  /// out, so a scope change followed by a burst of typing and a quit would never be persisted.
+  public private(set) var searchText: String = ""
+
   public var filter: SessionFilter {
-    layout.filter
+    var filter = layout.filter
+    filter.searchText = searchText
+    return filter
   }
 
   /// What the sidebar lists. Every session is still held — and every terminal still mounted —
@@ -156,6 +163,9 @@ public final class AppModel {
     var updated = filter
     change(&updated)
     guard updated != filter else { return }
+    searchText = updated.searchText
+    updated.searchText = ""
+    guard updated != layout.filter else { return }
     layout.setFilter(updated)
   }
 
@@ -518,7 +528,10 @@ public final class AppModel {
       // A facet restored from a previous run can name an agent that has since been uninstalled,
       // or a folder no session uses any more. Dropping it is the difference between an empty
       // sidebar with a reason and one that reads as a lost store.
-      let reconciled = layout.filter.reconciled(with: sessions)
+      //
+      // The facets are reconciled against that same load, so they are spared the same way: an
+      // empty answer is a store caught mid-write, not a workspace without agents or folders.
+      let reconciled = sessions.isEmpty ? layout.filter : layout.filter.reconciled(with: sessions)
       if reconciled != layout.filter {
         layout.setFilter(reconciled)
       }

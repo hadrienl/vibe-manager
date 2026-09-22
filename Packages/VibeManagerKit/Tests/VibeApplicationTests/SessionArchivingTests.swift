@@ -80,6 +80,35 @@ private actor LoggingRepository: SessionRepository {
   }
 }
 
+/// A store in which the session is started again the instant the close lands.
+private actor RelaunchingRepository: SessionRepository {
+  private var stored: [WorkSession]
+  private var hasRelaunched = false
+
+  init(sessions: [WorkSession]) {
+    stored = sessions
+  }
+
+  func sessions() -> [WorkSession] { stored }
+
+  func session(id: SessionID) -> WorkSession? {
+    stored.first { $0.id == id }
+  }
+
+  func save(_ session: WorkSession) {
+    var session = session
+    if session.status == .closed, !hasRelaunched {
+      hasRelaunched = true
+      try? session.reopen(at: session.updatedAt)
+    }
+    if let index = stored.firstIndex(where: { $0.id == session.id }) {
+      stored[index] = session
+    } else {
+      stored.append(session)
+    }
+  }
+}
+
 private func runningSession(name: String = "Refactor the webhook") -> WorkSession {
   WorkSession(
     name: name,
@@ -259,6 +288,24 @@ struct ArchiveSessionTests {
 
     #expect(first.session == second.session)
     #expect(second.session.status == .archived)
+  }
+
+  /// Pressing Restart while the confirmation is still up relaunches the session between the
+  /// close and the archive. Letting the refusal pass silently reported a success and released
+  /// the pane anyway, leaving a session the store still lists as active with no terminal at all.
+  @Test("A session relaunched during the archive is refused, and keeps its pane")
+  func archivingRefusesARelaunchedSession() async {
+    let session = runningSession()
+    let runtime = SpyRuntime()
+    let archive = ArchiveSession(
+      repository: RelaunchingRepository(sessions: [session]),
+      runtime: runtime
+    )
+
+    await #expect(throws: SessionTransitionError.self) {
+      _ = try await archive(id: session.id)
+    }
+    #expect(await runtime.disposed.isEmpty)
   }
 
   @Test("Archiving writes nothing but the lifecycle")

@@ -150,6 +150,26 @@ struct SessionHistoryTests {
     #expect(launcher.pane(for: stored.id) != nil)
   }
 
+  /// The exit watch used to be armed before the session was stored active. A process already
+  /// over by the time it attached ran its close against a session still marked closed — refused,
+  /// and swallowed — and the launch then wrote `active` over it: a session listed as running,
+  /// with no process, no watch and nothing left to correct it.
+  @Test("A process that ends before the launch finishes never leaves the session running")
+  func aLaunchThatDiesImmediatelyStillCloses() async throws {
+    let stored = session()
+    let repository = MutableRepository(sessions: [stored])
+    let launcher = launcher(
+      supervisor: SpySupervisor(startsFinished: true),
+      repository: repository
+    )
+
+    await launcher.launch(session: stored, plan: plan())
+
+    try await waitUntil {
+      await repository.session(id: stored.id)?.status == .closed
+    }
+  }
+
   // MARK: - The workspace
 
   @Test("Archiving is confirmed before it happens")
@@ -245,6 +265,67 @@ struct SessionHistoryTests {
     #expect(model.detachWarning?.message.contains("archived") == true)
     model.dismissDetachWarning()
     #expect(model.detachWarning == nil)
+  }
+
+  /// The warning belongs to the command that could not confirm the stop. A terminal parked in
+  /// that state stays there, so reading it again on the next command claimed a stop that was
+  /// never attempted, against a process that may have been gone for hours.
+  @Test("An unconfirmable stop is warned about once, not again on the next command")
+  func theWarningIsNotRepeatedByALaterCommand() async {
+    let stored = session()
+    let repository = MutableRepository(sessions: [stored])
+    let supervisor = SpySupervisor(outcome: .unreachable(processIdentifier: 4242))
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
+    await model.load()
+    await launcher.launch(session: stored, plan: plan())
+
+    await model.close(stored.id)
+    #expect(model.detachWarning?.processIdentifier == 4242)
+    model.dismissDetachWarning()
+
+    model.requestArchive(stored.id)
+    await model.archive(stored.id)
+
+    #expect(model.detachWarning == nil)
+    #expect(await repository.session(id: stored.id)?.status == .archived)
+  }
+
+  /// The selection is written to survive a store caught mid-write; the facets are reconciled
+  /// against the same read, and dropping them there would erase the user's narrowing for good.
+  @Test("A load that comes back empty does not erase the saved facets")
+  func anEmptyLoadKeepsTheFacets() async {
+    let stored = session(status: .active)
+    let model = AppModel(
+      repository: EmptyingRepository(sessions: [stored]),
+      agents: EmptyRegistry()
+    )
+    await model.load()
+    model.toggleProviderFacet("stub")
+    #expect(model.filter.agentProviderIDs == ["stub"])
+
+    await model.reload()
+
+    #expect(model.filter.agentProviderIDs == ["stub"])
+  }
+
+  /// The layout's save waits out a delay that every change restarts. With the query inside the
+  /// saved value, a burst of typing cancelled the write a scope change was waiting on.
+  @Test("Typing a query never reaches the stored layout")
+  func searchTextStaysInMemory() async {
+    let model = AppModel(
+      repository: MutableRepository(sessions: [session()]),
+      agents: EmptyRegistry(),
+      layout: WorkspaceLayoutController(store: MemoryLayoutStore(), saveDelay: .zero)
+    )
+    await model.load()
+    model.setScope(.closed)
+    model.setSearchText("webhook")
+
+    #expect(model.filter.searchText == "webhook")
+    #expect(model.filter.scope == .closed)
+    #expect(model.layout.filter.searchText.isEmpty)
+    #expect(model.layout.filter.scope == .closed)
   }
 
   @Test("Narrowing the list never unmounts a terminal")
@@ -399,19 +480,52 @@ private actor MemoryLayoutStore: WorkspaceLayoutStore {
   }
 }
 
+/// A store that answers once and then comes back empty — a file read caught mid-write.
+private actor EmptyingRepository: SessionRepository {
+  private var stored: [WorkSession]
+  private var reads = 0
+
+  init(sessions: [WorkSession]) {
+    stored = sessions
+  }
+
+  func sessions() -> [WorkSession] {
+    reads += 1
+    return reads > 1 ? [] : stored
+  }
+
+  func session(id: SessionID) -> WorkSession? {
+    stored.first { $0.id == id }
+  }
+
+  func save(_ session: WorkSession) {
+    if let index = stored.firstIndex(where: { $0.id == session.id }) {
+      stored[index] = session
+    } else {
+      stored.append(session)
+    }
+  }
+}
+
 private actor SpySupervisor: TerminalSupervisor {
   private(set) var startCount = 0
   private(set) var stopped: [SessionID] = []
   private var sessions: [SessionID: FakeTerminalSession] = [:]
   private let outcome: SessionDetachOutcome
+  private let startsFinished: Bool
 
-  init(outcome: SessionDetachOutcome = .stopped) {
+  init(outcome: SessionDetachOutcome = .stopped, startsFinished: Bool = false) {
     self.outcome = outcome
+    self.startsFinished = startsFinished
   }
 
   func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
     startCount += 1
-    let session = FakeTerminalSession(id: id, stopOutcome: outcome)
+    let session = FakeTerminalSession(
+      id: id,
+      stopOutcome: outcome,
+      initialState: startsFinished ? .exited(code: 0) : .running(processIdentifier: 4242)
+    )
     sessions[id] = session
     return session
   }
@@ -443,13 +557,18 @@ private actor SpySupervisor: TerminalSupervisor {
 private actor FakeTerminalSession: TerminalSession {
   nonisolated let id: SessionID
 
-  private var currentState: TerminalProcessState = .running(processIdentifier: 4242)
+  private var currentState: TerminalProcessState
   private var subscribers: [UUID: AsyncStream<TerminalEvent>.Continuation] = [:]
   private let stopOutcome: SessionDetachOutcome
 
-  init(id: SessionID, stopOutcome: SessionDetachOutcome = .stopped) {
+  init(
+    id: SessionID,
+    stopOutcome: SessionDetachOutcome = .stopped,
+    initialState: TerminalProcessState = .running(processIdentifier: 4242)
+  ) {
     self.id = id
     self.stopOutcome = stopOutcome
+    currentState = initialState
   }
 
   func attach() -> TerminalAttachment {

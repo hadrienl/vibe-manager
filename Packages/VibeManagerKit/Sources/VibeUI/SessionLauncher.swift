@@ -77,11 +77,14 @@ public final class SessionLauncher: SessionRuntime {
 
     guard let terminal = pane.session else { return false }
 
+    // The session becomes active before anything is armed on it: it is stored closed until a
+    // process exists, so a launch that never reached one leaves a session the user can retry
+    // rather than a lie about a running agent — and a watch armed first would have nothing to
+    // close. A process that has already ended by now would run its watch during the observer's
+    // own await, find the session still closed, and leave it listed as running for good.
+    _ = try? await changeStatus(id: session.id, action: .reopen)
     watchForExit(id: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
-    // The session becomes active only now: it is stored closed, so a launch that never reached
-    // a process leaves a session the user can retry rather than a lie about a running agent.
-    _ = try? await changeStatus(id: session.id, action: .reopen)
     return true
   }
 
@@ -101,7 +104,10 @@ public final class SessionLauncher: SessionRuntime {
   }
 
   public func stopAll(gracePeriod: Duration = .seconds(3)) async {
-    for task in exitTasks.values {
+    // Retired as well as cancelled, exactly as `detach` does: a watch already on its way to the
+    // main actor would otherwise still write to the store and ask for a reload, during teardown.
+    for (id, task) in exitTasks {
+      _ = nextExitGeneration(for: id)
       task.cancel()
     }
     exitTasks.removeAll()
@@ -141,8 +147,11 @@ public final class SessionLauncher: SessionRuntime {
     }
 
     var wasRunning = false
+    var wasAlreadyUnreachable = false
     if let terminal {
-      wasRunning = !(await terminal.state().isFinished)
+      let state = await terminal.state()
+      wasRunning = !state.isFinished
+      if case .failed(.processOutcomeUnknown) = state { wasAlreadyUnreachable = true }
     }
 
     if let pane {
@@ -153,8 +162,12 @@ public final class SessionLauncher: SessionRuntime {
 
     // Asked before "was it running": a terminal whose group could not be reaped is already
     // finished, so answering `wasNotRunning` first would drop the warning on exactly the session
-    // that still has a process behind it — an earlier close having left it in that state.
-    if let terminal,
+    // that still has a process behind it.
+    //
+    // Only when this call is the one that left it there. A terminal parked in that state by an
+    // earlier close has already had its warning; repeating it on the archive would claim a stop
+    // that was never attempted, against a process that may have been gone for hours.
+    if let terminal, !wasAlreadyUnreachable,
       case .failed(.processOutcomeUnknown(let processIdentifier)) = await terminal.state()
     {
       return .unreachable(processIdentifier: processIdentifier)

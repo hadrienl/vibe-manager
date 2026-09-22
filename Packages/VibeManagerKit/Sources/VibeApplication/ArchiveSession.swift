@@ -48,15 +48,20 @@ public struct ArchiveSession: Sendable {
     // Read again inside the write, for the same reason closing does: the copy `close` handed
     // back was taken before this line, and the store is the only thing that knows the truth now.
     let updated = try await repository.mutate(id: id) { session in
-      guard session.status == .closed else { return }
+      // Archiving twice is the same archive, and the second one has nothing left to say.
+      guard session.status != .archived else { return }
+      // A session relaunched between the close and here refuses the transition, and the refusal
+      // is raised rather than swallowed: reporting a success would release the pane under a
+      // session the store still lists as active, leaving it running nothing.
       try session.archive(at: max(now, session.updatedAt))
     }
+
+    guard let updated else { throw ChangeSessionStatusError.sessionNotFound(id) }
 
     // The pane goes last, once the store agrees the session is archived: releasing it earlier
     // would throw away the terminal's history for an archive that might still have failed.
     await runtime.dispose(id)
 
-    guard let updated else { throw ChangeSessionStatusError.sessionNotFound(id) }
     return SessionArchival(session: updated, detachment: closure.detachment)
   }
 }
