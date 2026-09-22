@@ -100,6 +100,20 @@ The step does not come back: not once access is granted, because the status alon
 after a refusal, because the answer was recorded. The way back is the Settings window, which gets
 its first real row here — a permanent entrance, rather than something that surges up unbidden.
 
+### No folder is proposed any more
+
+The creation sheet used to open on the home directory. It is the one place that contains Desktop,
+Documents and Downloads without being guarded itself, so the remark said nothing and accepting the
+default sent an agent straight into all three. The sheet now opens with the field empty: choosing
+is always a gesture, and the open panel grants the access along the way. The panel still starts in
+the home directory, because it has to start somewhere.
+
+### An ad-hoc build says so
+
+A build phase warns, in Debug only, when `DEVELOPMENT_TEAM` is empty — the state in which macOS
+forgets every permission at the next compilation. It warns rather than fails: a fresh clone must
+still build, and CI must stay untouched.
+
 ### Refusing is an answer, not a failure
 
 A user who refuses works in their own repositories, which are almost never in a protected

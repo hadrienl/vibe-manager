@@ -23,7 +23,8 @@ does not accidentally adopt APIs newer than the documented baseline.
 
 No external package or secret is required for the foundation build.
 
-Before the first run, copy `Configuration/Local.xcconfig.example` to
+The session sheet proposes no working folder: it is always chosen through the open panel, which is
+also what grants access to it. Before the first run, copy `Configuration/Local.xcconfig.example` to
 `Configuration/Local.xcconfig` and put your own `DEVELOPMENT_TEAM` in it. That file is not
 versioned, and it is not cosmetic: without it Xcode signs the application ad hoc, macOS then
 identifies it by a hash that changes at every build, and every privacy permission granted — Full

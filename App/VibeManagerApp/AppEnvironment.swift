@@ -42,7 +42,11 @@ final class AppEnvironment {
       recovery: repository,
       agents: registry,
       launcher: launcher,
-      defaultWorkingDirectoryPath: AppEnvironment.defaultWorkingDirectory().path,
+      // No folder is proposed. The home directory used to be, and it is the one place that
+      // contains Desktop, Documents and Downloads without being guarded itself: accepting the
+      // default let an agent walk straight into them, with nothing said beforehand. Choosing is
+      // now always a gesture, and the open panel is what grants the access along the way.
+      defaultWorkingDirectoryPath: nil,
       layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore()),
       permissions: permissions
     )
@@ -65,9 +69,5 @@ final class AppEnvironment {
       providers.append(MockAgentProvider())
     }
     return providers
-  }
-
-  private static func defaultWorkingDirectory() -> URL {
-    URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
   }
 }

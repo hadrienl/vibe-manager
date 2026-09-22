@@ -269,9 +269,13 @@ public struct NewSessionSheet: View {
     panel.allowsMultipleSelection = false
     panel.canCreateDirectories = true
     panel.prompt = "Choose"
-    if let path = model.draft.resolvedWorkingDirectoryPath {
-      panel.directoryURL = URL(fileURLWithPath: path, isDirectory: true)
-    }
+    // The panel opens on the home directory when nothing is chosen yet. The sheet itself
+    // proposes no folder — accepting one that contains Desktop, Documents and Downloads would
+    // send an agent into them with nothing said — but the panel has to start somewhere.
+    panel.directoryURL = URL(
+      fileURLWithPath: model.draft.resolvedWorkingDirectoryPath ?? NSHomeDirectory(),
+      isDirectory: true
+    )
     guard panel.runModal() == .OK, let url = panel.url else { return }
     Task { await model.folderChosen(url.path) }
   }
