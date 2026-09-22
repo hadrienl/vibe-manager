@@ -37,6 +37,7 @@ public final class AppModel {
 
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
   private var preferredSelection: SessionID?
+  private var resolutionTask: Task<Void, Never>?
 
   public let layout: WorkspaceLayoutController
 
@@ -153,6 +154,10 @@ public final class AppModel {
     select(sessions[index - 1].id)
   }
 
+  /// How many sessions a shortcut can reach. Past that, the sidebar and its arrow keys are the
+  /// honest way around, rather than a second modifier nobody would guess.
+  public static let shortcutPositionLimit = 9
+
   /// Selects the session at a one-based position, for the ⌘1…⌘9 shortcuts.
   public func select(position: Int) {
     let index = position - 1
@@ -168,13 +173,26 @@ public final class AppModel {
     resolutions[id]
   }
 
-  /// Asks each listed session what its agent can do. Nothing here starts a detection of its own:
-  /// `ResolveSessionAgent` reads the availability the registry already holds.
+  /// Asks what each listed session's agent can do, once per provider rather than once per
+  /// session: the answer depends on the CLI, not on the session, and on a cold cache each of
+  /// those questions is a real detection with a real timeout behind it.
   public func refreshResolutions() async {
     guard agents != nil else { return }
+
+    var byProvider: [String: SessionAgentResolution] = [:]
     var resolved: [SessionID: SessionAgentResolution] = [:]
     for session in sessions {
-      resolved[session.id] = await resolution(for: session)
+      guard let providerID = session.agent?.providerID else {
+        resolved[session.id] = .unassigned
+        continue
+      }
+      if let known = byProvider[providerID] {
+        resolved[session.id] = known
+        continue
+      }
+      let answer = await resolution(for: session)
+      byProvider[providerID] = answer
+      resolved[session.id] = answer
     }
     resolutions = resolved
   }
@@ -244,7 +262,10 @@ public final class AppModel {
         sessions.contains { $0.id == previousSelection } ? previousSelection : sessions.first?.id
       )
       preferredSelection = nil
-      await refreshResolutions()
+      // Not awaited: the sidebar draws perfectly well without knowing what each agent can do,
+      // and on a cold cache this is a detection the first frame would otherwise wait for.
+      resolutionTask?.cancel()
+      resolutionTask = Task { [weak self] in await self?.refreshResolutions() }
     } catch {
       await report(error)
     }

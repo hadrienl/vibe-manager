@@ -83,10 +83,55 @@ struct WorkspaceLayoutControllerTests {
     for width in stride(from: 240.0, through: 320.0, by: 4) {
       controller.sidebarWidthChanged(to: width)
     }
-    try await Task.sleep(for: .milliseconds(120))
+    // Generously longer than the delay: what is being checked is that twenty widths did not
+    // become twenty writes, not how fast one of them lands.
+    try await Task.sleep(for: .milliseconds(500))
 
     await #expect(store.saves.count == 1)
     #expect(controller.intent.sidebarWidth == 320)
+  }
+
+  @Test("A column folding away does not overwrite the width it was dragged to")
+  func foldingKeepsTheWidth() async {
+    let controller = WorkspaceLayoutController()
+    controller.windowWidthChanged(to: 1_400)
+    controller.sidebarWidthChanged(to: 320)
+
+    // What a column on its way out reports: its minimum, then nothing at all.
+    controller.sidebarWidthChanged(to: 120)
+    controller.sidebarWidthChanged(to: 0)
+    controller.inspectorWidthChanged(to: 0)
+
+    #expect(controller.intent.sidebarWidth == 320)
+    #expect(controller.intent.inspectorWidth == 300)
+  }
+
+  @Test("A narrow window can still be asked for its sidebar")
+  func narrowWindowStillOpensItsColumns() async {
+    let controller = WorkspaceLayoutController()
+    controller.windowWidthChanged(to: 700)
+    #expect(!controller.columns.isSidebarVisible)
+
+    // What the sidebar button and ⌃⌘S do: ask for the column the fold took away.
+    controller.setSidebarVisible(true)
+    #expect(controller.columns.isSidebarVisible)
+
+    controller.setSidebarVisible(false)
+    #expect(!controller.columns.isSidebarVisible)
+  }
+
+  @Test("The exception granted to a narrow window ends when the window changes")
+  func overrideEndsWithTheWindow() async {
+    let controller = WorkspaceLayoutController()
+    controller.windowWidthChanged(to: 700)
+    controller.setSidebarVisible(true)
+    #expect(controller.columns.isSidebarVisible)
+
+    controller.windowWidthChanged(to: 1_400)
+    #expect(controller.columns.isSidebarVisible)
+
+    controller.windowWidthChanged(to: 700)
+    #expect(!controller.columns.isSidebarVisible)
   }
 
   @Test("A width outside the range never reaches the layout")

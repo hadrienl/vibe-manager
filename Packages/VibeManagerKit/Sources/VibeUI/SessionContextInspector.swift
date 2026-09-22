@@ -59,7 +59,6 @@ public struct SessionContextInspector: View {
       }
     }
     .listStyle(.sidebar)
-    .accessibilityLabel("Context for \(session.name)")
   }
 }
 

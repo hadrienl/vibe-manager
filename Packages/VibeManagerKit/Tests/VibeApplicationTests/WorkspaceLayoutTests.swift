@@ -22,6 +22,18 @@ struct WorkspaceLayoutTests {
     #expect(WorkspaceLayout.inspectorWidthRange.contains(layout.inspectorWidth))
   }
 
+  @Test("A width a folding column reports is not an arrangement")
+  func foldingWidthsAreNotMeasurements() {
+    #expect(WorkspaceLayout.measured(0, in: WorkspaceLayout.sidebarWidthRange) == nil)
+    #expect(WorkspaceLayout.measured(120, in: WorkspaceLayout.sidebarWidthRange) == nil)
+    #expect(WorkspaceLayout.measured(.nan, in: WorkspaceLayout.sidebarWidthRange) == nil)
+    #expect(WorkspaceLayout.measured(300, in: WorkspaceLayout.sidebarWidthRange) == 300)
+    #expect(
+      WorkspaceLayout.measured(10_000, in: WorkspaceLayout.sidebarWidthRange)
+        == WorkspaceLayout.sidebarWidthRange.upperBound
+    )
+  }
+
   @Test("A stored layout survives a round trip")
   func roundTrip() throws {
     let layout = WorkspaceLayout(

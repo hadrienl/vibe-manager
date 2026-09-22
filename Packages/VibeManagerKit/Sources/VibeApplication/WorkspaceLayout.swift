@@ -28,8 +28,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
     self.isInspectorVisible = isInspectorVisible
-    self.sidebarWidth = Self.sidebarWidthRange.clamping(sidebarWidth, fallback: 280)
-    self.inspectorWidth = Self.inspectorWidthRange.clamping(inspectorWidth, fallback: 300)
+    self.sidebarWidth = Self.bounded(sidebarWidth, in: Self.sidebarWidthRange, fallback: 280)
+    self.inspectorWidth = Self.bounded(inspectorWidth, in: Self.inspectorWidthRange, fallback: 300)
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -51,12 +51,27 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   }
 }
 
-extension ClosedRange where Bound == Double {
-  /// Bounds a measured width. A width that is not a number at all — an unmeasured column, a
-  /// corrupted preference — falls back rather than propagating into the layout.
-  public func clamping(_ value: Double, fallback: Double) -> Double {
+extension WorkspaceLayout {
+  /// Bounds a stored width. A width that is not a number at all — a corrupted preference, an
+  /// unmeasured column — falls back rather than propagating into the layout.
+  public static func bounded(
+    _ value: Double,
+    in range: ClosedRange<Double>,
+    fallback: Double
+  ) -> Double {
     guard value.isFinite else { return fallback }
-    return Swift.min(Swift.max(value, lowerBound), upperBound)
+    return min(max(value, range.lowerBound), range.upperBound)
+  }
+
+  /// The width a column just measured, or `nil` when that measurement says nothing about what
+  /// the user wants.
+  ///
+  /// A column being folded, or animating towards it, reports widths well under its own minimum,
+  /// down to zero. Bounding those into the range would answer with the smallest allowed width
+  /// and overwrite the width the user actually dragged to — so they are ignored instead.
+  public static func measured(_ value: Double, in range: ClosedRange<Double>) -> Double? {
+    guard value.isFinite, value >= range.lowerBound else { return nil }
+    return min(value, range.upperBound)
   }
 }
 

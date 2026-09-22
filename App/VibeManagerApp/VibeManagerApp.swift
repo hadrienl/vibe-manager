@@ -28,7 +28,10 @@ struct VibeManagerApp: App {
       // particular view holds focus is a shortcut nobody can rely on, and the menu is also
       // where VoiceOver and the keyboard-only user find these actions at all.
       CommandGroup(after: .sidebar) {
-        Button("Show Context") {
+        Button(
+          environment.appModel.layout.columns.isInspectorVisible
+            ? "Hide Context" : "Show Context"
+        ) {
           environment.appModel.layout.toggleInspector()
         }
         .keyboardShortcut("i", modifiers: [.command, .option])
@@ -46,8 +49,6 @@ struct VibeManagerApp: App {
         .keyboardShortcut(.upArrow, modifiers: [.command, .option])
 
         SessionPositionCommands(model: environment.appModel)
-
-        Divider()
       }
     }
 
@@ -62,20 +63,29 @@ struct VibeManagerApp: App {
   }
 }
 
-/// One menu item per listed session, for ⌘1…⌘9.
+/// ⌘1…⌘9, one menu item per position rather than one per session.
 ///
-/// Ten and beyond get no shortcut rather than a second modifier nobody would guess: past nine
-/// parallel tasks, the sidebar and its arrow keys are the honest way around.
+/// The items are fixed and only their labels follow the list: a menu that SwiftUI has not
+/// rebuilt since a session was created or renamed then shows a stale name, where a menu built
+/// from the sessions themselves would run the wrong one. `select(position:)` reads the list when
+/// it is pressed, and does nothing when nobody is listed at that position.
 private struct SessionPositionCommands: View {
   let model: AppModel
 
   var body: some View {
-    ForEach(Array(model.sessions.prefix(9).enumerated()), id: \.element.id) { index, session in
-      Button(session.name) {
-        model.select(position: index + 1)
+    ForEach(1...AppModel.shortcutPositionLimit, id: \.self) { position in
+      Button(label(for: position)) {
+        model.select(position: position)
       }
-      .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+      .keyboardShortcut(KeyEquivalent(Character("\(position)")), modifiers: .command)
+      .disabled(model.sessions.count < position)
     }
+  }
+
+  private func label(for position: Int) -> String {
+    let index = position - 1
+    guard model.sessions.indices.contains(index) else { return "Session \(position)" }
+    return model.sessions[index].name
   }
 }
 

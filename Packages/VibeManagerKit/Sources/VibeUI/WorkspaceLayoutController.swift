@@ -15,6 +15,15 @@ public final class WorkspaceLayoutController {
   public private(set) var columns: WorkspaceColumns
   public private(set) var windowWidth: Double = 0
 
+  /// A column the user asked for while the window was too narrow for it.
+  ///
+  /// Without this, the fold and the toggle fight: the binding reads the folded result and writes
+  /// the intent, so under the threshold the sidebar button and ⌃⌘S did nothing at all and the
+  /// session list could not be reached. An explicit ask outranks the fold, until the window
+  /// width changes what the fold itself proposes.
+  private var sidebarOverride = false
+  private var inspectorOverride = false
+
   private let store: (any WorkspaceLayoutStore)?
   private let saveDelay: Duration
   private var saveTask: Task<Void, Never>?
@@ -46,49 +55,68 @@ public final class WorkspaceLayoutController {
   }
 
   public func setSidebarVisible(_ isVisible: Bool) {
-    guard intent.isSidebarVisible != isVisible else { return }
+    sidebarOverride = isVisible && !proposal.isSidebarVisible
+    guard intent.isSidebarVisible != isVisible || sidebarOverride else {
+      resolveColumns()
+      return
+    }
     intent.isSidebarVisible = isVisible
     resolveColumns()
     scheduleSave()
   }
 
   public func setInspectorVisible(_ isVisible: Bool) {
-    guard intent.isInspectorVisible != isVisible else { return }
+    inspectorOverride = isVisible && !proposal.isInspectorVisible
+    guard intent.isInspectorVisible != isVisible || inspectorOverride else {
+      resolveColumns()
+      return
+    }
     intent.isInspectorVisible = isVisible
     resolveColumns()
     scheduleSave()
   }
 
   public func toggleSidebar() {
-    setSidebarVisible(!intent.isSidebarVisible)
+    setSidebarVisible(!columns.isSidebarVisible)
   }
 
   public func toggleInspector() {
-    setInspectorVisible(!intent.isInspectorVisible)
+    setInspectorVisible(!columns.isInspectorVisible)
   }
 
   public func windowWidthChanged(to width: Double) {
     guard width.isFinite, abs(width - windowWidth) >= 1 else { return }
+    let previous = proposal
     windowWidth = width
+    // A width that changes what the fold proposes ends the exception the user was granted:
+    // widening the window is how they get the ordinary behaviour back.
+    if proposal != previous {
+      sidebarOverride = false
+      inspectorOverride = false
+    }
     resolveColumns()
   }
 
   /// Column widths arrive from the views, which measure themselves: SwiftUI hands a split view
-  /// the width it should adopt, and never reports back the one the user dragged it to.
+  /// the width it should adopt, and never reports back the one the user dragged it to. A column
+  /// on its way out reports widths under its own minimum, and those are not an arrangement.
   public func sidebarWidthChanged(to width: Double) {
-    let bounded = WorkspaceLayout.sidebarWidthRange.clamping(width, fallback: intent.sidebarWidth)
-    guard abs(bounded - intent.sidebarWidth) >= 1 else { return }
-    intent.sidebarWidth = bounded
+    guard let measured = WorkspaceLayout.measured(width, in: WorkspaceLayout.sidebarWidthRange),
+      abs(measured - intent.sidebarWidth) >= 1
+    else {
+      return
+    }
+    intent.sidebarWidth = measured
     scheduleSave()
   }
 
   public func inspectorWidthChanged(to width: Double) {
-    let bounded = WorkspaceLayout.inspectorWidthRange.clamping(
-      width,
-      fallback: intent.inspectorWidth
-    )
-    guard abs(bounded - intent.inspectorWidth) >= 1 else { return }
-    intent.inspectorWidth = bounded
+    guard let measured = WorkspaceLayout.measured(width, in: WorkspaceLayout.inspectorWidthRange),
+      abs(measured - intent.inspectorWidth) >= 1
+    else {
+      return
+    }
+    intent.inspectorWidth = measured
     scheduleSave()
   }
 
@@ -105,8 +133,17 @@ public final class WorkspaceLayoutController {
     resolveColumns()
   }
 
+  /// What the window width alone would show.
+  private var proposal: WorkspaceColumns {
+    WorkspaceLayoutPolicy.resolve(windowWidth: windowWidth, intent: intent)
+  }
+
   private func resolveColumns() {
-    columns = WorkspaceLayoutPolicy.resolve(windowWidth: windowWidth, intent: intent)
+    let proposal = proposal
+    columns = WorkspaceColumns(
+      isSidebarVisible: proposal.isSidebarVisible || sidebarOverride,
+      isInspectorVisible: proposal.isInspectorVisible || inspectorOverride
+    )
   }
 
   /// One write per pause instead of one per event: dragging a separator produces a continuous
@@ -115,7 +152,7 @@ public final class WorkspaceLayoutController {
     guard let store else { return }
     saveTask?.cancel()
     let layout = intent
-    saveTask = Task { [saveDelay] in
+    saveTask = Task { [store, saveDelay] in
       try? await Task.sleep(for: saveDelay)
       guard !Task.isCancelled else { return }
       await store.save(layout)

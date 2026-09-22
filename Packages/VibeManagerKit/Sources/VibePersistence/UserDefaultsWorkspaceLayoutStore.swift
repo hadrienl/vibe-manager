@@ -31,22 +31,3 @@ public actor UserDefaultsWorkspaceLayoutStore: WorkspaceLayoutStore {
     defaults.set(data, forKey: key)
   }
 }
-
-/// The layout of a workspace that keeps nothing, for previews and tests.
-public actor InMemoryWorkspaceLayoutStore: WorkspaceLayoutStore {
-  private var layout: WorkspaceLayout
-  public private(set) var saveCount = 0
-
-  public init(layout: WorkspaceLayout = WorkspaceLayout()) {
-    self.layout = layout
-  }
-
-  public func load() -> WorkspaceLayout {
-    layout
-  }
-
-  public func save(_ layout: WorkspaceLayout) {
-    self.layout = layout
-    saveCount += 1
-  }
-}

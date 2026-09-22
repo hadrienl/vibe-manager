@@ -105,12 +105,17 @@ public struct RootView: View {
           .disabled(!model.canCreateSession)
         }
         ToolbarItem(placement: .primaryAction) {
+          // Never disabled: with the column open and the selection gone, a disabled button
+          // would be the only way to close it. The column says so itself instead.
           Button {
             model.layout.toggleInspector()
           } label: {
-            Label("Context", systemImage: "sidebar.right")
+            Label(
+              model.layout.columns.isInspectorVisible ? "Hide Context" : "Show Context",
+              systemImage: "sidebar.right"
+            )
           }
-          .disabled(model.selectedSession == nil)
+          .accessibilityValue(model.layout.columns.isInspectorVisible ? "Shown" : "Hidden")
         }
       }
       .inspector(isPresented: inspectorPresented) {
@@ -284,8 +289,8 @@ private struct SessionSidebar: View {
             paneStatus: model.pane(for: session.id)?.status,
             resolution: model.resolution(forID: session.id)
           ),
-          // Only the first nine rows can be reached by a shortcut, so only they claim one.
-          shortcutPosition: index < 9 ? index + 1 : nil
+          // Only the rows a shortcut can reach claim one.
+          shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil
         )
         .tag(session.id)
       }
