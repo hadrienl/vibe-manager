@@ -78,9 +78,19 @@ public actor FullDiskAccessGate {
   /// the preferences in that window would otherwise be told to present the step all over again.
   public func shouldPresentStep() async -> Bool {
     guard !hasPresentedStep else { return false }
-    guard await status() == .notGranted else { return false }
-    guard await !preferences.isFullDiskAccessStepDismissed() else { return false }
+    // Claimed before the first suspension, not after the last one. Both questions below leave the
+    // actor, and a guard that latches only on the way out is no guard at all: two callers would
+    // cross in that window and both be told to present the step. The claim is given back when the
+    // answer turns out to be no, so a later launch-time change of heart is still heard.
     hasPresentedStep = true
+    guard await status() == .notGranted else {
+      hasPresentedStep = false
+      return false
+    }
+    guard await !preferences.isFullDiskAccessStepDismissed() else {
+      hasPresentedStep = false
+      return false
+    }
     return true
   }
 

@@ -86,6 +86,71 @@ struct FullDiskAccessGateTests {
     #expect(await gate.shouldPresentStep())
     #expect(await gate.shouldPresentStep() == false)
   }
+
+  @Test("Two callers asking at the same time still get one step")
+  func concurrentCallersAreOfferedOneStep() async {
+    // Both questions the gate asks leave the actor, so "at the same time" is not hypothetical:
+    // a second caller can run all the way through while the first is waiting on the probe.
+    let gate = FullDiskAccessGate(
+      probe: SlowProbe(status: .notGranted),
+      preferences: SlowPreferences()
+    )
+
+    async let first = gate.shouldPresentStep()
+    async let second = gate.shouldPresentStep()
+    let answers = await [first, second]
+
+    #expect(answers.filter { $0 }.count == 1)
+  }
+
+  @Test("A step withheld because access was granted is not owed forever")
+  func aStepNotPresentedIsNotSpent() async {
+    // Nothing was shown, so nothing was answered: if the status reads differently later in the
+    // same launch, the step is still the gate's to offer.
+    let probe = RevokingProbe()
+    let gate = FullDiskAccessGate(probe: probe, preferences: SpyPreferences(dismissed: false))
+
+    #expect(await gate.shouldPresentStep() == false)
+    _ = await gate.refreshedStatus()
+
+    #expect(await gate.shouldPresentStep())
+  }
+}
+
+/// Suspends before answering, so that a second caller really does run in the gap.
+private actor SlowProbe: FullDiskAccessProbe {
+  private let value: FullDiskAccessStatus
+
+  init(status: FullDiskAccessStatus) {
+    value = status
+  }
+
+  func status() async -> FullDiskAccessStatus {
+    await Task.yield()
+    return value
+  }
+}
+
+private actor SlowPreferences: PermissionPreferences {
+  private var dismissed = false
+
+  func isFullDiskAccessStepDismissed() async -> Bool {
+    await Task.yield()
+    return dismissed
+  }
+
+  func dismissFullDiskAccessStep() { dismissed = true }
+}
+
+/// Granted when first asked, and not the second time — the shape of an access taken away in
+/// System Settings while the application is running.
+private actor RevokingProbe: FullDiskAccessProbe {
+  private var probes = 0
+
+  func status() async -> FullDiskAccessStatus {
+    probes += 1
+    return probes == 1 ? .granted : .notGranted
+  }
 }
 
 private actor StubProbe: FullDiskAccessProbe {
