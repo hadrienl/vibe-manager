@@ -41,10 +41,17 @@ public final class NewSessionModel {
 
   private let create: CreateSession
   private let registry: any AgentProviderResolving
+  private let revalidationDelay: Duration
+  private var revalidation: Task<Void, Never>?
 
-  public init(create: CreateSession, registry: any AgentProviderResolving) {
+  public init(
+    create: CreateSession,
+    registry: any AgentProviderResolving,
+    revalidationDelay: Duration = .milliseconds(250)
+  ) {
     self.create = create
     self.registry = registry
+    self.revalidationDelay = revalidationDelay
   }
 
   public var selectedAgent: AgentOption? {
@@ -116,18 +123,40 @@ public final class NewSessionModel {
 
   /// Called by the sheet whenever a field changes: problems refresh as they are fixed, but only
   /// once the user has actually asked for the session.
+  ///
+  /// One task at a time, and only after the typing has paused. A task per keystroke would probe
+  /// the disk and the agents on every character, and finish out of order — an early verdict
+  /// landing last would post "A name is required." over a name that is now there.
+  public func draftChanged() {
+    guard hasSubmitted else { return }
+    revalidation?.cancel()
+    revalidation = Task { [revalidationDelay] in
+      try? await Task.sleep(for: revalidationDelay)
+      guard !Task.isCancelled else { return }
+      await revalidate()
+    }
+  }
+
   public func revalidateIfSubmitted() async {
     guard hasSubmitted else { return }
     await revalidate()
   }
 
   public func revalidate() async {
-    issues = await create.problems(with: draft)
+    let checked = draft
+    let found = await create.problems(with: checked)
+    // The draft may have moved on while the checks ran, so a verdict on an older one is
+    // dropped rather than shown over what the user is looking at now.
+    guard !Task.isCancelled, checked == draft else { return }
+    issues = found
   }
 
   /// Returns the created session and the plan to launch, or `nil` when the draft was refused.
   public func submit() async -> SessionCreation? {
     guard !isSubmitting else { return nil }
+    // A pending debounce would otherwise land after the verdict of this submit and replace it.
+    revalidation?.cancel()
+    revalidation = nil
     hasSubmitted = true
     isSubmitting = true
     defer { isSubmitting = false }

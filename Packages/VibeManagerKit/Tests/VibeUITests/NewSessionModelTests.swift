@@ -11,16 +11,19 @@ struct NewSessionModelTests {
   private func makeModel(
     providers: [StubProvider] = [StubProvider(id: "claude-code", state: .available)],
     folder: WorkingDirectoryStatus = .usable,
-    repository: SpyRepository = SpyRepository()
+    repository: SpyRepository = SpyRepository(),
+    folders: (any WorkingDirectoryProbe)? = nil,
+    revalidationDelay: Duration = .milliseconds(250)
   ) -> NewSessionModel {
     let registry = StubRegistry(providers: providers)
     return NewSessionModel(
       create: CreateSession(
         repository: repository,
         agents: registry,
-        folders: StubFolders(status: folder)
+        folders: folders ?? StubFolders(status: folder)
       ),
-      registry: registry
+      registry: registry,
+      revalidationDelay: revalidationDelay
     )
   }
 
@@ -115,6 +118,58 @@ struct NewSessionModelTests {
     model.draft.name = "R"
     await model.revalidateIfSubmitted()
 
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("A burst of keystrokes is checked once, when the typing stops")
+  func revalidationIsDebounced() async throws {
+    let folders = CountingFolders()
+    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(40))
+    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    _ = await model.submit()
+    await folders.reset()
+
+    for character in "Refactor the webhook" {
+      model.draft.name.append(character)
+      model.draftChanged()
+    }
+    try await Task.sleep(for: .milliseconds(300))
+
+    #expect(await folders.count == 1)
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("A verdict on a draft the user has already moved past is dropped")
+  func staleVerdictIsNotShown() async {
+    // The checks cross actors, so they can finish in an order the typing never had. A verdict
+    // that arrives late must not contradict the form the user is looking at.
+    let folders = GatedFolders()
+    let model = makeModel(folders: folders)
+    await model.load(defaultWorkingDirectoryPath: "/workspace")
+
+    let checking = Task { await model.revalidate() }
+    await Task.yield()
+    model.draft.name = "Refactor the webhook"
+    await folders.open()
+    await checking.value
+
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("A pending check never overwrites the verdict of a submission")
+  func submissionSurvivesAPendingCheck() async throws {
+    let model = makeModel(revalidationDelay: .milliseconds(40))
+    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    _ = await model.submit()
+    #expect(model.issues == [.nameMissing])
+
+    // A keystroke, then Create pressed before the debounce fires.
+    model.draft.name = "Refactor the webhook"
+    model.draftChanged()
+    let creation = await model.submit()
+    try await Task.sleep(for: .milliseconds(200))
+
+    #expect(creation != nil)
     #expect(model.issues.isEmpty)
   }
 
@@ -234,5 +289,37 @@ private struct StubRegistry: AgentProviderResolving {
       result[provider.descriptor.id] = await provider.availability(forceRefresh: forceRefresh)
     }
     return result
+  }
+}
+
+/// Counts how many times a draft was actually checked against the disk.
+private actor CountingFolders: WorkingDirectoryProbe {
+  private(set) var count = 0
+
+  func reset() { count = 0 }
+
+  func inspect(path: String) -> WorkingDirectoryStatus {
+    count += 1
+    return .usable
+  }
+}
+
+/// A probe that holds a check open, so the draft can change while it is in flight.
+private actor GatedFolders: WorkingDirectoryProbe {
+  private var isOpen = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func open() {
+    isOpen = true
+    let waiters = self.waiters
+    self.waiters = []
+    waiters.forEach { $0.resume() }
+  }
+
+  func inspect(path: String) async -> WorkingDirectoryStatus {
+    while !isOpen {
+      await withCheckedContinuation { waiters.append($0) }
+    }
+    return .usable
   }
 }

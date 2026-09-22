@@ -70,7 +70,7 @@ public struct NewSessionSheet: View {
       .padding(.vertical, 18)
     }
     .onChange(of: model.draft) {
-      Task { await model.revalidateIfSubmitted() }
+      model.draftChanged()
     }
   }
 
@@ -153,7 +153,7 @@ public struct NewSessionSheet: View {
       help: model.draft.appearance == nil
         ? "Derived from the name until you pick one."
         : nil,
-      issues: []
+      issues: model.issues(for: .appearance)
     ) {
       HStack(alignment: .top, spacing: 14) {
         SessionBadge(appearance: model.draft.effectiveAppearance, size: 46)
@@ -228,10 +228,16 @@ public struct NewSessionSheet: View {
     .padding(.vertical, 13)
   }
 
+  /// Only these fields own a control that can take the keyboard: aiming the caret at any other
+  /// would leave it nowhere at all.
+  private static let focusableFields: Set<SessionDraftField> = [
+    .name, .initialPrompt, .workingDirectory,
+  ]
+
   private func submit() {
     Task {
       guard let creation = await model.submit() else {
-        focus = model.issues.first?.field
+        focus = model.issues.map(\.field).first { Self.focusableFields.contains($0) }
         return
       }
       created(creation)
