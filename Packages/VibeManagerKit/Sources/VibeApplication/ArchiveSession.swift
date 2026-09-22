@@ -25,7 +25,7 @@ public struct ArchiveSession: Sendable {
   private let repository: any SessionRepository
   private let runtime: any SessionRuntime
   private let close: CloseSession
-  private let changeStatus: ChangeSessionStatus
+  private let clock: any SessionClock
 
   public init(
     repository: any SessionRepository,
@@ -34,8 +34,8 @@ public struct ArchiveSession: Sendable {
   ) {
     self.repository = repository
     self.runtime = runtime
+    self.clock = clock
     close = CloseSession(repository: repository, runtime: runtime, clock: clock)
-    changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
 
   @discardableResult
@@ -43,17 +43,21 @@ public struct ArchiveSession: Sendable {
     // Stops the process and writes `closed` first, so the archived status is only ever reached
     // from a state where nothing is running.
     let closure = try await close(id: id)
+    let now = clock.now()
 
-    var session = closure.session
-    if session.status == .closed {
-      session = try await changeStatus(id: id, action: .archive)
+    // Read again inside the write, for the same reason closing does: the copy `close` handed
+    // back was taken before this line, and the store is the only thing that knows the truth now.
+    let updated = try await repository.mutate(id: id) { session in
+      guard session.status == .closed else { return }
+      try session.archive(at: max(now, session.updatedAt))
     }
 
     // The pane goes last, once the store agrees the session is archived: releasing it earlier
     // would throw away the terminal's history for an archive that might still have failed.
     await runtime.dispose(id)
 
-    return SessionArchival(session: session, detachment: closure.detachment)
+    guard let updated else { throw ChangeSessionStatusError.sessionNotFound(id) }
+    return SessionArchival(session: updated, detachment: closure.detachment)
   }
 }
 

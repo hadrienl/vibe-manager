@@ -22,7 +22,7 @@ public struct SessionClosure: Equatable, Sendable {
 public struct CloseSession: Sendable {
   private let repository: any SessionRepository
   private let runtime: any SessionRuntime
-  private let changeStatus: ChangeSessionStatus
+  private let clock: any SessionClock
 
   public init(
     repository: any SessionRepository,
@@ -31,24 +31,28 @@ public struct CloseSession: Sendable {
   ) {
     self.repository = repository
     self.runtime = runtime
-    changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
+    self.clock = clock
   }
 
   @discardableResult
   public func callAsFunction(id: SessionID) async throws -> SessionClosure {
-    guard let current = try await repository.session(id: id) else {
+    guard try await repository.session(id: id) != nil else {
       throw ChangeSessionStatusError.sessionNotFound(id)
     }
 
     let detachment = await runtime.detach(id)
+    let now = clock.now()
 
-    // Closing something already closed is not a failure: a session whose agent exited on its own
-    // is closed before the user ever presses the command, and the command must still work.
-    guard current.status == .active else {
-      return SessionClosure(session: current, detachment: detachment)
+    // The status is decided on a read taken *after* the stop, never on the one taken before it.
+    // Stopping a terminal suspends for as long as the grace period, and an agent that exits of
+    // its own accord in that window has already written `closed`: closing it a second time from
+    // a stale copy throws an invalid transition, which the caller would have no way to act on.
+    let updated = try await repository.mutate(id: id) { session in
+      guard session.status == .active else { return }
+      try session.close(at: max(now, session.updatedAt))
     }
 
-    let closed = try await changeStatus(id: id, action: .close)
-    return SessionClosure(session: closed, detachment: detachment)
+    guard let updated else { throw ChangeSessionStatusError.sessionNotFound(id) }
+    return SessionClosure(session: updated, detachment: detachment)
   }
 }

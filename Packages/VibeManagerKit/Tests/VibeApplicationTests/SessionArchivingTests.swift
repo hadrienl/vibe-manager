@@ -28,6 +28,23 @@ private actor SpyRuntime: SessionRuntime {
   }
 }
 
+/// A runtime whose stop takes long enough for the session's own agent to exit and write
+/// `closed` — the race the exit watch creates for real.
+private struct ClosingRuntime: SessionRuntime {
+  let repository: LoggingRepository
+  let id: SessionID
+
+  func detach(_ id: SessionID) async -> SessionDetachOutcome {
+    _ = try? await repository.mutate(id: self.id) { session in
+      guard session.status == .active else { return }
+      try session.close(at: Date(timeIntervalSince1970: 150))
+    }
+    return .stopped
+  }
+
+  func dispose(_ id: SessionID) async {}
+}
+
 /// One ordered trace shared by the runtime and the repository, so "stopped before written" is
 /// asserted on facts rather than on the shape of the code.
 private actor EventLog {
@@ -140,6 +157,24 @@ struct CloseSessionTests {
     #expect(await runtime.detached == [session.id])
   }
 
+  /// Stopping a terminal suspends for as long as its grace period, and an agent that exits of
+  /// its own accord in that window writes `closed` itself. Deciding the transition on the copy
+  /// read *before* the stop meant closing an already-closed session — an invalid transition that
+  /// threw, and that the workspace could only swallow.
+  @Test("A session that closed itself during the stop does not make the command fail")
+  func closingToleratesASessionThatClosedItself() async throws {
+    let session = runningSession()
+    let repository = LoggingRepository(sessions: [session])
+    let close = CloseSession(
+      repository: repository,
+      runtime: ClosingRuntime(repository: repository, id: session.id)
+    )
+
+    let closure = try await close(id: session.id)
+
+    #expect(closure.session.status == .closed)
+  }
+
   @Test("An unknown session is reported rather than silently ignored")
   func unknownSessionThrows() async {
     let close = CloseSession(repository: LoggingRepository(sessions: []))
@@ -197,6 +232,20 @@ struct ArchiveSessionTests {
     #expect(archival.session.status == .archived)
     #expect(archival.detachment == .unreachable(processIdentifier: 4242))
     #expect(archival.detachment.isUnreachable)
+  }
+
+  @Test("An archive survives the session closing itself mid-stop")
+  func archivingToleratesASessionThatClosedItself() async throws {
+    let session = runningSession()
+    let repository = LoggingRepository(sessions: [session])
+    let archive = ArchiveSession(
+      repository: repository,
+      runtime: ClosingRuntime(repository: repository, id: session.id)
+    )
+
+    let archival = try await archive(id: session.id)
+
+    #expect(archival.session.status == .archived)
   }
 
   @Test("Archiving twice changes nothing the second time")

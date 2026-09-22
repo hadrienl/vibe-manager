@@ -20,6 +20,12 @@ public final class SessionLauncher: SessionRuntime {
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
   private var exitTasks: [SessionID: Task<Void, Never>] = [:]
+  /// Which exit watch is the current one for a session.
+  ///
+  /// Cancelling a task only asks. A watch that has already seen its process end, and is waiting
+  /// its turn on the main actor, will still run: without this counter it could close a session
+  /// that has just been relaunched, or drop a newer watch's entry and leave it untrackable.
+  private var exitGenerations: [SessionID: Int] = [:]
 
   /// Called once a session's own process has ended and the store has been told. The workspace
   /// uses it to refresh: an agent that typed `exit` must not leave a session listed as running.
@@ -120,6 +126,9 @@ public final class SessionLauncher: SessionRuntime {
   /// there would be exactly the lie the archive is not allowed to tell.
   public func detach(_ id: SessionID) async -> SessionDetachOutcome {
     exitTasks.removeValue(forKey: id)?.cancel()
+    // Retires the watch as well as cancelling it: one already on its way to the main actor is
+    // past the point where cancellation can stop it.
+    _ = nextExitGeneration(for: id)
     outputTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
       await observer.finished()
@@ -142,14 +151,16 @@ public final class SessionLauncher: SessionRuntime {
       await supervisor.stop(id: id, gracePeriod: .seconds(3))
     }
 
-    guard wasRunning else { return .wasNotRunning }
-
+    // Asked before "was it running": a terminal whose group could not be reaped is already
+    // finished, so answering `wasNotRunning` first would drop the warning on exactly the session
+    // that still has a process behind it — an earlier close having left it in that state.
     if let terminal,
-      case .failed(.processOutcomeUnknown(let processIdentifier)) =
-        await terminal.state()
+      case .failed(.processOutcomeUnknown(let processIdentifier)) = await terminal.state()
     {
       return .unreachable(processIdentifier: processIdentifier)
     }
+
+    guard wasRunning else { return .wasNotRunning }
     return .stopped
   }
 
@@ -166,6 +177,7 @@ public final class SessionLauncher: SessionRuntime {
   /// already had its say.
   private func watchForExit(id: SessionID, terminal: any TerminalSession) {
     exitTasks[id]?.cancel()
+    let generation = nextExitGeneration(for: id)
     exitTasks[id] = Task { [weak self] in
       let attachment = await terminal.attach()
       if !attachment.state.isFinished {
@@ -175,11 +187,20 @@ public final class SessionLauncher: SessionRuntime {
         }
       }
       guard !Task.isCancelled else { return }
-      await self?.processDidFinish(id)
+      await self?.processDidFinish(id, generation: generation)
     }
   }
 
-  private func processDidFinish(_ id: SessionID) async {
+  private func nextExitGeneration(for id: SessionID) -> Int {
+    let generation = (exitGenerations[id] ?? 0) + 1
+    exitGenerations[id] = generation
+    return generation
+  }
+
+  private func processDidFinish(_ id: SessionID, generation: Int) async {
+    // The watch that reaches this point may have been superseded while it waited for the main
+    // actor — by a detach, or by a relaunch that installed its own. Only the current one speaks.
+    guard exitGenerations[id] == generation else { return }
     exitTasks[id] = nil
     outputTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
