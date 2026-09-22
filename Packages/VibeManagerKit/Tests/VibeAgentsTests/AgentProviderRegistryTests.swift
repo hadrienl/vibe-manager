@@ -50,19 +50,21 @@ struct AgentProviderRegistryTests {
 
   @Test("A slow provider does not prevent the others from answering")
   func slowProviderDoesNotBlockOthers() async {
+    // Concurrency is observed, not timed: the probes report when they are in flight, and the
+    // test asks whether two ever were at once. A wall clock would only ask whether the machine
+    // was busy — which is how this test used to fail on a loaded runner.
+    let witness = ConcurrencyWitness()
     let registry = AgentProviderRegistry(providers: [
-      FakeProvider(id: "slow", state: .available, delay: .milliseconds(200)),
-      FakeProvider(id: "fast", state: .available),
+      // Both hold their probe open, so an overlap is certain when they run together and
+      // impossible when they do not — no scheduling luck either way.
+      FakeProvider(id: "slow", state: .available, delay: .milliseconds(50), witness: witness),
+      FakeProvider(id: "fast", state: .available, delay: .milliseconds(50), witness: witness),
     ])
 
-    let clock = ContinuousClock()
-    let start = clock.now
     let availabilities = await registry.availabilities(forceRefresh: false)
-    let elapsed = clock.now - start
 
     #expect(availabilities.count == 2)
-    // Probes run concurrently, so the total time stays close to the slowest one.
-    #expect(elapsed < .milliseconds(600))
+    #expect(await witness.peak == 2)
   }
 
   @Test("An empty registry is a valid, non failing state")
@@ -74,21 +76,45 @@ struct AgentProviderRegistryTests {
   }
 }
 
+/// Counts how many probes were in flight at the same time.
+actor ConcurrencyWitness {
+  private(set) var peak = 0
+  private var current = 0
+
+  func enter() {
+    current += 1
+    peak = max(peak, current)
+  }
+
+  func leave() {
+    current -= 1
+  }
+}
+
 struct FakeProvider: AgentProvider {
   let descriptor: AgentDescriptor
   let state: AgentAvailabilityState
   let delay: Duration
+  let witness: ConcurrencyWitness?
 
-  init(id: String, state: AgentAvailabilityState = .available, delay: Duration = .zero) {
+  init(
+    id: String,
+    state: AgentAvailabilityState = .available,
+    delay: Duration = .zero,
+    witness: ConcurrencyWitness? = nil
+  ) {
     descriptor = AgentDescriptor(id: AgentProviderID(id), displayName: id.capitalized)
     self.state = state
     self.delay = delay
+    self.witness = witness
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
+    await witness?.enter()
     if delay != .zero {
       try? await Task.sleep(for: delay)
     }
+    await witness?.leave()
     return AgentDiagnosticFactory.availability(
       descriptor: descriptor,
       state: state,
