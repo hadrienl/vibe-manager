@@ -10,7 +10,7 @@ struct AgentAvailabilityProbeTests {
     locator: any ExecutableLocator,
     processProbe: any ProcessProbe,
     descriptor: AgentDescriptor = TestFixtures.descriptor,
-    timeToLive: Duration = .seconds(300),
+    timeToLive: Duration = .seconds(20),
     now: @escaping @Sendable () -> Date = { Date(timeIntervalSince1970: 0) }
   ) -> AgentAvailabilityProbe {
     AgentAvailabilityProbe(
@@ -20,7 +20,6 @@ struct AgentAvailabilityProbeTests {
       probe: processProbe,
       environment: ["PATH": "/usr/bin", "HOME": "/Users/test"],
       timeToLive: timeToLive,
-      failureTimeToLive: .seconds(20),
       now: now
     )
   }
@@ -294,9 +293,7 @@ struct AgentAvailabilityProbeTests {
 
   @Test("A sub second time to live still caches")
   func subSecondTimeToLiveIsHonoured() async {
-    let locator = CountingLocator(
-      location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
-    )
+    let locator = CountingLocator(location: .notFound)
     let clock = MutableClock(start: Date(timeIntervalSince1970: 0))
     let subject = AgentAvailabilityProbe(
       descriptor: TestFixtures.descriptor,
@@ -334,8 +331,8 @@ struct AgentAvailabilityProbeTests {
     #expect(processProbe.invocations.count == 1)
   }
 
-  @Test("A silent agent is not remembered as long as one that answered")
-  func aTransientFailureExpiresSooner() async {
+  @Test("A silent agent is detected again on the next screen")
+  func aTransientFailureExpires() async {
     let locator = CountingLocator(
       location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
     )
@@ -353,15 +350,44 @@ struct AgentAvailabilityProbeTests {
     _ = await subject.availability(forceRefresh: false)
     #expect(locator.invocationCount == 1)
 
-    // Well inside the five minutes a real answer would have been kept for: the next screen the
-    // user opens detects again by itself, instead of repeating a verdict nobody trusts.
+    // The next screen the user opens detects again by itself, instead of repeating a verdict
+    // nobody trusts.
     clock.advance(by: 15)
     _ = await subject.availability(forceRefresh: false)
     #expect(locator.invocationCount == 2)
   }
 
-  @Test("A constated state is kept for the full time to live")
-  func anAnsweredStateIsKeptLonger() async {
+  @Test("An agent whose remediation the user may be performing is detected again")
+  func anUnauthenticatedAgentExpires() async {
+    let specification = CommandLineAgentSpecification(
+      binaryName: "stub-agent",
+      authenticationArguments: ["auth", "status"]
+    )
+    let locator = CountingLocator(
+      location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+    )
+    let clock = MutableClock(start: Date(timeIntervalSince1970: 0))
+    let subject = AgentAvailabilityProbe(
+      descriptor: TestFixtures.descriptor,
+      specification: specification,
+      locator: locator,
+      probe: StubAuthenticationProbe(versionOutput: "stub-agent 2.4.1", authenticationExitCode: 1),
+      environment: [:],
+      timeToLive: .seconds(20),
+      now: { clock.now }
+    )
+
+    #expect(await subject.availability(forceRefresh: false).state == .unauthenticated)
+    // Signing in happens in a terminal, next to the application: coming back to the sheet has to
+    // be enough to see it, without the user having to find the detect button first.
+    clock.advance(by: 25)
+    _ = await subject.availability(forceRefresh: false)
+
+    #expect(locator.invocationCount == 2)
+  }
+
+  @Test("A ready agent is detected once, and not again for the rest of the session")
+  func aReadyAgentIsProbedOnce() async {
     let locator = CountingLocator(
       location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
     )
@@ -375,10 +401,15 @@ struct AgentAvailabilityProbeTests {
     )
 
     _ = await subject.availability(forceRefresh: false)
-    clock.advance(by: 25)
+    // A CLI does not uninstall itself while the application runs; opening the sheet an hour
+    // later must not cost a process.
+    clock.advance(by: 3600)
     _ = await subject.availability(forceRefresh: false)
-
     #expect(locator.invocationCount == 1)
+
+    // Only an explicit detection, or a new user defined path, looks again.
+    _ = await subject.availability(forceRefresh: true)
+    #expect(locator.invocationCount == 2)
   }
 
   @Test("A failing probe still reports where the executable was found")

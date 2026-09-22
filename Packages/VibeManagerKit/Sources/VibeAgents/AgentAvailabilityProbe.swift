@@ -11,7 +11,6 @@ public actor AgentAvailabilityProbe {
   private let probe: any ProcessProbe
   private let environment: [String: String]
   private let timeToLive: Duration
-  private let failureTimeToLive: Duration
   private let now: @Sendable () -> Date
 
   private var cached: AgentAvailability?
@@ -27,8 +26,7 @@ public actor AgentAvailabilityProbe {
     locator: any ExecutableLocator,
     probe: any ProcessProbe,
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    timeToLive: Duration = .seconds(300),
-    failureTimeToLive: Duration = .seconds(20),
+    timeToLive: Duration = .seconds(20),
     now: @escaping @Sendable () -> Date = Date.init
   ) {
     self.descriptor = descriptor
@@ -37,8 +35,6 @@ public actor AgentAvailabilityProbe {
     self.probe = probe
     self.environment = environment
     self.timeToLive = timeToLive
-    // Holding on to a non answer longer than to a real one would be the wrong way round.
-    self.failureTimeToLive = min(failureTimeToLive, timeToLive)
     self.now = now
   }
 
@@ -104,15 +100,17 @@ public actor AgentAvailabilityProbe {
     }
   }
 
+  /// An agent found ready stays ready for the whole session; anything else is re-detected.
+  ///
+  /// A CLI does not uninstall itself while the application runs, so probing a working agent
+  /// again costs two processes and buys nothing. Every other state is either an absence of
+  /// answer or a problem whose remediation the user was just asked to go and perform in a
+  /// terminal — installing, updating, signing in — so it is exactly the state that must not
+  /// survive their coming back. The short time to live only keeps a window that redraws, or a
+  /// sheet opened twice in a row, from spawning a process each time.
   private func isExpired(_ date: Date, for state: AgentAvailabilityState) -> Bool {
-    now().timeIntervalSince(date) >= lifetime(of: state).seconds
-  }
-
-  /// A transient failure is remembered just long enough to keep a redrawn window from spawning
-  /// a process, and not long enough to outlive the slow start that caused it.
-  private func lifetime(of state: AgentAvailabilityState) -> Duration {
-    guard case .probeFailed(let reason) = state, reason.isTransient else { return timeToLive }
-    return failureTimeToLive
+    guard state != .available else { return false }
+    return now().timeIntervalSince(date) >= timeToLive.seconds
   }
 
   private static func detect(

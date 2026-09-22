@@ -63,10 +63,20 @@ starting: the usual budget lapses on installations that are perfectly fine, and 
 then declares a working agent broken. An exit code, a refusal to start and a cancellation are
 answers, so none of them is retried.
 
-For the same reason, a transient failure — `timedOut` or `cancelled` — expires from the cache
-after `failureTimeToLive` rather than the full time to live, so the next screen detects again by
-itself instead of repeating a verdict nobody trusts. It is kept at all only so a redrawn window
-cannot spawn a process on every pass.
+### A ready agent is detected once, everything else is detected again
+
+An agent found `available` is cached for the whole session: a CLI does not uninstall itself while
+the application runs, so probing it again costs two processes per screen and buys nothing.
+
+Every other state expires after a short `timeToLive`. Each of them is either an absence of answer
+or a problem whose remediation the diagnostic just asked the user to go and perform in a terminal
+— install, update, sign in — so it is precisely the state that must not survive their coming
+back. Opening the sheet again is then enough to see the agent turn ready, without having to find
+the detect button first. The delay exists only so that a redrawn window, or a sheet opened twice
+in a row, does not spawn a process each time.
+
+`invalidate()`, a new user defined path and an explicit detection still look again in every case,
+`available` included.
 
 `AgentProbeFailure.isTransient` carries that distinction into the presentation: a silent agent
 reads as "did not answer in time" and offers to detect again first, while a failing one keeps
@@ -109,6 +119,9 @@ in Debug builds only, so a distributed Release never lists it.
 - The `PATH` discovered by the login shell is used to find the binary, not to launch the agent:
   a launched agent still inherits the application `PATH`, so an agent shelling out to `git` or
   `node` may not find them. Propagating the discovered `PATH` belongs to the launch work of #4.
+- An agent that is uninstalled, downgraded or moved while the application runs keeps its
+  `available` state until the user detects again; the launch then fails on the stale path with
+  the CLI's own error. Detecting once was the point, and the button is the way back.
 - A login shell lookup that lapses in `FileSystemExecutableLocator` still degrades to
   `notFound`, which reads as "was not found on this Mac" — as wrong as the timeout verdict this
   decision removes, but much rarer. The same reasoning applies to it the day it shows up.
