@@ -30,11 +30,14 @@ public enum SessionStartOutcome: Equatable, Sendable {
 
 @MainActor
 @Observable
-public final class SessionLauncher: SessionRuntime {
+public final class SessionLauncher: SessionRuntime, SessionRestarting {
   private let supervisor: any TerminalSupervisor
   private let repository: any SessionRepository
   private let agents: any AgentProviderResolving
   private let changeStatus: ChangeSessionStatus
+  /// Where what is running is written down, for the next launch to read. Absent in a workspace
+  /// assembled without the system around it, and the launcher then simply keeps no record.
+  private let recorder: SessionRuntimeRecorder?
 
   private var panes: [SessionID: TerminalPaneModel] = [:]
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
@@ -64,12 +67,14 @@ public final class SessionLauncher: SessionRuntime {
     supervisor: any TerminalSupervisor,
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
+    recorder: SessionRuntimeRecorder? = nil,
     clock: any SessionClock = SystemSessionClock(),
     viewportTimeout: Duration = .milliseconds(500)
   ) {
     self.supervisor = supervisor
     self.repository = repository
     self.agents = agents
+    self.recorder = recorder
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
@@ -151,7 +156,29 @@ public final class SessionLauncher: SessionRuntime {
     }
     watchForExit(id: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
+    // Recorded once there is something to record, and from the terminal rather than from the
+    // plan: the process group is the child's own pid, which only exists after the spawn. A
+    // process that has already ended by now leaves no record, which is the truth — there is
+    // nothing left to look for at the next launch.
+    if case .running(let processIdentifier) = await terminal.state() {
+      await recorder?.started(session.id, processGroup: processIdentifier)
+    }
     return .started
+  }
+
+  /// The port #11 restores through. One road to a process, and this is the door on it.
+  public func attemptRestart(_ restart: SessionRestart) async -> SessionRestartAttempt {
+    switch await self.restart(restart) {
+    case .started, .alreadyRunning:
+      return .started
+    case .failed(let reason):
+      let failure = failure(for: restart.session.id)
+      return SessionRestartAttempt(
+        started: false,
+        message: reason ?? failure?.message ?? "This session could not be restarted.",
+        suggestion: reason == nil ? failure?.suggestion : nil
+      )
+    }
   }
 
   static let archivedReason = "This session is archived."
@@ -267,6 +294,11 @@ public final class SessionLauncher: SessionRuntime {
     } else {
       await supervisor.stop(id: id, gracePeriod: .seconds(3))
     }
+    // The record is dropped only once the process really is stopped. Dropped beforehand, a
+    // `SIGKILL` landing inside the grace period would leave a live process group whose
+    // identifiers have just been erased: nothing to look for at the next launch, and nothing to
+    // tell the user about.
+    await recorder?.stopped(id)
 
     // Asked before "was it running": a terminal whose group could not be reaped is already
     // finished, so answering `wasNotRunning` first would drop the warning on exactly the session
@@ -333,6 +365,7 @@ public final class SessionLauncher: SessionRuntime {
     // The watch that reaches this point may have been superseded while it waited for the main
     // actor — by a detach, or by a relaunch that installed its own. Only the current one speaks.
     guard exitGenerations[id] == generation else { return }
+    await recorder?.stopped(id)
     exitTasks[id] = nil
     outputTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {

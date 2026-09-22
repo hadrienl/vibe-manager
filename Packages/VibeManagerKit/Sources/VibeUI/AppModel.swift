@@ -126,6 +126,91 @@ public final class AppModel {
     public let suggestion: String?
   }
 
+  /// A restoration under way, from the first session to the last.
+  public private(set) var restoration: Restoration?
+  /// Sessions an unexpected stop left behind, offered rather than resumed.
+  public private(set) var restoreOffer: RestoreOffer?
+  /// Another copy of the application holds these sessions. Nothing was reconciled, nothing taken.
+  public private(set) var otherInstanceProcessIdentifier: Int32?
+  /// What did not come back, once the queue is done. `nil` when everything did: a restoration
+  /// that worked has nothing to say and says nothing.
+  public private(set) var restoreReport: RestoreReport?
+
+  /// The offer's own intention, held here rather than rebuilt from the screen: it was consumed
+  /// from the runtime document at launch, and there is nowhere left to read it from.
+  private var offeredRestoreIntent: SessionRestoreIntent?
+  private var restoreTask: Task<Void, Never>?
+  /// Whether the launch sequence has already been run, set before anything suspends.
+  private var hasLoaded = false
+
+  /// Where a restoration has got to.
+  public struct Restoration: Equatable {
+    public let total: Int
+    public let completed: Int
+    public let currentSessionID: SessionID?
+    public let currentName: String?
+
+    public var message: String {
+      guard let currentName else {
+        return "Restoring sessions — \(completed) of \(total)"
+      }
+      return "Restoring sessions — \(min(completed + 1, total)) of \(total) · \(currentName)"
+    }
+  }
+
+  /// An unexpected stop, and what it left running.
+  ///
+  /// The sessions are offered, not resumed: a crash is not an intention, and the agent that was
+  /// running may be what brought the application down. Relaunching it unattended would start the
+  /// same fall again, with more agents in it each time.
+  public struct RestoreOffer: Equatable {
+    public let sessionCount: Int
+    /// Process groups of the previous run that answer but cannot be identified. Reported,
+    /// deliberately never signalled: pids are recycled.
+    public let leftoverProcessIdentifiers: [Int32]
+    public let interruptedAt: Date?
+
+    public var message: String {
+      let subject =
+        sessionCount == 1 ? "1 session was running" : "\(sessionCount) sessions were running"
+      return "Vibe Manager stopped unexpectedly. \(subject)."
+    }
+
+    public var suggestion: String? {
+      guard !leftoverProcessIdentifiers.isEmpty else { return nil }
+      let pids = leftoverProcessIdentifiers.map(String.init).joined(separator: ", ")
+      return """
+        A process from that run may still be running (pid \(pids)) and was left alone; check \
+        Activity Monitor.
+        """
+    }
+  }
+
+  /// What a restoration left for the user to deal with, in one place.
+  ///
+  /// A list and not a dialog, and above all not one dialog per session: five modal questions at
+  /// launch is an application nobody can use.
+  public struct RestoreReport: Equatable {
+    public struct Line: Equatable, Identifiable {
+      public let id: SessionID
+      public let name: String
+      public let sentence: String
+      public let suggestion: String?
+    }
+
+    public let restartedCount: Int
+    public let cancelledCount: Int
+    public let lines: [Line]
+
+    public var message: String {
+      let subject =
+        lines.count == 1
+        ? "1 session did not come back" : "\(lines.count) sessions did not come back"
+      guard restartedCount > 0 else { return "\(subject)." }
+      return "\(subject), and \(restartedCount) did."
+    }
+  }
+
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
   private var preferredSelection: SessionID?
   private var resolutionTask: Task<Void, Never>?
@@ -146,6 +231,8 @@ public final class AppModel {
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
   private let restartSession: RestartSession?
+  private let detectPreviousShutdown: DetectPreviousShutdown?
+  private let restoreSessions: RestoreSessions?
   private let clock: any SessionClock
 
   public init(
@@ -156,6 +243,10 @@ public final class AppModel {
     defaultWorkingDirectoryPath: String? = nil,
     layout: WorkspaceLayoutController = WorkspaceLayoutController(),
     permissions: PermissionsModel? = nil,
+    /// Where the previous run wrote what it was running. Absent in a workspace assembled without
+    /// the system around it, and nothing is then detected or restored at launch.
+    runtimeRecorder: SessionRuntimeRecorder? = nil,
+    processes: any ProcessLivenessProbe = SystemProcessLivenessProbe(),
     // Only the resume probation reads it, and it is the one rule here measured in seconds of real
     // time: without a clock to move, its far side could only be tested by waiting eight seconds.
     clock: any SessionClock = SystemSessionClock()
@@ -178,7 +269,20 @@ public final class AppModel {
     restoreSession = RestoreSession(repository: repository)
     // A workspace without agents cannot build a launch plan, so it cannot restart anything —
     // and saying that with an optional is clearer than a use case that would refuse every call.
-    restartSession = agents.map { RestartSession(repository: repository, agents: $0) }
+    let restart = agents.map { RestartSession(repository: repository, agents: $0) }
+    restartSession = restart
+    // The two halves of #11: what the previous run left behind, and the queue that honours it.
+    // Both are absent together, because a workspace that cannot launch has nothing to restore.
+    detectPreviousShutdown = runtimeRecorder.map {
+      DetectPreviousShutdown(
+        repository: repository, recorder: $0, processes: processes, clock: clock)
+    }
+    restoreSessions =
+      launcher.flatMap { launcher in
+        restart.map {
+          RestoreSessions(restart: $0, launcher: launcher, repository: repository)
+        }
+      }
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
@@ -447,7 +551,6 @@ public final class AppModel {
     await performRestart(id: id)
   }
 
-
   /// Sends the summary the user has read, and possibly edited.
   public func confirmRestart(_ text: String) async {
     guard let pending = pendingRestart else { return }
@@ -469,7 +572,6 @@ public final class AppModel {
   public func dismissRestartFailure() {
     restartFailure = nil
   }
-
 
   private func performRestart(
     id: SessionID,
@@ -591,6 +693,148 @@ public final class AppModel {
     resumeRefusals.insert(id)
   }
 
+  // MARK: - Restoration at launch
+
+  /// Whether this session is the one the restoration is working on right now.
+  public func isRestoring(_ id: SessionID) -> Bool {
+    restoration?.currentSessionID == id
+  }
+
+  /// Resumes the sessions an unexpected stop left behind, now that the user has asked.
+  public func acceptRestoreOffer() async {
+    guard let intent = offeredRestoreIntent else { return }
+    restoreOffer = nil
+    offeredRestoreIntent = nil
+    await beginRestore(intent)
+  }
+
+  /// Declines the offer. Nothing is lost that was not already: the sessions are closed, whole,
+  /// and one Restart away.
+  public func dismissRestoreOffer() {
+    restoreOffer = nil
+    offeredRestoreIntent = nil
+  }
+
+  public func dismissRestoreReport() {
+    restoreReport = nil
+  }
+
+  public func dismissOtherInstanceNotice() {
+    otherInstanceProcessIdentifier = nil
+  }
+
+  /// Empties the queue. What is already running keeps running: stopping an agent that has just
+  /// been handed its conversation back, to honour a cancellation, would destroy the very work
+  /// this was restoring.
+  public func cancelRestore() {
+    restoreTask?.cancel()
+  }
+
+  /// Calls off a restoration and waits for the session in flight to finish being launched.
+  ///
+  /// Quitting needs this rather than `cancelRestore`: cancelling only asks, and a resume already
+  /// under way goes on to write `reopen`. That write landing after the shutdown had read what to
+  /// close left a session stored active, never detached, absent from the intention to resume it,
+  /// with a process only the supervisor's last sweep took down.
+  public func stopRestoring() async {
+    guard let task = restoreTask else { return }
+    task.cancel()
+    await task.value
+  }
+
+  private func honour(_ shutdown: PreviousShutdown?) async {
+    switch shutdown {
+    case .none, .nothingToDo:
+      return
+    case .otherInstance(let processIdentifier):
+      otherInstanceProcessIdentifier = processIdentifier
+    case .unexpected(let intent, let leftovers):
+      offeredRestoreIntent = intent
+      restoreOffer = RestoreOffer(
+        sessionCount: intent.sessionIDs.count,
+        leftoverProcessIdentifiers: leftovers.compactMap(\.processGroup),
+        interruptedAt: intent.interruptedAt
+      )
+    case .clean(let intent):
+      await beginRestore(intent)
+    }
+  }
+
+  private func beginRestore(_ intent: SessionRestoreIntent) async {
+    guard let restoreSessions, !intent.isEmpty else { return }
+    restoreReport = nil
+    restoration = Restoration(
+      total: intent.sessionIDs.count,
+      completed: 0,
+      currentSessionID: nil,
+      currentName: nil
+    )
+
+    // A queue already under way is called off rather than overwritten: its task would otherwise
+    // go on launching sessions with nobody holding it, and Cancel would only ever reach the last
+    // one started.
+    restoreTask?.cancel()
+
+    // Run from a task of its own so that Cancel has something to cancel: the queue checks for
+    // cancellation between two sessions, which is the only place where stopping costs nothing.
+    let task = Task { @MainActor [weak self] in
+      let outcomes = await restoreSessions(intent) { progress in
+        self?.note(progress)
+      }
+      await self?.finishRestore(with: outcomes)
+    }
+    restoreTask = task
+    await task.value
+  }
+
+  private func note(_ progress: SessionRestoreProgress) {
+    switch progress {
+    case .started(let id, let name, let index, let total):
+      restoration = Restoration(
+        total: total,
+        completed: index - 1,
+        currentSessionID: id,
+        currentName: name
+      )
+    case .finished:
+      guard let current = restoration else { return }
+      restoration = Restoration(
+        total: current.total,
+        completed: min(current.completed + 1, current.total),
+        currentSessionID: nil,
+        currentName: nil
+      )
+    }
+  }
+
+  private func finishRestore(with outcomes: [SessionRestoreOutcome]) async {
+    restoration = nil
+    restoreTask = nil
+
+    let lines = outcomes.compactMap { outcome -> RestoreReport.Line? in
+      guard let sentence = outcome.sentence else { return nil }
+      return RestoreReport.Line(
+        id: outcome.sessionID,
+        name: outcome.sessionName,
+        sentence: sentence,
+        suggestion: outcome.suggestion
+      )
+    }
+    // Silence on success. A report that appears when there is nothing to do about it teaches the
+    // user to dismiss reports without reading them.
+    restoreReport =
+      lines.isEmpty
+      ? nil
+      : RestoreReport(
+        restartedCount: outcomes.filter(\.didRestart).count,
+        cancelledCount: outcomes.filter(\.wasCancelled).count,
+        lines: lines
+      )
+    // Every session that came back had `reopen` written for it while the list on screen was the
+    // one loaded before the queue started.
+    await reload()
+  }
+
   private func report(
     _ detachment: SessionDetachOutcome,
     for session: WorkSession,
@@ -613,7 +857,12 @@ public final class AppModel {
   }
 
   public func load() async {
-    guard state == .idle else { return }
+    // Taken synchronously, before the first `await`. `state` only becomes `.loading` inside the
+    // reload, several suspensions later, so two loads — a second window, a `.task` run twice —
+    // both passed that guard, both detected the previous shutdown before either had claimed the
+    // runtime document, and both started a restoration of the same sessions.
+    guard !hasLoaded else { return }
+    hasLoaded = true
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
@@ -621,8 +870,16 @@ public final class AppModel {
     // pressing Create leaves nothing left to ask. Reading the store first left a window in which
     // ⌘N opened a sheet that did not yet know whether the access was there, and warned anyway.
     await permissions?.refresh()
+    // Before the first list, because it is what makes that list true: a session the previous run
+    // left `active` has nothing running behind it, and drawing it as running once — even for one
+    // frame — is the lie this whole ticket is about.
+    let shutdown = await detectPreviousShutdown?()
     await reload()
+    // Detections first, then the restoration: each resume asks its provider whether it can run,
+    // and a queue started before the probes had answered would pay for that answer session by
+    // session, on a cold cache, with a progress bar in front of the user.
     await refreshAgents()
+    await honour(shutdown)
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.

@@ -142,14 +142,41 @@ private struct SessionHistoryCommands: Commands {
 final class AppDelegate: NSObject, NSApplicationDelegate {
   var environment: AppEnvironment?
 
+  /// How long quitting may spend being tidy.
+  ///
+  /// The stop itself pays a three-second grace period per terminal, and this leaves room for the
+  /// store writes around it. Past that the application stops waiting: an agent that ignores
+  /// `SIGTERM`, and whose `SIGKILL` the kernel is slow to reap, was enough to make an application
+  /// that would not quit — a worse failure than the orphan the wait was avoiding, and one the
+  /// `atexit` guard of `TerminalProcessGroupGuard` catches anyway.
+  private static let shutdownDeadline: Duration = .seconds(6)
+
+  private var hasRepliedToTermination = false
+
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     guard let environment else { return .terminateNow }
+    // Asked a second time — a quit the system retries, a quit the user repeats — the work has
+    // already been done, and the reply for it has already been consumed. Another `terminateLater`
+    // would wait for an answer nothing is left to send, and the application would never quit.
+    guard !hasRepliedToTermination else { return .terminateNow }
 
-    // Terminating immediately would orphan the process tree of every open terminal.
+    // Terminating immediately would orphan the process tree of every open terminal, and leave
+    // the next launch without the intention to resume them.
     Task {
-      await environment.stopAllTerminals()
-      NSApplication.shared.reply(toApplicationShouldTerminate: true)
+      await environment.shutdown()
+      replyToTermination()
+    }
+    Task {
+      try? await Task.sleep(for: Self.shutdownDeadline)
+      replyToTermination()
     }
     return .terminateLater
+  }
+
+  /// Answered once, whichever of the two tasks gets here first.
+  private func replyToTermination() {
+    guard !hasRepliedToTermination else { return }
+    hasRepliedToTermination = true
+    NSApplication.shared.reply(toApplicationShouldTerminate: true)
   }
 }
