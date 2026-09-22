@@ -54,6 +54,16 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  public var filter: SessionFilter {
+    intent.sessionFilter
+  }
+
+  /// The scope, the sort and the facets are kept; the search text rides along in memory and is
+  /// dropped by the filter's own encoding, so a delayed save costs nothing while the user types.
+  public func setFilter(_ filter: SessionFilter) {
+    updateIntent { $0.sessionFilter = filter }
+  }
+
   /// Showing a column the window is too narrow for is an exception, not an arrangement: it is
   /// recorded as an override and leaves the stored intent alone, so that hiding it again only
   /// withdraws the exception and widening the window still restores the columns the user had.
