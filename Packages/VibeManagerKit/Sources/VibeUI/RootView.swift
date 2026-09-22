@@ -52,41 +52,71 @@ public struct RootView: View {
       )
     }
     .sheet(
-      isPresented: Binding(
-        get: { model.isPresentingNewSession },
-        set: { isPresented in
-          guard !isPresented else { return }
-          model.cancelNewSession()
+      item: Binding(
+        get: { presentedSheet },
+        set: { sheet in
+          guard sheet == nil else { return }
+          dismissPresentedSheet()
         }
       )
-    ) {
-      if let sheetModel = model.newSessionModel {
-        NewSessionSheet(
-          model: sheetModel,
-          defaultWorkingDirectoryPath: model.newSessionDefaultWorkingDirectoryPath,
-          created: { creation in Task { await model.complete(creation) } },
-          cancelled: { model.cancelNewSession() }
-        )
-      }
-    }
-    // Shown at launch and nowhere else. The alerts it exists to replace fall in the middle of
-    // creating a session, which is precisely where this question must never be asked.
-    .sheet(
-      isPresented: Binding(
-        get: { model.permissions?.isPresentingStep == true },
-        set: { isPresented in
-          guard !isPresented, let permissions = model.permissions else { return }
-          Task { await permissions.skipStep() }
+    ) { sheet in
+      switch sheet {
+      case .fullDiskAccess:
+        if let permissions = model.permissions {
+          FullDiskAccessSheet(
+            openSystemSettings: {
+              Task { await permissions.openSystemSettings() }
+            },
+            skip: { Task { await permissions.skipStep() } }
+          )
         }
-      )
-    ) {
-      if let permissions = model.permissions {
-        FullDiskAccessSheet(
-          openSystemSettings: { Task { await permissions.openSystemSettings() } },
-          skip: { Task { await permissions.skipStep() } }
-        )
+      case .newSession:
+        if let sheetModel = model.newSessionModel {
+          NewSessionSheet(
+            model: sheetModel,
+            defaultWorkingDirectoryPath: model.newSessionDefaultWorkingDirectoryPath,
+            created: { creation in Task { await model.complete(creation) } },
+            cancelled: { model.cancelNewSession() }
+          )
+        }
       }
     }
+  }
+
+  /// Which sheet the window is showing, out of the ones asking to be shown.
+  ///
+  /// One modifier, not two. SwiftUI presents a single sheet per view and drops the rest on the
+  /// floor: stacked, a ⌘N pressed while the launch step is up left the model believing the New
+  /// Session sheet was open and the user looking at nothing. Ordered rather than exclusive, so
+  /// that ⌘N is not lost either — the step is answered first, and the sheet it delayed opens next.
+  private var presentedSheet: RootSheet? {
+    if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
+    if model.isPresentingNewSession { return .newSession }
+    return nil
+  }
+
+  /// Reached when the sheet is closed by the window rather than by one of its own buttons — Escape
+  /// or a click outside. Closing is an answer in both cases, and it is the one already written for
+  /// each: skipping the step, cancelling the draft.
+  private func dismissPresentedSheet() {
+    switch presentedSheet {
+    case .fullDiskAccess:
+      guard let permissions = model.permissions else { return }
+      Task { await permissions.skipStep() }
+    case .newSession:
+      model.cancelNewSession()
+    case nil:
+      break
+    }
+  }
+
+  /// Shown at launch and nowhere else. The alerts the step exists to replace fall in the middle of
+  /// creating a session, which is precisely where this question must never be asked.
+  private enum RootSheet: Identifiable {
+    case fullDiskAccess
+    case newSession
+
+    var id: Self { self }
   }
 
   private var workspace: some View {
