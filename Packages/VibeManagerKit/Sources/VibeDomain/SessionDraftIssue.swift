@@ -6,6 +6,7 @@ public enum SessionDraftField: String, Hashable, Sendable, CaseIterable {
   case agent
   case model
   case workingDirectory
+  case appearance
 }
 
 /// One reason a draft cannot be created, and the way out of it.
@@ -108,7 +109,7 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   }
 
   public static let appearanceInvalid = SessionDraftIssue(
-    field: .name,
+    field: .appearance,
     message: "This session identity cannot be stored.",
     remedy: "Pick a symbol and a colour from the ones offered."
   )

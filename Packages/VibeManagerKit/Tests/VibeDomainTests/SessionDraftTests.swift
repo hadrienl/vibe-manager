@@ -35,6 +35,21 @@ struct SessionDraftTests {
     #expect(draft.validate().isEmpty)
   }
 
+  @Test("An identity that cannot be stored is reported on the appearance, not on the name")
+  func appearanceProblemIsFiledOnItsOwnField() {
+    var draft = SessionDraft(
+      name: "Refactor the webhook",
+      providerID: "claude-code",
+      workingDirectoryPath: "/tmp"
+    )
+    draft.appearance = SessionAppearance(symbolName: "", colorHex: "not-a-colour")
+
+    let issues = draft.validate()
+
+    #expect(issues == [.appearanceInvalid])
+    #expect(SessionDraftIssue.appearanceInvalid.field == .appearance)
+  }
+
   @Test("A relative path is refused before anything tries to enter it")
   func relativePathIsRejected() {
     let draft = SessionDraft(
