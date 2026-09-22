@@ -224,6 +224,11 @@ public actor AgentAvailabilityProbe {
         hints: hints
       )
     case .cancelled:
+      // Never displayed in practice, and deliberately so: the only thing that cancels a
+      // detection is `invalidate()`, which bumps the generation that `availability(forceRefresh:)`
+      // checks before publishing, so this value is discarded and the caller is probed again.
+      // It stays a state of its own because the alternative is dressing a cancellation up as a
+      // failure the user would be asked to act on.
       return AgentDiagnosticFactory.availability(
         descriptor: descriptor,
         state: .probeFailed(reason: .cancelled),
