@@ -54,6 +54,51 @@ a launch.
 expire after a short time to live, and `invalidate()` or a new user defined path clears them.
 Every probe has a timeout and terminates, then kills, a command that hangs.
 
+### A timeout is an absence of answer, not a diagnostic
+
+A version probe that lapses is retried once, on the wider `versionRetryTimeout` budget, and only
+the second silence produces `probeFailed(.timedOut)`. At first launch the binary is not in the
+disk cache yet, the login shell may have been asked where it lives, and the application is still
+starting: the usual budget lapses on installations that are perfectly fine, and the first screen
+then declares a working agent broken. An exit code, a refusal to start and a cancellation are
+answers, so none of them is retried.
+
+The same rule covers the other two commands of a detection. The login shell lookup in
+`FileSystemExecutableLocator` is retried on `loginShellRetryTimeout`, and a shell silent twice
+yields `ExecutableLocation.timedOut` rather than `notFound`: a shell still sourcing a heavy
+configuration has said nothing about the installation, and `notFound` would send a user whose
+agent lives outside the candidate directories off to install a CLI they already have. A shell that
+exits non zero has looked and not found it, so that answer is kept as is. The sign in check runs
+on the same binary, on the same cold start, so it is retried on `versionRetryTimeout` too;
+without it, a first silence used to read as "signed in" and announced a signed out agent as ready.
+A sign in check silent twice still never blocks a launch — silence is not a verdict either way —
+but it is written into the diagnostic detail, so an export does not read as a clean bill of
+health.
+
+### A ready agent is detected once, everything else is detected again
+
+An agent found `available` is cached for the whole session: a CLI does not uninstall itself while
+the application runs, so probing it again costs two processes per screen and buys nothing.
+
+Every other state expires after a short `timeToLive`. Each of them is either an absence of answer
+or a problem whose remediation the diagnostic just asked the user to go and perform in a terminal
+— install, update, sign in — so it is precisely the state that must not survive their coming
+back. Opening the sheet again is then enough to see the agent turn ready, without having to find
+the detect button first. The delay exists only so that a redrawn window, or a sheet opened twice
+in a row, does not spawn a process each time.
+
+`invalidate()`, a new user defined path and an explicit detection still look again in every case,
+`available` included.
+
+`AgentProbeFailure.isTransient` carries that distinction into the presentation: a silent agent
+reads as "did not answer in time" and offers to detect again first, while a failing one keeps
+"could not be inspected" and the remediations that ask the user to go and fix something.
+
+Serialising the startup probes was considered and refused: it turns one budget into one budget
+per provider on a Mac where no agent is installed, to remove a contention that is not the cause.
+Two short processes on a multiple core machine wait on the disk and on a runtime starting, not on
+each other.
+
 ### The registry is the only place a provider is registered
 
 `AgentProviderRegistry` keeps registration order, probes providers concurrently and answers
@@ -86,6 +131,12 @@ in Debug builds only, so a distributed Release never lists it.
 - The `PATH` discovered by the login shell is used to find the binary, not to launch the agent:
   a launched agent still inherits the application `PATH`, so an agent shelling out to `git` or
   `node` may not find them. Propagating the discovered `PATH` belongs to the launch work of #4.
+- An agent that is uninstalled, downgraded or moved while the application runs keeps its
+  `available` state until the user detects again; the launch then fails on the stale path with
+  the CLI's own error. Detecting once was the point, and the button is the way back.
+- A detection whose every command lapses now costs the three budgets plus their retries, and
+  `refreshAgents` stays busy for that whole window while silently ignoring the Refresh button.
+  Facing one wedged CLI the wait is noticeably longer than the verdict it replaces.
 - `AgentDiagnostic.redact(path:)` abbreviates against `NSHomeDirectory()`, which stops matching
   the day App Sandbox is enabled. Revisit it together with the sandboxing decision of #19.
 

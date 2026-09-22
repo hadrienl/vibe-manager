@@ -11,17 +11,22 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
   private let environment: [String: String]
   private let probe: (any ProcessProbe)?
   private let loginShellTimeout: Duration
+  private let loginShellRetryTimeout: Duration
 
   public init(
     fileSystem: any ExecutableFileSystem = DefaultExecutableFileSystem(),
     environment: [String: String] = ProcessInfo.processInfo.environment,
     probe: (any ProcessProbe)? = nil,
-    loginShellTimeout: Duration = .seconds(3)
+    loginShellTimeout: Duration = .seconds(3),
+    loginShellRetryTimeout: Duration = .seconds(10)
   ) {
     self.fileSystem = fileSystem
     self.environment = environment
     self.probe = probe
     self.loginShellTimeout = loginShellTimeout
+    // A retry budget narrower than the first attempt would make the second one strictly less
+    // likely to answer, which is the opposite of the point.
+    self.loginShellRetryTimeout = max(loginShellRetryTimeout, loginShellTimeout)
   }
 
   public func locate(_ plan: ExecutableSearchPlan) async -> ExecutableLocation {
@@ -42,7 +47,7 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
       case .notExecutable:
         shadowed = shadowed ?? location
         return nil
-      case .notFound:
+      case .notFound, .timedOut:
         return nil
       }
     }
@@ -59,11 +64,17 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
       if let location = consider(path: path, source: .processPath) { return location }
     }
 
-    guard plan.allowsLoginShellFallback, let path = await loginShellPath(for: plan.binaryName)
-    else {
+    guard plan.allowsLoginShellFallback else { return shadowed ?? .notFound }
+
+    switch await loginShellPath(for: plan.binaryName) {
+    case .path(let path):
+      return consider(path: path, source: .loginShell) ?? shadowed ?? .notFound
+    case .noAnswer:
+      // A file found earlier, even a non executable one, says more than a silent shell.
+      return shadowed ?? .timedOut
+    case .unavailable:
       return shadowed ?? .notFound
     }
-    return consider(path: path, source: .loginShell) ?? shadowed ?? .notFound
   }
 
   private func inspect(path: String, source: AgentDetectionSource) -> ExecutableLocation {
@@ -76,28 +87,51 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
   }
 
   /// Asks the user's login shell where the binary lives, without running the binary itself.
-  private func loginShellPath(for binaryName: String) async -> String? {
-    guard let probe else { return nil }
+  /// What asking the login shell produced.
+  ///
+  /// `noAnswer` is kept apart from `unavailable`: a shell that exits non zero has looked and not
+  /// found the binary, while a shell that never answers has not looked yet.
+  private enum LoginShellOutcome {
+    case path(String)
+    case noAnswer
+    case unavailable
+  }
+
+  private func loginShellPath(for binaryName: String) async -> LoginShellOutcome {
+    guard probe != nil else { return .unavailable }
 
     let shell = environment["SHELL"] ?? "/bin/zsh"
-    guard fileSystem.isExecutableFile(atPath: shell) else { return nil }
+    guard fileSystem.isExecutableFile(atPath: shell) else { return .unavailable }
 
-    let result = try? await probe.run(
-      executablePath: shell,
-      arguments: ["-l", "-c", "command -v -- \(shellQuoted(binaryName))"],
-      environment: AgentEnvironmentPolicy.environment(base: environment),
-      workingDirectoryPath: nil,
-      timeout: loginShellTimeout
-    )
-    guard let result, result.exitCode == 0, !result.didTimeOut else { return nil }
+    var result = await ask(shell: shell, for: binaryName, timeout: loginShellTimeout)
+    if result?.didTimeOut == true {
+      // Same reasoning as the version probe: a login shell still sourcing a heavy configuration
+      // has said nothing about the installation. The second attempt runs on a wider budget, and
+      // on a shell whose start up the first one has just warmed up.
+      result = await ask(shell: shell, for: binaryName, timeout: loginShellRetryTimeout)
+    }
+
+    guard let result else { return .unavailable }
+    guard !result.didTimeOut else { return .noAnswer }
+    guard result.exitCode == 0 else { return .unavailable }
 
     let path =
       result.standardOutput
       .split(separator: "\n")
       .last
       .map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
-    guard path.hasPrefix("/") else { return nil }
-    return path
+    guard path.hasPrefix("/") else { return .unavailable }
+    return .path(path)
+  }
+
+  private func ask(shell: String, for binaryName: String, timeout: Duration) async -> ProbeResult? {
+    try? await probe?.run(
+      executablePath: shell,
+      arguments: ["-l", "-c", "command -v -- \(shellQuoted(binaryName))"],
+      environment: AgentEnvironmentPolicy.environment(base: environment),
+      workingDirectoryPath: nil,
+      timeout: timeout
+    )
   }
 
   private func expand(_ directory: String) -> String {

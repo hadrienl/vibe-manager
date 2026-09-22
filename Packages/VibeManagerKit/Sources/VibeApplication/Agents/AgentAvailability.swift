@@ -58,6 +58,20 @@ public enum AgentProbeFailure: Hashable, Sendable {
   case timedOut
   case failed(exitCode: Int32)
   case cancelled
+
+  /// Whether the agent said nothing rather than said something wrong.
+  ///
+  /// A command that never answered and one that answered with an error deserve neither the same
+  /// sentence nor the same lifetime in a cache: the first one is likely to work on the next
+  /// attempt, the second one is not.
+  public var isTransient: Bool {
+    switch self {
+    case .timedOut, .cancelled:
+      return true
+    case .failed:
+      return false
+    }
+  }
 }
 
 public enum AgentRemediation: Hashable, Sendable, Identifiable {

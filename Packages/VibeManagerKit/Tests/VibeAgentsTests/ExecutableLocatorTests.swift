@@ -181,6 +181,87 @@ struct ExecutableLocatorTests {
     #expect(await locator.locate(ExecutableSearchPlan(binaryName: "stub-agent")) == .notFound)
   }
 
+  @Test("A login shell that stays silent is asked a second time on a wider budget")
+  func retriesTheLoginShellOnce() async {
+    let fileSystem = StubFileSystem(executables: ["/bin/zsh", "/Users/test/.bun/bin/stub-agent"])
+    let probe = ScriptedProcessProbe(responses: [
+      .success(ProbeResult(exitCode: -1, didTimeOut: true)),
+      .success(ProbeResult(exitCode: 0, standardOutput: "/Users/test/.bun/bin/stub-agent")),
+    ])
+    let locator = FileSystemExecutableLocator(
+      fileSystem: fileSystem,
+      environment: environment,
+      probe: probe
+    )
+
+    let location = await locator.locate(ExecutableSearchPlan(binaryName: "stub-agent"))
+
+    // A shell still sourcing a heavy configuration is the common cold start, not a missing CLI.
+    #expect(location == .found(path: "/Users/test/.bun/bin/stub-agent", source: .loginShell))
+    #expect(probe.invocations.count == 2)
+    #expect(probe.invocations.first?.timeout == .seconds(3))
+    #expect(probe.invocations.last?.timeout == .seconds(10))
+  }
+
+  @Test("A login shell silent twice is inconclusive, not a missing agent")
+  func aTwiceSilentLoginShellIsInconclusive() async {
+    let fileSystem = StubFileSystem(executables: ["/bin/zsh"])
+    let probe = StubProcessProbe(
+      responses: ["/bin/zsh": .success(ProbeResult(exitCode: -1, didTimeOut: true))]
+    )
+    let locator = FileSystemExecutableLocator(
+      fileSystem: fileSystem,
+      environment: environment,
+      probe: probe
+    )
+
+    let location = await locator.locate(ExecutableSearchPlan(binaryName: "stub-agent"))
+
+    #expect(location == .timedOut)
+    #expect(probe.invocations.count == 2)
+  }
+
+  @Test("A shell that looked and found nothing is still a missing agent")
+  func aShellThatFoundNothingIsNotATimeout() async {
+    let fileSystem = StubFileSystem(executables: ["/bin/zsh"])
+    let probe = StubProcessProbe(
+      responses: ["/bin/zsh": .success(ProbeResult(exitCode: 1))]
+    )
+    let locator = FileSystemExecutableLocator(
+      fileSystem: fileSystem,
+      environment: environment,
+      probe: probe
+    )
+
+    #expect(await locator.locate(ExecutableSearchPlan(binaryName: "stub-agent")) == .notFound)
+    // A non zero exit is an answer, so it is not retried.
+    #expect(probe.invocations.count == 1)
+  }
+
+  @Test("A file found earlier outweighs a silent login shell")
+  func aShadowedFileOutweighsASilentLoginShell() async {
+    let fileSystem = StubFileSystem(
+      executables: ["/bin/zsh"],
+      nonExecutableFiles: ["/opt/homebrew/bin/stub-agent"]
+    )
+    let probe = StubProcessProbe(
+      responses: ["/bin/zsh": .success(ProbeResult(exitCode: -1, didTimeOut: true))]
+    )
+    let locator = FileSystemExecutableLocator(
+      fileSystem: fileSystem,
+      environment: environment,
+      probe: probe
+    )
+
+    let location = await locator.locate(
+      ExecutableSearchPlan(binaryName: "stub-agent", candidateDirectories: ["/opt/homebrew/bin"])
+    )
+
+    #expect(
+      location == .notExecutable(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)
+    )
+  }
+
   @Test("Nothing anywhere yields notFound rather than an error")
   func missingEverywhere() async {
     let locator = FileSystemExecutableLocator(

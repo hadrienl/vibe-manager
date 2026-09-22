@@ -10,7 +10,8 @@ struct AgentAvailabilityProbeTests {
     locator: any ExecutableLocator,
     processProbe: any ProcessProbe,
     descriptor: AgentDescriptor = TestFixtures.descriptor,
-    timeToLive: Duration = .seconds(300)
+    timeToLive: Duration = .seconds(20),
+    now: @escaping @Sendable () -> Date = { Date(timeIntervalSince1970: 0) }
   ) -> AgentAvailabilityProbe {
     AgentAvailabilityProbe(
       descriptor: descriptor,
@@ -19,7 +20,7 @@ struct AgentAvailabilityProbeTests {
       probe: processProbe,
       environment: ["PATH": "/usr/bin", "HOME": "/Users/test"],
       timeToLive: timeToLive,
-      now: { Date(timeIntervalSince1970: 0) }
+      now: now
     )
   }
 
@@ -83,8 +84,47 @@ struct AgentAvailabilityProbeTests {
     #expect(availability.diagnostic.detail != nil)
   }
 
-  @Test("A version probe that times out is reported without throwing")
-  func reportsTimeout() async {
+  @Test("Only a second silence in a row is a timeout")
+  func reportsTimeoutAfterTwoAttempts() async {
+    let processProbe = StubProcessProbe(
+      defaultResponse: .success(ProbeResult(exitCode: -1, didTimeOut: true))
+    )
+    let availability = await probe(
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      processProbe: processProbe
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .probeFailed(reason: .timedOut))
+    #expect(!availability.isUsable)
+    let versionProbes = processProbe.invocations.filter { $0.arguments == ["--version"] }
+    #expect(versionProbes.count == 2)
+    // The second attempt is the one that has to conclude, so it gets the wider budget.
+    #expect(versionProbes.last?.timeout == TestFixtures.specification.versionRetryTimeout)
+    #expect(versionProbes.first?.timeout == TestFixtures.specification.versionTimeout)
+  }
+
+  @Test("A CLI that answers on the retry is available, not broken")
+  func retriesOnceAfterATimeout() async {
+    let processProbe = ScriptedProcessProbe(responses: [
+      .success(ProbeResult(exitCode: -1, didTimeOut: true)),
+      .success(ProbeResult(exitCode: 0, standardOutput: "stub-agent 2.4.1")),
+    ])
+    let availability = await probe(
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)
+      ),
+      processProbe: processProbe
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .available)
+    #expect(availability.installation?.version == AgentVersion(major: 2, minor: 4, patch: 1))
+    #expect(processProbe.invocations.count == 2)
+  }
+
+  @Test("A timeout says the agent stayed silent, and offers to detect again first")
+  func timeoutReadsAsTransient() async {
     let availability = await probe(
       locator: StubLocator(
         location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
@@ -94,22 +134,26 @@ struct AgentAvailabilityProbeTests {
       )
     ).availability(forceRefresh: false)
 
-    #expect(availability.state == .probeFailed(reason: .timedOut))
-    #expect(!availability.isUsable)
+    #expect(availability.diagnostic.summary == "Stub Agent did not answer in time.")
+    #expect(availability.diagnostic.remediations.first == .retryDetection)
   }
 
-  @Test("A non zero exit code from the version probe is a probe failure")
+  @Test("A non zero exit code from the version probe is a probe failure, and is not retried")
   func reportsFailingVersionProbe() async {
+    let processProbe = StubProcessProbe(
+      defaultResponse: .success(ProbeResult(exitCode: 127, standardError: "not found"))
+    )
     let availability = await probe(
       locator: StubLocator(
         location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
       ),
-      processProbe: StubProcessProbe(
-        defaultResponse: .success(ProbeResult(exitCode: 127, standardError: "not found"))
-      )
+      processProbe: processProbe
     ).availability(forceRefresh: false)
 
     #expect(availability.state == .probeFailed(reason: .failed(exitCode: 127)))
+    // An exit code is an answer: asking again would only double the wait for the same verdict.
+    #expect(processProbe.invocations.count == 1)
+    #expect(availability.diagnostic.summary == "Stub Agent could not be inspected.")
   }
 
   @Test("A binary that cannot be started is reported, not crashed on")
@@ -181,6 +225,82 @@ struct AgentAvailabilityProbeTests {
     #expect(processProbe.invocations.isEmpty)
   }
 
+  @Test("A sign in check that answers on the retry is trusted, not ignored")
+  func retriesTheAuthenticationProbeOnce() async {
+    let specification = CommandLineAgentSpecification(
+      binaryName: "stub-agent",
+      authenticationArguments: ["auth", "status"]
+    )
+    let processProbe = ScriptedAuthenticationProbe(
+      versionOutput: "stub-agent 2.4.1",
+      authenticationResponses: [
+        ProbeResult(exitCode: -1, didTimeOut: true),
+        ProbeResult(exitCode: 1),
+      ]
+    )
+
+    let availability = await AgentAvailabilityProbe(
+      descriptor: TestFixtures.descriptor,
+      specification: specification,
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      probe: processProbe,
+      environment: [:],
+      now: { Date(timeIntervalSince1970: 0) }
+    ).availability(forceRefresh: false)
+
+    // A first silence used to be read as "signed in", announcing a signed out agent as ready.
+    #expect(availability.state == .unauthenticated)
+    #expect(processProbe.authenticationInvocations.count == 2)
+    #expect(processProbe.authenticationInvocations.first?.timeout == specification.versionTimeout)
+    #expect(
+      processProbe.authenticationInvocations.last?.timeout == specification.versionRetryTimeout
+    )
+  }
+
+  @Test("A sign in check silent twice leaves the agent usable but says so")
+  func reportsAnUnansweredAuthenticationProbe() async {
+    let specification = CommandLineAgentSpecification(
+      binaryName: "stub-agent",
+      authenticationArguments: ["auth", "status"]
+    )
+    let processProbe = ScriptedAuthenticationProbe(
+      versionOutput: "stub-agent 2.4.1",
+      authenticationResponses: [ProbeResult(exitCode: -1, didTimeOut: true)]
+    )
+
+    let availability = await AgentAvailabilityProbe(
+      descriptor: TestFixtures.descriptor,
+      specification: specification,
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      probe: processProbe,
+      environment: [:],
+      now: { Date(timeIntervalSince1970: 0) }
+    ).availability(forceRefresh: false)
+
+    // Silence is not a verdict either way, so the agent stays launchable.
+    #expect(availability.state == .available)
+    #expect(processProbe.authenticationInvocations.count == 2)
+    // But an export must not read as a clean bill of health.
+    #expect(availability.diagnostic.detail?.contains("sign in check") == true)
+  }
+
+  @Test("A login shell that never answered is not a missing agent")
+  func aSilentLoginShellIsNotAMissingAgent() async {
+    let availability = await probe(
+      locator: StubLocator(location: .timedOut),
+      processProbe: StubProcessProbe()
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .probeFailed(reason: .timedOut))
+    #expect(availability.diagnostic.remediations.first == .retryDetection)
+    // Being told to install a CLI that is already there is the verdict this avoids.
+    #expect(!availability.diagnostic.remediations.contains(.install(documentationURL: nil)))
+  }
+
   @Test("Concurrent callers share a single detection and the cache avoids further probes")
   func cachesAndCoalesces() async {
     let locator = CountingLocator(
@@ -249,9 +369,7 @@ struct AgentAvailabilityProbeTests {
 
   @Test("A sub second time to live still caches")
   func subSecondTimeToLiveIsHonoured() async {
-    let locator = CountingLocator(
-      location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
-    )
+    let locator = CountingLocator(location: .notFound)
     let clock = MutableClock(start: Date(timeIntervalSince1970: 0))
     let subject = AgentAvailabilityProbe(
       descriptor: TestFixtures.descriptor,
@@ -275,16 +393,99 @@ struct AgentAvailabilityProbeTests {
     #expect(locator.invocationCount == 2)
   }
 
-  @Test("A cancelled probe is reported as cancelled, not as a launch failure")
+  @Test("A cancelled probe is reported as cancelled, not as a launch failure, and is not retried")
   func reportsCancellation() async {
+    let processProbe = StubProcessProbe(defaultResponse: .failure(.cancelled))
     let availability = await probe(
       locator: StubLocator(
         location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
       ),
-      processProbe: StubProcessProbe(defaultResponse: .failure(.cancelled))
+      processProbe: processProbe
     ).availability(forceRefresh: false)
 
     #expect(availability.state == .probeFailed(reason: .cancelled))
+    #expect(processProbe.invocations.count == 1)
+  }
+
+  @Test("A silent agent is detected again on the next screen")
+  func aTransientFailureExpires() async {
+    let locator = CountingLocator(
+      location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+    )
+    let clock = MutableClock(start: Date(timeIntervalSince1970: 0))
+    let subject = probe(
+      locator: locator,
+      processProbe: StubProcessProbe(
+        defaultResponse: .success(ProbeResult(exitCode: -1, didTimeOut: true))
+      ),
+      now: { clock.now }
+    )
+
+    _ = await subject.availability(forceRefresh: false)
+    clock.advance(by: 10)
+    _ = await subject.availability(forceRefresh: false)
+    #expect(locator.invocationCount == 1)
+
+    // The next screen the user opens detects again by itself, instead of repeating a verdict
+    // nobody trusts.
+    clock.advance(by: 15)
+    _ = await subject.availability(forceRefresh: false)
+    #expect(locator.invocationCount == 2)
+  }
+
+  @Test("An agent whose remediation the user may be performing is detected again")
+  func anUnauthenticatedAgentExpires() async {
+    let specification = CommandLineAgentSpecification(
+      binaryName: "stub-agent",
+      authenticationArguments: ["auth", "status"]
+    )
+    let locator = CountingLocator(
+      location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+    )
+    let clock = MutableClock(start: Date(timeIntervalSince1970: 0))
+    let subject = AgentAvailabilityProbe(
+      descriptor: TestFixtures.descriptor,
+      specification: specification,
+      locator: locator,
+      probe: StubAuthenticationProbe(versionOutput: "stub-agent 2.4.1", authenticationExitCode: 1),
+      environment: [:],
+      timeToLive: .seconds(20),
+      now: { clock.now }
+    )
+
+    #expect(await subject.availability(forceRefresh: false).state == .unauthenticated)
+    // Signing in happens in a terminal, next to the application: coming back to the sheet has to
+    // be enough to see it, without the user having to find the detect button first.
+    clock.advance(by: 25)
+    _ = await subject.availability(forceRefresh: false)
+
+    #expect(locator.invocationCount == 2)
+  }
+
+  @Test("A ready agent is detected once, and not again for the rest of the session")
+  func aReadyAgentIsProbedOnce() async {
+    let locator = CountingLocator(
+      location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+    )
+    let clock = MutableClock(start: Date(timeIntervalSince1970: 0))
+    let subject = probe(
+      locator: locator,
+      processProbe: StubProcessProbe(
+        defaultResponse: .success(ProbeResult(exitCode: 0, standardOutput: "stub-agent 2.4.1"))
+      ),
+      now: { clock.now }
+    )
+
+    _ = await subject.availability(forceRefresh: false)
+    // A CLI does not uninstall itself while the application runs; opening the sheet an hour
+    // later must not cost a process.
+    clock.advance(by: 3600)
+    _ = await subject.availability(forceRefresh: false)
+    #expect(locator.invocationCount == 1)
+
+    // Only an explicit detection, or a new user defined path, looks again.
+    _ = await subject.availability(forceRefresh: true)
+    #expect(locator.invocationCount == 2)
   }
 
   @Test("A failing probe still reports where the executable was found")
@@ -406,4 +607,47 @@ private struct StubAuthenticationProbe: ProcessProbe {
     return ProbeResult(exitCode: 0, standardOutput: versionOutput)
   }
 
+}
+
+/// Answers the version straight away and the sign in check from a script, so a retry on the
+/// authentication command can be observed.
+private final class ScriptedAuthenticationProbe: ProcessProbe, @unchecked Sendable {
+  private let lock = NSLock()
+  private let versionOutput: String
+  private var authenticationResponses: [ProbeResult]
+  private let last: ProbeResult
+  private var recorded: [StubProcessProbe.Invocation] = []
+
+  init(versionOutput: String, authenticationResponses: [ProbeResult]) {
+    precondition(!authenticationResponses.isEmpty)
+    self.versionOutput = versionOutput
+    self.authenticationResponses = authenticationResponses
+    last = authenticationResponses[authenticationResponses.count - 1]
+  }
+
+  var authenticationInvocations: [StubProcessProbe.Invocation] {
+    lock.withLock { recorded.filter { $0.arguments != ["--version"] } }
+  }
+
+  func run(
+    executablePath: String,
+    arguments: [String],
+    environment: [String: String],
+    workingDirectoryPath: String?,
+    timeout: Duration
+  ) async throws -> ProbeResult {
+    lock.withLock {
+      recorded.append(
+        StubProcessProbe.Invocation(
+          executablePath: executablePath,
+          arguments: arguments,
+          timeout: timeout
+        )
+      )
+      guard arguments != ["--version"] else {
+        return ProbeResult(exitCode: 0, standardOutput: versionOutput)
+      }
+      return authenticationResponses.isEmpty ? last : authenticationResponses.removeFirst()
+    }
+  }
 }
