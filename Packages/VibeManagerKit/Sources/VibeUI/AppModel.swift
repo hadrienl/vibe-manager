@@ -230,10 +230,14 @@ public final class AppModel {
     pendingArchive = nil
   }
 
-  public func confirmArchive() async {
-    guard let session = pendingArchive else { return }
+  /// Archives the session the confirmation was opened for.
+  ///
+  /// It takes the identifier rather than reading `pendingArchive`, because by the time the
+  /// dialog's button runs its action SwiftUI has already dismissed the dialog — and the dismissal
+  /// clears `pendingArchive`. Reading it here made Archive do nothing at all.
+  public func archive(_ id: SessionID) async {
     pendingArchive = nil
-    guard let archival = try? await archiveSession(id: session.id) else { return }
+    guard let archival = try? await archiveSession(id: id) else { return }
     report(archival.detachment, for: archival.session)
     await reload()
     reconcileSelection()

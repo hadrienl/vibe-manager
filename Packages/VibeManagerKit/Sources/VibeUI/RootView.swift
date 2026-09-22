@@ -152,6 +152,9 @@ public struct RootView: View {
     .background(WidthReporter { model.layout.windowWidthChanged(to: $0) })
     // Archiving is reversible, so the question is short and says what actually happens. Cancel
     // is the default button: the pointer slip that opened this must not also answer it.
+    // `presenting:` hands the session to the buttons, rather than having them read it back from
+    // the model. SwiftUI dismisses the dialog before running a button's action, and the dismissal
+    // clears the pending session — read there, Archive found nothing and did nothing.
     .confirmationDialog(
       model.pendingArchive.map { "Archive “\($0.name)”?" } ?? "Archive this session?",
       isPresented: Binding(
@@ -161,22 +164,22 @@ public struct RootView: View {
           model.cancelArchive()
         }
       ),
-      titleVisibility: .visible
-    ) {
+      titleVisibility: .visible,
+      presenting: model.pendingArchive
+    ) { session in
       Button("Archive") {
-        Task { await model.confirmArchive() }
+        Task { await model.archive(session.id) }
       }
       Button("Cancel", role: .cancel) {
         model.cancelArchive()
       }
-    } message: {
-      Text(archiveConfirmationMessage)
+    } message: { session in
+      Text(archiveConfirmationMessage(for: session))
     }
   }
 
-  private var archiveConfirmationMessage: String {
-    let isRunning =
-      model.pendingArchive.map { model.pane(for: $0.id)?.status == .running } ?? false
+  private func archiveConfirmationMessage(for session: WorkSession) -> String {
+    let isRunning = model.pane(for: session.id)?.status == .running
     let agent = isRunning ? "Its running agent will be stopped. " : ""
     return """
       \(agent)Nothing is deleted: notes, repositories and Git metadata are kept, and the session \

@@ -167,6 +167,23 @@ struct SessionHistoryTests {
     #expect(await repository.session(id: stored.id)?.status == .closed)
   }
 
+  /// SwiftUI dismisses a confirmation dialog *before* running the button's action, and the
+  /// dismissal clears the pending session. Confirming that read it back from the model therefore
+  /// found nothing, and Archive silently did nothing at all.
+  @Test("Confirming archives the session even though the dialog has already been dismissed")
+  func confirmingDoesNotDependOnThePendingSession() async {
+    let stored = session()
+    let repository = MutableRepository(sessions: [stored])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+
+    model.requestArchive(stored.id)
+    model.cancelArchive()
+    await model.archive(stored.id)
+
+    #expect(await repository.session(id: stored.id)?.status == .archived)
+  }
+
   @Test("A confirmed archive moves the session out of the current scope, and back on request")
   func archiveAndUnarchiveFromTheWorkspace() async {
     let kept = session(name: "Still working")
@@ -176,7 +193,7 @@ struct SessionHistoryTests {
     await model.load()
 
     model.requestArchive(archived.id)
-    await model.confirmArchive()
+    await model.archive(archived.id)
 
     #expect(model.visibleSessions.map(\.name) == ["Still working"])
     #expect(model.archivedSessionCount == 1)
@@ -201,7 +218,7 @@ struct SessionHistoryTests {
     await model.load()
 
     model.requestArchive(stored.id)
-    await model.confirmArchive()
+    await model.archive(stored.id)
 
     let archived = await repository.session(id: stored.id)
     #expect(archived?.notes == stored.notes)
@@ -221,7 +238,7 @@ struct SessionHistoryTests {
     await launcher.launch(session: stored, plan: plan())
 
     model.requestArchive(stored.id)
-    await model.confirmArchive()
+    await model.archive(stored.id)
 
     #expect(model.detachWarning?.processIdentifier == 4242)
     #expect(model.detachWarning?.message.contains(stored.name) == true)
