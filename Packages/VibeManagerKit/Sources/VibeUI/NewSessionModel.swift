@@ -15,6 +15,8 @@ public final class NewSessionModel {
     public var name: String { descriptor.displayName }
     public var status: String { availability.diagnostic.summary }
     public var remediations: [AgentRemediation] { availability.diagnostic.remediations }
+    /// Shown next to an agent that cannot run: a diagnostic without a way out is a dead end.
+    public var remedy: String { AgentRemediation.sentence(for: remediations) }
 
     /// Usable, yet worth a warning: the CLI runs, and asks for credentials itself in the
     /// terminal. Hiding that would make the first screen of the session a surprise.

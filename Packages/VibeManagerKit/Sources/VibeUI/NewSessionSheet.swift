@@ -31,7 +31,7 @@ public struct NewSessionSheet: View {
       Divider()
       footer
     }
-    .frame(width: 640, height: 640)
+    .frame(width: 640, height: 700)
     .task {
       await model.load(defaultWorkingDirectoryPath: defaultWorkingDirectoryPath)
       focus = .name
@@ -52,18 +52,20 @@ public struct NewSessionSheet: View {
     .padding(.bottom, 14)
   }
 
+  /// The required fields come first, and the cosmetic one last: the folder used to sit below the
+  /// fold, which left the sheet refusing to create a session over a field nobody could see.
   private var form: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: 16) {
         nameField
         promptField
+        folderField
         agentField
         modelField
         appearanceField
-        folderField
       }
       .padding(.horizontal, 24)
-      .padding(.vertical, 20)
+      .padding(.vertical, 18)
     }
   }
 
@@ -83,7 +85,7 @@ public struct NewSessionSheet: View {
     ) {
       TextEditor(text: $model.draft.initialPrompt)
         .font(.body)
-        .frame(height: 68)
+        .frame(height: 54)
         .overlay {
           RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
         }
@@ -335,6 +337,13 @@ private struct AgentRow: View {
             .font(.caption)
             .foregroundStyle(agent.isUsable ? .secondary : Color.red)
             .fixedSize(horizontal: false, vertical: true)
+          if !agent.isUsable {
+            // The remedy travels with the diagnostic, here as much as in the validation list.
+            Text(agent.remedy)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
         }
         Spacer()
         if agent.warnsBeforeLaunch {
@@ -365,7 +374,11 @@ private struct AgentRow: View {
     .disabled(!agent.isUsable)
     .opacity(agent.isUsable ? 1 : 0.6)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    .accessibilityLabel("\(agent.name). \(agent.status)")
+    .accessibilityLabel(
+      agent.isUsable
+        ? "\(agent.name). \(agent.status)"
+        : "\(agent.name). \(agent.status) \(agent.remedy)"
+    )
   }
 }
 

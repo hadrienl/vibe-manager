@@ -94,7 +94,7 @@ public struct CreateSession: Sendable {
         .agentUnavailable(
           name: provider.descriptor.displayName,
           summary: availability.diagnostic.summary,
-          remedy: Self.remedy(for: availability.diagnostic.remediations)
+          remedy: AgentRemediation.sentence(for: availability.diagnostic.remediations)
         )
       )
     }
@@ -166,22 +166,4 @@ public struct CreateSession: Sendable {
     }
   }
 
-  private static func remedy(for remediations: [AgentRemediation]) -> String {
-    for remediation in remediations {
-      switch remediation {
-      case .install:
-        return "Install the agent, then detect again."
-      case .update(let minimumVersion, _):
-        return "Update it to \(minimumVersion) or newer, then detect again."
-      case .authenticate(let command):
-        guard let command else { return "Sign in to the agent, then detect again." }
-        return "Run \(command) in a terminal, then detect again."
-      case .defineExecutablePath:
-        return "Set the path to its executable, then detect again."
-      case .retryDetection:
-        continue
-      }
-    }
-    return "Detect again, or pick another agent."
-  }
 }
