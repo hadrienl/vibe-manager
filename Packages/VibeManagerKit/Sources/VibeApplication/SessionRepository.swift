@@ -17,6 +17,11 @@ extension SessionRepository {
   /// Fallback for repositories that cannot serialize the read-modify-write themselves.
   /// Concurrent callers can overwrite each other here; conformers that own their
   /// storage (actors, databases) should provide an atomic implementation instead.
+  ///
+  /// Such an implementation has to be declared `async`, as `FileSessionRepository` and
+  /// `InMemorySessionRepository` are. A synchronous method on an actor still satisfies the
+  /// requirement, so it is used through `any SessionRepository` — but a caller holding the
+  /// concrete type resolves to this default instead, and loses the atomicity without a word.
   public func mutate(
     id: SessionID,
     _ transform: @Sendable (inout WorkSession) throws -> Void

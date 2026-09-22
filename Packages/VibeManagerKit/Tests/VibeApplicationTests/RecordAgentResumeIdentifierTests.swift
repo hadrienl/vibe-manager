@@ -6,6 +6,10 @@ import VibeDomain
 
 /// An atomic repository, like the file backed one: the read, the change and the write happen
 /// inside the actor, so a concurrent caller cannot overwrite another's change.
+///
+/// `mutate` is declared `async`, like the real conformers. Without it a caller holding the
+/// concrete type resolves to the non-atomic default of `SessionRepository` instead of this
+/// method, and a test of concurrency would quietly stop testing the actor at all.
 private actor RecordingRepository: SessionRepository {
   private var stored: WorkSession?
   private(set) var saveCount = 0
@@ -17,7 +21,7 @@ private actor RecordingRepository: SessionRepository {
   func mutate(
     id: SessionID,
     _ transform: @Sendable (inout WorkSession) throws -> Void
-  ) throws -> WorkSession? {
+  ) async throws -> WorkSession? {
     guard var session = stored, session.id == id else { return nil }
     let before = session
     try transform(&session)
@@ -143,7 +147,8 @@ func concurrentChangeIsPreserved() async throws {
   let repository = RecordingRepository(stored: stored)
   let identifier = "019ee0a1-06d9-7e52-957b-d61a982d6b43"
 
-  async let recorded: RecordAgentResumeIdentifierOutcome = RecordAgentResumeIdentifier(repository: repository)(
+  let record = RecordAgentResumeIdentifier(repository: repository)
+  async let recorded: RecordAgentResumeIdentifierOutcome = record(
     sessionID: stored.id,
     identifier: identifier
   )
