@@ -30,8 +30,10 @@ private actor FakeTerminalSession: TerminalSession {
   func history() -> TerminalHistorySnapshot {
     TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
   }
+  private(set) var resizes: [TerminalSize] = []
+
   func write(_ bytes: [UInt8]) {}
-  func resize(to size: TerminalSize) {}
+  func resize(to size: TerminalSize) { resizes.append(size) }
   func stop(gracePeriod: Duration) { emit(.exited(code: 0)) }
   func kill() { emit(.terminated(signal: SIGKILL)) }
 
@@ -47,6 +49,7 @@ private actor FakeSupervisor: TerminalSupervisor {
   private let failure: TerminalError?
   private var sessions: [SessionID: FakeTerminalSession] = [:]
   private(set) var startCount = 0
+  private(set) var startedSpecs: [TerminalSpec] = []
 
   init(failure: TerminalError? = nil) {
     self.failure = failure
@@ -55,6 +58,7 @@ private actor FakeSupervisor: TerminalSupervisor {
   func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
     if let failure { throw failure }
     startCount += 1
+    startedSpecs.append(spec)
     let session = FakeTerminalSession(id: id)
     sessions[id] = session
     return session
@@ -89,7 +93,8 @@ private func makeSpec() -> TerminalSpec {
 func paneFollowsSessionLifecycle() async throws {
   let id = SessionID()
   let supervisor = FakeSupervisor()
-  let model = TerminalPaneModel(sessionID: id, supervisor: supervisor, spec: makeSpec())
+  let model = TerminalPaneModel(
+    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   #expect(model.session != nil)
@@ -110,7 +115,8 @@ func paneReportsLaunchFailure() async {
   let model = TerminalPaneModel(
     sessionID: SessionID(),
     supervisor: supervisor,
-    spec: makeSpec()
+    spec: makeSpec(),
+    viewportTimeout: .zero
   )
 
   await model.start()
@@ -126,7 +132,8 @@ func paneReportsLaunchFailure() async {
 func paneRestartsAfterItsProcessFinished() async throws {
   let id = SessionID()
   let supervisor = FakeSupervisor()
-  let model = TerminalPaneModel(sessionID: id, supervisor: supervisor, spec: makeSpec())
+  let model = TerminalPaneModel(
+    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   #expect(model.session != nil)
@@ -146,7 +153,8 @@ func paneRestartsAfterItsProcessFinished() async throws {
 func paneIgnoresRedundantStart() async throws {
   let id = SessionID()
   let supervisor = FakeSupervisor()
-  let model = TerminalPaneModel(sessionID: id, supervisor: supervisor, spec: makeSpec())
+  let model = TerminalPaneModel(
+    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   await supervisor.emit(.running(processIdentifier: 42), for: id)
@@ -156,4 +164,80 @@ func paneIgnoresRedundantStart() async throws {
 
   #expect(await supervisor.startCount == 1)
   #expect(model.status == .running)
+}
+
+@MainActor
+@Test("The process is started at the size the surface measured, not at a placeholder")
+func paneStartsAtTheMeasuredSize() async throws {
+  let id = SessionID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    sessionID: id,
+    supervisor: supervisor,
+    spec: makeSpec(),
+    viewportTimeout: .seconds(5)
+  )
+
+  async let started: Void = model.start()
+  await Task.yield()
+  await model.reportViewportSize(TerminalSize(columns: 197, rows: 51))
+  await started
+
+  let spec = try #require(await supervisor.startedSpecs.first)
+  #expect(spec.initialSize == TerminalSize(columns: 197, rows: 51))
+}
+
+@MainActor
+@Test("A pane nobody measured still starts, rather than waiting forever")
+func paneStartsWithoutAMeasurement() async throws {
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    sessionID: SessionID(),
+    supervisor: supervisor,
+    spec: makeSpec(),
+    viewportTimeout: .zero
+  )
+
+  await model.start()
+
+  let spec = try #require(await supervisor.startedSpecs.first)
+  #expect(spec.initialSize == TerminalSize.default)
+  #expect(model.session != nil)
+}
+
+@MainActor
+@Test("A size measured once the process runs is forwarded to it")
+func laterMeasurementsResizeTheProcess() async throws {
+  let id = SessionID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    sessionID: id,
+    supervisor: supervisor,
+    spec: makeSpec(),
+    viewportTimeout: .zero
+  )
+  await model.start()
+
+  await model.reportViewportSize(TerminalSize(columns: 120, rows: 40))
+
+  let session = try #require(await supervisor.session(for: id) as? FakeTerminalSession)
+  #expect(await session.resizes == [TerminalSize(columns: 120, rows: 40)])
+}
+
+@MainActor
+@Test("A measurement of nothing is ignored rather than passed on as a size")
+func emptyMeasurementsAreIgnored() async throws {
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    sessionID: SessionID(),
+    supervisor: supervisor,
+    spec: makeSpec(),
+    viewportTimeout: .zero
+  )
+
+  await model.reportViewportSize(TerminalSize(columns: 0, rows: 0))
+  await model.start()
+
+  let spec = try #require(await supervisor.startedSpecs.first)
+  #expect(spec.initialSize == TerminalSize.default)
 }

@@ -101,11 +101,21 @@ struct NewSessionModelTests {
     #expect(model.issues(for: .name) == [.nameMissing])
 
     model.draft.name = "Refactor the webhook"
-    // The draft observer revalidates on the next hop of the main actor.
-    await Task.yield()
-    await model.revalidate()
+    // What the sheet does on every field change, once the user has asked for the session.
+    await model.revalidateIfSubmitted()
 
     #expect(model.issues(for: .name).isEmpty)
+  }
+
+  @Test("Before the first Create, editing a field reports nothing")
+  func noNaggingBeforeTheFirstSubmission() async {
+    let model = makeModel()
+    await model.load(defaultWorkingDirectoryPath: nil)
+
+    model.draft.name = "R"
+    await model.revalidateIfSubmitted()
+
+    #expect(model.issues.isEmpty)
   }
 
   @Test("An accepted submission stores the session and hands back the plan to launch")
@@ -135,9 +145,7 @@ struct NewSessionModelTests {
     await model.load(defaultWorkingDirectoryPath: "/workspace")
     model.draft.modelID = "opus"
 
-    model.draft.providerID = "codex"
-    await Task.yield()
-    await model.loadModels()
+    await model.select(agent: "codex")
 
     #expect(model.draft.modelID == nil)
   }

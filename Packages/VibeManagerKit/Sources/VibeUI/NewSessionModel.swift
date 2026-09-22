@@ -34,17 +34,10 @@ public final class NewSessionModel {
   /// turns red while the first character is being typed is a form that nags.
   public private(set) var hasSubmitted = false
 
-  public var draft = SessionDraft() {
-    didSet {
-      guard oldValue != draft else { return }
-      if oldValue.providerID != draft.providerID {
-        draft.modelID = nil
-        Task { await loadModels() }
-      }
-      guard hasSubmitted else { return }
-      Task { await revalidate() }
-    }
-  }
+  /// Edited directly by the sheet's bindings. Reacting to a change is an explicit call rather
+  /// than an observer that fires a detached task: the model list the user sees must follow the
+  /// agent they just picked, not the scheduler.
+  public var draft = SessionDraft()
 
   private let create: CreateSession
   private let registry: any AgentProviderResolving
@@ -109,6 +102,23 @@ public final class NewSessionModel {
     if let modelID = draft.modelID, !models.contains(where: { $0.id == modelID }) {
       draft.modelID = nil
     }
+  }
+
+  /// Picks an agent and lists that agent's models — the two belong together, so no state exists
+  /// where the selected agent and the offered models disagree.
+  public func select(agent id: String) async {
+    guard draft.providerID != id else { return }
+    draft.providerID = id
+    draft.modelID = nil
+    await loadModels()
+    await revalidateIfSubmitted()
+  }
+
+  /// Called by the sheet whenever a field changes: problems refresh as they are fixed, but only
+  /// once the user has actually asked for the session.
+  public func revalidateIfSubmitted() async {
+    guard hasSubmitted else { return }
+    await revalidate()
   }
 
   public func revalidate() async {

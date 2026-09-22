@@ -67,6 +67,9 @@ public struct NewSessionSheet: View {
       .padding(.horizontal, 24)
       .padding(.vertical, 18)
     }
+    .onChange(of: model.draft) {
+      Task { await model.revalidateIfSubmitted() }
+    }
   }
 
   private var nameField: some View {
@@ -109,7 +112,7 @@ public struct NewSessionSheet: View {
           AgentRow(
             agent: agent,
             isSelected: agent.id.rawValue == model.draft.providerID,
-            select: { model.draft.providerID = agent.id.rawValue }
+            select: { Task { await model.select(agent: agent.id.rawValue) } }
           )
         }
         Button("Detect again") {

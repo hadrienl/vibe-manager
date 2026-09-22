@@ -20,15 +20,21 @@ public final class SessionLauncher {
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
 
+  /// How long a launch waits for the pane to measure itself before falling back to the spec's
+  /// own size. Long enough for one layout pass, short enough never to feel like a delay.
+  private let viewportTimeout: Duration
+
   public init(
     supervisor: any TerminalSupervisor,
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
-    clock: any SessionClock = SystemSessionClock()
+    clock: any SessionClock = SystemSessionClock(),
+    viewportTimeout: Duration = .milliseconds(500)
   ) {
     self.supervisor = supervisor
     self.repository = repository
     self.agents = agents
+    self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
 
@@ -51,7 +57,8 @@ public final class SessionLauncher {
     let pane = TerminalPaneModel(
       sessionID: session.id,
       supervisor: supervisor,
-      spec: .agent(plan: plan)
+      spec: .agent(plan: plan),
+      viewportTimeout: viewportTimeout
     )
     panes[session.id] = pane
     await pane.start()

@@ -16,24 +16,26 @@ public struct TerminalPaneView: View {
 
   public var body: some View {
     VStack(spacing: 0) {
-      Group {
-        if let session = model.session {
-          TerminalSurface(session: session)
-        } else if let failure = model.failure {
-          ContentUnavailableView {
-            Label("Terminal unavailable", systemImage: "exclamationmark.triangle")
-          } description: {
-            Text(failure.message)
-          } actions: {
-            Button("Try Again") {
-              Task { await model.start() }
+      // The surface is mounted from the start: its measured size is what the process is
+      // launched with, so it has to exist before there is a process to show.
+      TerminalSurface(pane: model, session: model.session)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay {
+          if let failure = model.failure {
+            ContentUnavailableView {
+              Label("Terminal unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+              Text(failure.message)
+            } actions: {
+              Button("Try Again") {
+                Task { await model.start() }
+              }
             }
+            .background(.background)
+          } else if model.session == nil {
+            ProgressView("Starting terminal…")
           }
-        } else {
-          ProgressView("Starting terminal…")
         }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       Divider()
       TerminalStatusBar(

@@ -35,7 +35,8 @@ struct SessionLauncherTests {
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
-      agents: EmptyRegistry()
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero
     )
     let session = await repository.sessions().first!
 
@@ -51,7 +52,8 @@ struct SessionLauncherTests {
     let launcher = SessionLauncher(
       supervisor: SpySupervisor(),
       repository: repository,
-      agents: EmptyRegistry()
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero
     )
     let session = await repository.sessions().first!
 
@@ -68,7 +70,8 @@ struct SessionLauncherTests {
     let launcher = SessionLauncher(
       supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35)),
       repository: repository,
-      agents: EmptyRegistry()
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero
     )
     let session = await repository.sessions().first!
 
@@ -107,7 +110,8 @@ struct SessionLauncherTests {
     let launcher = SessionLauncher(
       supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35)),
       repository: repository,
-      agents: EmptyRegistry()
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero
     )
     let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
 

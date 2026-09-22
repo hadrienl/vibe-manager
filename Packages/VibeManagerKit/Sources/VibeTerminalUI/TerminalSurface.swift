@@ -1,18 +1,23 @@
 import SwiftTerm
 import SwiftUI
 import VibeApplication
+import VibeDomain
 
-// The only place that knows about the emulator. Views above it see a session and a state, never
-// a descriptor, a process identifier or a SwiftTerm type.
+/// The terminal view, mounted before the process exists.
+///
+/// It has to be: its own layout is what tells the pane how many columns and rows the agent will
+/// be started with. Until a session appears it simply has nothing to display.
 public struct TerminalSurface: NSViewRepresentable {
-  private let session: any TerminalSession
+  private let pane: TerminalPaneModel
+  private let session: (any TerminalSession)?
 
-  public init(session: any TerminalSession) {
+  public init(pane: TerminalPaneModel, session: (any TerminalSession)?) {
+    self.pane = pane
     self.session = session
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
-    TerminalSurfaceCoordinator(session: session)
+    TerminalSurfaceCoordinator(pane: pane)
   }
 
   public func makeNSView(context: Context) -> TerminalView {
@@ -23,7 +28,10 @@ public struct TerminalSurface: NSViewRepresentable {
     return view
   }
 
-  public func updateNSView(_ nsView: TerminalView, context: Context) {}
+  public func updateNSView(_ nsView: TerminalView, context: Context) {
+    guard let session else { return }
+    context.coordinator.attachIfNeeded(to: session)
+  }
 
   public static func dismantleNSView(
     _ nsView: TerminalView,
@@ -33,9 +41,6 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 }
 
-// Input and resizes reach the session through one serial channel. Unstructured tasks have no
-// ordering guarantee between them, so a task per delegate callback would let fast typing, a pasted
-// chunk split across several callbacks, or two resizes during a window drag arrive out of order.
 private enum TerminalCommand: Sendable {
   case write([UInt8])
   case resize(TerminalSize)
@@ -43,14 +48,15 @@ private enum TerminalCommand: Sendable {
 
 @MainActor
 public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
-  private let session: any TerminalSession
+  private let pane: TerminalPaneModel
   private weak var view: TerminalView?
   private var eventTask: Task<Void, Never>?
+  private var attachedSessionID: SessionID?
   private let commands: AsyncStream<TerminalCommand>.Continuation
   private let commandTask: Task<Void, Never>
 
-  init(session: any TerminalSession) {
-    self.session = session
+  init(pane: TerminalPaneModel) {
+    self.pane = pane
 
     var continuation: AsyncStream<TerminalCommand>.Continuation?
     let stream = AsyncStream<TerminalCommand> { continuation = $0 }
@@ -58,13 +64,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       preconditionFailure("AsyncStream did not provide a continuation")
     }
     commands = continuation
-    commandTask = Task { [session] in
+    // One consumer, one order: keystrokes and resizes reach the process in the order the user
+    // made them, and a size measured before the process exists is remembered rather than lost.
+    commandTask = Task { @MainActor [pane] in
       for await command in stream {
         switch command {
         case .write(let bytes):
-          await session.write(bytes)
+          await pane.write(bytes)
         case .resize(let size):
-          await session.resize(to: size)
+          await pane.reportViewportSize(size)
         }
       }
     }
@@ -77,11 +85,14 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   func bind(to view: TerminalView) {
     self.view = view
+  }
+
+  func attachIfNeeded(to session: any TerminalSession) {
+    guard attachedSessionID != session.id else { return }
+    attachedSessionID = session.id
     eventTask?.cancel()
     eventTask = Task { [session] in
       let attachment = await session.attach()
-      // The backlog is replayed first so that a view created after the process started shows
-      // what has already been printed.
       feed(attachment.history.bytes)
       for await event in attachment.events {
         guard !Task.isCancelled else { return }
@@ -95,6 +106,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func unbind() {
     eventTask?.cancel()
     eventTask = nil
+    attachedSessionID = nil
     view = nil
   }
 

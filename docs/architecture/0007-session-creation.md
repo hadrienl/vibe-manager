@@ -94,6 +94,24 @@ each terminal's state and scroll across tab changes.
 Relaunching a session that is already running is refused rather than queued: two presses of
 Create, or a restore that overlaps a running session, must not fork two agents.
 
+### The agent is started at the size it will be shown in
+
+A terminal program reads its size once, at startup, and draws itself around it. Spawning at 80×24
+and resizing a moment later leaves the agent's first screen — its banner, its prompt box — laid
+out for a terminal that never existed, and no later `SIGWINCH` repaints what is already drawn.
+
+So the surface is mounted before there is a process: its own layout is what tells the pane how
+many columns and rows to start with. The wait is bounded to half a second — if nothing has
+measured itself by then the spec's size is used, because a launch that hangs waiting for a view
+would be worse than a launch that is merely narrow.
+
+### The offered models follow the selected agent, without a scheduler in between
+
+Reacting to a change of agent through a property observer meant a detached task, and a window
+where the selected agent and the listed models disagreed. That window was not theoretical: the
+test that covered it passed alone and failed in a full run. Picking an agent is now one call that
+sets the agent, drops a model the new one does not offer, and loads the new list.
+
 ### Watching a launch without knowing which CLI it is
 
 `AgentLaunchObserver` is the seam ADR 0006 promised. Claude Code stores the identifier its plan
