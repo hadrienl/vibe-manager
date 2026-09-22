@@ -10,6 +10,13 @@ public struct CommandLineAgentSpecification: Sendable {
   public let candidateDirectories: [String]
   public let versionArguments: [String]
   public let versionTimeout: Duration
+  /// Budget of the second chance given to a version probe that did not answer in time.
+  ///
+  /// A timeout is an absence of answer, not a diagnostic. At first launch the binary is not in
+  /// the disk cache yet and the machine is still starting the application, so the usual budget
+  /// can lapse on a CLI that is perfectly installed. The retry is wider because it is the one
+  /// that has to conclude.
+  public let versionRetryTimeout: Duration
   /// Optional command whose exit code hints at the sign in state. Never reads a token.
   public let authenticationArguments: [String]?
   /// Extra environment keys this CLI needs on top of the shared allow list.
@@ -30,6 +37,7 @@ public struct CommandLineAgentSpecification: Sendable {
     candidateDirectories: [String] = CommandLineAgentSpecification.defaultCandidateDirectories,
     versionArguments: [String] = ["--version"],
     versionTimeout: Duration = .seconds(5),
+    versionRetryTimeout: Duration = .seconds(10),
     authenticationArguments: [String]? = nil,
     additionalEnvironmentKeys: Set<String> = [],
     documentationURL: URL? = nil,
@@ -41,6 +49,9 @@ public struct CommandLineAgentSpecification: Sendable {
     self.candidateDirectories = candidateDirectories
     self.versionArguments = versionArguments
     self.versionTimeout = versionTimeout
+    // A retry narrower than the first attempt would concede defeat faster than the attempt it
+    // is meant to rescue.
+    self.versionRetryTimeout = max(versionRetryTimeout, versionTimeout)
     self.authenticationArguments = authenticationArguments
     self.additionalEnvironmentKeys = additionalEnvironmentKeys
     self.documentationURL = documentationURL

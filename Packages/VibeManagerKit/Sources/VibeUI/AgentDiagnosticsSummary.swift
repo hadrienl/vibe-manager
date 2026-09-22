@@ -58,7 +58,8 @@ struct AgentDiagnosticsSummary: View {
     case .unauthenticated: return "person.crop.circle.badge.questionmark"
     case .outdated: return "arrow.up.circle"
     case .notFound, .notExecutable: return "questionmark.circle"
-    case .probeFailed: return "exclamationmark.triangle"
+    case .probeFailed(let reason):
+      return reason.isTransient ? "clock.badge.exclamationmark" : "exclamationmark.triangle"
     }
   }
 
@@ -66,7 +67,10 @@ struct AgentDiagnosticsSummary: View {
     switch state {
     case .available: return .green
     case .unauthenticated, .outdated: return .orange
-    case .notFound, .notExecutable, .probeFailed: return .secondary
+    // A pending answer is worth an eye, not an alarm; a real failure keeps the quiet grey of
+    // something the user has to go and fix.
+    case .probeFailed(let reason): return reason.isTransient ? .orange : .secondary
+    case .notFound, .notExecutable: return .secondary
     }
   }
 }

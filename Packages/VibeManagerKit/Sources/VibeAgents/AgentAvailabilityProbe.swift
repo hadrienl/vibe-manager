@@ -11,6 +11,7 @@ public actor AgentAvailabilityProbe {
   private let probe: any ProcessProbe
   private let environment: [String: String]
   private let timeToLive: Duration
+  private let failureTimeToLive: Duration
   private let now: @Sendable () -> Date
 
   private var cached: AgentAvailability?
@@ -27,6 +28,7 @@ public actor AgentAvailabilityProbe {
     probe: any ProcessProbe,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     timeToLive: Duration = .seconds(300),
+    failureTimeToLive: Duration = .seconds(20),
     now: @escaping @Sendable () -> Date = Date.init
   ) {
     self.descriptor = descriptor
@@ -35,6 +37,8 @@ public actor AgentAvailabilityProbe {
     self.probe = probe
     self.environment = environment
     self.timeToLive = timeToLive
+    // Holding on to a non answer longer than to a real one would be the wrong way round.
+    self.failureTimeToLive = min(failureTimeToLive, timeToLive)
     self.now = now
   }
 
@@ -62,7 +66,7 @@ public actor AgentAvailabilityProbe {
     }
 
     while true {
-      if let cached, let cachedAt, !isExpired(cachedAt) {
+      if let cached, let cachedAt, !isExpired(cachedAt, for: cached.state) {
         return cached
       }
 
@@ -100,8 +104,15 @@ public actor AgentAvailabilityProbe {
     }
   }
 
-  private func isExpired(_ date: Date) -> Bool {
-    now().timeIntervalSince(date) >= timeToLive.seconds
+  private func isExpired(_ date: Date, for state: AgentAvailabilityState) -> Bool {
+    now().timeIntervalSince(date) >= lifetime(of: state).seconds
+  }
+
+  /// A transient failure is remembered just long enough to keep a redrawn window from spawning
+  /// a process, and not long enough to outlive the slow start that caused it.
+  private func lifetime(of state: AgentAvailabilityState) -> Duration {
+    guard case .probeFailed(let reason) = state, reason.isTransient else { return timeToLive }
+    return failureTimeToLive
   }
 
   private static func detect(
@@ -169,19 +180,41 @@ public actor AgentAvailabilityProbe {
     now: @Sendable () -> Date
   ) async -> AgentAvailability {
     let hints = AgentRemediationHints(specification: specification)
-    let result: ProbeResult
-    do {
-      result = try await probe.run(
-        executablePath: path,
-        arguments: specification.versionArguments,
-        environment: AgentEnvironmentPolicy.environment(
-          base: environment,
-          additionalKeys: specification.additionalEnvironmentKeys
-        ),
-        workingDirectoryPath: nil,
-        timeout: specification.versionTimeout
+    var outcome = await versionProbeOutcome(
+      specification: specification,
+      probe: probe,
+      environment: environment,
+      path: path,
+      timeout: specification.versionTimeout
+    )
+    if case .timedOut = outcome {
+      // A timeout is not an answer, so it is not a verdict either. The second attempt runs on a
+      // wider budget and against a binary the first one has just warmed up; only its silence
+      // says anything about the installation.
+      outcome = await versionProbeOutcome(
+        specification: specification,
+        probe: probe,
+        environment: environment,
+        path: path,
+        timeout: specification.versionRetryTimeout
       )
-    } catch is CancellationError, ProbeError.cancelled {
+    }
+
+    let result: ProbeResult
+    switch outcome {
+    case .answered(let answer):
+      result = answer
+    case .timedOut:
+      return AgentDiagnosticFactory.availability(
+        descriptor: descriptor,
+        state: .probeFailed(reason: .timedOut),
+        // The path is kept: an export of a failing probe is useless without it.
+        installation: located(path: path, source: source, now: now),
+        detail: "\(specification.binaryName) did not answer --version in time, twice.",
+        at: now(),
+        hints: hints
+      )
+    case .cancelled:
       return AgentDiagnosticFactory.availability(
         descriptor: descriptor,
         state: .probeFailed(reason: .cancelled),
@@ -190,7 +223,7 @@ public actor AgentAvailabilityProbe {
         at: now(),
         hints: hints
       )
-    } catch {
+    case .notStarted:
       return AgentDiagnosticFactory.availability(
         descriptor: descriptor,
         state: .probeFailed(reason: .failed(exitCode: -1)),
@@ -201,17 +234,6 @@ public actor AgentAvailabilityProbe {
       )
     }
 
-    guard !result.didTimeOut else {
-      return AgentDiagnosticFactory.availability(
-        descriptor: descriptor,
-        state: .probeFailed(reason: .timedOut),
-        // The path is kept: an export of a failing probe is useless without it.
-        installation: located(path: path, source: source, now: now),
-        detail: "\(specification.binaryName) did not answer --version in time.",
-        at: now(),
-        hints: hints
-      )
-    }
     guard result.exitCode == 0 else {
       return AgentDiagnosticFactory.availability(
         descriptor: descriptor,
@@ -272,6 +294,43 @@ public actor AgentAvailabilityProbe {
       at: now(),
       hints: hints
     )
+  }
+
+  /// What one attempt at reading the version produced.
+  ///
+  /// Only `timedOut` is worth another attempt: an exit code, a refusal to start and a
+  /// cancellation are all answers, and repeating them would only double the wait.
+  private enum VersionProbeOutcome {
+    case answered(ProbeResult)
+    case timedOut
+    case cancelled
+    case notStarted
+  }
+
+  private static func versionProbeOutcome(
+    specification: CommandLineAgentSpecification,
+    probe: any ProcessProbe,
+    environment: [String: String],
+    path: String,
+    timeout: Duration
+  ) async -> VersionProbeOutcome {
+    do {
+      let result = try await probe.run(
+        executablePath: path,
+        arguments: specification.versionArguments,
+        environment: AgentEnvironmentPolicy.environment(
+          base: environment,
+          additionalKeys: specification.additionalEnvironmentKeys
+        ),
+        workingDirectoryPath: nil,
+        timeout: timeout
+      )
+      return result.didTimeOut ? .timedOut : .answered(result)
+    } catch is CancellationError, ProbeError.cancelled {
+      return .cancelled
+    } catch {
+      return .notStarted
+    }
   }
 
   /// A located but unusable binary, so a failing diagnostic still says where it is.
@@ -369,8 +428,17 @@ enum AgentDiagnosticFactory {
       return "The \(descriptor.displayName) command exists but cannot be run."
     case .unauthenticated:
       return "\(descriptor.displayName) is installed but not signed in."
-    case .probeFailed:
-      return "\(descriptor.displayName) could not be inspected."
+    case .probeFailed(let reason):
+      // Saying "could not be inspected" about a command that simply stayed silent describes a
+      // broken installation the user does not have.
+      switch reason {
+      case .timedOut:
+        return "\(descriptor.displayName) did not answer in time."
+      case .cancelled:
+        return "The \(descriptor.displayName) check was interrupted."
+      case .failed:
+        return "\(descriptor.displayName) could not be inspected."
+      }
     }
   }
 
@@ -394,8 +462,11 @@ enum AgentDiagnosticFactory {
       return [.defineExecutablePath, .retryDetection]
     case .unauthenticated:
       return [.authenticate(command: hints.authenticationCommandLine), .retryDetection]
-    case .probeFailed:
-      return [.defineExecutablePath, .retryDetection]
+    case .probeFailed(let reason):
+      // Retrying explains nothing anywhere else, so it comes last. Here it is the explanation.
+      return reason.isTransient
+        ? [.retryDetection, .defineExecutablePath]
+        : [.defineExecutablePath, .retryDetection]
     }
   }
 }

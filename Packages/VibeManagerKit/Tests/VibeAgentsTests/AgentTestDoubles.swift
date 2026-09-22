@@ -27,6 +27,7 @@ final class StubProcessProbe: ProcessProbe, @unchecked Sendable {
   struct Invocation: Sendable, Equatable {
     let executablePath: String
     let arguments: [String]
+    let timeout: Duration
   }
 
   private let lock = NSLock()
@@ -54,8 +55,53 @@ final class StubProcessProbe: ProcessProbe, @unchecked Sendable {
     timeout: Duration
   ) async throws -> ProbeResult {
     let response = lock.withLock {
-      recorded.append(Invocation(executablePath: executablePath, arguments: arguments))
+      recorded.append(
+        Invocation(executablePath: executablePath, arguments: arguments, timeout: timeout)
+      )
       return responses[executablePath] ?? defaultResponse
+    }
+
+    switch response {
+    case .success(let result): return result
+    case .failure(let error): throw error
+    }
+  }
+}
+
+/// Answers a different result on each call, so a retry can be observed succeeding where the
+/// attempt before it stayed silent.
+final class ScriptedProcessProbe: ProcessProbe, @unchecked Sendable {
+  private let lock = NSLock()
+  private var responses: [Result<ProbeResult, ProbeError>]
+  private let last: Result<ProbeResult, ProbeError>
+  private var recorded: [StubProcessProbe.Invocation] = []
+
+  init(responses: [Result<ProbeResult, ProbeError>]) {
+    precondition(!responses.isEmpty)
+    self.responses = responses
+    last = responses[responses.count - 1]
+  }
+
+  var invocations: [StubProcessProbe.Invocation] {
+    lock.withLock { recorded }
+  }
+
+  func run(
+    executablePath: String,
+    arguments: [String],
+    environment: [String: String],
+    workingDirectoryPath: String?,
+    timeout: Duration
+  ) async throws -> ProbeResult {
+    let response = lock.withLock {
+      recorded.append(
+        StubProcessProbe.Invocation(
+          executablePath: executablePath,
+          arguments: arguments,
+          timeout: timeout
+        )
+      )
+      return responses.isEmpty ? last : responses.removeFirst()
     }
 
     switch response {

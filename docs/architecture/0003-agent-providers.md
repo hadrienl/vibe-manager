@@ -54,6 +54,29 @@ a launch.
 expire after a short time to live, and `invalidate()` or a new user defined path clears them.
 Every probe has a timeout and terminates, then kills, a command that hangs.
 
+### A timeout is an absence of answer, not a diagnostic
+
+A version probe that lapses is retried once, on the wider `versionRetryTimeout` budget, and only
+the second silence produces `probeFailed(.timedOut)`. At first launch the binary is not in the
+disk cache yet, the login shell may have been asked where it lives, and the application is still
+starting: the usual budget lapses on installations that are perfectly fine, and the first screen
+then declares a working agent broken. An exit code, a refusal to start and a cancellation are
+answers, so none of them is retried.
+
+For the same reason, a transient failure — `timedOut` or `cancelled` — expires from the cache
+after `failureTimeToLive` rather than the full time to live, so the next screen detects again by
+itself instead of repeating a verdict nobody trusts. It is kept at all only so a redrawn window
+cannot spawn a process on every pass.
+
+`AgentProbeFailure.isTransient` carries that distinction into the presentation: a silent agent
+reads as "did not answer in time" and offers to detect again first, while a failing one keeps
+"could not be inspected" and the remediations that ask the user to go and fix something.
+
+Serialising the startup probes was considered and refused: it turns one budget into one budget
+per provider on a Mac where no agent is installed, to remove a contention that is not the cause.
+Two short processes on a multiple core machine wait on the disk and on a runtime starting, not on
+each other.
+
 ### The registry is the only place a provider is registered
 
 `AgentProviderRegistry` keeps registration order, probes providers concurrently and answers
@@ -86,6 +109,9 @@ in Debug builds only, so a distributed Release never lists it.
 - The `PATH` discovered by the login shell is used to find the binary, not to launch the agent:
   a launched agent still inherits the application `PATH`, so an agent shelling out to `git` or
   `node` may not find them. Propagating the discovered `PATH` belongs to the launch work of #4.
+- A login shell lookup that lapses in `FileSystemExecutableLocator` still degrades to
+  `notFound`, which reads as "was not found on this Mac" — as wrong as the timeout verdict this
+  decision removes, but much rarer. The same reasoning applies to it the day it shows up.
 - `AgentDiagnostic.redact(path:)` abbreviates against `NSHomeDirectory()`, which stops matching
   the day App Sandbox is enabled. Revisit it together with the sandboxing decision of #19.
 
