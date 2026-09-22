@@ -51,7 +51,7 @@ struct PermissionsModelTests {
     let model = makeModel(status: .notGranted, preferences: preferences, opened: opened)
     await model.refresh()
 
-    await model.openSystemSettings()
+    await model.answerStepByOpeningSystemSettings()
 
     #expect(opened.urls == [PermissionsModel.fullDiskAccessSettingsURL])
     #expect(opened.urls.first?.absoluteString.contains("Privacy_AllFiles") == true)
@@ -59,6 +59,26 @@ struct PermissionsModelTests {
     // The step is answered even though the switch itself is flipped elsewhere: coming back to a
     // question the user has already gone to answer would be asking twice.
     #expect(await preferences.dismissals == 1)
+  }
+
+  @Test("The settings window opens the same pane without answering the step")
+  func settingsWindowDoesNotAnswerTheStep() async {
+    // The button in the settings window is reachable before the step has ever been shown. Clicking
+    // it and then changing one's mind must not silence a question that was never asked.
+    let opened = OpenedURLs()
+    let preferences = SpyPreferences()
+    let model = makeModel(status: .notGranted, preferences: preferences, opened: opened)
+
+    model.openSystemSettings()
+
+    #expect(opened.urls == [PermissionsModel.fullDiskAccessSettingsURL])
+    #expect(await preferences.dismissals == 0)
+
+    // The next launch still has the step to show.
+    let next = makeModel(status: .notGranted, preferences: preferences)
+    await next.refresh()
+
+    #expect(next.isPresentingStep)
   }
 
   @Test("Asking the question again never closes a step the user is reading")

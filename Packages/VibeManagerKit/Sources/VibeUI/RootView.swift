@@ -65,7 +65,7 @@ public struct RootView: View {
         if let permissions = model.permissions {
           FullDiskAccessSheet(
             openSystemSettings: {
-              Task { await permissions.openSystemSettings() }
+              Task { await permissions.answerStepByOpeningSystemSettings() }
             },
             skip: { Task { await permissions.skipStep() } }
           )

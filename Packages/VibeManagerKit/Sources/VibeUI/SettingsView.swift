@@ -53,7 +53,7 @@ private struct FullDiskAccessRow: View {
         .fixedSize(horizontal: false, vertical: true)
 
         Button("Open System Settings") {
-          Task { await permissions.openSystemSettings() }
+          permissions.openSystemSettings()
         }
       }
     }

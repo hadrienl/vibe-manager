@@ -59,13 +59,22 @@ public final class PermissionsModel {
     status = await gate.refreshedStatus()
   }
 
-  /// Opens the right pane of System Settings and closes the step.
+  /// Opens the right pane of System Settings, and nothing else.
+  ///
+  /// Reaching that pane is not an answer to the step: the settings window offers the same button,
+  /// and a user who opens it before the step has ever been shown would otherwise lose the step for
+  /// good by clicking there and then changing their mind.
+  public func openSystemSettings() {
+    openURL(Self.fullDiskAccessSettingsURL)
+  }
+
+  /// The step's own default button: opens the pane and closes the step.
   ///
   /// The step does not wait for the user to come back: the switch they are about to flip only
   /// reaches this application at its next launch, so there is nothing here left to wait for.
   /// System Settings offers "Quit & Reopen" itself, and that offer is better placed than ours.
-  public func openSystemSettings() async {
-    openURL(Self.fullDiskAccessSettingsURL)
+  public func answerStepByOpeningSystemSettings() async {
+    openSystemSettings()
     await dismissStep()
   }
 
