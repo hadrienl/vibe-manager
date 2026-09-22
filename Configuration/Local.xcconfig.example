@@ -1,0 +1,11 @@
+// Per-machine signing. Copy this file to Configuration/Local.xcconfig, which is not versioned,
+// and put your own Apple Development team in it.
+//
+// Without it Xcode signs the application ad hoc, and macOS then identifies it by a hash that
+// changes at every build: Full Disk Access, and every folder ever allowed, are forgotten between
+// two compilations. With a stable identity, an access granted once stays granted.
+//
+// Find the identifier with: security find-identity -v -p codesigning
+
+DEVELOPMENT_TEAM = ABCDE12345
+CODE_SIGN_IDENTITY = Apple Development
