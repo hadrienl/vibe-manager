@@ -117,7 +117,9 @@ carry no prompt, token or environment dump.
 
 `MockAgentProvider` runs a bundled `mock-agent.sh`, supports model selection, initial prompt and
 resume, prints a resume identifier and can simulate every availability state. It is registered
-in Debug builds only, so a distributed Release never lists it.
+only when `VIBE_ENABLE_MOCK_AGENT` is set, in any configuration, so neither a distributed Release
+nor an ordinary Debug run ever lists a fake agent beside the real ones. *(Amended by #7: it used
+to be registered by default in Debug.)*
 
 ### Known limits, left open on purpose
 

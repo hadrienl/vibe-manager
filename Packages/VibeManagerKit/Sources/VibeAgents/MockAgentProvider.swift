@@ -49,16 +49,16 @@ public struct MockAgentProvider: AgentProvider {
     Bundle.module.url(forResource: "mock-agent", withExtension: "sh")
   }
 
-  /// Registered only in Debug builds or when the dedicated variable is set, so a distributed
-  /// Release build never lists it.
+  /// Registered only when it is asked for, in any configuration.
+  ///
+  /// It used to appear by default in a Debug build, which put a fake agent in the list next to
+  /// the real ones every time the application was run from Xcode. The exercise it exists for —
+  /// driving the whole chain without Claude, Codex or an account — is deliberate enough to
+  /// deserve an explicit `VIBE_ENABLE_MOCK_AGENT`.
   public static func isEnabled(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> Bool {
-    #if DEBUG
-      return environment["VIBE_DISABLE_MOCK_AGENT"] == nil
-    #else
-      return environment["VIBE_ENABLE_MOCK_AGENT"] != nil
-    #endif
+    environment["VIBE_ENABLE_MOCK_AGENT"] != nil
   }
 
   public func availability(forceRefresh: Bool) async -> AgentAvailability {

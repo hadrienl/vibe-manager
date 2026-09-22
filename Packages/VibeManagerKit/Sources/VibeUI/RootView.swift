@@ -79,14 +79,6 @@ public struct RootView: View {
           }
         }
     }
-    .overlay(alignment: .bottomLeading) {
-      AgentDiagnosticsSummary(
-        diagnostics: model.agentDiagnostics,
-        isRefreshing: model.isRefreshingAgents,
-        refresh: { Task { await model.refreshAgents(forceRefresh: true) } }
-      )
-      .padding()
-    }
   }
 
   @ViewBuilder
