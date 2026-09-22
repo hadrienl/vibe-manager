@@ -39,14 +39,51 @@ extension ProtectedFileLocation {
   ///
   /// A user's own repositories are almost never in one of these, which is why refusing Full Disk
   /// Access is a workable answer rather than a broken application.
+  /// - Parameter isBootVolumeMount: whether a `/Volumes/<name>` mount point is the startup disk.
+  ///   macOS firmlinks the startup volume into `/Volumes` under its own name, so a repository
+  ///   perfectly at home in `/Users` can also be reached as `/Volumes/Macintosh HD/Users/…` —
+  ///   the same folder, announced as "external volumes" unless someone asks which volume it is.
+  ///   Asking reads the mount point's own metadata, never anything inside it, so the rule above
+  ///   still holds: nothing here opens a guarded folder.
   public static func covering(
     path: String,
-    homeDirectoryPath: String = NSHomeDirectory()
+    homeDirectoryPath: String = NSHomeDirectory(),
+    isBootVolumeMount: (String) -> Bool = ProtectedFileLocation.mountIsBootVolume
   ) -> ProtectedFileLocation? {
     let candidate = (path as NSString).standardizingPath
     return allCases.first { location in
       let root = location.rootPath(homeDirectoryPath: homeDirectoryPath)
-      return candidate == root || candidate.hasPrefix(root + "/")
+      guard isWithin(candidate, root: root) else { return false }
+      guard location == .externalVolume, let mount = mountPoint(of: candidate) else { return true }
+      return !isBootVolumeMount(mount)
     }
+  }
+
+  /// Compared without regard to case, because the volumes these folders live on almost never keep
+  /// any. `~/documents/notes` is the Documents folder — typed that way it is just as guarded, and
+  /// a warning that goes missing because of a lowercase "d" is a warning that failed.
+  private static func isWithin(_ candidate: String, root: String) -> Bool {
+    let candidate = candidate.lowercased()
+    let root = root.lowercased()
+    return candidate == root || candidate.hasPrefix(root + "/")
+  }
+
+  /// `/Volumes/Backup/repo` → `/Volumes/Backup`. Nil when the path names no volume at all.
+  private static func mountPoint(of path: String) -> String? {
+    let components = path.split(separator: "/", omittingEmptySubsequences: true)
+    guard components.count >= 2 else { return nil }
+    return "/" + components[0] + "/" + components[1]
+  }
+
+  /// Whether a mount point is the startup volume, asked of the filesystem because no path can
+  /// answer it: a firmlink leaves no trace in the name.
+  public static func mountIsBootVolume(_ mountPath: String) -> Bool {
+    let keys: Set<URLResourceKey> = [.volumeIdentifierKey]
+    guard
+      let mounted = try? URL(fileURLWithPath: mountPath).resourceValues(forKeys: keys)
+        .volumeIdentifier,
+      let boot = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys).volumeIdentifier
+    else { return false }
+    return mounted.isEqual(boot)
   }
 }

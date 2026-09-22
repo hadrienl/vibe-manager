@@ -27,7 +27,32 @@ struct ProtectedFileLocationTests {
     #expect(covering("/Users/tester/DesktopBackup") == nil)
   }
 
-  private func covering(_ path: String) -> ProtectedFileLocation? {
-    ProtectedFileLocation.covering(path: path, homeDirectoryPath: home)
+  @Test("The same folder typed in another case is the same guarded folder")
+  func matchingIgnoresCase() {
+    // The volume these live on keeps no case, so `~/documents` opens Documents. A warning lost to
+    // a lowercase letter is a warning that failed.
+    #expect(covering("/Users/tester/documents/notes") == .documents)
+    #expect(covering("/users/tester/Desktop") == .desktop)
+    #expect(covering("/Users/tester/library/mobile documents") == .iCloudDrive)
+  }
+
+  @Test("The startup disk reached through /Volumes is not an external volume")
+  func theBootVolumeIsNotExternal() {
+    // macOS firmlinks the startup volume into /Volumes under its own name: the very same folder,
+    // announced as external unless someone asks which volume it is.
+    let boot = "/Volumes/Macintosh HD"
+    #expect(covering(boot + "/Users/tester/Code", bootMount: boot) == nil)
+    #expect(covering("/Volumes/Backup/repo", bootMount: boot) == .externalVolume)
+  }
+
+  private func covering(
+    _ path: String,
+    bootMount: String? = nil
+  ) -> ProtectedFileLocation? {
+    ProtectedFileLocation.covering(
+      path: path,
+      homeDirectoryPath: home,
+      isBootVolumeMount: { $0 == bootMount }
+    )
   }
 }
