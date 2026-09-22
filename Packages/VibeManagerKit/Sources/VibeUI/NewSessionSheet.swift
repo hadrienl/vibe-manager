@@ -183,7 +183,11 @@ public struct NewSessionSheet: View {
   }
 
   private var folderField: some View {
-    LabeledField("Working folder", issues: model.issues(for: .workingDirectory)) {
+    LabeledField(
+      "Working folder",
+      help: model.protectedLocationNotice,
+      issues: model.issues(for: .workingDirectory)
+    ) {
       HStack(spacing: 8) {
         TextField(
           "Choose a folder",
@@ -269,7 +273,7 @@ public struct NewSessionSheet: View {
       panel.directoryURL = URL(fileURLWithPath: path, isDirectory: true)
     }
     guard panel.runModal() == .OK, let url = panel.url else { return }
-    model.draft.workingDirectoryPath = url.path
+    Task { await model.folderChosen(url.path) }
   }
 }
 

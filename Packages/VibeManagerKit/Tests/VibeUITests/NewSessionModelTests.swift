@@ -123,11 +123,14 @@ struct NewSessionModelTests {
 
   @Test("A burst of keystrokes is checked once, when the typing stops")
   func revalidationIsDebounced() async throws {
-    let folders = CountingFolders()
-    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(40))
+    let plans = PlanCounter()
+    let model = makeModel(
+      providers: [StubProvider(id: "claude-code", state: .available, plans: plans)],
+      revalidationDelay: .milliseconds(40)
+    )
     await model.load(defaultWorkingDirectoryPath: "/workspace")
     _ = await model.submit()
-    await folders.reset()
+    let beforeTyping = await plans.count
 
     for character in "Refactor the webhook" {
       model.draft.name.append(character)
@@ -135,8 +138,96 @@ struct NewSessionModelTests {
     }
     try await Task.sleep(for: .milliseconds(300))
 
-    #expect(await folders.count == 1)
+    #expect(await plans.count == beforeTyping + 1)
     #expect(model.issues.isEmpty)
+  }
+
+  @Test("Typing a path never opens it: that is what raises a system alert")
+  func typingAPathDoesNotReadTheDisk() async throws {
+    let folders = CountingFolders()
+    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(40))
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor the webhook"
+    model.draft.workingDirectoryPath = "/workspace"
+    _ = await model.submit()
+    await folders.reset()
+
+    for character in "/Documents/notes" {
+      model.draft.workingDirectoryPath?.append(character)
+      model.draftChanged()
+    }
+    try await Task.sleep(for: .milliseconds(300))
+
+    #expect(await folders.count == 0)
+  }
+
+  @Test("The folder designated in the open panel is the one that gets checked")
+  func choosingAFolderChecksIt() async {
+    let folders = CountingFolders()
+    let model = makeModel(folders: folders)
+    await model.load(defaultWorkingDirectoryPath: nil)
+
+    await model.folderChosen("/workspace")
+
+    #expect(model.draft.workingDirectoryPath == "/workspace")
+    #expect(await folders.count == 1)
+  }
+
+  @Test("A folder that cannot be read is said at once, and nothing else is")
+  func chosenFolderReportsItsOwnProblem() async {
+    let model = makeModel(folder: .missing)
+    await model.load(defaultWorkingDirectoryPath: nil)
+
+    await model.folderChosen("/gone")
+
+    #expect(model.issues == [.workingDirectoryNotFound])
+    // The name has not been typed yet, and the sheet does not turn red over it.
+    #expect(model.issues(for: .name).isEmpty)
+  }
+
+  @Test("Editing the path afterwards drops a verdict that no longer judges it")
+  func editingThePathClearsTheChosenFolderVerdict() async {
+    let model = makeModel(folder: .missing)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.folderChosen("/gone")
+    #expect(!model.issues.isEmpty)
+
+    model.draft.workingDirectoryPath = "/gone/elsewhere"
+    model.draftChanged()
+
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("A folder macOS guards is remarked upon, and never blocks creation")
+  func protectedFolderIsARemark() async {
+    let model = makeModel()
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor the webhook"
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
+
+    #expect(model.protectedLocationNotice != nil)
+    #expect(model.canSubmit)
+
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Code/vibe-manager"
+    #expect(model.protectedLocationNotice == nil)
+  }
+
+  @Test("With the access granted, there is nothing left to remark upon")
+  func grantedAccessSaysNothing() async {
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let model = NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(),
+        agents: registry,
+        folders: StubFolders(status: .usable)
+      ),
+      registry: registry,
+      isFullDiskAccessGranted: true
+    )
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
+
+    #expect(model.protectedLocationNotice == nil)
   }
 
   @Test("A verdict on a draft the user has already moved past is dropped")
@@ -226,12 +317,26 @@ private actor SpyRepository: SessionRepository {
   }
 }
 
+/// Counts the checks that reach the agent, which is what a revalidation costs now that the
+/// working folder is left alone until the user designates one.
+private actor PlanCounter {
+  private(set) var count = 0
+
+  func record() { count += 1 }
+}
+
 private struct StubProvider: AgentProvider {
   let descriptor: AgentDescriptor
   let state: AgentAvailabilityState
   let catalog: [AgentModel]
+  let plans: PlanCounter?
 
-  init(id: String, state: AgentAvailabilityState, models: [AgentModel] = []) {
+  init(
+    id: String,
+    state: AgentAvailabilityState,
+    models: [AgentModel] = [],
+    plans: PlanCounter? = nil
+  ) {
     descriptor = AgentDescriptor(
       id: AgentProviderID(id),
       displayName: id,
@@ -243,6 +348,7 @@ private struct StubProvider: AgentProvider {
     )
     self.state = state
     catalog = models
+    self.plans = plans
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
@@ -263,7 +369,8 @@ private struct StubProvider: AgentProvider {
   func models() async -> [AgentModel] { catalog }
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    AgentLaunchPlan(
+    await plans?.record()
+    return AgentLaunchPlan(
       providerID: descriptor.id,
       executablePath: "/usr/bin/true",
       arguments: [],

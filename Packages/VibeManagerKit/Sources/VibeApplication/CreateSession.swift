@@ -45,14 +45,23 @@ public struct CreateSession: Sendable {
   }
 
   /// Everything wrong with this draft right now, without creating anything.
-  public func problems(with draft: SessionDraft) async -> [SessionDraftIssue] {
-    await evaluate(draft).issues
+  ///
+  /// The working folder is only opened when `checkingFolder` is asked for, and the default is to
+  /// leave it alone. Typing a path is not a request to read it: on a Mac, opening `~/Documents`
+  /// raises a system consent alert, and doing that on every keystroke put the alert in the middle
+  /// of the form. The folder is checked where the user actually designates one — at the return of
+  /// the open panel, and at creation.
+  public func problems(
+    with draft: SessionDraft,
+    checkingFolder: Bool = false
+  ) async -> [SessionDraftIssue] {
+    await evaluate(draft, checkingFolder: checkingFolder).issues
   }
 
   public func callAsFunction(_ draft: SessionDraft) async throws -> SessionCreation {
     // Re-checked here rather than trusted from the sheet: a CLI can be uninstalled, and a folder
     // deleted, between the moment the form was filled and the moment Create is pressed.
-    let (issues, plan) = await evaluate(draft)
+    let (issues, plan) = await evaluate(draft, checkingFolder: true)
     guard issues.isEmpty, let plan else {
       throw SessionCreationRejected(issues: issues)
     }
@@ -69,19 +78,21 @@ public struct CreateSession: Sendable {
   /// its sentence, so a repeat would collide in the lists the sheet renders and would be counted
   /// twice in its footer.
   private func evaluate(
-    _ draft: SessionDraft
+    _ draft: SessionDraft,
+    checkingFolder: Bool
   ) async -> (issues: [SessionDraftIssue], plan: AgentLaunchPlan?) {
-    let outcome = await assess(draft)
+    let outcome = await assess(draft, checkingFolder: checkingFolder)
     var seen: Set<SessionDraftIssue.ID> = []
     return (outcome.issues.filter { seen.insert($0.id).inserted }, outcome.plan)
   }
 
   private func assess(
-    _ draft: SessionDraft
+    _ draft: SessionDraft,
+    checkingFolder: Bool
   ) async -> (issues: [SessionDraftIssue], plan: AgentLaunchPlan?) {
     var issues = draft.validate()
 
-    if let path = draft.resolvedWorkingDirectoryPath, path.hasPrefix("/") {
+    if checkingFolder, let path = draft.resolvedWorkingDirectoryPath, path.hasPrefix("/") {
       switch await folders.inspect(path: path) {
       case .usable:
         break

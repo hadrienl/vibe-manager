@@ -54,7 +54,10 @@ struct CreateSessionTests {
     await #expect(throws: SessionCreationRejected.self) {
       try await create(self.draft())
     }
-    #expect(await create.problems(with: draft()).contains(.workingDirectoryNotFound))
+    #expect(
+      await create.problems(with: draft(), checkingFolder: true)
+        .contains(.workingDirectoryNotFound)
+    )
     #expect(await repository.savedSessions.isEmpty)
   }
 
@@ -62,7 +65,43 @@ struct CreateSessionTests {
   func fileInsteadOfFolder() async {
     let (create, _) = makeSubject(folder: .notADirectory)
 
-    #expect(await create.problems(with: draft()).contains(.workingDirectoryNotADirectory))
+    #expect(
+      await create.problems(with: draft(), checkingFolder: true)
+        .contains(.workingDirectoryNotADirectory)
+    )
+  }
+
+  @Test("Validating a draft never opens the working folder")
+  func validationDoesNotTouchTheDisk() async {
+    // Opening a protected folder — Desktop, Documents, Downloads — is what raises a macOS consent
+    // alert, and validation runs while the user types. The folder is only looked at where they
+    // designated one, and at creation.
+    let folders = CountingFolders()
+    let create = CreateSession(
+      repository: SpyRepository(),
+      agents: StubRegistry(providers: [StubProvider()]),
+      folders: folders,
+      clock: FixedClock()
+    )
+
+    _ = await create.problems(with: draft())
+
+    #expect(await folders.inspections.isEmpty)
+  }
+
+  @Test("Creating a session does open it, so a folder that disappeared is caught")
+  func creationTouchesTheDiskOnce() async throws {
+    let folders = CountingFolders()
+    let create = CreateSession(
+      repository: SpyRepository(),
+      agents: StubRegistry(providers: [StubProvider()]),
+      folders: folders,
+      clock: FixedClock()
+    )
+
+    _ = try await create(draft())
+
+    #expect(await folders.inspections == ["/workspace"])
   }
 
   @Test("An agent that became unusable between the form and Create blocks the launch")
@@ -162,6 +201,15 @@ struct CreateSessionTests {
 
 private struct FixedClock: SessionClock {
   func now() -> Date { Date(timeIntervalSince1970: 1_700_000_000) }
+}
+
+private actor CountingFolders: WorkingDirectoryProbe {
+  private(set) var inspections: [String] = []
+
+  func inspect(path: String) async -> WorkingDirectoryStatus {
+    inspections.append(path)
+    return .usable
+  }
 }
 
 private struct StubFolders: WorkingDirectoryProbe {
