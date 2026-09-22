@@ -21,10 +21,19 @@ therefore not a form to fill in again but a plan to rebuild from what is stored.
 The user presses **Restart**. Underneath, `SessionRestartMode` records which of four things that
 turned out to be:
 
-- `firstLaunch` — the session was created and never ran (`closedAt == nil`). Nothing to resume,
+- `firstLaunch` — the session was created and never ran (`startedAt == nil`). Nothing to resume,
   nothing to summarise: it gets the launch it never had, initial prompt included. The command even
   calls itself **Start Session** there, because promising a *re*start on the first run is a false
   sentence.
+
+  The fact is recorded, not derived. A created session is stored *closed*, with its whole
+  lifecycle sitting on its creation date, so `closedAt` cannot tell a session that never ran from
+  one that was worked in and closed — keyed on `closedAt == nil` this mode was unreachable, and a
+  session whose very first launch had failed was restarted with a summary apologising for a
+  conversation that never existed. `SessionLifecycle.startedAt` is written by the first `reopen`
+  and never overwritten; a store written before it existed has it inferred from the rest of the
+  lifecycle, where only one shape — created, closed on the same instant, untouched since — means
+  "never launched".
 - `native(identifier:)` — the agent's own conversation is resumed, and **no prompt is sent**. The
   conversation already contains the instruction that started it; handing it back would set the
   agent off on a days-old brief a second time.
@@ -122,9 +131,13 @@ before a detection and a launch plan — seconds, on a cold cache. The store is 
 once before the process is spawned, and once when `reopen` comes back refused. A refusal means the
 session moved while the launch was under way, and archived is the case that cannot be let through —
 the pane is disposed and the process stopped, because "nothing stays attached to an archived
-session" is worth nothing if a launch a moment too late can break it in silence. Any other refusal
-leaves the process alone: a session stored active with nothing running is #11's problem, and killing
-an agent to tidy a status would be the worse mistake.
+session" is worth nothing if a launch a moment too late can break it in silence.
+
+One refusal is harmless and one only: the session is already `active`, because another path opened
+it first. Everything else — a write that failed, a store that would not answer — is treated like
+the archive: the pane is disposed and the process stopped. Letting those through left a live agent
+attached to a session the store still called closed, and nothing reconciled it, because the exit's
+own `close` was refused for the same reason and discarded.
 
 ### A separator that was never earned is thrown away
 
@@ -145,18 +158,65 @@ The pane is reused, so the previous agent's output stays above the next one's �
 buffer make yesterday's output read as today's. It names the mode, so a user who reads "new
 process" knows the agent above has been told none of it.
 
-### A ghost resume is offered a way out, not given one
+### A ghost resume is remembered, and told at the next restart
 
-`claude --resume <uuid>` whose transcript was deleted exits within seconds; no check is possible
-beforehand without reading the CLI's own store. When a **native** restart ends in under
-`AppModel.resumeProbation` (8 seconds) with a non-zero code, the workspace offers **Restart Without
-Resuming** and does nothing else. Relaunching automatically would put an agent to work on a summary
-nobody has read.
+`claude --resume <uuid>` whose transcript was deleted — or whose lock a killed process left behind
+— exits within seconds; no check is possible beforehand without reading the CLI's own store. When a
+**native** restart ends in under `AppModel.resumeProbation` (8 seconds) with a non-zero code, the
+session is recorded in `resumeRefusals` and **nothing is shown**.
+
+Nothing is relaunched either: putting an agent to work on a summary nobody has read would double
+the work behind the user's back. But the news is not announced when it happens, because the person
+watching has just finished with that session — a banner there interrupts them with something they
+can do nothing useful with yet. It is acted on the next time they ask for that session: the restart
+skips the resume, and the summary sheet they have to answer carries the reason
+(`resumeFailedBefore`). That is the moment the fact matters, and the sheet is already the place
+where a fresh start is read, edited or called off.
+
+A restart that reaches a process clears the refusal: that process has a conversation of its own,
+and a stale refusal would skip the resume of an identifier that has since been replaced. Nothing is
+persisted either — a lock left behind by a killed CLI is usually gone by the next launch, and a
+session refused today deserves one more honest try tomorrow.
+
+Two endings are never a refused resume, whatever they exit with: one the user typed into
+(`TerminalPaneModel.hasReceivedInput` — an agent that refused its conversation exits before a key
+is pressed) and one this application killed itself (`wasStoppedOnPurpose` — that is Close
+answering, not the agent refusing). Without them, closing a session within eight seconds of
+restarting it announced that its conversation had been lost, which was simply untrue.
 
 The window is measured against an injected `SessionClock`, which is the only reason its far side
 can be tested at all: the rule "past the probation, it is an ordinary close" would otherwise cost
-eight seconds of sleep per assertion. The attempt is consumed only once it has been judged, never
-before, so a pane that has not yet caught up with its process cannot swallow the offer for good.
+eight seconds of sleep per assertion.
+
+What the process ended in travels *with* the closure — `sessionDidClose` carries the final
+`TerminalProcessState` — rather than being read back from the pane. The pane is driven by its own
+attachment, on its own task, with no ordering against the exit watcher: asked during that gap it
+answered "still running" about a process that had already exited, the offer was skipped, and the
+attempt was dropped by the probation check a moment later. Nothing is re-read, so there is no gap
+left to lose it in.
+
+### The sidebar follows the session it just put back to work
+
+The two sidebar tabs split on whether an agent is running (#9), so a session restarted from
+**Closed** leaves that tab the instant it starts. Left alone, the session the user had selected
+vanished from the list under their pointer and the selection fell to whatever row took its place —
+the one command whose whole point is "get back to this session" ended by showing them another one.
+
+`AppModel.follow(_:)` therefore moves the scope to the tab the session is now in and re-selects it,
+after the reload that published the new status. It runs after every restart, successful or not: a
+restart that failed left the session closed, which this simply confirms. Creating a session does
+the same, for the same reason.
+
+Only the scope moves. A search or a facet that also hides the session is a narrowing the user typed
+themselves, and clearing it would undo work they can see.
+
+### One sheet, presented from the root
+
+The restart confirmation is one of the three sheets in `presentedSheet`, not a `.sheet` of its own
+on the workspace column. SwiftUI presents a single sheet per view and drops the rest, and the
+column it was attached to only exists while the store is loaded: a refresh that failed while the
+summary was open tore the sheet down with `pendingRestart` still set, leaving a restart nobody
+could confirm or call off — and `canRestart` withheld for that session ever after.
 
 ### Failures leave the session exactly as it was
 

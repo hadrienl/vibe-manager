@@ -79,6 +79,19 @@ public struct RootView: View {
             cancelled: { model.cancelNewSession() }
           )
         }
+      case .restartContext:
+        // A fresh start is the one restart that sends something: the text is shown before it
+        // goes, and the sheet is where it can still be changed or called off.
+        if let pending = model.pendingRestart {
+          RestartContextSheet(
+            pending: pending,
+            restart: { text in Task { await model.confirmRestart(text) } },
+            cancel: { model.cancelRestart() }
+          )
+          // Keyed on the session: the editor holds its text in `@State`, seeded once, so a sheet
+          // re-presented for another session would open on the previous session's summary.
+          .id(pending.sessionID)
+        }
       }
     }
   }
@@ -92,6 +105,7 @@ public struct RootView: View {
   private var presentedSheet: RootSheet? {
     if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
     if model.isPresentingNewSession { return .newSession }
+    if model.pendingRestart != nil { return .restartContext }
     return nil
   }
 
@@ -105,6 +119,8 @@ public struct RootView: View {
       Task { await permissions.skipStep() }
     case .newSession:
       model.cancelNewSession()
+    case .restartContext:
+      model.cancelRestart()
     case nil:
       break
     }
@@ -115,6 +131,10 @@ public struct RootView: View {
   private enum RootSheet: Identifiable {
     case fullDiskAccess
     case newSession
+    /// Presented from the root rather than from the workspace: attached to the loaded column it
+    /// was torn down by a refresh that failed, leaving a pending restart nobody could answer or
+    /// call off — and a session whose Restart command stayed withheld.
+    case restartContext
 
     var id: Self { self }
   }
@@ -149,15 +169,6 @@ public struct RootView: View {
             detect: { Task { await model.refreshAgents(forceRefresh: true) } },
             isDetecting: model.isRefreshingAgents,
             dismiss: { model.dismissRestartFailure() }
-          )
-          Divider()
-        }
-        if let failure = model.resumeFailure {
-          // The offer is made, and nothing is relaunched until it is taken.
-          ResumeFailureBanner(
-            failure: failure,
-            restart: { Task { await model.restartWithoutResuming(failure.sessionID) } },
-            dismiss: { model.dismissResumeFailure() }
           )
           Divider()
         }
@@ -241,28 +252,6 @@ public struct RootView: View {
       }
     } message: { session in
       Text(archiveConfirmationMessage(for: session))
-    }
-    // A fresh start is the one restart that sends something: the text is shown before it goes,
-    // and the sheet is where it can still be changed or called off.
-    .sheet(
-      isPresented: Binding(
-        get: { model.pendingRestart != nil },
-        set: { isPresented in
-          guard !isPresented else { return }
-          model.cancelRestart()
-        }
-      )
-    ) {
-      if let pending = model.pendingRestart {
-        RestartContextSheet(
-          pending: pending,
-          restart: { text in Task { await model.confirmRestart(text) } },
-          cancel: { model.cancelRestart() }
-        )
-        // Keyed on the session: the editor holds its text in `@State`, seeded once, so a sheet
-        // re-presented for another session would open on the previous session's summary.
-        .id(pending.sessionID)
-      }
     }
   }
 
@@ -369,6 +358,11 @@ public struct RootView: View {
         .background(.background)
       }
     }
+    // Takes the whole column even with nothing mounted in it. A terminal fills it on its own,
+    // but a window where no session has a pane yet — every one of them closed, straight after a
+    // relaunch — left this stack at the size of its "no terminal" card, and the bar above it was
+    // then centred in the column instead of sitting under the toolbar.
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 
@@ -432,43 +426,6 @@ private struct RestartFailureBanner: View {
       Button("Detect Again", action: detect)
         .controlSize(.small)
         .disabled(isDetecting)
-      Button {
-        dismiss()
-      } label: {
-        Image(systemName: "xmark")
-      }
-      .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
-    }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 8)
-    .background(.quaternary)
-  }
-}
-
-/// A resumed conversation the agent dropped at once, and the only thing the application will do
-/// about it without being asked: offer.
-private struct ResumeFailureBanner: View {
-  let failure: AppModel.ResumeFailure
-  let restart: () -> Void
-  let dismiss: () -> Void
-
-  var body: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "arrow.clockwise.circle")
-        .foregroundStyle(.orange)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(failure.message)
-          .font(.callout)
-        Text(
-          "Restarting without resuming starts a new conversation, with a summary of the session."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      }
-      Spacer(minLength: 8)
-      Button("Restart Without Resuming", action: restart)
-        .controlSize(.small)
       Button {
         dismiss()
       } label: {
@@ -750,7 +707,8 @@ private struct SessionSidebar: View {
           status: SessionStatusPresentation.make(
             session: session,
             paneStatus: model.pane(for: session.id)?.status,
-            resolution: model.resolution(forID: session.id)
+            resolution: model.resolution(forID: session.id),
+            wasStoppedOnPurpose: model.pane(for: session.id)?.wasStoppedOnPurpose == true
           ),
           // Only the rows a shortcut can reach claim one.
           shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,

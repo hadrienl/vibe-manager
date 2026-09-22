@@ -42,6 +42,18 @@ struct SessionRestartTests {
     )
   }
 
+  /// A session as `CreateSession` actually stores one: closed, sitting entirely on its creation
+  /// date, with no agent ever started in it.
+  private func neverStartedSession(path: String) -> WorkSession {
+    SessionDraft(
+      name: "Refactor the webhook",
+      initialPrompt: "Split the signature check out.",
+      providerID: "stub",
+      workingDirectoryPath: path
+    )
+    .session(createdAt: Date(timeIntervalSince1970: 1_699_000_000))
+  }
+
   private func plan(path: String) -> AgentLaunchPlan {
     AgentLaunchPlan(
       providerID: AgentProviderID("stub"),
@@ -102,7 +114,7 @@ struct SessionRestartTests {
 
     // The process had already ended on its own, so there was nothing left to stop.
     #expect(closed == .wasNotRunning)
-    #expect(restarted)
+    #expect(restarted == .started)
     #expect(launcher.pane(for: subject.id) === pane)
     let notice = String(decoding: pane?.takePendingNotice() ?? [], as: UTF8.self)
     #expect(notice.contains("Restart"))
@@ -123,7 +135,7 @@ struct SessionRestartTests {
     )
   }
 
-  @Test("A session that is still running is not restarted")
+  @Test("A session that is still running is left alone rather than started a second time")
   func runningSessionIsNotRestarted() async {
     let path = folder()
     let subject = session(path: path)
@@ -139,7 +151,9 @@ struct SessionRestartTests {
       )
     )
 
-    #expect(!restarted)
+    // Not a failure: the agent the user asked for is up, and reporting an error over it put a
+    // banner on screen about a session that was running perfectly well.
+    #expect(restarted == .alreadyRunning)
     #expect(await supervisor.startCount == 1)
   }
 
@@ -161,7 +175,8 @@ struct SessionRestartTests {
       )
     )
 
-    #expect(!restarted)
+    // No reason of its own: the pane holds the terminal's failure and stays on screen with it.
+    #expect(restarted == .failed(reason: nil))
     // Kept, it would be drawn above the next process, dating a restart that never happened.
     #expect(launcher.pane(for: subject.id)?.takePendingNotice().isEmpty == true)
   }
@@ -190,7 +205,7 @@ struct SessionRestartTests {
       )
     )
 
-    #expect(!restarted)
+    #expect(restarted == .failed(reason: SessionLauncher.archivedReason))
     #expect(await supervisor.startCount == 0)
   }
 
@@ -218,7 +233,7 @@ struct SessionRestartTests {
       )
     )
 
-    #expect(!restarted)
+    #expect(restarted == .failed(reason: SessionLauncher.archivedReason))
     #expect(launcher.pane(for: subject.id) == nil)
     #expect(await supervisor.session(for: subject.id) == nil)
     #expect(await repository.session(id: subject.id)?.status == .archived)
@@ -270,8 +285,28 @@ struct SessionRestartTests {
     let path = folder()
     let (model, _, _, _) = makeWorkspace(session: session(path: path))
 
-    #expect(model.restartTitle(for: session(closedAt: nil, path: path)) == "Start Session")
+    // Built as `CreateSession` stores one: closed, on its creation date, never launched. A
+    // fixture with `closedAt: nil` described a *running* session, so the "Start Session" wording
+    // was only ever proved against a state the store cannot hold.
+    #expect(model.restartTitle(for: neverStartedSession(path: path)) == "Start Session")
     #expect(model.restartTitle(for: session(path: path)) == "Restart Session")
+  }
+
+  @Test("A session that never ran is offered its own prompt, not a summary")
+  func neverStartedIsOfferedItsPrompt() async {
+    let path = folder()
+    let subject = neverStartedSession(path: path)
+    let (model, _, _, _) = makeWorkspace(session: subject)
+    await model.reload()
+    await model.refreshResolutions()
+
+    #expect(model.expectedRestartMode(for: subject) == "Start Session")
+
+    await model.restart(subject.id)
+
+    // Started outright: no summary to read, and nothing to confirm.
+    #expect(model.pendingRestart == nil)
+    #expect(model.restartFailure == nil)
   }
 
   @Test("Two restarts asked at once start one agent")
@@ -429,8 +464,8 @@ struct SessionRestartTests {
     #expect(await repository.session(id: subject.id)?.status == .closed)
   }
 
-  @Test("A resumed conversation the agent drops at once is offered a fresh start, not given one")
-  func ghostResumeIsOfferedNotTaken() async {
+  @Test("A resumed conversation the agent drops at once is remembered, not announced")
+  func ghostResumeIsRememberedNotAnnounced() async {
     let path = folder()
     let subject = session(path: path)
     let supervisor = SpySupervisor(initialState: .exited(code: 1))
@@ -438,11 +473,34 @@ struct SessionRestartTests {
     await model.reload()
 
     await model.restart(subject.id)
-    await waitUntil { model.resumeFailure != nil }
+    await waitUntil { model.resumeRefusals.contains(subject.id) }
 
-    #expect(model.resumeFailure?.sessionID == subject.id)
-    // One process, and it is the resumed one: nothing was relaunched on the user's behalf.
+    // One process, and it is the resumed one: nothing was relaunched on the user's behalf, and
+    // nothing was put on screen over a session the user has just finished with.
     #expect(await supervisor.startCount == 1)
+    #expect(model.pendingRestart == nil)
+    #expect(model.restartFailure == nil)
+  }
+
+  @Test("The next restart of that session says so, and does not hand the conversation back")
+  func aRefusedResumeIsToldAtTheNextRestart() async {
+    let path = folder()
+    let subject = session(path: path)
+    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
+    await model.reload()
+    await model.restart(subject.id)
+    await waitUntil { model.resumeRefusals.contains(subject.id) }
+
+    await model.restart(subject.id)
+
+    // The news reaches the user where it is useful: in the summary they are about to send, at
+    // the moment they ask for the session back.
+    let pending = model.pendingRestart
+    #expect(pending?.sessionID == subject.id)
+    #expect(
+      pending?.explanation.contains("stopped as soon as this conversation was resumed") == true
+    )
   }
 
   @Test("An agent worked in for a while and quit is not a refused resume")
@@ -460,7 +518,7 @@ struct SessionRestartTests {
     await supervisor.finish(id: subject.id, state: .exited(code: 1))
     await waitUntil { model.sessions.first?.status == .closed }
 
-    #expect(model.resumeFailure == nil)
+    #expect(model.resumeRefusals.isEmpty)
   }
 
   @Test("A clean exit right after a resume is an agent that finished, not a refused resume")
@@ -474,7 +532,160 @@ struct SessionRestartTests {
     await model.restart(subject.id)
     await waitUntil { model.sessions.first?.status == .closed }
 
-    #expect(model.resumeFailure == nil)
+    #expect(model.resumeRefusals.isEmpty)
+  }
+
+  @Test("A session the user closed himself never counts as a conversation the agent refused")
+  func aDeliberateCloseIsNotARefusedResume() async {
+    let path = folder()
+    let subject = session(path: path)
+    let (model, _, _, _) = makeWorkspace(session: subject)
+    await model.reload()
+    await model.restart(subject.id)
+    await waitUntil { model.sessions.first?.status == .active }
+
+    // Close, inside the probation window: the resume had worked, and the user simply stopped.
+    await model.close(subject.id)
+    await waitUntil { model.sessions.first?.status == .closed }
+
+    #expect(model.resumeRefusals.isEmpty)
+  }
+
+  @Test("An agent the user typed into resumed its conversation, whatever it exits with")
+  func inputProvesTheResumeWorked() async {
+    let path = folder()
+    let subject = session(path: path)
+    let supervisor = SpySupervisor()
+    let (model, launcher, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
+    await model.reload()
+    await model.restart(subject.id)
+
+    await launcher.pane(for: subject.id)?.write([UInt8]("hello".utf8))
+    await supervisor.finish(id: subject.id, state: .exited(code: 1))
+    await waitUntil { model.sessions.first?.status == .closed }
+
+    #expect(model.resumeRefusals.isEmpty)
+  }
+
+  @Test("The exit is reported with the state the process actually ended in")
+  func closureCarriesTheFinalState() async {
+    let path = folder()
+    let subject = session(path: path)
+    let supervisor = SpySupervisor()
+    let repository = MutableRepository(sessions: [subject])
+    let launcher = SessionLauncher(
+      supervisor: supervisor,
+      repository: repository,
+      agents: StubRegistry(providers: [StubProvider()]),
+      viewportTimeout: .zero
+    )
+    // Read back from the pane this was a race — the pane runs its own attachment on its own
+    // task — and a listener could be told "still running" about a process that had exited.
+    var reported: TerminalProcessState?
+    launcher.sessionDidClose = { _, state in reported = state }
+
+    await launcher.launch(session: subject, plan: plan(path: path))
+    await supervisor.finish(id: subject.id, state: .exited(code: 3))
+    await waitUntil { reported != nil }
+
+    #expect(reported == .exited(code: 3))
+  }
+
+  // MARK: - Where the session is after it starts
+
+  @Test("A session restarted from Closed is followed into Active, and stays selected")
+  func restartMovesTheSidebarToActive() async {
+    let path = folder()
+    let subject = session(path: path)
+    let (model, _, _, _) = makeWorkspace(session: subject)
+    await model.reload()
+    model.setScope(.closed)
+    model.select(subject.id)
+
+    await model.restart(subject.id)
+
+    // The sidebar splits on whether an agent is running, so the session left Closed the moment
+    // it started. Left alone, it would have vanished from the list under the user's pointer.
+    #expect(model.filter.scope == .active)
+    #expect(model.selectedSessionID == subject.id)
+    #expect(model.visibleSessions.map(\.id) == [subject.id])
+  }
+
+  @Test("A restart that failed leaves the sidebar where the session still is")
+  func failedRestartStaysInClosed() async {
+    let path = folder()
+    let subject = session(path: path)
+    let (model, _, _, _) = makeWorkspace(
+      session: subject,
+      supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35))
+    )
+    await model.reload()
+    model.setScope(.closed)
+
+    await model.restart(subject.id)
+
+    #expect(model.filter.scope == .closed)
+    #expect(model.selectedSessionID == subject.id)
+  }
+
+  // MARK: - Banners
+
+  @Test("A restart that reached a process clears the refusal it was started to work around")
+  func startingClearsTheRefusal() async {
+    let path = folder()
+    let subject = session(path: path)
+    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
+    await model.reload()
+    await model.restart(subject.id)
+    await waitUntil { model.resumeRefusals.contains(subject.id) }
+
+    await supervisor.nextProcessStarts(in: .running(processIdentifier: 99))
+    await model.restart(subject.id)
+    await model.confirmRestart(model.pendingRestart?.briefText ?? "")
+
+    // The new process has a conversation of its own. Kept, the refusal would skip the resume of
+    // an identifier that has since been replaced.
+    #expect(!model.resumeRefusals.contains(subject.id))
+  }
+
+  @Test("A store that refuses to reopen leaves no process attached to a closed session")
+  func refusedReopenLeavesNothingAttached() async {
+    let path = folder()
+    let subject = session(path: path)
+    let repository = RefusingRepository(sessions: [subject])
+    let supervisor = SpySupervisor()
+    let model = AppModel(
+      repository: repository,
+      agents: StubRegistry(providers: [StubProvider()]),
+      launcher: SessionLauncher(
+        supervisor: supervisor,
+        repository: repository,
+        agents: StubRegistry(providers: [StubProvider()]),
+        viewportTimeout: .zero
+      )
+    )
+    await model.reload()
+
+    await model.restart(subject.id)
+
+    #expect(model.restartFailure?.message == SessionLauncher.storeRefusedReason)
+    #expect(model.pane(for: subject.id) == nil)
+    #expect(await supervisor.session(for: subject.id) == nil)
+    #expect(await repository.session(id: subject.id)?.status == .closed)
+  }
+
+  @Test("An identifier of whitespace promises no conversation the restart cannot resume")
+  func blankIdentifierPromisesNoResume() async {
+    let path = folder()
+    let subject = session(resumeIdentifier: " \n", path: path)
+    let (model, _, _, _) = makeWorkspace(session: subject)
+    await model.reload()
+    await model.refreshResolutions()
+
+    // `RestartSession` trims before it believes an identifier, and this sentence has to agree
+    // with it: promising a resume that will not happen is worse than saying nothing.
+    #expect(model.expectedRestartMode(for: subject).contains("new process, with a summary"))
   }
 
   private func waitUntil(
@@ -590,12 +801,41 @@ private actor MutableRepository: SessionRepository {
   }
 }
 
+/// A store that reads fine and refuses every write, for the failure that is neither an archive
+/// nor a session that moved: the write itself did not go through.
+private actor RefusingRepository: SessionRepository {
+  struct Refusal: Error {}
+
+  private var stored: [WorkSession]
+
+  init(sessions: [WorkSession]) {
+    stored = sessions
+  }
+
+  func sessions() -> [WorkSession] { stored }
+
+  func session(id: SessionID) -> WorkSession? {
+    stored.first { $0.id == id }
+  }
+
+  func save(_ session: WorkSession) throws {
+    throw Refusal()
+  }
+
+  func mutate(
+    id: SessionID,
+    _ transform: @Sendable (inout WorkSession) throws -> Void
+  ) throws -> WorkSession? {
+    throw Refusal()
+  }
+}
+
 private actor SpySupervisor: TerminalSupervisor {
   private(set) var startCount = 0
   private(set) var lastSpec: TerminalSpec?
   private var sessions: [SessionID: FakeTerminalSession] = [:]
   private let failure: TerminalError?
-  private let initialState: TerminalProcessState
+  private var initialState: TerminalProcessState
 
   init(
     failure: TerminalError? = nil,
@@ -603,6 +843,12 @@ private actor SpySupervisor: TerminalSupervisor {
   ) {
     self.failure = failure
     self.initialState = initialState
+  }
+
+  /// What the next process starts in, for a test whose second launch must not repeat the fate
+  /// of its first.
+  func nextProcessStarts(in state: TerminalProcessState) {
+    initialState = state
   }
 
   func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {

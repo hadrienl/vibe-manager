@@ -32,6 +32,24 @@ struct RestartSessionTests {
     )
   }
 
+  /// A session as `CreateSession` actually stores one, before any agent has run in it.
+  ///
+  /// Built from the draft rather than assembled by hand: a stored session is never `closedAt:
+  /// nil` — that shape only exists while a session is running — and a fixture that invented it
+  /// tested a state the store cannot hold.
+  private func neverStartedSession(prompt: String = "Split the signature check out.")
+    -> WorkSession
+  {
+    SessionDraft(
+      name: "Refactor the webhook",
+      initialPrompt: prompt,
+      providerID: "stub",
+      modelID: "fast",
+      workingDirectoryPath: "/work/app"
+    )
+    .session(createdAt: Date(timeIntervalSince1970: 1_699_000_000))
+  }
+
   private func makeSubject(
     session: WorkSession,
     provider: StubProvider = StubProvider(),
@@ -44,6 +62,24 @@ struct RestartSessionTests {
       folders: StubFolders(status: folder)
     )
     return (restart, repository)
+  }
+
+  /// The refusal a restart answers with, for the tests that hold each one to its wording.
+  ///
+  /// The use case throws its refusals rather than offering them, so that nothing can ask what
+  /// would go wrong at the price of a detection and a launch plan it then discards.
+  private func refusal(
+    from restart: RestartSession,
+    for id: SessionID
+  ) async -> SessionRestartRefusal? {
+    do {
+      _ = try await restart(id: id)
+      return nil
+    } catch let refusal as SessionRestartRefusal {
+      return refusal
+    } catch {
+      return .storeUnreadable
+    }
   }
 
   // MARK: - Choosing the mode
@@ -63,14 +99,25 @@ struct RestartSessionTests {
 
   @Test("A session that never ran gets the launch it never had, prompt and all")
   func firstLaunchKeepsTheInitialPrompt() async throws {
-    let subject = session(closedAt: nil, resumeIdentifier: nil)
-    let (restart, repository) = makeSubject(session: subject)
+    let (restart, repository) = makeSubject(session: neverStartedSession())
 
     let outcome = try await restart(id: repository.stored[0].id)
 
     #expect(outcome.mode == .firstLaunch)
     #expect(outcome.plan.promptDelivery == .argument)
     #expect(!outcome.needsConfirmation)
+  }
+
+  @Test("A stale identifier on a session that never ran does not fake a conversation to resume")
+  func neverStartedIgnoresAStoredIdentifier() async throws {
+    var subject = neverStartedSession()
+    subject.agent?.resumeIdentifier = "0f7e6d5c-4b3a-2190-8765-43210fedcba9"
+    let (restart, repository) = makeSubject(session: subject)
+
+    let outcome = try await restart(id: repository.stored[0].id)
+
+    #expect(outcome.mode == .firstLaunch)
+    #expect(outcome.explanation == nil)
   }
 
   @Test("Without an identifier, a new process is proposed with a summary and an explanation")
@@ -114,9 +161,25 @@ struct RestartSessionTests {
   func ignoringTheIdentifier() async throws {
     let (restart, repository) = makeSubject(session: session())
 
-    let outcome = try await restart(id: repository.stored[0].id, ignoringResumeIdentifier: true)
+    let outcome = try await restart(
+      id: repository.stored[0].id,
+      skippingResume: .alreadyAnswered
+    )
 
     #expect(outcome.explanation == .resumeDeclined(agentName: "Stub Agent"))
+    #expect(outcome.mode.brief != nil)
+  }
+
+  @Test("A conversation the agent dropped last time is not handed back, and the summary says so")
+  func skippingAResumeThatFailedBefore() async throws {
+    let (restart, repository) = makeSubject(session: session())
+
+    let outcome = try await restart(
+      id: repository.stored[0].id,
+      skippingResume: .failedLastTime
+    )
+
+    #expect(outcome.explanation == .resumeFailedBefore(agentName: "Stub Agent"))
     #expect(outcome.mode.brief != nil)
   }
 
@@ -185,10 +248,10 @@ struct RestartSessionTests {
     let (restart, repository) = makeSubject(session: session(status: .archived))
     let id = repository.stored[0].id
 
-    let refusal = await restart.problem(for: id)
+    let answer = await refusal(from: restart, for: id)
 
-    #expect(refusal == .notRestartable(.archived))
-    #expect(refusal?.recoverySuggestion == "Unarchive it first, then restart it.")
+    #expect(answer == .notRestartable(.archived))
+    #expect(answer?.recoverySuggestion == "Unarchive it first, then restart it.")
     #expect(await repository.writes == 0)
   }
 
@@ -196,7 +259,7 @@ struct RestartSessionTests {
   func activeIsRefused() async throws {
     let (restart, repository) = makeSubject(session: session(status: .active, closedAt: nil))
 
-    #expect(await restart.problem(for: repository.stored[0].id) == .notRestartable(.active))
+    #expect(await refusal(from: restart, for: repository.stored[0].id) == .notRestartable(.active))
     #expect(await repository.writes == 0)
   }
 
@@ -204,7 +267,7 @@ struct RestartSessionTests {
   func unknownAgentIsRefused() async throws {
     let (restart, repository) = makeSubject(session: session(providerID: "gone"))
 
-    #expect(await restart.problem(for: repository.stored[0].id) == .agentUnknown("gone"))
+    #expect(await refusal(from: restart, for: repository.stored[0].id) == .agentUnknown("gone"))
     #expect(await repository.writes == 0)
   }
 
@@ -215,7 +278,7 @@ struct RestartSessionTests {
       provider: StubProvider(state: .notFound)
     )
 
-    guard case .agentUnavailable = await restart.problem(for: repository.stored[0].id) else {
+    guard case .agentUnavailable = await refusal(from: restart, for: repository.stored[0].id) else {
       Issue.record("An unusable agent must refuse the restart")
       return
     }
@@ -227,7 +290,7 @@ struct RestartSessionTests {
     let (restart, repository) = makeSubject(session: session(), folder: .missing)
 
     #expect(
-      await restart.problem(for: repository.stored[0].id)
+      await refusal(from: restart, for: repository.stored[0].id)
         == .workingDirectoryUnusable(path: "/work/app", status: .missing)
     )
     #expect(await repository.writes == 0)
@@ -237,7 +300,7 @@ struct RestartSessionTests {
   func noFolderIsRefused() async throws {
     let (restart, repository) = makeSubject(session: session(repositories: []))
 
-    #expect(await restart.problem(for: repository.stored[0].id) == .noRepository)
+    #expect(await refusal(from: restart, for: repository.stored[0].id) == .noRepository)
     #expect(await repository.writes == 0)
   }
 
@@ -245,7 +308,7 @@ struct RestartSessionTests {
   func missingSessionIsRefused() async throws {
     let (restart, _) = makeSubject(session: session())
 
-    #expect(await restart.problem(for: SessionID()) == .sessionMissing)
+    #expect(await refusal(from: restart, for: SessionID()) == .sessionMissing)
   }
 
   @Test("A launch the agent refuses is reported as such, and writes nothing")
@@ -256,10 +319,10 @@ struct RestartSessionTests {
       provider: provider
     )
 
-    let refusal = await restart.problem(for: repository.stored[0].id)
+    let answer = await refusal(from: restart, for: repository.stored[0].id)
 
     #expect(
-      refusal == .launchRejected(.promptTooLarge(byteCount: 40_000, limit: 16_384))
+      answer == .launchRejected(.promptTooLarge(byteCount: 40_000, limit: 16_384))
     )
     #expect(await repository.writes == 0)
   }

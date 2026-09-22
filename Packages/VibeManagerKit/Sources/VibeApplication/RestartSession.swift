@@ -44,6 +44,8 @@ public enum SessionRestartExplanation: Equatable, Sendable {
   case identifierRejected(agentName: String)
   /// The user asked for a fresh start after a resume failed in front of them.
   case resumeDeclined(agentName: String)
+  /// The conversation was resumed once and the agent dropped it within seconds.
+  case resumeFailedBefore(agentName: String)
 
   public var sentence: String {
     switch self {
@@ -55,6 +57,28 @@ public enum SessionRestartExplanation: Equatable, Sendable {
       return "The identifier stored for this session is not one \(name) would accept."
     case .resumeDeclined(let name):
       return "Restarting without resuming the \(name) conversation, as you asked."
+    case .resumeFailedBefore(let name):
+      return """
+        \(name) stopped as soon as this conversation was resumed last time, so it is not being \
+        resumed again.
+        """
+    }
+  }
+}
+
+/// Why a restart is not even trying the agent's own resume.
+public enum SessionResumeSkip: Equatable, Sendable {
+  /// The conversation was already found unresumable, and the user has answered the summary this
+  /// restart is about to send. Asking the agent again would only offer it a second refusal.
+  case alreadyAnswered
+  /// The agent dropped this conversation within seconds of being handed it, the last time it was
+  /// tried. Handing it back would repeat that in front of the user.
+  case failedLastTime
+
+  var explanation: (String) -> SessionRestartExplanation {
+    switch self {
+    case .alreadyAnswered: return SessionRestartExplanation.resumeDeclined
+    case .failedLastTime: return SessionRestartExplanation.resumeFailedBefore
     }
   }
 }
@@ -183,34 +207,13 @@ public struct RestartSession: Sendable {
     self.brief = brief
   }
 
-  /// What would stop this restart, without starting or writing anything.
-  ///
-  /// One reason, not a list: unlike a draft, a stored session has no fields left to fill in, so
-  /// the first thing in the way is the thing to say.
-  ///
-  /// The workspace does not call it to decide whether to offer the command — that answer has to be
-  /// instant, and this one costs a detection. It is for a caller walking the whole store and
-  /// needing to know why a session was passed over: #11 restoring sessions at launch, and the
-  /// tests that hold each refusal to its wording.
-  public func problem(for id: SessionID) async -> SessionRestartRefusal? {
-    do {
-      _ = try await callAsFunction(id: id)
-      return nil
-    } catch let refusal as SessionRestartRefusal {
-      return refusal
-    } catch {
-      return .storeUnreadable
-    }
-  }
-
   /// - Parameters:
   ///   - contextOverride: the summary the user edited, used in place of the generated one.
-  ///   - ignoringResumeIdentifier: skip the agent's own resume, because it has just been tried
-  ///     in front of the user and failed.
+  ///   - skippingResume: do not try the agent's own resume, and say why in the explanation.
   public func callAsFunction(
     id: SessionID,
     contextOverride: String? = nil,
-    ignoringResumeIdentifier: Bool = false
+    skippingResume: SessionResumeSkip? = nil
   ) async throws -> SessionRestart {
     // Read from the store, never from the list on screen: a session the sidebar still draws as
     // closed may have been reopened or archived since that list was loaded.
@@ -246,7 +249,14 @@ public struct RestartSession: Sendable {
       throw SessionRestartRefusal.workingDirectoryUnusable(path: path, status: status)
     }
 
-    if !ignoringResumeIdentifier, descriptor.capabilities.supportsResume,
+    // Asked before anything is resumed: a session that has never run has no conversation to go
+    // back to, whatever a stored identifier might claim, and what it is owed is the prompt it
+    // was created with — not a summary apologising for a conversation that never existed.
+    if !session.hasEverStarted {
+      return try await firstLaunch(session: session, provider: provider, path: path)
+    }
+
+    if skippingResume == nil, descriptor.capabilities.supportsResume,
       let identifier = configuration.resumeIdentifier?
         .trimmingCharacters(in: .whitespacesAndNewlines),
       !identifier.isEmpty
@@ -283,15 +293,9 @@ public struct RestartSession: Sendable {
       }
     }
 
-    // A session that was created and never ran has no conversation to resume and no state to
-    // summarise: its restart is the launch it never got, initial prompt and all.
-    if session.closedAt == nil {
-      return try await firstLaunch(session: session, provider: provider, path: path)
-    }
-
     let explanation: SessionRestartExplanation
-    if ignoringResumeIdentifier {
-      explanation = .resumeDeclined(agentName: descriptor.displayName)
+    if let skippingResume {
+      explanation = skippingResume.explanation(descriptor.displayName)
     } else if !descriptor.capabilities.supportsResume {
       explanation = .agentCannotResume(agentName: descriptor.displayName)
     } else {
