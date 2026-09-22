@@ -13,7 +13,8 @@ struct NewSessionModelTests {
     folder: WorkingDirectoryStatus = .usable,
     repository: SpyRepository = SpyRepository(),
     folders: (any WorkingDirectoryProbe)? = nil,
-    revalidationDelay: Duration = .milliseconds(250)
+    revalidationDelay: Duration = .milliseconds(250),
+    fullDiskAccess: FullDiskAccessStatus? = .notGranted
   ) -> NewSessionModel {
     let registry = StubRegistry(providers: providers)
     return NewSessionModel(
@@ -23,7 +24,8 @@ struct NewSessionModelTests {
         folders: folders ?? StubFolders(status: folder)
       ),
       registry: registry,
-      revalidationDelay: revalidationDelay
+      revalidationDelay: revalidationDelay,
+      fullDiskAccess: fullDiskAccess
     )
   }
 
@@ -214,20 +216,62 @@ struct NewSessionModelTests {
 
   @Test("With the access granted, there is nothing left to remark upon")
   func grantedAccessSaysNothing() async {
-    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
-    let model = NewSessionModel(
-      create: CreateSession(
-        repository: SpyRepository(),
-        agents: registry,
-        folders: StubFolders(status: .usable)
-      ),
-      registry: registry,
-      isFullDiskAccessGranted: true
-    )
+    let model = makeModel(fullDiskAccess: .granted)
     await model.load(defaultWorkingDirectoryPath: nil)
     model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
 
     #expect(model.protectedLocationNotice == nil)
+  }
+
+  @Test("An access not probed yet says nothing rather than guessing")
+  func unknownAccessSaysNothing() async {
+    // Warning someone who granted the access long ago would be worse than staying quiet: the
+    // sheet only remarks on what the application positively knows.
+    let model = makeModel(fullDiskAccess: nil)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
+
+    #expect(model.protectedLocationNotice == nil)
+  }
+
+  @Test("A folder that disappeared stays reported while the next field is fixed")
+  func folderVerdictSurvivesTheNextEdit() async throws {
+    // The folder was opened by Create, so re-checking it raises nothing new. Skipping the check
+    // instead made the problem vanish as soon as the name was edited, and come back at the next
+    // Create — a form that contradicts itself.
+    let model = makeModel(folder: .missing, revalidationDelay: .milliseconds(10))
+    await model.load(defaultWorkingDirectoryPath: "/gone")
+    _ = await model.submit()
+    #expect(model.issues.contains(.workingDirectoryNotFound))
+
+    model.draft.name = "Refactor the webhook"
+    model.draftChanged()
+    try await Task.sleep(for: .milliseconds(200))
+
+    #expect(model.issues.contains(.workingDirectoryNotFound))
+    #expect(model.issues(for: .name).isEmpty)
+  }
+
+  @Test("A folder chosen while the form is already red does not republish a stale verdict")
+  func chosenFolderDoesNotRestoreAStaleVerdict() async throws {
+    // A folder on a network volume takes long enough to check for a name to be typed under it.
+    // The answer that comes back describes the older draft, so only the part of it that was
+    // asked about — the folder — is kept.
+    let folders = GatedFolders()
+    let model = makeModel(folders: folders, revalidationDelay: .milliseconds(10))
+    await model.load(defaultWorkingDirectoryPath: nil)
+    _ = await model.submit()
+    #expect(model.issues.contains(.nameMissing))
+
+    let choosing = Task { await model.folderChosen("/workspace") }
+    await Task.yield()
+    model.draft.name = "Refactor the webhook"
+    model.draftChanged()
+    await folders.open()
+    await choosing.value
+    try await Task.sleep(for: .milliseconds(200))
+
+    #expect(model.issues.isEmpty)
   }
 
   @Test("A verdict on a draft the user has already moved past is dropped")

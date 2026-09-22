@@ -42,24 +42,25 @@ public final class NewSessionModel {
   private let create: CreateSession
   private let registry: any AgentProviderResolving
   private let revalidationDelay: Duration
-  private let isFullDiskAccessGranted: Bool
+  private let fullDiskAccess: FullDiskAccessStatus?
   private var revalidation: Task<Void, Never>?
   /// The folder the open panel last handed over, and the only one checked on the disk before the
   /// user asks for the session.
   private var checkedFolderPath: String?
 
-  /// `isFullDiskAccessGranted` only decides whether the sheet warns about a protected folder, so
-  /// the cautious default is the one that says something rather than the one that stays silent.
+  /// `fullDiskAccess` decides whether the sheet remarks on a protected folder, and `nil` — not
+  /// probed yet — stays silent. The remark is only worth making when the application positively
+  /// knows the access is missing; guessing it would warn users who granted it long ago.
   public init(
     create: CreateSession,
     registry: any AgentProviderResolving,
     revalidationDelay: Duration = .milliseconds(250),
-    isFullDiskAccessGranted: Bool = false
+    fullDiskAccess: FullDiskAccessStatus? = nil
   ) {
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
-    self.isFullDiskAccessGranted = isFullDiskAccessGranted
+    self.fullDiskAccess = fullDiskAccess
   }
 
   /// What the sheet says under a working folder macOS guards — a remark, never a problem.
@@ -68,7 +69,7 @@ public final class NewSessionModel {
   /// alert this line exists to announce. It never blocks creation, because being asked once for a
   /// folder the user deliberately chose is a perfectly good outcome.
   public var protectedLocationNotice: String? {
-    guard !isFullDiskAccessGranted,
+    guard fullDiskAccess == .notGranted,
       let path = draft.resolvedWorkingDirectoryPath,
       let location = ProtectedFileLocation.covering(path: path)
     else {
@@ -184,11 +185,22 @@ public final class NewSessionModel {
     // the new path is the one being looked at and leaves its verdict alone.
     checkedFolderPath = path
     draft.workingDirectoryPath = path
-    let found = await create.problems(with: draft, checkingFolder: true)
+    let checked = draft
+    let found = await create.problems(with: checked, checkingFolder: true)
     guard checkedFolderPath == path else { return }
-    // Before the first submit, only what was asked about is reported: a chosen folder must not
-    // turn the whole form red over a name that has not been typed yet.
-    issues = hasSubmitted ? found : found.filter { $0.field == .workingDirectory }
+
+    // The whole verdict is only published when it still describes the form on screen. A check on
+    // a network volume takes long enough for a name to be typed under it, and posting the older
+    // answer whole would put "A name is required." back over a name that is now there.
+    if hasSubmitted, checked == draft {
+      issues = found
+      return
+    }
+    // Otherwise only what was asked about is kept, merged into what is already shown: before the
+    // first submit a chosen folder must not turn the whole form red over a name nobody has typed.
+    issues =
+      issues.filter { $0.field != .workingDirectory }
+      + found.filter { $0.field == .workingDirectory }
   }
 
   public func revalidateIfSubmitted() async {
@@ -198,7 +210,15 @@ public final class NewSessionModel {
 
   public func revalidate() async {
     let checked = draft
-    let found = await create.problems(with: checked)
+    // A folder already opened once in this session is opened again: the consent it may have
+    // needed has been given, so re-checking it costs nothing and says nothing new to the system.
+    // Skipping it instead made a folder that had disappeared vanish from the list of problems as
+    // soon as the next field was edited, and come back only at the following Create.
+    let path = checked.workingDirectoryPath
+    let found = await create.problems(
+      with: checked,
+      checkingFolder: path != nil && path == checkedFolderPath
+    )
     // The draft may have moved on while the checks ran, so a verdict on an older one is
     // dropped rather than shown over what the user is looking at now.
     guard !Task.isCancelled, checked == draft else { return }
@@ -214,6 +234,9 @@ public final class NewSessionModel {
     hasSubmitted = true
     isSubmitting = true
     defer { isSubmitting = false }
+    // Creation opens the folder itself, so from here on it is a folder this session has looked
+    // at, and the checks that follow may keep looking at it.
+    checkedFolderPath = draft.workingDirectoryPath
 
     do {
       let creation = try await create(draft)

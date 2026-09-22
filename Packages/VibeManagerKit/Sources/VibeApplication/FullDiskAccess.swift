@@ -38,6 +38,7 @@ public actor FullDiskAccessGate {
   private let probe: any FullDiskAccessProbe
   private let preferences: any PermissionPreferences
   private var cachedStatus: FullDiskAccessStatus?
+  private var hasPresentedStep = false
 
   public init(probe: any FullDiskAccessProbe, preferences: any PermissionPreferences) {
     self.probe = probe
@@ -46,6 +47,20 @@ public actor FullDiskAccessGate {
 
   public func status() async -> FullDiskAccessStatus {
     if let cachedStatus { return cachedStatus }
+    return await probed()
+  }
+
+  /// Asks the system again rather than answering from the cache.
+  ///
+  /// For the step itself the cache is the honest answer, since the grant reaches this process
+  /// only at its next launch. But someone who opens the settings window has usually just been to
+  /// System Settings, and a window that keeps saying "Not granted" because it decided that once
+  /// at launch would be a window that lies. Asking again costs one file open.
+  public func refreshedStatus() async -> FullDiskAccessStatus {
+    await probed()
+  }
+
+  private func probed() async -> FullDiskAccessStatus {
     let status = await probe.status()
     cachedStatus = status
     return status
@@ -58,9 +73,15 @@ public actor FullDiskAccessGate {
   /// | `granted`    | —              | no        |
   /// | `notGranted` | no             | **yes**   |
   /// | `notGranted` | yes            | no        |
+  /// Presented at most once per launch, whoever asks. Recording the answer is what makes the
+  /// step final across launches, but it is written asynchronously, and a second caller reading
+  /// the preferences in that window would otherwise be told to present the step all over again.
   public func shouldPresentStep() async -> Bool {
+    guard !hasPresentedStep else { return false }
     guard await status() == .notGranted else { return false }
-    return await !preferences.isFullDiskAccessStepDismissed()
+    guard await !preferences.isFullDiskAccessStepDismissed() else { return false }
+    hasPresentedStep = true
+    return true
   }
 
   /// Records that the user answered the step — by granting access or by skipping it. Either way

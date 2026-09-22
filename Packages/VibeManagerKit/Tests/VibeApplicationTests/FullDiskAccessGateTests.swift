@@ -59,15 +59,44 @@ struct FullDiskAccessGateTests {
 
     #expect(await probe.probes == 1)
   }
+
+  @Test("A screen the user opened themselves may ask the system again")
+  func refreshedStatusAsksAgain() async {
+    // Someone opening the settings window has usually just come back from System Settings, and
+    // a row answering from a decision taken at launch would be a row that lies.
+    let probe = StubProbe(status: .notGranted)
+    let gate = FullDiskAccessGate(probe: probe, preferences: SpyPreferences(dismissed: false))
+
+    _ = await gate.status()
+    await probe.grant()
+    #expect(await gate.refreshedStatus() == .granted)
+    #expect(await gate.status() == .granted)
+    #expect(await probe.probes == 2)
+  }
+
+  @Test("The step is offered once per launch, whoever asks")
+  func stepIsOfferedOncePerLaunch() async {
+    // The answer is written asynchronously, and a second caller reading the preferences in that
+    // window would otherwise be told to present a step the user is already looking at.
+    let gate = FullDiskAccessGate(
+      probe: StubProbe(status: .notGranted),
+      preferences: SpyPreferences(dismissed: false)
+    )
+
+    #expect(await gate.shouldPresentStep())
+    #expect(await gate.shouldPresentStep() == false)
+  }
 }
 
 private actor StubProbe: FullDiskAccessProbe {
-  private let value: FullDiskAccessStatus
+  private var value: FullDiskAccessStatus
   private(set) var probes = 0
 
   init(status: FullDiskAccessStatus) {
     value = status
   }
+
+  func grant() { value = .granted }
 
   func status() async -> FullDiskAccessStatus {
     probes += 1

@@ -39,11 +39,24 @@ public final class PermissionsModel {
     status == .granted
   }
 
-  /// Reads the status once and decides whether the step has anything to say. Called at launch,
-  /// after the window is up — never from the session-creation flow, which is the whole point.
+  /// Reads the status and decides whether the step has anything to say. Called at launch — never
+  /// from the session-creation flow, which is the whole point.
+  ///
+  /// It can raise the step but never lowers it: the gate only ever says yes once per launch, so
+  /// a second caller asking the question would otherwise close a step the user is reading.
   public func refresh() async {
     status = await gate.status()
-    isPresentingStep = await gate.shouldPresentStep()
+    if await gate.shouldPresentStep() {
+      isPresentingStep = true
+    }
+  }
+
+  /// Asks the system again, for a screen the user opened themselves.
+  ///
+  /// Someone opening the settings window has usually just come back from System Settings, and a
+  /// row still reading "Not granted" from a decision taken at launch would be a row that lies.
+  public func recheck() async {
+    status = await gate.refreshedStatus()
   }
 
   /// Opens the right pane of System Settings and closes the step.

@@ -26,7 +26,7 @@ public struct SettingsView: View {
     }
     .formStyle(.grouped)
     .frame(width: 460)
-    .task { await permissions?.refresh() }
+    .task { await permissions?.recheck() }
   }
 }
 

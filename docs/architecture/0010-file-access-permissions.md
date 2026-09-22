@@ -70,11 +70,25 @@ it exists on every Mac, and only Full Disk Access opens it. Crucially, a process
 access is refused *silently* — the path is hidden rather than denied (`errno = 2` observed), with
 no alert. Nothing is read from the file; being allowed to open it is the whole answer.
 
-### Probed once per launch
+### Probed once per launch, except where the user is looking
 
 TCC freezes a process's permissions when it starts, so the answer cannot change under a running
 process. `FullDiskAccessGate` caches it, and that same fact is why the step has to talk about
 relaunching rather than waiting for the user to come back.
+
+The settings window is the exception, and asks again through `refreshedStatus()`. Someone who
+opens it has usually just come back from System Settings, and a row that kept saying "Not granted"
+because the question was settled at launch would be a row that lies. One file open is a small
+price for that.
+
+The step itself is offered at most once per launch, in the gate rather than in the interface:
+recording the answer is what makes it final across launches, but that write is asynchronous, and a
+second caller reading the preferences inside that window would otherwise be told to present a step
+the user is already reading.
+
+Nothing is ever warned about on a guess. Until the first probe has answered, the status is `nil`,
+and the creation sheet says nothing about a protected folder: telling someone who granted the
+access long ago that macOS is about to interrupt them would be worse than staying quiet.
 
 ### The application stores the answer, never the access
 
@@ -106,6 +120,11 @@ The folder is now checked at two moments, and only two: when the open panel hand
 continuation of a gesture the user just made, through the system's own panel — and at creation,
 which already re-checks everything (ADR 0007) and is the last place a folder that disappeared can
 be caught.
+
+A folder already opened once in this session keeps being checked afterwards, because the consent
+it may have needed has been given and re-opening it says nothing new to the system. Without that,
+a folder that had disappeared vanished from the list of problems as soon as the next field was
+edited, and came back only at the following Create — a form contradicting itself.
 
 The open panel itself remains the one place an alert can legitimately appear without Full Disk
 Access: outside the sandbox it runs in-process, so browsing into Desktop from it may prompt.

@@ -330,10 +330,11 @@ public final class AppModel {
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
-    await reload()
-    // Asked here, at launch, and never from the creation flow: the point of the whole step is
-    // that pressing Create leaves nothing left to ask.
+    // Before the sessions, and never from the creation flow: the point of the whole step is that
+    // pressing Create leaves nothing left to ask. Reading the store first left a window in which
+    // ⌘N opened a sheet that did not yet know whether the access was there, and warned anyway.
     await permissions?.refresh()
+    await reload()
     await refreshAgents()
   }
 
@@ -471,7 +472,7 @@ public final class AppModel {
     newSessionModel = NewSessionModel(
       create: CreateSession(repository: repository, agents: agents),
       registry: agents,
-      isFullDiskAccessGranted: permissions?.isGranted ?? false
+      fullDiskAccess: permissions?.status
     )
     isPresentingNewSession = true
   }

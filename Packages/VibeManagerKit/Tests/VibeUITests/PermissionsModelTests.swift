@@ -61,6 +61,38 @@ struct PermissionsModelTests {
     #expect(await preferences.dismissals == 1)
   }
 
+  @Test("Asking the question again never closes a step the user is reading")
+  func refreshDoesNotCloseAnOpenStep() async {
+    // The settings window asks on its own, and the answer is recorded asynchronously: neither
+    // must be able to take the step off the screen while it is being read.
+    let model = makeModel(status: .notGranted, preferences: SpyPreferences())
+    await model.refresh()
+    #expect(model.isPresentingStep)
+
+    await model.refresh()
+
+    #expect(model.isPresentingStep)
+  }
+
+  @Test("The settings window asks the system again, and never reopens the step")
+  func recheckReadsTheSystemAgain() async {
+    let probe = MutableProbe(status: .notGranted)
+    let model = PermissionsModel(
+      gate: FullDiskAccessGate(probe: probe, preferences: SpyPreferences()),
+      openURL: { _ in }
+    )
+    await model.refresh()
+    await model.skipStep()
+    #expect(model.status == .notGranted)
+
+    // Granted elsewhere, in System Settings, while the application is running.
+    await probe.grant()
+    await model.recheck()
+
+    #expect(model.isGranted)
+    #expect(!model.isPresentingStep)
+  }
+
   private func makeModel(
     status: FullDiskAccessStatus,
     preferences: SpyPreferences,
@@ -84,6 +116,18 @@ private struct StubProbe: FullDiskAccessProbe {
   init(status: FullDiskAccessStatus) {
     value = status
   }
+
+  func status() async -> FullDiskAccessStatus { value }
+}
+
+private actor MutableProbe: FullDiskAccessProbe {
+  private var value: FullDiskAccessStatus
+
+  init(status: FullDiskAccessStatus) {
+    value = status
+  }
+
+  func grant() { value = .granted }
 
   func status() async -> FullDiskAccessStatus { value }
 }
