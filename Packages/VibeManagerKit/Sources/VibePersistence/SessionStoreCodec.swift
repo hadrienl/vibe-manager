@@ -152,6 +152,7 @@ private struct StoredSessionV2: Codable {
       updatedAt: lifecycle.updatedAt,
       closedAt: lifecycle.closedAt,
       archivedAt: lifecycle.archivedAt,
+      startedAt: lifecycle.startedAt,
       repositories: repositories.map(\.domainValue),
       notes: notes,
       template: template?.domainValue
@@ -212,6 +213,7 @@ private struct StoredSessionV1: Decodable {
       updatedAt: lifecycle.updatedAt,
       closedAt: lifecycle.closedAt,
       archivedAt: lifecycle.archivedAt,
+      startedAt: lifecycle.startedAt,
       repositories: repositories.map(\.domainValue),
       notes: notes,
       template: template?.domainValue
@@ -255,6 +257,10 @@ private struct StoredLifecycleV2: Codable {
   let updatedAt: Date
   let closedAt: Date?
   let archivedAt: Date?
+  /// Absent from every document written before it was kept, and from the v0 and v1 shapes.
+  /// `SessionLifecycle` infers it in that case rather than reading those sessions as never
+  /// started.
+  let startedAt: Date?
 
   init(_ lifecycle: SessionLifecycle) {
     status = lifecycle.status
@@ -262,6 +268,7 @@ private struct StoredLifecycleV2: Codable {
     updatedAt = lifecycle.updatedAt
     closedAt = lifecycle.closedAt
     archivedAt = lifecycle.archivedAt
+    startedAt = lifecycle.startedAt
   }
 }
 

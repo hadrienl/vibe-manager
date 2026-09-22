@@ -116,3 +116,57 @@ func completeSessionValidation() throws {
 
   try session.validate()
 }
+
+@Test("A created session has never started, and its first launch is what records that it did")
+func startedAtIsRecordedOnTheFirstLaunch() throws {
+  let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+  var session = SessionDraft(
+    name: "Refactor the webhook",
+    providerID: "codex",
+    workingDirectoryPath: "/work/app"
+  )
+  .session(createdAt: createdAt)
+
+  #expect(!session.hasEverStarted)
+
+  let firstLaunch = createdAt.addingTimeInterval(60)
+  try session.reopen(at: firstLaunch)
+  #expect(session.startedAt == firstLaunch)
+
+  // A second run is not a first one: what this records is when the session began, not when it
+  // last did.
+  try session.close(at: firstLaunch.addingTimeInterval(60))
+  try session.reopen(at: firstLaunch.addingTimeInterval(120))
+  #expect(session.startedAt == firstLaunch)
+}
+
+@Test("A lifecycle stored before this was kept says whether it ever ran")
+func startedAtIsInferredForOlderStores() {
+  let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+
+  // Created and never launched: the whole lifecycle still sits on the creation date.
+  let untouched = SessionLifecycle(
+    status: .closed,
+    createdAt: createdAt,
+    updatedAt: createdAt,
+    closedAt: createdAt
+  )
+  #expect(untouched.startedAt == nil)
+
+  // Worked in and closed: it ran, and offering it a first launch would hand it its own prompt
+  // again in place of the conversation it is owed.
+  let worked = SessionLifecycle(
+    status: .closed,
+    createdAt: createdAt,
+    updatedAt: createdAt.addingTimeInterval(600),
+    closedAt: createdAt.addingTimeInterval(600)
+  )
+  #expect(worked.startedAt == createdAt.addingTimeInterval(600))
+
+  let running = SessionLifecycle(
+    status: .active,
+    createdAt: createdAt,
+    updatedAt: createdAt.addingTimeInterval(60)
+  )
+  #expect(running.startedAt == createdAt)
+}
