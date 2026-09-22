@@ -277,14 +277,14 @@ public actor AgentAvailabilityProbe {
       )
     }
 
-    let detail = version == nil ? "The reported version could not be parsed." : nil
-    let authenticated = await authenticationState(
+    var detail = version == nil ? "The reported version could not be parsed." : nil
+    let authentication = await authenticationState(
       specification: specification,
       probe: probe,
       environment: environment,
       path: path
     )
-    guard authenticated != false else {
+    if case .answered(false) = authentication {
       return AgentDiagnosticFactory.availability(
         descriptor: descriptor,
         state: .unauthenticated,
@@ -293,6 +293,14 @@ public actor AgentAvailabilityProbe {
         at: now(),
         hints: hints
       )
+    }
+
+    if case .unanswered = authentication {
+      // Silence is still not a verdict, so the agent stays usable; but the diagnostic must say
+      // the sign in state is unknown rather than let an export read as a clean bill of health.
+      detail = [detail, "The sign in check did not answer in time, twice."]
+        .compactMap { $0 }
+        .joined(separator: "\n")
     }
 
     return AgentDiagnosticFactory.availability(
@@ -351,7 +359,17 @@ public actor AgentAvailabilityProbe {
     AgentInstallation(executablePath: path, version: nil, source: source, detectedAt: now())
   }
 
-  /// Best effort only: `nil` means "unknown", and unknown never blocks a launch.
+  /// What asking the agent whether it is signed in produced.
+  ///
+  /// `answered(nil)` is a command that ran and stayed inconclusive; `unanswered` is a command
+  /// that never came back. Neither blocks a launch, but only the second is worth reporting.
+  private enum AuthenticationOutcome {
+    case notDeclared
+    case answered(Bool?)
+    case unanswered
+  }
+
+  /// Best effort only: anything but an explicit "not signed in" lets the agent through.
   ///
   /// No token, credential file or keychain item is ever read; only the exit code of the
   /// command the provider declares is considered.
@@ -360,10 +378,48 @@ public actor AgentAvailabilityProbe {
     probe: any ProcessProbe,
     environment: [String: String],
     path: String
-  ) async -> Bool? {
-    guard let arguments = specification.authenticationArguments else { return nil }
+  ) async -> AuthenticationOutcome {
+    guard let arguments = specification.authenticationArguments else { return .notDeclared }
 
-    let result = try? await probe.run(
+    var result = await authenticationProbeResult(
+      specification: specification,
+      probe: probe,
+      environment: environment,
+      path: path,
+      arguments: arguments,
+      timeout: specification.versionTimeout
+    )
+    if result?.didTimeOut == true {
+      // This command runs on the same binary as the version probe, on the same cold start; if
+      // that one needed the wider budget, this one needs it too. Without the retry, a genuinely
+      // signed out agent is announced ready and the user meets the failure in the terminal.
+      result = await authenticationProbeResult(
+        specification: specification,
+        probe: probe,
+        environment: environment,
+        path: path,
+        arguments: arguments,
+        timeout: specification.versionRetryTimeout
+      )
+    }
+
+    guard let result else { return .answered(nil) }
+    guard !result.didTimeOut else { return .unanswered }
+    guard let outcome = specification.authenticationOutcome else {
+      return .answered(result.exitCode == 0)
+    }
+    return .answered(outcome(result))
+  }
+
+  private static func authenticationProbeResult(
+    specification: CommandLineAgentSpecification,
+    probe: any ProcessProbe,
+    environment: [String: String],
+    path: String,
+    arguments: [String],
+    timeout: Duration
+  ) async -> ProbeResult? {
+    try? await probe.run(
       executablePath: path,
       arguments: arguments,
       environment: AgentEnvironmentPolicy.environment(
@@ -371,11 +427,8 @@ public actor AgentAvailabilityProbe {
         additionalKeys: specification.additionalEnvironmentKeys
       ),
       workingDirectoryPath: nil,
-      timeout: specification.versionTimeout
+      timeout: timeout
     )
-    guard let result, !result.didTimeOut else { return nil }
-    guard let outcome = specification.authenticationOutcome else { return result.exitCode == 0 }
-    return outcome(result)
   }
 }
 

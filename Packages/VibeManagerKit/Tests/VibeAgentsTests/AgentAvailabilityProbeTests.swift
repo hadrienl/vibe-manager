@@ -225,6 +225,69 @@ struct AgentAvailabilityProbeTests {
     #expect(processProbe.invocations.isEmpty)
   }
 
+  @Test("A sign in check that answers on the retry is trusted, not ignored")
+  func retriesTheAuthenticationProbeOnce() async {
+    let specification = CommandLineAgentSpecification(
+      binaryName: "stub-agent",
+      authenticationArguments: ["auth", "status"]
+    )
+    let processProbe = ScriptedAuthenticationProbe(
+      versionOutput: "stub-agent 2.4.1",
+      authenticationResponses: [
+        ProbeResult(exitCode: -1, didTimeOut: true),
+        ProbeResult(exitCode: 1),
+      ]
+    )
+
+    let availability = await AgentAvailabilityProbe(
+      descriptor: TestFixtures.descriptor,
+      specification: specification,
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      probe: processProbe,
+      environment: [:],
+      now: { Date(timeIntervalSince1970: 0) }
+    ).availability(forceRefresh: false)
+
+    // A first silence used to be read as "signed in", announcing a signed out agent as ready.
+    #expect(availability.state == .unauthenticated)
+    #expect(processProbe.authenticationInvocations.count == 2)
+    #expect(processProbe.authenticationInvocations.first?.timeout == specification.versionTimeout)
+    #expect(
+      processProbe.authenticationInvocations.last?.timeout == specification.versionRetryTimeout
+    )
+  }
+
+  @Test("A sign in check silent twice leaves the agent usable but says so")
+  func reportsAnUnansweredAuthenticationProbe() async {
+    let specification = CommandLineAgentSpecification(
+      binaryName: "stub-agent",
+      authenticationArguments: ["auth", "status"]
+    )
+    let processProbe = ScriptedAuthenticationProbe(
+      versionOutput: "stub-agent 2.4.1",
+      authenticationResponses: [ProbeResult(exitCode: -1, didTimeOut: true)]
+    )
+
+    let availability = await AgentAvailabilityProbe(
+      descriptor: TestFixtures.descriptor,
+      specification: specification,
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      probe: processProbe,
+      environment: [:],
+      now: { Date(timeIntervalSince1970: 0) }
+    ).availability(forceRefresh: false)
+
+    // Silence is not a verdict either way, so the agent stays launchable.
+    #expect(availability.state == .available)
+    #expect(processProbe.authenticationInvocations.count == 2)
+    // But an export must not read as a clean bill of health.
+    #expect(availability.diagnostic.detail?.contains("sign in check") == true)
+  }
+
   @Test("A login shell that never answered is not a missing agent")
   func aSilentLoginShellIsNotAMissingAgent() async {
     let availability = await probe(
@@ -544,4 +607,47 @@ private struct StubAuthenticationProbe: ProcessProbe {
     return ProbeResult(exitCode: 0, standardOutput: versionOutput)
   }
 
+}
+
+/// Answers the version straight away and the sign in check from a script, so a retry on the
+/// authentication command can be observed.
+private final class ScriptedAuthenticationProbe: ProcessProbe, @unchecked Sendable {
+  private let lock = NSLock()
+  private let versionOutput: String
+  private var authenticationResponses: [ProbeResult]
+  private let last: ProbeResult
+  private var recorded: [StubProcessProbe.Invocation] = []
+
+  init(versionOutput: String, authenticationResponses: [ProbeResult]) {
+    precondition(!authenticationResponses.isEmpty)
+    self.versionOutput = versionOutput
+    self.authenticationResponses = authenticationResponses
+    last = authenticationResponses[authenticationResponses.count - 1]
+  }
+
+  var authenticationInvocations: [StubProcessProbe.Invocation] {
+    lock.withLock { recorded.filter { $0.arguments != ["--version"] } }
+  }
+
+  func run(
+    executablePath: String,
+    arguments: [String],
+    environment: [String: String],
+    workingDirectoryPath: String?,
+    timeout: Duration
+  ) async throws -> ProbeResult {
+    lock.withLock {
+      recorded.append(
+        StubProcessProbe.Invocation(
+          executablePath: executablePath,
+          arguments: arguments,
+          timeout: timeout
+        )
+      )
+      guard arguments != ["--version"] else {
+        return ProbeResult(exitCode: 0, standardOutput: versionOutput)
+      }
+      return authenticationResponses.isEmpty ? last : authenticationResponses.removeFirst()
+    }
+  }
 }
