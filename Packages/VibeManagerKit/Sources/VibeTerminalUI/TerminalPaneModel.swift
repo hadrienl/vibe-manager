@@ -32,6 +32,7 @@ public final class TerminalPaneModel {
   private var stateTask: Task<Void, Never>?
   private var isStarting = false
   private var viewportWaiters: [ViewportWaiter] = []
+  private var pendingNotice: [UInt8] = []
 
   public init(
     sessionID: SessionID,
@@ -92,6 +93,22 @@ public final class TerminalPaneModel {
       failure = Failure(message: "The terminal could not be started.", suggestion: nil)
       status = .failed(message: "The terminal could not be started.")
     }
+  }
+
+  /// Holds a line the application itself writes into the terminal, above the next process.
+  ///
+  /// It is kept rather than fed straight to the view because the pane is the only thing that
+  /// exists at this point in a restart: the surface may not be mounted yet, and the terminal
+  /// session the line belongs above has not been started. The surface takes it when it attaches,
+  /// so the line always lands before the first byte of the new process and never twice.
+  public func post(notice text: String) {
+    pendingNotice.append(contentsOf: Array(text.utf8))
+  }
+
+  /// The pending notice, handed over once.
+  public func takePendingNotice() -> [UInt8] {
+    defer { pendingNotice = [] }
+    return pendingNotice
   }
 
   /// Called by the surface whenever it has measured itself, before and after the process exists.

@@ -63,6 +63,19 @@ public final class SessionLauncher: SessionRuntime {
   /// Create twice, or restoring a session that is already up, must not fork a second agent.
   @discardableResult
   public func launch(session: WorkSession, plan: AgentLaunchPlan) async -> Bool {
+    await launch(session: session, plan: plan, notice: nil)
+  }
+
+  /// - Parameter notice: a line written into the terminal just above the process, for a restart.
+  ///   It travels with the launch rather than being posted beforehand, because posting it would
+  ///   mean creating the pane first — and a pane that exists but has never started reads as
+  ///   `starting`, which is exactly what this method refuses to start over.
+  @discardableResult
+  private func launch(
+    session: WorkSession,
+    plan: AgentLaunchPlan,
+    notice: String?
+  ) async -> Bool {
     // An archived session is out of reach by design. Refusing here, rather than only hiding the
     // command, is what lets #10's Restart and #11's restore walk the whole store without having
     // to remember the rule — and it is how "no process stays attached" survives their arrival.
@@ -73,6 +86,9 @@ public final class SessionLauncher: SessionRuntime {
     // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
     // resize wiring — pointed at a pane nobody renders any more.
     let pane = pane(for: session.id) ?? makePane(for: session.id, plan: plan)
+    if let notice {
+      pane.post(notice: notice)
+    }
     await pane.start(spec: .agent(plan: plan))
 
     guard let terminal = pane.session else { return false }
@@ -86,6 +102,47 @@ public final class SessionLauncher: SessionRuntime {
     watchForExit(id: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     return true
+  }
+
+  /// Starts a closed session again, in the pane it already has.
+  ///
+  /// The pane is reused rather than rebuilt, so what the previous agent said stays on screen
+  /// above what the next one will say — that is what "restarting keeps its context" looks like
+  /// to the person watching. A dated separator is written between the two: without it, two runs
+  /// of an agent share one buffer and yesterday's output reads as today's.
+  @discardableResult
+  public func restart(_ restart: SessionRestart, at date: Date = Date()) async -> Bool {
+    let session = restart.session
+    guard session.status != .archived else { return false }
+    // Not a second launch, and not a silent success either: the caller asked for a restart and
+    // this session never stopped.
+    guard !isRunning(session.id) else { return false }
+
+    return await launch(
+      session: session,
+      plan: restart.plan,
+      notice: Self.separator(for: restart.mode, at: date)
+    )
+  }
+
+  /// The line written into the terminal above a restarted process.
+  ///
+  /// Dim, on its own lines, and it says which of the three restarts this was: a user who reads
+  /// "new process" knows the agent above has not been told any of it.
+  static func separator(for mode: SessionRestartMode, at date: Date) -> String {
+    let stamp = date.formatted(date: .abbreviated, time: .shortened)
+    let what: String
+    switch mode {
+    case .firstLaunch:
+      what = "first start"
+    case .native:
+      what = "resumed conversation"
+    case .freshWithContext:
+      what = "new process, given a summary"
+    case .freshWithoutContext:
+      what = "new process"
+    }
+    return "\r\n\u{1B}[2m── Restart · \(stamp) · \(what) ──\u{1B}[0m\r\n"
   }
 
   private func makePane(for id: SessionID, plan: AgentLaunchPlan) -> TerminalPaneModel {
