@@ -278,12 +278,16 @@ struct NewSessionModelTests {
   func staleVerdictIsNotShown() async {
     // The checks cross actors, so they can finish in an order the typing never had. A verdict
     // that arrives late must not contradict the form the user is looking at.
-    let folders = GatedFolders()
+    let folders = GatedFolders(open: true)
     let model = makeModel(folders: folders)
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    await model.load(defaultWorkingDirectoryPath: nil)
+    // Designated through the panel first, so the check that follows really reads the folder — and
+    // really does wait at the gate, rather than counting on the scheduler to be slow enough.
+    await model.folderChosen("/workspace")
+    await folders.close()
 
     let checking = Task { await model.revalidate() }
-    await Task.yield()
+    await folders.waitForCheck()
     model.draft.name = "Refactor the webhook"
     await folders.open()
     await checking.value
@@ -457,8 +461,14 @@ private actor CountingFolders: WorkingDirectoryProbe {
 
 /// A probe that holds a check open, so the draft can change while it is in flight.
 private actor GatedFolders: WorkingDirectoryProbe {
-  private var isOpen = false
+  private var isOpen: Bool
   private var waiters: [CheckedContinuation<Void, Never>] = []
+  private var isChecking = false
+  private var arrivals: [CheckedContinuation<Void, Never>] = []
+
+  init(open: Bool = false) {
+    isOpen = open
+  }
 
   func open() {
     isOpen = true
@@ -467,10 +477,26 @@ private actor GatedFolders: WorkingDirectoryProbe {
     waiters.forEach { $0.resume() }
   }
 
+  func close() {
+    isOpen = false
+  }
+
+  /// Returns once a check is actually waiting at the gate, so a test never has to guess whether
+  /// the scheduler has started it yet.
+  func waitForCheck() async {
+    guard !isChecking else { return }
+    await withCheckedContinuation { arrivals.append($0) }
+  }
+
   func inspect(path: String) async -> WorkingDirectoryStatus {
+    isChecking = true
+    let arrivals = self.arrivals
+    self.arrivals = []
+    arrivals.forEach { $0.resume() }
     while !isOpen {
       await withCheckedContinuation { waiters.append($0) }
     }
+    isChecking = false
     return .usable
   }
 }
