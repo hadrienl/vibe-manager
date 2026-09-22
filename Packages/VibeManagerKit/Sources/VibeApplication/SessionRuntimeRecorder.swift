@@ -12,6 +12,12 @@ public actor SessionRuntimeRecorder {
   private let clock: any SessionClock
   private let processIdentifier: Int32
   private var state: SessionRuntimeState
+  /// Set once another copy of the application has been found holding the document.
+  ///
+  /// From then on this instance writes nothing: the document belongs to the copy that is working
+  /// in those sessions, and a first launch here would otherwise overwrite its pid and its process
+  /// groups at the first session started — leaving its agents unfindable at its own next launch.
+  private var isSealed = false
 
   public init(
     store: any SessionRuntimeStateStore,
@@ -31,6 +37,17 @@ public actor SessionRuntimeRecorder {
       launchedAt: now,
       updatedAt: now
     )
+  }
+
+  /// Gives up writing: the document is another instance's, and this one only reads from now on.
+  public func seal() {
+    isSealed = true
+  }
+
+  /// Whether this instance has given up writing. Quitting reads it to know that the sessions the
+  /// store calls active are not its own to close.
+  public func isReadOnly() -> Bool {
+    isSealed
   }
 
   /// What the previous instance left behind, read without touching it.
@@ -92,6 +109,7 @@ public actor SessionRuntimeRecorder {
   /// The groups are dropped: those processes have just been stopped, and a group recorded here
   /// would be looked for — and possibly signalled — at the next launch.
   public func markStopped(resuming ids: [SessionID]) async {
+    guard !isSealed else { return }
     let now = clock.now()
     state.phase = .stopped
     state.stoppedAt = now.storageRounded
@@ -102,6 +120,7 @@ public actor SessionRuntimeRecorder {
 
   private func update(sessions: [SessionRuntimeRecord]) async {
     state.sessions = sessions
+    guard !isSealed else { return }
     state.updatedAt = clock.now().storageRounded
     await store.write(state)
   }

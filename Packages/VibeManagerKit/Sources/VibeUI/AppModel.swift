@@ -202,12 +202,28 @@ public final class AppModel {
     public let cancelledCount: Int
     public let lines: [Line]
 
+    /// What the banner says. Cancelling is an answer, not a failure, so it has a sentence of its
+    /// own rather than a list of lines: the user knows they stopped it, and what they do not know
+    /// is how many sessions that left closed.
     public var message: String {
-      let subject =
-        lines.count == 1
-        ? "1 session did not come back" : "\(lines.count) sessions did not come back"
-      guard restartedCount > 0 else { return "\(subject)." }
-      return "\(subject), and \(restartedCount) did."
+      var sentences: [String] = []
+      if !lines.isEmpty {
+        sentences.append(
+          lines.count == 1
+            ? "1 session did not come back." : "\(lines.count) sessions did not come back.")
+      }
+      if cancelledCount > 0 {
+        sentences.append(
+          cancelledCount == 1
+            ? "1 more was left closed when you cancelled."
+            : "\(cancelledCount) more were left closed when you cancelled."
+        )
+      }
+      if restartedCount > 0 {
+        sentences.append(
+          restartedCount == 1 ? "1 session came back." : "\(restartedCount) sessions came back.")
+      }
+      return sentences.joined(separator: " ")
     }
   }
 
@@ -807,7 +823,9 @@ public final class AppModel {
     }
   }
 
-  private func finishRestore(with outcomes: [SessionRestoreOutcome]) async {
+  /// Internal rather than private: the mapping from outcomes to what the user reads is the part
+  /// of this worth holding to its wording, and it is reached from nowhere else.
+  func finishRestore(with outcomes: [SessionRestoreOutcome]) async {
     restoration = nil
     restoreTask = nil
 
@@ -820,14 +838,16 @@ public final class AppModel {
         suggestion: outcome.suggestion
       )
     }
-    // Silence on success. A report that appears when there is nothing to do about it teaches the
-    // user to dismiss reports without reading them.
+    // Silence on success, and only on success. A restoration where everything came back has
+    // nothing to say; one the user called off has left sessions closed, and how many is exactly
+    // what they cannot see for themselves.
+    let cancelledCount = outcomes.filter(\.wasCancelled).count
     restoreReport =
-      lines.isEmpty
+      lines.isEmpty && cancelledCount == 0
       ? nil
       : RestoreReport(
         restartedCount: outcomes.filter(\.didRestart).count,
-        cancelledCount: outcomes.filter(\.wasCancelled).count,
+        cancelledCount: cancelledCount,
         lines: lines
       )
     // Every session that came back had `reopen` written for it while the list on screen was the

@@ -684,25 +684,33 @@ private struct RestoreReportBanner: View {
     HStack(alignment: .top, spacing: 10) {
       Image(systemName: "info.circle")
         .foregroundStyle(.secondary)
-      DisclosureGroup(isExpanded: $isExpanded) {
-        VStack(alignment: .leading, spacing: 6) {
-          ForEach(report.lines) { line in
-            VStack(alignment: .leading, spacing: 1) {
-              Text("\(line.name): \(line.sentence)")
-                .font(.caption)
-              if let suggestion = line.suggestion {
-                Text(suggestion)
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
-              }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        .padding(.top, 4)
-      } label: {
+      if report.lines.isEmpty {
+        // Nothing failed — the user cancelled. One sentence, and no disclosure triangle over an
+        // empty list.
         Text(report.message)
           .font(.callout)
+          .fixedSize(horizontal: false, vertical: true)
+      } else {
+        DisclosureGroup(isExpanded: $isExpanded) {
+          VStack(alignment: .leading, spacing: 6) {
+            ForEach(report.lines) { line in
+              VStack(alignment: .leading, spacing: 1) {
+                Text("\(line.name): \(line.sentence)")
+                  .font(.caption)
+                if let suggestion = line.suggestion {
+                  Text(suggestion)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          .padding(.top, 4)
+        } label: {
+          Text(report.message)
+            .font(.callout)
+        }
       }
       Spacer(minLength: 8)
       Button {

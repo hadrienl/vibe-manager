@@ -169,6 +169,39 @@ struct PrepareForQuitTests {
     #expect(await store.read()?.sessions.map(\.sessionID) == [subject.id])
   }
 
+  @Test("A read-only instance closes only what it started itself")
+  func readOnlyInstanceLeavesTheOtherCopyAlone() async {
+    let theirs = session(
+      name: "Theirs", status: .active, updatedAt: Date(timeIntervalSince1970: 1_700_000_200))
+    let journal = Journal()
+    let store = EphemeralSessionRuntimeStateStore()
+    let repository = MutableRepository(sessions: [theirs], journal: journal)
+    let runtime = SpyRuntime(journal: journal)
+    let recorder = SessionRuntimeRecorder(
+      store: store,
+      processIdentifier: 4242,
+      probe: StubProcesses(),
+      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+    )
+    // The document was found held by another copy, so this instance gave up writing it.
+    await recorder.seal()
+    let prepare = PrepareForQuit(
+      repository: repository,
+      runtime: runtime,
+      recorder: recorder,
+      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+    )
+
+    let shutdown = await prepare()
+
+    // That session is running under the other copy's agent: stopping it, or writing a status
+    // about it, would be a statement about somebody else's process.
+    #expect(shutdown.closed.isEmpty)
+    #expect(await runtime.detached.isEmpty)
+    #expect(await repository.status(of: theirs.id) == .active)
+    #expect(await store.read() == nil)
+  }
+
   @Test("A store that cannot be read still stops what this instance recorded")
   func stopsRecordedSessionsWhenTheStoreIsUnreadable() async {
     let unreadable = UnreadableRepository()

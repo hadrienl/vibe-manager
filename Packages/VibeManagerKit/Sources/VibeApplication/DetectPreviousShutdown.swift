@@ -77,6 +77,10 @@ public struct DetectPreviousShutdown: Sendable {
       // answers nothing rather than reconciling again, because the sessions that are active by
       // then are the ones this instance has just started.
       guard instance != processIdentifier else { return .nothingToDo }
+      // Nothing is claimed, and nothing will be: from here on this instance only reads the
+      // document. Writing it at the first session started would overwrite the other copy's pid
+      // and process groups, and its own next launch would find neither.
+      await recorder.seal()
       return .otherInstance(processIdentifier: instance)
     }
 

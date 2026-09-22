@@ -276,6 +276,36 @@ struct DetectPreviousShutdownTests {
     #expect(intent.sessionIDs == [recent.id, stale.id])
   }
 
+  @Test("Once another copy is found, this instance writes nothing at all")
+  func stopsWritingAfterFindingAnotherCopy() async {
+    let subject = session(status: .active)
+    let held = state(phase: .running, sessions: [SessionRuntimeRecord(sessionID: subject.id)])
+    let store = EphemeralSessionRuntimeStateStore(state: held)
+    let processes = StubProcesses(
+      alive: [1_001], startTimes: [1_001: Date(timeIntervalSince1970: 1_699_999_000)])
+    let recorder = SessionRuntimeRecorder(
+      store: store,
+      processIdentifier: 4242,
+      probe: processes,
+      clock: FixedClock(Self.now)
+    )
+    let detect = DetectPreviousShutdown(
+      repository: MutableRepository(sessions: [subject]),
+      recorder: recorder,
+      processes: processes,
+      clock: FixedClock(Self.now),
+      processIdentifier: 4242
+    )
+
+    #expect(await detect() == .otherInstance(processIdentifier: 1_001))
+
+    // Starting a session here would otherwise overwrite the other copy's pid and its process
+    // groups, and its own next launch would find neither.
+    await recorder.started(SessionID(), processGroup: 9_001)
+    await recorder.markStopped(resuming: [subject.id])
+    #expect(await store.read() == held)
+  }
+
   // MARK: - Leftovers
 
   @Test("A leftover group is stopped only when its identity is confirmed")

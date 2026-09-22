@@ -98,6 +98,13 @@ public struct PrepareForQuit: Sendable {
   /// read would otherwise take the whole intention down with it, and a session the launcher
   /// started but the store never heard about would be left running.
   private func candidates() async -> [SessionID] {
+    // A copy that found the document held by another instance closes only what it started
+    // itself. The sessions the store calls active are the other copy's, running under its own
+    // agents, and closing them here would be a status written about somebody else's process.
+    guard await !recorder.isReadOnly() else {
+      return await recorder.records().map(\.sessionID)
+    }
+
     let stored = (try? await repository.sessions()) ?? []
     // Most recently worked first, and stated here rather than inherited from the store's own
     // order: this is the order the sessions are closed in, and therefore the order the next

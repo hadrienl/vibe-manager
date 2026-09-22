@@ -21,7 +21,7 @@ struct SessionRestorationTests {
 
   private func session(
     name: String = "Refactor the webhook",
-    status: SessionStatus,
+    status: SessionStatus = .closed,
     resumeIdentifier: String? = "kept-identifier",
     path: String
   ) -> WorkSession {
@@ -237,6 +237,45 @@ struct SessionRestorationTests {
 
     #expect(workspace.model.restoreOffer?.leftoverProcessIdentifiers == [7_003])
     #expect(workspace.model.restoreOffer?.suggestion?.contains("7003") == true)
+  }
+
+  // MARK: - The report
+
+  @Test("A cancelled restoration says how many sessions it left closed")
+  func reportsWhatACancellationLeftClosed() async {
+    let path = folder()
+    let first = session(name: "First", path: path)
+    let second = session(name: "Second", path: path)
+    let workspace = makeWorkspace(sessions: [first, second])
+
+    await workspace.model.finishRestore(with: [
+      SessionRestoreOutcome(
+        sessionID: first.id, sessionName: "First", result: .restarted(.native(identifier: "k"))),
+      SessionRestoreOutcome(
+        sessionID: second.id, sessionName: "Second", result: .skipped(.cancelled)),
+    ])
+
+    let report = workspace.model.restoreReport
+    #expect(report?.cancelledCount == 1)
+    #expect(report?.lines.isEmpty == true)
+    #expect(report?.message == "1 more was left closed when you cancelled. 1 session came back.")
+  }
+
+  @Test("A restoration where everything came back says nothing")
+  func staysSilentWhenEverythingCameBack() async {
+    let path = folder()
+    let subject = session(status: .closed, path: path)
+    let workspace = makeWorkspace(sessions: [subject])
+
+    await workspace.model.finishRestore(with: [
+      SessionRestoreOutcome(
+        sessionID: subject.id,
+        sessionName: subject.name,
+        result: .restarted(.native(identifier: "kept-identifier"))
+      )
+    ])
+
+    #expect(workspace.model.restoreReport == nil)
   }
 
   // MARK: - A second copy

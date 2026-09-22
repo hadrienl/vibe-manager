@@ -86,6 +86,13 @@ very launch. A pid that answers but cannot be identified at all is treated as a 
 which is the conservative half of the two mistakes: taking sessions from a copy that is working in
 them would close them under its own agents, while refusing to take them says so in a banner.
 
+A copy that finds the document held by another one does not merely refrain from claiming it: it
+gives up writing it altogether, for the rest of its life. Writing it at the first session started
+would overwrite the other copy's pid and its process groups, and *its* next launch would find
+neither. Quitting such an instance closes only what it started itself, because the sessions the
+store calls active are running under the other copy's agents, and a status written about somebody
+else's process is the same lie in the other direction.
+
 ### The intention is consumed before the first resume
 
 `DetectPreviousShutdown` claims the document for this instance as soon as it has read it. That is
@@ -129,8 +136,12 @@ work this was restoring. Quitting mid-restoration cancels it too, and then runs 
 Failures never interrupt the queue — an unavailable provider is the normal case, not an incident —
 and everything that did not come back is gathered into one collapsible report, one line per
 session with its sentence and its remedy. Never a dialog, and above all never one dialog per
-session: five modal questions at launch is an application nobody can use. A restoration where
-everything came back says nothing at all.
+session: five modal questions at launch is an application nobody can use.
+
+A restoration where everything came back says nothing at all. One the user called off does say
+something, in a sentence rather than a list: cancelling is an answer, not a failure, and it has no
+lines to show — but how many sessions it left closed is precisely what the user cannot see for
+themselves.
 
 ### Quitting is bounded in time, so the stops are paid concurrently
 
@@ -186,7 +197,9 @@ is not ours at all and is not even mentioned.
 
 ## Out of scope
 
-A preference for restoring at launch — the cancel button and the offer after a crash are the V1's
+Anything else about two copies of the application running at once: the second one reads, says so,
+and touches nothing, which is enough to keep the first one's work intact. A preference for
+restoring at launch — the cancel button and the offer after a crash are the V1's
 answer, and a remembered "no" is a preference that belongs with the other preferences. Reattaching
 to a process that survived the application, which would take a daemon. Persisting the terminal
 scrollback (#9, still true here: the terminal comes back empty, with #10's dated separator for
