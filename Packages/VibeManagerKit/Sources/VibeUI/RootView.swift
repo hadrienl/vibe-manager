@@ -5,10 +5,10 @@ import VibeDomain
 import VibeTerminalUI
 
 public struct RootView: View {
-  @State private var model: AppModel
+  private let model: AppModel
 
   public init(model: AppModel) {
-    _model = State(initialValue: model)
+    self.model = model
   }
 
   public var body: some View {
@@ -94,7 +94,10 @@ public struct RootView: View {
     if let session = model.selectedSession {
       if let pane = model.pane(for: session.id) {
         // The pane is started by the launcher, so switching sessions never restarts an agent.
+        // The identity is the session's: the terminal view owns an AppKit view and a coordinator
+        // bound to one session, and reusing them for another shows the wrong terminal.
         TerminalPaneView(model: pane, autoStart: false)
+          .id(session.id)
       } else {
         ContentUnavailableView {
           Label(session.name, systemImage: session.appearance.symbolName)

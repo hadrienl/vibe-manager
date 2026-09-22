@@ -4,13 +4,16 @@ import VibeApplication
 // Presentation of one terminal: the surface itself plus a readable lifecycle state. The view
 // knows nothing of process identifiers or descriptors.
 public struct TerminalPaneView: View {
-  @State private var model: TerminalPaneModel
+  /// Held, not stored in `@State`: `@State` keeps the value it was first given for as long as
+  /// the view keeps its identity, so showing another session's pane in the same place went on
+  /// displaying the first one. The model is an observable reference owned elsewhere.
+  private let model: TerminalPaneModel
   /// A pane whose process someone else owns must not be started again when the view appears:
   /// re-showing a finished session would silently launch a second agent.
   private let autoStart: Bool
 
   public init(model: TerminalPaneModel, autoStart: Bool = true) {
-    _model = State(initialValue: model)
+    self.model = model
     self.autoStart = autoStart
   }
 

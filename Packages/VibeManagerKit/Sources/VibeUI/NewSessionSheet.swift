@@ -4,7 +4,9 @@ import VibeApplication
 import VibeDomain
 
 public struct NewSessionSheet: View {
-  @State private var model: NewSessionModel
+  /// Bindable, not `@State`: the fields need bindings, but the model belongs to `AppModel` and
+  /// must not be frozen at the value this view was first given.
+  @Bindable private var model: NewSessionModel
   @FocusState private var focus: SessionDraftField?
 
   private let defaultWorkingDirectoryPath: String?
@@ -17,7 +19,7 @@ public struct NewSessionSheet: View {
     created: @escaping (SessionCreation) -> Void,
     cancelled: @escaping () -> Void
   ) {
-    _model = State(initialValue: model)
+    _model = Bindable(model)
     self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
     self.created = created
     self.cancelled = cancelled

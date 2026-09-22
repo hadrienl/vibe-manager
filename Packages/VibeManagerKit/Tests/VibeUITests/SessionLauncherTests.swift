@@ -121,6 +121,36 @@ struct SessionLauncherTests {
     #expect(model.sessions.map(\.id) == [session.id])
     #expect(!model.isPresentingNewSession)
   }
+
+  /// The model side of what made a tab change show the wrong terminal. The view side — one
+  /// AppKit terminal view per session rather than one reused across them — is not reachable from
+  /// a headless test and is held by the session's identity in `RootView`.
+  @Test("Each session keeps its own pane")
+  func panesAreNeverShared() async {
+    let first = WorkSession(
+      name: "First",
+      agent: SessionAgentConfiguration(providerID: "stub"),
+      repositories: [RepositoryContext(path: "/workspace")]
+    )
+    let second = WorkSession(
+      name: "Second",
+      agent: SessionAgentConfiguration(providerID: "stub"),
+      repositories: [RepositoryContext(path: "/workspace")]
+    )
+    let launcher = SessionLauncher(
+      supervisor: SpySupervisor(),
+      repository: MutableRepository(sessions: [first, second]),
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero
+    )
+
+    await launcher.launch(session: first, plan: plan())
+    await launcher.launch(session: second, plan: plan())
+
+    #expect(launcher.pane(for: first.id) != nil)
+    #expect(launcher.pane(for: second.id) != nil)
+    #expect(launcher.pane(for: first.id) !== launcher.pane(for: second.id))
+  }
 }
 
 private actor MutableRepository: SessionRepository {
