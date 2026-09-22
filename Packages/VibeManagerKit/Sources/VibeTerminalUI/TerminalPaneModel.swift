@@ -24,6 +24,17 @@ public final class TerminalPaneModel {
   public private(set) var failure: Failure?
   /// The size the surface last measured, in character cells.
   public private(set) var viewportSize: TerminalSize?
+  /// Whether this process ended because the application asked it to.
+  ///
+  /// An agent stopped by Close or Archive is killed, and reports the signal it was killed with —
+  /// 143 for a `SIGTERM`. Read as a bare exit code that is an alarming red row about a session
+  /// the user closed themselves on purpose.
+  public private(set) var wasStoppedOnPurpose = false
+  /// Whether anything was ever typed into this process.
+  ///
+  /// An agent that refused the conversation it was handed exits before a key is pressed. One the
+  /// user actually worked in did not refuse anything, whatever it exits with afterwards.
+  public private(set) var hasReceivedInput = false
 
   private let sessionID: SessionID
   private let supervisor: any TerminalSupervisor
@@ -74,6 +85,9 @@ public final class TerminalPaneModel {
     session = nil
     status = .starting
     failure = nil
+    // A new process: whatever ended the previous one says nothing about how this one will end.
+    wasStoppedOnPurpose = false
+    hasReceivedInput = false
 
     if viewportSize == nil {
       await waitForViewport()
@@ -132,10 +146,13 @@ public final class TerminalPaneModel {
 
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
+    guard !bytes.isEmpty else { return }
+    hasReceivedInput = true
     await session?.write(bytes)
   }
 
   public func stop() async {
+    wasStoppedOnPurpose = true
     await supervisor.stop(id: sessionID, gracePeriod: .seconds(3))
     if let session {
       apply(await session.state())

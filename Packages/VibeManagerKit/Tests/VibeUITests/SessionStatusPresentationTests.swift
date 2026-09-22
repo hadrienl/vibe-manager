@@ -27,6 +27,28 @@ struct SessionStatusPresentationTests {
     #expect(presentation.severity == .normal)
   }
 
+  @Test("A session the user closed reads as closed, not as the signal that stopped its agent")
+  func deliberateStopIsNotAFailure() {
+    // Close and Archive kill the agent, and it reports the signal it was killed with — 143 for
+    // SIGTERM. Shown as an exit code it is a red alarm about something the user just did.
+    let closed = SessionStatusPresentation.make(
+      session: session(status: .closed),
+      paneStatus: .exited(code: 143),
+      wasStoppedOnPurpose: true
+    )
+
+    #expect(closed.label == "Closed")
+    #expect(closed.severity == .normal)
+
+    // The same code, from an agent nobody asked to stop, is still a failure.
+    let crashed = SessionStatusPresentation.make(
+      session: session(status: .closed),
+      paneStatus: .exited(code: 143)
+    )
+
+    #expect(crashed.severity == .error)
+  }
+
   @Test("A failure is an error, and says which one")
   func failuresAreErrors() {
     let failed = SessionStatusPresentation.make(
