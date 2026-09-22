@@ -84,7 +84,12 @@ struct SessionContextBriefTests {
     let subject = session()
     let builder = SessionContextBriefBuilder()
 
-    #expect(builder(for: subject).text == builder(for: subject).text)
+    // Two separate builds of the same session, named so that what is being compared is two
+    // *runs* and not one expression written twice.
+    let first = builder(for: subject).text
+    let second = builder(for: subject).text
+
+    #expect(first == second)
   }
 
   @Test("Too long a summary drops whole sections, in order, and says that it was shortened")
