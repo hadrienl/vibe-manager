@@ -32,14 +32,21 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     paneStatus: TerminalPaneModel.Status?,
     resolution: SessionAgentResolution? = nil
   ) -> SessionStatusPresentation {
-    if let paneStatus, let process = process(paneStatus) {
+    let process = paneStatus.flatMap(process)
+
+    // A terminal that is live, or that ended badly, says more than a detection: it reports what
+    // just happened here. Only once nothing is running, and nothing went wrong, does a missing
+    // agent become the session's headline — a terminal that simply finished must not hide it.
+    if let paneStatus, let process, outranksResolution(paneStatus) {
       return process
     }
 
-    // Only once nothing is running does a missing agent become the session's headline: a
-    // running terminal is worth more than a detection that has gone stale behind it.
     if let resolution, let unavailable = unavailableAgent(resolution) {
       return unavailable
+    }
+
+    if let process {
+      return process
     }
 
     switch session.status {
@@ -79,6 +86,17 @@ public struct SessionStatusPresentation: Equatable, Sendable {
 
   /// What the process itself says. `nil` means it says nothing the sidebar should show, and the
   /// stored status is left to speak.
+  /// Whether a terminal's own state is worth more than what its agent can do: it is running, or
+  /// it ended badly. A clean exit is neither, and steps aside for a missing agent.
+  private static func outranksResolution(_ status: TerminalPaneModel.Status) -> Bool {
+    switch status {
+    case .starting, .running, .terminated, .failed:
+      return true
+    case .exited(let code):
+      return code != 0
+    }
+  }
+
   private static func process(
     _ status: TerminalPaneModel.Status
   ) -> SessionStatusPresentation? {

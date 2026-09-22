@@ -54,26 +54,39 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  /// Showing a column the window is too narrow for is an exception, not an arrangement: it is
+  /// recorded as an override and leaves the stored intent alone, so that hiding it again only
+  /// withdraws the exception and widening the window still restores the columns the user had.
   public func setSidebarVisible(_ isVisible: Bool) {
-    sidebarOverride = isVisible && !proposal.isSidebarVisible
-    guard intent.isSidebarVisible != isVisible || sidebarOverride else {
-      resolveColumns()
-      return
+    if isVisible {
+      if allowances.isSidebarVisible {
+        sidebarOverride = false
+        updateIntent { $0.isSidebarVisible = true }
+      } else {
+        sidebarOverride = true
+      }
+    } else if sidebarOverride {
+      sidebarOverride = false
+    } else {
+      updateIntent { $0.isSidebarVisible = false }
     }
-    intent.isSidebarVisible = isVisible
     resolveColumns()
-    scheduleSave()
   }
 
   public func setInspectorVisible(_ isVisible: Bool) {
-    inspectorOverride = isVisible && !proposal.isInspectorVisible
-    guard intent.isInspectorVisible != isVisible || inspectorOverride else {
-      resolveColumns()
-      return
+    if isVisible {
+      if allowances.isInspectorVisible {
+        inspectorOverride = false
+        updateIntent { $0.isInspectorVisible = true }
+      } else {
+        inspectorOverride = true
+      }
+    } else if inspectorOverride {
+      inspectorOverride = false
+    } else {
+      updateIntent { $0.isInspectorVisible = false }
     }
-    intent.isInspectorVisible = isVisible
     resolveColumns()
-    scheduleSave()
   }
 
   public func toggleSidebar() {
@@ -86,12 +99,17 @@ public final class WorkspaceLayoutController {
 
   public func windowWidthChanged(to width: Double) {
     guard width.isFinite, abs(width - windowWidth) >= 1 else { return }
-    let previous = proposal
+    let previous = allowances
     windowWidth = width
-    // A width that changes what the fold proposes ends the exception the user was granted:
-    // widening the window is how they get the ordinary behaviour back.
-    if proposal != previous {
+    // A width that changes what a column is allowed to do ends the exception the user was
+    // granted for that column: widening the window is how they get the ordinary behaviour back.
+    // Each column answers for itself, so revealing the inspector by hand does not survive, or
+    // die with, a width that only concerns the sidebar.
+    let current = allowances
+    if current.isSidebarVisible != previous.isSidebarVisible {
       sidebarOverride = false
+    }
+    if current.isInspectorVisible != previous.isInspectorVisible {
       inspectorOverride = false
     }
     resolveColumns()
@@ -136,6 +154,19 @@ public final class WorkspaceLayoutController {
   /// What the window width alone would show.
   private var proposal: WorkspaceColumns {
     WorkspaceLayoutPolicy.resolve(windowWidth: windowWidth, intent: intent)
+  }
+
+  /// What the window is wide enough to hold, whatever the user asked for.
+  private var allowances: WorkspaceColumns {
+    WorkspaceLayoutPolicy.allowances(windowWidth: windowWidth)
+  }
+
+  private func updateIntent(_ change: (inout WorkspaceLayout) -> Void) {
+    var updated = intent
+    change(&updated)
+    guard updated != intent else { return }
+    intent = updated
+    scheduleSave()
   }
 
   private func resolveColumns() {

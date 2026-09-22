@@ -133,7 +133,14 @@ public final class AppModel {
     return await ResolveSessionAgent(registry: agents)(for: session)
   }
 
+  /// An explicit selection replaces whatever the previous run had asked for: the user is here
+  /// now, and a session that reappears later must not take them away from it.
   public func select(_ id: SessionID?) {
+    preferredSelection = nil
+    apply(selection: id)
+  }
+
+  private func apply(selection id: SessionID?) {
     selectedSessionID = id
     layout.select(id)
   }
@@ -194,6 +201,9 @@ public final class AppModel {
       byProvider[providerID] = answer
       resolved[session.id] = answer
     }
+    // A run the next reload replaced must not land last: cancelling it only asks, and these
+    // answers describe a session list that has since been thrown away.
+    guard !Task.isCancelled else { return }
     resolutions = resolved
   }
 
@@ -250,7 +260,7 @@ public final class AppModel {
       state = .loading
     }
 
-    let previousSelection = selectedSessionID ?? preferredSelection
+    let previousSelection = preferredSelection ?? selectedSessionID
     do {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
@@ -258,10 +268,16 @@ public final class AppModel {
       // A selection restored from a previous run may name a session that has been archived out
       // of the list, or that never came back at all. It falls back instead of blocking the
       // launch on a session that no longer exists.
-      select(
-        sessions.contains { $0.id == previousSelection } ? previousSelection : sessions.first?.id
-      )
-      preferredSelection = nil
+      //
+      // The fallback keeps the restored selection in hand rather than resolving it away: a load
+      // that came back empty or short — a store caught mid-write — would otherwise persist the
+      // fallback and lose the user's place for good.
+      if let previousSelection, sessions.contains(where: { $0.id == previousSelection }) {
+        preferredSelection = nil
+        apply(selection: previousSelection)
+      } else if !sessions.isEmpty {
+        apply(selection: sessions.first?.id)
+      }
       // Not awaited: the sidebar draws perfectly well without knowing what each agent can do,
       // and on a cold cache this is a detection the first frame would otherwise wait for.
       resolutionTask?.cancel()

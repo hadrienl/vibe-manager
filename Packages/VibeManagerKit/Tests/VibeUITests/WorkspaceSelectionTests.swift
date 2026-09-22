@@ -51,6 +51,27 @@ struct WorkspaceSelectionTests {
     #expect(model.selectedSessionID == nil)
   }
 
+  @Test("A refresh that comes back empty does not cost the user their place")
+  func transientlyEmptyRefreshKeepsTheSelection() async {
+    let first = WorkSession(name: "First", updatedAt: Date(timeIntervalSince1970: 200))
+    let second = WorkSession(name: "Second", updatedAt: Date(timeIntervalSince1970: 100))
+    let repository = StubRepository(sessions: [first, second])
+    let store = RecordingLayoutStore(layout: WorkspaceLayout(selectedSessionID: second.id))
+    let model = AppModel(repository: repository, layout: WorkspaceLayoutController(store: store))
+    await model.load()
+    #expect(model.selectedSessionID == second.id)
+
+    // A store caught mid-write: the list is momentarily gone, the selection is not a decision
+    // the user made to leave it.
+    await repository.replace(with: [])
+    await model.reload()
+    #expect(model.selectedSessionID == second.id)
+
+    await repository.replace(with: [first, second])
+    await model.reload()
+    #expect(model.selectedSessionID == second.id)
+  }
+
   @Test("Selecting from the sidebar is what gets stored")
   func selectionIsStored() async {
     let first = WorkSession(name: "First", updatedAt: Date(timeIntervalSince1970: 200))
@@ -111,6 +132,10 @@ private actor StubRepository: SessionRepository {
       }
       return lhs.updatedAt > rhs.updatedAt
     }
+  }
+
+  func replace(with sessions: [WorkSession]) {
+    stored = sessions
   }
 
   func session(id: SessionID) -> WorkSession? {

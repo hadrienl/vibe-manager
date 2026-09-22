@@ -120,6 +120,37 @@ struct WorkspaceLayoutControllerTests {
     #expect(!controller.columns.isSidebarVisible)
   }
 
+  @Test("Withdrawing a narrow window's exception leaves the arrangement alone")
+  func hidingAnOverriddenColumnKeepsTheIntent() async {
+    let store = RecordingLayoutStore()
+    let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(1))
+    controller.windowWidthChanged(to: 700)
+
+    controller.setSidebarVisible(true)
+    controller.setSidebarVisible(false)
+
+    #expect(controller.intent.isSidebarVisible)
+    await #expect(store.saves.isEmpty)
+
+    // Widening brings back exactly the columns that were open before the window got narrow.
+    controller.windowWidthChanged(to: 1_400)
+    #expect(controller.columns.isSidebarVisible)
+  }
+
+  @Test("Widening past one column's threshold leaves the other column's exception standing")
+  func eachColumnAnswersForItsOwnException() async {
+    let controller = WorkspaceLayoutController()
+    controller.windowWidthChanged(to: 700)
+
+    controller.setInspectorVisible(true)
+    #expect(controller.columns.isInspectorVisible)
+
+    // Wide enough for the sidebar, still too narrow for the inspector.
+    controller.windowWidthChanged(to: 900)
+    #expect(controller.columns.isSidebarVisible)
+    #expect(controller.columns.isInspectorVisible)
+  }
+
   @Test("The exception granted to a narrow window ends when the window changes")
   func overrideEndsWithTheWindow() async {
     let controller = WorkspaceLayoutController()

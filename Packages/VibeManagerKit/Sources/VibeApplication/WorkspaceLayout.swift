@@ -94,19 +94,26 @@ public enum WorkspaceLayoutPolicy {
   /// Below this width the sidebar folds too, and is reached through its toolbar button.
   public static let sidebarThreshold: Double = 820
 
-  public static func resolve(windowWidth: Double, intent: WorkspaceLayout) -> WorkspaceColumns {
-    // An unmeasured window follows the user's intent rather than guessing it away: the first
-    // layout pass must not fold columns that the window is in fact wide enough for.
+  /// Which columns the window is wide enough to hold, whatever the user asked for.
+  ///
+  /// An unmeasured window holds everything: the first layout pass must not fold columns that the
+  /// window is in fact wide enough for.
+  public static func allowances(windowWidth: Double) -> WorkspaceColumns {
     guard windowWidth.isFinite, windowWidth > 0 else {
-      return WorkspaceColumns(
-        isSidebarVisible: intent.isSidebarVisible,
-        isInspectorVisible: intent.isInspectorVisible
-      )
+      return WorkspaceColumns(isSidebarVisible: true, isInspectorVisible: true)
     }
 
     return WorkspaceColumns(
-      isSidebarVisible: intent.isSidebarVisible && windowWidth >= sidebarThreshold,
-      isInspectorVisible: intent.isInspectorVisible && windowWidth >= inspectorThreshold
+      isSidebarVisible: windowWidth >= sidebarThreshold,
+      isInspectorVisible: windowWidth >= inspectorThreshold
+    )
+  }
+
+  public static func resolve(windowWidth: Double, intent: WorkspaceLayout) -> WorkspaceColumns {
+    let allowances = allowances(windowWidth: windowWidth)
+    return WorkspaceColumns(
+      isSidebarVisible: intent.isSidebarVisible && allowances.isSidebarVisible,
+      isInspectorVisible: intent.isInspectorVisible && allowances.isInspectorVisible
     )
   }
 }

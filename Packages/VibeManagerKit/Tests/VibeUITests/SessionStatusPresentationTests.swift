@@ -88,6 +88,26 @@ struct SessionStatusPresentationTests {
     #expect(running.label == "Running")
   }
 
+  @Test("A terminal that simply finished does not hide a missing agent")
+  func missingAgentOutranksAFinishedTerminal() {
+    let unknown = SessionAgentResolution.unknownProvider("codex")
+
+    let finished = SessionStatusPresentation.make(
+      session: session(),
+      paneStatus: .exited(code: 0),
+      resolution: unknown
+    )
+    // A terminal that ended badly still says more: that is what just happened here.
+    let failed = SessionStatusPresentation.make(
+      session: session(),
+      paneStatus: .exited(code: 127),
+      resolution: unknown
+    )
+
+    #expect(finished.label == "Agent unavailable")
+    #expect(failed.label.contains("127"))
+  }
+
   @Test("VoiceOver hears the name, the agent and the state")
   func accessibilityLabelCarriesTheState() {
     let session = session()
