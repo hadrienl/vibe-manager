@@ -54,14 +54,11 @@ public final class SessionLauncher {
   public func launch(session: WorkSession, plan: AgentLaunchPlan) async -> Bool {
     guard !isRunning(session.id) else { return true }
 
-    let pane = TerminalPaneModel(
-      sessionID: session.id,
-      supervisor: supervisor,
-      spec: .agent(plan: plan),
-      viewportTimeout: viewportTimeout
-    )
-    panes[session.id] = pane
-    await pane.start()
+    // The pane a session already has is reused rather than replaced. The view that renders it
+    // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
+    // resize wiring — pointed at a pane nobody renders any more.
+    let pane = pane(for: session.id) ?? makePane(for: session.id, plan: plan)
+    await pane.start(spec: .agent(plan: plan))
 
     guard let terminal = pane.session else { return false }
 
@@ -70,6 +67,17 @@ public final class SessionLauncher {
     // a process leaves a session the user can retry rather than a lie about a running agent.
     _ = try? await changeStatus(id: session.id, action: .reopen)
     return true
+  }
+
+  private func makePane(for id: SessionID, plan: AgentLaunchPlan) -> TerminalPaneModel {
+    let pane = TerminalPaneModel(
+      sessionID: id,
+      supervisor: supervisor,
+      spec: .agent(plan: plan),
+      viewportTimeout: viewportTimeout
+    )
+    panes[id] = pane
+    return pane
   }
 
   public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {

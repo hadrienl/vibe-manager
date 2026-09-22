@@ -27,7 +27,7 @@ public final class TerminalPaneModel {
 
   private let sessionID: SessionID
   private let supervisor: any TerminalSupervisor
-  private let spec: TerminalSpec
+  private var spec: TerminalSpec
   private let viewportTimeout: Duration
   private var stateTask: Task<Void, Never>?
   private var isStarting = false
@@ -51,10 +51,17 @@ public final class TerminalPaneModel {
   /// 80×24 and resizing a moment later leaves the agent's first screen — its banner, its prompt
   /// box — laid out for a terminal that never existed. The wait is bounded: if no surface has
   /// measured itself by then, the spec's own size is used rather than delaying the launch.
-  public func start() async {
+  ///
+  /// A restart may carry a new plan — the session's agent, model or folder can have changed — so
+  /// a given `spec` replaces the one the pane was built with rather than being ignored.
+  public func start(spec: TerminalSpec? = nil) async {
     guard !isStarting, session == nil || !status.isRunning else { return }
     isStarting = true
     defer { isStarting = false }
+
+    if let spec {
+      self.spec = spec
+    }
 
     if viewportSize == nil {
       await waitForViewport()
@@ -66,13 +73,13 @@ public final class TerminalPaneModel {
     status = .starting
     failure = nil
 
-    var spec = spec
+    var launchSpec = self.spec
     if let viewportSize {
-      spec.initialSize = viewportSize
+      launchSpec.initialSize = viewportSize
     }
 
     do {
-      let session = try await supervisor.start(spec, for: sessionID)
+      let session = try await supervisor.start(launchSpec, for: sessionID)
       self.session = session
       observe(session)
     } catch let error as TerminalError {

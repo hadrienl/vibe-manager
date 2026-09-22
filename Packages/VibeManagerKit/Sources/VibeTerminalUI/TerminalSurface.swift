@@ -32,6 +32,9 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 
   public func updateNSView(_ nsView: TerminalView, context: Context) {
+    // The pane can be replaced under a view SwiftUI keeps identical — a relaunch of the same
+    // session builds a new one — so the coordinator is told which pane is the live one.
+    context.coordinator.adopt(pane: pane)
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
@@ -65,12 +68,14 @@ private enum TerminalCommand: Sendable {
 
 @MainActor
 public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
-  private let pane: TerminalPaneModel
+  private var pane: TerminalPaneModel
   private weak var view: TerminalView?
   private var eventTask: Task<Void, Never>?
-  private var attachedSessionID: SessionID?
+  // Object identity, not `session.id`: the id belongs to the work session and is reused by every
+  // process started for it, so it cannot tell a restarted session from the one already attached.
+  private var attachedSession: ObjectIdentifier?
   private let commands: AsyncStream<TerminalCommand>.Continuation
-  private let commandTask: Task<Void, Never>
+  private var commandTask: Task<Void, Never>?
 
   init(pane: TerminalPaneModel) {
     self.pane = pane
@@ -81,10 +86,13 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       preconditionFailure("AsyncStream did not provide a continuation")
     }
     commands = continuation
+    super.init()
     // One consumer, one order: keystrokes and resizes reach the process in the order the user
     // made them, and a size measured before the process exists is remembered rather than lost.
-    commandTask = Task { @MainActor [pane] in
+    commandTask = Task { @MainActor [weak self] in
       for await command in stream {
+        // Read the pane on each command rather than capturing it: `adopt` can have replaced it.
+        guard let pane = self?.pane else { continue }
         switch command {
         case .write(let bytes):
           await pane.write(bytes)
@@ -97,16 +105,29 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   deinit {
     commands.finish()
-    commandTask.cancel()
+    commandTask?.cancel()
   }
 
   func bind(to view: TerminalView) {
     self.view = view
   }
 
+  /// Points the coordinator at the pane the view now renders.
+  ///
+  /// A relaunch replaces the pane while SwiftUI keeps the same view identity, so without this the
+  /// coordinator would keep writing keystrokes and viewport sizes into a discarded model.
+  func adopt(pane: TerminalPaneModel) {
+    guard self.pane !== pane else { return }
+    self.pane = pane
+    eventTask?.cancel()
+    eventTask = nil
+    attachedSession = nil
+  }
+
   func attachIfNeeded(to session: any TerminalSession) {
-    guard attachedSessionID != session.id else { return }
-    attachedSessionID = session.id
+    let identity = ObjectIdentifier(session)
+    guard attachedSession != identity else { return }
+    attachedSession = identity
     eventTask?.cancel()
     eventTask = Task { [session] in
       let attachment = await session.attach()
@@ -123,7 +144,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func unbind() {
     eventTask?.cancel()
     eventTask = nil
-    attachedSessionID = nil
+    attachedSession = nil
     view = nil
   }
 

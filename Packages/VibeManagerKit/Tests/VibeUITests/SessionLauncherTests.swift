@@ -125,6 +125,26 @@ struct SessionLauncherTests {
   /// The model side of what made a tab change show the wrong terminal. The view side — one
   /// AppKit terminal view per session rather than one reused across them — is not reachable from
   /// a headless test and is held by the session's identity in `RootView`.
+  @Test("Relaunching a session keeps its pane rather than replacing it")
+  func relaunchReusesThePane() async {
+    // The view that renders a pane is keyed on the session id, so a replacement pane would be
+    // installed under a coordinator still wired to the discarded one.
+    let session = storedSession()
+    let launcher = SessionLauncher(
+      supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35)),
+      repository: MutableRepository(sessions: [session]),
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero
+    )
+
+    await launcher.launch(session: session, plan: plan())
+    let first = launcher.pane(for: session.id)
+    await launcher.launch(session: session, plan: plan())
+
+    #expect(first != nil)
+    #expect(launcher.pane(for: session.id) === first)
+  }
+
   @Test("Each session keeps its own pane")
   func panesAreNeverShared() async {
     let first = WorkSession(

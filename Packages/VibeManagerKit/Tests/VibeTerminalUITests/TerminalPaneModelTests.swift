@@ -149,6 +149,25 @@ func paneRestartsAfterItsProcessFinished() async throws {
 }
 
 @MainActor
+@Test("A restart carries the plan it was given, not the one the pane was built with")
+func paneRestartsWithTheGivenSpec() async throws {
+  let id = SessionID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+
+  await model.start()
+  await supervisor.emit(.exited(code: 0), for: id)
+  try await Task.sleep(for: .milliseconds(50))
+
+  var replacement = makeSpec()
+  replacement.arguments = ["--resume", "abc"]
+  await model.start(spec: replacement)
+
+  #expect(await supervisor.startedSpecs.last?.arguments == ["--resume", "abc"])
+}
+
+@MainActor
 @Test("Starting a pane that is already running changes nothing")
 func paneIgnoresRedundantStart() async throws {
   let id = SessionID()
