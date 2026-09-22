@@ -17,6 +17,7 @@ public final class AppModel {
   public private(set) var state: State = .idle
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   public private(set) var isRefreshingAgents = false
+  private var isReloading = false
   public private(set) var selectedSessionID: SessionID?
   public private(set) var isPresentingNewSession = false
   public private(set) var newSessionModel: NewSessionModel?
@@ -136,10 +137,14 @@ public final class AppModel {
   /// The order the ticket asks for: the session is already stored, so it is published and
   /// selected first, and only then does anything get started. A launch that fails leaves a
   /// session the user can see and retry, never a disappearing one.
+  ///
+  /// It is published by inserting it rather than by reloading the store: the session is already
+  /// written, so showing it is a fact and not a guess, and the workspace never has to go blank
+  /// to display something the application already holds.
   public func complete(_ creation: SessionCreation) async {
     isPresentingNewSession = false
     newSessionModel = nil
-    await reload()
+    insert(creation.session)
     select(creation.session.id)
     guard let launcher else { return }
     await launcher.launch(session: creation.session, plan: creation.plan)
@@ -147,10 +152,17 @@ public final class AppModel {
   }
 
   public func reload() async {
-    guard state != .loading else { return }
+    guard !isReloading else { return }
+    isReloading = true
+    defer { isReloading = false }
+
+    // A refresh over something already on screen never blanks it. The spinner belongs to the
+    // first load, when there is genuinely nothing to show.
+    if sessions.isEmpty {
+      state = .loading
+    }
 
     let previousSelection = selectedSessionID
-    state = .loading
     do {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
@@ -159,6 +171,19 @@ public final class AppModel {
     } catch {
       state = await failure(for: error)
     }
+  }
+
+  private func insert(_ session: WorkSession) {
+    var sessions = sessions.filter { $0.id != session.id }
+    sessions.append(session)
+    state = .loaded(
+      sessions.sorted { lhs, rhs in
+        if lhs.updatedAt == rhs.updatedAt {
+          return lhs.id.description < rhs.id.description
+        }
+        return lhs.updatedAt > rhs.updatedAt
+      }
+    )
   }
 
   public func restoreBackup() async {
