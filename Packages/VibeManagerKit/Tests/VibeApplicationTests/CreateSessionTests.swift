@@ -135,6 +135,20 @@ struct CreateSessionTests {
     #expect(await repository.savedSessions.isEmpty)
   }
 
+  @Test("A problem two checks agree on is stated once")
+  func duplicateIssuesAreCollapsed() async {
+    // The draft rejects a relative folder, and so does the agent when asked for a launch plan:
+    // the sheet must not list the same sentence twice, nor count one problem as two.
+    let (create, _) = makeSubject(
+      provider: StubProvider(launchFailure: .invalidWorkingDirectory)
+    )
+
+    let issues = await create.problems(with: draft(path: "workspace"))
+
+    #expect(issues.filter { $0 == .workingDirectoryNotAbsolute }.count == 1)
+    #expect(Set(issues.map(\.id)).count == issues.count)
+  }
+
   @Test("A store that refuses the write surfaces its error rather than a fake session")
   func storeFailureIsPropagated() async {
     let repository = SpyRepository(failsOnSave: true)

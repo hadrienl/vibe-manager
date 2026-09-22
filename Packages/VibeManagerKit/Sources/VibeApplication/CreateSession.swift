@@ -62,7 +62,21 @@ public struct CreateSession: Sendable {
     return SessionCreation(session: session, plan: plan)
   }
 
+  /// The draft's problems, each stated once.
+  ///
+  /// Two checks can reach the same conclusion — a relative folder is caught by the draft and
+  /// again by the agent refusing to plan a launch — and an issue is identified by its field and
+  /// its sentence, so a repeat would collide in the lists the sheet renders and would be counted
+  /// twice in its footer.
   private func evaluate(
+    _ draft: SessionDraft
+  ) async -> (issues: [SessionDraftIssue], plan: AgentLaunchPlan?) {
+    let outcome = await assess(draft)
+    var seen: Set<SessionDraftIssue.ID> = []
+    return (outcome.issues.filter { seen.insert($0.id).inserted }, outcome.plan)
+  }
+
+  private func assess(
     _ draft: SessionDraft
   ) async -> (issues: [SessionDraftIssue], plan: AgentLaunchPlan?) {
     var issues = draft.validate()
