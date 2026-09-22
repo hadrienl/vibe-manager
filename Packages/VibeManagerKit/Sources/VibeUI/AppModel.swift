@@ -40,14 +40,36 @@ public final class AppModel {
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.
+  ///
+  /// Each agent is published as its own detection lands, in registration order. Waiting for the
+  /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
+  /// probes now costs three budgets and their retries: there is no reason for the agents that
+  /// answered straight away to stay hidden for that long.
   public func refreshAgents(forceRefresh: Bool = false) async {
     guard let agents, !isRefreshingAgents else { return }
 
     isRefreshingAgents = true
     defer { isRefreshingAgents = false }
 
-    let availabilities = await agents.availabilities(forceRefresh: forceRefresh)
-    agentDiagnostics = await agents.descriptors().compactMap { availabilities[$0.id]?.diagnostic }
+    let descriptors = await agents.descriptors()
+    var diagnostics: [AgentProviderID: AgentDiagnostic] = [:]
+
+    await withTaskGroup(of: (AgentProviderID, AgentAvailability?).self) { group in
+      for descriptor in descriptors {
+        group.addTask {
+          guard let provider = await agents.provider(id: descriptor.id) else {
+            return (descriptor.id, nil)
+          }
+          return (descriptor.id, await provider.availability(forceRefresh: forceRefresh))
+        }
+      }
+
+      for await (id, availability) in group {
+        guard let availability else { continue }
+        diagnostics[id] = availability.diagnostic
+        agentDiagnostics = descriptors.compactMap { diagnostics[$0.id] }
+      }
+    }
   }
 
   /// Whether a stored session can be handed back to its agent.

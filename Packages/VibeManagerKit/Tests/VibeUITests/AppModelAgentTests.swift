@@ -14,14 +14,19 @@ private actor EmptyRepository: SessionRepository {
 private struct StubAgentProvider: AgentProvider {
   let descriptor: AgentDescriptor
   let state: AgentAvailabilityState
+  let delay: Duration
 
-  init(id: String, state: AgentAvailabilityState) {
+  init(id: String, state: AgentAvailabilityState, delay: Duration = .zero) {
     descriptor = AgentDescriptor(id: AgentProviderID(id), displayName: id.capitalized)
     self.state = state
+    self.delay = delay
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
-    AgentAvailability(
+    if delay != .zero {
+      try? await Task.sleep(for: delay)
+    }
+    return AgentAvailability(
       state: state,
       installation: nil,
       diagnostic: AgentDiagnostic(
@@ -75,6 +80,30 @@ func appModelExposesAgentDiagnostics() async {
 
   #expect(model.agentDiagnostics.map(\.providerID.rawValue) == ["claude", "codex"])
   #expect(model.agentDiagnostics.last?.state == .notFound)
+}
+
+@MainActor
+@Test("An agent that answered is shown without waiting for one that has not")
+func aFastAgentIsNotHeldBehindASlowOne() async {
+  let model = AppModel(
+    repository: EmptyRepository(),
+    agents: StubAgentRegistry(providers: [
+      StubAgentProvider(id: "claude", state: .available, delay: .milliseconds(300)),
+      StubAgentProvider(id: "codex", state: .notFound),
+    ])
+  )
+
+  let refresh = Task { await model.refreshAgents() }
+  try? await Task.sleep(for: .milliseconds(60))
+
+  // A CLI that answers none of its probes costs three budgets and their retries. Holding the
+  // agents that answered straight away behind it is what this avoids.
+  #expect(model.agentDiagnostics.map(\.providerID.rawValue) == ["codex"])
+
+  await refresh.value
+
+  // And the registration order is restored once everything has landed.
+  #expect(model.agentDiagnostics.map(\.providerID.rawValue) == ["claude", "codex"])
 }
 
 @MainActor
