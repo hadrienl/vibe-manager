@@ -4,32 +4,44 @@ import VibeApplication
 // Presentation of one terminal: the surface itself plus a readable lifecycle state. The view
 // knows nothing of process identifiers or descriptors.
 public struct TerminalPaneView: View {
-  @State private var model: TerminalPaneModel
+  /// Held, not stored in `@State`: `@State` keeps the value it was first given for as long as
+  /// the view keeps its identity, so showing another session's pane in the same place went on
+  /// displaying the first one. The model is an observable reference owned elsewhere.
+  private let model: TerminalPaneModel
+  /// A pane whose process someone else owns must not be started again when the view appears:
+  /// re-showing a finished session would silently launch a second agent.
+  private let autoStart: Bool
+  /// False for a pane that stays mounted behind the one being shown.
+  private let isActive: Bool
 
-  public init(model: TerminalPaneModel) {
-    _model = State(initialValue: model)
+  public init(model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true) {
+    self.model = model
+    self.autoStart = autoStart
+    self.isActive = isActive
   }
 
   public var body: some View {
     VStack(spacing: 0) {
-      Group {
-        if let session = model.session {
-          TerminalSurface(session: session)
-        } else if let failure = model.failure {
-          ContentUnavailableView {
-            Label("Terminal unavailable", systemImage: "exclamationmark.triangle")
-          } description: {
-            Text(failure.message)
-          } actions: {
-            Button("Try Again") {
-              Task { await model.start() }
+      // The surface is mounted from the start: its measured size is what the process is
+      // launched with, so it has to exist before there is a process to show.
+      TerminalSurface(pane: model, session: model.session, isActive: isActive)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay {
+          if let failure = model.failure {
+            ContentUnavailableView {
+              Label("Terminal unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+              Text(failure.message)
+            } actions: {
+              Button("Try Again") {
+                Task { await model.start() }
+              }
             }
+            .background(.background)
+          } else if model.session == nil {
+            ProgressView("Starting terminal…")
           }
-        } else {
-          ProgressView("Starting terminal…")
         }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       Divider()
       TerminalStatusBar(
@@ -39,6 +51,7 @@ public struct TerminalPaneView: View {
       )
     }
     .task {
+      guard autoStart else { return }
       await model.start()
     }
   }

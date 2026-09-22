@@ -96,6 +96,36 @@ public enum AgentRemediation: Hashable, Sendable, Identifiable {
 ///
 /// `summary` is safe to display anywhere. `detail` carries technical context and is only meant
 /// for an explicit export. Neither ever contains a prompt, a token or an environment dump.
+extension AgentRemediation {
+  public var sentence: String {
+    switch self {
+    case .install:
+      return "Install the agent, then detect again."
+    case .update(let minimumVersion, _):
+      return "Update it to \(minimumVersion) or newer, then detect again."
+    case .authenticate(let command):
+      guard let command else { return "Sign in to the agent, then detect again." }
+      return "Run \(command) in a terminal, then detect again."
+    case .defineExecutablePath:
+      return "Set the path to its executable, then detect again."
+    case .retryDetection:
+      return "Detect again."
+    }
+  }
+
+  /// The one sentence to show next to an unusable agent.
+  ///
+  /// Retrying detection is the remedy of last resort: it is already a button, and it explains
+  /// nothing about what is wrong, so anything more specific comes first.
+  public static func sentence(for remediations: [AgentRemediation]) -> String {
+    let specific = remediations.first { remediation in
+      if case .retryDetection = remediation { return false }
+      return true
+    }
+    return (specific ?? remediations.first)?.sentence ?? "Detect again, or pick another agent."
+  }
+}
+
 public struct AgentDiagnostic: Hashable, Sendable {
   public let providerID: AgentProviderID
   public let providerName: String

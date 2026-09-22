@@ -1,0 +1,134 @@
+import Foundation
+import Observation
+import VibeApplication
+import VibeDomain
+import VibeTerminalUI
+
+/// Starts the terminal and the agent of a session, and keeps one pane per session alive.
+///
+/// The pane outlives a tab change on purpose: #8 needs each terminal to keep its state and its
+/// scroll, and an agent must never be restarted just because the user looked at another session.
+@MainActor
+@Observable
+public final class SessionLauncher {
+  private let supervisor: any TerminalSupervisor
+  private let repository: any SessionRepository
+  private let agents: any AgentProviderResolving
+  private let changeStatus: ChangeSessionStatus
+
+  private var panes: [SessionID: TerminalPaneModel] = [:]
+  private var observers: [SessionID: any AgentLaunchObserver] = [:]
+  private var outputTasks: [SessionID: Task<Void, Never>] = [:]
+
+  /// How long a launch waits for the pane to measure itself before falling back to the spec's
+  /// own size. Long enough for one layout pass, short enough never to feel like a delay.
+  private let viewportTimeout: Duration
+
+  public init(
+    supervisor: any TerminalSupervisor,
+    repository: any SessionRepository,
+    agents: any AgentProviderResolving,
+    clock: any SessionClock = SystemSessionClock(),
+    viewportTimeout: Duration = .milliseconds(500)
+  ) {
+    self.supervisor = supervisor
+    self.repository = repository
+    self.agents = agents
+    self.viewportTimeout = viewportTimeout
+    changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
+  }
+
+  public func pane(for id: SessionID) -> TerminalPaneModel? {
+    panes[id]
+  }
+
+  public func isRunning(_ id: SessionID) -> Bool {
+    panes[id]?.status == .running || panes[id]?.status == .starting
+  }
+
+  /// Starts one launch. Returns `true` once the process is running.
+  ///
+  /// A session that already has a running pane is left alone rather than started twice: pressing
+  /// Create twice, or restoring a session that is already up, must not fork a second agent.
+  @discardableResult
+  public func launch(session: WorkSession, plan: AgentLaunchPlan) async -> Bool {
+    guard !isRunning(session.id) else { return true }
+
+    // The pane a session already has is reused rather than replaced. The view that renders it
+    // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
+    // resize wiring — pointed at a pane nobody renders any more.
+    let pane = pane(for: session.id) ?? makePane(for: session.id, plan: plan)
+    await pane.start(spec: .agent(plan: plan))
+
+    guard let terminal = pane.session else { return false }
+
+    await startObserver(for: session, plan: plan, terminal: terminal)
+    // The session becomes active only now: it is stored closed, so a launch that never reached
+    // a process leaves a session the user can retry rather than a lie about a running agent.
+    _ = try? await changeStatus(id: session.id, action: .reopen)
+    return true
+  }
+
+  private func makePane(for id: SessionID, plan: AgentLaunchPlan) -> TerminalPaneModel {
+    let pane = TerminalPaneModel(
+      sessionID: id,
+      supervisor: supervisor,
+      spec: .agent(plan: plan),
+      viewportTimeout: viewportTimeout
+    )
+    panes[id] = pane
+    return pane
+  }
+
+  public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {
+    panes[id]?.failure
+  }
+
+  public func stopAll(gracePeriod: Duration = .seconds(3)) async {
+    for task in outputTasks.values {
+      task.cancel()
+    }
+    outputTasks.removeAll()
+    for observer in observers.values {
+      await observer.finished()
+    }
+    observers.removeAll()
+    await supervisor.stopAll(gracePeriod: gracePeriod)
+  }
+
+  private func startObserver(
+    for session: WorkSession,
+    plan: AgentLaunchPlan,
+    terminal: any TerminalSession
+  ) async {
+    guard let providerID = session.agent?.providerID,
+      let provider = await agents.provider(id: AgentProviderID(providerID)),
+      let observing = provider as? any AgentLaunchObserverProviding
+    else {
+      return
+    }
+
+    let observer = observing.launchObserver(for: session.id, repository: repository)
+    observers[session.id] = observer
+    await observer.launched(plan: plan)
+
+    outputTasks[session.id]?.cancel()
+    outputTasks[session.id] = Task {
+      let attachment = await terminal.attach()
+      // One decoder for the whole stream: a read can end in the middle of a character, and the
+      // identifiers the observer looks for would be broken by a replacement character.
+      var decoder = UTF8StreamDecoder()
+      for await event in attachment.events {
+        guard case .output(let bytes) = event else { continue }
+        let text = decoder.decode(bytes)
+        guard !text.isEmpty else { continue }
+        await observer.observe(output: text)
+      }
+      let tail = decoder.flush()
+      if !tail.isEmpty {
+        await observer.observe(output: tail)
+      }
+      await observer.finished()
+    }
+  }
+}

@@ -22,37 +22,67 @@ public final class TerminalPaneModel {
   public private(set) var status: Status = .starting
   public private(set) var session: (any TerminalSession)?
   public private(set) var failure: Failure?
+  /// The size the surface last measured, in character cells.
+  public private(set) var viewportSize: TerminalSize?
 
   private let sessionID: SessionID
   private let supervisor: any TerminalSupervisor
-  private let spec: TerminalSpec
+  private var spec: TerminalSpec
+  private let viewportTimeout: Duration
   private var stateTask: Task<Void, Never>?
   private var isStarting = false
+  private var viewportWaiters: [ViewportWaiter] = []
 
-  public init(sessionID: SessionID, supervisor: any TerminalSupervisor, spec: TerminalSpec) {
+  public init(
+    sessionID: SessionID,
+    supervisor: any TerminalSupervisor,
+    spec: TerminalSpec,
+    viewportTimeout: Duration = .milliseconds(500)
+  ) {
     self.sessionID = sessionID
     self.supervisor = supervisor
     self.spec = spec
+    self.viewportTimeout = viewportTimeout
   }
 
-  // A pane whose process has finished can be started again: the guard keys on whether a session is
-  // still running, not on whether one was ever created.
-  public func start() async {
+  /// Starts the process, once the pane knows how big it is.
+  ///
+  /// A terminal program reads its size when it starts and draws itself around it. Spawning at
+  /// 80×24 and resizing a moment later leaves the agent's first screen — its banner, its prompt
+  /// box — laid out for a terminal that never existed. The wait is bounded: if no surface has
+  /// measured itself by then, the spec's own size is used rather than delaying the launch.
+  ///
+  /// A restart may carry a new plan — the session's agent, model or folder can have changed — so
+  /// a given `spec` replaces the one the pane was built with rather than being ignored.
+  public func start(spec: TerminalSpec? = nil) async {
     guard !isStarting, session == nil || !status.isRunning else { return }
     isStarting = true
     defer { isStarting = false }
+
+    if let spec {
+      self.spec = spec
+    }
+
+    if viewportSize == nil {
+      await waitForViewport()
+    }
 
     stateTask?.cancel()
     stateTask = nil
     session = nil
     status = .starting
     failure = nil
+
+    var launchSpec = self.spec
+    if let viewportSize {
+      launchSpec.initialSize = viewportSize
+    }
+
     do {
-      let session = try await supervisor.start(spec, for: sessionID)
+      let session = try await supervisor.start(launchSpec, for: sessionID)
       self.session = session
       observe(session)
     } catch let error as TerminalError {
-      // The presented text stays free of technical detail; the errno lives in the diagnostic.
       failure = Failure(
         message: error.errorDescription ?? "The terminal could not be started.",
         suggestion: error.recoverySuggestion
@@ -64,12 +94,40 @@ public final class TerminalPaneModel {
     }
   }
 
+  /// Called by the surface whenever it has measured itself, before and after the process exists.
+  public func reportViewportSize(_ size: TerminalSize) async {
+    guard size.isUsable else { return }
+    let isFirst = viewportSize == nil
+    viewportSize = size
+
+    if isFirst {
+      let waiters = viewportWaiters
+      viewportWaiters = []
+      waiters.forEach { $0.resume() }
+    }
+    await session?.resize(to: size)
+  }
+
+  /// Input travels through here so that keystrokes and resizes keep the order they were made in.
+  public func write(_ bytes: [UInt8]) async {
+    await session?.write(bytes)
+  }
+
   public func stop() async {
     await supervisor.stop(id: sessionID, gracePeriod: .seconds(3))
-    // The supervisor has dropped the session; make sure the pane reports the outcome even if the
-    // final state change never reached the event stream.
     if let session {
       apply(await session.state())
+    }
+  }
+
+  private func waitForViewport() async {
+    await withCheckedContinuation { continuation in
+      let waiter = ViewportWaiter(continuation)
+      viewportWaiters.append(waiter)
+      Task { [viewportTimeout] in
+        try? await Task.sleep(for: viewportTimeout)
+        waiter.resume()
+      }
     }
   }
 
@@ -82,8 +140,6 @@ public final class TerminalPaneModel {
         guard case .stateChanged(let state) = event else { continue }
         self?.apply(state)
       }
-      // The stream ends when the session finalises, and a stalled subscriber may have missed the
-      // last state change, so read the settled state rather than trusting the events alone.
       guard !Task.isCancelled else { return }
       self?.apply(await session.state())
     }
@@ -102,5 +158,20 @@ public final class TerminalPaneModel {
     case .failed(let error):
       status = .failed(message: error.errorDescription ?? "The terminal failed.")
     }
+  }
+}
+
+/// Resumed either by the first measurement or by the deadline, and never twice.
+@MainActor
+private final class ViewportWaiter {
+  private var continuation: CheckedContinuation<Void, Never>?
+
+  init(_ continuation: CheckedContinuation<Void, Never>) {
+    self.continuation = continuation
+  }
+
+  func resume() {
+    continuation?.resume()
+    continuation = nil
   }
 }

@@ -182,7 +182,12 @@ public struct TerminalAttachment: Sendable {
   }
 }
 
-public protocol TerminalSession: Sendable {
+/// One process behind one terminal.
+///
+/// `AnyObject` is part of the contract: a session's `id` is the identifier of the *work* session,
+/// which outlives the process, so a restart hands out a new session object under the same id.
+/// Anything that caches an attachment has to tell those apart by object identity.
+public protocol TerminalSession: AnyObject, Sendable {
   var id: SessionID { get }
 
   // A view needs the backlog and the live stream as one consistent value: reading them

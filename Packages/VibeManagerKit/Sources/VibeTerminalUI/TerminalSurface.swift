@@ -1,18 +1,26 @@
 import SwiftTerm
 import SwiftUI
 import VibeApplication
+import VibeDomain
 
-// The only place that knows about the emulator. Views above it see a session and a state, never
-// a descriptor, a process identifier or a SwiftTerm type.
+/// The terminal view, mounted before the process exists.
+///
+/// It has to be: its own layout is what tells the pane how many columns and rows the agent will
+/// be started with. Until a session appears it simply has nothing to display.
 public struct TerminalSurface: NSViewRepresentable {
-  private let session: any TerminalSession
+  private let pane: TerminalPaneModel
+  private let session: (any TerminalSession)?
+  /// Panes that are not on screen stay mounted, so they must not keep the keyboard.
+  private let isActive: Bool
 
-  public init(session: any TerminalSession) {
+  public init(pane: TerminalPaneModel, session: (any TerminalSession)?, isActive: Bool = true) {
+    self.pane = pane
     self.session = session
+    self.isActive = isActive
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
-    TerminalSurfaceCoordinator(session: session)
+    TerminalSurfaceCoordinator(pane: pane)
   }
 
   public func makeNSView(context: Context) -> TerminalView {
@@ -23,7 +31,15 @@ public struct TerminalSurface: NSViewRepresentable {
     return view
   }
 
-  public func updateNSView(_ nsView: TerminalView, context: Context) {}
+  public func updateNSView(_ nsView: TerminalView, context: Context) {
+    // The pane can be replaced under a view SwiftUI keeps identical — a relaunch of the same
+    // session builds a new one — so the coordinator is told which pane is the live one.
+    context.coordinator.adopt(pane: pane)
+    if let session {
+      context.coordinator.attachIfNeeded(to: session)
+    }
+    context.coordinator.followActivation(isActive, in: nsView)
+  }
 
   public static func dismantleNSView(
     _ nsView: TerminalView,
@@ -33,9 +49,6 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 }
 
-// Input and resizes reach the session through one serial channel. Unstructured tasks have no
-// ordering guarantee between them, so a task per delegate callback would let fast typing, a pasted
-// chunk split across several callbacks, or two resizes during a window drag arrive out of order.
 private enum TerminalCommand: Sendable {
   case write([UInt8])
   case resize(TerminalSize)
@@ -43,14 +56,18 @@ private enum TerminalCommand: Sendable {
 
 @MainActor
 public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
-  private let session: any TerminalSession
+  private var pane: TerminalPaneModel
   private weak var view: TerminalView?
   private var eventTask: Task<Void, Never>?
+  // Object identity, not `session.id`: the id belongs to the work session and is reused by every
+  // process started for it, so it cannot tell a restarted session from the one already attached.
+  private var attachedSession: ObjectIdentifier?
+  private var wasActive: Bool?
   private let commands: AsyncStream<TerminalCommand>.Continuation
-  private let commandTask: Task<Void, Never>
+  private var commandTask: Task<Void, Never>?
 
-  init(session: any TerminalSession) {
-    self.session = session
+  init(pane: TerminalPaneModel) {
+    self.pane = pane
 
     var continuation: AsyncStream<TerminalCommand>.Continuation?
     let stream = AsyncStream<TerminalCommand> { continuation = $0 }
@@ -58,13 +75,18 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       preconditionFailure("AsyncStream did not provide a continuation")
     }
     commands = continuation
-    commandTask = Task { [session] in
+    super.init()
+    // One consumer, one order: keystrokes and resizes reach the process in the order the user
+    // made them, and a size measured before the process exists is remembered rather than lost.
+    commandTask = Task { @MainActor [weak self] in
       for await command in stream {
+        // Read the pane on each command rather than capturing it: `adopt` can have replaced it.
+        guard let pane = self?.pane else { continue }
         switch command {
         case .write(let bytes):
-          await session.write(bytes)
+          await pane.write(bytes)
         case .resize(let size):
-          await session.resize(to: size)
+          await pane.reportViewportSize(size)
         }
       }
     }
@@ -72,16 +94,52 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   deinit {
     commands.finish()
-    commandTask.cancel()
+    commandTask?.cancel()
   }
 
   func bind(to view: TerminalView) {
     self.view = view
+  }
+
+  /// Points the coordinator at the pane the view now renders.
+  ///
+  /// A relaunch replaces the pane while SwiftUI keeps the same view identity, so without this the
+  /// coordinator would keep writing keystrokes and viewport sizes into a discarded model.
+  func adopt(pane: TerminalPaneModel) {
+    guard self.pane !== pane else { return }
+    self.pane = pane
+    eventTask?.cancel()
+    eventTask = nil
+    attachedSession = nil
+  }
+
+  /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
+  /// that kept the first responder would quietly receive what was typed for its neighbour.
+  ///
+  /// Only a *change* of activation moves the keyboard. Claiming it on every update would fight
+  /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
+  /// active terminal would steal the focus back from the sidebar mid-keystroke.
+  func followActivation(_ isActive: Bool, in view: TerminalView) {
+    // No window yet: nothing can hold the keyboard, and this is not the change we are waiting
+    // for — leave the state untouched so the next update still acts on it.
+    guard let window = view.window else { return }
+    guard wasActive != isActive else { return }
+    wasActive = isActive
+
+    if isActive {
+      window.makeFirstResponder(view)
+    } else if window.firstResponder === view {
+      window.makeFirstResponder(nil)
+    }
+  }
+
+  func attachIfNeeded(to session: any TerminalSession) {
+    let identity = ObjectIdentifier(session)
+    guard attachedSession != identity else { return }
+    attachedSession = identity
     eventTask?.cancel()
     eventTask = Task { [session] in
       let attachment = await session.attach()
-      // The backlog is replayed first so that a view created after the process started shows
-      // what has already been printed.
       feed(attachment.history.bytes)
       for await event in attachment.events {
         guard !Task.isCancelled else { return }
@@ -95,6 +153,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func unbind() {
     eventTask?.cancel()
     eventTask = nil
+    attachedSession = nil
     view = nil
   }
 

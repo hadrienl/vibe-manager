@@ -10,31 +10,35 @@ import VibeUI
 @MainActor
 final class AppEnvironment {
   let appModel: AppModel
-  let terminalPane: TerminalPaneModel
 
   private let terminalSupervisor: PTYTerminalSupervisor
+  private let launcher: SessionLauncher
 
   init() {
     let repository = FileSessionRepository()
     let registry = AgentProviderRegistry(providers: Self.providers())
-    appModel = AppModel(repository: repository, recovery: repository, agents: registry)
-
     let supervisor = PTYTerminalSupervisor()
+
     terminalSupervisor = supervisor
-    terminalPane = TerminalPaneModel(
-      sessionID: SessionID(),
+    launcher = SessionLauncher(
       supervisor: supervisor,
-      spec: .loginShell(workingDirectoryURL: AppEnvironment.defaultWorkingDirectory())
+      repository: repository,
+      agents: registry
+    )
+    appModel = AppModel(
+      repository: repository,
+      recovery: repository,
+      agents: registry,
+      launcher: launcher,
+      defaultWorkingDirectoryPath: AppEnvironment.defaultWorkingDirectory().path
     )
   }
 
-  // Quitting must not leave agent processes behind, so termination waits for the graceful stop
-  // of every terminal before the application actually exits.
   func stopAllTerminals() async {
+    await launcher.stopAll()
     await terminalSupervisor.stopAll(gracePeriod: .seconds(3))
   }
 
-  /// The only place a provider is registered. Adding an agent stops here.
   private static func providers() -> [any AgentProvider] {
     var providers: [any AgentProvider] = [
       ClaudeCodeAgentProvider.make(),

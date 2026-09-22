@@ -9,12 +9,21 @@ struct VibeManagerApp: App {
 
   var body: some Scene {
     WindowGroup {
-      RootView(model: environment.appModel, terminal: environment.terminalPane)
+      RootView(model: environment.appModel)
         .onAppear {
           appDelegate.environment = environment
         }
     }
     .defaultSize(width: 1_180, height: 760)
+    .commands {
+      CommandGroup(replacing: .newItem) {
+        Button("New Session") {
+          environment.appModel.beginNewSession()
+        }
+        .keyboardShortcut("n", modifiers: .command)
+        .disabled(!environment.appModel.canCreateSession)
+      }
+    }
 
     Settings {
       Form {
