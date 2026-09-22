@@ -63,6 +63,18 @@ starting: the usual budget lapses on installations that are perfectly fine, and 
 then declares a working agent broken. An exit code, a refusal to start and a cancellation are
 answers, so none of them is retried.
 
+The same rule covers the other two commands of a detection. The login shell lookup in
+`FileSystemExecutableLocator` is retried on `loginShellRetryTimeout`, and a shell silent twice
+yields `ExecutableLocation.timedOut` rather than `notFound`: a shell still sourcing a heavy
+configuration has said nothing about the installation, and `notFound` would send a user whose
+agent lives outside the candidate directories off to install a CLI they already have. A shell that
+exits non zero has looked and not found it, so that answer is kept as is. The sign in check runs
+on the same binary, on the same cold start, so it is retried on `versionRetryTimeout` too;
+without it, a first silence used to read as "signed in" and announced a signed out agent as ready.
+A sign in check silent twice still never blocks a launch — silence is not a verdict either way —
+but it is written into the diagnostic detail, so an export does not read as a clean bill of
+health.
+
 ### A ready agent is detected once, everything else is detected again
 
 An agent found `available` is cached for the whole session: a CLI does not uninstall itself while
@@ -122,9 +134,9 @@ in Debug builds only, so a distributed Release never lists it.
 - An agent that is uninstalled, downgraded or moved while the application runs keeps its
   `available` state until the user detects again; the launch then fails on the stale path with
   the CLI's own error. Detecting once was the point, and the button is the way back.
-- A login shell lookup that lapses in `FileSystemExecutableLocator` still degrades to
-  `notFound`, which reads as "was not found on this Mac" — as wrong as the timeout verdict this
-  decision removes, but much rarer. The same reasoning applies to it the day it shows up.
+- A detection whose every command lapses now costs the three budgets plus their retries, and
+  `refreshAgents` stays busy for that whole window while silently ignoring the Refresh button.
+  Facing one wedged CLI the wait is noticeably longer than the verdict it replaces.
 - `AgentDiagnostic.redact(path:)` abbreviates against `NSHomeDirectory()`, which stops matching
   the day App Sandbox is enabled. Revisit it together with the sandboxing decision of #19.
 
