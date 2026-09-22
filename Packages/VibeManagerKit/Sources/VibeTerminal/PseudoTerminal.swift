@@ -28,8 +28,18 @@ struct PseudoTerminal: Sendable {
     processIdentifier
   }
 
+  /// Resizes the terminal, and tells the child about it.
+  ///
+  /// Writing the new size is not enough. The kernel raises `SIGWINCH` on the terminal's
+  /// foreground process group, and a process started by the application has none: measured on a
+  /// running session, the agent reports no controlling terminal and a foreground group of 0,
+  /// where a child spawned from a shell gets both. The size was therefore updated under a
+  /// program nobody told to read it again, and the agent kept drawing at the width it started
+  /// with. The signal is sent to the group the child leads, which does not depend on any of it.
   func resize(to size: TerminalSize) {
+    guard size.isUsable else { return }
     setWindowSize(size, on: masterDescriptor)
+    signalProcessGroup(SIGWINCH)
   }
 
   @discardableResult
