@@ -384,7 +384,30 @@ public final class AppModel {
     // ⌃⌘R again would build a second plan and replace the question under the user, leaving the
     // text they had started editing attached to nothing.
     guard pendingRestart?.sessionID != session.id else { return false }
+    // An agent that cannot run has nothing to restart into, and the ticket asks for the command to
+    // be withheld rather than offered and then refused. The answer is the one the detections
+    // already left here, so no probe is run to draw a row: a session whose agent has not been
+    // resolved yet keeps the command, because "not asked yet" is not "unusable".
+    if let resolution = resolutions[session.id], !resolution.isResumable { return false }
     return launcher?.isRunning(session.id) != true
+  }
+
+  /// What Restart will do to this session, as far as can be told without building a plan.
+  ///
+  /// Read from the session and the cached resolution, so a row can say it; the real decision is
+  /// `RestartSession`'s, and the two agree because they read the same two facts.
+  public func expectedRestartMode(for session: WorkSession) -> String {
+    guard case .ready(let descriptor, _) = resolutions[session.id] else {
+      return restartTitle(for: session)
+    }
+    let hasIdentifier = session.agent?.resumeIdentifier?.isEmpty == false
+    if hasIdentifier, descriptor.capabilities.supportsResume {
+      return "\(restartTitle(for: session)), resuming its \(descriptor.displayName) conversation"
+    }
+    if session.closedAt == nil {
+      return restartTitle(for: session)
+    }
+    return "\(restartTitle(for: session)) in a new process, with a summary"
   }
 
   /// A session that was created and never ran is started, not restarted. Promising a restart

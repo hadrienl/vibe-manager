@@ -144,7 +144,12 @@ public struct RootView: View {
           Divider()
         }
         if let failure = model.restartFailure {
-          RestartFailureBanner(failure: failure) { model.dismissRestartFailure() }
+          RestartFailureBanner(
+            failure: failure,
+            detect: { Task { await model.refreshAgents(forceRefresh: true) } },
+            isDetecting: model.isRefreshingAgents,
+            dismiss: { model.dismissRestartFailure() }
+          )
           Divider()
         }
         if let failure = model.resumeFailure {
@@ -404,6 +409,8 @@ private struct ClosedSessionBar: View {
 /// selection that started it.
 private struct RestartFailureBanner: View {
   let failure: AppModel.RestartFailure
+  let detect: () -> Void
+  let isDetecting: Bool
   let dismiss: () -> Void
 
   var body: some View {
@@ -420,6 +427,11 @@ private struct RestartFailureBanner: View {
         }
       }
       Spacer(minLength: 8)
+      // Most of these failures are an agent the Mac cannot run right now, and detecting again is
+      // what turns that around without leaving the workspace.
+      Button("Detect Again", action: detect)
+        .controlSize(.small)
+        .disabled(isDetecting)
       Button {
         dismiss()
       } label: {
@@ -896,6 +908,8 @@ struct SessionCommands {
   var canRestore: Bool { model.canRestore(session) }
   var canRestart: Bool { model.canRestart(session) }
   var restartTitle: String { model.restartTitle(for: session) }
+  /// Spoken rather than read, so it says what the command will actually do.
+  var restartAnnouncement: String { model.expectedRestartMode(for: session) }
 
   func close() { Task { await model.close(session.id) } }
   func requestArchive() { model.requestArchive(session.id) }
@@ -962,7 +976,7 @@ private struct SessionRow: View {
     .accessibilityElement(children: .combine)
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
     // The same commands, reachable without a pointer and without the menu bar.
-    .accessibilityAction(named: Text(commands.restartTitle)) {
+    .accessibilityAction(named: Text(commands.restartAnnouncement)) {
       guard commands.canRestart else { return }
       commands.restart()
     }

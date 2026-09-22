@@ -237,6 +237,34 @@ struct SessionRestartTests {
     #expect(!model.canRestart(session(status: .archived, path: path)))
   }
 
+  @Test("Restart is withheld from a session whose agent cannot run")
+  func unusableAgentWithholdsTheCommand() async {
+    let path = folder()
+    let subject = session(providerID: "gone", path: path)
+    let (model, _, _, _) = makeWorkspace(session: subject)
+    await model.reload()
+    await model.refreshResolutions()
+
+    #expect(!model.canRestart(subject))
+  }
+
+  @Test("What Restart will do is announced, not left to be discovered")
+  func modeIsAnnouncedBeforeTheCommand() async {
+    let path = folder()
+    let resumable = session(path: path)
+    let (resumableModel, _, _, _) = makeWorkspace(session: resumable)
+    await resumableModel.reload()
+    await resumableModel.refreshResolutions()
+
+    let fresh = session(resumeIdentifier: nil, path: path)
+    let (freshModel, _, _, _) = makeWorkspace(session: fresh)
+    await freshModel.reload()
+    await freshModel.refreshResolutions()
+
+    #expect(resumableModel.expectedRestartMode(for: resumable).contains("resuming its Stub Agent"))
+    #expect(freshModel.expectedRestartMode(for: fresh).contains("new process, with a summary"))
+  }
+
   @Test("A session that never ran is started, not restarted")
   func titleFollowsWhetherItEverRan() {
     let path = folder()

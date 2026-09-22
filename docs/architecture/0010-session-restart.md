@@ -49,7 +49,12 @@ discovered.
 
 An unknown or unusable agent is a typed refusal, never a substitution: restarting someone's work in
 an agent they did not choose, without their conversation, would be a worse outcome than not
-restarting it. Changing agent or model is #15, and it is a decision, not a fallback.
+restarting it. Changing agent or model is #15, and it is a decision, not a fallback. The command is
+withheld rather than offered and then refused, using the resolution the detections already left on
+the model — no probe is run to draw a sidebar row, and a session whose agent has not been resolved
+yet keeps its command, because "not asked yet" is not "unusable". When a refusal does reach the
+banner, **Detect Again** is on it: most of these are a CLI the Mac cannot see right now, and that
+is what turns it around without leaving the workspace.
 
 ### A stored identifier the CLI would refuse is a fallback, not a failure
 
@@ -81,6 +86,11 @@ whole sections are dropped in a fixed order (initial prompt, then notes, then fo
 says it was shortened; half a note reads like a whole one, and the agent has no way to tell that
 the sentence it is acting on was cut. An edited summary goes through the same clamp, so the user
 cannot type a brief the launch would refuse.
+
+VoiceOver is told which of the four modes the command will take — "Restart audit deps, resuming its
+Claude Code conversation" — and it is told from the same two stored facts `RestartSession` decides
+on, never by building a plan: an announcement that cost a detection would be one the sidebar could
+not afford to make.
 
 The terminal's scrollback is deliberately not in it: it lives in memory, may already have been
 released, and a truncated transcript passed off as a report would be worse than no report.
