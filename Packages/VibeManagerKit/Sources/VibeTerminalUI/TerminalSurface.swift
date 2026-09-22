@@ -38,19 +38,7 @@ public struct TerminalSurface: NSViewRepresentable {
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
-    updateResponder(nsView)
-  }
-
-  /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
-  /// that kept the first responder would quietly receive what was typed for its neighbour.
-  private func updateResponder(_ view: TerminalView) {
-    guard let window = view.window else { return }
-    let holdsKeyboard = window.firstResponder === view
-    if isActive, !holdsKeyboard {
-      window.makeFirstResponder(view)
-    } else if !isActive, holdsKeyboard {
-      window.makeFirstResponder(nil)
-    }
+    context.coordinator.followActivation(isActive, in: nsView)
   }
 
   public static func dismantleNSView(
@@ -74,6 +62,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   // Object identity, not `session.id`: the id belongs to the work session and is reused by every
   // process started for it, so it cannot tell a restarted session from the one already attached.
   private var attachedSession: ObjectIdentifier?
+  private var wasActive: Bool?
   private let commands: AsyncStream<TerminalCommand>.Continuation
   private var commandTask: Task<Void, Never>?
 
@@ -122,6 +111,26 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     eventTask?.cancel()
     eventTask = nil
     attachedSession = nil
+  }
+
+  /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
+  /// that kept the first responder would quietly receive what was typed for its neighbour.
+  ///
+  /// Only a *change* of activation moves the keyboard. Claiming it on every update would fight
+  /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
+  /// active terminal would steal the focus back from the sidebar mid-keystroke.
+  func followActivation(_ isActive: Bool, in view: TerminalView) {
+    // No window yet: nothing can hold the keyboard, and this is not the change we are waiting
+    // for — leave the state untouched so the next update still acts on it.
+    guard let window = view.window else { return }
+    guard wasActive != isActive else { return }
+    wasActive = isActive
+
+    if isActive {
+      window.makeFirstResponder(view)
+    } else if window.firstResponder === view {
+      window.makeFirstResponder(nil)
+    }
   }
 
   func attachIfNeeded(to session: any TerminalSession) {
