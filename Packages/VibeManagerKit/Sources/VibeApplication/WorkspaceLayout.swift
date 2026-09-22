@@ -17,23 +17,30 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   public var isInspectorVisible: Bool
   public var sidebarWidth: Double
   public var inspectorWidth: Double
+  /// Which part of the history the sidebar is showing, and in what order. It belongs here for
+  /// the same reason as the columns: it is how the user arranged their view, not a fact about
+  /// the work, and it must be found again exactly as it was left.
+  public var sessionFilter: SessionFilter
 
   public init(
     selectedSessionID: SessionID? = nil,
     isSidebarVisible: Bool = true,
     isInspectorVisible: Bool = true,
     sidebarWidth: Double = 280,
-    inspectorWidth: Double = 300
+    inspectorWidth: Double = 300,
+    sessionFilter: SessionFilter = SessionFilter()
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
     self.isInspectorVisible = isInspectorVisible
     self.sidebarWidth = Self.bounded(sidebarWidth, in: Self.sidebarWidthRange, fallback: 280)
     self.inspectorWidth = Self.bounded(inspectorWidth, in: Self.inspectorWidthRange, fallback: 300)
+    self.sessionFilter = sessionFilter
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
+    case sessionFilter
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -46,7 +53,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       isInspectorVisible: try container.decodeIfPresent(Bool.self, forKey: .isInspectorVisible)
         ?? true,
       sidebarWidth: try container.decodeIfPresent(Double.self, forKey: .sidebarWidth) ?? 280,
-      inspectorWidth: try container.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? 300
+      inspectorWidth: try container.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? 300,
+      sessionFilter: try container.decodeIfPresent(SessionFilter.self, forKey: .sessionFilter)
+        ?? SessionFilter()
     )
   }
 }

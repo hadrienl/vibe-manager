@@ -39,6 +39,45 @@ struct UserDefaultsWorkspaceLayoutStoreTests {
     #expect(await UserDefaultsWorkspaceLayoutStore(suiteName: suite).load() == WorkspaceLayout())
   }
 
+  @Test("The filter comes back with the columns, minus the search that was in progress")
+  func filterRoundTrip() async {
+    let suite = suiteName()
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    let store = UserDefaultsWorkspaceLayoutStore(suiteName: suite)
+    let layout = WorkspaceLayout(
+      sessionFilter: SessionFilter(
+        scope: .closed,
+        sort: .name,
+        searchText: "half-typed query",
+        agentProviderIDs: ["codex"],
+        repositoryPath: "/work/api"
+      )
+    )
+
+    await store.save(layout)
+    let loaded = await UserDefaultsWorkspaceLayoutStore(suiteName: suite).load()
+
+    #expect(loaded.sessionFilter.scope == .closed)
+    #expect(loaded.sessionFilter.sort == .name)
+    #expect(loaded.sessionFilter.agentProviderIDs == ["codex"])
+    #expect(loaded.sessionFilter.repositoryPath == "/work/api")
+    // A query typed days ago would read as an empty store rather than as a filter.
+    #expect(loaded.sessionFilter.searchText.isEmpty)
+  }
+
+  @Test("A layout written before filters existed opens the default view")
+  func layoutWithoutFilterFallsBack() async {
+    let suite = suiteName()
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    let legacy = Data(#"{"isSidebarVisible":true,"isInspectorVisible":false}"#.utf8)
+    UserDefaults(suiteName: suite)?.set(legacy, forKey: "workspace.layout.v1")
+
+    let loaded = await UserDefaultsWorkspaceLayoutStore(suiteName: suite).load()
+
+    #expect(loaded.isInspectorVisible == false)
+    #expect(loaded.sessionFilter == SessionFilter())
+  }
+
   @Test("A preference written by something else is ignored, not obeyed")
   func corruptedPreferenceFallsBack() async {
     let suite = suiteName()

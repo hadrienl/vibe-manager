@@ -49,7 +49,16 @@ struct VibeManagerApp: App {
         .keyboardShortcut(.upArrow, modifiers: [.command, .option])
 
         SessionPositionCommands(model: environment.appModel)
+
+        Divider()
+
+        Button("Next Scope") {
+          environment.appModel.cycleScope()
+        }
+        .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
       }
+
+      SessionHistoryCommands(model: environment.appModel)
     }
 
     Settings {
@@ -86,6 +95,39 @@ private struct SessionPositionCommands: View {
     let index = position - 1
     guard model.sessions.indices.contains(index) else { return "Session \(position)" }
     return model.sessions[index].name
+  }
+}
+
+/// Closing, archiving and unarchiving the selected session, in their own menu.
+///
+/// ⌃⌘W rather than ⌘W: closing a session and closing the window must not be one modifier apart,
+/// because one of them ends an agent's work and the other only puts a window away.
+private struct SessionHistoryCommands: Commands {
+  let model: AppModel
+
+  var body: some Commands {
+    CommandMenu("Session") {
+      Button("Close Session") {
+        guard let session = model.selectedSession else { return }
+        Task { await model.close(session.id) }
+      }
+      .keyboardShortcut("w", modifiers: [.command, .control])
+      .disabled(!(model.selectedSession.map(model.canClose) ?? false))
+
+      Button("Archive…") {
+        guard let session = model.selectedSession else { return }
+        model.requestArchive(session.id)
+      }
+      .keyboardShortcut("a", modifiers: [.command, .control])
+      .disabled(!(model.selectedSession.map(model.canArchive) ?? false))
+
+      Button("Unarchive") {
+        guard let session = model.selectedSession else { return }
+        Task { await model.restore(session.id) }
+      }
+      .keyboardShortcut("a", modifiers: [.command, .control, .shift])
+      .disabled(!(model.selectedSession.map(model.canRestore) ?? false))
+    }
   }
 }
 

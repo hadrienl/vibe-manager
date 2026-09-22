@@ -76,6 +76,14 @@ is shown and nothing else — no process is restarted and no scrollback is lost.
 folding thresholds of the columns and what is restored at launch are documented in
 [`docs/architecture/0008-workspace-layout.md`](docs/architecture/0008-workspace-layout.md).
 
+Nothing leaves that list on its own. Closing a session stops its agent and keeps everything else,
+terminal output included; archiving asks once, detaches the process and marks the session as no
+longer reopenable until it is unarchived. The sidebar has two tabs — Active and Closed — split on
+whether an agent is running, not on whether a session was archived, so all past work is found in
+one place. No session is ever deleted, and the list is searchable, filterable and sorted in an
+order that survives a relaunch. The rules are documented in
+[`docs/architecture/0009-session-history-and-archive.md`](docs/architecture/0009-session-history-and-archive.md).
+
 Two real agents ship with the application, each documented with the choices its CLI forced:
 [`docs/architecture/0005-codex-provider.md`](docs/architecture/0005-codex-provider.md) and
 [`docs/architecture/0006-claude-code-provider.md`](docs/architecture/0006-claude-code-provider.md).
