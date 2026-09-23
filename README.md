@@ -4,7 +4,8 @@ Vibe Manager is a native macOS application for running several coding-agent sess
 their terminals, repositories and tasks organized in one place.
 
 The application launches a SwiftUI state backed by an atomic, versioned local session store.
-Claude, Codex, terminal and live Git integrations are tracked as separate V1 issues.
+Claude Code and Codex run in real terminals, and a session can span several repositories, each in
+a worktree of its own on one shared branch. Live Git status is tracked as a separate V1 issue.
 
 ## Requirements
 
@@ -113,6 +114,21 @@ identity is confirmed. The sessions come back one at a time, with progress and a
 stops nothing already running, and a restoration that sends a text to an agent is never automatic.
 The runtime document, the four verdicts and the bounded exit are documented in
 [`docs/architecture/0011-session-restoration.md`](docs/architecture/0011-session-restoration.md).
+
+A session is one branch. Its slug is derived from its title once, editable before creation, and
+never recomputed — renaming a session never renames `vibe/<slug>`. Each Git repository attached to
+it gets a worktree on that branch under `~/VibeManager/Worktrees/<slug>/` (the root is a setting),
+unless it is attached in place or is a plain folder. Every repository is read and planned before
+anything is written, and each conflict — a branch already checked out, a stale record, a bare
+repository — blocks only its own repository, with a remedy and, when it helps, a command to copy.
+The agent starts in the main repository and is handed the others with `--add-dir`; the convention
+opens its first prompt, and is shown in the sheet before it is sent. Vibe Manager creates
+worktrees and branches and never deletes one: detaching, closing and archiving forget, and offer
+the cleanup command instead. While an agent works, the inspector reports what it did to the
+branches of each repository since the session started — created, moved, rewritten, deleted, and
+what is uncommitted — read every 30 seconds for the session on screen only. The store moved to schema v3, where earlier sessions became
+repositories attached in place. The decisions are documented in
+[`docs/architecture/0012-multi-repository-worktrees.md`](docs/architecture/0012-multi-repository-worktrees.md).
 
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
