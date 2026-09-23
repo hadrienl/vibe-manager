@@ -100,12 +100,10 @@ func paneFollowsSessionLifecycle() async throws {
   #expect(model.session != nil)
 
   await supervisor.emit(.running(processIdentifier: 1_234), for: id)
-  try await Task.sleep(for: .milliseconds(50))
-  #expect(model.status == .running)
+  #expect(await settles { model.status == .running })
 
   await supervisor.emit(.exited(code: 3), for: id)
-  try await Task.sleep(for: .milliseconds(50))
-  #expect(model.status == .exited(code: 3))
+  #expect(await settles { model.status == .exited(code: 3) })
 }
 
 @MainActor
@@ -139,8 +137,7 @@ func paneRestartsAfterItsProcessFinished() async throws {
   #expect(model.session != nil)
 
   await supervisor.emit(.exited(code: 0), for: id)
-  try await Task.sleep(for: .milliseconds(50))
-  #expect(model.status == .exited(code: 0))
+  #expect(await settles { model.status == .exited(code: 0) })
 
   await model.start()
   #expect(await supervisor.startCount == 2)
@@ -158,7 +155,7 @@ func paneRestartsWithTheGivenSpec() async throws {
 
   await model.start()
   await supervisor.emit(.exited(code: 0), for: id)
-  try await Task.sleep(for: .milliseconds(50))
+  #expect(await settles { model.status == .exited(code: 0) })
 
   var replacement = makeSpec()
   replacement.arguments = ["--resume", "abc"]
@@ -177,7 +174,7 @@ func paneIgnoresRedundantStart() async throws {
 
   await model.start()
   await supervisor.emit(.running(processIdentifier: 42), for: id)
-  try await Task.sleep(for: .milliseconds(50))
+  #expect(await settles { model.status == .running })
 
   await model.start()
 
@@ -259,4 +256,15 @@ func emptyMeasurementsAreIgnored() async throws {
 
   let spec = try #require(await supervisor.startedSpecs.first)
   #expect(spec.initialSize == TerminalSize.default)
+}
+
+/// Waits for the model to reach a state an event sent elsewhere puts it in: a loaded CI runner may
+/// take far longer than the milliseconds it takes here.
+@MainActor
+private func settles(_ condition: @MainActor () -> Bool) async -> Bool {
+  let deadline = ContinuousClock.now + .seconds(10)
+  while !condition(), ContinuousClock.now < deadline {
+    try? await Task.sleep(for: .milliseconds(5))
+  }
+  return condition()
 }

@@ -14,18 +14,17 @@ private actor EmptyRepository: SessionRepository {
 private struct StubAgentProvider: AgentProvider {
   let descriptor: AgentDescriptor
   let state: AgentAvailabilityState
-  let delay: Duration
+  /// Holds the detection until the test opens it.
+  let gate: ProbeGate?
 
-  init(id: String, state: AgentAvailabilityState, delay: Duration = .zero) {
+  init(id: String, state: AgentAvailabilityState, gate: ProbeGate? = nil) {
     descriptor = AgentDescriptor(id: AgentProviderID(id), displayName: id.capitalized)
     self.state = state
-    self.delay = delay
+    self.gate = gate
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
-    if delay != .zero {
-      try? await Task.sleep(for: delay)
-    }
+    await gate?.wait()
     return AgentAvailability(
       state: state,
       installation: nil,
@@ -85,21 +84,27 @@ func appModelExposesAgentDiagnostics() async {
 @MainActor
 @Test("An agent that answered is shown without waiting for one that has not")
 func aFastAgentIsNotHeldBehindASlowOne() async {
+  let slow = ProbeGate()
   let model = AppModel(
     repository: EmptyRepository(),
     agents: StubAgentRegistry(providers: [
-      StubAgentProvider(id: "claude", state: .available, delay: .milliseconds(300)),
+      StubAgentProvider(id: "claude", state: .available, gate: slow),
       StubAgentProvider(id: "codex", state: .notFound),
     ])
   )
 
   let refresh = Task { await model.refreshAgents() }
-  try? await Task.sleep(for: .milliseconds(60))
+  // Claude answers only once the test says so, whatever the speed of the machine.
+  let deadline = ContinuousClock.now + .seconds(10)
+  while model.agentDiagnostics.isEmpty, ContinuousClock.now < deadline {
+    try? await Task.sleep(for: .milliseconds(10))
+  }
 
   // A CLI that answers none of its probes costs three budgets and their retries. Holding the
   // agents that answered straight away behind it is what this avoids.
   #expect(model.agentDiagnostics.map(\.providerID.rawValue) == ["codex"])
 
+  await slow.open()
   await refresh.value
 
   // And the registration order is restored once everything has landed.
