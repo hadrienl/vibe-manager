@@ -228,12 +228,23 @@ struct GitStatusReaderTests {
       await reader.status(atPath: closed, limit: 10) == .failure(.permissionDenied(path: closed)))
   }
 
+  @Test("A large output is cut to the limit with exact counts")
+  func largeOutput() async throws {
+    let reader = GitStatusReader(git: CannedRunner(output: Self.untracked(200_000)))
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+
+    let status = try await reader.status(atPath: sandbox.root, limit: 5_000).get()
+
+    #expect(status.entries.count == 5_000)
+    #expect(status.counts.untracked == 200_000)
+    #expect(status.isTruncated == true)
+  }
+
   @MainActor
-  @Test("A large output is cut to the limit with exact counts, and never needs the main actor")
-  func largeOutputOffTheMainActor() async throws {
-    let records = (0..<200_000).map { "? generated/file-\($0).txt" }
-    let output = Data((records.joined(separator: "\0") + "\0").utf8)
-    let reader = GitStatusReader(git: CannedRunner(output: output))
+  @Test("A reading never needs the main actor")
+  func readingOffTheMainActor() async throws {
+    let reader = GitStatusReader(git: CannedRunner(output: Self.untracked(1_000)))
     let sandbox = try Sandbox()
     defer { sandbox.remove() }
 
@@ -244,14 +255,16 @@ struct GitStatusReaderTests {
       box.value = try? await reader.status(atPath: root, limit: 5_000).get()
       finished.signal()
     }
-    // The main actor is held for the whole reading. A parse that needed it would never finish;
-    // one that runs elsewhere finishes however slow the machine. Measuring how long the main
-    // actor waited instead would measure every other suite sharing it in this process.
-    #expect(MainActorHold.until(finished, atMost: .seconds(60)))
+    // The main actor is held until the reading ends: one that needed it would never end. Timing
+    // how long the main actor waited would time every other suite sharing it in this process. The
+    // output is small, so that the other suites wait a few milliseconds, not the whole parse.
+    #expect(MainActorHold.until(finished, atMost: .seconds(30)))
+    #expect(box.value?.counts.untracked == 1_000)
+  }
 
-    #expect(box.value?.entries.count == 5_000)
-    #expect(box.value?.counts.untracked == 200_000)
-    #expect(box.value?.isTruncated == true)
+  private static func untracked(_ count: Int) -> Data {
+    let records = (0..<count).map { "? generated/file-\($0).txt" }
+    return Data((records.joined(separator: "\0") + "\0").utf8)
   }
 }
 
