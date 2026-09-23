@@ -52,14 +52,14 @@ struct RestartSessionTests {
 
   private func makeSubject(
     session: WorkSession,
-    provider: StubProvider = StubProvider(),
+    provider: RestorationProvider = RestorationProvider(),
     folder: WorkingDirectoryStatus = .usable
   ) -> (RestartSession, SpyRepository) {
     let repository = SpyRepository(sessions: [session])
     let restart = RestartSession(
       repository: repository,
-      agents: StubRegistry(providers: [provider]),
-      folders: StubFolders(status: folder)
+      agents: RestorationRegistry(providers: [provider]),
+      folders: RestorationFolders(status: folder)
     )
     return (restart, repository)
   }
@@ -135,7 +135,7 @@ struct RestartSessionTests {
 
   @Test("An agent that cannot resume says so, rather than failing the restart")
   func agentWithoutResume() async throws {
-    let provider = StubProvider(
+    let provider = RestorationProvider(
       capabilities: AgentCapabilities(supportsModelSelection: true, supportsInitialPrompt: true)
     )
     let (restart, repository) = makeSubject(session: session(), provider: provider)
@@ -148,7 +148,7 @@ struct RestartSessionTests {
 
   @Test("An identifier the CLI would refuse falls back instead of stopping the restart")
   func rejectedIdentifierFallsBack() async throws {
-    let provider = StubProvider(resumeFailure: .missingResumeIdentifier)
+    let provider = RestorationProvider(resumeFailure: .missingResumeIdentifier)
     let (restart, repository) = makeSubject(session: session(), provider: provider)
 
     let outcome = try await restart(id: repository.stored[0].id)
@@ -185,7 +185,7 @@ struct RestartSessionTests {
 
   @Test("An agent that takes no prompt is restarted without one, and the user is told")
   func agentWithoutPrompt() async throws {
-    let provider = StubProvider(capabilities: AgentCapabilities())
+    let provider = RestorationProvider(capabilities: AgentCapabilities())
     let (restart, repository) = makeSubject(session: session(), provider: provider)
 
     let outcome = try await restart(id: repository.stored[0].id)
@@ -275,7 +275,7 @@ struct RestartSessionTests {
   func unavailableAgentIsRefused() async throws {
     let (restart, repository) = makeSubject(
       session: session(),
-      provider: StubProvider(state: .notFound)
+      provider: RestorationProvider(state: .notFound)
     )
 
     guard case .agentUnavailable = await refusal(from: restart, for: repository.stored[0].id) else {
@@ -313,7 +313,8 @@ struct RestartSessionTests {
 
   @Test("A launch the agent refuses is reported as such, and writes nothing")
   func launchRejectionIsReported() async throws {
-    let provider = StubProvider(launchFailure: .promptTooLarge(byteCount: 40_000, limit: 16_384))
+    let provider = RestorationProvider(
+      launchFailure: .promptTooLarge(byteCount: 40_000, limit: 16_384))
     let (restart, repository) = makeSubject(
       session: session(resumeIdentifier: nil),
       provider: provider
@@ -368,95 +369,5 @@ private actor SpyRepository: SessionRepository {
     writes += 1
     sessionsByID[id] = session
     return session
-  }
-}
-
-private struct StubFolders: WorkingDirectoryProbe {
-  let status: WorkingDirectoryStatus
-
-  func inspect(path: String) async -> WorkingDirectoryStatus { status }
-}
-
-private struct StubProvider: AgentProvider {
-  let descriptor: AgentDescriptor
-  let state: AgentAvailabilityState
-  let launchFailure: AgentLaunchError?
-  /// Raised only when a resume is asked for, as a CLI refusing a stored identifier would.
-  let resumeFailure: AgentLaunchError?
-
-  init(
-    state: AgentAvailabilityState = .available,
-    capabilities: AgentCapabilities = AgentCapabilities(
-      supportsModelSelection: true,
-      supportsInitialPrompt: true,
-      supportsResume: true
-    ),
-    launchFailure: AgentLaunchError? = nil,
-    resumeFailure: AgentLaunchError? = nil
-  ) {
-    descriptor = AgentDescriptor(
-      id: AgentProviderID("stub"),
-      displayName: "Stub Agent",
-      capabilities: capabilities
-    )
-    self.state = state
-    self.launchFailure = launchFailure
-    self.resumeFailure = resumeFailure
-  }
-
-  func availability(forceRefresh: Bool) async -> AgentAvailability {
-    AgentAvailability(
-      state: state,
-      installation: nil,
-      diagnostic: AgentDiagnostic(
-        providerID: descriptor.id,
-        providerName: descriptor.displayName,
-        state: state,
-        summary: "Stub Agent is \(state == .available ? "ready" : "unusable").",
-        probedAt: Date(timeIntervalSince1970: 0),
-        remediations: state == .available ? [] : [.install(documentationURL: nil)]
-      )
-    )
-  }
-
-  func models() async -> [AgentModel] { [] }
-
-  func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    if let launchFailure { throw launchFailure }
-    if case .identifier = request.resume, let resumeFailure { throw resumeFailure }
-
-    var arguments: [String] = []
-    if case .identifier(let identifier) = request.resume {
-      arguments.append(contentsOf: ["--resume", identifier])
-    }
-    if let modelID = request.modelID {
-      arguments.append(contentsOf: ["--model", modelID])
-    }
-    return AgentLaunchPlan(
-      providerID: descriptor.id,
-      executablePath: "/usr/bin/true",
-      arguments: arguments,
-      environment: [:],
-      workingDirectoryPath: request.workingDirectoryPath,
-      promptDelivery: request.initialPrompt == nil ? .none : .argument
-    )
-  }
-}
-
-private struct StubRegistry: AgentProviderResolving {
-  var providers: [StubProvider]
-
-  func descriptors() async -> [AgentDescriptor] { providers.map(\.descriptor) }
-
-  func provider(id: AgentProviderID) async -> (any AgentProvider)? {
-    providers.first { $0.descriptor.id == id }
-  }
-
-  func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] {
-    var result: [AgentProviderID: AgentAvailability] = [:]
-    for provider in providers {
-      result[provider.descriptor.id] = await provider.availability(forceRefresh: forceRefresh)
-    }
-    return result
   }
 }

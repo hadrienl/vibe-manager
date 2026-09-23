@@ -172,6 +172,32 @@ public struct RootView: View {
           )
           Divider()
         }
+        // The four faces of #11, and only ever one of them at a time: a restoration running, one
+        // offered after an unexpected stop, a second copy of the application holding the
+        // sessions, or the account of what did not come back.
+        if let restoration = model.restoration {
+          RestorationBanner(restoration: restoration, cancel: { model.cancelRestore() })
+          Divider()
+        }
+        if let offer = model.restoreOffer {
+          RestoreOfferBanner(
+            offer: offer,
+            resume: { Task { await model.acceptRestoreOffer() } },
+            dismiss: { model.dismissRestoreOffer() }
+          )
+          Divider()
+        }
+        if let processIdentifier = model.otherInstanceProcessIdentifier {
+          OtherInstanceBanner(
+            processIdentifier: processIdentifier,
+            dismiss: { model.dismissOtherInstanceNotice() }
+          )
+          Divider()
+        }
+        if let report = model.restoreReport {
+          RestoreReportBanner(report: report, dismiss: { model.dismissRestoreReport() })
+          Divider()
+        }
         detail
       }
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
@@ -549,6 +575,158 @@ private struct RefreshFailureBanner: View {
   }
 }
 
+/// A restoration under way, with the one thing the user can do about it.
+///
+/// Cancel empties the queue and touches nothing that is already running: a restoration that
+/// could not be interrupted would be an application deciding, for several minutes, what the
+/// machine is busy with.
+private struct RestorationBanner: View {
+  let restoration: AppModel.Restoration
+  let cancel: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      ProgressView()
+        .controlSize(.small)
+      Text(restoration.message)
+        .font(.callout)
+        .lineLimit(1)
+      Spacer(minLength: 8)
+      Button("Cancel", action: cancel)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(restoration.message)
+    // Announced as it moves, once per session rather than once per line of output: the count and
+    // the name are what tell a listener that the application is working and on what.
+    .accessibilityAddTraits(.updatesFrequently)
+  }
+}
+
+/// An unexpected stop, offering what it left behind instead of taking it upon itself.
+private struct RestoreOfferBanner: View {
+  let offer: AppModel.RestoreOffer
+  let resume: () -> Void
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.arrow.circlepath")
+        .foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(offer.message)
+          .font(.callout)
+        if let suggestion = offer.suggestion {
+          Text(suggestion)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      Spacer(minLength: 8)
+      Button("Resume Sessions", action: resume)
+        .controlSize(.small)
+        .buttonStyle(.borderedProminent)
+      Button("Ignore", action: dismiss)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// Two copies of the application, and the sessions belong to the other one.
+private struct OtherInstanceBanner: View {
+  let processIdentifier: Int32
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "rectangle.on.rectangle")
+        .foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Another copy of Vibe Manager (pid \(processIdentifier)) is running these sessions.")
+          .font(.callout)
+        Text("Nothing was restored or changed here. Quit that copy before working from this one.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// What a restoration could not bring back, as a list rather than a queue of dialogs.
+///
+/// Each line says the session, the reason and the way out; the sessions themselves are closed,
+/// whole, and one Restart away. Nothing is shown when everything came back.
+///
+/// Deliberately built from a stack and a button rather than a `DisclosureGroup`. In a banner
+/// inside the split view's detail column, the disclosure and the column negotiated a width
+/// against each other on every pass: AppKit counted 186 requests to update the window's
+/// constraints in a single display cycle, tripped its own loop guard at 180, and threw — which
+/// with an application built for development is a crash, seconds after launch.
+private struct RestoreReportBanner: View {
+  let report: AppModel.RestoreReport
+  let dismiss: () -> Void
+
+  @State private var isShowingDetails = true
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "info.circle")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(report.message)
+          .font(.callout)
+        if isShowingDetails {
+          ForEach(report.lines) { line in
+            VStack(alignment: .leading, spacing: 1) {
+              Text("\(line.name): \(line.sentence)")
+                .font(.caption)
+              if let suggestion = line.suggestion {
+                Text(suggestion)
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+        }
+      }
+      Spacer(minLength: 8)
+      if !report.lines.isEmpty {
+        Button(isShowingDetails ? "Hide Details" : "Show Details") {
+          isShowingDetails.toggle()
+        }
+        .controlSize(.small)
+      }
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
 /// A stop the system would not confirm, shown over a workspace that keeps working.
 private struct DetachWarningBanner: View {
   let warning: AppModel.DetachWarning
@@ -710,6 +888,7 @@ private struct SessionSidebar: View {
             resolution: model.resolution(forID: session.id),
             wasStoppedOnPurpose: model.pane(for: session.id)?.wasStoppedOnPurpose == true
           ),
+          isRestoring: model.isRestoring(session.id),
           // Only the rows a shortcut can reach claim one.
           shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,
           commands: SessionCommands(model: model, session: session)
@@ -897,6 +1076,9 @@ private struct SessionCommandButtons: View {
 private struct SessionRow: View {
   let session: WorkSession
   let status: SessionStatusPresentation
+  /// The one row the restoration is working on. Said on the row rather than only in the banner,
+  /// because the banner names a session the sidebar may have scrolled away from.
+  let isRestoring: Bool
   let shortcutPosition: Int?
   let commands: SessionCommands
 
@@ -914,10 +1096,13 @@ private struct SessionRow: View {
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
-        Label(status.label, systemImage: status.symbolName)
-          .font(.caption)
-          .foregroundStyle(tint)
-          .lineLimit(1)
+        Label(
+          isRestoring ? "Restoring…" : status.label,
+          systemImage: isRestoring ? "arrow.clockwise" : status.symbolName
+        )
+        .font(.caption)
+        .foregroundStyle(isRestoring ? Color.secondary : tint)
+        .lineLimit(1)
       }
       Spacer(minLength: 4)
       if let shortcutPosition {
@@ -933,6 +1118,7 @@ private struct SessionRow: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
+    .accessibilityValue(isRestoring ? "Restoring" : "")
     // The same commands, reachable without a pointer and without the menu bar.
     .accessibilityAction(named: Text(commands.restartAnnouncement)) {
       guard commands.canRestart else { return }
