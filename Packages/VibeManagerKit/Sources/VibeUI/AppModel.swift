@@ -758,10 +758,9 @@ public final class AppModel {
     await task.value
   }
 
-  private func honour(_ shutdown: PreviousShutdown?) async {
+  /// What the verdict has to say straight away, before anything is probed or launched.
+  private func announce(_ shutdown: PreviousShutdown?) {
     switch shutdown {
-    case .none, .nothingToDo:
-      return
     case .otherInstance(let processIdentifier):
       otherInstanceProcessIdentifier = processIdentifier
     case .unexpected(let intent, let leftovers):
@@ -771,9 +770,15 @@ public final class AppModel {
         leftoverProcessIdentifiers: leftovers.compactMap(\.processGroup),
         interruptedAt: intent.interruptedAt
       )
-    case .clean(let intent):
-      await beginRestore(intent)
+    case .none, .nothingToDo, .clean:
+      return
     }
+  }
+
+  /// The one verdict that puts sessions back to work by itself.
+  private func resume(_ shutdown: PreviousShutdown?) async {
+    guard case .clean(let intent) = shutdown else { return }
+    await beginRestore(intent)
   }
 
   private func beginRestore(_ intent: SessionRestoreIntent) async {
@@ -895,11 +900,16 @@ public final class AppModel {
     // frame — is the lie this whole ticket is about.
     let shutdown = await detectPreviousShutdown?()
     await reload()
-    // Detections first, then the restoration: each resume asks its provider whether it can run,
-    // and a queue started before the probes had answered would pay for that answer session by
-    // session, on a cold cache, with a progress bar in front of the user.
+    // Said as soon as the list is on screen. An offer asks no provider anything, and waiting for
+    // the detections to announce it meant a minute of silence after a crash — on a cold cache,
+    // with a CLI that answers none of its probes, the banner arrived long after the user had
+    // decided the application had forgotten their sessions.
+    announce(shutdown)
+    // The restoration, on the other hand, waits: each resume asks its provider whether it can
+    // run, and a queue started before the probes had answered would pay for that answer session
+    // by session, with a progress bar in front of the user.
     await refreshAgents()
-    await honour(shutdown)
+    await resume(shutdown)
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.

@@ -66,7 +66,8 @@ struct SessionRestorationTests {
     alive: Set<Int32> = [],
     runtime: EphemeralSessionRuntimeStateStore? = nil,
     repository: MutableRepository? = nil,
-    processIdentifier: Int32 = 4_242
+    processIdentifier: Int32 = 4_242,
+    probeDelay: Duration = .zero
   ) -> Workspace {
     let repository = repository ?? MutableRepository(sessions: sessions)
     let store = runtime ?? EphemeralSessionRuntimeStateStore(state: document)
@@ -76,7 +77,7 @@ struct SessionRestorationTests {
       processIdentifier: processIdentifier,
       probe: processes
     )
-    let registry = StubRegistry(providers: [StubProvider()])
+    let registry = StubRegistry(providers: [StubProvider(probeDelay: probeDelay)])
     let launcher = SessionLauncher(
       supervisor: SpySupervisor(),
       repository: repository,
@@ -178,6 +179,27 @@ struct SessionRestorationTests {
     // is stored active.
     #expect(await workspace.repository.status(of: subject.id) == .closed)
     #expect(workspace.model.sessions.first?.status == .closed)
+  }
+
+  @Test("The offer is on screen before the agents have answered their probes")
+  func offersWithoutWaitingForTheDetections() async {
+    let path = folder()
+    let subject = session(status: .active, path: path)
+    let workspace = makeWorkspace(
+      sessions: [subject],
+      document: document(phase: .running, sessions: [SessionRuntimeRecord(sessionID: subject.id)]),
+      probeDelay: .milliseconds(600)
+    )
+
+    let launch = Task { await workspace.model.load() }
+    try? await Task.sleep(for: .milliseconds(120))
+
+    // An offer asks no provider anything. Announced after the detections, it arrived on a cold
+    // cache long after the user had decided their sessions were gone.
+    #expect(workspace.model.restoreOffer?.sessionCount == 1)
+    #expect(workspace.model.isRefreshingAgents)
+
+    await launch.value
   }
 
   @Test("Accepting the offer restores the sessions, once")
@@ -491,6 +513,8 @@ private actor FakeTerminalSession: TerminalSession {
 }
 
 private struct StubProvider: AgentProvider {
+  var probeDelay: Duration = .zero
+
   let descriptor = AgentDescriptor(
     id: AgentProviderID("stub"),
     displayName: "Stub Agent",
@@ -502,7 +526,10 @@ private struct StubProvider: AgentProvider {
   )
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
-    AgentAvailability(
+    if probeDelay != .zero {
+      try? await Task.sleep(for: probeDelay)
+    }
+    return AgentAvailability(
       state: .available,
       installation: nil,
       diagnostic: AgentDiagnostic(
