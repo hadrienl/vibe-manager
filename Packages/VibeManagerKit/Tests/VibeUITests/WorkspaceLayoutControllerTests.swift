@@ -83,9 +83,13 @@ struct WorkspaceLayoutControllerTests {
     for width in stride(from: 240.0, through: 320.0, by: 4) {
       controller.sidebarWidthChanged(to: width)
     }
-    // Generously longer than the delay: what is being checked is that twenty widths did not
-    // become twenty writes, not how fast one of them lands.
-    try await Task.sleep(for: .milliseconds(500))
+    // What is being checked is that twenty widths did not become twenty writes, not how fast
+    // one of them lands: a loaded CI runner may take seconds to run the delayed save.
+    let deadline = ContinuousClock.now + .seconds(10)
+    while await store.saves.isEmpty, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    try await Task.sleep(for: .milliseconds(100))
 
     await #expect(store.saves.count == 1)
     #expect(controller.intent.sidebarWidth == 320)
