@@ -503,6 +503,33 @@ struct SessionRestartTests {
     )
   }
 
+  @Test("A refusal recorded while the launch was still in flight survives its own success")
+  func aRefusalIsNotWipedByTheLaunchThatEarnedIt() async {
+    let path = folder()
+    let subject = session(path: path)
+    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    // An observer that takes its time is what makes the ordering certain rather than lucky: the
+    // exit of a refused resume then reaches the model *inside* the call that goes on to report
+    // success. On CI, where the machine is loaded, that is the ordinary ordering — and the
+    // refusal was being wiped by the very launch that earned it, so the next restart handed the
+    // same dead conversation back without a word.
+    let (model, _, _, _) = makeWorkspace(
+      session: subject,
+      supervisor: supervisor,
+      provider: StubProvider(observerDelayYields: 40)
+    )
+    await model.reload()
+
+    await model.restart(subject.id)
+    await waitUntil { model.resumeRefusals.contains(subject.id) }
+
+    #expect(model.resumeRefusals.contains(subject.id))
+
+    // And the next restart says so, instead of resuming a conversation the agent has dropped.
+    await model.restart(subject.id)
+    #expect(model.pendingRestart?.sessionID == subject.id)
+  }
+
   @Test("An agent worked in for a while and quit is not a refused resume")
   func exitAfterTheProbationIsOrdinary() async {
     let path = folder()
@@ -932,7 +959,17 @@ private actor FakeTerminalSession: TerminalSession {
   }
 }
 
-private struct StubProvider: AgentProvider {
+private struct StubProvider: AgentProvider, AgentLaunchObserverProviding {
+  /// How long the launch observer holds the launch open, in scheduler turns.
+  var observerDelayYields = 0
+
+  func launchObserver(
+    for sessionID: SessionID,
+    repository: any SessionRepository
+  ) -> any AgentLaunchObserver {
+    SlowObserver(yields: observerDelayYields)
+  }
+
   let descriptor = AgentDescriptor(
     id: AgentProviderID("stub"),
     displayName: "Stub Agent",
@@ -977,6 +1014,19 @@ private struct StubProvider: AgentProvider {
       promptDelivery: request.initialPrompt == nil ? .none : .argument
     )
   }
+}
+
+/// An observer that keeps a launch in flight for a known number of scheduler turns.
+private struct SlowObserver: AgentLaunchObserver {
+  let yields: Int
+
+  func launched(plan: AgentLaunchPlan) async {
+    for _ in 0..<yields { await Task.yield() }
+  }
+
+  func observe(output: String) async {}
+
+  func finished() async {}
 }
 
 private struct StubRegistry: AgentProviderResolving {

@@ -635,9 +635,19 @@ public final class AppModel {
 
       switch await launcher.restart(restart) {
       case .started:
-        // The refusal has been acted on, and this process starts a conversation of its own. Kept
-        // any longer it would skip the resume of an identifier that has since been replaced.
-        resumeRefusals.remove(id)
+        switch restart.mode {
+        case .firstLaunch, .freshWithContext, .freshWithoutContext:
+          // The refusal has been acted on, and this process starts a conversation of its own.
+          // Kept any longer it would skip the resume of an identifier that has since been
+          // replaced.
+          resumeRefusals.remove(id)
+        case .native:
+          // A resume that was refused *while this very call was in flight* records its refusal
+          // before the launch returns — the process is already gone by then. Clearing it here
+          // because the launch "succeeded" handed the same dead conversation back at the next
+          // restart, and the user was never told why their session would not come up.
+          break
+        }
       case .alreadyRunning:
         // The agent the user asked for is up; another path got there first. Nothing was handed a
         // conversation here, so the attempt is dropped — and no failure is reported over a
