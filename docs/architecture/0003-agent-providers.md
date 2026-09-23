@@ -75,6 +75,18 @@ A sign in check silent twice still never blocks a launch — silence is not a ve
 but it is written into the diagnostic detail, so an export does not read as a clean bill of
 health.
 
+### A native build wins over one that needs Rosetta
+
+On Apple silicon, `FileSystemExecutableLocator` reads the Mach-O header of every executable it
+finds, and one with no `arm64` slice does not end the search: it is kept, like a non executable
+file, and only returned when nothing native turns up further down. Rosetta translates a binary
+the first time it runs, again after every install or update, and for a CLI of a few hundred
+megabytes that takes about thirty seconds — measured on `codex` 0.156.1 from an Intel Homebrew
+under `/usr/local`, while a native `codex` sat in `~/.local/bin`. No version probe budget survives
+that, so the agent read as `probeFailed(.timedOut)` after each update, every restart of its
+sessions was refused, and a later "Detect again" found it ready because the translation had
+finished in the meantime. A path the user set themselves is never second guessed.
+
 ### A ready agent is detected once, everything else is detected again
 
 An agent found `available` is cached for the whole session: a CLI does not uninstall itself while

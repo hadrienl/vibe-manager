@@ -7,6 +7,8 @@ struct StubFileSystem: ExecutableFileSystem {
   var executables: Set<String> = []
   var nonExecutableFiles: Set<String> = []
   var symlinks: [String: String] = [:]
+  /// Executables this Mac could only run through Rosetta.
+  var translatedExecutables: Set<String> = []
 
   func fileExists(atPath path: String) -> Bool {
     let resolved = resolvedPath(for: path)
@@ -19,6 +21,10 @@ struct StubFileSystem: ExecutableFileSystem {
 
   func resolvedPath(for path: String) -> String {
     symlinks[path] ?? path
+  }
+
+  func needsTranslation(atPath path: String) -> Bool {
+    translatedExecutables.contains(resolvedPath(for: path))
   }
 }
 
