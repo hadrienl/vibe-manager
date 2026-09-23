@@ -13,6 +13,10 @@ struct SessionStoreDecodeResult {
 
 struct SessionStoreCodec {
   static let currentSchemaVersion = 2
+  /// Written only by a build of #12 that created a worktree per session, and was reworked before
+  /// release. Read back into v2 so that the sessions it migrated are not lost; the next schema
+  /// change has to skip it and be v4.
+  static let abandonedSchemaVersion = 3
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
@@ -48,6 +52,10 @@ struct SessionStoreCodec {
         let current = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
         sessions = current.sessions.map(\.workSession)
         requiresRewrite = false
+      case Self.abandonedSchemaVersion:
+        let abandoned = try Self.makeDecoder().decode(StoreEnvelopeV3.self, from: data)
+        sessions = abandoned.sessions.map(\.workSession)
+        requiresRewrite = true
       default:
         throw SessionStoreCodecError.unsupportedSchemaVersion(probe.schemaVersion)
       }
@@ -218,6 +226,60 @@ private struct StoredSessionV1: Decodable {
       notes: notes,
       template: template?.domainValue
     )
+  }
+}
+
+/// The schema v3 document of the abandoned #12 build, kept only to be read.
+///
+/// It differs from v2 by its repositories alone: `rootPath` and an attachment mode where v2 has a
+/// `path`. What the agent was started in is what the session keeps — the worktree, when one was
+/// made — so that resuming it finds its conversation again; the rest is dropped.
+private struct StoreEnvelopeV3: Decodable {
+  let schemaVersion: Int
+  let savedAt: Date
+  let sessions: [StoredSessionV3]
+}
+
+private struct StoredSessionV3: Decodable {
+  let id: UUID
+  let name: String
+  let initialPrompt: String
+  let agent: StoredAgentV2?
+  let appearance: StoredAppearanceV2
+  let lifecycle: StoredLifecycleV2
+  let repositories: [StoredRepositoryV3]
+  let notes: String?
+  let template: StoredTemplateV2?
+
+  var workSession: WorkSession {
+    WorkSession(
+      id: SessionID(rawValue: id),
+      name: name,
+      initialPrompt: initialPrompt,
+      agent: agent?.domainValue,
+      appearance: appearance.domainValue,
+      status: lifecycle.status,
+      createdAt: lifecycle.createdAt,
+      updatedAt: lifecycle.updatedAt,
+      closedAt: lifecycle.closedAt,
+      archivedAt: lifecycle.archivedAt,
+      startedAt: lifecycle.startedAt,
+      repositories: repositories.map(\.domainValue),
+      notes: notes,
+      template: template?.domainValue
+    )
+  }
+}
+
+private struct StoredRepositoryV3: Decodable {
+  let id: UUID
+  let rootPath: String
+  let mode: String?
+  let worktreePath: String?
+
+  var domainValue: RepositoryContext {
+    let worktree = mode == "worktree" ? worktreePath.flatMap { $0.isEmpty ? nil : $0 } : nil
+    return RepositoryContext(id: RepositoryID(rawValue: id), path: worktree ?? rootPath)
   }
 }
 
