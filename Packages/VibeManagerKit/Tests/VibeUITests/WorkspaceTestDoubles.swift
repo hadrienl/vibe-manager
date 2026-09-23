@@ -111,11 +111,30 @@ actor WorkspaceTerminal: TerminalSession {
   }
 }
 
+/// A door the detections wait at until the test opens it.
+actor ProbeGate {
+  private var isOpen = false
+  private var waiting: [CheckedContinuation<Void, Never>] = []
+
+  func wait() async {
+    guard !isOpen else { return }
+    await withCheckedContinuation { waiting.append($0) }
+  }
+
+  func open() {
+    isOpen = true
+    let waiting = self.waiting
+    self.waiting = []
+    for continuation in waiting { continuation.resume() }
+  }
+}
+
 struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
   /// How long the launch observer holds the launch open, in scheduler turns.
   var observerDelayYields = 0
-  /// How long a detection takes, for the suites that check what is on screen before it lands.
-  var probeDelay: Duration = .zero
+  /// Holds every detection until the test opens it: what is on screen before one lands, however
+  /// slow the machine.
+  var probeGate: ProbeGate?
 
   func launchObserver(
     for _: SessionID,
@@ -135,9 +154,7 @@ struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
   )
 
   func availability(forceRefresh _: Bool) async -> AgentAvailability {
-    if probeDelay != .zero {
-      try? await Task.sleep(for: probeDelay)
-    }
+    await probeGate?.wait()
     return AgentAvailability(
       state: .available,
       installation: nil,

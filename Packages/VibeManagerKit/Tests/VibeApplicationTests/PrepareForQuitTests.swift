@@ -76,8 +76,11 @@ struct PrepareForQuitTests {
     #expect(shutdown.closed.map(\.name) == ["Recent", "Older"])
     #expect(await repository.status(of: recent.id) == .closed)
     #expect(await repository.status(of: older.id) == .closed)
-    // Neither a closed session nor an archived one has a process, so neither is touched.
-    #expect(await runtime.detached == [recent.id, older.id])
+    // Neither a closed session nor an archived one has a process, so neither is touched. The
+    // sessions are stopped side by side: in no particular order, each once.
+    let detached = await runtime.detached
+    #expect(detached.count == 2)
+    #expect(Set(detached) == [recent.id, older.id])
     #expect(await repository.status(of: archived.id) == .archived)
 
     let state = await store.read()

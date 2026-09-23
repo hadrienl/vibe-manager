@@ -67,7 +67,7 @@ struct SessionRestorationTests {
     runtime: EphemeralSessionRuntimeStateStore? = nil,
     repository: WorkspaceRepository? = nil,
     processIdentifier: Int32 = 4_242,
-    probeDelay: Duration = .zero
+    probeGate: ProbeGate? = nil
   ) -> Workspace {
     let repository = repository ?? WorkspaceRepository(sessions: sessions)
     let store = runtime ?? EphemeralSessionRuntimeStateStore(state: document)
@@ -77,7 +77,7 @@ struct SessionRestorationTests {
       processIdentifier: processIdentifier,
       probe: processes
     )
-    let registry = WorkspaceRegistry(providers: [WorkspaceProvider(probeDelay: probeDelay)])
+    let registry = WorkspaceRegistry(providers: [WorkspaceProvider(probeGate: probeGate)])
     let launcher = SessionLauncher(
       supervisor: WorkspaceSupervisor(),
       repository: repository,
@@ -185,20 +185,26 @@ struct SessionRestorationTests {
   func offersWithoutWaitingForTheDetections() async {
     let path = folder()
     let subject = session(status: .active, path: path)
+    let gate = ProbeGate()
     let workspace = makeWorkspace(
       sessions: [subject],
       document: document(phase: .running, sessions: [SessionRuntimeRecord(sessionID: subject.id)]),
-      probeDelay: .milliseconds(600)
+      probeGate: gate
     )
 
     let launch = Task { await workspace.model.load() }
-    try? await Task.sleep(for: .milliseconds(120))
+    // The detections are held until the end: the offer can only come before them.
+    let deadline = ContinuousClock.now + .seconds(10)
+    while workspace.model.restoreOffer == nil, ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(10))
+    }
 
     // An offer asks no provider anything. Announced after the detections, it arrived on a cold
     // cache long after the user had decided their sessions were gone.
     #expect(workspace.model.restoreOffer?.sessionCount == 1)
     #expect(workspace.model.isRefreshingAgents)
 
+    await gate.open()
     await launch.value
   }
 
