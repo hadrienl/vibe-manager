@@ -21,7 +21,7 @@ struct PrepareForQuitTests {
       updatedAt: updatedAt,
       closedAt: status == .active ? nil : updatedAt,
       archivedAt: status == .archived ? updatedAt : nil,
-      repositories: [RepositoryContext(path: "/work/app")]
+      repositories: [RepositoryContext(path: Fixture.folderPath)]
     )
   }
 
@@ -235,6 +235,18 @@ struct PrepareForQuitTests {
 }
 
 // MARK: - Doubles
+
+/// The fixtures' folder and executable, built rather than written out.
+///
+/// Nothing here is ever opened or run — the folder probe and the launcher are doubles — so what
+/// matters is only that the paths are stable and belong to nobody: an absolute system path in a
+/// fixture reads as a dependency on the machine the tests happen to run on.
+private enum Fixture {
+  static let folderPath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vibe-fixture-folder", isDirectory: true).path
+  static let executablePath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vibe-fixture-agent", isDirectory: false).path
+}
 
 /// The order in which things happened, which is the whole assertion of this suite.
 private actor Journal {

@@ -369,6 +369,18 @@ struct SessionRestorationTests {
 
 // MARK: - Doubles
 
+/// The fixtures' folder and executable, built rather than written out.
+///
+/// Nothing here is ever opened or run — the folder probe and the launcher are doubles — so what
+/// matters is only that the paths are stable and belong to nobody: an absolute system path in a
+/// fixture reads as a dependency on the machine the tests happen to run on.
+private enum Fixture {
+  static let folderPath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vibe-fixture-folder", isDirectory: true).path
+  static let executablePath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vibe-fixture-agent", isDirectory: false).path
+}
+
 private actor MutableRepository: SessionRepository {
   private var stored: [WorkSession]
 
@@ -556,7 +568,7 @@ private struct StubProvider: AgentProvider {
     }
     return AgentLaunchPlan(
       providerID: descriptor.id,
-      executablePath: "/usr/bin/true",
+      executablePath: Fixture.executablePath,
       arguments: arguments,
       environment: [:],
       workingDirectoryPath: request.workingDirectoryPath,

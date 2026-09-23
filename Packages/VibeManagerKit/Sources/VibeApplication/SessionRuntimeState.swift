@@ -164,7 +164,9 @@ extension ProcessLivenessProbe {
 }
 
 public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
-  public init() {}
+  public init() {
+    // The system is the state: this probe holds nothing of its own.
+  }
 
   public func isAlive(processIdentifier: Int32) -> Bool {
     guard processIdentifier > 0 else { return false }

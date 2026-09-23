@@ -22,7 +22,7 @@ struct RestoreSessionsTests {
       createdAt: Date(timeIntervalSince1970: 1_699_000_000),
       updatedAt: Date(timeIntervalSince1970: 1_700_000_100),
       closedAt: Date(timeIntervalSince1970: 1_700_000_100),
-      repositories: [RepositoryContext(path: "/work/app")],
+      repositories: [RepositoryContext(path: Fixture.folderPath)],
       notes: "The retry path is still untested."
     )
   }
@@ -166,7 +166,7 @@ struct RestoreSessionsTests {
       name: "Never ran",
       initialPrompt: "Split the signature check out.",
       providerID: "stub",
-      workingDirectoryPath: "/work/app"
+      workingDirectoryPath: Fixture.folderPath
     )
     .session(createdAt: Date(timeIntervalSince1970: 1_699_000_000))
     let (restore, launcher) = makeSubject(sessions: [neverRan])
@@ -219,6 +219,18 @@ struct RestoreSessionsTests {
 }
 
 // MARK: - Doubles
+
+/// The fixtures' folder and executable, built rather than written out.
+///
+/// Nothing here is ever opened or run — the folder probe and the launcher are doubles — so what
+/// matters is only that the paths are stable and belong to nobody: an absolute system path in a
+/// fixture reads as a dependency on the machine the tests happen to run on.
+private enum Fixture {
+  static let folderPath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vibe-fixture-folder", isDirectory: true).path
+  static let executablePath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vibe-fixture-agent", isDirectory: false).path
+}
 
 private struct Started: Equatable {
   let name: String
@@ -346,7 +358,7 @@ private struct StubProvider: AgentProvider {
     }
     return AgentLaunchPlan(
       providerID: descriptor.id,
-      executablePath: "/usr/bin/true",
+      executablePath: Fixture.executablePath,
       arguments: arguments,
       environment: [:],
       workingDirectoryPath: request.workingDirectoryPath,
