@@ -623,7 +623,6 @@ private struct RestoreOfferBanner: View {
           Text(suggestion)
             .font(.caption)
             .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
         }
       }
       Spacer(minLength: 8)
@@ -674,45 +673,46 @@ private struct OtherInstanceBanner: View {
 ///
 /// Each line says the session, the reason and the way out; the sessions themselves are closed,
 /// whole, and one Restart away. Nothing is shown when everything came back.
+///
+/// Deliberately built from a stack and a button rather than a `DisclosureGroup`. In a banner
+/// inside the split view's detail column, the disclosure and the column negotiated a width
+/// against each other on every pass: AppKit counted 186 requests to update the window's
+/// constraints in a single display cycle, tripped its own loop guard at 180, and threw — which
+/// with an application built for development is a crash, seconds after launch.
 private struct RestoreReportBanner: View {
   let report: AppModel.RestoreReport
   let dismiss: () -> Void
 
-  @State private var isExpanded = true
+  @State private var isShowingDetails = true
 
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
       Image(systemName: "info.circle")
         .foregroundStyle(.secondary)
-      if report.lines.isEmpty {
-        // Nothing failed — the user cancelled. One sentence, and no disclosure triangle over an
-        // empty list.
+      VStack(alignment: .leading, spacing: 4) {
         Text(report.message)
           .font(.callout)
-          .fixedSize(horizontal: false, vertical: true)
-      } else {
-        DisclosureGroup(isExpanded: $isExpanded) {
-          VStack(alignment: .leading, spacing: 6) {
-            ForEach(report.lines) { line in
-              VStack(alignment: .leading, spacing: 1) {
-                Text("\(line.name): \(line.sentence)")
-                  .font(.caption)
-                if let suggestion = line.suggestion {
-                  Text(suggestion)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
+        if isShowingDetails {
+          ForEach(report.lines) { line in
+            VStack(alignment: .leading, spacing: 1) {
+              Text("\(line.name): \(line.sentence)")
+                .font(.caption)
+              if let suggestion = line.suggestion {
+                Text(suggestion)
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
               }
-              .fixedSize(horizontal: false, vertical: true)
             }
           }
-          .padding(.top, 4)
-        } label: {
-          Text(report.message)
-            .font(.callout)
         }
       }
       Spacer(minLength: 8)
+      if !report.lines.isEmpty {
+        Button(isShowingDetails ? "Hide Details" : "Show Details") {
+          isShowingDetails.toggle()
+        }
+        .controlSize(.small)
+      }
       Button {
         dismiss()
       } label: {
