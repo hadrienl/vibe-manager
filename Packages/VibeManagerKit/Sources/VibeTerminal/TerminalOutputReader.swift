@@ -26,6 +26,7 @@ final class TerminalOutputReader: @unchecked Sendable {
   private var outstandingByteCount = 0
   private var isSuspended = false
   private var isFinished = false
+  private var isThrottling = true
 
   let events: AsyncStream<TerminalReadEvent>
 
@@ -66,22 +67,66 @@ final class TerminalOutputReader: @unchecked Sendable {
     lock.unlock()
   }
 
-  func finish() {
+  /// Reads on whatever the subscribers keep up with: a process being stopped cannot finish
+  /// exiting while its output waits in the terminal, and the memory it costs ends with it.
+  func stopThrottling() {
     lock.lock()
-    guard !isFinished else {
-      lock.unlock()
-      return
-    }
-    isFinished = true
-    // A suspended source never runs its cancel handler, and the descriptor would leak.
-    if isSuspended {
+    isThrottling = false
+    if isSuspended, !isFinished {
       isSuspended = false
       source.resume()
     }
-    source.cancel()
     lock.unlock()
+  }
 
+  /// Hands over what the terminal still holds, then ends the stream.
+  ///
+  /// A process that exits leaves its last lines in the kernel buffer, and the read source may not
+  /// have been scheduled yet on a loaded machine: closing the descriptor then would drop exactly
+  /// the lines that explain a failure. They are read here, on the reader's own queue so that no
+  /// event handler runs in between, and yielded before the stream finishes.
+  func finish() {
+    queue.sync {
+      lock.lock()
+      guard !isFinished else {
+        lock.unlock()
+        return
+      }
+      lock.unlock()
+
+      enqueue(readRemainingBytes())
+      flush(endOfFile: false)
+
+      lock.lock()
+      isFinished = true
+      if isSuspended {
+        isSuspended = false
+        source.resume()
+      }
+      source.cancel()
+      lock.unlock()
+    }
     continuation.finish()
+  }
+
+  /// Everything readable without waiting, up to the high-water mark: a grandchild still writing
+  /// must not keep the session from ending.
+  private func readRemainingBytes() -> [UInt8] {
+    var buffer = [UInt8](repeating: 0, count: Self.readBufferSize)
+    var collected: [UInt8] = []
+    while collected.count < Self.highWaterMark {
+      let count = buffer.withUnsafeMutableBytes { pointer in
+        read(descriptor, pointer.baseAddress, Self.readBufferSize)
+      }
+      if count > 0 {
+        collected.append(contentsOf: buffer[0..<count])
+      } else if count < 0, errno == EINTR {
+        continue
+      } else {
+        break
+      }
+    }
+    return collected
   }
 
   private func readAvailableBytes() {
@@ -161,7 +206,9 @@ final class TerminalOutputReader: @unchecked Sendable {
     // letting the application accumulate unbounded output in memory. It has to happen before the
     // bytes leave the lock: the consumer acknowledges them on another thread and would otherwise
     // resume a source that is not suspended yet.
-    if !isSuspended, !hasFinished, !endOfFile, outstandingByteCount > Self.highWaterMark {
+    if isThrottling, !isSuspended, !hasFinished, !endOfFile,
+      outstandingByteCount > Self.highWaterMark
+    {
       isSuspended = true
       source.suspend()
     }

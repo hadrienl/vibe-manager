@@ -12,6 +12,7 @@ public struct RootView: View {
   @State private var idealWidths: IdealColumnWidths?
   /// The "Don't ask again" box of the close confirmation, unticked each time it opens.
   @State private var suppressesCloseConfirmation = false
+  @Environment(\.scenePhase) private var scenePhase
 
   public init(model: AppModel) {
     self.model = model
@@ -52,6 +53,10 @@ public struct RootView: View {
         sidebar: model.layout.intent.sidebarWidth,
         inspector: model.layout.intent.inspectorWidth
       )
+    }
+    // Back from sleep, or from another application: an event may have been missed meanwhile.
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { model.applicationDidBecomeActive() }
     }
     .sheet(
       item: Binding(
@@ -234,6 +239,9 @@ public struct RootView: View {
               session: session,
               resolution: model.resolution(forID: session.id),
               branchReport: model.branchReport(for: session.id),
+              repositoryStatuses: model.repositoryStatuses,
+              sessionNames: Dictionary(
+                model.sessions.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
               refreshBranches: model.reportsBranches
                 ? { Task { await model.refreshBranchReport() } } : nil
             )

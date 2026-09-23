@@ -11,17 +11,27 @@ public struct SessionContextInspector: View {
   private let session: WorkSession
   private let resolution: SessionAgentResolution?
   private let branchReport: SessionBranchReport?
+  private let repositoryStatuses: [String: RepositoryStatusState]
+  private let sessionNames: [SessionID: String]
   private let refreshBranches: (() -> Void)?
 
   public init(
     session: WorkSession,
     resolution: SessionAgentResolution?,
     branchReport: SessionBranchReport? = nil,
+    repositoryStatuses: [RepositoryStatusKey: RepositoryStatusState] = [:],
+    sessionNames: [SessionID: String] = [:],
     refreshBranches: (() -> Void)? = nil
   ) {
     self.session = session
     self.resolution = resolution
     self.branchReport = branchReport
+    var byPath: [String: RepositoryStatusState] = [:]
+    for (key, state) in repositoryStatuses where key.sessionID == session.id {
+      byPath[key.repositoryPath] = state
+    }
+    self.repositoryStatuses = byPath
+    self.sessionNames = sessionNames
     self.refreshBranches = refreshBranches
   }
 
@@ -43,7 +53,12 @@ public struct SessionContextInspector: View {
         HStack(spacing: 6) {
           Text("Git")
           Spacer()
-          if let branchReport {
+          if isLive {
+            // Said only when it is true: every repository is watched and its last reading held.
+            Text("live")
+              .font(.caption2)
+              .foregroundStyle(.tertiary)
+          } else if let branchReport {
             // The age is said, never implied: this is what was read, not a live view.
             TimelineView(.periodic(from: .now, by: 10)) { context in
               Text(age(of: branchReport.readAt, at: context.date))
@@ -94,6 +109,12 @@ public struct SessionContextInspector: View {
 }
 
 extension SessionContextInspector {
+  /// Every repository of the report watched, and read without failing since.
+  fileprivate var isLive: Bool {
+    guard let branchReport, !branchReport.repositories.isEmpty else { return false }
+    return branchReport.repositories.allSatisfy { repositoryStatuses[$0.path]?.phase == .fresh }
+  }
+
   @ViewBuilder
   fileprivate var branchContent: some View {
     if let branchReport {
@@ -109,7 +130,7 @@ extension SessionContextInspector {
         .fixedSize(horizontal: false, vertical: true)
       }
       ForEach(groups) { group in
-        BranchGroupView(group: group)
+        BranchGroupView(group: group, statuses: repositoryStatuses, sessionNames: sessionNames)
       }
       if !branchReport.visitedOnly.isEmpty {
         Text("Also looked in: \(branchReport.visitedOnly.joined(separator: ", "))")
@@ -173,6 +194,8 @@ private struct BranchGroup: Identifiable {
 
 private struct BranchGroupView: View {
   let group: BranchGroup
+  let statuses: [String: RepositoryStatusState]
+  let sessionNames: [SessionID: String]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
@@ -193,7 +216,8 @@ private struct BranchGroupView: View {
       }
       VStack(alignment: .leading, spacing: 4) {
         ForEach(group.entries) { entry in
-          EntryRow(entry: entry)
+          EntryRow(
+            entry: entry, status: statuses[entry.report.path], sessionNames: sessionNames)
         }
       }
       .padding(.leading, 18)
@@ -204,6 +228,8 @@ private struct BranchGroupView: View {
 
 private struct EntryRow: View {
   let entry: BranchGroup.Entry
+  let status: RepositoryStatusState?
+  let sessionNames: [SessionID: String]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -221,6 +247,9 @@ private struct EntryRow: View {
           .font(.caption)
           .foregroundStyle(.tertiary)
           .fixedSize(horizontal: false, vertical: true)
+      }
+      if let status {
+        RepositoryStatusSummary(state: status, sessionNames: sessionNames)
       }
     }
     .accessibilityElement(children: .combine)

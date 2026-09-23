@@ -20,6 +20,15 @@ private func setWindowSize(_ size: TerminalSize, on descriptor: Int32) {
 
 struct PseudoTerminal: Sendable {
   let masterDescriptor: Int32
+  /// The parent's own descriptor on the slave, held until the session has read everything.
+  ///
+  /// A terminal that is nobody's controlling one throws its unread output away when its last
+  /// descriptor closes. Whether the slave opened by the spawn's file actions becomes the child's
+  /// controlling terminal is not something `posix_spawn` promises — no file action performs a
+  /// `TIOCSCTTY` — and on the CI runner's macOS 15 a child that wrote its last lines and exited
+  /// before the reader ran lost them: `exited(code: 0)`, and nothing on screen. Held open here, the
+  /// slave is never closed by the child's exit, which instead waits for its output to be read.
+  let slaveDescriptor: Int32
   let processIdentifier: pid_t
 
   // The child is a session leader, so its process group identifier equals its process
@@ -42,6 +51,11 @@ struct PseudoTerminal: Sendable {
     signalProcessGroup(SIGWINCH)
   }
 
+  /// Called once the master has been drained: the terminal is now nobody's.
+  func closeSlave() {
+    close(slaveDescriptor)
+  }
+
   @discardableResult
   func signalProcessGroup(_ signalNumber: Int32) -> Bool {
     kill(-processGroupIdentifier, signalNumber) == 0
@@ -61,17 +75,24 @@ enum PseudoTerminalLauncher {
       _ = fcntl(master, F_SETFD, FD_CLOEXEC)
 
       // Darwin rejects window-size ioctls on a master whose slave has never been opened, and the
-      // child must already see its size when it starts. The parent therefore opens the slave,
-      // sizes the terminal, and closes its own descriptor once the child holds one.
+      // child must already see its size when it starts. The parent therefore opens the slave and
+      // sizes the terminal — and keeps it open: see `PseudoTerminal.slaveDescriptor`.
       let slave = open(slavePath, O_RDWR | O_NOCTTY)
       guard slave >= 0 else {
         throw TerminalError.pseudoTerminalUnavailable(code: errno)
       }
-      defer { close(slave) }
+      _ = fcntl(slave, F_SETFD, FD_CLOEXEC)
       setWindowSize(spec.initialSize, on: slave)
 
-      let processIdentifier = try spawn(spec, slavePath: slavePath)
-      return PseudoTerminal(masterDescriptor: master, processIdentifier: processIdentifier)
+      let processIdentifier: pid_t
+      do {
+        processIdentifier = try spawn(spec, slavePath: slavePath)
+      } catch {
+        close(slave)
+        throw error
+      }
+      return PseudoTerminal(
+        masterDescriptor: master, slaveDescriptor: slave, processIdentifier: processIdentifier)
     } catch {
       close(master)
       throw error

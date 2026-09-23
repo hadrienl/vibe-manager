@@ -118,10 +118,18 @@ The application never creates a branch or a worktree: the agent makes those it n
 inspector's Git section reports what it did — each branch the session worked on, the repositories
 it is checked out in (worktrees the agent made for itself included), and whether it was created,
 moved forward or rewritten, or has uncommitted work. The repositories come from the session's own
-transcript, so two sessions in one folder are never told each other's work. The report is read
-without taking any lock, every 30 seconds and for the session on screen only. The decisions are
+transcript, so two sessions in one folder are never told each other's work. The decisions are
 documented in
 [`docs/architecture/0012-session-branch-report.md`](docs/architecture/0012-session-branch-report.md).
+
+Each of those repositories is kept live while its session is on screen: staged, unstaged,
+untracked, renamed, deleted and conflicted files, the distance from upstream and an operation left
+half done, with every changed file the session's transcript names attributed to its agent. Nothing
+reads a repository on a timer — the file system says something moved, and one `git status` confirms
+it, without ever taking a lock, off the main thread, never more often than the repository's own
+speed allows. A failure keeps the last state that was true beside the reason. The decisions are
+documented in
+[`docs/architecture/0013-live-git-status.md`](docs/architecture/0013-live-git-status.md).
 
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single

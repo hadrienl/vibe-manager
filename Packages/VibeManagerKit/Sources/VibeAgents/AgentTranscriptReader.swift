@@ -10,10 +10,9 @@ import VibeDomain
 /// carry the `file_path` they wrote. Codex writes `sessions/YYYY/MM/DD/rollout-…-<id>.jsonl`, whose
 /// lines carry a `cwd`, the `workdir` of its commands, and patches naming the files they touch.
 ///
-/// Only read, never written, and read incrementally: a transcript grows to megabytes and the
-/// report is asked for every thirty seconds, so each file is resumed where the last reading
-/// stopped.
-public actor AgentTranscriptReader: SessionTranscriptReading {
+/// Only read, never written, and read incrementally: a transcript grows to megabytes and is read
+/// again each time it grows, so each file is resumed where the last reading stopped.
+public actor AgentTranscriptReader: SessionTranscriptSource {
   private let claudeProjects: URL
   private let codexSessions: URL
   private var progress: [String: FileProgress] = [:]
@@ -60,6 +59,29 @@ public actor AgentTranscriptReader: SessionTranscriptReading {
       activity.workingDirectories.formUnion(read.workingDirectories)
     }
     return activity
+  }
+
+  /// The folders to watch for the session's transcript to grow: the whole Claude Code projects
+  /// folder, or the whole Codex sessions folder.
+  ///
+  /// Not the folders its files are in today. A Claude Code session selected before its agent wrote
+  /// a word has no file yet, so no folder; a Codex session writes in the folder of the day, which
+  /// changes at midnight and when it is resumed the next day. Either would stop being watched
+  /// exactly when it starts to matter. Events from other sessions' transcripts wake the monitor for
+  /// a comparison of names, nothing more: only files named after this session count.
+  public func transcriptDirectories(for session: WorkSession) async -> [String] {
+    guard let agent = session.agent,
+      let identifier = agent.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !identifier.isEmpty
+    else { return [] }
+    switch agent.providerID {
+    case ClaudeCodeAgentProvider.id.rawValue:
+      return [claudeProjects.path]
+    case CodexAgentProvider.id.rawValue:
+      return [codexSessions.path]
+    default:
+      return []
+    }
   }
 
   // MARK: - Finding the files

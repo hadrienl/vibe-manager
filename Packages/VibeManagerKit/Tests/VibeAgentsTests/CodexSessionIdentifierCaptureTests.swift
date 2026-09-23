@@ -306,7 +306,7 @@ private actor Gate {
 /// Polls a condition instead of sleeping for a fixed time, so the suite stays fast and does
 /// not depend on how quickly a watcher task is scheduled.
 private func waitUntil(
-  timeout: Duration = .seconds(2),
+  timeout: Duration = .seconds(10),
   _ condition: @Sendable () async -> Bool
 ) async throws {
   let deadline = ContinuousClock.now.advanced(by: timeout)

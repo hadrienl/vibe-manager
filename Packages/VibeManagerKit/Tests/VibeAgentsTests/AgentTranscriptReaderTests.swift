@@ -115,4 +115,21 @@ struct AgentTranscriptReaderTests {
     #expect(
       await reader.activity(for: session(provider: "claude-code", identifier: "missing")) == nil)
   }
+
+  @Test("The whole transcript folder is watched, even before the agent wrote its first line")
+  func watchedFolders() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let projects = root.appendingPathComponent("projects")
+    let sessions = root.appendingPathComponent("sessions")
+    let reader = AgentTranscriptReader(claudeProjects: projects, codexSessions: sessions)
+
+    #expect(
+      await reader.transcriptDirectories(for: session(provider: "claude-code", identifier: "new"))
+        == [projects.path])
+    #expect(
+      await reader.transcriptDirectories(for: session(provider: "codex", identifier: "019e"))
+        == [sessions.path])
+    #expect(await reader.transcriptDirectories(for: WorkSession(name: "Bare")).isEmpty)
+  }
 }
