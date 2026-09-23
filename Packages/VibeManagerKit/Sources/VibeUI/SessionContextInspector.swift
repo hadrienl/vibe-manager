@@ -974,7 +974,10 @@ private struct AgentHistoryList: View {
   @ViewBuilder
   private func entry(_ change: AgentChange) -> some View {
     let from = Self.label(change.previous, names: names)
-    let to = Self.label(change.next, names: names)
+    // Another model of the same agent names the model alone: the agent is already on the line.
+    let to =
+      change.changesProvider
+      ? Self.label(change.next, names: names) : (change.next.modelID ?? "default model")
     switch change.outcome {
     case .completed:
       row(
@@ -999,26 +1002,25 @@ private struct AgentHistoryList: View {
   private func row(
     date: Date, text: String, detail: String?, failed: Bool, spoken: String
   ) -> some View {
+    // The change first and whole, on as many lines as it takes; when and how below it.
     VStack(alignment: .leading, spacing: 1) {
-      HStack(alignment: .firstTextBaseline, spacing: 6) {
-        Text(date.formatted(date: .abbreviated, time: .shortened))
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
+      HStack(alignment: .firstTextBaseline, spacing: 4) {
         if failed {
           Image(systemName: "exclamationmark.triangle.fill")
-            .font(.caption)
             .foregroundStyle(.orange)
         }
         Text(text)
-          .font(.caption)
           .foregroundStyle(failed ? Color.orange : .primary)
-      }
-      if let detail {
-        Text(detail)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
+      .font(.caption)
+      Text(
+        [date.formatted(date: .abbreviated, time: .shortened), detail]
+          .compactMap { $0 }.joined(separator: " · ")
+      )
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(spoken)

@@ -150,7 +150,8 @@ public final class AgentSwitchModel {
   public var continuityNotice: String {
     switch handover {
     case .resumesConversation:
-      return "The conversation continues with \(modelID ?? "the agent's default model")."
+      let model = modelID.map { id in models.first { $0.id == id }?.displayName ?? id }
+      return "The conversation continues with \(model ?? "the agent's default model")."
     case .firstLaunch:
       return """
         This session has never run: \(targetName) starts it with the prompt it was created with.

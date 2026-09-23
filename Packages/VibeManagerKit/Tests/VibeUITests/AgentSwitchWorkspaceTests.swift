@@ -92,7 +92,7 @@ struct AgentSwitchWorkspaceTests {
     sheet.select(model: "deep")
 
     #expect(sheet.handover == .resumesConversation)
-    #expect(sheet.continuityNotice.contains("conversation continues with deep"))
+    #expect(sheet.continuityNotice.contains("conversation continues with Deep"))
     #expect(sheet.canSwitch)
   }
 
