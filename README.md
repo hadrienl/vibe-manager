@@ -131,6 +131,15 @@ speed allows. A failure keeps the last state that was true beside the reason. Th
 documented in
 [`docs/architecture/0013-live-git-status.md`](docs/architecture/0013-live-git-status.md).
 
+The inspector shows it one repository at a time, above the session's notes, each pane scrolling on
+its own: the branch, the distance from upstream and an operation left half done in the header, then
+the conflicted, staged, unstaged and untracked files in Git's own order — a file staged and changed
+again is in both lists. Folding, "Show More", the selection and the scroll position survive every
+update, and a file keeps its selection as it moves from one list to another. Return or a
+double-click opens a file in the editor chosen in Settings, and only reveals it in the Finder until
+one is chosen. The decisions are documented in
+[`docs/architecture/0014-git-inspector.md`](docs/architecture/0014-git-inspector.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the
