@@ -55,7 +55,7 @@ struct SessionRestorationTests {
   private struct Workspace {
     let model: AppModel
     let launcher: SessionLauncher
-    let repository: MutableRepository
+    let repository: WorkspaceRepository
     let runtime: EphemeralSessionRuntimeStateStore
     let recorder: SessionRuntimeRecorder
   }
@@ -65,11 +65,11 @@ struct SessionRestorationTests {
     document: SessionRuntimeState? = nil,
     alive: Set<Int32> = [],
     runtime: EphemeralSessionRuntimeStateStore? = nil,
-    repository: MutableRepository? = nil,
+    repository: WorkspaceRepository? = nil,
     processIdentifier: Int32 = 4_242,
     probeDelay: Duration = .zero
   ) -> Workspace {
-    let repository = repository ?? MutableRepository(sessions: sessions)
+    let repository = repository ?? WorkspaceRepository(sessions: sessions)
     let store = runtime ?? EphemeralSessionRuntimeStateStore(state: document)
     let processes = StubProcesses(alive: alive)
     let recorder = SessionRuntimeRecorder(
@@ -77,9 +77,9 @@ struct SessionRestorationTests {
       processIdentifier: processIdentifier,
       probe: processes
     )
-    let registry = StubRegistry(providers: [StubProvider(probeDelay: probeDelay)])
+    let registry = WorkspaceRegistry(providers: [WorkspaceProvider(probeDelay: probeDelay)])
     let launcher = SessionLauncher(
-      supervisor: SpySupervisor(),
+      supervisor: WorkspaceSupervisor(),
       repository: repository,
       agents: registry,
       recorder: recorder,
@@ -332,7 +332,7 @@ struct SessionRestorationTests {
   func theFullCircle() async {
     let path = folder()
     let subject = session(status: .closed, path: path)
-    let repository = MutableRepository(sessions: [subject])
+    let repository = WorkspaceRepository(sessions: [subject])
     let runtime = EphemeralSessionRuntimeStateStore(
       state: document(phase: .stopped, sessions: [SessionRuntimeRecord(sessionID: subject.id)])
     )
@@ -381,41 +381,6 @@ private enum Fixture {
     .appendingPathComponent("vibe-fixture-agent", isDirectory: false).path
 }
 
-private actor MutableRepository: SessionRepository {
-  private var stored: [WorkSession]
-
-  init(sessions: [WorkSession]) {
-    stored = sessions
-  }
-
-  func status(of id: SessionID) -> SessionStatus? {
-    stored.first { $0.id == id }?.status
-  }
-
-  func sessions() -> [WorkSession] { stored }
-
-  func session(id: SessionID) -> WorkSession? { stored.first { $0.id == id } }
-
-  func save(_ session: WorkSession) {
-    if let index = stored.firstIndex(where: { $0.id == session.id }) {
-      stored[index] = session
-    } else {
-      stored.append(session)
-    }
-  }
-
-  func mutate(
-    id: SessionID,
-    _ transform: @Sendable (inout WorkSession) throws -> Void
-  ) throws -> WorkSession? {
-    guard let index = stored.firstIndex(where: { $0.id == id }) else { return nil }
-    var session = stored[index]
-    try transform(&session)
-    stored[index] = session
-    return session
-  }
-}
-
 /// A system whose processes the test decides on.
 private final class StubProcesses: ProcessLivenessProbe, @unchecked Sendable {
   private let lock = NSLock()
@@ -440,157 +405,5 @@ private final class StubProcesses: ProcessLivenessProbe, @unchecked Sendable {
   func terminate(processGroup: Int32) -> Bool {
     lock.withLock { killed.append(processGroup) }
     return true
-  }
-}
-
-private actor SpySupervisor: TerminalSupervisor {
-  private var sessions: [SessionID: FakeTerminalSession] = [:]
-
-  func start(_: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
-    let session = FakeTerminalSession(id: id, state: .running(processIdentifier: 4_242))
-    sessions[id] = session
-    return session
-  }
-
-  func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
-
-  func stop(id: SessionID, gracePeriod _: Duration) async {
-    await sessions.removeValue(forKey: id)?.finish(state: .exited(code: 0))
-  }
-
-  func stopAll(gracePeriod _: Duration) async {
-    let running = sessions.values
-    sessions.removeAll()
-    for session in running {
-      await session.finish(state: .exited(code: 0))
-    }
-  }
-}
-
-private actor FakeTerminalSession: TerminalSession {
-  nonisolated let id: SessionID
-  private var current: TerminalProcessState
-  private var continuations: [AsyncStream<TerminalEvent>.Continuation] = []
-
-  init(id: SessionID, state: TerminalProcessState) {
-    self.id = id
-    current = state
-  }
-
-  func attach() -> TerminalAttachment {
-    let state = current
-    var continuation: AsyncStream<TerminalEvent>.Continuation?
-    let events = AsyncStream<TerminalEvent> { continuation = $0 }
-    if let continuation {
-      if state.isFinished {
-        continuation.finish()
-      } else {
-        continuations.append(continuation)
-      }
-    }
-    return TerminalAttachment(
-      state: state,
-      history: TerminalHistorySnapshot(bytes: [], droppedByteCount: 0),
-      events: events
-    )
-  }
-
-  func state() -> TerminalProcessState { current }
-
-  func history() -> TerminalHistorySnapshot {
-    TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
-  }
-
-  func write(_: [UInt8]) {
-    // Nothing reads this terminal's input: the tests drive its state directly.
-  }
-
-  func resize(to _: TerminalSize) {
-    // No view is attached, so a size means nothing here.
-  }
-
-  func stop(gracePeriod _: Duration) {
-    finish(state: .exited(code: 0))
-  }
-
-  func kill() {
-    finish(state: .terminated(signal: 9))
-  }
-
-  func finish(state: TerminalProcessState) {
-    guard !current.isFinished else { return }
-    current = state
-    for continuation in continuations {
-      continuation.yield(.stateChanged(state))
-      continuation.finish()
-    }
-    continuations.removeAll()
-  }
-}
-
-private struct StubProvider: AgentProvider {
-  var probeDelay: Duration = .zero
-
-  let descriptor = AgentDescriptor(
-    id: AgentProviderID("stub"),
-    displayName: "Stub Agent",
-    capabilities: AgentCapabilities(
-      supportsModelSelection: true,
-      supportsInitialPrompt: true,
-      supportsResume: true
-    )
-  )
-
-  func availability(forceRefresh _: Bool) async -> AgentAvailability {
-    if probeDelay != .zero {
-      try? await Task.sleep(for: probeDelay)
-    }
-    return AgentAvailability(
-      state: .available,
-      installation: nil,
-      diagnostic: AgentDiagnostic(
-        providerID: descriptor.id,
-        providerName: descriptor.displayName,
-        state: .available,
-        summary: "Stub Agent is ready.",
-        probedAt: Date(timeIntervalSince1970: 0),
-        remediations: []
-      )
-    )
-  }
-
-  func models() async -> [AgentModel] { [] }
-
-  func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    var arguments: [String] = []
-    if case .identifier(let identifier) = request.resume {
-      arguments.append(contentsOf: ["--resume", identifier])
-    }
-    return AgentLaunchPlan(
-      providerID: descriptor.id,
-      executablePath: Fixture.executablePath,
-      arguments: arguments,
-      environment: [:],
-      workingDirectoryPath: request.workingDirectoryPath,
-      promptDelivery: request.initialPrompt == nil ? .none : .argument
-    )
-  }
-}
-
-private struct StubRegistry: AgentProviderResolving {
-  var providers: [StubProvider]
-
-  func descriptors() async -> [AgentDescriptor] { providers.map(\.descriptor) }
-
-  func provider(id: AgentProviderID) async -> (any AgentProvider)? {
-    providers.first { $0.descriptor.id == id }
-  }
-
-  func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] {
-    var result: [AgentProviderID: AgentAvailability] = [:]
-    for provider in providers {
-      result[provider.descriptor.id] = await provider.availability(forceRefresh: forceRefresh)
-    }
-    return result
   }
 }

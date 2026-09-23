@@ -67,12 +67,12 @@ struct SessionRestartTests {
 
   private func makeWorkspace(
     session: WorkSession,
-    supervisor: SpySupervisor = SpySupervisor(),
-    provider: StubProvider = StubProvider(),
+    supervisor: WorkspaceSupervisor = WorkspaceSupervisor(),
+    provider: WorkspaceProvider = WorkspaceProvider(),
     clock: SessionClock = SystemSessionClock()
-  ) -> (AppModel, SessionLauncher, SpySupervisor, MutableRepository) {
-    let repository = MutableRepository(sessions: [session])
-    let registry = StubRegistry(providers: [provider])
+  ) -> (AppModel, SessionLauncher, WorkspaceSupervisor, WorkspaceRepository) {
+    let repository = WorkspaceRepository(sessions: [session])
+    let registry = WorkspaceRegistry(providers: [provider])
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
@@ -163,7 +163,7 @@ struct SessionRestartTests {
     let subject = session(path: path)
     let (_, launcher, _, _) = makeWorkspace(
       session: subject,
-      supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35))
+      supervisor: WorkspaceSupervisor(failure: .resourceLimitReached(code: 35))
     )
 
     let restarted = await launcher.restart(
@@ -185,14 +185,14 @@ struct SessionRestartTests {
   func archivedDuringPreparationIsNotStarted() async {
     let path = folder()
     let subject = session(path: path)
-    let repository = MutableRepository(sessions: [subject])
+    let repository = WorkspaceRepository(sessions: [subject])
     // Archived after the restart read it, which is the whole of the window this guards.
     await repository.archive(subject.id)
-    let supervisor = SpySupervisor()
+    let supervisor = WorkspaceSupervisor()
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
-      agents: StubRegistry(providers: [StubProvider()]),
+      agents: WorkspaceRegistry(providers: [WorkspaceProvider()]),
       viewportTimeout: .zero
     )
 
@@ -216,11 +216,11 @@ struct SessionRestartTests {
     // Closed when the launch checks, archived by the time it writes: the one ordering in which a
     // process could survive an archive.
     let repository = RacingRepository(session: subject, archiveAfterReads: 1)
-    let supervisor = SpySupervisor()
+    let supervisor = WorkspaceSupervisor()
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
-      agents: StubRegistry(providers: [StubProvider()]),
+      agents: WorkspaceRegistry(providers: [WorkspaceProvider()]),
       viewportTimeout: .zero
     )
 
@@ -454,7 +454,7 @@ struct SessionRestartTests {
     let subject = session(path: path)
     let (model, _, _, repository) = makeWorkspace(
       session: subject,
-      supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35))
+      supervisor: WorkspaceSupervisor(failure: .resourceLimitReached(code: 35))
     )
     await model.reload()
 
@@ -468,7 +468,7 @@ struct SessionRestartTests {
   func ghostResumeIsRememberedNotAnnounced() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
 
@@ -486,7 +486,7 @@ struct SessionRestartTests {
   func aRefusedResumeIsToldAtTheNextRestart() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
     await model.restart(subject.id)
@@ -507,7 +507,7 @@ struct SessionRestartTests {
   func aRefusalIsNotWipedByTheLaunchThatEarnedIt() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
     // An observer that takes its time is what makes the ordering certain rather than lucky: the
     // exit of a refused resume then reaches the model *inside* the call that goes on to report
     // success. On CI, where the machine is loaded, that is the ordinary ordering — and the
@@ -516,7 +516,7 @@ struct SessionRestartTests {
     let (model, _, _, _) = makeWorkspace(
       session: subject,
       supervisor: supervisor,
-      provider: StubProvider(observerDelayYields: 40)
+      provider: WorkspaceProvider(observerDelayYields: 40)
     )
     await model.reload()
 
@@ -535,7 +535,7 @@ struct SessionRestartTests {
     let path = folder()
     let subject = session(path: path)
     let clock = SteppableClock(Date(timeIntervalSince1970: 1_700_000_000))
-    let supervisor = SpySupervisor()
+    let supervisor = WorkspaceSupervisor()
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor, clock: clock)
     await model.reload()
     await model.restart(subject.id)
@@ -552,7 +552,7 @@ struct SessionRestartTests {
   func cleanExitIsNotAGhostResume() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor(initialState: .exited(code: 0))
+    let supervisor = WorkspaceSupervisor(initialState: .exited(code: 0))
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
 
@@ -582,7 +582,7 @@ struct SessionRestartTests {
   func inputProvesTheResumeWorked() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor()
+    let supervisor = WorkspaceSupervisor()
     let (model, launcher, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
     await model.restart(subject.id)
@@ -598,12 +598,12 @@ struct SessionRestartTests {
   func closureCarriesTheFinalState() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor()
-    let repository = MutableRepository(sessions: [subject])
+    let supervisor = WorkspaceSupervisor()
+    let repository = WorkspaceRepository(sessions: [subject])
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
-      agents: StubRegistry(providers: [StubProvider()]),
+      agents: WorkspaceRegistry(providers: [WorkspaceProvider()]),
       viewportTimeout: .zero
     )
     // Read back from the pane this was a race — the pane runs its own attachment on its own
@@ -644,7 +644,7 @@ struct SessionRestartTests {
     let subject = session(path: path)
     let (model, _, _, _) = makeWorkspace(
       session: subject,
-      supervisor: SpySupervisor(failure: .resourceLimitReached(code: 35))
+      supervisor: WorkspaceSupervisor(failure: .resourceLimitReached(code: 35))
     )
     await model.reload()
     model.setScope(.closed)
@@ -661,7 +661,7 @@ struct SessionRestartTests {
   func startingClearsTheRefusal() async {
     let path = folder()
     let subject = session(path: path)
-    let supervisor = SpySupervisor(initialState: .exited(code: 1))
+    let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
     await model.restart(subject.id)
@@ -681,14 +681,14 @@ struct SessionRestartTests {
     let path = folder()
     let subject = session(path: path)
     let repository = RefusingRepository(sessions: [subject])
-    let supervisor = SpySupervisor()
+    let supervisor = WorkspaceSupervisor()
     let model = AppModel(
       repository: repository,
-      agents: StubRegistry(providers: [StubProvider()]),
+      agents: WorkspaceRegistry(providers: [WorkspaceProvider()]),
       launcher: SessionLauncher(
         supervisor: supervisor,
         repository: repository,
-        agents: StubRegistry(providers: [StubProvider()]),
+        agents: WorkspaceRegistry(providers: [WorkspaceProvider()]),
         viewportTimeout: .zero
       )
     )
@@ -788,46 +788,6 @@ private actor RacingRepository: SessionRepository {
   }
 }
 
-private actor MutableRepository: SessionRepository {
-  private var stored: [WorkSession]
-
-  init(sessions: [WorkSession]) {
-    stored = sessions
-  }
-
-  func sessions() -> [WorkSession] { stored }
-
-  func session(id: SessionID) -> WorkSession? {
-    stored.first { $0.id == id }
-  }
-
-  func save(_ session: WorkSession) {
-    if let index = stored.firstIndex(where: { $0.id == session.id }) {
-      stored[index] = session
-    } else {
-      stored.append(session)
-    }
-  }
-
-  /// Archives the stored session the way the archiving use case would, for a test that needs the
-  /// store to disagree with the value a caller is holding.
-  func archive(_ id: SessionID) {
-    guard let index = stored.firstIndex(where: { $0.id == id }) else { return }
-    try? stored[index].archive(at: stored[index].updatedAt)
-  }
-
-  func mutate(
-    id: SessionID,
-    _ transform: @Sendable (inout WorkSession) throws -> Void
-  ) throws -> WorkSession? {
-    guard let index = stored.firstIndex(where: { $0.id == id }) else { return nil }
-    var session = stored[index]
-    try transform(&session)
-    stored[index] = session
-    return session
-  }
-}
-
 /// A store that reads fine and refuses every write, for the failure that is neither an archive
 /// nor a session that moved: the write itself did not go through.
 private actor RefusingRepository: SessionRepository {
@@ -854,199 +814,5 @@ private actor RefusingRepository: SessionRepository {
     _ transform: @Sendable (inout WorkSession) throws -> Void
   ) throws -> WorkSession? {
     throw Refusal()
-  }
-}
-
-private actor SpySupervisor: TerminalSupervisor {
-  private(set) var startCount = 0
-  private(set) var lastSpec: TerminalSpec?
-  private var sessions: [SessionID: FakeTerminalSession] = [:]
-  private let failure: TerminalError?
-  private var initialState: TerminalProcessState
-
-  init(
-    failure: TerminalError? = nil,
-    initialState: TerminalProcessState = .running(processIdentifier: 4242)
-  ) {
-    self.failure = failure
-    self.initialState = initialState
-  }
-
-  /// What the next process starts in, for a test whose second launch must not repeat the fate
-  /// of its first.
-  func nextProcessStarts(in state: TerminalProcessState) {
-    initialState = state
-  }
-
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
-    if let failure { throw failure }
-    startCount += 1
-    lastSpec = spec
-    let session = FakeTerminalSession(id: id, state: initialState)
-    sessions[id] = session
-    return session
-  }
-
-  func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
-
-  func stop(id: SessionID, gracePeriod: Duration) async {
-    // Released as well as finished, exactly as `PTYTerminalSupervisor` does: a double that kept
-    // the entry would let a test claim nothing is attached while the supervisor still holds it.
-    await sessions.removeValue(forKey: id)?.finish(state: .exited(code: 0))
-  }
-
-  func stopAll(gracePeriod: Duration) {}
-
-  func finish(id: SessionID, state: TerminalProcessState) async {
-    await sessions[id]?.finish(state: state)
-  }
-}
-
-private actor FakeTerminalSession: TerminalSession {
-  nonisolated let id: SessionID
-  private var current: TerminalProcessState
-  private var continuations: [AsyncStream<TerminalEvent>.Continuation] = []
-
-  init(id: SessionID, state: TerminalProcessState) {
-    self.id = id
-    current = state
-  }
-
-  func attach() -> TerminalAttachment {
-    let state = current
-    var continuation: AsyncStream<TerminalEvent>.Continuation?
-    let events = AsyncStream<TerminalEvent> { continuation = $0 }
-    if let continuation {
-      if state.isFinished {
-        continuation.finish()
-      } else {
-        continuations.append(continuation)
-      }
-    }
-    return TerminalAttachment(
-      state: state,
-      history: TerminalHistorySnapshot(bytes: [], droppedByteCount: 0),
-      events: events
-    )
-  }
-
-  func state() -> TerminalProcessState { current }
-
-  func history() -> TerminalHistorySnapshot {
-    TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
-  }
-
-  func write(_ bytes: [UInt8]) {}
-
-  func resize(to size: TerminalSize) {}
-
-  func stop(gracePeriod: Duration) {
-    finish(state: .exited(code: 0))
-  }
-
-  func kill() {
-    finish(state: .terminated(signal: 9))
-  }
-
-  func finish(state: TerminalProcessState) {
-    guard !current.isFinished else { return }
-    current = state
-    for continuation in continuations {
-      continuation.yield(.stateChanged(state))
-      continuation.finish()
-    }
-    continuations.removeAll()
-  }
-}
-
-private struct StubProvider: AgentProvider, AgentLaunchObserverProviding {
-  /// How long the launch observer holds the launch open, in scheduler turns.
-  var observerDelayYields = 0
-
-  func launchObserver(
-    for _: SessionID,
-    repository _: any SessionRepository
-  ) -> any AgentLaunchObserver {
-    SlowObserver(yields: observerDelayYields)
-  }
-
-  let descriptor = AgentDescriptor(
-    id: AgentProviderID("stub"),
-    displayName: "Stub Agent",
-    capabilities: AgentCapabilities(
-      supportsModelSelection: true,
-      supportsInitialPrompt: true,
-      supportsResume: true
-    )
-  )
-
-  func availability(forceRefresh: Bool) async -> AgentAvailability {
-    AgentAvailability(
-      state: .available,
-      installation: nil,
-      diagnostic: AgentDiagnostic(
-        providerID: descriptor.id,
-        providerName: descriptor.displayName,
-        state: .available,
-        summary: "Stub Agent is ready.",
-        probedAt: Date(timeIntervalSince1970: 0),
-        remediations: []
-      )
-    )
-  }
-
-  func models() async -> [AgentModel] { [] }
-
-  func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    var arguments: [String] = []
-    if case .identifier(let identifier) = request.resume {
-      arguments.append(contentsOf: ["--resume", identifier])
-    }
-    if let prompt = request.initialPrompt {
-      arguments.append(prompt)
-    }
-    return AgentLaunchPlan(
-      providerID: descriptor.id,
-      executablePath: "/usr/bin/true",
-      arguments: arguments,
-      environment: [:],
-      workingDirectoryPath: request.workingDirectoryPath,
-      promptDelivery: request.initialPrompt == nil ? .none : .argument
-    )
-  }
-}
-
-/// An observer that keeps a launch in flight for a known number of scheduler turns.
-private struct SlowObserver: AgentLaunchObserver {
-  let yields: Int
-
-  func launched(plan _: AgentLaunchPlan) async {
-    for _ in 0..<yields { await Task.yield() }
-  }
-
-  func observe(output _: String) async {
-    // The identifier this launch would reveal is not what these tests are about.
-  }
-
-  func finished() async {
-    // Nothing was kept, so there is nothing to flush.
-  }
-}
-
-private struct StubRegistry: AgentProviderResolving {
-  var providers: [StubProvider]
-
-  func descriptors() async -> [AgentDescriptor] { providers.map(\.descriptor) }
-
-  func provider(id: AgentProviderID) async -> (any AgentProvider)? {
-    providers.first { $0.descriptor.id == id }
-  }
-
-  func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] {
-    var result: [AgentProviderID: AgentAvailability] = [:]
-    for provider in providers {
-      result[provider.descriptor.id] = await provider.availability(forceRefresh: forceRefresh)
-    }
-    return result
   }
 }

@@ -31,11 +31,11 @@ struct RestoreSessionsTests {
     sessions: [WorkSession],
     launcher: StubLauncher = StubLauncher()
   ) -> (RestoreSessions, StubLauncher) {
-    let repository = MutableRepository(sessions: sessions)
+    let repository = RestorationRepository(sessions: sessions)
     let restart = RestartSession(
       repository: repository,
-      agents: StubRegistry(providers: [StubProvider()]),
-      folders: StubFolders()
+      agents: RestorationRegistry(providers: [RestorationProvider()]),
+      folders: RestorationFolders()
     )
     return (
       RestoreSessions(restart: restart, launcher: launcher, repository: repository), launcher
@@ -288,99 +288,5 @@ private final class StubLauncher: SessionRestarting {
     restarted.append(restart.session.id)
     running.insert(restart.session.id)
     return .started
-  }
-}
-
-private actor MutableRepository: SessionRepository {
-  private var stored: [WorkSession]
-
-  init(sessions: [WorkSession]) {
-    stored = sessions
-  }
-
-  func sessions() -> [WorkSession] { stored }
-
-  func session(id: SessionID) -> WorkSession? { stored.first { $0.id == id } }
-
-  func save(_ session: WorkSession) {
-    guard let index = stored.firstIndex(where: { $0.id == session.id }) else { return }
-    stored[index] = session
-  }
-
-  func mutate(
-    id: SessionID,
-    _ transform: @Sendable (inout WorkSession) throws -> Void
-  ) throws -> WorkSession? {
-    guard let index = stored.firstIndex(where: { $0.id == id }) else { return nil }
-    var session = stored[index]
-    try transform(&session)
-    stored[index] = session
-    return session
-  }
-}
-
-private struct StubFolders: WorkingDirectoryProbe {
-  func inspect(path _: String) async -> WorkingDirectoryStatus { .usable }
-}
-
-private struct StubProvider: AgentProvider {
-  let descriptor = AgentDescriptor(
-    id: AgentProviderID("stub"),
-    displayName: "Stub Agent",
-    capabilities: AgentCapabilities(
-      supportsModelSelection: true,
-      supportsInitialPrompt: true,
-      supportsResume: true
-    )
-  )
-
-  func availability(forceRefresh _: Bool) async -> AgentAvailability {
-    AgentAvailability(
-      state: .available,
-      installation: nil,
-      diagnostic: AgentDiagnostic(
-        providerID: descriptor.id,
-        providerName: descriptor.displayName,
-        state: .available,
-        summary: "Stub Agent is ready.",
-        probedAt: Date(timeIntervalSince1970: 0),
-        remediations: []
-      )
-    )
-  }
-
-  func models() async -> [AgentModel] { [] }
-
-  func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    var arguments: [String] = []
-    if case .identifier(let identifier) = request.resume {
-      arguments.append(contentsOf: ["--resume", identifier])
-    }
-    return AgentLaunchPlan(
-      providerID: descriptor.id,
-      executablePath: Fixture.executablePath,
-      arguments: arguments,
-      environment: [:],
-      workingDirectoryPath: request.workingDirectoryPath,
-      promptDelivery: request.initialPrompt == nil ? .none : .argument
-    )
-  }
-}
-
-private struct StubRegistry: AgentProviderResolving {
-  var providers: [StubProvider]
-
-  func descriptors() async -> [AgentDescriptor] { providers.map(\.descriptor) }
-
-  func provider(id: AgentProviderID) async -> (any AgentProvider)? {
-    providers.first { $0.descriptor.id == id }
-  }
-
-  func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] {
-    var result: [AgentProviderID: AgentAvailability] = [:]
-    for provider in providers {
-      result[provider.descriptor.id] = await provider.availability(forceRefresh: forceRefresh)
-    }
-    return result
   }
 }

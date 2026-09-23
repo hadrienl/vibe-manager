@@ -28,19 +28,20 @@ struct PrepareForQuitTests {
   private func makeSubject(
     sessions: [WorkSession],
     records: [SessionID] = [],
-    repository: MutableRepository? = nil
+    repository: RestorationRepository? = nil
   ) async -> (
-    PrepareForQuit, MutableRepository, SpyRuntime, EphemeralSessionRuntimeStateStore, Journal
+    PrepareForQuit, RestorationRepository, SpyRuntime, EphemeralSessionRuntimeStateStore,
+    RestorationJournal
   ) {
-    let journal = Journal()
+    let journal = RestorationJournal()
     let store = EphemeralSessionRuntimeStateStore()
-    let repository = repository ?? MutableRepository(sessions: sessions, journal: journal)
+    let repository = repository ?? RestorationRepository(sessions: sessions, journal: journal)
     let runtime = SpyRuntime(journal: journal)
     let recorder = SessionRuntimeRecorder(
       store: JournalingRuntimeStateStore(store: store, journal: journal),
       processIdentifier: 4242,
-      probe: StubProcesses(),
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      probe: RestorationProcesses(),
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
     for id in records {
       await recorder.started(id, processGroup: 5555)
@@ -50,7 +51,7 @@ struct PrepareForQuitTests {
       repository: repository,
       runtime: runtime,
       recorder: recorder,
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
     return (subject, repository, runtime, store, journal)
   }
@@ -117,20 +118,20 @@ struct PrepareForQuitTests {
       name: "First", status: .active, updatedAt: Date(timeIntervalSince1970: 1_700_000_200))
     let second = session(
       name: "Second", status: .active, updatedAt: Date(timeIntervalSince1970: 1_700_000_100))
-    let journal = Journal()
+    let journal = RestorationJournal()
     let store = EphemeralSessionRuntimeStateStore()
     let runtime = SlowRuntime(journal: journal)
     let recorder = SessionRuntimeRecorder(
       store: store,
       processIdentifier: 4242,
-      probe: StubProcesses(),
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      probe: RestorationProcesses(),
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
     let prepare = PrepareForQuit(
-      repository: MutableRepository(sessions: [first, second], journal: journal),
+      repository: RestorationRepository(sessions: [first, second], journal: journal),
       runtime: runtime,
       recorder: recorder,
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
 
     await prepare()
@@ -173,15 +174,15 @@ struct PrepareForQuitTests {
   func readOnlyInstanceLeavesTheOtherCopyAlone() async {
     let theirs = session(
       name: "Theirs", status: .active, updatedAt: Date(timeIntervalSince1970: 1_700_000_200))
-    let journal = Journal()
+    let journal = RestorationJournal()
     let store = EphemeralSessionRuntimeStateStore()
-    let repository = MutableRepository(sessions: [theirs], journal: journal)
+    let repository = RestorationRepository(sessions: [theirs], journal: journal)
     let runtime = SpyRuntime(journal: journal)
     let recorder = SessionRuntimeRecorder(
       store: store,
       processIdentifier: 4242,
-      probe: StubProcesses(),
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      probe: RestorationProcesses(),
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
     // The document was found held by another copy, so this instance gave up writing it.
     await recorder.seal()
@@ -189,7 +190,7 @@ struct PrepareForQuitTests {
       repository: repository,
       runtime: runtime,
       recorder: recorder,
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
 
     let shutdown = await prepare()
@@ -205,14 +206,14 @@ struct PrepareForQuitTests {
   @Test("A store that cannot be read still stops what this instance recorded")
   func stopsRecordedSessionsWhenTheStoreIsUnreadable() async {
     let unreadable = UnreadableRepository()
-    let journal = Journal()
+    let journal = RestorationJournal()
     let store = EphemeralSessionRuntimeStateStore()
     let runtime = SpyRuntime(journal: journal)
     let recorder = SessionRuntimeRecorder(
       store: store,
       processIdentifier: 4242,
-      probe: StubProcesses(),
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      probe: RestorationProcesses(),
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
     let recorded = SessionID()
     await recorder.started(recorded, processGroup: 5555)
@@ -220,7 +221,7 @@ struct PrepareForQuitTests {
       repository: unreadable,
       runtime: runtime,
       recorder: recorder,
-      clock: FixedClock(Date(timeIntervalSince1970: 1_700_000_500))
+      clock: RestorationClock(Date(timeIntervalSince1970: 1_700_000_500))
     )
 
     let shutdown = await prepare()
@@ -248,54 +249,6 @@ private enum Fixture {
     .appendingPathComponent("vibe-fixture-agent", isDirectory: false).path
 }
 
-/// The order in which things happened, which is the whole assertion of this suite.
-private actor Journal {
-  private(set) var entries: [String] = []
-
-  func record(_ entry: String) {
-    entries.append(entry)
-  }
-
-  func clear() {
-    entries.removeAll()
-  }
-}
-
-private actor MutableRepository: SessionRepository {
-  private var stored: [WorkSession]
-  private let journal: Journal
-
-  init(sessions: [WorkSession], journal: Journal) {
-    stored = sessions
-    self.journal = journal
-  }
-
-  func status(of id: SessionID) -> SessionStatus? {
-    stored.first { $0.id == id }?.status
-  }
-
-  func sessions() -> [WorkSession] { stored }
-
-  func session(id: SessionID) -> WorkSession? { stored.first { $0.id == id } }
-
-  func save(_ session: WorkSession) {
-    guard let index = stored.firstIndex(where: { $0.id == session.id }) else { return }
-    stored[index] = session
-  }
-
-  func mutate(
-    id: SessionID,
-    _ transform: @Sendable (inout WorkSession) throws -> Void
-  ) async throws -> WorkSession? {
-    guard let index = stored.firstIndex(where: { $0.id == id }) else { return nil }
-    var session = stored[index]
-    try transform(&session)
-    stored[index] = session
-    await journal.record("close:\(id)")
-    return session
-  }
-}
-
 private actor UnreadableRepository: SessionRepository {
   struct Unreadable: Error {}
 
@@ -318,9 +271,9 @@ private actor UnreadableRepository: SessionRepository {
 private actor SlowRuntime: SessionRuntime {
   private(set) var highestConcurrency = 0
   private var inFlight = 0
-  private let journal: Journal
+  private let journal: RestorationJournal
 
-  init(journal: Journal) {
+  init(journal: RestorationJournal) {
     self.journal = journal
   }
 
@@ -340,9 +293,9 @@ private actor SlowRuntime: SessionRuntime {
 
 private actor SpyRuntime: SessionRuntime {
   private(set) var detached: [SessionID] = []
-  private let journal: Journal
+  private let journal: RestorationJournal
 
-  init(journal: Journal) {
+  init(journal: RestorationJournal) {
     self.journal = journal
   }
 
@@ -361,7 +314,7 @@ private actor SpyRuntime: SessionRuntime {
 /// to the one the store's own rules depend on.
 private struct JournalingRuntimeStateStore: SessionRuntimeStateStore {
   let store: EphemeralSessionRuntimeStateStore
-  let journal: Journal
+  let journal: RestorationJournal
 
   func read() async -> SessionRuntimeState? { await store.read() }
 
@@ -373,23 +326,4 @@ private struct JournalingRuntimeStateStore: SessionRuntimeStateStore {
   }
 
   func clear() async { await store.clear() }
-}
-
-private struct StubProcesses: ProcessLivenessProbe {
-  func isAlive(processIdentifier _: Int32) -> Bool { false }
-
-  func startTime(of _: Int32) -> Date? { nil }
-
-  @discardableResult
-  func terminate(processGroup _: Int32) -> Bool { true }
-}
-
-private struct FixedClock: SessionClock {
-  let value: Date
-
-  init(_ value: Date) {
-    self.value = value
-  }
-
-  func now() -> Date { value }
 }

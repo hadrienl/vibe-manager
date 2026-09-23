@@ -49,21 +49,21 @@ struct DetectPreviousShutdownTests {
   private func makeSubject(
     sessions: [WorkSession],
     document: SessionRuntimeState? = nil,
-    processes: StubProcesses = StubProcesses()
-  ) async -> (DetectPreviousShutdown, MutableRepository, EphemeralSessionRuntimeStateStore) {
-    let repository = MutableRepository(sessions: sessions)
+    processes: RestorationProcesses = RestorationProcesses()
+  ) async -> (DetectPreviousShutdown, RestorationRepository, EphemeralSessionRuntimeStateStore) {
+    let repository = RestorationRepository(sessions: sessions)
     let store = EphemeralSessionRuntimeStateStore(state: document)
     let recorder = SessionRuntimeRecorder(
       store: store,
       processIdentifier: 4242,
       probe: processes,
-      clock: FixedClock(Self.now)
+      clock: RestorationClock(Self.now)
     )
     let subject = DetectPreviousShutdown(
       repository: repository,
       recorder: recorder,
       processes: processes,
-      clock: FixedClock(Self.now),
+      clock: RestorationClock(Self.now),
       processIdentifier: 4242
     )
     return (subject, repository, store)
@@ -151,7 +151,7 @@ struct DetectPreviousShutdownTests {
     let (detect, repository, store) = await makeSubject(
       sessions: [subject],
       document: document,
-      processes: StubProcesses(
+      processes: RestorationProcesses(
         alive: [1_001], startTimes: [1_001: Date(timeIntervalSince1970: 1_699_999_000)])
     )
 
@@ -187,18 +187,18 @@ struct DetectPreviousShutdownTests {
   @Test("A document this build cannot read is not an error, only an absence")
   func anUnreadableDocumentIsNotAnError() async {
     let subject = session(status: .closed)
-    let repository = MutableRepository(sessions: [subject])
+    let repository = RestorationRepository(sessions: [subject])
     let recorder = SessionRuntimeRecorder(
       store: UnreadableRuntimeStateStore(),
       processIdentifier: 4242,
-      probe: StubProcesses(),
-      clock: FixedClock(Self.now)
+      probe: RestorationProcesses(),
+      clock: RestorationClock(Self.now)
     )
     let detect = DetectPreviousShutdown(
       repository: repository,
       recorder: recorder,
-      processes: StubProcesses(),
-      clock: FixedClock(Self.now),
+      processes: RestorationProcesses(),
+      clock: RestorationClock(Self.now),
       processIdentifier: 4242
     )
 
@@ -214,7 +214,7 @@ struct DetectPreviousShutdownTests {
         phase: .running, sessions: [SessionRuntimeRecord(sessionID: subject.id)]),
       // Alive, but started long after the run that wrote the document: the pid was recycled, and
       // reading it as a living copy would block every restoration from here on.
-      processes: StubProcesses(
+      processes: RestorationProcesses(
         alive: [1_001], startTimes: [1_001: Date(timeIntervalSince1970: 1_700_005_000)])
     )
 
@@ -239,7 +239,7 @@ struct DetectPreviousShutdownTests {
         sessions: [SessionRuntimeRecord(sessionID: subject.id)]
       ),
       // This process is alive — it is us — but it did not start when the document was written.
-      processes: StubProcesses(
+      processes: RestorationProcesses(
         alive: [4_242], startTimes: [4_242: Date(timeIntervalSince1970: 1_700_005_000)])
     )
 
@@ -281,19 +281,19 @@ struct DetectPreviousShutdownTests {
     let subject = session(status: .active)
     let held = state(phase: .running, sessions: [SessionRuntimeRecord(sessionID: subject.id)])
     let store = EphemeralSessionRuntimeStateStore(state: held)
-    let processes = StubProcesses(
+    let processes = RestorationProcesses(
       alive: [1_001], startTimes: [1_001: Date(timeIntervalSince1970: 1_699_999_000)])
     let recorder = SessionRuntimeRecorder(
       store: store,
       processIdentifier: 4242,
       probe: processes,
-      clock: FixedClock(Self.now)
+      clock: RestorationClock(Self.now)
     )
     let detect = DetectPreviousShutdown(
-      repository: MutableRepository(sessions: [subject]),
+      repository: RestorationRepository(sessions: [subject]),
       recorder: recorder,
       processes: processes,
-      clock: FixedClock(Self.now),
+      clock: RestorationClock(Self.now),
       processIdentifier: 4242
     )
 
@@ -314,7 +314,7 @@ struct DetectPreviousShutdownTests {
     let recycled = session(name: "Recycled", status: .active)
     let unknown = session(name: "Unknown", status: .active)
     let startedAt = Date(timeIntervalSince1970: 1_700_000_050)
-    let processes = StubProcesses(
+    let processes = RestorationProcesses(
       alive: [7_001, 7_002, 7_003],
       startTimes: [7_001: startedAt, 7_002: Date(timeIntervalSince1970: 1_700_008_000)]
     )
@@ -359,38 +359,6 @@ private enum Fixture {
     .appendingPathComponent("vibe-fixture-agent", isDirectory: false).path
 }
 
-private actor MutableRepository: SessionRepository {
-  private var stored: [WorkSession]
-
-  init(sessions: [WorkSession]) {
-    stored = sessions
-  }
-
-  func status(of id: SessionID) -> SessionStatus? {
-    stored.first { $0.id == id }?.status
-  }
-
-  func sessions() -> [WorkSession] { stored }
-
-  func session(id: SessionID) -> WorkSession? { stored.first { $0.id == id } }
-
-  func save(_ session: WorkSession) {
-    guard let index = stored.firstIndex(where: { $0.id == session.id }) else { return }
-    stored[index] = session
-  }
-
-  func mutate(
-    id: SessionID,
-    _ transform: @Sendable (inout WorkSession) throws -> Void
-  ) throws -> WorkSession? {
-    guard let index = stored.firstIndex(where: { $0.id == id }) else { return nil }
-    var session = stored[index]
-    try transform(&session)
-    stored[index] = session
-    return session
-  }
-}
-
 /// A document nothing can be read out of — a damaged file, or one from a newer build.
 private struct UnreadableRuntimeStateStore: SessionRuntimeStateStore {
   func read() async -> SessionRuntimeState? { nil }
@@ -402,48 +370,4 @@ private struct UnreadableRuntimeStateStore: SessionRuntimeStateStore {
   func clear() async {
     // Nothing is stored, so there is nothing to clear.
   }
-}
-
-/// A system whose processes a test decides on, and which records what it was asked to kill.
-///
-/// A lock rather than an actor: the probe is synchronous by contract — a leftover check must not
-/// be able to suspend in the middle of deciding whether to send a signal.
-private final class StubProcesses: ProcessLivenessProbe, @unchecked Sendable {
-  private let lock = NSLock()
-  private let alive: Set<Int32>
-  private let startTimes: [Int32: Date]
-  private var killed: [Int32] = []
-
-  init(alive: Set<Int32> = [], startTimes: [Int32: Date] = [:]) {
-    self.alive = alive
-    self.startTimes = startTimes
-  }
-
-  var terminated: [Int32] {
-    lock.withLock { killed }
-  }
-
-  func isAlive(processIdentifier: Int32) -> Bool {
-    alive.contains(processIdentifier)
-  }
-
-  func startTime(of processIdentifier: Int32) -> Date? {
-    startTimes[processIdentifier]
-  }
-
-  @discardableResult
-  func terminate(processGroup: Int32) -> Bool {
-    lock.withLock { killed.append(processGroup) }
-    return true
-  }
-}
-
-private struct FixedClock: SessionClock {
-  let value: Date
-
-  init(_ value: Date) {
-    self.value = value
-  }
-
-  func now() -> Date { value }
 }
