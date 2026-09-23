@@ -61,43 +61,30 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
     return activity
   }
 
-  /// The folders the session's transcript files are in, so that their growth can be watched: the
-  /// project folder of a Claude Code session and its sub-agents' folder, or the day folders of a
-  /// Codex rollout — and today's, which is where a session resumed today writes.
+  /// The folders to watch for the session's transcript to grow: the whole Claude Code projects
+  /// folder, or the whole Codex sessions folder.
+  ///
+  /// Not the folders its files are in today. A Claude Code session selected before its agent wrote
+  /// a word has no file yet, so no folder; a Codex session writes in the folder of the day, which
+  /// changes at midnight and when it is resumed the next day. Either would stop being watched
+  /// exactly when it starts to matter. Events from other sessions' transcripts wake the monitor for
+  /// a comparison of names, nothing more: only files named after this session count.
   public func transcriptDirectories(for session: WorkSession) async -> [String] {
     guard let agent = session.agent,
       let identifier = agent.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
       !identifier.isEmpty
     else { return [] }
-    var folders: Set<String> = []
     switch agent.providerID {
     case ClaudeCodeAgentProvider.id.rawValue:
-      for file in claudeTranscripts(for: identifier) {
-        folders.insert(file.deletingLastPathComponent().path)
-      }
+      return [claudeProjects.path]
     case CodexAgentProvider.id.rawValue:
-      for file in codexRollouts(for: identifier, since: session.createdAt) {
-        folders.insert(file.deletingLastPathComponent().path)
-      }
-      folders.insert(Self.dayFolder(of: Date(), in: codexSessions).path)
+      return [codexSessions.path]
     default:
       return []
     }
-    return folders.sorted()
   }
 
   // MARK: - Finding the files
-
-  private static func dayFolder(of day: Date, in root: URL) -> URL {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = .current
-    let parts = calendar.dateComponents([.year, .month, .day], from: day)
-    return
-      root
-      .appendingPathComponent(String(format: "%04d", parts.year ?? 0))
-      .appendingPathComponent(String(format: "%02d", parts.month ?? 0))
-      .appendingPathComponent(String(format: "%02d", parts.day ?? 0))
-  }
 
   private func claudeTranscripts(for identifier: String) -> [URL] {
     let manager = FileManager.default

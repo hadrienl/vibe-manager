@@ -329,6 +329,26 @@ extension RepositoryStatusMonitorTests {
     }
   }
 
+  @Test("A watch replaced by a new one reads again the repositories the old one watched")
+  func replacedWatch() async throws {
+    let reader = ScriptedStatusReader()
+    let events = ManualFileChanges()
+    let monitor = makeMonitor(reader: reader, events: events)
+    await monitor.observe(session, repositories: [ObservedRepository(path: "/work/api")])
+    #expect(await eventually { events.openStreams == 1 })
+    #expect(await eventually { await reader.readCount("/work/api") == 1 })
+
+    // The old stream may have held back a change in /work/api when the new one opened.
+    await monitor.observe(
+      session,
+      repositories: [ObservedRepository(path: "/work/api"), ObservedRepository(path: "/work/web")])
+
+    #expect(await eventually { await reader.readCount("/work/api") == 2 })
+    #expect(await eventually { await reader.readCount("/work/web") == 1 })
+    try await Task.sleep(for: .milliseconds(250))
+    #expect(await reader.readCount("/work/web") == 1)
+  }
+
   @Test("A reference moved by the clone reads the worktree of it that is watched too")
   func sharedReferences() async throws {
     let reader = ScriptedStatusReader()

@@ -86,8 +86,12 @@ names the same repository, the state says so, because the unattributed files may
   button goes through the same queue, so an older report can never land after a newer one.
 - A transcript folder holds the transcripts of every session opened in the same place: only the
   files named after this session's identifier count.
-- A session selected before its agent wrote anything has no transcript to watch yet. The first
-  time the agent writes in one of its repositories, the transcript is looked for again.
+- The whole transcript folder of the agent is watched — `~/.claude/projects`, or Codex's
+  `sessions` — not the folders its files are in. A session selected before its agent wrote
+  anything has no file yet, and a Codex session writes in the folder of the day, which changes at
+  midnight: a narrower watch would miss the transcript exactly when it starts to grow.
+- A watch whose folders change is replaced by a new stream, which starts from now: what the old
+  one had not delivered is lost, so the repositories it watched are read once more.
 - A clone and a worktree of it watched together share their references: a reference that moves in
   the clone's folder reads both.
 - Readings without an event: when a session is selected, when the application comes back to the

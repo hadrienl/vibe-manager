@@ -527,8 +527,15 @@ public actor RepositoryStatusMonitor {
 
     let paths = Array(Set(routes.map(\.prefix))).sorted()
     guard paths != watchedPaths else { return }
+    let previouslyWatched = watchTask == nil ? [] : Set(watchedPaths)
     watchedPaths = paths
     watchTask?.cancel()
+    // A stream that is closed is never flushed, and the next one starts from now: what the old one
+    // held back, or what happened between the two, is gone. The repositories it watched are read
+    // once more rather than trusted.
+    for path in repositories.keys.sorted() where previouslyWatched.contains(path) {
+      markDirty(path)
+    }
     guard !paths.isEmpty else {
       watchTask = nil
       return
@@ -569,17 +576,6 @@ public actor RepositoryStatusMonitor {
 
     for path in dirty.sorted() {
       markDirty(path)
-    }
-    // A session selected before its agent wrote a word has no transcript yet. The agent writing in
-    // a repository is the moment to look for it again — otherwise nothing would ever be attributed.
-    if !dirty.isEmpty, transcriptDirectories.isEmpty, let transcripts {
-      let found = await transcripts.transcriptDirectories(for: session)
-      guard generation == self.generation else { return }
-      if !found.isEmpty {
-        transcriptDirectories = found.map(CanonicalPath.of)
-        rewatch()
-        transcriptGrew = true
-      }
     }
     if transcriptGrew, let transcripts {
       let activity = await transcripts.activity(for: session)

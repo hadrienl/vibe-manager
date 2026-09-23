@@ -46,6 +46,8 @@ public final class AppModel {
   private var reportReadings: [SessionID: Task<Void, Never>] = [:]
   private var pendingReports: Set<SessionID> = []
   private var statusUpdates: Task<Void, Never>?
+  /// The last stop sent to the monitor, which the next one and every `observe` wait for.
+  private var pendingStop: Task<Void, Never>?
 
   /// The session the user asked to archive, held until they confirm. Archiving is reversible,
   /// but it moves a session out of sight, and a slip of the pointer must not do that.
@@ -1323,7 +1325,7 @@ extension AppModel {
     guard readBranchReport != nil, let id = selectedSessionID else {
       observedSessionID = nil
       if let repositoryStatus {
-        Task { await repositoryStatus.stopObserving() }
+        stopObserving(with: repositoryStatus, unless: nil)
       }
       return
     }
@@ -1334,9 +1336,20 @@ extension AppModel {
     // The session left is no longer watched even if the new one's report never comes. A stop that
     // lands after the new session's first `observe` leaves it alone.
     if hadPrevious, let repositoryStatus {
-      Task { await repositoryStatus.stopObserving(unless: id) }
+      stopObserving(with: repositoryStatus, unless: id)
     }
     requestBranchReport(of: id)
+  }
+
+  /// Each stop waits for the one before it, and `observeRepositories` for the last of them: two
+  /// tasks started one after the other may run in any order, and a stop that reached the monitor
+  /// after the next `observe` would leave the session on screen unwatched.
+  private func stopObserving(with monitor: RepositoryStatusMonitor, unless keep: SessionID?) {
+    let previous = pendingStop
+    pendingStop = Task {
+      await previous?.value
+      await monitor.stopObserving(unless: keep)
+    }
   }
 
   /// Reads everything the session on screen shows again: its report and its repositories. The
@@ -1406,6 +1419,7 @@ extension AppModel {
   /// Hands the repositories of the report to the monitor. Only for the session still on screen: a
   /// reading that ends after the user moved on must not take the watch back.
   private func observeRepositories(of id: SessionID) async {
+    await pendingStop?.value
     guard let repositoryStatus, observedSessionID == id,
       let session = sessions.first(where: { $0.id == id }), let report = branchReports[id]
     else { return }
