@@ -85,23 +85,17 @@ public struct AgentCapabilities: Hashable, Sendable {
   public let supportsInitialPrompt: Bool
   public let supportsResume: Bool
   public let reportsUsage: Bool
-  /// Whether the CLI can be given folders beyond its working directory — `--add-dir` for both
-  /// Claude Code and Codex. Without it, a session's other repositories are out of the agent's
-  /// reach, and the sheet says so instead of letting the user believe otherwise.
-  public let supportsAdditionalDirectories: Bool
 
   public init(
     supportsModelSelection: Bool = false,
     supportsInitialPrompt: Bool = false,
     supportsResume: Bool = false,
-    reportsUsage: Bool = false,
-    supportsAdditionalDirectories: Bool = false
+    reportsUsage: Bool = false
   ) {
     self.supportsModelSelection = supportsModelSelection
     self.supportsInitialPrompt = supportsInitialPrompt
     self.supportsResume = supportsResume
     self.reportsUsage = reportsUsage
-    self.supportsAdditionalDirectories = supportsAdditionalDirectories
   }
 }
 

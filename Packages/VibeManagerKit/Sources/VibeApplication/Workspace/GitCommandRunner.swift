@@ -24,23 +24,9 @@ public struct GitCommandResult: Hashable, Sendable {
     while text.hasSuffix("\n") { text.removeLast() }
     return text
   }
-
-  /// What Git said went wrong, on one line, for a sentence in front of the user.
-  public var errorSummary: String {
-    let lines = errorOutput.split(whereSeparator: \.isNewline).map {
-      $0.trimmingCharacters(in: .whitespaces)
-    }
-    return lines.first { !$0.isEmpty }.map { line in
-      line.hasPrefix("fatal: ") ? String(line.dropFirst(7)) : line
-    } ?? "git exited with status \(exitCode)."
-  }
 }
 
 /// Why `git` itself could not be run — as opposed to a command it ran and refused.
-///
-/// Shaped like the diagnostic of an unavailable agent, a sentence and a remedy: on a new Mac,
-/// `/usr/bin/git` exists and does nothing but ask for the Command Line Tools, and saying that is
-/// worth more than an exit status of 1 with no sentence.
 public enum GitUnavailable: Error, Hashable, Sendable, LocalizedError {
   case notInstalled
   /// `/usr/bin/git` is the Xcode stub, and the developer tools it would forward to are absent.
@@ -57,30 +43,12 @@ public enum GitUnavailable: Error, Hashable, Sendable, LocalizedError {
       return "Git could not be started: \(reason)"
     }
   }
-
-  public var recoverySuggestion: String? {
-    switch self {
-    case .notInstalled, .commandLineToolsMissing:
-      return "Install them with xcode-select --install, then try again."
-    case .failedToStart:
-      return "Check that git runs in a terminal, then try again."
-    }
-  }
-
-  public var command: String? {
-    switch self {
-    case .notInstalled, .commandLineToolsMissing: return "xcode-select --install"
-    case .failedToStart: return nil
-    }
-  }
 }
 
 /// `git`, seen as a port.
 ///
 /// The arguments are an array and never a command line: no path is ever turned back into shell
-/// text on its way to Git, so a folder called `l'API (v2)` needs no quoting at all. It is also what
-/// makes every plan testable without a repository, while the integration tests still create real
-/// ones behind the process implementation.
+/// text on its way to Git, so a folder called `l'API (v2)` needs no quoting at all.
 public protocol GitCommandRunner: Sendable {
   /// Runs `git` with `arguments`, from `directory`.
   ///
@@ -89,33 +57,17 @@ public protocol GitCommandRunner: Sendable {
   func run(_ arguments: [String], in directory: String) async throws -> GitCommandResult
 }
 
-/// Turns a path back into text for the one place it has to be: a command the user copies into a
-/// shell. Single quotes, with the single quotes of the path itself closed and escaped.
-public enum ShellQuoting {
-  public static func quote(_ argument: String) -> String {
-    let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "@%+=:,./-_"))
-    if !argument.isEmpty, argument.unicodeScalars.allSatisfy({ safe.contains($0) && $0.isASCII }) {
-      return argument
-    }
-    return "'" + argument.replacingOccurrences(of: "'", with: "'\\''") + "'"
-  }
-
-  public static func command(_ arguments: [String]) -> String {
-    arguments.map(quote).joined(separator: " ")
-  }
-}
-
 /// A path compared the way the file system does: through its symbolic links.
 ///
-/// Worktrees, temporary folders and a repository designated through a link all reach the same
-/// place by different spellings — `/var` and `/private/var` on every Mac — and comparing the
-/// spellings would attach one repository twice, or plan a worktree on top of itself.
+/// Worktrees, temporary folders and a folder designated through a link all reach the same place by
+/// different spellings — `/var` and `/private/var` on every Mac — and comparing the spellings would
+/// file a repository under the wrong folder.
 public enum CanonicalPath {
   public static func of(_ path: String) -> String {
     var url = URL(fileURLWithPath: path).standardizedFileURL
     var remainder: [String] = []
-    // A path that does not exist yet is resolved through its deepest ancestor that does: that is
-    // where a link would be, and what `git worktree add` will write under.
+    // A path that no longer exists is resolved through its deepest ancestor that does: that is
+    // where a link would be.
     while !FileManager.default.fileExists(atPath: url.path), url.pathComponents.count > 1 {
       remainder.insert(url.lastPathComponent, at: 0)
       url.deleteLastPathComponent()

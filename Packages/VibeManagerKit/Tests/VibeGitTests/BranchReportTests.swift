@@ -3,7 +3,6 @@ import Testing
 import VibeApplication
 import VibeDomain
 import VibeGit
-import VibePersistence
 
 @Suite("What the agent did to the branches, read from a real repository")
 struct BranchReportTests {
@@ -41,7 +40,7 @@ struct BranchReportTests {
         name: name, status: .closed, createdAt: startedAt,
         updatedAt: startedAt.addingTimeInterval(60), closedAt: startedAt.addingTimeInterval(60),
         startedAt: startedAt,
-        repositories: [RepositoryContext(rootPath: folder, mode: .inPlace)])
+        repositories: [RepositoryContext(path: folder)])
     }
     let connectors = session("Fix all connectors")
     let phone = session("Prisme.ai mobile")
@@ -68,30 +67,6 @@ struct BranchReportTests {
     #expect(second.repositories.first?.isDirty == true)
     #expect(second.repositories.first?.change?.commitCount == 1)
     #expect(!second.repositories.contains { $0.name == "prismeai-workspaces" })
-  }
-
-  @Test("The photograph is taken once, at the first start, and the branch in place is recorded")
-  func baselineIsTakenOnce() async throws {
-    let sandbox = try Sandbox()
-    defer { sandbox.remove() }
-    let clone = sandbox.path("web")
-    try await makeRepository(at: clone)
-    let session = WorkSession(
-      name: "Stored before reports", repositories: [RepositoryContext(rootPath: clone)])
-    let store = InMemorySessionRepository(sessions: [session])
-    let capture = CaptureSessionBaseline(repository: store, reader: GitActivityReader())
-
-    await capture(sessionID: session.id)
-    let first = try #require(await store.session(id: session.id)?.repositories.first)
-    try await git(["checkout", "-q", "-b", "later"], in: clone)
-    try await commit("Later", in: clone)
-    await capture(sessionID: session.id)
-    let second = try #require(await store.session(id: session.id)?.repositories.first)
-
-    #expect(first.branchName == "main")
-    #expect(first.baseline?.branches.keys.sorted() == ["main"])
-    #expect(second.baseline == first.baseline)
-    #expect(second.branchName == "later")
   }
 }
 

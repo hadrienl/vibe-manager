@@ -24,16 +24,16 @@ struct SessionBranchReportTests {
 
   @Test("The repositories come from the transcript, filed under the folder they are in")
   func repositoriesFromTheTranscript() async {
-    let folder = RepositoryContext(rootPath: "/projects", mode: .inPlace)
+    let folder = RepositoryContext(path: "/projects")
     let report = await read(
       session([folder]),
       activity: TranscriptActivity(
         editedPaths: ["/projects/api/Sources/a.swift"],
         workingDirectories: ["/projects", "/projects/web"]))
 
-    #expect(report.found(in: folder.id).map(\.name) == ["api"])
+    #expect(report.repositories.map(\.name) == ["api"])
+    #expect(report.repositories.first?.involvement == .edited)
     #expect(report.visitedOnly == ["web"])
-    #expect(report.report(for: folder.id, path: folder.effectivePath) == nil)
   }
 
   @Test("Only the branch checked out is reported: the others may be anyone's")
@@ -48,42 +48,42 @@ struct SessionBranchReportTests {
 
     let repository = try #require(report.repositories.first)
     #expect(repository.change == BranchChange(name: "main", kind: .advanced, commitCount: 1))
-    #expect(repository.changes.count == 1)
   }
 
-  @Test("A repository outside every attached folder is reported on its own")
+  @Test("A repository outside the session's folder is named by its path, after the folder")
   func elsewhere() async {
     let report = await read(
-      session([RepositoryContext(rootPath: "/projects/api", mode: .inPlace)]),
+      session([RepositoryContext(path: "/projects/api")]),
       activity: TranscriptActivity(editedPaths: ["/elsewhere/lib/x"]))
 
-    #expect(report.elsewhere.map(\.name) == ["/elsewhere/lib"])
+    #expect(report.repositories.map(\.name) == ["api", "/elsewhere/lib"])
     #expect(report.repositories.first?.involvement == .attached)
   }
 
   @Test("A worktree an agent made for itself is named after its clone")
   func agentWorktreeName() async {
-    let folder = RepositoryContext(rootPath: "/projects", mode: .plainFolder)
+    let folder = RepositoryContext(path: "/projects")
     let report = await read(
       session([folder]),
       activity: TranscriptActivity(editedPaths: ["/projects/Mobile/.claude/worktrees/230/x"]))
 
-    #expect(report.found(in: folder.id).map(\.name) == ["Mobile · worktree 230"])
+    #expect(report.repositories.map(\.name) == ["Mobile · worktree 230"])
   }
 
   @Test("Without a transcript, only the attached repositories are known, and that is said")
   func withoutTranscript() async {
-    let attached = RepositoryContext(rootPath: "/projects/api", mode: .inPlace)
+    let attached = RepositoryContext(path: "/projects/api")
     let report = await read(session([attached]), activity: nil)
 
     #expect(!report.hasTranscript)
-    #expect(report.report(for: attached.id, path: attached.effectivePath)?.name == "api")
+    #expect(report.repositories.map(\.name) == ["api"])
   }
 
   @Test("A reflog reads as created, moved forward or rewritten")
   func reflogClassification() {
     func change(_ subjects: [String]) -> BranchChange? {
-      BranchChange.fromReflogForTests(
+      BranchChange.fromReflog(
+        branch: "b",
         subjects.enumerated().map {
           ReflogEntry(
             branch: "b", date: Date(timeIntervalSince1970: Double($0.offset)), subject: $0.element)
@@ -102,8 +102,8 @@ struct SessionBranchReportTests {
 private struct FakeRepositories: RepositoryActivityReading {
   var reflog: [ReflogEntry] = []
 
-  func references(atPath path: String) async -> GitReferenceSnapshot? {
-    GitReferenceSnapshot(checkedOutBranch: "main", headRevision: "a", branches: ["main": "a"])
+  func head(atPath path: String) async -> RepositoryHead? {
+    RepositoryHead(checkedOutBranch: "main")
   }
 
   func repositoryRoot(containing path: String) async -> String? {

@@ -4,9 +4,8 @@ import VibeDomain
 
 /// Reads a repository's branches for the session report, with plumbing only.
 ///
-/// `for-each-ref` for every branch and its commit, `symbolic-ref` and `rev-parse` for what is
-/// checked out, `reflog` for how a branch moved, `status -z` for uncommitted work. The runner
-/// takes no optional lock.
+/// `symbolic-ref` and `rev-parse` for what is checked out, `reflog` for how a branch moved,
+/// `status -z` for uncommitted work. Nothing here writes, and the runner takes no optional lock.
 public struct GitActivityReader: RepositoryActivityReading {
   private let git: any GitCommandRunner
   private let roots = RepositoryRootCache()
@@ -15,34 +14,20 @@ public struct GitActivityReader: RepositoryActivityReading {
     self.git = git
   }
 
-  public func references(atPath path: String) async -> GitReferenceSnapshot? {
+  public func head(atPath path: String) async -> RepositoryHead? {
     guard FileManager.default.fileExists(atPath: path),
-      let refs = try? await git.run(
-        ["for-each-ref", "--format=%(refname)%09%(objectname)", "refs/heads"], in: path),
-      refs.succeeded
+      let head = try? await git.run(["rev-parse", "--verify", "--quiet", "HEAD"], in: path),
+      head.succeeded
     else { return nil }
-
-    var branches: [String: String] = [:]
-    for line in refs.text.split(separator: "\n") {
-      let fields = line.split(separator: "\t", maxSplits: 1).map(String.init)
-      guard fields.count == 2, let name = GitRepositoryInspector.shortBranch(fields[0]) else {
-        continue
-      }
-      branches[name] = fields[1]
-    }
     let symbolic = try? await git.run(["symbolic-ref", "--quiet", "HEAD"], in: path)
-    let head = try? await git.run(["rev-parse", "--verify", "--quiet", "HEAD"], in: path)
-    let status = try? await git.run(
-      ["status", "--porcelain=v2", "-z", "--untracked-files=normal"], in: path)
+    return RepositoryHead(
+      checkedOutBranch: symbolic.flatMap { $0.succeeded ? Self.shortBranch($0.text) : nil })
+  }
 
-    return GitReferenceSnapshot(
-      checkedOutBranch: symbolic.flatMap {
-        $0.succeeded ? GitRepositoryInspector.shortBranch($0.text) : nil
-      },
-      headRevision: head.flatMap { $0.succeeded && !$0.text.isEmpty ? $0.text : nil },
-      branches: branches,
-      isDirty: status.map { $0.succeeded && !$0.output.isEmpty } ?? false
-    )
+  static func shortBranch(_ reference: String) -> String? {
+    let prefix = "refs/heads/"
+    guard reference.hasPrefix(prefix) else { return nil }
+    return String(reference.dropFirst(prefix.count))
   }
 
   public func repositoryRoot(containing path: String) async -> String? {

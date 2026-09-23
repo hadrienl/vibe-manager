@@ -189,20 +189,6 @@ public enum AgentLaunchValidation {
     }
   }
 
-  /// The folders to hand over besides the working directory, or none for a CLI that cannot take
-  /// them. Each one is an absolute path, exactly like the working directory: a relative one would
-  /// be resolved against wherever the CLI happens to be started.
-  public static func additionalDirectories(
-    _ request: AgentLaunchRequest,
-    descriptor: AgentDescriptor
-  ) throws -> [String] {
-    guard descriptor.capabilities.supportsAdditionalDirectories else { return [] }
-    for path in request.additionalWorkingDirectoryPaths {
-      try validateWorkingDirectory(path)
-    }
-    return request.additionalWorkingDirectoryPaths
-  }
-
   public static func validateModel(
     _ modelID: String?,
     in catalog: [AgentModel],

@@ -322,7 +322,7 @@ struct NewSessionModelTests {
     let creation = await model.submit()
 
     #expect(creation?.session.name == "Refactor the webhook")
-    #expect(creation?.plan?.workingDirectoryPath == "/workspace")
+    #expect(creation?.plan.workingDirectoryPath == "/workspace")
     #expect(await repository.savedSessions.count == 1)
   }
 

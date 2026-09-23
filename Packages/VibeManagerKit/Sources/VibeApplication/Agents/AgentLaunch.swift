@@ -11,25 +11,19 @@ public struct AgentLaunchRequest: Hashable, Sendable {
   public var initialPrompt: String?
   public var resume: AgentResumeRequest
   public var additionalEnvironment: [String: String]
-  /// The session's other repositories, which the agent may read and write besides its working
-  /// directory. A provider that cannot hand them over says so through its descriptor, and leaves
-  /// them out rather than pretending.
-  public var additionalWorkingDirectoryPaths: [String]
 
   public init(
     workingDirectoryPath: String,
     modelID: String? = nil,
     initialPrompt: String? = nil,
     resume: AgentResumeRequest = .none,
-    additionalEnvironment: [String: String] = [:],
-    additionalWorkingDirectoryPaths: [String] = []
+    additionalEnvironment: [String: String] = [:]
   ) {
     self.workingDirectoryPath = workingDirectoryPath
     self.modelID = modelID
     self.initialPrompt = initialPrompt
     self.resume = resume
     self.additionalEnvironment = additionalEnvironment
-    self.additionalWorkingDirectoryPaths = additionalWorkingDirectoryPaths
   }
 }
 

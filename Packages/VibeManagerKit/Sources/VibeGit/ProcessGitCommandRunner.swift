@@ -3,10 +3,10 @@ import VibeApplication
 
 /// Runs the system's `git`, with an array of arguments and never through a shell.
 ///
-/// Every command it is asked for is plumbing — `rev-parse`, `worktree list --porcelain`,
-/// `status --porcelain=v2 -z` — whose output is stable across versions and parses without
-/// heuristics. The environment is an allowlist, Git is told never to prompt, and reads take no
-/// optional lock, so inspecting a repository an agent is committing in never collides with it.
+/// Every command it is asked for is plumbing — `rev-parse`, `reflog`, `status --porcelain -z` —
+/// whose output is stable across versions and parses without heuristics. The environment is an
+/// allowlist, Git is told never to prompt, and reads take no optional lock, so inspecting a
+/// repository an agent is committing in never collides with it.
 public struct ProcessGitCommandRunner: GitCommandRunner {
   private let executable: GitExecutable
   private let timeout: Duration

@@ -32,12 +32,6 @@ public struct CodexArgumentBuilder: CommandLineAgentArgumentBuilder {
     // derives its workspace root and filters resumable sessions from this directory.
     arguments.append(contentsOf: ["-C", request.workingDirectoryPath])
 
-    // Writable alongside the workspace root: without them the session's other repositories are
-    // read-only to the agent, or refused outright by its sandbox.
-    for path in try AgentLaunchValidation.additionalDirectories(request, descriptor: descriptor) {
-      arguments.append(contentsOf: ["--add-dir", path])
-    }
-
     switch promptDelivery {
     case .none:
       break

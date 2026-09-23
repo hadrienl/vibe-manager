@@ -4,8 +4,7 @@ Vibe Manager is a native macOS application for running several coding-agent sess
 their terminals, repositories and tasks organized in one place.
 
 The application launches a SwiftUI state backed by an atomic, versioned local session store.
-Claude Code and Codex run in real terminals, and a session can span several repositories, each in
-a worktree of its own on one shared branch. Live Git status is tracked as a separate V1 issue.
+Claude, Codex, terminal and live Git integrations are tracked as separate V1 issues.
 
 ## Requirements
 
@@ -115,20 +114,14 @@ stops nothing already running, and a restoration that sends a text to an agent i
 The runtime document, the four verdicts and the bounded exit are documented in
 [`docs/architecture/0011-session-restoration.md`](docs/architecture/0011-session-restoration.md).
 
-A session is one branch. Its slug is derived from its title once, editable before creation, and
-never recomputed — renaming a session never renames `vibe/<slug>`. Each Git repository attached to
-it gets a worktree on that branch under `~/VibeManager/Worktrees/<slug>/` (the root is a setting),
-unless it is attached in place or is a plain folder. Every repository is read and planned before
-anything is written, and each conflict — a branch already checked out, a stale record, a bare
-repository — blocks only its own repository, with a remedy and, when it helps, a command to copy.
-The agent starts in the main repository and is handed the others with `--add-dir`; the convention
-opens its first prompt, and is shown in the sheet before it is sent. Vibe Manager creates
-worktrees and branches and never deletes one: detaching, closing and archiving forget, and offer
-the cleanup command instead. While an agent works, the inspector reports what it did to the
-branches of each repository since the session started — created, moved, rewritten, deleted, and
-what is uncommitted — read every 30 seconds for the session on screen only. The store moved to schema v3, where earlier sessions became
-repositories attached in place. The decisions are documented in
-[`docs/architecture/0012-multi-repository-worktrees.md`](docs/architecture/0012-multi-repository-worktrees.md).
+The application never creates a branch or a worktree: the agent makes those it needs. The
+inspector's Git section reports what it did — each branch the session worked on, the repositories
+it is checked out in (worktrees the agent made for itself included), and whether it was created,
+moved forward or rewritten, or has uncommitted work. The repositories come from the session's own
+transcript, so two sessions in one folder are never told each other's work. The report is read
+without taking any lock, every 30 seconds and for the session on screen only. The decisions are
+documented in
+[`docs/architecture/0012-session-branch-report.md`](docs/architecture/0012-session-branch-report.md).
 
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single

@@ -1,18 +1,16 @@
 import SwiftUI
 import VibeApplication
 
-/// The application's settings.
+/// The application's settings, which for now are one line — and that line matters.
 ///
-/// The first line is the permanent way back to Full Disk Access. The step at launch is asked once
-/// and never again, so refusing it must not be a door that closes: this is where the user finds
-/// the question again, on their own terms. The second is where worktrees go.
+/// It is the permanent way back to Full Disk Access. The step at launch is asked once and never
+/// again, so refusing it must not be a door that closes: this is where the user finds the question
+/// again, on their own terms.
 public struct SettingsView: View {
   private let permissions: PermissionsModel?
-  private let worktreeRoot: WorktreeRootSettings?
 
-  public init(permissions: PermissionsModel? = nil, worktreeRoot: WorktreeRootSettings? = nil) {
+  public init(permissions: PermissionsModel? = nil) {
     self.permissions = permissions
-    self.worktreeRoot = worktreeRoot
   }
 
   public var body: some View {
@@ -25,18 +23,10 @@ public struct SettingsView: View {
             .foregroundStyle(.secondary)
         }
       }
-      if let worktreeRoot {
-        Section("Worktrees") {
-          WorktreeRootRow(settings: worktreeRoot)
-        }
-      }
     }
     .formStyle(.grouped)
     .frame(width: 460)
-    .task {
-      await permissions?.recheck()
-      await worktreeRoot?.load()
-    }
+    .task { await permissions?.recheck() }
   }
 }
 
@@ -82,40 +72,6 @@ private struct FullDiskAccessRow: View {
     case .granted: return "checkmark.circle"
     case .notGranted: return "exclamationmark.circle"
     case nil: return "clock"
-    }
-  }
-}
-
-private struct WorktreeRootRow: View {
-  let settings: WorktreeRootSettings
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      LabeledContent("Folder") {
-        Text(settings.path.map(abbreviatedPath) ?? "…")
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .help(settings.path ?? "")
-      }
-      Text(
-        """
-        Each session's worktrees go in a folder of its own under this one — never inside a \
-        repository, where they would show up in its status and in the agent's searches. Changing \
-        it moves nothing that already exists.
-        """
-      )
-      .font(.callout)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-      HStack {
-        Button("Choose…") {
-          guard let path = chooseFolder(startingAt: settings.path) else { return }
-          Task { await settings.choose(path) }
-        }
-        if !settings.isDefault {
-          Button("Use the Default") { Task { await settings.reset() } }
-        }
-      }
     }
   }
 }

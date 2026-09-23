@@ -11,7 +11,7 @@ struct SessionContextBriefTests {
     notes: String? = "The retry path is still untested.",
     repositories: [RepositoryContext] = [
       RepositoryContext(
-        rootPath: "/work/app",
+        path: "/work/app",
         git: GitSnapshot(
           repositoryRootPath: "/work/app",
           branchName: "feat/webhook",

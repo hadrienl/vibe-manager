@@ -33,6 +33,10 @@ public final class AppModel {
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
+  /// What the agent did to the branches of each session, as last read. Only the session on
+  /// screen is read, so the others keep what was true when they were last looked at.
+  public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
+  private var branchWatch: (id: SessionID, token: UUID, task: Task<Void, Never>)?
 
   /// The session the user asked to archive, held until they confirm. Archiving is reversible,
   /// but it moves a session out of sight, and a slip of the pointer must not do that.
@@ -124,39 +128,6 @@ public final class AppModel {
     public let sessionName: String
     public let message: String
     public let suggestion: String?
-  }
-
-  /// A repository being added to a session, from the panel to the confirmation.
-  public private(set) var repositoryAttachment: RepositoryAttachmentModel?
-  /// What to tell an agent already running about a repository just added to its session. Shown
-  /// with its text, and typed into the terminal only when the user clicks: the first newline in a
-  /// pseudo terminal submits a message, and the keyboard there is the user's.
-  public private(set) var pendingAddendum: PendingAddendum?
-  /// What detaching, preparing again or reordering a repository left to be said.
-  public private(set) var repositoryNotice: RepositoryNotice?
-  /// What the verification before a launch found and did not stop it for.
-  public private(set) var launchWarning: LaunchWarning?
-  /// What the agent did to the branches of each session, as last read. Only the session on
-  /// screen is read, so the others keep what was true when they were last looked at.
-  public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
-  private var branchWatch: (id: SessionID, task: Task<Void, Never>)?
-
-  public struct PendingAddendum: Equatable {
-    public let sessionID: SessionID
-    public let sessionName: String
-    public let text: String
-  }
-
-  public struct RepositoryNotice: Equatable {
-    public let message: String
-    public let suggestion: String?
-    /// The command to copy, when the notice is about something left on the disk.
-    public let command: String?
-  }
-
-  public struct LaunchWarning: Equatable {
-    public let sessionName: String
-    public let lines: [String]
   }
 
   /// A restoration under way, from the first session to the last.
@@ -270,11 +241,11 @@ public final class AppModel {
   /// application always has one.
   public let permissions: PermissionsModel?
 
-  let repository: any SessionRepository
+  private let repository: any SessionRepository
   private let loadSessions: LoadSessions
   private let recovery: (any SessionStoreRecovery)?
   private let agents: (any AgentProviderResolving)?
-  let launcher: SessionLauncher?
+  private let launcher: SessionLauncher?
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
   private let archiveSession: ArchiveSession
@@ -282,14 +253,10 @@ public final class AppModel {
   private let restartSession: RestartSession?
   private let detectPreviousShutdown: DetectPreviousShutdown?
   private let restoreSessions: RestoreSessions?
-  let clock: any SessionClock
-  let workspace: SessionWorkspaceServices?
+  private let clock: any SessionClock
   private let readBranchReport: ReadSessionBranchReport?
-  let captureBaseline: CaptureSessionBaseline?
   /// How often the branches of the session on screen are read again while its agent runs.
   private let branchReportInterval: Duration
-  private let detachRepository: DetachRepository
-  private let makeMainRepository: MakeMainRepository
 
   public init(
     repository: any SessionRepository,
@@ -306,22 +273,14 @@ public final class AppModel {
     // Only the resume probation reads it, and it is the one rule here measured in seconds of real
     // time: without a clock to move, its far side could only be tested by waiting eight seconds.
     clock: any SessionClock = SystemSessionClock(),
-    /// Git and the worktree root. Absent in a workspace assembled without them, where every
-    /// folder is attached in place and nothing can be added afterwards.
-    workspace: SessionWorkspaceServices? = nil,
+    /// Reads what the agent did to the branches. Absent in a workspace assembled without Git,
+    /// where the inspector shows no report at all.
+    branchReader: ReadSessionBranchReport? = nil,
     branchReportInterval: Duration = .seconds(30)
   ) {
     self.clock = clock
-    self.workspace = workspace
+    readBranchReport = branchReader
     self.branchReportInterval = branchReportInterval
-    readBranchReport = workspace?.activity.map {
-      ReadSessionBranchReport(reader: $0, transcripts: workspace?.transcripts, clock: clock)
-    }
-    captureBaseline = workspace?.activity.map {
-      CaptureSessionBaseline(repository: repository, reader: $0)
-    }
-    detachRepository = DetachRepository(repository: repository, clock: clock)
-    makeMainRepository = MakeMainRepository(repository: repository, clock: clock)
     self.permissions = permissions
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
@@ -339,9 +298,7 @@ public final class AppModel {
     restoreSession = RestoreSession(repository: repository)
     // A workspace without agents cannot build a launch plan, so it cannot restart anything —
     // and saying that with an optional is clearer than a use case that would refuse every call.
-    let restart = agents.map {
-      RestartSession(repository: repository, agents: $0, workspace: workspace)
-    }
+    let restart = agents.map { RestartSession(repository: repository, agents: $0) }
     restartSession = restart
     // The two halves of #11: what the previous run left behind, and the queue that honours it.
     // Both are absent together, because a workspace that cannot launch has nothing to restore.
@@ -359,10 +316,6 @@ public final class AppModel {
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
       self.noteProcessDidFinish(id, state: state)
-      // Once more when the agent stops: its last commits are the ones the user wants to see.
-      if self.selectedSessionID == id {
-        Task { await self.readBranches(of: id) }
-      }
       // The store already says the session is closed; the list on screen is what has to catch up.
       Task { await self.reload() }
     }
@@ -693,9 +646,6 @@ public final class AppModel {
         resumeAttempts[id] = nil
       }
 
-      launchWarning =
-        restart.warnings.isEmpty
-        ? nil : LaunchWarning(sessionName: restart.session.name, lines: restart.warnings)
       switch await launcher.restart(restart) {
       case .started:
         switch restart.mode {
@@ -1118,7 +1068,7 @@ public final class AppModel {
   public func beginNewSession() {
     guard let agents, canCreateSession else { return }
     newSessionModel = NewSessionModel(
-      create: CreateSession(repository: repository, agents: agents, workspace: workspace),
+      create: CreateSession(repository: repository, agents: agents),
       registry: agents,
       fullDiskAccess: permissions?.status
     )
@@ -1144,19 +1094,7 @@ public final class AppModel {
     insert(creation.session)
     select(creation.session.id)
     guard let launcher else { return }
-    guard let plan = creation.plan else {
-      // The session exists, with what happened to its main repository; nothing was started, and
-      // the banner says why and what to do about it.
-      restartFailure = RestartFailure(
-        sessionName: creation.session.name,
-        message: creation.launchRefusal?.errorDescription ?? "The session could not be started.",
-        suggestion: creation.launchRefusal?.recoverySuggestion
-      )
-      await reload()
-      return
-    }
-    report(preparationOf: creation.session)
-    await launcher.launch(session: creation.session, plan: plan)
+    await launcher.launch(session: creation.session, plan: creation.plan)
     await reload()
     // A session created while the sidebar was on Closed is running by now, and it is the one the
     // user is looking at: the tab follows it rather than hiding what they just made.
@@ -1265,7 +1203,7 @@ public final class AppModel {
   /// backup. With sessions already listed, and possibly an agent running in one of them, it is
   /// a banner over them: a transient read error must not dismantle the terminals or lose the
   /// user's place.
-  func report(_ error: Error) async {
+  private func report(_ error: Error) async {
     let message = (error as? LocalizedError)?.errorDescription ?? "Unable to load work sessions."
     let canRestoreBackup = await recovery?.recoveryStatus() == .backupAvailable
 
@@ -1274,157 +1212,6 @@ public final class AppModel {
     } else {
       refreshFailure = RefreshFailure(message: message, canRestoreBackup: canRestoreBackup)
     }
-  }
-}
-
-// MARK: - Repositories
-
-extension AppModel {
-  public var canEditRepositories: Bool { workspace != nil }
-
-  /// Opens the attachment of one more repository to a session, once a folder is designated.
-  public func beginAttachRepository(to id: SessionID, path: String) async {
-    guard let workspace, let session = sessions.first(where: { $0.id == id }) else { return }
-    let model = RepositoryAttachmentModel(
-      sessionID: id,
-      sessionName: session.name,
-      attach: AttachRepository(repository: repository, services: workspace, clock: clock),
-      isRunning: { [weak self] in self?.launcher?.isRunning(id) ?? false }
-    )
-    repositoryAttachment = model
-    await model.folderChosen(path)
-  }
-
-  public func cancelAttachRepository() {
-    repositoryAttachment = nil
-  }
-
-  /// Prepares and attaches the repository the sheet shows, then offers the addendum to a running
-  /// agent — offers it, and nothing more.
-  public func confirmAttachRepository() async {
-    guard let model = repositoryAttachment, let attachment = await model.confirm() else { return }
-    repositoryAttachment = nil
-    if let text = attachment.addendum {
-      pendingAddendum = PendingAddendum(
-        sessionID: attachment.session.id,
-        sessionName: attachment.session.name,
-        text: text
-      )
-    }
-    if attachment.addendum != nil, let captureBaseline {
-      // Attached while its agent runs: what happens in it from now on is part of the report.
-      await captureBaseline(sessionID: attachment.session.id)
-    }
-    if let failure = attachment.repository.failure {
-      repositoryNotice = RepositoryNotice(
-        message:
-          "\(attachment.repository.displayName) was attached, but not prepared: \(failure.message)",
-        suggestion: failure.remedy,
-        command: nil
-      )
-    }
-    await reload()
-  }
-
-  /// Types the addendum into the session's terminal, as a paste followed by Return. Only ever
-  /// called from the button that shows the text.
-  public func sendAddendum() async {
-    guard let addendum = pendingAddendum else { return }
-    pendingAddendum = nil
-    guard let pane = launcher?.pane(for: addendum.sessionID),
-      launcher?.isRunning(addendum.sessionID) == true
-    else { return }
-    // Bracketed paste: the agent's composer takes the whole text as one message, newlines and
-    // all, instead of submitting it at its first line.
-    let pasted = "\u{1B}[200~" + addendum.text + "\u{1B}[201~"
-    await pane.write(Array(pasted.utf8))
-    await pane.write(Array("\r".utf8))
-  }
-
-  public func dismissAddendum() {
-    pendingAddendum = nil
-  }
-
-  public func dismissRepositoryNotice() {
-    repositoryNotice = nil
-  }
-
-  public func dismissLaunchWarning() {
-    launchWarning = nil
-  }
-
-  /// Forgets a repository. The worktree and the branch stay where they are; the notice gives the
-  /// command that would remove them, for the user to run if they decide to.
-  public func detach(repository repositoryID: RepositoryID, from id: SessionID) async {
-    do {
-      let detachment = try await detachRepository(sessionID: id, repositoryID: repositoryID)
-      var message =
-        "\(detachment.repository.displayName) was detached. Nothing on disk was removed."
-      if detachment.changedMainRepository {
-        message +=
-          launcher?.isRunning(id) == true
-          ? " The next repository is now the main one; the running agent stays where it was started."
-          : " The next repository is now the main one."
-      }
-      repositoryNotice = RepositoryNotice(
-        message: message,
-        suggestion: detachment.cleanupCommand == nil
-          ? nil : "To remove what it left, run this yourself:",
-        command: detachment.cleanupCommand
-      )
-    } catch {
-      await report(error)
-    }
-    await reload()
-  }
-
-  /// Prepares a repository again — the remedy for a worktree that disappeared or never came.
-  public func recreate(repository repositoryID: RepositoryID, in id: SessionID) async {
-    guard let workspace else { return }
-    do {
-      let repaired = try await RepairRepository(
-        repository: repository, services: workspace, clock: clock
-      )(sessionID: id, repositoryID: repositoryID)
-      if let failure = repaired.failure {
-        repositoryNotice = RepositoryNotice(
-          message: "\(repaired.displayName) could not be prepared: \(failure.message)",
-          suggestion: failure.remedy,
-          command: nil
-        )
-      } else {
-        repositoryNotice = nil
-      }
-    } catch {
-      await report(error)
-    }
-    await reload()
-  }
-
-  public func makeMain(repository repositoryID: RepositoryID, in id: SessionID) async {
-    do {
-      try await makeMainRepository(sessionID: id, repositoryID: repositoryID)
-      if launcher?.isRunning(id) == true {
-        repositoryNotice = RepositoryNotice(
-          message: "The main repository changed. The running agent stays where it was started.",
-          suggestion: "It will start in the new main repository at the next restart.",
-          command: nil
-        )
-      }
-    } catch {
-      await report(error)
-    }
-    await reload()
-  }
-
-  /// Says, once the session exists, which of its repositories were not prepared. The session is
-  /// usable anyway; these are the ones to come back to.
-  func report(preparationOf session: WorkSession) {
-    let failed = session.repositories.filter { $0.failure != nil }
-    guard !failed.isEmpty else { return }
-    launchWarning = LaunchWarning(
-      sessionName: session.name,
-      lines: failed.map { "\($0.displayName) was not prepared: \($0.failure?.message ?? "")" }
-    )
   }
 }
 
@@ -1450,16 +1237,18 @@ extension AppModel {
     if let branchWatch, branchWatch.id == id, !branchWatch.task.isCancelled { return }
     branchWatch?.task.cancel()
     let interval = branchReportInterval
+    let token = UUID()
     let task = Task { [weak self] in
       while !Task.isCancelled {
         await self?.readBranches(of: id)
         guard let self, self.launcher?.isRunning(id) == true else { break }
         try? await Task.sleep(for: interval)
       }
-      // Finished rather than cancelled: the next selection or start watches again.
-      if let self, self.branchWatch?.id == id { self.branchWatch = nil }
+      // Finished rather than cancelled: the next selection watches again. Only this watch is
+      // forgotten — a cancelled one ending late must not drop the watch that replaced it.
+      if let self, self.branchWatch?.token == token { self.branchWatch = nil }
     }
-    branchWatch = (id, task)
+    branchWatch = (id, token, task)
   }
 
   public func refreshBranchReport() async {

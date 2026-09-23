@@ -71,10 +71,10 @@ struct SessionStoreMigrationTests {
     #expect(session.name == "Stored before the migration")
     #expect(session.agent?.modelID == "gpt-6-astra")
     #expect(session.agent?.resumeIdentifier == "thread-123")
-    #expect(session.repositories.map(\.rootPath) == ["/projects/app"])
+    #expect(session.repositories.map(\.path) == ["/projects/app"])
   }
 
-  @Test("Reading a v1 document rewrites it in the current schema")
+  @Test("Reading a v1 document rewrites it as v2")
   func v1DocumentIsRewritten() async throws {
     let storeURL = try makeStoreURL()
     defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
@@ -84,7 +84,7 @@ struct SessionStoreMigrationTests {
 
     let rewritten = try JSONSerialization.jsonObject(with: try Data(contentsOf: storeURL))
     let object = try #require(rewritten as? [String: Any])
-    #expect(object["schemaVersion"] as? Int == 3)
+    #expect(object["schemaVersion"] as? Int == 2)
   }
 
   @Test("An empty v1 model becomes no model, never a model named nothing")

@@ -1,74 +1,41 @@
-import AppKit
 import SwiftUI
 import VibeApplication
 import VibeDomain
 
 /// The right column: what this session works on, and with what.
 ///
-/// Everything here is read from what the session already carries — its repositories and the Git
-/// snapshot captured when it was stored, its agent, its notes. Nothing is queried: a live Git
-/// status and editable notes are their own tickets, and this column has to be honest about the
-/// age of what it shows rather than invent a freshness it does not have.
+/// Everything here is read from what the session already carries — its folder, its agent, its
+/// notes — except the Git report, which is read from the agent's transcript and the repositories
+/// it names, and says how old it is rather than invent a freshness it does not have.
 public struct SessionContextInspector: View {
-  /// What the inspector can ask of the workspace. Every gesture that touches the disk goes through
-  /// one of these, and none of them removes anything.
-  public struct Actions {
-    public var addRepository: (() -> Void)?
-    public var detach: ((RepositoryID) -> Void)?
-    public var recreate: ((RepositoryID) -> Void)?
-    public var makeMain: ((RepositoryID) -> Void)?
-
-    public init(
-      addRepository: (() -> Void)? = nil,
-      detach: ((RepositoryID) -> Void)? = nil,
-      recreate: ((RepositoryID) -> Void)? = nil,
-      makeMain: ((RepositoryID) -> Void)? = nil
-    ) {
-      self.addRepository = addRepository
-      self.detach = detach
-      self.recreate = recreate
-      self.makeMain = makeMain
-    }
-  }
-
   private let session: WorkSession
   private let resolution: SessionAgentResolution?
-  private let actions: Actions
   private let branchReport: SessionBranchReport?
   private let refreshBranches: (() -> Void)?
 
   public init(
     session: WorkSession,
     resolution: SessionAgentResolution?,
-    actions: Actions = Actions(),
     branchReport: SessionBranchReport? = nil,
     refreshBranches: (() -> Void)? = nil
   ) {
     self.session = session
     self.resolution = resolution
-    self.actions = actions
     self.branchReport = branchReport
     self.refreshBranches = refreshBranches
   }
 
   public var body: some View {
     List {
-      // One section for Git, read as couples of branch and repository: each branch the session
-      // worked on is a heading, and the repositories it is checked out in are listed under it.
-      // That is the shape of the convention itself — one branch, several repositories — and it
-      // keeps the two things that matter, whole, on lines of their own.
+      // The folder the session was opened on, then each branch the agent worked on as a heading,
+      // with the repositories it is checked out in under it. The branches and worktrees are the
+      // agent's own: the application only reports them.
       Section {
         if session.repositories.isEmpty {
           InspectorPlaceholder("No folder is attached to this session.")
         } else {
-          ForEach(Array(session.repositories.enumerated()), id: \.element.id) {
-            index, repository in
-            AttachedRow(
-              repository: repository,
-              isMain: index == 0,
-              canDetach: session.repositories.count > 1 && session.status != .archived,
-              actions: actions
-            )
+          ForEach(session.repositories) { repository in
+            RepositoryRow(repository: repository)
           }
         }
         branchContent
@@ -89,19 +56,6 @@ public struct SessionContextInspector: View {
               .buttonStyle(.borderless)
               .help("Read the repositories again")
               .accessibilityLabel("Read the repositories again")
-          }
-          // Out of the way, in a menu: attaching one more is occasional, and a button under the
-          // list read as a sign that something was missing from it.
-          if let addRepository = actions.addRepository, session.status != .archived {
-            Menu {
-              Button("Attach Another Repository…", action: addRepository)
-            } label: {
-              Image(systemName: "ellipsis.circle")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .accessibilityLabel("Repository actions")
           }
         }
       }
@@ -163,7 +117,7 @@ extension SessionContextInspector {
           .foregroundStyle(.tertiary)
           .fixedSize(horizontal: false, vertical: true)
       }
-    } else if !session.repositories.isEmpty {
+    } else if refreshBranches != nil, !session.repositories.isEmpty {
       Text("Reading the repositories…")
         .font(.caption)
         .foregroundStyle(.tertiary)
@@ -282,8 +236,6 @@ private struct EntryRow: View {
         if let count = change.commitCount, count > 0 { pills.append(("+\(count)", .blue)) }
       case .rewritten:
         pills.append(("rewritten", .orange))
-      case .deleted:
-        break
       }
     }
     if report.isDirty { pills.append(("modified", .orange)) }
@@ -311,94 +263,27 @@ private struct Pill: View {
   }
 }
 
-/// One folder attached to the session, on one line, with what can be done to it in its menu.
-/// What it is worked on is said by the branches below, not here.
-private struct AttachedRow: View {
+private struct RepositoryRow: View {
   let repository: RepositoryContext
-  let isMain: Bool
-  let canDetach: Bool
-  let actions: SessionContextInspector.Actions
-
-  @State private var showsCleanup = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      HStack(alignment: .firstTextBaseline, spacing: 6) {
-        Image(systemName: isMain ? "star.fill" : "folder")
-          .font(.caption)
-          .foregroundStyle(isMain ? Color.accentColor : .secondary)
-          .help(isMain ? "Main repository: the agent starts in it." : "")
-        Text(repository.displayName)
-          .font(.callout.weight(.medium))
-          .fixedSize(horizontal: false, vertical: true)
-          .help(repository.rootPath)
-        Text(kind)
-          .font(.caption)
-          .foregroundStyle(.tertiary)
-        Spacer(minLength: 4)
-        menu
-      }
-
-      if let failure = repository.failure {
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-          Image(systemName: "exclamationmark.circle.fill")
-            .foregroundStyle(.red)
-          Text("\(failure.message) \(failure.remedy)")
-            .fixedSize(horizontal: false, vertical: true)
-        }
+      Label(name, systemImage: "folder")
+        .lineLimit(1)
+      Text(repository.path)
         .font(.caption)
-        if let recreate = actions.recreate {
-          Button("Prepare Again") { recreate(repository.id) }
-            .controlSize(.small)
-        }
-      }
-
-      if showsCleanup, let command = RepositoryCleanupCommand.make(for: repository) {
-        Text("Vibe Manager never deletes a worktree or a branch. To do it yourself:")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-        CopyableCommand(command: command)
-      }
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .truncationMode(.middle)
+        .help(repository.path)
     }
-    .padding(.vertical, 1)
+    .padding(.vertical, 2)
+    .accessibilityElement(children: .combine)
   }
 
-  private var kind: String {
-    switch repository.mode {
-    case .worktree: return repository.createdByVibeManager ? "worktree" : "adopted worktree"
-    case .inPlace: return "in place"
-    case .plainFolder: return "folder"
-    }
-  }
-
-  private var menu: some View {
-    Menu {
-      Button("Reveal in Finder") {
-        let path = repository.effectivePath ?? repository.rootPath
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-      }
-      if repository.mode == .worktree, let recreate = actions.recreate {
-        Button("Recreate the Worktree") { recreate(repository.id) }
-      }
-      if RepositoryCleanupCommand.make(for: repository) != nil {
-        Button(showsCleanup ? "Hide the Cleanup Command" : "Show the Cleanup Command") {
-          showsCleanup.toggle()
-        }
-      }
-      if !isMain, let makeMain = actions.makeMain {
-        Button("Make Main Repository") { makeMain(repository.id) }
-      }
-      if canDetach, let detach = actions.detach {
-        Divider()
-        Button("Detach from Session") { detach(repository.id) }
-      }
-    } label: {
-      Image(systemName: "ellipsis.circle")
-    }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.hidden)
-    .fixedSize()
-    .accessibilityLabel("Actions for \(repository.displayName)")
+  private var name: String {
+    let component = URL(fileURLWithPath: repository.path).lastPathComponent
+    return component.isEmpty ? repository.path : component
   }
 }
 

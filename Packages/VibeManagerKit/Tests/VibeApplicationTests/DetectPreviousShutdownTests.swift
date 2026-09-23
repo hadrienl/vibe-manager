@@ -25,7 +25,7 @@ struct DetectPreviousShutdownTests {
       updatedAt: updatedAt,
       closedAt: status == .active ? nil : updatedAt,
       archivedAt: status == .archived ? updatedAt : nil,
-      repositories: [RepositoryContext(rootPath: Fixture.folderPath)]
+      repositories: [RepositoryContext(path: Fixture.folderPath)]
     )
   }
 

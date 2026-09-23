@@ -43,7 +43,7 @@ struct CreateSessionTests {
 
     #expect(creation.session.name == "Refactor the webhook")
     #expect(creation.session.status == .closed)
-    #expect(creation.plan?.workingDirectoryPath == "/workspace")
+    #expect(creation.plan.workingDirectoryPath == "/workspace")
     #expect(await repository.savedSessions.count == 1)
   }
 

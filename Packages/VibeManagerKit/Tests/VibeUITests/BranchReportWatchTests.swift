@@ -11,23 +11,18 @@ struct BranchReportWatchTests {
   private let api = WorkSession(
     name: "API",
     updatedAt: Date(timeIntervalSince1970: 2_000),
-    repositories: [RepositoryContext(rootPath: "/work/api")]
+    repositories: [RepositoryContext(path: "/work/api")]
   )
   private let web = WorkSession(
     name: "Web",
     updatedAt: Date(timeIntervalSince1970: 1_000),
-    repositories: [RepositoryContext(rootPath: "/work/web")]
+    repositories: [RepositoryContext(path: "/work/web")]
   )
 
   private func makeModel(reader: CountingReader) -> AppModel {
     AppModel(
       repository: WatchRepository(values: [api, web]),
-      workspace: SessionWorkspaceServices(
-        inspector: NoInspector(),
-        writer: NoWriter(),
-        root: FixedWorktreeRoot(path: "/roots"),
-        activity: reader
-      ),
+      branchReader: ReadSessionBranchReport(reader: reader),
       branchReportInterval: .milliseconds(10)
     )
   }
@@ -66,10 +61,9 @@ private actor CountingReader: RepositoryActivityReading {
 
   func reads(of path: String) -> Int { counts[path] ?? 0 }
 
-  func references(atPath path: String) -> GitReferenceSnapshot? {
+  func head(atPath path: String) -> RepositoryHead? {
     counts[path, default: 0] += 1
-    return GitReferenceSnapshot(
-      checkedOutBranch: "main", headRevision: "abc", branches: ["main": "abc"])
+    return RepositoryHead(checkedOutBranch: "main")
   }
 
   func repositoryRoot(containing path: String) -> String? { path }
@@ -77,18 +71,6 @@ private actor CountingReader: RepositoryActivityReading {
   func reflog(atPath path: String, since date: Date) -> [ReflogEntry] { [] }
 
   func hasUncommittedChanges(atPath path: String, since date: Date) -> Bool { false }
-}
-
-private struct NoInspector: RepositoryInspecting {
-  func inspect(path: String) async -> RepositoryInspection { .plainFolder }
-}
-
-private struct NoWriter: WorktreeCreating {
-  func createSessionFolder(atPath path: String) async throws {}
-  func createWorktree(_ request: WorktreeCreationRequest) async throws {}
-  func createBranchInPlace(repositoryPath: String, commonDirectory: String, branch: String)
-    async throws
-  {}
 }
 
 private actor WatchRepository: SessionRepository {

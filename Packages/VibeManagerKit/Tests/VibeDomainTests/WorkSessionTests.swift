@@ -100,7 +100,7 @@ func completeSessionValidation() throws {
     updatedAt: date,
     repositories: [
       RepositoryContext(
-        rootPath: "/projects/vibe-manager",
+        path: "/projects/vibe-manager",
         git: GitSnapshot(
           repositoryRootPath: "/projects/vibe-manager",
           branchName: "feature/persistence",

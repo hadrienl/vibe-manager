@@ -248,171 +248,15 @@ public struct GitSnapshot: Hashable, Codable, Sendable {
   }
 }
 
-/// How a folder takes part in a session.
-public enum RepositoryAttachmentMode: String, Hashable, Codable, Sendable, CaseIterable {
-  /// A worktree of the repository, on the session's branch, under the worktree root. The default
-  /// for a Git repository: the clone the user designated is never touched.
-  case worktree
-  /// The clone itself, on whatever branch it is on. What every session stored before worktrees
-  /// existed does, and what a user chooses when the clone is the place they want the work.
-  case inPlace
-  /// A folder without Git — notes, data. It has its place in a session, with no branch and no
-  /// convention.
-  case plainFolder
-}
-
-/// Why a repository attached to a session could not be prepared, kept on it so the inspector and
-/// the next restart can say so.
-///
-/// A sentence and a remedy, like `SessionDraftIssue`: the same shape renders in the sheet, the
-/// inspector and the restart banner.
-public struct RepositoryPreparationFailure: Hashable, Codable, Sendable {
-  public var message: String
-  public var remedy: String
-
-  public init(message: String, remedy: String) {
-    self.message = message
-    self.remedy = remedy
-  }
-}
-
-/// One folder attached to a session: the clone it came from, and the place the work happens.
-/// The branches of a repository at one instant: what a session's report is measured against.
-///
-/// Every local branch with the commit it names, the branch checked out and the `HEAD`. A dated
-/// photograph, like `GitSnapshot`: nothing here is kept up to date.
-public struct GitReferenceSnapshot: Hashable, Codable, Sendable {
-  public var checkedOutBranch: String?
-  public var headRevision: String?
-  public var branches: [String: String]
-  public var isDirty: Bool
-  public var capturedAt: Date {
-    didSet { capturedAt = capturedAt.storageRounded }
-  }
-
-  public init(
-    checkedOutBranch: String?,
-    headRevision: String?,
-    branches: [String: String],
-    isDirty: Bool = false,
-    capturedAt: Date = Date()
-  ) {
-    self.checkedOutBranch = checkedOutBranch
-    self.headRevision = headRevision
-    self.branches = branches
-    self.isDirty = isDirty
-    self.capturedAt = capturedAt.storageRounded
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case checkedOutBranch, headRevision, branches, isDirty, capturedAt
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.init(
-      checkedOutBranch: try container.decodeIfPresent(String.self, forKey: .checkedOutBranch),
-      headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision),
-      branches: try container.decode([String: String].self, forKey: .branches),
-      isDirty: try container.decodeIfPresent(Bool.self, forKey: .isDirty) ?? false,
-      capturedAt: try container.decode(Date.self, forKey: .capturedAt)
-    )
-  }
-}
-
 public struct RepositoryContext: Identifiable, Hashable, Codable, Sendable {
   public let id: RepositoryID
-  /// The clone the user designated. Never moved, and the path the session is grouped by — so a
-  /// session working in a worktree stays filed with its project.
-  public var rootPath: String
-  public var mode: RepositoryAttachmentMode
-  /// Where the worktree is, for `worktree`. `nil` otherwise, and `nil` for a worktree that could
-  /// not be prepared.
-  public var worktreePath: String?
-  /// The branch the work happens on. The session's branch for a worktree, the clone's own for a
-  /// repository attached in place, `nil` for a plain folder or a detached `HEAD`.
-  public var branchName: String?
-  /// What the branch started from, when Vibe Manager created it.
-  public var baseRevision: String?
-  /// `false` when an existing worktree was adopted: the application did not make it, and must
-  /// not suggest it did — least of all in the cleanup command it offers.
-  public var createdByVibeManager: Bool
-  public var attachedAt: Date? {
-    didSet { attachedAt = attachedAt?.storageRounded }
-  }
-  /// Set when preparing this repository failed. The session exists anyway: one repository that
-  /// refuses does not take the others down.
-  public var failure: RepositoryPreparationFailure?
-  /// The branches as they were when an agent first ran for this session: what the report of what
-  /// the agent created or moved is measured against. Taken once, never on a restart.
-  public var baseline: GitReferenceSnapshot?
+  public var path: String
   public var git: GitSnapshot?
 
-  public init(
-    id: RepositoryID = RepositoryID(),
-    rootPath: String,
-    mode: RepositoryAttachmentMode = .inPlace,
-    worktreePath: String? = nil,
-    branchName: String? = nil,
-    baseRevision: String? = nil,
-    createdByVibeManager: Bool = false,
-    attachedAt: Date? = nil,
-    failure: RepositoryPreparationFailure? = nil,
-    baseline: GitReferenceSnapshot? = nil,
-    git: GitSnapshot? = nil
-  ) {
+  public init(id: RepositoryID = RepositoryID(), path: String, git: GitSnapshot? = nil) {
     self.id = id
-    self.rootPath = rootPath
-    self.mode = mode
-    self.worktreePath = worktreePath
-    self.branchName = branchName
-    self.baseRevision = baseRevision
-    self.createdByVibeManager = createdByVibeManager
-    self.attachedAt = attachedAt?.storageRounded
-    self.failure = failure
-    self.baseline = baseline
+    self.path = path
     self.git = git
-  }
-
-  /// Where the agent works for this repository: the worktree when there is one, the folder
-  /// itself otherwise. `nil` for a worktree that was never prepared — sending the agent into the
-  /// clone instead would be exactly what the worktree was meant to avoid.
-  public var effectivePath: String? {
-    switch mode {
-    case .worktree:
-      return failure == nil ? worktreePath : nil
-    case .inPlace, .plainFolder:
-      return failure == nil ? rootPath : nil
-    }
-  }
-
-  /// The last component of the clone's path, which is what the rows and the convention call it.
-  public var displayName: String {
-    let component = URL(fileURLWithPath: rootPath).lastPathComponent
-    return component.isEmpty ? rootPath : component
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case id, rootPath, mode, worktreePath, branchName, baseRevision, createdByVibeManager
-    case attachedAt, failure, baseline, git
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.init(
-      id: try container.decode(RepositoryID.self, forKey: .id),
-      rootPath: try container.decode(String.self, forKey: .rootPath),
-      mode: try container.decode(RepositoryAttachmentMode.self, forKey: .mode),
-      worktreePath: try container.decodeIfPresent(String.self, forKey: .worktreePath),
-      branchName: try container.decodeIfPresent(String.self, forKey: .branchName),
-      baseRevision: try container.decodeIfPresent(String.self, forKey: .baseRevision),
-      createdByVibeManager: try container.decode(Bool.self, forKey: .createdByVibeManager),
-      attachedAt: try container.decodeIfPresent(Date.self, forKey: .attachedAt),
-      failure: try container.decodeIfPresent(
-        RepositoryPreparationFailure.self, forKey: .failure),
-      baseline: try container.decodeIfPresent(GitReferenceSnapshot.self, forKey: .baseline),
-      git: try container.decodeIfPresent(GitSnapshot.self, forKey: .git)
-    )
   }
 }
 
@@ -423,7 +267,6 @@ public enum WorkSessionValidationError: Error, Equatable, Sendable {
   case invalidLifecycle
   case duplicateRepositoryIdentifier
   case emptyRepositoryPath
-  case invalidRepositoryAttachment
 }
 
 public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
@@ -433,12 +276,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   public var agent: SessionAgentConfiguration?
   public var appearance: SessionAppearance
   public private(set) var lifecycle: SessionLifecycle
-  /// The first repository is the main one: the agent is started in it.
   public var repositories: [RepositoryContext]
-  /// The name of the session's branch and worktree folder, fixed at creation. `nil` for a session
-  /// stored before worktrees existed, which works in its folders in place — until the first
-  /// worktree is attached to it, which is the one moment it is given one.
-  public private(set) var slug: SessionSlug?
   public var notes: String?
   public var template: PromptTemplateReference?
 
@@ -485,7 +323,6 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     archivedAt: Date? = nil,
     startedAt: Date? = nil,
     repositories: [RepositoryContext] = [],
-    slug: SessionSlug? = nil,
     notes: String? = nil,
     template: PromptTemplateReference? = nil
   ) {
@@ -503,22 +340,8 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       startedAt: startedAt
     )
     self.repositories = repositories
-    self.slug = slug
     self.notes = notes
     self.template = template
-  }
-
-  /// Gives a session stored without a slug the one it will keep. A slug already there is never
-  /// replaced: renaming a session must not rename its branch.
-  public mutating func adoptSlugIfMissing(_ candidate: SessionSlug) {
-    guard slug == nil else { return }
-    slug = candidate
-  }
-
-  /// Records that something about the session changed — a repository attached or detached —
-  /// without moving it through its lifecycle.
-  public mutating func touch(at date: Date) throws {
-    try lifecycle.touch(at: date)
   }
 
   public mutating func close(at date: Date) throws {
@@ -555,46 +378,8 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     guard Set(repositories.map(\.id)).count == repositories.count else {
       throw WorkSessionValidationError.duplicateRepositoryIdentifier
     }
-    guard repositories.allSatisfy({ !$0.rootPath.isEmpty }) else {
+    guard repositories.allSatisfy({ !$0.path.isEmpty }) else {
       throw WorkSessionValidationError.emptyRepositoryPath
-    }
-    guard repositories.allSatisfy(Self.isValidAttachment) else {
-      throw WorkSessionValidationError.invalidRepositoryAttachment
-    }
-  }
-
-  /// The folder this session's worktrees were made in, read from the worktrees themselves.
-  ///
-  /// Not recomputed from the current root: the root is a setting, and a session whose worktrees
-  /// were made before it changed still lives where they are.
-  public var worktreeFolderPath: String? {
-    guard let slug else { return nil }
-    for repository in repositories where repository.createdByVibeManager {
-      guard let path = repository.worktreePath else { continue }
-      let folder = (path as NSString).deletingLastPathComponent
-      if (folder as NSString).lastPathComponent == slug.rawValue { return folder }
-    }
-    return nil
-  }
-
-  /// The repository the agent is started in: the first one that can be worked in.
-  ///
-  /// The first one, full stop, is the *main* repository; this is it only when it is usable. The
-  /// callers that launch decide what to do when it is not — refusing, most of the time.
-  public var mainRepository: RepositoryContext? {
-    repositories.first
-  }
-
-  /// A plain folder carries no branch, and a worktree that was prepared has one.
-  private static func isValidAttachment(_ repository: RepositoryContext) -> Bool {
-    switch repository.mode {
-    case .plainFolder:
-      return repository.worktreePath == nil && repository.branchName == nil
-    case .worktree:
-      guard repository.failure == nil else { return true }
-      return repository.worktreePath.map { !$0.isEmpty } ?? false
-    case .inPlace:
-      return repository.worktreePath == nil
     }
   }
 

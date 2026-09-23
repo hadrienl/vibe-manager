@@ -33,7 +33,7 @@ struct SessionRestorationTests {
       createdAt: Date(timeIntervalSince1970: 1_699_000_000),
       updatedAt: Date(timeIntervalSince1970: 1_700_000_100),
       closedAt: status == .active ? nil : Date(timeIntervalSince1970: 1_700_000_100),
-      repositories: [RepositoryContext(rootPath: path)]
+      repositories: [RepositoryContext(path: path)]
     )
   }
 
@@ -362,7 +362,7 @@ struct SessionRestorationTests {
     let restored = await repository.session(id: subject.id)
     #expect(restored?.status == .active)
     #expect(restored?.agent?.resumeIdentifier == "kept-identifier")
-    #expect(restored?.repositories.first?.rootPath == path)
+    #expect(restored?.repositories.first?.path == path)
     #expect(restored?.name == subject.name)
   }
 }

@@ -115,7 +115,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     }
 
     if let repositoryPath {
-      guard session.repositories.contains(where: { $0.rootPath == repositoryPath }) else {
+      guard session.repositories.contains(where: { $0.path == repositoryPath }) else {
         return false
       }
     }
@@ -127,11 +127,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     // ignored, so "refacto" finds "Réfactoring" without the user learning a syntax.
     var haystack = [session.name, session.initialPrompt]
     if let notes = session.notes { haystack.append(notes) }
-    for repository in session.repositories {
-      haystack.append(repository.rootPath)
-      if let worktreePath = repository.worktreePath { haystack.append(worktreePath) }
-      if let branchName = repository.branchName { haystack.append(branchName) }
-    }
+    haystack.append(contentsOf: session.repositories.map(\.path))
     return haystack.contains { $0.localizedStandardContains(query) }
   }
 
@@ -159,7 +155,7 @@ extension SessionFilter {
   }
 
   public static func availableRepositoryPaths(in sessions: [WorkSession]) -> [String] {
-    Set(sessions.flatMap { $0.repositories.map(\.rootPath) }).sorted()
+    Set(sessions.flatMap { $0.repositories.map(\.path) }).sorted()
   }
 
   /// Drops the facets that no longer name anything.

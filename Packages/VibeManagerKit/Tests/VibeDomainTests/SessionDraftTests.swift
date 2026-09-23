@@ -114,7 +114,7 @@ struct SessionDraftTests {
     #expect(session.agent?.providerID == "claude-code")
     // No model chosen means no model stored — never a sentinel that would reach `--model`.
     #expect(session.agent?.modelID == nil)
-    #expect(session.repositories.map(\.rootPath) == ["/tmp"])
+    #expect(session.repositories.map(\.path) == ["/tmp"])
     try session.validate()
   }
 

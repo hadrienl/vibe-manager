@@ -38,8 +38,6 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
   /// Where what is running is written down, for the next launch to read. Absent in a workspace
   /// assembled without the system around it, and the launcher then simply keeps no record.
   private let recorder: SessionRuntimeRecorder?
-  /// Photographs the branches when an agent starts, for the session report. Absent without Git.
-  private let baseline: CaptureSessionBaseline?
 
   private var panes: [SessionID: TerminalPaneModel] = [:]
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
@@ -70,7 +68,6 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     recorder: SessionRuntimeRecorder? = nil,
-    baseline: CaptureSessionBaseline? = nil,
     clock: any SessionClock = SystemSessionClock(),
     viewportTimeout: Duration = .milliseconds(500)
   ) {
@@ -78,7 +75,6 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     self.repository = repository
     self.agents = agents
     self.recorder = recorder
-    self.baseline = baseline
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
@@ -167,9 +163,6 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     if case .running(let processIdentifier) = await terminal.state() {
       await recorder?.started(session.id, processGroup: processIdentifier)
     }
-    // Taken on the one road to a process, so a creation, a restart and a restoration all take it;
-    // it only ever fills what is missing, so a restart never resets the report to nothing.
-    await baseline?(sessionID: session.id)
     return .started
   }
 

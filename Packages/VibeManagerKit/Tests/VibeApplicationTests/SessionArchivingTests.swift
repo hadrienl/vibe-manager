@@ -123,7 +123,7 @@ private func runningSession(name: String = "Refactor the webhook") -> WorkSessio
     updatedAt: Date(timeIntervalSince1970: 100),
     repositories: [
       RepositoryContext(
-        rootPath: "/work/api",
+        path: "/work/api",
         git: GitSnapshot(
           repositoryRootPath: "/work/api",
           branchName: "main",

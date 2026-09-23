@@ -33,7 +33,7 @@ public struct NewSessionSheet: View {
       Divider()
       footer
     }
-    .frame(width: 700, height: 780)
+    .frame(width: 640, height: 700)
     .task {
       await model.load(defaultWorkingDirectoryPath: defaultWorkingDirectoryPath)
       focus = .name
@@ -62,8 +62,6 @@ public struct NewSessionSheet: View {
         nameField
         promptField
         folderField
-        slugField
-        conventionField
         agentField
         modelField
         appearanceField
@@ -184,126 +182,24 @@ public struct NewSessionSheet: View {
     }
   }
 
-  /// The folders of the session, the main one first, each with what will be done to it.
   private var folderField: some View {
     LabeledField(
-      "Repositories",
-      help: model.protectedLocationNotice
-        ?? "The first one is the main repository: the agent starts in it.",
-      issues: model.issues(for: .workingDirectory) + model.issues(for: .repositories)
+      "Working folder",
+      help: model.protectedLocationNotice,
+      issues: model.issues(for: .workingDirectory)
     ) {
-      VStack(alignment: .leading, spacing: 8) {
-        if model.draft.repositories.isEmpty {
-          Text("No folder yet.")
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        }
-        ForEach(Array(model.draft.repositories.enumerated()), id: \.element.id) {
-          index, repository in
-          DraftRepositoryRow(
-            repository: repository,
-            isMain: index == 0,
-            isFirst: index == 0,
-            isLast: index == model.draft.repositories.count - 1,
-            plan: model.plan(for: repository.id),
-            setMode: { model.setMode($0, for: repository.id) },
-            setBase: { model.setBase($0, for: repository.id) },
-            move: { model.moveRepository(repository.id, by: $0) },
-            remove: { model.removeRepository(repository.id) },
-            resolve: { resolve($0, for: repository.id) }
+      HStack(spacing: 8) {
+        TextField(
+          "Choose a folder",
+          text: Binding(
+            get: { model.draft.workingDirectoryPath ?? "" },
+            set: { model.draft.workingDirectoryPath = $0.isEmpty ? nil : $0 }
           )
-        }
-        HStack(spacing: 8) {
-          Button(model.draft.repositories.isEmpty ? "Choose…" : "Add Repository…") {
-            addRepository()
-          }
-          if model.preview?.additionalDirectoriesUnsupported == true,
-            let agent = model.selectedAgent
-          {
-            Label(
-              "\(agent.name) cannot be given the other repositories: only the main one is reachable.",
-              systemImage: "exclamationmark.triangle"
-            )
-            .font(.caption)
-            .foregroundStyle(.orange)
-          }
-        }
-      }
-    }
-  }
+        )
+        .textFieldStyle(.roundedBorder)
+        .focused($focus, equals: .workingDirectory)
 
-  /// The slug, with the branch it becomes. It follows the name until it is typed in — and it is
-  /// not shown at all for a session whose folders are all plain or worked in place, which name no
-  /// branch.
-  @ViewBuilder
-  private var slugField: some View {
-    if model.preview?.workspace?.usesSessionBranch != false {
-      slugEditor
-    }
-  }
-
-  private var slugEditor: some View {
-    LabeledField(
-      "Branch",
-      help: branchHelp,
-      issues: slugIssues
-    ) {
-      VStack(alignment: .leading, spacing: 5) {
-        HStack(spacing: 8) {
-          Text(SessionSlug.branchPrefix)
-            .font(.system(.body, design: .monospaced))
-            .foregroundStyle(.secondary)
-          TextField("slug", text: $model.slugText)
-            .textFieldStyle(.roundedBorder)
-            .font(.system(.body, design: .monospaced))
-            .focused($focus, equals: .slug)
-          if !model.slugFollowsName {
-            Button("Follow the Name") { model.resetSlug() }
-              .controlSize(.small)
-          }
-        }
-        if let suggestion = model.preview?.workspace?.slugSuggestion {
-          Button("Use \(suggestion.rawValue)") {
-            model.slugText = suggestion.rawValue
-            model.draftChanged()
-          }
-          .controlSize(.small)
-        }
-      }
-    }
-  }
-
-  /// The slug's own problems, and the collision the plan found, which is shown as soon as it is
-  /// known rather than after the first Create — each one once.
-  private var slugIssues: [SessionDraftIssue] {
-    var seen: Set<SessionDraftIssue.ID> = []
-    return (model.issues(for: .slug) + (model.preview?.workspace?.sessionIssues ?? []))
-      .filter { seen.insert($0.id).inserted }
-  }
-
-  private var branchHelp: String? {
-    let fixed = "Fixed once the session exists: renaming the session never renames its branch."
-    guard let folder = model.preview?.workspace?.sessionFolderPath,
-      model.preview?.workspace?.createsWorktrees == true
-    else { return fixed }
-    return "Worktrees go in \(abbreviatedPath(folder)). \(fixed)"
-  }
-
-  /// What the agent will be told, exactly as it will be sent — folded, and there to be read.
-  @ViewBuilder
-  private var conventionField: some View {
-    if let convention = model.preview?.convention {
-      LabeledField("Convention", issues: []) {
-        DisclosureGroup("Show what the agent is told first") {
-          Text(convention)
-            .font(.system(.caption, design: .monospaced))
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-            .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary))
-        }
-        .font(.callout)
+        Button("Choose…", action: chooseFolder)
       }
     }
   }
@@ -339,7 +235,7 @@ public struct NewSessionSheet: View {
   /// Only these fields own a control that can take the keyboard: aiming the caret at any other
   /// would leave it nowhere at all.
   private static let focusableFields: Set<SessionDraftField> = [
-    .name, .initialPrompt, .slug,
+    .name, .initialPrompt, .workingDirectory,
   ]
 
   private func submit() {
@@ -366,147 +262,22 @@ public struct NewSessionSheet: View {
     )
   }
 
-  private func addRepository() {
-    let start = model.draft.repositories.last?.resolvedPath.map {
-      ($0 as NSString).deletingLastPathComponent
-    }
+  private func chooseFolder() {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = false
+    panel.canCreateDirectories = true
+    panel.prompt = "Choose"
     // The panel opens on the home directory when nothing is chosen yet. The sheet itself
     // proposes no folder — accepting one that contains Desktop, Documents and Downloads would
     // send an agent into them with nothing said — but the panel has to start somewhere.
-    guard let path = chooseFolder(startingAt: start) else { return }
-    Task {
-      if model.draft.repositories.isEmpty {
-        await model.folderChosen(path)
-      } else {
-        await model.addRepository(path)
-      }
-    }
-  }
-
-  private func resolve(_ resolution: RepositoryResolution, for id: RepositoryID) {
-    guard model.resolve(resolution, for: id) == .chooseAnotherFolder else { return }
-    let current = model.draft.repositories.first { $0.id == id }?.resolvedPath
-    guard let path = chooseFolder(startingAt: current) else { return }
-    Task {
-      if model.draft.repositories.first?.id == id {
-        await model.folderChosen(path)
-      } else {
-        await model.replaceRepository(id, with: path)
-      }
-    }
-  }
-}
-
-/// One folder of the draft: its path, how it is attached, and what the plan says about it.
-private struct DraftRepositoryRow: View {
-  let repository: SessionDraftRepository
-  let isMain: Bool
-  let isFirst: Bool
-  let isLast: Bool
-  let plan: RepositoryPlan?
-  let setMode: (RepositoryAttachmentMode) -> Void
-  let setBase: (RepositoryBase) -> Void
-  let move: (Int) -> Void
-  let remove: () -> Void
-  let resolve: (RepositoryResolution) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 6) {
-        Image(systemName: isMain ? "star.circle.fill" : "folder")
-          .foregroundStyle(isMain ? Color.accentColor : .secondary)
-          .help(isMain ? "Main repository: the agent starts in it." : "")
-        VStack(alignment: .leading, spacing: 1) {
-          Text(name)
-            .fontWeight(.medium)
-          Text(abbreviatedPath(repository.resolvedPath ?? repository.path))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-        }
-        Spacer()
-        Button {
-          move(-1)
-        } label: {
-          Image(systemName: "arrow.up")
-        }
-        .buttonStyle(.borderless)
-        .disabled(isFirst)
-        .accessibilityLabel("Move up")
-        Button {
-          move(1)
-        } label: {
-          Image(systemName: "arrow.down")
-        }
-        .buttonStyle(.borderless)
-        .disabled(isLast)
-        .accessibilityLabel("Move down")
-        Button(action: remove) { Image(systemName: "minus.circle") }
-          .buttonStyle(.borderless)
-          .accessibilityLabel("Remove \(name)")
-      }
-
-      if isRepository {
-        HStack(spacing: 10) {
-          Picker("Mode", selection: modeBinding) {
-            Text("Worktree").tag(RepositoryAttachmentMode.worktree)
-            Text("In place").tag(RepositoryAttachmentMode.inPlace)
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-          .frame(width: 180)
-
-          if plan?.mode == .worktree {
-            Picker("Base", selection: baseBinding) {
-              Text("From HEAD").tag(RepositoryBase.head)
-              Text("From the default branch").tag(RepositoryBase.defaultBranch)
-            }
-            .labelsHidden()
-            .frame(maxWidth: 220)
-          }
-        }
-      }
-
-      if let plan {
-        RepositoryPlanSummary(plan: plan)
-        ForEach(plan.issues) { issue in
-          RepositoryIssueRow(issue: issue, resolve: resolve)
-        }
-      } else {
-        Text("Read when chosen through the panel.")
-          .font(.caption)
-          .foregroundStyle(.tertiary)
-      }
-    }
-    .padding(9)
-    .background(
-      RoundedRectangle(cornerRadius: 8)
-        .strokeBorder(
-          plan?.isBlocked == true ? Color.red.opacity(0.6) : Color(nsColor: .separatorColor))
+    panel.directoryURL = URL(
+      fileURLWithPath: model.draft.resolvedWorkingDirectoryPath ?? NSHomeDirectory(),
+      isDirectory: true
     )
-  }
-
-  private var name: String {
-    let component = URL(fileURLWithPath: repository.resolvedPath ?? repository.path)
-      .lastPathComponent
-    return component.isEmpty ? repository.path : component
-  }
-
-  private var isRepository: Bool {
-    guard let plan else { return false }
-    return plan.mode != .plainFolder && plan.commonDirectory != nil
-  }
-
-  private var modeBinding: Binding<RepositoryAttachmentMode> {
-    Binding(
-      get: { plan?.mode == .inPlace ? .inPlace : .worktree },
-      set: { setMode($0) }
-    )
-  }
-
-  private var baseBinding: Binding<RepositoryBase> {
-    Binding(get: { repository.base }, set: { setBase($0) })
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    Task { await model.folderChosen(url.path) }
   }
 }
 

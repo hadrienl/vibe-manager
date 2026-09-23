@@ -33,7 +33,7 @@ struct SessionHistoryTests {
       archivedAt: status == .archived ? Date(timeIntervalSince1970: 60) : nil,
       repositories: [
         RepositoryContext(
-          rootPath: "/workspace",
+          path: "/workspace",
           git: GitSnapshot(repositoryRootPath: "/workspace", branchName: "main", isDirty: true)
         )
       ],

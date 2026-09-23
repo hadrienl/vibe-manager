@@ -26,7 +26,7 @@ private func session(
     updatedAt: updatedAt,
     closedAt: status == .closed || status == .archived ? createdAt : nil,
     archivedAt: status == .archived ? updatedAt : nil,
-    repositories: repositoryPaths.map { RepositoryContext(rootPath: $0) },
+    repositories: repositoryPaths.map { RepositoryContext(path: $0) },
     notes: notes
   )
 }

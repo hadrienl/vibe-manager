@@ -14,8 +14,6 @@ final class AppEnvironment {
   /// Held here as well as inside the model: the settings window is a scene of its own, and it
   /// must read the same status the workspace read rather than probe the system a second time.
   let permissions: PermissionsModel
-  /// The worktree root, read by every plan and changed from the settings window.
-  let worktreeRoot: WorktreeRootSettings
 
   private let terminalSupervisor: PTYTerminalSupervisor
   private let launcher: SessionLauncher
@@ -26,19 +24,6 @@ final class AppEnvironment {
     let repository = FileSessionRepository(storeURL: data.store)
     let registry = AgentProviderRegistry(providers: Self.providers())
     let supervisor = PTYTerminalSupervisor()
-    // One runner and one writer for the whole application: the writer's queue is what keeps two
-    // sessions prepared at the same moment on one repository from meeting on `index.lock`.
-    let git = ProcessGitCommandRunner()
-    let reader = GitActivityReader(git: git)
-    let rootStore = UserDefaultsWorktreeRootStore(suiteName: data.defaultsSuite)
-    let workspace = SessionWorkspaceServices(
-      inspector: GitRepositoryInspector(git: git),
-      writer: GitWorktreeService(git: git),
-      root: rootStore,
-      activity: reader,
-      transcripts: AgentTranscriptReader()
-    )
-    worktreeRoot = WorktreeRootSettings(store: rootStore)
 
     terminalSupervisor = supervisor
     // The runtime document: what this copy of the application is running, so the next launch can
@@ -49,8 +34,7 @@ final class AppEnvironment {
       supervisor: supervisor,
       repository: repository,
       agents: registry,
-      recorder: recorder,
-      baseline: CaptureSessionBaseline(repository: repository, reader: reader)
+      recorder: recorder
     )
     self.launcher = launcher
     prepareForQuit = PrepareForQuit(
@@ -81,7 +65,10 @@ final class AppEnvironment {
         store: UserDefaultsWorkspaceLayoutStore(suiteName: data.defaultsSuite)),
       permissions: permissions,
       runtimeRecorder: recorder,
-      workspace: workspace
+      // Read only: the application reports the branches and worktrees the agent made, and never
+      // makes one itself.
+      branchReader: ReadSessionBranchReport(
+        reader: GitActivityReader(), transcripts: AgentTranscriptReader())
     )
   }
 
