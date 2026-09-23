@@ -111,19 +111,23 @@ public struct RepositoryStatusLimits: Sendable {
   /// How long another Git process may hold the index before it is said.
   public var lockGrace: Duration
   public var concurrentReads: Int
+  /// The files of one unfolded untracked folder kept for the list; the rest are counted.
+  public var maximumUntrackedFiles: Int
 
   public init(
     maximumEntries: Int = 5_000,
     minimumInterval: Duration = .seconds(1),
     maximumInterval: Duration = .seconds(15),
     lockGrace: Duration = .seconds(10),
-    concurrentReads: Int = 2
+    concurrentReads: Int = 2,
+    maximumUntrackedFiles: Int = 1_000
   ) {
     self.maximumEntries = maximumEntries
     self.minimumInterval = minimumInterval
     self.maximumInterval = maximumInterval
     self.lockGrace = lockGrace
     self.concurrentReads = max(1, concurrentReads)
+    self.maximumUntrackedFiles = max(1, maximumUntrackedFiles)
   }
 }
 
@@ -379,6 +383,21 @@ public actor RepositoryStatusMonitor {
       try? await sleep(pause)
       self.endPause(path, generation: generation)
     }
+  }
+
+  /// The files of an untracked folder, read when someone unfolds it — through the same slots as
+  /// `git status`, so that unfolding a folder never makes a third Git run beside two readings.
+  public func untrackedFiles(in directory: String, of key: RepositoryStatusKey) async -> Result<
+    UntrackedListing, RepositoryStatusIssue
+  > {
+    guard !isStopped else {
+      return .failure(.failed(summary: "The repositories are no longer read."))
+    }
+    await acquireReadSlot()
+    let result = await reader.untrackedFiles(
+      in: directory, atPath: key.repositoryPath, limit: limits.maximumUntrackedFiles)
+    releaseReadSlot()
+    return result
   }
 
   private func place(_ path: String, _ directories: Result<GitDirectories, RepositoryStatusIssue>) {

@@ -50,6 +50,23 @@ actor ScriptedStatusReader: RepositoryStatusReading {
     return answers[path] ?? .success(.sample(path, entries: []))
   }
 
+  private(set) var listings = 0
+
+  func untrackedFiles(in directory: String, atPath path: String, limit: Int) async -> Result<
+    UntrackedListing, RepositoryStatusIssue
+  > {
+    listings += 1
+    running += 1
+    mostAtOnce = max(mostAtOnce, running)
+    if isHeld {
+      await withCheckedContinuation { held.append($0) }
+    }
+    running -= 1
+    let paths = (0..<3).map { "\(directory)file\($0).txt" }
+    return .success(
+      UntrackedListing(directory: directory, paths: Array(paths.prefix(limit)), totalCount: 3))
+  }
+
   func gitDirectories(atPath path: String) async -> Result<GitDirectories, RepositoryStatusIssue> {
     if let known = directories[path] { return .success(known) }
     return .success(GitDirectories(gitDirectory: path + "/.git", commonDirectory: path + "/.git"))

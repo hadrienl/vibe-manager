@@ -278,6 +278,31 @@ struct RepositoryStatusMonitorTests {
     #expect(await reader.mostAtOnce == 2)
   }
 
+  @Test("Unfolding an untracked folder waits for a slot, like any other reading")
+  func untrackedListingShareTheSlots() async {
+    let reader = ScriptedStatusReader()
+    await reader.hold()
+    let monitor = makeMonitor(reader: reader)
+    let paths = ["/work/api", "/work/web"]
+    await monitor.observe(session, repositories: paths.map { ObservedRepository(path: $0) })
+    #expect(await eventually { await reader.mostAtOnce == 2 })
+
+    let key = RepositoryStatusKey(sessionID: session.id, repositoryPath: "/work/api")
+    let listing = Task { await monitor.untrackedFiles(in: "Generated/", of: key) }
+    try? await Task.sleep(for: .milliseconds(100))
+    // Both slots are held by `git status`: the listing has not started.
+    #expect(await reader.listings == 0)
+    #expect(await reader.mostAtOnce == 2)
+
+    await reader.release()
+    let result = await listing.value
+    #expect(
+      (try? result.get())?.paths == [
+        "Generated/file0.txt", "Generated/file1.txt", "Generated/file2.txt",
+      ])
+    #expect(await reader.mostAtOnce == 2)
+  }
+
   @Test("Leaving the session marks its states unobserved, and a late reading lands on nothing")
   func stoppingObservation() async throws {
     let reader = ScriptedStatusReader()

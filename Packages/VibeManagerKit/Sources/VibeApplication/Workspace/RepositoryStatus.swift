@@ -22,6 +22,29 @@ public protocol RepositoryStatusReading: Sendable {
     WorkingTreeStatus, RepositoryStatusIssue
   >
   func gitDirectories(atPath path: String) async -> Result<GitDirectories, RepositoryStatusIssue>
+  /// The files of a folder `git status` reports as one untracked entry, at most `limit` of them
+  /// kept and every one counted. Read only when someone unfolds it.
+  func untrackedFiles(in directory: String, atPath path: String, limit: Int) async -> Result<
+    UntrackedListing, RepositoryStatusIssue
+  >
+}
+
+/// What an untracked folder holds, as `git status --untracked-files=all` lists it.
+public struct UntrackedListing: Hashable, Sendable {
+  /// Relative to the repository's root, with its trailing `/`, as Git wrote it.
+  public let directory: String
+  /// Relative to the repository's root, in Git's order.
+  public let paths: [String]
+  /// Every file, even past the limit.
+  public let totalCount: Int
+
+  public init(directory: String, paths: [String], totalCount: Int) {
+    self.directory = directory
+    self.paths = paths
+    self.totalCount = totalCount
+  }
+
+  public var isTruncated: Bool { totalCount > paths.count }
 }
 
 /// What the file system says about the folders being watched — never what changed in them, only

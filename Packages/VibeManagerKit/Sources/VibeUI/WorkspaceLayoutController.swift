@@ -148,6 +148,16 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  /// The divider between Git and the notes, as a share of the inspector's height.
+  public func inspectorSplitChanged(to fraction: Double) {
+    guard fraction.isFinite else { return }
+    let bounded = WorkspaceLayout.bounded(
+      fraction, in: WorkspaceLayout.inspectorSplitRange, fallback: intent.inspectorSplit)
+    guard abs(bounded - intent.inspectorSplit) >= 0.005 else { return }
+    intent.inspectorSplit = bounded
+    scheduleSave()
+  }
+
   /// Writes whatever is pending right away. Called when the application is about to quit, where
   /// waiting out the delay would mean losing the last arrangement.
   public func flush() async {

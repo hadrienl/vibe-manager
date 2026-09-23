@@ -93,6 +93,41 @@ public struct GitStatusReader: RepositoryStatusReading {
     return .success(found)
   }
 
+  /// `git status` narrowed to one untracked folder, with every file in it listed rather than the
+  /// folder itself. The pathspec is literal: a folder named `[draft]*` means that folder, not a
+  /// pattern.
+  public func untrackedFiles(in directory: String, atPath path: String, limit: Int) async
+    -> Result<UntrackedListing, RepositoryStatusIssue>
+  {
+    if let refused = Self.accessIssue(at: path) { return .failure(refused) }
+    let result: GitCommandResult
+    do {
+      result = try await git.run(Self.untrackedArguments(for: directory), in: path)
+    } catch let unavailable as GitUnavailable {
+      return .failure(.gitUnavailable(unavailable))
+    } catch {
+      return .failure(.failed(summary: error.localizedDescription))
+    }
+    guard result.succeeded else {
+      if result.exitCode == -1 { return .failure(.timedOut(after: .seconds(30))) }
+      return .failure(RepositoryStatusIssue.classify(errorOutput: result.errorOutput, path: path))
+    }
+    let parsed = parser.parse(result.output, limit: limit)
+    return .success(
+      UntrackedListing(
+        directory: directory,
+        paths: parsed.entries.filter { $0.kind == .untracked || $0.kind == .untrackedDirectory }
+          .map(\.path),
+        totalCount: parsed.counts.untracked))
+  }
+
+  static func untrackedArguments(for directory: String) -> [String] {
+    [
+      "--no-optional-locks", "status", "--porcelain=v2", "-z", "--untracked-files=all",
+      "--", ":(literal)" + directory,
+    ]
+  }
+
   /// Said before Git is run: a folder that is gone or closed to us would otherwise surface as a
   /// Git that "could not be started", which is true and useless.
   static func accessIssue(at path: String) -> RepositoryStatusIssue? {

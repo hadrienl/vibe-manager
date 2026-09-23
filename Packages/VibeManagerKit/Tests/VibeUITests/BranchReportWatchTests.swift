@@ -185,6 +185,12 @@ private struct CleanStatusReader: RepositoryStatusReading {
   func gitDirectories(atPath path: String) async -> Result<GitDirectories, RepositoryStatusIssue> {
     .success(GitDirectories(gitDirectory: path + "/.git", commonDirectory: path + "/.git"))
   }
+
+  func untrackedFiles(in directory: String, atPath path: String, limit: Int) async -> Result<
+    UntrackedListing, RepositoryStatusIssue
+  > {
+    .success(UntrackedListing(directory: directory, paths: [], totalCount: 0))
+  }
 }
 
 private final class HandFileChanges: FileChangeObserving, @unchecked Sendable {

@@ -41,7 +41,8 @@ struct WorkspaceLayoutTests {
       isSidebarVisible: false,
       isInspectorVisible: false,
       sidebarWidth: 300,
-      inspectorWidth: 320
+      inspectorWidth: 320,
+      inspectorSplit: 0.4
     )
 
     let data = try JSONEncoder().encode(layout)
@@ -58,6 +59,16 @@ struct WorkspaceLayoutTests {
     #expect(layout.inspectorWidth == WorkspaceLayout.inspectorWidthRange.lowerBound)
     #expect(layout.isSidebarVisible)
     #expect(layout.isInspectorVisible)
+  }
+
+  @Test("A layout stored before the inspector was split reads back with Git given 60 %")
+  func layoutWithoutSplit() throws {
+    let json = Data(#"{"sidebarWidth": 300, "inspectorWidth": 320}"#.utf8)
+
+    #expect(try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSplit == 0.6)
+    #expect(WorkspaceLayout(inspectorSplit: 0.99).inspectorSplit == 0.85)
+    #expect(WorkspaceLayout(inspectorSplit: 0).inspectorSplit == 0.25)
+    #expect(WorkspaceLayout(inspectorSplit: .nan).inspectorSplit == 0.6)
   }
 }
 

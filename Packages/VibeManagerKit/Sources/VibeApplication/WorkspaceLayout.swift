@@ -9,6 +9,8 @@ import VibeDomain
 public struct WorkspaceLayout: Equatable, Sendable, Codable {
   public static let sidebarWidthRange: ClosedRange<Double> = 220...360
   public static let inspectorWidthRange: ClosedRange<Double> = 260...420
+  /// How much of the inspector's height the Git pane takes, the session's notes having the rest.
+  public static let inspectorSplitRange: ClosedRange<Double> = 0.25...0.85
 
   public var selectedSessionID: SessionID?
   /// What the user asked for, not what is currently on screen. A column folded because the
@@ -21,6 +23,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// the same reason as the columns: it is how the user arranged their view, not a fact about
   /// the work, and it must be found again exactly as it was left.
   public var sessionFilter: SessionFilter
+  /// The share of the inspector given to Git, above the notes. Bounded both ways so that neither
+  /// pane can be dragged out of reach.
+  public var inspectorSplit: Double
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -28,7 +33,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     isInspectorVisible: Bool = true,
     sidebarWidth: Double = 280,
     inspectorWidth: Double = 300,
-    sessionFilter: SessionFilter = SessionFilter()
+    sessionFilter: SessionFilter = SessionFilter(),
+    inspectorSplit: Double = 0.6
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -36,11 +42,12 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.sidebarWidth = Self.bounded(sidebarWidth, in: Self.sidebarWidthRange, fallback: 280)
     self.inspectorWidth = Self.bounded(inspectorWidth, in: Self.inspectorWidthRange, fallback: 300)
     self.sessionFilter = sessionFilter
+    self.inspectorSplit = Self.bounded(inspectorSplit, in: Self.inspectorSplitRange, fallback: 0.6)
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
-    case sessionFilter
+    case sessionFilter, inspectorSplit
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -55,7 +62,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       sidebarWidth: try container.decodeIfPresent(Double.self, forKey: .sidebarWidth) ?? 280,
       inspectorWidth: try container.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? 300,
       sessionFilter: try container.decodeIfPresent(SessionFilter.self, forKey: .sessionFilter)
-        ?? SessionFilter()
+        ?? SessionFilter(),
+      inspectorSplit: try container.decodeIfPresent(Double.self, forKey: .inspectorSplit) ?? 0.6
     )
   }
 }

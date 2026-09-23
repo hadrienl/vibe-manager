@@ -63,9 +63,10 @@ went into is said by the transcript.
 
 ### Presentation
 
-One "Git" section in the inspector, organised by **branch**: each branch the session worked on is a
-heading, and the repositories it is checked out in are listed under it, with their pills (`new`,
-`+N`, `modified`, `rewritten`).
+One "Git" section in the inspector. It was first organised by **branch**, each branch a heading
+over the repositories it is checked out in; ADR 0014 organises it by **repository** instead, with
+the branch and its pills (`new`, `+N`, `rewritten`) in each repository's header, and the
+`modified` pill replaced by the list of changed files.
 
 ## Consequences
 
