@@ -246,7 +246,6 @@ private struct GitPane: View {
             showsBanner: pane.sharedIssue == nil,
             bannerActions: bannerActions
           )
-          .equatable()
         }
         ForEach(pane.plainFolders, id: \.self) { folder in
           PlainFolderRow(path: folder) { git.revealRepository(folder) }
@@ -382,6 +381,11 @@ private func age(of date: Date, at now: Date) -> String {
 
 /// One repository: its header, then its lists. Equatable on what it draws, so that a selection
 /// moving in the pane does not have every group compare its rows again.
+///
+/// Never wrapped in `.equatable()`: an `EquatableView` stands between the list and the
+/// `DisclosureGroup`, which then no longer knows it is an outline row, falls back to a stack, and
+/// SwiftUI stops the application on its first draw (`_DisclosureGroupContainer … may not have
+/// Body == Never`). SwiftUI compares an `Equatable` view with `==` on its own.
 private struct RepositoryGroupView: View, Equatable {
   let group: RepositoryGroupPresentation
   let session: SessionID
