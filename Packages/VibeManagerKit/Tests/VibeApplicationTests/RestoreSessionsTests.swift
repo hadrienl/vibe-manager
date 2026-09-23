@@ -308,7 +308,7 @@ private actor MutableRepository: SessionRepository {
 }
 
 private struct StubFolders: WorkingDirectoryProbe {
-  func inspect(path: String) async -> WorkingDirectoryStatus { .usable }
+  func inspect(path _: String) async -> WorkingDirectoryStatus { .usable }
 }
 
 private struct StubProvider: AgentProvider {
@@ -322,7 +322,7 @@ private struct StubProvider: AgentProvider {
     )
   )
 
-  func availability(forceRefresh: Bool) async -> AgentAvailability {
+  func availability(forceRefresh _: Bool) async -> AgentAvailability {
     AgentAvailability(
       state: .available,
       installation: nil,

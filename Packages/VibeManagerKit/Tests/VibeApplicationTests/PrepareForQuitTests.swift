@@ -289,13 +289,13 @@ private actor UnreadableRepository: SessionRepository {
 
   func sessions() throws -> [WorkSession] { throw Unreadable() }
 
-  func session(id: SessionID) throws -> WorkSession? { throw Unreadable() }
+  func session(id _: SessionID) throws -> WorkSession? { throw Unreadable() }
 
-  func save(_ session: WorkSession) throws { throw Unreadable() }
+  func save(_: WorkSession) throws { throw Unreadable() }
 
   func mutate(
-    id: SessionID,
-    _ transform: @Sendable (inout WorkSession) throws -> Void
+    id _: SessionID,
+    _: @Sendable (inout WorkSession) throws -> Void
   ) throws -> WorkSession? {
     throw Unreadable()
   }
@@ -321,7 +321,9 @@ private actor SlowRuntime: SessionRuntime {
     return .stopped
   }
 
-  func dispose(_ id: SessionID) async {}
+  func dispose(_: SessionID) async {
+    // Nothing is held here, so there is nothing to release.
+  }
 }
 
 private actor SpyRuntime: SessionRuntime {
@@ -338,7 +340,9 @@ private actor SpyRuntime: SessionRuntime {
     return .stopped
   }
 
-  func dispose(_ id: SessionID) async {}
+  func dispose(_: SessionID) async {
+    // Nothing is held here, so there is nothing to release.
+  }
 }
 
 /// A runtime document that says when it was written, so the order of the whole quit can be held
@@ -360,12 +364,12 @@ private struct JournalingRuntimeStateStore: SessionRuntimeStateStore {
 }
 
 private struct StubProcesses: ProcessLivenessProbe {
-  func isAlive(processIdentifier: Int32) -> Bool { false }
+  func isAlive(processIdentifier _: Int32) -> Bool { false }
 
-  func startTime(of processIdentifier: Int32) -> Date? { nil }
+  func startTime(of _: Int32) -> Date? { nil }
 
   @discardableResult
-  func terminate(processGroup: Int32) -> Bool { true }
+  func terminate(processGroup _: Int32) -> Bool { true }
 }
 
 private struct FixedClock: SessionClock {

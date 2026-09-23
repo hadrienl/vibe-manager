@@ -120,6 +120,8 @@ public actor EphemeralSessionRuntimeStateStore: SessionRuntimeStateStore {
   public func write(_ state: SessionRuntimeState) { self.state = state }
 
   public func clear() { state = nil }
+
+  // Nothing else: this store is the whole of what a workspace without a disk remembers.
 }
 
 /// Whether the process behind a recorded group is still the one that was recorded.

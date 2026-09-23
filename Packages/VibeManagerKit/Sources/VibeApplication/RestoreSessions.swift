@@ -130,7 +130,9 @@ public struct RestoreSessions: Sendable {
   @discardableResult
   public func callAsFunction(
     _ intent: SessionRestoreIntent,
-    onProgress: @escaping @MainActor @Sendable (SessionRestoreProgress) -> Void = { _ in }
+    onProgress: @escaping @MainActor @Sendable (SessionRestoreProgress) -> Void = { _ in
+      // A caller that only wants the outcomes watches nothing as they land.
+    }
   ) async -> [SessionRestoreOutcome] {
     var outcomes: [SessionRestoreOutcome] = []
     let total = intent.sessionIDs.count

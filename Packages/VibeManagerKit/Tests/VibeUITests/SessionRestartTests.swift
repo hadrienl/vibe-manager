@@ -964,8 +964,8 @@ private struct StubProvider: AgentProvider, AgentLaunchObserverProviding {
   var observerDelayYields = 0
 
   func launchObserver(
-    for sessionID: SessionID,
-    repository: any SessionRepository
+    for _: SessionID,
+    repository _: any SessionRepository
   ) -> any AgentLaunchObserver {
     SlowObserver(yields: observerDelayYields)
   }
@@ -1020,13 +1020,17 @@ private struct StubProvider: AgentProvider, AgentLaunchObserverProviding {
 private struct SlowObserver: AgentLaunchObserver {
   let yields: Int
 
-  func launched(plan: AgentLaunchPlan) async {
+  func launched(plan _: AgentLaunchPlan) async {
     for _ in 0..<yields { await Task.yield() }
   }
 
-  func observe(output: String) async {}
+  func observe(output _: String) async {
+    // The identifier this launch would reveal is not what these tests are about.
+  }
 
-  func finished() async {}
+  func finished() async {
+    // Nothing was kept, so there is nothing to flush.
+  }
 }
 
 private struct StubRegistry: AgentProviderResolving {

@@ -422,7 +422,7 @@ private final class StubProcesses: ProcessLivenessProbe, @unchecked Sendable {
 
   /// Never answered: every recorded group is therefore unidentifiable, which is the case that
   /// must be reported rather than signalled.
-  func startTime(of processIdentifier: Int32) -> Date? { nil }
+  func startTime(of _: Int32) -> Date? { nil }
 
   @discardableResult
   func terminate(processGroup: Int32) -> Bool {
@@ -434,7 +434,7 @@ private final class StubProcesses: ProcessLivenessProbe, @unchecked Sendable {
 private actor SpySupervisor: TerminalSupervisor {
   private var sessions: [SessionID: FakeTerminalSession] = [:]
 
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
+  func start(_: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
     let session = FakeTerminalSession(id: id, state: .running(processIdentifier: 4_242))
     sessions[id] = session
     return session
@@ -442,11 +442,11 @@ private actor SpySupervisor: TerminalSupervisor {
 
   func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
 
-  func stop(id: SessionID, gracePeriod: Duration) async {
+  func stop(id: SessionID, gracePeriod _: Duration) async {
     await sessions.removeValue(forKey: id)?.finish(state: .exited(code: 0))
   }
 
-  func stopAll(gracePeriod: Duration) async {
+  func stopAll(gracePeriod _: Duration) async {
     let running = sessions.values
     sessions.removeAll()
     for session in running {
@@ -489,11 +489,15 @@ private actor FakeTerminalSession: TerminalSession {
     TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
   }
 
-  func write(_ bytes: [UInt8]) {}
+  func write(_: [UInt8]) {
+    // Nothing reads this terminal's input: the tests drive its state directly.
+  }
 
-  func resize(to size: TerminalSize) {}
+  func resize(to _: TerminalSize) {
+    // No view is attached, so a size means nothing here.
+  }
 
-  func stop(gracePeriod: Duration) {
+  func stop(gracePeriod _: Duration) {
     finish(state: .exited(code: 0))
   }
 
@@ -525,7 +529,7 @@ private struct StubProvider: AgentProvider {
     )
   )
 
-  func availability(forceRefresh: Bool) async -> AgentAvailability {
+  func availability(forceRefresh _: Bool) async -> AgentAvailability {
     if probeDelay != .zero {
       try? await Task.sleep(for: probeDelay)
     }

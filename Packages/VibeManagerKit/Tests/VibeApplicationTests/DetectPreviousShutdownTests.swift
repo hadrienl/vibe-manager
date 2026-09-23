@@ -383,9 +383,13 @@ private actor MutableRepository: SessionRepository {
 private struct UnreadableRuntimeStateStore: SessionRuntimeStateStore {
   func read() async -> SessionRuntimeState? { nil }
 
-  func write(_ state: SessionRuntimeState) async {}
+  func write(_: SessionRuntimeState) async {
+    // Writes land nowhere: this double exists to answer "nothing readable" to every read.
+  }
 
-  func clear() async {}
+  func clear() async {
+    // Nothing is stored, so there is nothing to clear.
+  }
 }
 
 /// A system whose processes a test decides on, and which records what it was asked to kill.
