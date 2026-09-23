@@ -27,10 +27,11 @@ One actor per session, held by a supervisor actor keyed by `SessionID`. Two sess
 mutable state, so interleaved output is structurally impossible rather than a discipline.
 
 A session is started with `posix_openpt`, `grantpt` and `unlockpt`. The parent opens the slave
-once to apply the initial window size — Darwin rejects window-size ioctls on a master whose slave
-has never been opened — then closes it after spawning. The child is created with `posix_spawn`,
-with `POSIX_SPAWN_SETSID` so it leads a new session, file actions that open the slave *path* on
-descriptor 0 and duplicate it onto 1 and 2 so it acquires a controlling terminal, and
+to apply the initial window size — Darwin rejects window-size ioctls on a master whose slave has
+never been opened — and keeps it open until the session has read everything. The child is created
+with `posix_spawn`, with `POSIX_SPAWN_SETSID` so it leads a new session, file actions that open the
+slave *path* on descriptor 0 and duplicate it onto 1 and 2 so that it may acquire a controlling
+terminal, and
 `POSIX_SPAWN_CLOEXEC_DEFAULT` so no other descriptor — including the master of another session —
 leaks into it. `posix_spawn` reports the failure of the exec itself, so a missing, unreadable or
 non-runnable binary is distinguishable from a process that started and exited immediately.
@@ -49,9 +50,18 @@ attachment receives the backlog and the live stream as one value, so nothing is 
 calls. Terminal output is never persisted: ADR 0002 deliberately excludes transcripts from the
 session store.
 
-The exit status comes from a process source and `waitpid`, never from the end of the stream: the
-reader is given a bounded drain window after the process exits so that the last lines — the ones
-that explain a failure — are delivered. Stopping sends `SIGTERM` to the process *group*, waits for
+The exit status comes from a process source and `waitpid`, never from the end of the stream. The
+last lines — the ones that explain a failure — must survive the process. `posix_spawn` does not
+promise the child a controlling terminal (no file action performs a `TIOCSCTTY`), and a terminal
+that is nobody's controlling one throws its unread output away when its last descriptor closes: on
+the CI runner's macOS 15, a process that exited before the reader ran was reported `exited(code:
+0)` with no output at all. The parent's slave descriptor is therefore held until the end, so the
+child's exit never closes the terminal and waits for its output to be read instead; the reader then
+drains what the master still holds before its stream ends, and the session reports its end only
+after that output. The price: a process that closes its terminal descriptors and keeps running is
+no longer seen to reach the end of the stream — it stays running until it exits or is stopped — and
+a stop lifts the reader's back pressure, since a process cannot finish exiting while its output
+waits to be read. Stopping sends `SIGTERM` to the process *group*, waits for
 the grace period, then sends `SIGKILL` to the group; the master descriptor is closed last. An
 `atexit` sweep kills the registered process groups, because a crash would otherwise leave agents
 running with no window to observe them.

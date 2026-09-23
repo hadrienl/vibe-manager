@@ -5,7 +5,6 @@ import VibeApplication
 import VibeDomain
 
 public actor PTYTerminalSession: VibeApplication.TerminalSession {
-  private static let exitDrainTimeout = Duration.milliseconds(500)
   private static let forcedStopTimeout = Duration.seconds(2)
   private static let statePollInterval = Duration.milliseconds(20)
   private static let exitPollAttempts = 50
@@ -28,6 +27,8 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private var exitSource: DispatchSourceProcess?
   private var lastSize: TerminalSize
   private var isReaderFinished = false
+  /// The process source said the child exited.
+  private var hasExited = false
   private var isFinalized = false
   /// The state the session ended in, held until the reader has handed over its last bytes.
   private var finalState: TerminalProcessState?
@@ -118,6 +119,8 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
 
   public func stop(gracePeriod: Duration) async {
     guard !isFinalized else { return await waitForEnd() }
+    // A process cannot finish exiting while its output waits to be read.
+    reader.stopThrottling()
 
     terminal.signalProcessGroup(SIGTERM)
     if await waitForCompletion(within: gracePeriod) { return }
@@ -138,6 +141,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
 
   public func kill() async {
     guard !isFinalized else { return await waitForEnd() }
+    reader.stopThrottling()
     terminal.signalProcessGroup(SIGKILL)
     if await waitForCompletion(within: Self.forcedStopTimeout) { return }
     finalize(
@@ -184,13 +188,9 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
 
   private func handleProcessExit() async {
     guard !isFinalized else { return }
-
-    // The exit status is authoritative, but the kernel buffer may still hold the last lines the
-    // process wrote — exactly the ones that explain a failure — so the reader is given time.
-    let deadline = ContinuousClock.now + Self.exitDrainTimeout
-    while !isReaderFinished, ContinuousClock.now < deadline {
-      try? await Task.sleep(for: Self.statePollInterval)
-    }
+    // The exit status is authoritative. The last lines the process wrote are not lost for it: the
+    // slave held open kept them in the kernel, and `finalize` drains them.
+    hasExited = true
     await reapProcess()
   }
 
@@ -208,11 +208,11 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
       guard !isFinalized else { return }
       finalize(with: Self.state(forWaitStatus: status), didReapProcess: true)
     case .alreadyReaped:
-      // The child is gone but its status was collected elsewhere; the terminal reported the end.
-      guard !isFinalized, isReaderFinished else { return }
+      // The child is gone but its status was collected elsewhere.
+      guard !isFinalized, isReaderFinished || hasExited else { return }
       finalize(with: .exited(code: 0), didReapProcess: true)
     case .stillRunning:
-      guard !isFinalized, isReaderFinished else { return }
+      guard !isFinalized, isReaderFinished, !hasExited else { return }
       await reclaimRunningProcess()
     }
   }
@@ -303,6 +303,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     // Its last bytes are yielded before its stream ends; the consumer loop delivers them, then
     // `readerDidDrain` says the session ended — output first, the exit after it.
     reader.finish()
+    terminal.closeSlave()
     if didReapProcess {
       TerminalProcessGroupGuard.unregister(terminal.processGroupIdentifier)
     }

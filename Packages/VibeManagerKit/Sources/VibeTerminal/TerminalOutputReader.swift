@@ -26,6 +26,7 @@ final class TerminalOutputReader: @unchecked Sendable {
   private var outstandingByteCount = 0
   private var isSuspended = false
   private var isFinished = false
+  private var isThrottling = true
 
   let events: AsyncStream<TerminalReadEvent>
 
@@ -60,6 +61,18 @@ final class TerminalOutputReader: @unchecked Sendable {
     lock.lock()
     outstandingByteCount = max(0, outstandingByteCount - byteCount)
     if isSuspended, outstandingByteCount <= Self.lowWaterMark, !isFinished {
+      isSuspended = false
+      source.resume()
+    }
+    lock.unlock()
+  }
+
+  /// Reads on whatever the subscribers keep up with: a process being stopped cannot finish
+  /// exiting while its output waits in the terminal, and the memory it costs ends with it.
+  func stopThrottling() {
+    lock.lock()
+    isThrottling = false
+    if isSuspended, !isFinished {
       isSuspended = false
       source.resume()
     }
@@ -193,7 +206,9 @@ final class TerminalOutputReader: @unchecked Sendable {
     // letting the application accumulate unbounded output in memory. It has to happen before the
     // bytes leave the lock: the consumer acknowledges them on another thread and would otherwise
     // resume a source that is not suspended yet.
-    if !isSuspended, !hasFinished, !endOfFile, outstandingByteCount > Self.highWaterMark {
+    if isThrottling, !isSuspended, !hasFinished, !endOfFile,
+      outstandingByteCount > Self.highWaterMark
+    {
       isSuspended = true
       source.suspend()
     }
