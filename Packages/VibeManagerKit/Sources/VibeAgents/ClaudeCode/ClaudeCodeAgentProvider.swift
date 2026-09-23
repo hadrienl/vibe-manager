@@ -88,7 +88,7 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
   ) -> ClaudeCodeSessionIdentifierCapture {
     ClaudeCodeSessionIdentifierCapture(
       sessionID: sessionID,
-      record: RecordAgentResumeIdentifier(repository: repository),
+      record: RecordAgentResumeIdentifier(repository: repository, providerID: Self.id.rawValue),
       transcripts: transcripts,
       transcriptTimeout: transcriptTimeout,
       persistenceWindow: persistenceWindow

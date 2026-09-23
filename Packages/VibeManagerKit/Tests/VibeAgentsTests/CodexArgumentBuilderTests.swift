@@ -49,6 +49,20 @@ struct CodexArgumentBuilderTests {
     )
   }
 
+  @Test("Switching model keeps the conversation: the resume and the new model travel together")
+  func resumeWithAnotherModel() throws {
+    let arguments = try arguments(
+      modelID: "gpt-5.5-mini",
+      resume: .identifier("019ee0a1-06d9-7e52-957b-d61a982d6b43")
+    )
+    #expect(
+      arguments == [
+        "resume", "-m", "gpt-5.5-mini", "-C", "/Users/test/Projects/app", "--",
+        "019ee0a1-06d9-7e52-957b-d61a982d6b43",
+      ]
+    )
+  }
+
   @Test("Resuming names the session, never the picker and never --last")
   func resumeLaunch() throws {
     let arguments = try arguments(
