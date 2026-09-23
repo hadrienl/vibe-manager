@@ -361,6 +361,128 @@ struct SessionHistoryTests {
     #expect(!model.canClose(archived) && !model.canArchive(archived) && model.canRestore(archived))
   }
 
+  // MARK: - ⌘W
+
+  @Test("Close Session applies to a running session only, and to none while it is closing")
+  func closeCommandAvailability() async {
+    let running = session(name: "Running", status: .active)
+    let repository = MutableRepository(sessions: [running])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.select(nil)
+
+    // No selection: the menu reads `nil`, and the command is disabled — ⌘W beeps.
+    #expect(model.selectedSession == nil)
+
+    model.select(running.id)
+    #expect(model.selectedSession.map(model.canClose) == true)
+
+    await model.requestClose(running.id)
+
+    let closed = model.sessions.first { $0.id == running.id }
+    #expect(closed?.status == .closed)
+    #expect(model.selectedSession.map(model.canClose) == false)
+  }
+
+  @Test("A session whose agent has stopped closes without asking, and stays selected")
+  func closingAStoppedAgentDoesNotAsk() async {
+    let stored = session(name: "Idle", status: .active)
+    let other = session(name: "Next", status: .active)
+    let repository = MutableRepository(sessions: [stored, other])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.select(stored.id)
+
+    await model.requestClose(stored.id)
+
+    #expect(model.pendingClose == nil)
+    #expect(model.sessions.first { $0.id == stored.id }?.status == .closed)
+    // The closed session keeps the detail column, with its closed bar; nothing moves on.
+    #expect(model.selectedSessionID == stored.id)
+  }
+
+  @Test("Two ⌘W in a row close one session, not the next one")
+  func twoCloseCommandsCloseOneSession() async {
+    let first = session(name: "First", status: .active)
+    let second = session(name: "Second", status: .active)
+    let repository = MutableRepository(sessions: [first, second])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.select(first.id)
+
+    for _ in 0..<2 {
+      guard let selected = model.selectedSession, model.canClose(selected) else { continue }
+      await model.requestClose(selected.id)
+    }
+
+    #expect(model.selectedSessionID == first.id)
+    #expect(model.sessions.first { $0.id == first.id }?.status == .closed)
+    #expect(model.sessions.first { $0.id == second.id }?.status == .active)
+  }
+
+  @Test("Closing a running agent asks first, and stops nothing until confirmed")
+  func closingARunningAgentAsks() async {
+    let stored = session(name: "Working", status: .active)
+    let repository = MutableRepository(sessions: [stored])
+    let supervisor = SpySupervisor()
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
+    await model.load()
+    await launcher.launch(session: stored, plan: plan())
+    await model.reload()
+
+    await model.requestClose(stored.id)
+
+    #expect(model.pendingClose?.id == stored.id)
+    #expect(await supervisor.stopped.isEmpty)
+
+    model.cancelClose()
+    #expect(model.pendingClose == nil)
+    #expect(launcher.isRunning(stored.id))
+
+    await model.requestClose(stored.id)
+    await model.confirmClose(stored.id)
+
+    #expect(model.pendingClose == nil)
+    #expect(await supervisor.stopped == [stored.id])
+    #expect(model.confirmsStoppingRunningAgent)
+  }
+
+  @Test("“Don't ask again” is remembered, and the settings can turn the question back on")
+  func dontAskAgainIsRemembered() async {
+    let first = session(name: "First", status: .active)
+    let second = session(name: "Second", status: .active)
+    let repository = MutableRepository(sessions: [first, second])
+    let supervisor = SpySupervisor()
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let preferences = InMemorySessionClosePreferences()
+    let model = AppModel(
+      repository: repository, agents: EmptyRegistry(), launcher: launcher,
+      closePreferences: preferences)
+    await model.load()
+    await launcher.launch(session: first, plan: plan())
+    await launcher.launch(session: second, plan: plan())
+    await model.reload()
+
+    await model.requestClose(first.id)
+    await model.confirmClose(first.id, askAgain: false)
+
+    #expect(!preferences.confirmsStoppingRunningAgent)
+
+    // A model built on the same preferences — the next launch — does not ask either.
+    let relaunched = AppModel(
+      repository: repository, agents: EmptyRegistry(), launcher: launcher,
+      closePreferences: preferences)
+    await relaunched.load()
+    await relaunched.requestClose(second.id)
+
+    #expect(relaunched.pendingClose == nil)
+    #expect(await supervisor.stopped == [first.id, second.id])
+
+    relaunched.confirmsStoppingRunningAgent = true
+    #expect(preferences.confirmsStoppingRunningAgent)
+  }
+
   @Test("Scope and sort survive a relaunch; the search text does not")
   func filterSurvivesARelaunch() async {
     let store = MemoryLayoutStore()

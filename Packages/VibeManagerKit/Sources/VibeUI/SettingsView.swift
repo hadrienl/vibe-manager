@@ -1,20 +1,27 @@
 import SwiftUI
 import VibeApplication
 
-/// The application's settings, which for now are one line — and that line matters.
+/// The application's settings.
 ///
-/// It is the permanent way back to Full Disk Access. The step at launch is asked once and never
-/// again, so refusing it must not be a door that closes: this is where the user finds the question
-/// again, on their own terms.
+/// Both lines are ways back to a question asked once. The Full Disk Access step at launch is never
+/// asked again, and neither is the close confirmation once "Don't ask again" was ticked: refusing
+/// either must not be a door that closes, so this is where the user finds the question again.
 public struct SettingsView: View {
   private let permissions: PermissionsModel?
+  private let model: AppModel?
 
-  public init(permissions: PermissionsModel? = nil) {
+  public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
     self.permissions = permissions
+    self.model = model
   }
 
   public var body: some View {
     Form {
+      if let model {
+        Section("Sessions") {
+          SessionCloseRow(model: model)
+        }
+      }
       Section("Privacy") {
         if let permissions {
           FullDiskAccessRow(permissions: permissions)
@@ -73,5 +80,16 @@ private struct FullDiskAccessRow: View {
     case .notGranted: return "exclamationmark.circle"
     case nil: return "clock"
     }
+  }
+}
+
+private struct SessionCloseRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    Toggle(
+      "Ask before closing a session whose agent is running",
+      isOn: $model.confirmsStoppingRunningAgent
+    )
   }
 }

@@ -5,6 +5,7 @@ import VibeUI
 @main
 struct VibeManagerApp: App {
   @State private var environment = AppEnvironment()
+  @State private var windowFocus = WindowFocus()
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
   var body: some Scene {
@@ -13,6 +14,7 @@ struct VibeManagerApp: App {
         .onAppear {
           appDelegate.environment = environment
         }
+        .background(WorkspaceWindowReader(focus: windowFocus))
     }
     .defaultSize(width: 1_180, height: 760)
     .commands {
@@ -22,6 +24,16 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("n", modifiers: .command)
         .disabled(!environment.appModel.canCreateSession)
+      }
+
+      // SwiftUI's own Close sits here on ⌘W, which now belongs to the session. The window keeps
+      // a way out one modifier further, as in Terminal and Safari.
+      CommandGroup(replacing: .saveItem) {
+        Button("Close Window") {
+          windowFocus.closeKeyWindow()
+        }
+        .keyboardShortcut("w", modifiers: [.command, .shift])
+        .disabled(windowFocus.front == .none || windowFocus.front == .sheet)
       }
 
       // In the menus rather than bound to the views: a shortcut that only works while a
@@ -58,11 +70,11 @@ struct VibeManagerApp: App {
         .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
       }
 
-      SessionHistoryCommands(model: environment.appModel)
+      SessionHistoryCommands(model: environment.appModel, focus: windowFocus)
     }
 
     Settings {
-      SettingsView(permissions: environment.permissions)
+      SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
   }
 }
@@ -95,11 +107,19 @@ private struct SessionPositionCommands: View {
 
 /// Restarting, closing, archiving and unarchiving the selected session, in their own menu.
 ///
-/// ⌃⌘W rather than ⌘W: closing a session and closing the window must not be one modifier apart,
-/// because one of them ends an agent's work and the other only puts a window away. ⌃⌘R joins the
-/// same series, so every verb that moves a session through its life shares one modifier.
+/// Close Session is ⌘W. It used to be ⌃⌘W, to keep it one modifier away from closing the window,
+/// on the grounds that one ends an agent's work and the other only puts a window away. In practice
+/// the sessions are this window's tabs and ⌘W is the reflex for "done with this one": the accident
+/// was the window vanishing with every agent still running behind it. The agent is now protected
+/// by a confirmation instead of by an awkward shortcut, and the window moved to ⇧⌘W.
+///
+/// ⌘W never falls back to closing the window. With nothing to close it is disabled and beeps: a
+/// key that closes a session or the window depending on a state nobody can see is worse than
+/// either. The other verbs keep ⌃⌘, so every one that moves a session through its life but the
+/// most common shares one modifier.
 private struct SessionHistoryCommands: Commands {
   let model: AppModel
+  let focus: WindowFocus
 
   var body: some Commands {
     CommandMenu("Session") {
@@ -115,11 +135,16 @@ private struct SessionHistoryCommands: Commands {
       Divider()
 
       Button("Close Session") {
+        // Over Settings or any other window, ⌘W keeps closing that window.
+        guard focus.front == .workspace else {
+          focus.closeKeyWindow()
+          return
+        }
         guard let session = model.selectedSession else { return }
-        Task { await model.close(session.id) }
+        Task { await model.requestClose(session.id) }
       }
-      .keyboardShortcut("w", modifiers: [.command, .control])
-      .disabled(!(model.selectedSession.map(model.canClose) ?? false))
+      .keyboardShortcut("w", modifiers: .command)
+      .disabled(!isCloseEnabled)
 
       Button("Archive…") {
         guard let session = model.selectedSession else { return }
@@ -134,6 +159,15 @@ private struct SessionHistoryCommands: Commands {
       }
       .keyboardShortcut("a", modifiers: [.command, .control, .shift])
       .disabled(!(model.selectedSession.map(model.canRestore) ?? false))
+    }
+  }
+
+  /// A sheet over the workspace keeps ⌘W to itself, so the session behind it is never closed.
+  private var isCloseEnabled: Bool {
+    switch focus.front {
+    case .other: return true
+    case .workspace: return model.selectedSession.map(model.canClose) ?? false
+    case .sheet, .none: return false
     }
   }
 }

@@ -68,7 +68,8 @@ final class AppEnvironment {
       // Read only: the application reports the branches and worktrees the agent made, and never
       // makes one itself.
       branchReader: ReadSessionBranchReport(
-        reader: GitActivityReader(), transcripts: AgentTranscriptReader())
+        reader: GitActivityReader(), transcripts: AgentTranscriptReader()),
+      closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite)
     )
   }
 
