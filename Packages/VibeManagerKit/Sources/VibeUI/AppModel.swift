@@ -36,7 +36,16 @@ public final class AppModel {
   /// What the agent did to the branches of each session, as last read. Only the session on
   /// screen is read, so the others keep what was true when they were last looked at.
   public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
-  private var branchWatch: (id: SessionID, token: UUID, task: Task<Void, Never>)?
+  /// What `git status` says of each repository of each session, as last read. The session on
+  /// screen is kept live by the monitor; the others keep what was true when they left it.
+  public private(set) var repositoryStatuses: [RepositoryStatusKey: RepositoryStatusState] = [:]
+  /// The session whose repositories are watched: the one on screen, and only that one.
+  private var observedSessionID: SessionID?
+  /// Branch reports being read, and those asked for again during that reading. A burst of
+  /// commits costs two readings of the report, not one per commit.
+  private var reportReadings: [SessionID: Task<Void, Never>] = [:]
+  private var pendingReports: Set<SessionID> = []
+  private var statusUpdates: Task<Void, Never>?
 
   /// The session the user asked to archive, held until they confirm. Archiving is reversible,
   /// but it moves a session out of sight, and a slip of the pointer must not do that.
@@ -267,8 +276,7 @@ public final class AppModel {
   private let restoreSessions: RestoreSessions?
   private let clock: any SessionClock
   private let readBranchReport: ReadSessionBranchReport?
-  /// How often the branches of the session on screen are read again while its agent runs.
-  private let branchReportInterval: Duration
+  private let repositoryStatus: RepositoryStatusMonitor?
 
   public init(
     repository: any SessionRepository,
@@ -288,14 +296,16 @@ public final class AppModel {
     /// Reads what the agent did to the branches. Absent in a workspace assembled without Git,
     /// where the inspector shows no report at all.
     branchReader: ReadSessionBranchReport? = nil,
-    branchReportInterval: Duration = .seconds(30),
+    /// Keeps the repositories of the session on screen read, when the disk says they moved.
+    /// Absent in a workspace assembled without Git: the report is then read on demand only.
+    repositoryStatus: RepositoryStatusMonitor? = nil,
     closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences()
   ) {
     self.closePreferences = closePreferences
     confirmsStoppingRunningAgent = closePreferences.confirmsStoppingRunningAgent
     self.clock = clock
     readBranchReport = branchReader
-    self.branchReportInterval = branchReportInterval
+    self.repositoryStatus = repositoryStatus
     self.permissions = permissions
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
@@ -333,6 +343,20 @@ public final class AppModel {
       self.noteProcessDidFinish(id, state: state)
       // The store already says the session is closed; the list on screen is what has to catch up.
       Task { await self.reload() }
+      // An agent that stops has often just committed: its repositories are read once more.
+      if id == self.observedSessionID {
+        Task { await self.refreshBranchReport() }
+      }
+    }
+
+    if let repositoryStatus {
+      let updates = repositoryStatus.updates
+      statusUpdates = Task { [weak self] in
+        for await update in updates {
+          guard let self else { return }
+          self.apply(update)
+        }
+      }
     }
   }
 
@@ -1284,37 +1308,59 @@ extension AppModel {
 
   public var reportsBranches: Bool { readBranchReport != nil }
 
-  /// Reads the branches of the session on screen now, then every thirty seconds for as long as
-  /// its agent runs. Only that session: reading twenty repositories that nobody is looking at
-  /// would cost the disk for nothing.
-  func watchBranches() {
-    guard readBranchReport != nil, let id = selectedSessionID else {
-      branchWatch?.task.cancel()
-      branchWatch = nil
-      return
-    }
-    // A reload re-applies the same selection; a watch already on it is left alone.
-    if let branchWatch, branchWatch.id == id, !branchWatch.task.isCancelled { return }
-    branchWatch?.task.cancel()
-    let interval = branchReportInterval
-    let token = UUID()
-    let task = Task { [weak self] in
-      while !Task.isCancelled {
-        await self?.readBranches(of: id)
-        guard let self, self.launcher?.isRunning(id) == true else { break }
-        try? await Task.sleep(for: interval)
-      }
-      // Finished rather than cancelled: the next selection watches again. Only this watch is
-      // forgotten — a cancelled one ending late must not drop the watch that replaced it.
-      if let self, self.branchWatch?.token == token { self.branchWatch = nil }
-    }
-    branchWatch = (id, token, task)
+  /// Whether the repositories of the session on screen are kept live, rather than read on demand.
+  public var observesRepositories: Bool { repositoryStatus != nil }
+
+  public func repositoryStatus(for id: SessionID, path: String) -> RepositoryStatusState? {
+    repositoryStatuses[RepositoryStatusKey(sessionID: id, repositoryPath: path)]
   }
 
+  /// Reads the branches of the session on screen, then watches its repositories — and only that
+  /// session: reading twenty repositories that nobody is looking at would cost the disk for
+  /// nothing. Nothing is read again on a timer: the monitor says when the transcript grew or a
+  /// branch moved, and that is when the report is read again.
+  func watchBranches() {
+    guard readBranchReport != nil, let id = selectedSessionID else {
+      observedSessionID = nil
+      if let repositoryStatus {
+        Task { await repositoryStatus.stopObserving() }
+      }
+      return
+    }
+    // A reload re-applies the same selection; a session already watched is left alone.
+    guard observedSessionID != id else { return }
+    let hadPrevious = observedSessionID != nil
+    observedSessionID = id
+    // The session left is no longer watched even if the new one's report never comes. A stop that
+    // lands after the new session's first `observe` leaves it alone.
+    if hadPrevious, let repositoryStatus {
+      Task { await repositoryStatus.stopObserving(unless: id) }
+    }
+    requestBranchReport(of: id)
+  }
+
+  /// Reads everything the session on screen shows again: its report and its repositories. The
+  /// user asked, or came back to the application, or its agent just stopped.
   public func refreshBranchReport() async {
     guard let id = selectedSessionID else { return }
-    await readBranches(of: id)
+    await repositoryStatus?.refresh()
     watchBranches()
+    // Through the same queue as every other reading: two reports read side by side could land in
+    // the wrong order and hand the monitor the older list of repositories last.
+    await requestBranchReport(of: id).value
+  }
+
+  /// Called when the application comes back to the front: an event may have been missed while
+  /// the Mac slept or a volume was away.
+  public func applicationDidBecomeActive() {
+    guard observedSessionID != nil else { return }
+    Task { await refreshBranchReport() }
+  }
+
+  /// Stops every watch, for good. Called on the way out.
+  public func stopWatchingRepositories() async {
+    statusUpdates?.cancel()
+    await repositoryStatus?.stop()
   }
 
   func readBranches(of id: SessionID) async {
@@ -1324,5 +1370,72 @@ extension AppModel {
     let report = await readBranchReport(for: session)
     guard !Task.isCancelled else { return }
     branchReports[id] = report
+  }
+
+  /// One reading of the report at a time, and one more for whatever asked during it — after a
+  /// pause that grows with how long the reading took, as the monitor does for `git status`. An
+  /// agent streaming its transcript asks for a report many times a second; it gets one every so
+  /// often, never more than its repositories can answer.
+  @discardableResult
+  private func requestBranchReport(of id: SessionID) -> Task<Void, Never> {
+    if let reading = reportReadings[id] {
+      pendingReports.insert(id)
+      return reading
+    }
+    let task = Task { [weak self] in
+      guard let self else { return }
+      let clock = ContinuousClock()
+      while true {
+        self.pendingReports.remove(id)
+        let started = clock.now
+        await self.readBranches(of: id)
+        await self.observeRepositories(of: id)
+        guard self.pendingReports.contains(id), self.observedSessionID == id else { break }
+        let pause = max(Self.minimumReportPause, (clock.now - started) * 2)
+        try? await Task.sleep(for: pause)
+      }
+      self.reportReadings[id] = nil
+    }
+    reportReadings[id] = task
+    return task
+  }
+
+  /// The shortest pause between two readings of the same report asked for by the disk.
+  static let minimumReportPause: Duration = .seconds(1)
+
+  /// Hands the repositories of the report to the monitor. Only for the session still on screen: a
+  /// reading that ends after the user moved on must not take the watch back.
+  private func observeRepositories(of id: SessionID) async {
+    guard let repositoryStatus, observedSessionID == id,
+      let session = sessions.first(where: { $0.id == id }), let report = branchReports[id]
+    else { return }
+    let repositories = report.repositories.map { repository in
+      ObservedRepository(
+        path: repository.path, sharedWith: sharers(of: repository.path, besides: id))
+    }
+    await repositoryStatus.observe(session, repositories: repositories)
+  }
+
+  /// The other sessions whose last report names this repository. Only what has been read in this
+  /// run is known: a session never shown since launch is not counted.
+  private func sharers(of path: String, besides id: SessionID) -> [SessionID] {
+    sessions
+      .filter { session in
+        session.id != id && session.status != .archived
+          && branchReports[session.id]?.repositories.contains { $0.path == path } == true
+      }
+      .map(\.id)
+  }
+
+  private func apply(_ update: RepositoryStatusUpdate) {
+    switch update {
+    case .states(let states):
+      for state in states {
+        repositoryStatuses[state.key] = state
+      }
+    case .branchReportOutdated(let id):
+      guard id == observedSessionID else { return }
+      requestBranchReport(of: id)
+    }
   }
 }

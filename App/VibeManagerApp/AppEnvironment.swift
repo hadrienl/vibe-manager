@@ -51,6 +51,7 @@ final class AppEnvironment {
       )
     )
     self.permissions = permissions
+    let transcripts = AgentTranscriptReader()
     appModel = AppModel(
       repository: repository,
       recovery: repository,
@@ -67,8 +68,14 @@ final class AppEnvironment {
       runtimeRecorder: recorder,
       // Read only: the application reports the branches and worktrees the agent made, and never
       // makes one itself.
-      branchReader: ReadSessionBranchReport(
-        reader: GitActivityReader(), transcripts: AgentTranscriptReader()),
+      branchReader: ReadSessionBranchReport(reader: GitActivityReader(), transcripts: transcripts),
+      // Read only as well, and only when the disk says something moved: no timer reads a
+      // repository. One transcript reader for both, so each file is read once, incrementally.
+      repositoryStatus: RepositoryStatusMonitor(
+        reader: GitStatusReader(),
+        events: FSEventsFileChangeObserver(),
+        transcripts: transcripts
+      ),
       closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite)
     )
   }
@@ -83,6 +90,8 @@ final class AppEnvironment {
     // The pending layout is written first: quitting is exactly when the delayed save that keeps
     // a separator drag cheap would otherwise be thrown away.
     await appModel.layout.flush()
+    // No FSEvents stream and no new `git status` outlive the window they were reading for.
+    await appModel.stopWatchingRepositories()
     // A restoration under way is called off *and waited for*: cancelling only asks, and a resume
     // already in flight would otherwise write `reopen` after this shutdown had decided what to
     // close.

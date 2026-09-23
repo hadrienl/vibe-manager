@@ -10,10 +10,9 @@ import VibeDomain
 /// carry the `file_path` they wrote. Codex writes `sessions/YYYY/MM/DD/rollout-…-<id>.jsonl`, whose
 /// lines carry a `cwd`, the `workdir` of its commands, and patches naming the files they touch.
 ///
-/// Only read, never written, and read incrementally: a transcript grows to megabytes and the
-/// report is asked for every thirty seconds, so each file is resumed where the last reading
-/// stopped.
-public actor AgentTranscriptReader: SessionTranscriptReading {
+/// Only read, never written, and read incrementally: a transcript grows to megabytes and is read
+/// again each time it grows, so each file is resumed where the last reading stopped.
+public actor AgentTranscriptReader: SessionTranscriptSource {
   private let claudeProjects: URL
   private let codexSessions: URL
   private var progress: [String: FileProgress] = [:]
@@ -62,7 +61,43 @@ public actor AgentTranscriptReader: SessionTranscriptReading {
     return activity
   }
 
+  /// The folders the session's transcript files are in, so that their growth can be watched: the
+  /// project folder of a Claude Code session and its sub-agents' folder, or the day folders of a
+  /// Codex rollout — and today's, which is where a session resumed today writes.
+  public func transcriptDirectories(for session: WorkSession) async -> [String] {
+    guard let agent = session.agent,
+      let identifier = agent.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !identifier.isEmpty
+    else { return [] }
+    var folders: Set<String> = []
+    switch agent.providerID {
+    case ClaudeCodeAgentProvider.id.rawValue:
+      for file in claudeTranscripts(for: identifier) {
+        folders.insert(file.deletingLastPathComponent().path)
+      }
+    case CodexAgentProvider.id.rawValue:
+      for file in codexRollouts(for: identifier, since: session.createdAt) {
+        folders.insert(file.deletingLastPathComponent().path)
+      }
+      folders.insert(Self.dayFolder(of: Date(), in: codexSessions).path)
+    default:
+      return []
+    }
+    return folders.sorted()
+  }
+
   // MARK: - Finding the files
+
+  private static func dayFolder(of day: Date, in root: URL) -> URL {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    let parts = calendar.dateComponents([.year, .month, .day], from: day)
+    return
+      root
+      .appendingPathComponent(String(format: "%04d", parts.year ?? 0))
+      .appendingPathComponent(String(format: "%02d", parts.month ?? 0))
+      .appendingPathComponent(String(format: "%02d", parts.day ?? 0))
+  }
 
   private func claudeTranscripts(for identifier: String) -> [URL] {
     let manager = FileManager.default
