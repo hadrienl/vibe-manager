@@ -95,6 +95,26 @@ struct WorkspaceLayoutControllerTests {
     #expect(controller.intent.sidebarWidth == 320)
   }
 
+  @Test("The divider between Git and the notes is kept, within its bounds")
+  func inspectorSplit() async throws {
+    let store = RecordingLayoutStore()
+    let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(20))
+
+    controller.inspectorSplitChanged(to: 0.4)
+    #expect(controller.intent.inspectorSplit == 0.4)
+    controller.inspectorSplitChanged(to: 2)
+    #expect(controller.intent.inspectorSplit == WorkspaceLayout.inspectorSplitRange.upperBound)
+    controller.inspectorSplitChanged(to: .nan)
+    #expect(controller.intent.inspectorSplit == WorkspaceLayout.inspectorSplitRange.upperBound)
+
+    let deadline = ContinuousClock.now + .seconds(10)
+    while await store.saves.isEmpty, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    await #expect(
+      store.saves.last?.inspectorSplit == WorkspaceLayout.inspectorSplitRange.upperBound)
+  }
+
   @Test("A column folding away does not overwrite the width it was dragged to")
   func foldingKeepsTheWidth() async {
     let controller = WorkspaceLayoutController()

@@ -63,6 +63,16 @@ public final class AppModel {
   public var confirmsStoppingRunningAgent: Bool {
     didSet { closePreferences.confirmsStoppingRunningAgent = confirmsStoppingRunningAgent }
   }
+  /// Where a changed file listed in the inspector opens. `nil`: it is only revealed. Mirrored
+  /// here so that the settings window and the inspector read and change the same answer.
+  public var fileEditor: EditorChoice? {
+    didSet {
+      fileOpeningPreferences.editor = fileEditor
+      gitInspector.editor = fileEditor
+    }
+  }
+  /// The screen state of the inspector's Git pane, kept per session for the length of the run.
+  let gitInspector: GitInspectorModel
   /// A process the system would not let go of. Reported rather than swallowed: the promise that
   /// nothing stays attached to an archived session is only worth making if its failure is said.
   public private(set) var detachWarning: DetachWarning?
@@ -271,6 +281,7 @@ public final class AppModel {
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
+  private let fileOpeningPreferences: any FileOpeningPreferences
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
   private let restartSession: RestartSession?
@@ -301,9 +312,23 @@ public final class AppModel {
     /// Keeps the repositories of the session on screen read, when the disk says they moved.
     /// Absent in a workspace assembled without Git: the report is then read on demand only.
     repositoryStatus: RepositoryStatusMonitor? = nil,
-    closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences()
+    closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences(),
+    fileOpeningPreferences: any FileOpeningPreferences = InMemoryFileOpeningPreferences()
   ) {
     self.closePreferences = closePreferences
+    self.fileOpeningPreferences = fileOpeningPreferences
+    fileEditor = fileOpeningPreferences.editor
+    var listUntracked: GitInspectorModel.ListUntracked?
+    if let repositoryStatus {
+      listUntracked = { directory, key in
+        await repositoryStatus.untrackedFiles(in: directory, of: key)
+      }
+    }
+    gitInspector = GitInspectorModel(
+      listUntracked: listUntracked,
+      opener: WorkspaceFileOpener(),
+      editor: fileOpeningPreferences.editor
+    )
     confirmsStoppingRunningAgent = closePreferences.confirmsStoppingRunningAgent
     self.clock = clock
     readBranchReport = branchReader
@@ -1447,6 +1472,7 @@ extension AppModel {
       for state in states {
         repositoryStatuses[state.key] = state
       }
+      gitInspector.statesChanged(states)
     case .branchReportOutdated(let id):
       guard id == observedSessionID else { return }
       requestBranchReport(of: id)

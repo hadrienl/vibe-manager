@@ -76,7 +76,8 @@ final class AppEnvironment {
         events: FSEventsFileChangeObserver(),
         transcripts: transcripts
       ),
-      closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite)
+      closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite),
+      fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite)
     )
   }
 

@@ -243,7 +243,13 @@ public struct RootView: View {
               sessionNames: Dictionary(
                 model.sessions.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
               refreshBranches: model.reportsBranches
-                ? { Task { await model.refreshBranchReport() } } : nil
+                ? { Task { await model.refreshBranchReport() } } : nil,
+              git: model.gitInspector,
+              split: model.layout.intent.inspectorSplit,
+              splitChanged: { model.layout.inspectorSplitChanged(to: $0) },
+              openPrivacySettings: model.permissions.map { permissions in
+                { permissions.openSystemSettings() }
+              }
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
