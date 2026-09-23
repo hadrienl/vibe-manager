@@ -514,19 +514,22 @@ public final class AppModel {
   ///
   /// The session stays selected, and the sidebar follows it to Closed. Left to the reload, the
   /// selection fell to the next running session — and a second ⌘W then closed that one too.
+  ///
+  /// The selection is read once the agent has stopped, not before: stopping can take a while,
+  /// and a session the user picked in the meantime is theirs to keep.
   public func close(_ id: SessionID) async {
     guard !closingSessionIDs.contains(id) else { return }
     closingSessionIDs.insert(id)
     defer { closingSessionIDs.remove(id) }
-    let wasSelected = selectedSessionID == id
     do {
       let closure = try await closeSession(id: id)
       report(closure.detachment, for: closure.session, action: .closed)
     } catch {
       await report(error)
     }
+    let isStillSelected = selectedSessionID == id
     await reload()
-    if wasSelected {
+    if isStillSelected {
       follow(id)
     }
   }

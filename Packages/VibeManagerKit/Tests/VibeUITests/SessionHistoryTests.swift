@@ -420,6 +420,31 @@ struct SessionHistoryTests {
     #expect(model.sessions.first { $0.id == second.id }?.status == .active)
   }
 
+  @Test("A session picked while an agent is stopping keeps the selection")
+  func pickingAnotherSessionDuringACloseKeepsIt() async {
+    let first = session(name: "First", status: .active)
+    let second = session(name: "Second", status: .active)
+    let repository = MutableRepository(sessions: [first, second])
+    let supervisor = SpySupervisor(holdsStop: true)
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
+    await model.load()
+    await launcher.launch(session: first, plan: plan())
+    await model.reload()
+    model.select(first.id)
+
+    let closing = Task { await model.confirmClose(first.id) }
+    while await supervisor.stopped.isEmpty {
+      await Task.yield()
+    }
+    model.select(second.id)
+    await supervisor.releaseStop()
+    await closing.value
+
+    #expect(model.sessions.first { $0.id == first.id }?.status == .closed)
+    #expect(model.selectedSessionID == second.id)
+  }
+
   @Test("Closing a running agent asks first, and stops nothing until confirmed")
   func closingARunningAgentAsks() async {
     let stored = session(name: "Working", status: .active)
@@ -635,10 +660,24 @@ private actor SpySupervisor: TerminalSupervisor {
   private var sessions: [SessionID: FakeTerminalSession] = [:]
   private let outcome: SessionDetachOutcome
   private let startsFinished: Bool
+  /// Holds every stop until `releaseStop()`, the way an agent slow to quit keeps a close waiting.
+  private let holdsStop: Bool
+  private var heldStop: CheckedContinuation<Void, Never>?
+  private var isStopReleased = false
 
-  init(outcome: SessionDetachOutcome = .stopped, startsFinished: Bool = false) {
+  init(
+    outcome: SessionDetachOutcome = .stopped, startsFinished: Bool = false,
+    holdsStop: Bool = false
+  ) {
     self.outcome = outcome
     self.startsFinished = startsFinished
+    self.holdsStop = holdsStop
+  }
+
+  func releaseStop() {
+    isStopReleased = true
+    heldStop?.resume()
+    heldStop = nil
   }
 
   func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
@@ -656,6 +695,9 @@ private actor SpySupervisor: TerminalSupervisor {
 
   func stop(id: SessionID, gracePeriod: Duration) async {
     stopped.append(id)
+    if holdsStop, !isStopReleased {
+      await withCheckedContinuation { heldStop = $0 }
+    }
     await sessions[id]?.stop(gracePeriod: gracePeriod)
     // A terminal the supervisor stopped is a terminal it no longer holds, exactly as the real
     // one releases a finished session.
