@@ -2,6 +2,7 @@ import Foundation
 import VibeAgents
 import VibeApplication
 import VibeDomain
+import VibeGit
 import VibePersistence
 import VibeTerminal
 import VibeTerminalUI
@@ -13,26 +14,43 @@ final class AppEnvironment {
   /// Held here as well as inside the model: the settings window is a scene of its own, and it
   /// must read the same status the workspace read rather than probe the system a second time.
   let permissions: PermissionsModel
+  /// The worktree root, read by every plan and changed from the settings window.
+  let worktreeRoot: WorktreeRootSettings
 
   private let terminalSupervisor: PTYTerminalSupervisor
   private let launcher: SessionLauncher
   private let prepareForQuit: PrepareForQuit
 
   init() {
-    let repository = FileSessionRepository()
+    let data = Self.dataLocation()
+    let repository = FileSessionRepository(storeURL: data.store)
     let registry = AgentProviderRegistry(providers: Self.providers())
     let supervisor = PTYTerminalSupervisor()
+    // One runner and one writer for the whole application: the writer's queue is what keeps two
+    // sessions prepared at the same moment on one repository from meeting on `index.lock`.
+    let git = ProcessGitCommandRunner()
+    let reader = GitActivityReader(git: git)
+    let rootStore = UserDefaultsWorktreeRootStore(suiteName: data.defaultsSuite)
+    let workspace = SessionWorkspaceServices(
+      inspector: GitRepositoryInspector(git: git),
+      writer: GitWorktreeService(git: git),
+      root: rootStore,
+      activity: reader,
+      transcripts: AgentTranscriptReader()
+    )
+    worktreeRoot = WorktreeRootSettings(store: rootStore)
 
     terminalSupervisor = supervisor
     // The runtime document: what this copy of the application is running, so the next launch can
     // tell a quit from a crash and knows what to put back to work. Deliberately a document of its
     // own, next to the session store and never inside it.
-    let recorder = SessionRuntimeRecorder(store: FileSessionRuntimeStateStore())
+    let recorder = SessionRuntimeRecorder(store: FileSessionRuntimeStateStore(url: data.runtime))
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
       agents: registry,
-      recorder: recorder
+      recorder: recorder,
+      baseline: CaptureSessionBaseline(repository: repository, reader: reader)
     )
     self.launcher = launcher
     prepareForQuit = PrepareForQuit(
@@ -59,9 +77,11 @@ final class AppEnvironment {
       // default let an agent walk straight into them, with nothing said beforehand. Choosing is
       // now always a gesture, and the open panel is what grants the access along the way.
       defaultWorkingDirectoryPath: nil,
-      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore()),
+      layout: WorkspaceLayoutController(
+        store: UserDefaultsWorkspaceLayoutStore(suiteName: data.defaultsSuite)),
       permissions: permissions,
-      runtimeRecorder: recorder
+      runtimeRecorder: recorder,
+      workspace: workspace
     )
   }
 
@@ -82,6 +102,27 @@ final class AppEnvironment {
     await prepareForQuit()
     await launcher.stopAll()
     await terminalSupervisor.stopAll(gracePeriod: .seconds(3))
+  }
+
+  /// Where this copy of the application keeps what it writes.
+  ///
+  /// `VIBE_DATA_DIRECTORY` points a second copy at a folder of its own — its own store, its own
+  /// runtime document, its own layout — so it can run beside the one the user works in without
+  /// either taking the other for a second instance, or migrating the other's sessions.
+  private static func dataLocation(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> (store: URL, runtime: URL, defaultsSuite: String?) {
+    guard let directory = environment["VIBE_DATA_DIRECTORY"], directory.hasPrefix("/") else {
+      return (
+        FileSessionRepository.defaultStoreURL(), FileSessionRuntimeStateStore.defaultURL(), nil
+      )
+    }
+    let folder = URL(fileURLWithPath: directory, isDirectory: true)
+    return (
+      folder.appendingPathComponent("sessions.json"),
+      folder.appendingPathComponent("runtime.json"),
+      "com.hadrienl.VibeManager.isolated"
+    )
   }
 
   private static func providers() -> [any AgentProvider] {

@@ -58,6 +58,10 @@ let package = Package(
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain", "VibeTerminal"]
     ),
     .testTarget(
+      name: "VibeGitTests",
+      dependencies: ["VibeGit", "VibeApplication", "VibeDomain", "VibePersistence"]
+    ),
+    .testTarget(
       name: "VibeTerminalTests",
       dependencies: ["VibeTerminal", "VibeApplication", "VibeDomain"]
     ),

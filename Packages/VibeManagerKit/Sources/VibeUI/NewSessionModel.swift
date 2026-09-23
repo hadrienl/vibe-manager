@@ -33,6 +33,12 @@ public final class NewSessionModel {
   /// Problems are shown once the user has asked for the session, then kept live: a form that
   /// turns red while the first character is being typed is a form that nags.
   public private(set) var hasSubmitted = false
+  /// What was read of each designated folder, kept so the plan can be recomputed on every
+  /// keystroke without reading anything again.
+  public private(set) var inspections: [RepositoryID: RepositoryInspection] = [:]
+  /// The plan, the convention and the command line, as they stand. Shown live, unlike the
+  /// problems: seeing what will be created is the point of looking before confirming.
+  public private(set) var preview: SessionCreationPreview?
 
   /// Edited directly by the sheet's bindings. Reacting to a change is an explicit call rather
   /// than an observer that fires a detached task: the model list the user sees must follow the
@@ -44,6 +50,7 @@ public final class NewSessionModel {
   private let revalidationDelay: Duration
   private let fullDiskAccess: FullDiskAccessStatus?
   private var revalidation: Task<Void, Never>?
+  private var previewTask: Task<Void, Never>?
   /// The folder the open panel last handed over, and the only one checked on the disk before the
   /// user asks for the session.
   private var checkedFolderPath: String?
@@ -88,10 +95,150 @@ public final class NewSessionModel {
 
   public var canSubmit: Bool {
     !isSubmitting && !draft.trimmedName.isEmpty && draft.resolvedWorkingDirectoryPath != nil
+      && isPlanShown
+  }
+
+  /// With Git, nothing is created before its plan is on screen, for every repository: a folder
+  /// still being read would otherwise be prepared without anyone having seen what it would get.
+  public var isPlanShown: Bool {
+    guard create.plansWorkspace else { return true }
+    guard let workspace = preview?.workspace else { return false }
+    return draft.repositories.allSatisfy { workspace.plan(for: $0.id) != nil }
   }
 
   public func issues(for field: SessionDraftField) -> [SessionDraftIssue] {
     issues.filter { $0.field == field }
+  }
+
+  public func plan(for id: RepositoryID) -> RepositoryPlan? {
+    preview?.workspace?.plan(for: id)
+  }
+
+  /// The slug field. Typing in it detaches it from the name for good; clearing it with Reset
+  /// makes it follow the name again.
+  public var slugText: String {
+    get { draft.slugText }
+    set { draft.customSlug = newValue }
+  }
+
+  public var slugFollowsName: Bool { draft.customSlug == nil }
+
+  public func resetSlug() {
+    draft.customSlug = nil
+    draftChanged()
+  }
+
+  public var branchPreview: String? {
+    draft.slug?.branchName
+  }
+
+  // MARK: - Repositories
+
+  /// Adds a folder designated through the open panel, and reads it.
+  public func addRepository(_ path: String) async {
+    let repository = SessionDraftRepository(path: path)
+    draft.repositories.append(repository)
+    await inspect(repository)
+  }
+
+  public func removeRepository(_ id: RepositoryID) {
+    draft.repositories.removeAll { $0.id == id }
+    inspections[id] = nil
+    draftChanged()
+  }
+
+  /// The first repository is the main one; moving another to the top makes it the main one.
+  public func moveRepository(_ id: RepositoryID, by offset: Int) {
+    guard let index = draft.repositories.firstIndex(where: { $0.id == id }) else { return }
+    let target = index + offset
+    guard draft.repositories.indices.contains(target) else { return }
+    draft.repositories.swapAt(index, target)
+    draftChanged()
+  }
+
+  public func setMode(_ mode: RepositoryAttachmentMode, for id: RepositoryID) {
+    update(id) {
+      $0.mode = mode
+      $0.choice = nil
+    }
+  }
+
+  public func setBase(_ base: RepositoryBase, for id: RepositoryID) {
+    update(id) { $0.base = base }
+  }
+
+  /// Carries out the resolution the user picked, or returns what the sheet must do for it.
+  @discardableResult
+  func resolve(_ resolution: RepositoryResolution, for id: RepositoryID)
+    -> RepositoryResolutionEffect
+  {
+    guard let index = draft.repositories.firstIndex(where: { $0.id == id }) else {
+      return .applied
+    }
+    var repository = draft.repositories[index]
+    let effect = repository.apply(resolution)
+    switch effect {
+    case .applied:
+      draft.repositories[index] = repository
+      draftChanged()
+    case .remove:
+      removeRepository(id)
+    case .changeSlug(let suggestion):
+      draft.customSlug = suggestion
+      draftChanged()
+    case .chooseAnotherFolder:
+      break
+    }
+    return effect
+  }
+
+  /// Replaces one repository's folder with another designated through the panel.
+  public func replaceRepository(_ id: RepositoryID, with path: String) async {
+    guard let index = draft.repositories.firstIndex(where: { $0.id == id }) else { return }
+    let repository = SessionDraftRepository(id: id, path: path)
+    draft.repositories[index] = repository
+    inspections[id] = nil
+    await inspect(repository)
+  }
+
+  private func update(_ id: RepositoryID, _ change: (inout SessionDraftRepository) -> Void) {
+    guard let index = draft.repositories.firstIndex(where: { $0.id == id }) else { return }
+    change(&draft.repositories[index])
+    draftChanged()
+  }
+
+  private func inspect(_ repository: SessionDraftRepository) async {
+    // Without Git there is nothing to plan: the folder is checked by the problems, as it always
+    // was, and reading it a second time here would only open it twice.
+    guard create.plansWorkspace else { return }
+    let inspection = await create.inspect(repository)
+    guard
+      draft.repositories.contains(where: { $0.id == repository.id && $0.path == repository.path })
+    else { return }
+    inspections[repository.id] = inspection
+    await refreshPreview()
+  }
+
+  /// Recomputes the plan from what was already read. Reads no folder.
+  public func refreshPreview() async {
+    guard create.plansWorkspace else { return }
+    let checked = draft
+    let read = inspections
+    let found = await create.preview(checked, inspections: read)
+    // Dropped unless it still describes the form *and* what was read: a preview scheduled before
+    // a folder was read would otherwise land last and take its plan off the screen.
+    guard !Task.isCancelled, checked == draft, read == inspections else { return }
+    preview = found
+  }
+
+  private func schedulePreview() {
+    guard create.plansWorkspace else { return }
+    previewTask?.cancel()
+    previewTask = Task { [revalidationDelay] in
+      try? await Task.sleep(for: revalidationDelay)
+      guard !Task.isCancelled else { return }
+      await refreshPreview()
+    }
   }
 
   public func load(defaultWorkingDirectoryPath: String?) async {
@@ -99,6 +246,7 @@ public final class NewSessionModel {
       draft.workingDirectoryPath = defaultWorkingDirectoryPath
     }
     await refreshAgents(forceRefresh: false)
+    await refreshPreview()
   }
 
   public func refreshAgents(forceRefresh: Bool) async {
@@ -126,6 +274,7 @@ public final class NewSessionModel {
   }
 
   public func loadModels() async {
+    defer { schedulePreview() }
     guard let providerID = draft.providerID,
       let provider = await registry.provider(id: AgentProviderID(providerID))
     else {
@@ -155,6 +304,7 @@ public final class NewSessionModel {
   /// the disk and the agents on every character, and finish out of order — an early verdict
   /// landing last would post "A name is required." over a name that is now there.
   public func draftChanged() {
+    schedulePreview()
     guard hasSubmitted else {
       // Before the first submit the only problems on screen are the ones the open panel came
       // back with, and they judge the folder that was designated then. Once the field says
@@ -185,8 +335,13 @@ public final class NewSessionModel {
     // the new path is the one being looked at and leaves its verdict alone.
     checkedFolderPath = path
     draft.workingDirectoryPath = path
+    if let main = draft.repositories.first {
+      inspections[main.id] = nil
+      await inspect(main)
+    }
     let checked = draft
-    let found = await create.problems(with: checked, checkingFolder: true)
+    let found = await create.problems(
+      with: checked, checkingFolder: true, inspections: inspections)
     guard checkedFolderPath == path else { return }
 
     // The whole verdict is only published when it still describes the form on screen. A check on
@@ -217,7 +372,8 @@ public final class NewSessionModel {
     let path = checked.workingDirectoryPath
     let found = await create.problems(
       with: checked,
-      checkingFolder: path != nil && path == checkedFolderPath
+      checkingFolder: path != nil && path == checkedFolderPath,
+      inspections: inspections
     )
     // The draft may have moved on while the checks ran, so a verdict on an older one is
     // dropped rather than shown over what the user is looking at now.
@@ -239,11 +395,18 @@ public final class NewSessionModel {
     checkedFolderPath = draft.workingDirectoryPath
 
     do {
-      let creation = try await create(draft)
+      let creation = try await create(draft, expecting: preview?.workspace)
       issues = []
       return creation
     } catch let rejection as SessionCreationRejected {
       issues = rejection.issues
+      if rejection.issues.contains(.planChanged) {
+        // What was read no longer holds: every folder is read again, and the new plan shown.
+        inspections = [:]
+        for repository in draft.repositories {
+          await inspect(repository)
+        }
+      }
       return nil
     } catch {
       issues = [

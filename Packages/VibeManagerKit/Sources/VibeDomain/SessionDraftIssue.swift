@@ -6,6 +6,8 @@ public enum SessionDraftField: String, Hashable, Sendable, CaseIterable {
   case agent
   case model
   case workingDirectory
+  case slug
+  case repositories
   case appearance
 }
 
@@ -107,6 +109,36 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   public static func promptRejected(message: String, remedy: String) -> SessionDraftIssue {
     SessionDraftIssue(field: .initialPrompt, message: message, remedy: remedy)
   }
+
+  public static func slugInvalid(_ problem: SessionSlugProblem) -> SessionDraftIssue {
+    SessionDraftIssue(
+      field: .slug,
+      message: problem.message,
+      remedy: "Use lower-case letters, digits and dashes."
+    )
+  }
+
+  public static func slugTaken(by sessionName: String, suggestion: SessionSlug) -> SessionDraftIssue
+  {
+    SessionDraftIssue(
+      field: .slug,
+      message: "The session “\(sessionName)” already works on this branch.",
+      remedy:
+        "Use \(suggestion.rawValue) instead — two agents on one branch commit over each other."
+    )
+  }
+
+  public static let planChanged = SessionDraftIssue(
+    field: .repositories,
+    message: "The folders changed since their plan was shown.",
+    remedy: "Read the plan again, then create the session."
+  )
+
+  public static let mainRepositoryBlocked = SessionDraftIssue(
+    field: .repositories,
+    message: "The main repository cannot be prepared.",
+    remedy: "Resolve its conflict, or move another repository to the top of the list."
+  )
 
   public static let appearanceInvalid = SessionDraftIssue(
     field: .appearance,

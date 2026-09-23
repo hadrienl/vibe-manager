@@ -13,7 +13,7 @@ struct RestartSessionTests {
     providerID: String? = "stub",
     resumeIdentifier: String? = "0f7e6d5c-4b3a-2190-8765-43210fedcba9",
     prompt: String = "Split the signature check out.",
-    repositories: [RepositoryContext] = [RepositoryContext(path: "/work/app")]
+    repositories: [RepositoryContext] = [RepositoryContext(rootPath: "/work/app")]
   ) -> WorkSession {
     WorkSession(
       name: "Refactor the webhook",
@@ -226,8 +226,10 @@ struct RestartSessionTests {
     let subject = session(
       repositories: [
         RepositoryContext(
-          path: "/work/app",
-          git: GitSnapshot(repositoryRootPath: "/work/app", worktreePath: "/work/app-hotfix")
+          rootPath: "/work/app",
+          mode: .worktree,
+          worktreePath: "/work/app-hotfix",
+          branchName: "vibe/hotfix"
         )
       ]
     )

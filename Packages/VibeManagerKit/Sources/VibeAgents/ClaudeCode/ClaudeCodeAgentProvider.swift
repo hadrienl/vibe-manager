@@ -20,7 +20,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
       supportsModelSelection: true,
       supportsInitialPrompt: true,
       supportsResume: true,
-      reportsUsage: false
+      reportsUsage: false,
+      supportsAdditionalDirectories: true
     )
   )
 

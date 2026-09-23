@@ -95,6 +95,10 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
   case agentUnavailable(name: String, summary: String, remedy: String)
   case noRepository
   case workingDirectoryUnusable(path: String, status: WorkingDirectoryStatus)
+  /// The main repository's worktree is gone. Recreating it is a gesture, not a side effect.
+  case mainWorktreeMissing(name: String, path: String)
+  /// The main repository was never prepared, or no longer is.
+  case mainRepositoryUnprepared(name: String, reason: String)
   case launchRejected(AgentLaunchError)
 
   public var errorDescription: String? {
@@ -123,6 +127,10 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
       return "The path of this session, \(path), is not a folder any more."
     case .workingDirectoryUnusable(let path, _):
       return "The folder of this session, \(path), cannot be entered."
+    case .mainWorktreeMissing(let name, let path):
+      return "The worktree of \(name), the main repository, no longer exists at \(path)."
+    case .mainRepositoryUnprepared(let name, let reason):
+      return "\(name), the main repository, is not ready: \(reason)"
     case .launchRejected(let error):
       return error.errorDescription
     }
@@ -150,6 +158,8 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
       return "Create a new session in the folder you want to work in."
     case .workingDirectoryUnusable:
       return "Put the folder back where it was, or create a new session in its new place."
+    case .mainWorktreeMissing, .mainRepositoryUnprepared:
+      return "Recreate the worktree from the inspector, or make another repository the main one."
     case .launchRejected:
       return "Try again, and report the failure if it persists."
     }
@@ -164,17 +174,22 @@ public struct SessionRestart: Sendable {
   public let mode: SessionRestartMode
   /// Why the agent's own conversation is not being resumed. `nil` when it is.
   public let explanation: SessionRestartExplanation?
+  /// What the verification found and did not stop the launch for: a secondary repository that
+  /// is missing and left out, a worktree on another branch than the one recorded.
+  public let warnings: [String]
 
   public init(
     session: WorkSession,
     plan: AgentLaunchPlan,
     mode: SessionRestartMode,
-    explanation: SessionRestartExplanation?
+    explanation: SessionRestartExplanation?,
+    warnings: [String] = []
   ) {
     self.session = session
     self.plan = plan
     self.mode = mode
     self.explanation = explanation
+    self.warnings = warnings
   }
 
   public var needsConfirmation: Bool { mode.needsConfirmation }
@@ -194,17 +209,22 @@ public struct RestartSession: Sendable {
   private let agents: any AgentProviderResolving
   private let folders: any WorkingDirectoryProbe
   private let brief: SessionContextBriefBuilder
+  private let verify: VerifySessionWorkspace
+  private let root: (any WorktreeRootProviding)?
 
   public init(
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     folders: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
-    brief: SessionContextBriefBuilder = SessionContextBriefBuilder()
+    brief: SessionContextBriefBuilder = SessionContextBriefBuilder(),
+    workspace: SessionWorkspaceServices? = nil
   ) {
     self.repository = repository
     self.agents = agents
     self.folders = folders
     self.brief = brief
+    verify = VerifySessionWorkspace(folders: folders, inspector: workspace?.inspector)
+    root = workspace?.root
   }
 
   /// - Parameters:
@@ -240,20 +260,17 @@ public struct RestartSession: Sendable {
       )
     }
 
-    let path = try workingDirectoryPath(of: session)
-    // Checked before the launch rather than discovered by it: a worktree deleted between two
-    // sessions is ordinary, and finding out through a terminal that dies on `chdir` tells the
-    // user nothing they can act on.
-    let status = await folders.inspect(path: path)
-    guard status == .usable else {
-      throw SessionRestartRefusal.workingDirectoryUnusable(path: path, status: status)
-    }
+    // Every repository is read again before the launch rather than discovered by it: a worktree
+    // deleted between two sessions is ordinary, and finding out through a terminal that dies on
+    // `chdir` tells the user nothing they can act on.
+    let (context, warnings) = try await launchContext(for: session)
 
     // Asked before anything is resumed: a session that has never run has no conversation to go
     // back to, whatever a stored identifier might claim, and what it is owed is the prompt it
     // was created with — not a summary apologising for a conversation that never existed.
     if !session.hasEverStarted {
-      return try await firstLaunch(session: session, provider: provider, path: path)
+      return try await firstLaunch(
+        session: session, provider: provider, context: context, warnings: warnings)
     }
 
     if skippingResume == nil, descriptor.capabilities.supportsResume,
@@ -265,10 +282,9 @@ public struct RestartSession: Sendable {
         // No prompt: the conversation being resumed already contains the instruction that
         // started it, and handing it back would set the agent off on it a second time.
         let plan = try await provider.launchPlan(
-          for: AgentLaunchRequest(
-            workingDirectoryPath: path,
+          for: context.request(
             modelID: configuration.modelID,
-            initialPrompt: nil,
+            prompt: nil,
             resume: .identifier(identifier)
           )
         )
@@ -276,7 +292,8 @@ public struct RestartSession: Sendable {
           session: session,
           plan: plan,
           mode: .native(identifier: identifier),
-          explanation: nil
+          explanation: nil,
+          warnings: warnings
         )
       } catch AgentLaunchError.missingResumeIdentifier, AgentLaunchError.resumeUnsupported {
         // A stored identifier the CLI would not take is precisely "this conversation cannot be
@@ -284,7 +301,8 @@ public struct RestartSession: Sendable {
         return try await fresh(
           session: session,
           provider: provider,
-          path: path,
+          context: context,
+          warnings: warnings,
           contextOverride: contextOverride,
           explanation: .identifierRejected(agentName: descriptor.displayName)
         )
@@ -304,7 +322,8 @@ public struct RestartSession: Sendable {
     return try await fresh(
       session: session,
       provider: provider,
-      path: path,
+      context: context,
+      warnings: warnings,
       contextOverride: contextOverride,
       explanation: explanation
     )
@@ -315,43 +334,43 @@ public struct RestartSession: Sendable {
   private func firstLaunch(
     session: WorkSession,
     provider: any AgentProvider,
-    path: String
+    context: SessionLaunchContext,
+    warnings: [String]
   ) async throws -> SessionRestart {
-    let prompt = session.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    // The convention goes first, exactly as it would have at creation: this *is* the creation's
+    // launch, only later.
+    let takesPrompt = provider.descriptor.capabilities.supportsInitialPrompt
+    let initialPrompt =
+      session.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      ? nil : session.initialPrompt
     let plan = try await launchPlan(
       from: provider,
-      request: AgentLaunchRequest(
-        workingDirectoryPath: path,
+      request: context.request(
         modelID: session.agent?.modelID,
-        initialPrompt: prompt.isEmpty ? nil : session.initialPrompt,
-        resume: .none
+        prompt: takesPrompt ? context.prompt(with: initialPrompt) : initialPrompt
       )
     )
-    return SessionRestart(session: session, plan: plan, mode: .firstLaunch, explanation: nil)
+    return SessionRestart(
+      session: session, plan: plan, mode: .firstLaunch, explanation: nil, warnings: warnings)
   }
 
   private func fresh(
     session: WorkSession,
     provider: any AgentProvider,
-    path: String,
+    context: SessionLaunchContext,
+    warnings: [String],
     contextOverride: String?,
     explanation: SessionRestartExplanation
   ) async throws -> SessionRestart {
+    let bare = context.request(modelID: session.agent?.modelID, prompt: nil)
     guard provider.descriptor.capabilities.supportsInitialPrompt else {
-      let plan = try await launchPlan(
-        from: provider,
-        request: AgentLaunchRequest(
-          workingDirectoryPath: path,
-          modelID: session.agent?.modelID,
-          initialPrompt: nil,
-          resume: .none
-        )
-      )
+      let plan = try await launchPlan(from: provider, request: bare)
       return SessionRestart(
         session: session,
         plan: plan,
         mode: .freshWithoutContext,
-        explanation: explanation
+        explanation: explanation,
+        warnings: warnings
       )
     }
 
@@ -359,20 +378,13 @@ public struct RestartSession: Sendable {
     // be announced as a summary: the terminal's separator and the sheet both say one was sent.
     if let contextOverride, contextOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     {
-      let plan = try await launchPlan(
-        from: provider,
-        request: AgentLaunchRequest(
-          workingDirectoryPath: path,
-          modelID: session.agent?.modelID,
-          initialPrompt: nil,
-          resume: .none
-        )
-      )
+      let plan = try await launchPlan(from: provider, request: bare)
       return SessionRestart(
         session: session,
         plan: plan,
         mode: .freshWithoutContext,
-        explanation: explanation
+        explanation: explanation,
+        warnings: warnings
       )
     }
 
@@ -387,23 +399,19 @@ public struct RestartSession: Sendable {
         includedSections: []
       )
     } else {
-      summary = brief(for: session)
+      summary = brief(for: session, missing: Set(context.leftOut.map(\.id)))
     }
 
     let plan = try await launchPlan(
       from: provider,
-      request: AgentLaunchRequest(
-        workingDirectoryPath: path,
-        modelID: session.agent?.modelID,
-        initialPrompt: summary.text,
-        resume: .none
-      )
+      request: context.request(modelID: session.agent?.modelID, prompt: summary.text)
     )
     return SessionRestart(
       session: session,
       plan: plan,
       mode: .freshWithContext(summary),
-      explanation: explanation
+      explanation: explanation,
+      warnings: warnings
     )
   }
 
@@ -418,14 +426,58 @@ public struct RestartSession: Sendable {
     }
   }
 
-  /// The folder a session is started in: the worktree it recorded, or the repository itself.
+  /// Where the session starts, after every repository has been read again.
   ///
-  /// The first repository, and it is said out loud rather than left to be discovered: several
-  /// repositories per session are #12, and until then a session has exactly one place to run.
-  private func workingDirectoryPath(of session: WorkSession) throws -> String {
-    guard let repository = session.repositories.first else {
+  /// The main repository decides: gone, or never prepared, and nothing is launched — recreating a
+  /// worktree is a gesture the user makes, not a side effect of Restart. Any other repository
+  /// that is missing is left out of this launch, still attached, and said.
+  private func launchContext(
+    for session: WorkSession
+  ) async throws -> (SessionLaunchContext, [String]) {
+    guard let main = session.repositories.first else {
       throw SessionRestartRefusal.noRepository
     }
-    return repository.git?.worktreePath ?? repository.path
+    let verdicts = await verify(session)
+    switch verdicts[main.id] ?? .ready {
+    case .ready, .otherBranch:
+      break
+    case .worktreeMissing(let path):
+      throw SessionRestartRefusal.mainWorktreeMissing(name: main.displayName, path: path)
+    case .cloneMissing(let path):
+      guard main.mode == .worktree else {
+        throw SessionRestartRefusal.workingDirectoryUnusable(
+          path: path, status: await folders.inspect(path: path))
+      }
+      throw SessionRestartRefusal.mainRepositoryUnprepared(
+        name: main.displayName, reason: "its clone is no longer at \(path).")
+    case .notPrepared(let failure):
+      throw SessionRestartRefusal.mainRepositoryUnprepared(
+        name: main.displayName, reason: failure.message)
+    }
+
+    let excluded = Set(
+      session.repositories.compactMap { repository in
+        verdicts[repository.id]?.isUsable == false ? repository.id : nil
+      })
+    let warnings = session.repositories.compactMap { repository -> String? in
+      guard let verdict = verdicts[repository.id], let sentence = verdict.sentence(for: repository)
+      else { return nil }
+      return verdict.isUsable ? sentence : "\(sentence) The session starts without it."
+    }
+
+    do {
+      let context = try SessionLaunchContext.make(
+        for: session,
+        worktreeRootPath: await root?.worktreeRootPath(),
+        excluding: excluded
+      )
+      return (context, warnings)
+    } catch .noRepository {
+      throw SessionRestartRefusal.noRepository
+    } catch .mainRepositoryUnavailable(let repository) {
+      throw SessionRestartRefusal.mainRepositoryUnprepared(
+        name: repository.displayName,
+        reason: repository.failure?.message ?? "it has no folder to start in.")
+    }
   }
 }

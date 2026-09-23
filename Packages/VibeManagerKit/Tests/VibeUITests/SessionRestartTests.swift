@@ -38,7 +38,7 @@ struct SessionRestartTests {
       updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
       closedAt: closedAt,
       archivedAt: status == .archived ? Date(timeIntervalSince1970: 1_700_000_000) : nil,
-      repositories: [RepositoryContext(path: path)]
+      repositories: [RepositoryContext(rootPath: path)]
     )
   }
 

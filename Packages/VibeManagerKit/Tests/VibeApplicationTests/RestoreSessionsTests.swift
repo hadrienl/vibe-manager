@@ -22,7 +22,7 @@ struct RestoreSessionsTests {
       createdAt: Date(timeIntervalSince1970: 1_699_000_000),
       updatedAt: Date(timeIntervalSince1970: 1_700_000_100),
       closedAt: Date(timeIntervalSince1970: 1_700_000_100),
-      repositories: [RepositoryContext(path: Fixture.folderPath)],
+      repositories: [RepositoryContext(rootPath: Fixture.folderPath)],
       notes: "The retry path is still untested."
     )
   }

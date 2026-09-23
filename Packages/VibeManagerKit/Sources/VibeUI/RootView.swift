@@ -92,6 +92,14 @@ public struct RootView: View {
           // re-presented for another session would open on the previous session's summary.
           .id(pending.sessionID)
         }
+      case .attachRepository:
+        if let attachment = model.repositoryAttachment {
+          AttachRepositorySheet(
+            model: attachment,
+            attach: { Task { await model.confirmAttachRepository() } },
+            cancel: { model.cancelAttachRepository() }
+          )
+        }
       }
     }
   }
@@ -106,6 +114,7 @@ public struct RootView: View {
     if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
     if model.isPresentingNewSession { return .newSession }
     if model.pendingRestart != nil { return .restartContext }
+    if model.repositoryAttachment != nil { return .attachRepository }
     return nil
   }
 
@@ -121,6 +130,8 @@ public struct RootView: View {
       model.cancelNewSession()
     case .restartContext:
       model.cancelRestart()
+    case .attachRepository:
+      model.cancelAttachRepository()
     case nil:
       break
     }
@@ -135,6 +146,7 @@ public struct RootView: View {
     /// was torn down by a refresh that failed, leaving a pending restart nobody could answer or
     /// call off — and a session whose Restart command stayed withheld.
     case restartContext
+    case attachRepository
 
     var id: Self { self }
   }
@@ -198,6 +210,22 @@ public struct RootView: View {
           RestoreReportBanner(report: report, dismiss: { model.dismissRestoreReport() })
           Divider()
         }
+        if let warning = model.launchWarning {
+          LaunchWarningBanner(warning: warning, dismiss: { model.dismissLaunchWarning() })
+          Divider()
+        }
+        if let notice = model.repositoryNotice {
+          RepositoryNoticeBanner(notice: notice, dismiss: { model.dismissRepositoryNotice() })
+          Divider()
+        }
+        if let addendum = model.pendingAddendum {
+          AddendumBanner(
+            addendum: addendum,
+            send: { Task { await model.sendAddendum() } },
+            dismiss: { model.dismissAddendum() }
+          )
+          Divider()
+        }
         detail
       }
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
@@ -230,7 +258,11 @@ public struct RootView: View {
           if let session = model.selectedSession {
             SessionContextInspector(
               session: session,
-              resolution: model.resolution(forID: session.id)
+              resolution: model.resolution(forID: session.id),
+              actions: inspectorActions(for: session),
+              branchReport: model.branchReport(for: session.id),
+              refreshBranches: model.reportsBranches
+                ? { Task { await model.refreshBranchReport() } } : nil
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
@@ -279,6 +311,25 @@ public struct RootView: View {
     } message: { session in
       Text(archiveConfirmationMessage(for: session))
     }
+  }
+
+  private func inspectorActions(for session: WorkSession) -> SessionContextInspector.Actions {
+    guard model.canEditRepositories else { return .init() }
+    let id = session.id
+    return SessionContextInspector.Actions(
+      addRepository: {
+        let start = session.repositories.first.map {
+          ($0.rootPath as NSString).deletingLastPathComponent
+        }
+        guard let path = chooseFolder(startingAt: start, prompt: "Attach") else { return }
+        Task { await model.beginAttachRepository(to: id, path: path) }
+      },
+      detach: { repositoryID in Task { await model.detach(repository: repositoryID, from: id) } },
+      recreate: { repositoryID in
+        Task { await model.recreate(repository: repositoryID, in: id) }
+      },
+      makeMain: { repositoryID in Task { await model.makeMain(repository: repositoryID, in: id) } }
+    )
   }
 
   private func archiveConfirmationMessage(for session: WorkSession) -> String {
@@ -537,6 +588,113 @@ private struct RestartContextSheet: View {
       \(pending.explanation) A new process will be started instead, and given this summary of \
       what the session carries. You can edit it before it is sent.
       """
+  }
+}
+
+/// What a launch found and did not stop for: a secondary repository left out, a worktree on
+/// another branch than the session's.
+private struct LaunchWarningBanner: View {
+  let warning: AppModel.LaunchWarning
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "exclamationmark.triangle")
+        .foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(warning.sessionName):")
+          .font(.callout.weight(.medium))
+        ForEach(warning.lines, id: \.self) { line in
+          Text(line)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      Spacer(minLength: 8)
+      DismissButton(dismiss: dismiss)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// What a repository gesture left to say, and the command to copy when something stayed on disk.
+private struct RepositoryNoticeBanner: View {
+  let notice: AppModel.RepositoryNotice
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "info.circle")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(notice.message)
+          .font(.callout)
+          .fixedSize(horizontal: false, vertical: true)
+        if let suggestion = notice.suggestion {
+          Text(suggestion)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        if let command = notice.command {
+          CopyableCommand(command: command)
+        }
+      }
+      Spacer(minLength: 8)
+      DismissButton(dismiss: dismiss)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// The text a running agent would be told about a repository just added, and the one button that
+/// types it. Nothing reaches the terminal otherwise.
+private struct AddendumBanner: View {
+  let addendum: AppModel.PendingAddendum
+  let send: () -> Void
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "text.bubble")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Tell the agent of \(addendum.sessionName) about the new repository?")
+          .font(.callout)
+        Text(addendum.text)
+          .font(.system(.caption, design: .monospaced))
+          .textSelection(.enabled)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(6)
+          .background(RoundedRectangle(cornerRadius: 5).fill(.background))
+      }
+      Spacer(minLength: 8)
+      VStack(spacing: 6) {
+        Button("Send to Agent", action: send)
+          .controlSize(.small)
+        Button("Not Now", action: dismiss)
+          .controlSize(.small)
+      }
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+private struct DismissButton: View {
+  let dismiss: () -> Void
+
+  var body: some View {
+    Button(action: dismiss) {
+      Image(systemName: "xmark")
+    }
+    .buttonStyle(.borderless)
+    .accessibilityLabel("Dismiss")
   }
 }
 

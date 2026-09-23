@@ -21,7 +21,7 @@ struct PrepareForQuitTests {
       updatedAt: updatedAt,
       closedAt: status == .active ? nil : updatedAt,
       archivedAt: status == .archived ? updatedAt : nil,
-      repositories: [RepositoryContext(path: Fixture.folderPath)]
+      repositories: [RepositoryContext(rootPath: Fixture.folderPath)]
     )
   }
 
@@ -77,7 +77,8 @@ struct PrepareForQuitTests {
     #expect(await repository.status(of: recent.id) == .closed)
     #expect(await repository.status(of: older.id) == .closed)
     // Neither a closed session nor an archived one has a process, so neither is touched.
-    #expect(await runtime.detached == [recent.id, older.id])
+    // Stopped side by side, so in no particular order.
+    #expect(Set(await runtime.detached) == [recent.id, older.id])
     #expect(await repository.status(of: archived.id) == .archived)
 
     let state = await store.read()

@@ -12,14 +12,14 @@ struct SessionStoreDecodeResult {
 }
 
 struct SessionStoreCodec {
-  static let currentSchemaVersion = 2
+  static let currentSchemaVersion = 3
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV2(
+    let envelope = StoreEnvelopeV3(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV2.init)
+      sessions: sessions.map(StoredSessionV3.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -44,9 +44,15 @@ struct SessionStoreCodec {
         let previous = try Self.makeDecoder().decode(StoreEnvelopeV1.self, from: data)
         sessions = previous.sessions.map(\.workSession)
         requiresRewrite = true
+      case 2:
+        // Every v2 session works in its folder, on that folder's branch: exactly what `inPlace`
+        // describes. Nothing on disk is looked at or created to read it.
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
+        sessions = previous.sessions.map(\.workSession)
+        requiresRewrite = true
       case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
-        sessions = current.sessions.map(\.workSession)
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV3.self, from: data)
+        sessions = try current.sessions.map { try $0.workSession }
         requiresRewrite = false
       default:
         throw SessionStoreCodecError.unsupportedSchemaVersion(probe.schemaVersion)
@@ -111,20 +117,22 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-private struct StoreEnvelopeV2: Codable {
+private struct StoreEnvelopeV3: Codable {
   let schemaVersion: Int
   let savedAt: Date
-  let sessions: [StoredSessionV2]
+  let sessions: [StoredSessionV3]
 }
 
-private struct StoredSessionV2: Codable {
+private struct StoredSessionV3: Codable {
   let id: UUID
   let name: String
   let initialPrompt: String
   let agent: StoredAgentV2?
   let appearance: StoredAppearanceV2
   let lifecycle: StoredLifecycleV2
-  let repositories: [StoredRepositoryV2]
+  let repositories: [StoredRepositoryV3]
+  /// Absent for a session migrated from v2: it was never given a branch of its own.
+  let slug: String?
   let notes: String?
   let template: StoredTemplateV2?
 
@@ -135,10 +143,144 @@ private struct StoredSessionV2: Codable {
     agent = session.agent.map(StoredAgentV2.init)
     appearance = StoredAppearanceV2(session.appearance)
     lifecycle = StoredLifecycleV2(session.lifecycle)
-    repositories = session.repositories.map(StoredRepositoryV2.init)
+    repositories = session.repositories.map(StoredRepositoryV3.init)
+    slug = session.slug?.rawValue
     notes = session.notes
     template = session.template.map(StoredTemplateV2.init)
   }
+
+  var workSession: WorkSession {
+    get throws {
+      // A slug is a branch name: one edited by hand into something Git would refuse is a store
+      // that cannot be trusted, not a value to pass to `git worktree add`.
+      let slug = try slug.map { raw in
+        guard let slug = SessionSlug(raw) else { throw SessionStoreCodecError.invalidStore }
+        return slug
+      }
+      return WorkSession(
+        id: SessionID(rawValue: id),
+        name: name,
+        initialPrompt: initialPrompt,
+        agent: agent?.domainValue,
+        appearance: appearance.domainValue,
+        status: lifecycle.status,
+        createdAt: lifecycle.createdAt,
+        updatedAt: lifecycle.updatedAt,
+        closedAt: lifecycle.closedAt,
+        archivedAt: lifecycle.archivedAt,
+        startedAt: lifecycle.startedAt,
+        repositories: repositories.map(\.domainValue),
+        slug: slug,
+        notes: notes,
+        template: template?.domainValue
+      )
+    }
+  }
+}
+
+private struct StoredRepositoryV3: Codable {
+  let id: UUID
+  let rootPath: String
+  let mode: RepositoryAttachmentMode
+  let worktreePath: String?
+  let branchName: String?
+  let baseRevision: String?
+  let createdByVibeManager: Bool
+  let attachedAt: Date?
+  let failure: StoredRepositoryFailureV3?
+  /// Absent until an agent has run for the session.
+  let baseline: StoredReferenceSnapshotV3?
+  let git: StoredGitSnapshotV2?
+
+  init(_ repository: RepositoryContext) {
+    id = repository.id.rawValue
+    rootPath = repository.rootPath
+    mode = repository.mode
+    worktreePath = repository.worktreePath
+    branchName = repository.branchName
+    baseRevision = repository.baseRevision
+    createdByVibeManager = repository.createdByVibeManager
+    attachedAt = repository.attachedAt
+    failure = repository.failure.map(StoredRepositoryFailureV3.init)
+    baseline = repository.baseline.map(StoredReferenceSnapshotV3.init)
+    git = repository.git.map(StoredGitSnapshotV2.init)
+  }
+
+  var domainValue: RepositoryContext {
+    RepositoryContext(
+      id: RepositoryID(rawValue: id),
+      rootPath: rootPath,
+      mode: mode,
+      worktreePath: worktreePath,
+      branchName: branchName,
+      baseRevision: baseRevision,
+      createdByVibeManager: createdByVibeManager,
+      attachedAt: attachedAt,
+      failure: failure?.domainValue,
+      baseline: baseline?.domainValue,
+      git: git?.domainValue
+    )
+  }
+}
+
+private struct StoredReferenceSnapshotV3: Codable {
+  let checkedOutBranch: String?
+  let headRevision: String?
+  let branches: [String: String]
+  let isDirty: Bool
+  let capturedAt: Date
+
+  init(_ snapshot: GitReferenceSnapshot) {
+    checkedOutBranch = snapshot.checkedOutBranch
+    headRevision = snapshot.headRevision
+    branches = snapshot.branches
+    isDirty = snapshot.isDirty
+    capturedAt = snapshot.capturedAt
+  }
+
+  var domainValue: GitReferenceSnapshot {
+    GitReferenceSnapshot(
+      checkedOutBranch: checkedOutBranch,
+      headRevision: headRevision,
+      branches: branches,
+      isDirty: isDirty,
+      capturedAt: capturedAt
+    )
+  }
+}
+
+private struct StoredRepositoryFailureV3: Codable {
+  let message: String
+  let remedy: String
+
+  init(_ failure: RepositoryPreparationFailure) {
+    message = failure.message
+    remedy = failure.remedy
+  }
+
+  var domainValue: RepositoryPreparationFailure {
+    RepositoryPreparationFailure(message: message, remedy: remedy)
+  }
+}
+
+/// The schema v2 document, kept only to be read. Its sessions had one shape of repository: a
+/// path and a snapshot.
+private struct StoreEnvelopeV2: Decodable {
+  let schemaVersion: Int
+  let savedAt: Date
+  let sessions: [StoredSessionV2]
+}
+
+private struct StoredSessionV2: Decodable {
+  let id: UUID
+  let name: String
+  let initialPrompt: String
+  let agent: StoredAgentV2?
+  let appearance: StoredAppearanceV2
+  let lifecycle: StoredLifecycleV2
+  let repositories: [StoredRepositoryV2]
+  let notes: String?
+  let template: StoredTemplateV2?
 
   var workSession: WorkSession {
     WorkSession(
@@ -272,21 +414,16 @@ private struct StoredLifecycleV2: Codable {
   }
 }
 
-private struct StoredRepositoryV2: Codable {
+private struct StoredRepositoryV2: Decodable {
   let id: UUID
   let path: String
   let git: StoredGitSnapshotV2?
 
-  init(_ repository: RepositoryContext) {
-    id = repository.id.rawValue
-    path = repository.path
-    git = repository.git.map(StoredGitSnapshotV2.init)
-  }
-
   var domainValue: RepositoryContext {
     RepositoryContext(
       id: RepositoryID(rawValue: id),
-      path: path,
+      rootPath: path,
+      mode: .inPlace,
       git: git?.domainValue
     )
   }

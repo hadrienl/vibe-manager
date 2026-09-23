@@ -14,10 +14,12 @@ public struct SessionContextBrief: Hashable, Sendable {
   /// They are given up in a different order — the initial instruction first, then the notes, then
   /// the folders — because the older a section is, the less of it still holds: an instruction
   /// written days ago against files that have moved has aged more than the folder it was given in.
-  /// `heading`, `agent` and `instruction` are never dropped: a summary without them would not say
-  /// which work is being resumed, which is the one thing the agent cannot infer.
+  /// `heading`, `convention`, `agent` and `instruction` are never dropped: a summary without them
+  /// would not say which work is being resumed, which is the one thing the agent cannot infer —
+  /// and the convention is the one rule it cannot deduce from the files.
   public enum Section: String, Hashable, Sendable, CaseIterable {
     case heading
+    case convention
     case agent
     case folders
     case notes
@@ -46,13 +48,18 @@ public struct SessionContextBriefBuilder: Sendable {
   /// terminal the standard input is the keyboard, so a brief that does not fit in `argv` is a
   /// brief that cannot be delivered at all.
   public let byteLimit: Int
+  private let conventions = SessionConventionBuilder()
 
   public init(byteLimit: Int = AgentPromptLimits.argumentByteLimit) {
     self.byteLimit = byteLimit
   }
 
-  public func callAsFunction(for session: WorkSession) -> SessionContextBrief {
-    var sections = allSections(of: session)
+  /// - Parameter missing: repositories this launch leaves out, said as such in the convention.
+  public func callAsFunction(
+    for session: WorkSession,
+    missing: Set<RepositoryID> = []
+  ) -> SessionContextBrief {
+    var sections = allSections(of: session, missing: missing)
     var isTruncated = false
 
     // Dropped whole rather than cut in half: half a note reads like a complete one, and the
@@ -61,6 +68,16 @@ public struct SessionContextBriefBuilder: Sendable {
       guard byteCount(of: sections, truncated: isTruncated) > byteLimit else { break }
       guard sections.contains(where: { $0.section == droppable }) else { continue }
       sections.removeAll { $0.section == droppable }
+      isTruncated = true
+    }
+
+    // Never dropped, but it can shrink: the list of repositories is summarised before the text
+    // is cut, exactly as it is in front of a first prompt.
+    if byteCount(of: sections, truncated: isTruncated) > byteLimit,
+      let index = sections.firstIndex(where: { $0.section == .convention }),
+      let summarized = conventions(for: session, summarized: true, missing: missing)
+    {
+      sections[index] = Part(section: .convention, text: summarized)
       isTruncated = true
     }
 
@@ -93,13 +110,21 @@ public struct SessionContextBriefBuilder: Sendable {
     let text: String
   }
 
-  private func allSections(of session: WorkSession) -> [Part] {
+  private func allSections(of session: WorkSession, missing: Set<RepositoryID>) -> [Part] {
     var parts: [Part] = [Part(section: .heading, text: heading(of: session))]
 
+    // Right after the heading: an agent restarted without its conversation has to learn where it
+    // may work before it reads anything that sends it working.
+    let convention = conventions(for: session, missing: missing)
+    if let convention {
+      parts.append(Part(section: .convention, text: convention))
+    }
     if let agent = session.agent {
       parts.append(Part(section: .agent, text: agentLine(agent)))
     }
-    if let folders = folders(of: session) {
+    // The convention already lists every folder and where to work in it; a second list, with
+    // other words, would only give the agent two versions to reconcile.
+    if convention == nil, let folders = folders(of: session) {
       parts.append(Part(section: .folders, text: folders))
     }
     if let notes = session.notes?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -143,7 +168,7 @@ public struct SessionContextBriefBuilder: Sendable {
   private func folders(of session: WorkSession) -> String? {
     guard !session.repositories.isEmpty else { return nil }
     let lines = session.repositories.map { repository -> String in
-      var line = "- \(repository.path)"
+      var line = "- \(repository.effectivePath ?? repository.rootPath)"
       guard let git = repository.git else { return line }
 
       var facts: [String] = []
@@ -154,7 +179,7 @@ public struct SessionContextBriefBuilder: Sendable {
         facts.append("at \(String(head.prefix(7)))")
       }
       facts.append(git.isDirty ? "with uncommitted changes" : "with a clean worktree")
-      if let worktree = git.worktreePath, worktree != repository.path {
+      if let worktree = git.worktreePath, worktree != repository.rootPath {
         facts.append("worktree \(worktree)")
       }
       // Dated on purpose. A snapshot taken three days ago, written in the present tense, would

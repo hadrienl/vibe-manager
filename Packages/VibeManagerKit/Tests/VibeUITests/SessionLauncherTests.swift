@@ -24,7 +24,7 @@ struct SessionLauncherTests {
       name: "Refactor the webhook",
       agent: SessionAgentConfiguration(providerID: "stub"),
       status: .closed,
-      repositories: [RepositoryContext(path: "/workspace")]
+      repositories: [RepositoryContext(rootPath: "/workspace")]
     )
   }
 
@@ -150,12 +150,12 @@ struct SessionLauncherTests {
     let first = WorkSession(
       name: "First",
       agent: SessionAgentConfiguration(providerID: "stub"),
-      repositories: [RepositoryContext(path: "/workspace")]
+      repositories: [RepositoryContext(rootPath: "/workspace")]
     )
     let second = WorkSession(
       name: "Second",
       agent: SessionAgentConfiguration(providerID: "stub"),
-      repositories: [RepositoryContext(path: "/workspace")]
+      repositories: [RepositoryContext(rootPath: "/workspace")]
     )
     let launcher = SessionLauncher(
       supervisor: SpySupervisor(),

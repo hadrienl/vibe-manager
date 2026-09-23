@@ -38,6 +38,12 @@ public struct ClaudeCodeArgumentBuilder: CommandLineAgentArgumentBuilder {
       arguments.append(contentsOf: ["--model", try Self.validatedModelID(modelID)])
     }
 
+    // One option per folder: the CLI reads `--add-dir` as variadic, and the `--` in front of the
+    // prompt is what keeps the prompt from being swallowed as one more folder.
+    for path in try AgentLaunchValidation.additionalDirectories(request, descriptor: descriptor) {
+      arguments.append(contentsOf: ["--add-dir", path])
+    }
+
     switch promptDelivery {
     case .none:
       break

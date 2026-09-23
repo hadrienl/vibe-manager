@@ -62,7 +62,7 @@ struct VibeManagerApp: App {
     }
 
     Settings {
-      SettingsView(permissions: environment.permissions)
+      SettingsView(permissions: environment.permissions, worktreeRoot: environment.worktreeRoot)
     }
   }
 }
