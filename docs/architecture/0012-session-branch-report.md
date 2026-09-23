@@ -28,6 +28,9 @@ folder would be told each other's work. So the repositories come from the sessio
 - **Codex**: the rollouts named after the session under `~/.codex/sessions/YYYY/MM/DD/` — the
   `cwd`, the `workdir` of its commands and the files its patches touch.
 
+Every conversation the session has had is read, not only the current one: after a switch of agent
+(ADR 0015) the previous agent's transcript is still this session's work.
+
 Each path is brought back to the repository it belongs to with `rev-parse --show-toplevel`, so a
 worktree the agent made for itself is a repository of its own, named after its clone
 ("Mobile · worktree 230-send"). Transcripts are read incrementally, from where the last reading
