@@ -37,12 +37,14 @@ final class WorkspaceFileOpener: FileOpening {
       guard let application = workspace.urlForApplication(withBundleIdentifier: identifier) else {
         return false
       }
-      do {
-        _ = try await workspace.open(
-          [url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
-        return true
-      } catch {
-        return false
+      // The completion handler, not the async variant: that one sends `NSWorkspace`, which is not
+      // Sendable, off the main actor, and Swift 6.1 refuses it.
+      return await withCheckedContinuation { continuation in
+        workspace.open(
+          [url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration()
+        ) { _, error in
+          continuation.resume(returning: error == nil)
+        }
       }
     }
   }
