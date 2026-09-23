@@ -114,6 +114,15 @@ stops nothing already running, and a restoration that sends a text to an agent i
 The runtime document, the four verdicts and the bounded exit are documented in
 [`docs/architecture/0011-session-restoration.md`](docs/architecture/0011-session-restoration.md).
 
+The application never creates a branch or a worktree: the agent makes those it needs. The
+inspector's Git section reports what it did — each branch the session worked on, the repositories
+it is checked out in (worktrees the agent made for itself included), and whether it was created,
+moved forward or rewritten, or has uncommitted work. The repositories come from the session's own
+transcript, so two sessions in one folder are never told each other's work. The report is read
+without taking any lock, every 30 seconds and for the session on screen only. The decisions are
+documented in
+[`docs/architecture/0012-session-branch-report.md`](docs/architecture/0012-session-branch-report.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the

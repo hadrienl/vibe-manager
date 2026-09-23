@@ -230,7 +230,10 @@ public struct RootView: View {
           if let session = model.selectedSession {
             SessionContextInspector(
               session: session,
-              resolution: model.resolution(forID: session.id)
+              resolution: model.resolution(forID: session.id),
+              branchReport: model.branchReport(for: session.id),
+              refreshBranches: model.reportsBranches
+                ? { Task { await model.refreshBranchReport() } } : nil
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear

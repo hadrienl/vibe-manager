@@ -33,6 +33,10 @@ public final class AppModel {
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
+  /// What the agent did to the branches of each session, as last read. Only the session on
+  /// screen is read, so the others keep what was true when they were last looked at.
+  public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
+  private var branchWatch: (id: SessionID, token: UUID, task: Task<Void, Never>)?
 
   /// The session the user asked to archive, held until they confirm. Archiving is reversible,
   /// but it moves a session out of sight, and a slip of the pointer must not do that.
@@ -250,6 +254,9 @@ public final class AppModel {
   private let detectPreviousShutdown: DetectPreviousShutdown?
   private let restoreSessions: RestoreSessions?
   private let clock: any SessionClock
+  private let readBranchReport: ReadSessionBranchReport?
+  /// How often the branches of the session on screen are read again while its agent runs.
+  private let branchReportInterval: Duration
 
   public init(
     repository: any SessionRepository,
@@ -265,9 +272,15 @@ public final class AppModel {
     processes: any ProcessLivenessProbe = SystemProcessLivenessProbe(),
     // Only the resume probation reads it, and it is the one rule here measured in seconds of real
     // time: without a clock to move, its far side could only be tested by waiting eight seconds.
-    clock: any SessionClock = SystemSessionClock()
+    clock: any SessionClock = SystemSessionClock(),
+    /// Reads what the agent did to the branches. Absent in a workspace assembled without Git,
+    /// where the inspector shows no report at all.
+    branchReader: ReadSessionBranchReport? = nil,
+    branchReportInterval: Duration = .seconds(30)
   ) {
     self.clock = clock
+    readBranchReport = branchReader
+    self.branchReportInterval = branchReportInterval
     self.permissions = permissions
     self.repository = repository
     loadSessions = LoadSessions(repository: repository)
@@ -974,6 +987,7 @@ public final class AppModel {
   private func apply(selection id: SessionID?) {
     selectedSessionID = id
     layout.select(id)
+    watchBranches()
   }
 
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
@@ -1198,5 +1212,57 @@ public final class AppModel {
     } else {
       refreshFailure = RefreshFailure(message: message, canRestoreBackup: canRestoreBackup)
     }
+  }
+}
+
+// MARK: - Branch report
+
+extension AppModel {
+  public func branchReport(for id: SessionID) -> SessionBranchReport? {
+    branchReports[id]
+  }
+
+  public var reportsBranches: Bool { readBranchReport != nil }
+
+  /// Reads the branches of the session on screen now, then every thirty seconds for as long as
+  /// its agent runs. Only that session: reading twenty repositories that nobody is looking at
+  /// would cost the disk for nothing.
+  func watchBranches() {
+    guard readBranchReport != nil, let id = selectedSessionID else {
+      branchWatch?.task.cancel()
+      branchWatch = nil
+      return
+    }
+    // A reload re-applies the same selection; a watch already on it is left alone.
+    if let branchWatch, branchWatch.id == id, !branchWatch.task.isCancelled { return }
+    branchWatch?.task.cancel()
+    let interval = branchReportInterval
+    let token = UUID()
+    let task = Task { [weak self] in
+      while !Task.isCancelled {
+        await self?.readBranches(of: id)
+        guard let self, self.launcher?.isRunning(id) == true else { break }
+        try? await Task.sleep(for: interval)
+      }
+      // Finished rather than cancelled: the next selection watches again. Only this watch is
+      // forgotten — a cancelled one ending late must not drop the watch that replaced it.
+      if let self, self.branchWatch?.token == token { self.branchWatch = nil }
+    }
+    branchWatch = (id, token, task)
+  }
+
+  public func refreshBranchReport() async {
+    guard let id = selectedSessionID else { return }
+    await readBranches(of: id)
+    watchBranches()
+  }
+
+  func readBranches(of id: SessionID) async {
+    guard let readBranchReport, let session = sessions.first(where: { $0.id == id }) else {
+      return
+    }
+    let report = await readBranchReport(for: session)
+    guard !Task.isCancelled else { return }
+    branchReports[id] = report
   }
 }

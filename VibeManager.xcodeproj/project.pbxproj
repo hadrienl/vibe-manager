@@ -17,6 +17,7 @@
 		A00000000000000000000008 /* VibeDomain in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000005 /* VibeDomain */; };
 		A00000000000000000000009 /* VibeTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000006 /* VibeTerminal */; };
 		A0000000000000000000000A /* VibeTerminalUI in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000007 /* VibeTerminalUI */; };
+		A0000000000000000000000B /* VibeGit in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000008 /* VibeGit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 				A00000000000000000000008 /* VibeDomain in Frameworks */,
 				A00000000000000000000009 /* VibeTerminal in Frameworks */,
 				A0000000000000000000000A /* VibeTerminalUI in Frameworks */,
+				A0000000000000000000000B /* VibeGit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,6 +119,7 @@
 				J00000000000000000000005 /* VibeDomain */,
 				J00000000000000000000006 /* VibeTerminal */,
 				J00000000000000000000007 /* VibeTerminalUI */,
+				J00000000000000000000008 /* VibeGit */,
 			);
 			productName = VibeManager;
 			productReference = B00000000000000000000004 /* Vibe Manager.app */;
@@ -360,6 +363,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
 			productName = VibeTerminalUI;
+		};
+		J00000000000000000000008 /* VibeGit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
+			productName = VibeGit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

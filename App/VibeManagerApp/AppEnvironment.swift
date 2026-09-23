@@ -2,6 +2,7 @@ import Foundation
 import VibeAgents
 import VibeApplication
 import VibeDomain
+import VibeGit
 import VibePersistence
 import VibeTerminal
 import VibeTerminalUI
@@ -19,7 +20,8 @@ final class AppEnvironment {
   private let prepareForQuit: PrepareForQuit
 
   init() {
-    let repository = FileSessionRepository()
+    let data = Self.dataLocation()
+    let repository = FileSessionRepository(storeURL: data.store)
     let registry = AgentProviderRegistry(providers: Self.providers())
     let supervisor = PTYTerminalSupervisor()
 
@@ -27,7 +29,7 @@ final class AppEnvironment {
     // The runtime document: what this copy of the application is running, so the next launch can
     // tell a quit from a crash and knows what to put back to work. Deliberately a document of its
     // own, next to the session store and never inside it.
-    let recorder = SessionRuntimeRecorder(store: FileSessionRuntimeStateStore())
+    let recorder = SessionRuntimeRecorder(store: FileSessionRuntimeStateStore(url: data.runtime))
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
@@ -59,9 +61,14 @@ final class AppEnvironment {
       // default let an agent walk straight into them, with nothing said beforehand. Choosing is
       // now always a gesture, and the open panel is what grants the access along the way.
       defaultWorkingDirectoryPath: nil,
-      layout: WorkspaceLayoutController(store: UserDefaultsWorkspaceLayoutStore()),
+      layout: WorkspaceLayoutController(
+        store: UserDefaultsWorkspaceLayoutStore(suiteName: data.defaultsSuite)),
       permissions: permissions,
-      runtimeRecorder: recorder
+      runtimeRecorder: recorder,
+      // Read only: the application reports the branches and worktrees the agent made, and never
+      // makes one itself.
+      branchReader: ReadSessionBranchReport(
+        reader: GitActivityReader(), transcripts: AgentTranscriptReader())
     )
   }
 
@@ -82,6 +89,27 @@ final class AppEnvironment {
     await prepareForQuit()
     await launcher.stopAll()
     await terminalSupervisor.stopAll(gracePeriod: .seconds(3))
+  }
+
+  /// Where this copy of the application keeps what it writes.
+  ///
+  /// `VIBE_DATA_DIRECTORY` points a second copy at a folder of its own — its own store, its own
+  /// runtime document, its own layout — so it can run beside the one the user works in without
+  /// either taking the other for a second instance, or migrating the other's sessions.
+  private static func dataLocation(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> (store: URL, runtime: URL, defaultsSuite: String?) {
+    guard let directory = environment["VIBE_DATA_DIRECTORY"], directory.hasPrefix("/") else {
+      return (
+        FileSessionRepository.defaultStoreURL(), FileSessionRuntimeStateStore.defaultURL(), nil
+      )
+    }
+    let folder = URL(fileURLWithPath: directory, isDirectory: true)
+    return (
+      folder.appendingPathComponent("sessions.json"),
+      folder.appendingPathComponent("runtime.json"),
+      "com.hadrienl.VibeManager.isolated"
+    )
   }
 
   private static func providers() -> [any AgentProvider] {
