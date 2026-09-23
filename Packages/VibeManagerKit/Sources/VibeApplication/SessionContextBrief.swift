@@ -19,7 +19,13 @@ public struct SessionContextBrief: Hashable, Sendable {
   public enum Section: String, Hashable, Sendable, CaseIterable {
     case heading
     case agent
+    /// A handover only: the agents that worked in the session before.
+    case agents
     case folders
+    /// A handover only: the repositories read in the branch report, and where each one stands.
+    case repositories
+    /// A handover only: the repositories the agent went into and left untouched.
+    case visited
     case notes
     case task
     case instruction
@@ -28,12 +34,23 @@ public struct SessionContextBrief: Hashable, Sendable {
   public let text: String
   public let isTruncated: Bool
   public let includedSections: [Section]
+  /// How many bytes the text is over what an agent can be started with. Only a handover can be:
+  /// it never cuts the prompt the session was created with, and leaves the shortening to the user.
+  public let overflowByteCount: Int
 
-  public init(text: String, isTruncated: Bool, includedSections: [Section]) {
+  public init(
+    text: String,
+    isTruncated: Bool,
+    includedSections: [Section],
+    overflowByteCount: Int = 0
+  ) {
     self.text = text
     self.isTruncated = isTruncated
     self.includedSections = includedSections
+    self.overflowByteCount = overflowByteCount
   }
+
+  public var fits: Bool { overflowByteCount == 0 }
 }
 
 /// Builds the brief of a session, and nothing else.
@@ -97,7 +114,7 @@ public struct SessionContextBriefBuilder: Sendable {
     var parts: [Part] = [Part(section: .heading, text: heading(of: session))]
 
     if let agent = session.agent {
-      parts.append(Part(section: .agent, text: agentLine(agent)))
+      parts.append(Part(section: .agent, text: agentLine(agent, in: session)))
     }
     if let folders = folders(of: session) {
       parts.append(Part(section: .folders, text: folders))
@@ -122,7 +139,7 @@ public struct SessionContextBriefBuilder: Sendable {
     return parts
   }
 
-  private func heading(of session: WorkSession) -> String {
+  func heading(of session: WorkSession) -> String {
     var line = "Session: \(session.name)"
     line += "\nCreated \(Self.date(session.createdAt))"
     if let closedAt = session.closedAt {
@@ -132,15 +149,27 @@ public struct SessionContextBriefBuilder: Sendable {
     return line
   }
 
-  private func agentLine(_ agent: SessionAgentConfiguration) -> String {
-    var line = "Agent: \(agent.providerID)"
+  private func agentLine(_ agent: SessionAgentConfiguration, in session: WorkSession) -> String {
+    var line = "Agent: \(Self.label(agent, names: [:]))"
+    // After a switch, a restarted agent is told another one worked here: the files may hold work
+    // its own conversation knows nothing about.
+    let previous = session.agentHistory.filter { $0.outcome == .completed }.map(\.previous)
+    if !previous.isEmpty {
+      line += " (previously \(previous.map { Self.label($0, names: [:]) }.joined(separator: ", ")))"
+    }
+    return line
+  }
+
+  /// "Claude Code · opus": the agent's name when it is known, its identifier otherwise.
+  static func label(_ agent: SessionAgentConfiguration, names: [String: String]) -> String {
+    var line = names[agent.providerID] ?? agent.providerID
     if let modelID = agent.modelID {
       line += " · \(modelID)"
     }
     return line
   }
 
-  private func folders(of session: WorkSession) -> String? {
+  func folders(of session: WorkSession) -> String? {
     guard !session.repositories.isEmpty else { return nil }
     let lines = session.repositories.map { repository -> String in
       var line = "- \(repository.path)"
@@ -193,7 +222,7 @@ public struct SessionContextBriefBuilder: Sendable {
     assemble(parts, truncated: truncated).utf8.count
   }
 
-  private func clamp(_ text: String, to limit: Int) -> String {
+  func clamp(_ text: String, to limit: Int) -> String {
     var result = ""
     var count = 0
     for character in text {

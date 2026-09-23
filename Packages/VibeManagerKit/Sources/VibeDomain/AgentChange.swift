@@ -13,6 +13,8 @@ public struct AgentChange: Identifiable, Hashable, Codable, Sendable {
     case resumedConversation
     /// A new conversation, started with a summary of the session.
     case summary(byteCount: Int, isTruncated: Bool, wasEdited: Bool)
+    /// The session had never run: the next agent was given the prompt it was created with.
+    case initialPrompt
     /// A new conversation, told nothing.
     case nothing
   }

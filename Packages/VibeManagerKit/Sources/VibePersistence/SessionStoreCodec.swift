@@ -210,6 +210,11 @@ private struct StoredAgentChangeV4: Codable {
       summaryByteCount = byteCount
       summaryIsTruncated = isTruncated
       summaryWasEdited = wasEdited
+    case .initialPrompt:
+      handover = "initialPrompt"
+      summaryByteCount = nil
+      summaryIsTruncated = nil
+      summaryWasEdited = nil
     case .nothing:
       handover = "nothing"
       summaryByteCount = nil
@@ -231,6 +236,8 @@ private struct StoredAgentChangeV4: Codable {
     switch self.handover {
     case "resumedConversation":
       handover = .resumedConversation
+    case "initialPrompt":
+      handover = .initialPrompt
     case "summary":
       handover = .summary(
         byteCount: summaryByteCount ?? 0,
