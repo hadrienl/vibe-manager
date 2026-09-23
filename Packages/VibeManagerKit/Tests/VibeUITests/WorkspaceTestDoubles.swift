@@ -135,6 +135,9 @@ struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
   /// Holds every detection until the test opens it: what is on screen before one lands, however
   /// slow the machine.
   var probeGate: ProbeGate?
+  var id = "stub"
+  var name = "Stub Agent"
+  var catalog: [AgentModel] = []
 
   func launchObserver(
     for _: SessionID,
@@ -143,15 +146,17 @@ struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
     WorkspaceSlowObserver(yields: observerDelayYields)
   }
 
-  let descriptor = AgentDescriptor(
-    id: AgentProviderID("stub"),
-    displayName: "Stub Agent",
-    capabilities: AgentCapabilities(
-      supportsModelSelection: true,
-      supportsInitialPrompt: true,
-      supportsResume: true
+  var descriptor: AgentDescriptor {
+    AgentDescriptor(
+      id: AgentProviderID(id),
+      displayName: name,
+      capabilities: AgentCapabilities(
+        supportsModelSelection: true,
+        supportsInitialPrompt: true,
+        supportsResume: true
+      )
     )
-  )
+  }
 
   func availability(forceRefresh _: Bool) async -> AgentAvailability {
     await probeGate?.wait()
@@ -162,19 +167,22 @@ struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
         providerID: descriptor.id,
         providerName: descriptor.displayName,
         state: .available,
-        summary: "Stub Agent is ready.",
+        summary: "\(name) is ready.",
         probedAt: Date(timeIntervalSince1970: 0),
         remediations: []
       )
     )
   }
 
-  func models() async -> [AgentModel] { [] }
+  func models() async -> [AgentModel] { catalog }
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
     var arguments: [String] = []
     if case .identifier(let identifier) = request.resume {
       arguments.append(contentsOf: ["--resume", identifier])
+    }
+    if let modelID = request.modelID {
+      arguments.append(contentsOf: ["--model", modelID])
     }
     if let prompt = request.initialPrompt {
       arguments.append(prompt)

@@ -203,6 +203,47 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     )
   }
 
+  /// Starts the agent a session was just switched to, in the pane it already has.
+  ///
+  /// `session` is the one read back after the switch was recorded, so that everything the start
+  /// consults — the observer, the record — already names the new agent.
+  @discardableResult
+  public func launchSwitch(
+    _ plan: AgentSwitchPlan,
+    session: WorkSession,
+    previous: String,
+    at date: Date = Date()
+  ) async -> SessionStartOutcome {
+    await start(
+      session: session,
+      plan: plan.plan,
+      notice: Self.switchSeparator(for: plan, previous: previous, at: date)
+    )
+  }
+
+  /// The line written into the terminal above the agent a session was switched to.
+  ///
+  /// It names both agents: the output above it is the previous one's, and without the line the
+  /// user would read it as the new agent's own.
+  static func switchSeparator(
+    for plan: AgentSwitchPlan,
+    previous: String,
+    at date: Date
+  ) -> String {
+    let stamp = date.formatted(date: .abbreviated, time: .shortened)
+    let what: String
+    switch plan.mode {
+    case .resumeWithModel: what = "same conversation"
+    case .firstLaunch: what = "first start"
+    case .handover: what = "given a summary"
+    case .freshWithoutContext: what = "new process"
+    }
+    let next = plan.target.modelID.map { "\(plan.targetName) (\($0))" } ?? plan.targetName
+    let title =
+      plan.session.agent?.providerID == plan.target.providerID ? "Model changed" : "Agent switched"
+    return "\r\n\u{1B}[2m── \(title) · \(stamp) · \(previous) → \(next) · \(what) ──\u{1B}[0m\r\n"
+  }
+
   /// The line written into the terminal above a restarted process.
   ///
   /// Dim, on its own lines, and it says which of the three restarts this was: a user who reads
@@ -382,8 +423,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     plan: AgentLaunchPlan,
     terminal: any TerminalSession
   ) async {
-    guard let providerID = session.agent?.providerID,
-      let provider = await agents.provider(id: AgentProviderID(providerID)),
+    // The plan names the agent that is actually starting. The stored agent said the same until
+    // agents could be switched; now the plan is the one fact that cannot lag behind.
+    guard let provider = await agents.provider(id: plan.providerID),
       let observing = provider as? any AgentLaunchObserverProviding
     else {
       return

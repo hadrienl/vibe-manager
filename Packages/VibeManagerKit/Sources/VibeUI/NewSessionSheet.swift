@@ -111,7 +111,7 @@ public struct NewSessionSheet: View {
           .foregroundStyle(.secondary)
         }
         ForEach(model.agents) { agent in
-          AgentRow(
+          AgentChoiceRow(
             agent: agent,
             isSelected: agent.id.rawValue == model.draft.providerID,
             select: { Task { await model.select(agent: agent.id.rawValue) } }
@@ -339,8 +339,9 @@ private struct IssueLabel: View {
   }
 }
 
-private struct AgentRow: View {
-  let agent: NewSessionModel.AgentOption
+/// One agent in a list the user picks from, with its state and, when it cannot run, its remedy.
+struct AgentChoiceRow: View {
+  let agent: AgentOption
   let isSelected: Bool
   let select: () -> Void
 
