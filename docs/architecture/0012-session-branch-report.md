@@ -50,10 +50,12 @@ went into is said by the transcript.
 
 ### When, and how, it is read
 
-- **Only the session on screen**, then every 30 seconds while its agent runs, and once when it
-  stops. Twenty sessions read continuously would cost the disk for columns nobody looks at.
+- **Only the session on screen**, when it is selected, and then again each time its transcript
+  grows or one of its branches moves, and once when its agent stops. Twenty sessions read
+  continuously would cost the disk for columns nobody looks at. The first version read it every
+  30 seconds while the agent ran; #13 replaced that timer with the file system's events (ADR 0013).
 - **Read only**, with `symbolic-ref`, `rev-parse`, `reflog` and `status`, under
-  `GIT_OPTIONAL_LOCKS=0`: reading every 30 seconds a repository an agent commits in must never take
+  `GIT_OPTIONAL_LOCKS=0`: reading again and again a repository an agent commits in must never take
   its `index.lock`. A branch whose reflog file was not written since the session started is not
   read at all.
 - The report carries the time it was read, and the inspector says it ("read 20 s ago") rather than
