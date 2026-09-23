@@ -103,6 +103,11 @@ struct CodexTerminalIntegrationTests {
       }
     }
     await supervisor.stopAll(gracePeriod: .seconds(1))
+    if bytes.isEmpty {
+      // Seen only on the CI runner: says how the process ended, and which one it was.
+      Issue.record(
+        "No output from \(plan.executableURL.path) \(plan.arguments): \(await session.state())")
+    }
     return String(decoding: bytes, as: UTF8.self)
   }
 
