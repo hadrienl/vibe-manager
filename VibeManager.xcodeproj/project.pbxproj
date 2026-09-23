@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A00000000000000000000001 /* VibeManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* VibeManagerApp.swift */; };
+		A0000000000000000000000C /* WindowFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* WindowFocus.swift */; };
 		A00000000000000000000002 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* AppEnvironment.swift */; };
 		A00000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Assets.xcassets */; };
 		A00000000000000000000004 /* VibeUI in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000001 /* VibeUI */; };
@@ -23,6 +24,7 @@
 /* Begin PBXFileReference section */
 		B00000000000000000000001 /* VibeManagerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeManagerApp.swift; sourceTree = "<group>"; };
 		B00000000000000000000002 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		B00000000000000000000008 /* WindowFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowFocus.swift; sourceTree = "<group>"; };
 		B00000000000000000000003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B00000000000000000000004 /* Vibe Manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vibe Manager.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B00000000000000000000005 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
@@ -71,6 +73,7 @@
 			children = (
 				B00000000000000000000001 /* VibeManagerApp.swift */,
 				B00000000000000000000002 /* AppEnvironment.swift */,
+				B00000000000000000000008 /* WindowFocus.swift */,
 				B00000000000000000000003 /* Assets.xcassets */,
 			);
 			path = VibeManagerApp;
@@ -202,6 +205,7 @@
 			files = (
 				A00000000000000000000002 /* AppEnvironment.swift in Sources */,
 				A00000000000000000000001 /* VibeManagerApp.swift in Sources */,
+				A0000000000000000000000C /* WindowFocus.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

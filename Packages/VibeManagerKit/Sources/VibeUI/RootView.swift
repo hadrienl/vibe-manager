@@ -10,6 +10,8 @@ public struct RootView: View {
   /// alone. Handing the measured width back as the column's ideal width would close the loop —
   /// measure, store, propose again, resize — and fight the drag the user is in the middle of.
   @State private var idealWidths: IdealColumnWidths?
+  /// The "Don't ask again" box of the close confirmation, unticked each time it opens.
+  @State private var suppressesCloseConfirmation = false
 
   public init(model: AppModel) {
     self.model = model
@@ -256,6 +258,36 @@ public struct RootView: View {
     // Measured on the whole split view: which columns fit is a question about the window, and
     // the answer has to be known before either column decides whether to draw itself.
     .background(WidthReporter { model.layout.windowWidthChanged(to: $0) })
+    // Only asked when an agent is running: the one thing closing loses is the work it is doing.
+    // `presenting:` for the same reason as the archive dialog below.
+    .confirmationDialog(
+      model.pendingClose.map { "Close “\($0.name)”?" } ?? "Close this session?",
+      isPresented: Binding(
+        get: { model.pendingClose != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelClose()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingClose
+    ) { session in
+      Button("Close Session") {
+        let askAgain = !suppressesCloseConfirmation
+        Task { await model.confirmClose(session.id, askAgain: askAgain) }
+      }
+      Button("Cancel", role: .cancel) {
+        model.cancelClose()
+      }
+    } message: { _ in
+      Text("The agent will be stopped. The session can be restarted later.")
+    }
+    // Before the archive dialog in the chain: the toggle reaches every dialog it wraps, and the
+    // archive question has no "Don't ask again".
+    .dialogSuppressionToggle("Don’t ask again", isSuppressed: $suppressesCloseConfirmation)
+    .onChange(of: model.pendingClose?.id) { _, id in
+      if id != nil { suppressesCloseConfirmation = false }
+    }
     // Archiving is reversible, so the question is short and says what actually happens. Cancel
     // is the default button: the pointer slip that opened this must not also answer it.
     // `presenting:` hands the session to the buttons, rather than having them read it back from
@@ -1051,7 +1083,7 @@ struct SessionCommands {
   /// Spoken rather than read, so it says what the command will actually do.
   var restartAnnouncement: String { model.expectedRestartMode(for: session) }
 
-  func close() { Task { await model.close(session.id) } }
+  func close() { Task { await model.requestClose(session.id) } }
   func requestArchive() { model.requestArchive(session.id) }
   func restore() { Task { await model.restore(session.id) } }
   func restart() { Task { await model.restart(session.id) } }

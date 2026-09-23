@@ -41,6 +41,17 @@ public final class AppModel {
   /// The session the user asked to archive, held until they confirm. Archiving is reversible,
   /// but it moves a session out of sight, and a slip of the pointer must not do that.
   public private(set) var pendingArchive: WorkSession?
+  /// The session the user asked to close while its agent was still working, held until they
+  /// confirm. Closing can be undone with Restart, but the agent's work in progress cannot.
+  public private(set) var pendingClose: WorkSession?
+  /// Closes under way, from the command to the reload that shows the session closed. Until then
+  /// the session still reads as running, and a second ⌘W would stop it a second time.
+  public private(set) var closingSessionIDs: Set<SessionID> = []
+  /// Whether closing a session whose agent runs asks first. Mirrored here so that the settings
+  /// window and the dialog's "Don't ask again" read and change the same answer.
+  public var confirmsStoppingRunningAgent: Bool {
+    didSet { closePreferences.confirmsStoppingRunningAgent = confirmsStoppingRunningAgent }
+  }
   /// A process the system would not let go of. Reported rather than swallowed: the promise that
   /// nothing stays attached to an archived session is only worth making if its failure is said.
   public private(set) var detachWarning: DetachWarning?
@@ -248,6 +259,7 @@ public final class AppModel {
   private let launcher: SessionLauncher?
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
+  private let closePreferences: any SessionClosePreferences
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
   private let restartSession: RestartSession?
@@ -276,8 +288,11 @@ public final class AppModel {
     /// Reads what the agent did to the branches. Absent in a workspace assembled without Git,
     /// where the inspector shows no report at all.
     branchReader: ReadSessionBranchReport? = nil,
-    branchReportInterval: Duration = .seconds(30)
+    branchReportInterval: Duration = .seconds(30),
+    closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences()
   ) {
+    self.closePreferences = closePreferences
+    confirmsStoppingRunningAgent = closePreferences.confirmsStoppingRunningAgent
     self.clock = clock
     readBranchReport = branchReader
     self.branchReportInterval = branchReportInterval
@@ -451,7 +466,39 @@ public final class AppModel {
   // MARK: - Lifecycle commands
 
   public func canClose(_ session: WorkSession) -> Bool {
-    session.status == .active || launcher?.isRunning(session.id) == true
+    guard !closingSessionIDs.contains(session.id) else { return false }
+    return session.status == .active || launcher?.isRunning(session.id) == true
+  }
+
+  /// Whether closing this session would interrupt an agent at work, and the user wants to be
+  /// asked about that. A session whose agent has already stopped loses nothing by closing.
+  public func needsCloseConfirmation(_ session: WorkSession) -> Bool {
+    confirmsStoppingRunningAgent && launcher?.isRunning(session.id) == true
+  }
+
+  /// What ⌘W and every other Close Session run: closes at once, or asks first when an agent
+  /// would be interrupted. Does nothing for a session there is nothing left to close.
+  public func requestClose(_ id: SessionID) async {
+    guard let session = sessions.first(where: { $0.id == id }), canClose(session) else { return }
+    guard !needsCloseConfirmation(session) else {
+      pendingClose = session
+      return
+    }
+    await close(id)
+  }
+
+  public func cancelClose() {
+    pendingClose = nil
+  }
+
+  /// Closes the session the confirmation was opened for. Takes the identifier for the same reason
+  /// `archive(_:)` does: the dialog is dismissed, and `pendingClose` cleared, before this runs.
+  public func confirmClose(_ id: SessionID, askAgain: Bool = true) async {
+    pendingClose = nil
+    if !askAgain {
+      confirmsStoppingRunningAgent = false
+    }
+    await close(id)
   }
 
   public func canArchive(_ session: WorkSession) -> Bool {
@@ -464,14 +511,27 @@ public final class AppModel {
 
   /// Stops the agent and keeps everything else. The pane stays mounted so the last thing the
   /// agent said is still on screen.
+  ///
+  /// The session stays selected, and the sidebar follows it to Closed. Left to the reload, the
+  /// selection fell to the next running session — and a second ⌘W then closed that one too.
+  ///
+  /// The selection is read once the agent has stopped, not before: stopping can take a while,
+  /// and a session the user picked in the meantime is theirs to keep.
   public func close(_ id: SessionID) async {
+    guard !closingSessionIDs.contains(id) else { return }
+    closingSessionIDs.insert(id)
+    defer { closingSessionIDs.remove(id) }
     do {
       let closure = try await closeSession(id: id)
       report(closure.detachment, for: closure.session, action: .closed)
     } catch {
       await report(error)
     }
+    let isStillSelected = selectedSessionID == id
     await reload()
+    if isStillSelected {
+      follow(id)
+    }
   }
 
   /// Opens the confirmation rather than archiving. The command is reversible, but it takes a
