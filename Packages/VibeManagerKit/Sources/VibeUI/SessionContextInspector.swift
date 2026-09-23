@@ -388,10 +388,24 @@ private struct RepositoryGroupView: View, Equatable {
   let git: GitInspectorModel
   let showsBanner: Bool
   let bannerActions: IssueBannerView.Actions
+  /// The actions are closures, which cannot be compared: which of them the banner offers is.
+  private let offeredActions: [Bool]
+
+  init(
+    group: RepositoryGroupPresentation, session: SessionID, git: GitInspectorModel,
+    showsBanner: Bool, bannerActions: IssueBannerView.Actions
+  ) {
+    self.group = group
+    self.session = session
+    self.git = git
+    self.showsBanner = showsBanner
+    self.bannerActions = bannerActions
+    offeredActions = [bannerActions.refresh != nil, bannerActions.openPrivacySettings != nil]
+  }
 
   nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.group == rhs.group && lhs.session == rhs.session && lhs.git === rhs.git
-      && lhs.showsBanner == rhs.showsBanner
+      && lhs.showsBanner == rhs.showsBanner && lhs.offeredActions == rhs.offeredActions
   }
 
   var body: some View {

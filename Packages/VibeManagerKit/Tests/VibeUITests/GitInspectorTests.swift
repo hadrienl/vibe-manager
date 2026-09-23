@@ -423,6 +423,41 @@ struct GitInspectorModelTests {
     #expect(git.isExpanded(section, in: session))
   }
 
+  @Test("A path Git lists twice keeps the selection in the list the user picked it in")
+  func pathListedTwice() {
+    let git = makeModel()
+    git.select(row(.untracked, "foo"), in: session)
+
+    // `git rm --cached foo`: a staged deletion, and the file kept on disk, untracked.
+    git.statesChanged([
+      state(
+        [
+          (tracked("foo", .deleted, nil), true),
+          (WorkingTreeEntry(path: "foo", kind: .untracked), true),
+        ], session: session)
+    ])
+    #expect(git.selection(in: session) == row(.untracked, "foo"))
+  }
+
+  @Test("A selection followed into a list folded by default opens it")
+  func followedIntoAFoldedList() {
+    let git = makeModel()
+    let many = (0..<60).map { (WorkingTreeEntry(path: "f\($0)", kind: .untracked), true) }
+    git.select(row(.staged, "z.swift"), in: session)
+
+    // `git reset z.swift` on an added file, beside a long untracked list.
+    git.statesChanged([
+      state(many + [(WorkingTreeEntry(path: "z.swift", kind: .untracked), true)], session: session)
+    ])
+
+    #expect(git.selection(in: session) == row(.untracked, "z.swift"))
+    let untracked = RepositoryGroupPresentation(
+      report: report(),
+      state: state(many + [(WorkingTreeEntry(path: "z.swift", kind: .untracked), true)])
+    ).sections[0]
+    #expect(git.isExpanded(untracked, in: session))
+  }
+
   @Test("A folder is revealed, never opened in the editor; the default application is on demand")
   func foldersAreRevealed() async {
     let opener = FakeOpener()

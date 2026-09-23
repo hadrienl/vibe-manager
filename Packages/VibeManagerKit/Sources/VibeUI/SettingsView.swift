@@ -103,6 +103,9 @@ private struct SessionCloseRow: View {
 /// opened in an application the user did not pick.
 private struct EditorRow: View {
   @Bindable var model: AppModel
+  /// Renewed when "Other…" is cancelled: the setting did not change, so nothing else would bring
+  /// the popup back from "Other…" to the choice that holds.
+  @State private var pickerIdentity = 0
 
   private enum Choice: Hashable {
     case revealOnly
@@ -129,6 +132,7 @@ private struct EditorRow: View {
         Divider()
         Text("Other…").tag(Choice.other)
       }
+      .id(pickerIdentity)
       if case .application = model.fileEditor, let editor = model.fileEditor,
         model.gitInspector.name(of: editor) == nil
       {
@@ -186,7 +190,10 @@ private struct EditorRow: View {
     panel.prompt = "Choose"
     guard panel.runModal() == .OK, let url = panel.url,
       let identifier = Bundle(url: url)?.bundleIdentifier
-    else { return }
+    else {
+      pickerIdentity += 1
+      return
+    }
     model.fileEditor = .application(bundleIdentifier: identifier)
   }
 }

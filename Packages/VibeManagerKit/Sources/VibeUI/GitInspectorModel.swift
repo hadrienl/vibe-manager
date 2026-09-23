@@ -125,8 +125,12 @@ final class GitInspectorModel {
   }
 
   func isExpanded(_ section: FileSection, in session: SessionID) -> Bool {
-    if let chosen = sessions[session]?.sections[section.id] { return chosen }
-    return section.column != .untracked || section.rows.count <= Self.foldedUntrackedThreshold
+    isExpanded(section.id, rowCount: section.rows.count, in: session)
+  }
+
+  private func isExpanded(_ section: GitSectionID, rowCount: Int, in session: SessionID) -> Bool {
+    if let chosen = sessions[session]?.sections[section] { return chosen }
+    return section.column != .untracked || rowCount <= Self.foldedUntrackedThreshold
   }
 
   func setExpanded(_ section: GitSectionID, _ isExpanded: Bool, in session: SessionID) {
@@ -264,10 +268,10 @@ final class GitInspectorModel {
       let entries = entriesByRepository[key]
     else { return }
     // Only the selected path is looked for: building every row, labels and all, to place one
-    // selection would cost more than the publication it follows.
-    let columns =
-      entries.first { $0.entry.path == selected.path }.map { ChangeColumn.of($0.entry) }
-      ?? []
+    // selection would cost more than the publication it follows. Every entry of it counts: Git
+    // can list one path twice, a staged deletion beside the untracked file kept on disk.
+    let columns = entries.filter { $0.entry.path == selected.path }
+      .flatMap { ChangeColumn.of($0.entry) }
     if let child = selected.child {
       // A file of an unfolded folder: kept while its folder is listed and still holds it.
       let parent = GitInspectorRowID(
@@ -295,17 +299,19 @@ final class GitInspectorModel {
     selections[session] = moved
     // Followed into a list where it lies past what is shown: the list is opened far enough to
     // show it, rather than keeping a selection nobody can see.
-    var index = 0
-    for attributed in entries {
-      if attributed.entry.path == selected.path { break }
-      if ChangeColumn.of(attributed.entry).contains(column) { index += 1 }
+    var index: Int?
+    var rowCount = 0
+    for attributed in entries where ChangeColumn.of(attributed.entry).contains(column) {
+      if index == nil, attributed.entry.path == selected.path { index = rowCount }
+      rowCount += 1
     }
-    if index >= rowLimit(moved.section, in: session) {
+    if let index, index >= rowLimit(moved.section, in: session) {
       sessions[session, default: SessionState()].rowLimits[moved.section] =
         (index / Self.pageSize + 1) * Self.pageSize
     }
-    if sessions[session]?.sections[moved.section] == false {
-      sessions[session]?.sections[moved.section] = true
+    // Folded by the user, or by default — a long untracked list: opened all the same.
+    if !isExpanded(moved.section, rowCount: rowCount, in: session) {
+      sessions[session, default: SessionState()].sections[moved.section] = true
     }
   }
 
