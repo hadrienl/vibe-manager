@@ -43,7 +43,10 @@ the command stays offered, and #10's refusal banner offers it too.
 
 ### The order: plan, stop, re-read, record, launch
 
-1. **Plan** again with the text the user confirmed.
+1. **Plan** again with the text the user confirmed, and the mode the sheet showed. A plan that
+   would now do something else — resume a conversation whose identifier arrived while the sheet
+   was open, or hand over a summary nobody read because the CLI refused the resume — is refused
+   (`planChanged`) rather than run.
 2. **Stop** through `CloseSession`. A stop that cannot be confirmed abandons the switch before
    anything is written: two agents in the same files is the worst possible outcome.
 3. **Re-read**: a session archived during the stop is handed to nobody (`sessionMoved`).
@@ -53,12 +56,25 @@ the command stays offered, and #10's refusal banner offers it too.
    configuration, it would name a conversation that agent has never heard of.
 5. **Launch** in the same pane, under a separator naming both agents.
 
-A launch that fails before a process exists is undone by `RevertAgentSwitch`: the previous
+A launch that fails before a process exists — or finds the session already started by another
+path, which is not the agent the store now names — is undone by `RevertAgentSwitch`: the previous
 configuration comes back whole, resume identifier included, and the entry is marked failed. The
 session is closed and **Restart** resumes the previous agent's own conversation. An application
 that dies between 4 and 5 leaves a closed session on the new agent with no identifier; Restart then
 hands over, and the history says the switch happened — relaunchable, nothing lost, and nothing
-replayed behind the user's back (ADR 0011).
+replayed behind the user's back (ADR 0011). When the revert itself is refused — the session was
+archived in between, the store would not write — the banner says the session stays on the new
+agent instead of claiming it is back. The banner offers **Restart** and **Switch Agent…** for the
+session it names, whichever one is selected by then.
+
+The attempts that tell a quick failure are recorded *before* the launch: a CLI that refuses at once
+can exit, and its close be reported, while the launch is still wiring the pane up. A resume refusal
+is only forgotten when the new agent starts a conversation of its own. An exit watch that resumes
+after the switch has relaunched the session checks its generation after every suspension, so it
+never finishes the new agent's observer, closes the session under it, or reports its exit.
+
+No switch is offered while a restoration runs (#11): its queue holds plans built from the stored
+agent, and switching a session under it would record one agent while the queue starts the other.
 
 A new process that starts and then stops within `resumeProbation`, untouched and not stopped on
 purpose, is not a failed switch: it existed, and its own words — a model the account cannot run, a
@@ -72,18 +88,23 @@ for nothing a reader could not infer from this line.
 
 ### A late identifier is never written on the wrong agent
 
-`RecordAgentResumeIdentifier` is now built with the provider whose launch revealed the identifier,
-and answers `agentChanged` — not retryable — when the session's agent is no longer that one. The
+`RecordAgentResumeIdentifier` is now built with the provider whose launch revealed the identifier
+and the instant that launch started, and answers `agentChanged` — not retryable — when the
+session's agent is no longer that provider, or when a switch was completed after that instant. The
+second check is what covers a switch between two models of one agent, where the provider alone
+says nothing; a switch that failed and was undone does not count, since the agent it left is the
+one back in place. The
 launcher already finishes the observer on `detach`; the check closes the window left. The observer
 itself is chosen from the plan's provider rather than the stored agent, the one fact that cannot lag
 behind a switch.
 
 ### The summary says where the work is
 
-`SessionContextBriefBuilder.handover` is pure like the restart brief. Its input widens to what the
-window already knows: the branch report (#12) and the Git states (#13) of the session. Nothing is
-read for it, so the sheet never waits on Git; without them it falls back to the recorded snapshots
-and says so.
+`SessionContextBriefBuilder.handover` is pure like the restart brief. Its input widens to the
+branch report (#12) and the Git states (#13) of the session. The sheet never waits on Git: a
+session that is not on screen has no report yet, so one is read in the background when the sheet
+opens, and the summary is regenerated when it arrives — unless the user has started editing it.
+Until then, and if it never comes, the summary falls back to the recorded snapshots and says so.
 
 The application defines no Git convention (ADR 0012), so the "conventions" the new agent is owed
 are *where* the previous one worked: each repository, the branch checked out, whether it was
@@ -99,7 +120,9 @@ repository. Past that the summary is not cut: the sheet says by how many bytes i
 switch waits for the user to shorten it.
 
 A restart brief of a switched session names the previous agents on its `Agent:` line, and nothing
-else of it changed.
+else of it changed. A switch made before the session ever ran hands over the initial prompt, and
+the agent it left never worked: it opens no period in the summary, is not named as a previous
+agent, and is not the one the inspector says the session started with.
 
 ### The history is data the session keeps, not text it sent
 
@@ -118,9 +141,10 @@ branches and the attribution of changed files keep the previous agent's work.
 ### Schema v4
 
 The store moves to v4, skipping the abandoned v3. A v2 document is read with an empty history and
-rewritten, its original kept as the backup. A build that only knows v2 refuses a v4 document instead
-of reading it, ignoring the history as an unknown key and erasing it at its first write: louder,
-but nothing is lost, and the v2 backup is still there. The history is spelled out field by field in
+rewritten. A build that only knows v2 refuses a v4 document instead of reading it, ignoring the
+history as an unknown key and erasing it at its first write: louder, but nothing is lost. Going
+back to such a build is not supported: the backup holds the document as it was before the last
+write, so the v2 original only survives until the next save. The history is spelled out field by field in
 the store, so a kind written by a later build is read as the closest one this build knows rather
 than taking the whole store down.
 

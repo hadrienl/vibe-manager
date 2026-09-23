@@ -166,6 +166,9 @@ public final class AppModel {
     public let sessionName: String
     public let message: String
     public let suggestion: String?
+    /// The session it is about. The banner outlives the selection, so its buttons act on this one
+    /// rather than on whichever session is on screen by the time they are pressed.
+    public var sessionID: SessionID?
   }
 
   /// The Switch Agent sheet, while it is open.
@@ -820,14 +823,16 @@ public final class AppModel {
         restartFailure = RestartFailure(
           sessionName: restart.session.name,
           message: reason ?? failure?.message ?? "This session could not be restarted.",
-          suggestion: reason == nil ? failure?.suggestion : nil
+          suggestion: reason == nil ? failure?.suggestion : nil,
+          sessionID: id
         )
       }
     } catch let refusal as SessionRestartRefusal {
       restartFailure = RestartFailure(
         sessionName: sessions.first { $0.id == id }?.name ?? "This session",
         message: refusal.errorDescription ?? "This session could not be restarted.",
-        suggestion: refusal.recoverySuggestion
+        suggestion: refusal.recoverySuggestion,
+        sessionID: id
       )
     } catch {
       await report(error)
@@ -886,6 +891,9 @@ public final class AppModel {
   public func canSwitchAgent(_ session: WorkSession) -> Bool {
     guard planAgentSwitch != nil, launcher != nil, session.agent != nil else { return false }
     guard session.status != .archived else { return false }
+    // A restoration walks its queue with plans built from the stored agent: switching a session
+    // under it would record one agent while the queue starts the other.
+    guard restoration == nil else { return false }
     guard !restartingSessionIDs.contains(session.id), !closingSessionIDs.contains(session.id)
     else { return false }
     return pendingRestart?.sessionID != session.id && pendingSwitch?.sessionID != session.id
@@ -909,6 +917,17 @@ public final class AppModel {
     )
     pendingSwitch = sheet
     Task { await sheet.load() }
+    // A session not on screen has no report yet. It is read once, in the background: the sheet
+    // opens on what the session recorded, and the summary catches up — unless the user has
+    // started editing it, which is theirs to keep.
+    if branchReports[id] == nil, let readBranchReport {
+      Task { [weak self] in
+        let report = await readBranchReport(for: session)
+        guard let self else { return }
+        if self.branchReports[id] == nil { self.branchReports[id] = report }
+        if self.pendingSwitch === sheet { sheet.contextChanged() }
+      }
+    }
   }
 
   public func cancelAgentSwitch() {
@@ -935,7 +954,9 @@ public final class AppModel {
       to: sheet.target,
       previous: sheet.currentLabel,
       summary: summary,
-      wasEdited: sheet.isSummaryEdited
+      wasEdited: sheet.isSummaryEdited,
+      expecting: sheet.expectedModeKind,
+      names: sheet.agentNames
     )
   }
 
@@ -947,9 +968,11 @@ public final class AppModel {
     to target: AgentTarget,
     previous: String,
     summary: String?,
-    wasEdited: Bool
+    wasEdited: Bool,
+    expecting: AgentSwitchMode.Kind?,
+    names: [String: String]
   ) async {
-    guard let launcher, let planAgentSwitch else { return }
+    guard let launcher, let planAgentSwitch, restoration == nil else { return }
     // The restart lock: a switch and a restart of one session must never cross.
     guard restartingSessionIDs.insert(id).inserted else { return }
     defer { restartingSessionIDs.remove(id) }
@@ -963,8 +986,9 @@ public final class AppModel {
       let plan = try await planAgentSwitch(
         id: id,
         to: target,
-        context: current.map { briefInput(for: $0, names: [:]) },
-        summaryOverride: summary
+        context: current.map { briefInput(for: $0, names: names) },
+        summaryOverride: summary,
+        expecting: expecting
       )
 
       // 2. The running agent is stopped, and the session closed, before anything is written.
@@ -984,40 +1008,48 @@ public final class AppModel {
         throw AgentSwitchRefusal.sessionMissing
       }
 
-      // 5. The new agent, in the same pane, under a separator naming both.
-      switch await launcher.launchSwitch(plan, session: switched, previous: previous) {
-      case .started, .alreadyRunning:
+      // 5. The new agent, in the same pane, under a separator naming both. The attempts are
+      // recorded before the launch: a CLI that refuses at once can exit — and its close be
+      // reported — while the launch is still wiring the pane up.
+      if plan.mode.keepsConversation {
+        resumeAttempts[id] = clock.now()
+      } else {
+        resumeAttempts[id] = nil
+        // This process starts a conversation of its own: a refusal of the previous one is moot.
         resumeRefusals.remove(id)
-        if plan.mode.keepsConversation {
-          resumeAttempts[id] = clock.now()
-        } else {
-          resumeAttempts[id] = nil
+      }
+      let back = SwitchBack(
+        target: AgentTarget(
+          providerID: change.previous.providerID, modelID: change.previous.modelID),
+        label: previous
+      )
+      switchAttempts[id] = (clock.now(), back)
+
+      let outcome = await launcher.launchSwitch(plan, session: switched, previous: previous)
+      if outcome != .started {
+        resumeAttempts[id] = nil
+        switchAttempts[id] = nil
+        // `alreadyRunning` is a failure here: something else started this session between the
+        // stop and the launch, and it is not the agent the store now names.
+        let why: String
+        switch outcome {
+        case .failed(let reason?):
+          why = reason
+        case .alreadyRunning:
+          why = "Another launch started this session in the meantime."
+        default:
+          why = launcher.failure(for: id)?.message ?? "\(plan.targetName) could not be started."
         }
-        switchAttempts[id] = (
-          clock.now(),
-          SwitchBack(
-            target: AgentTarget(
-              providerID: change.previous.providerID, modelID: change.previous.modelID),
-            label: previous
-          )
-        )
-      case .failed(let reason):
-        let why =
-          reason ?? launcher.failure(for: id)?.message ?? "\(plan.targetName) could not be started."
-        // Put back exactly as it was, resume identifier included: Restart then resumes the
-        // previous agent's own conversation.
-        try? await revertAgentSwitch(id: id, change: change.id, reason: why)
-        switchFailure = RestartFailure(
-          sessionName: name,
-          message: "Could not switch to \(plan.targetName): \(why)",
-          suggestion: "The session is back on \(previous)."
-        )
+        await undoSwitch(
+          id: id, change: change, reason: why, target: plan.targetName, previous: previous,
+          name: name)
       }
     } catch let refusal as AgentSwitchRefusal {
       switchFailure = RestartFailure(
         sessionName: name,
         message: refusal.errorDescription ?? "The agent could not be switched.",
-        suggestion: refusal.recoverySuggestion
+        suggestion: refusal.recoverySuggestion,
+        sessionID: id
       )
     } catch {
       await report(error)
@@ -1026,9 +1058,37 @@ public final class AppModel {
     follow(id)
   }
 
-  /// What the summary is built from: the branch report and the Git states this window already
-  /// holds for the session. Nothing is read for it — the sheet must never wait on Git — and a
-  /// session never looked at is summarised from what it recorded.
+  /// Puts the session back on the agent the switch left, and says what actually happened: back
+  /// on it, or — when even that write was refused — still on the new one, which Restart then
+  /// starts with a summary.
+  private func undoSwitch(
+    id: SessionID,
+    change: AgentChange,
+    reason: String,
+    target: String,
+    previous: String,
+    name: String
+  ) async {
+    let suggestion: String
+    do {
+      try await revertAgentSwitch(id: id, change: change.id, reason: reason)
+      suggestion = "The session is back on \(previous)."
+    } catch {
+      suggestion =
+        "The session could not be put back on \(previous): it stays on \(target), and Restart "
+        + "will start it with a summary."
+    }
+    switchFailure = RestartFailure(
+      sessionName: name,
+      message: "Could not switch to \(target): \(reason)",
+      suggestion: suggestion,
+      sessionID: id
+    )
+  }
+
+  /// What the summary is built from: the branch report and the Git states this window holds for
+  /// the session. The sheet never waits on Git: a session never looked at is summarised from what
+  /// it recorded until its report, read in the background, arrives.
   private func briefInput(for session: WorkSession, names: [String: String]) -> SessionBriefInput {
     SessionBriefInput(
       session: session,

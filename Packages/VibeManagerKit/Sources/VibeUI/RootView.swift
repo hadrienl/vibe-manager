@@ -112,6 +112,20 @@ public struct RootView: View {
     }
   }
 
+  private func session(_ id: SessionID?) -> WorkSession? {
+    id.flatMap { id in model.sessions.first { $0.id == id } }
+  }
+
+  private func switchAction(for id: SessionID?) -> (() -> Void)? {
+    guard let session = session(id), model.canSwitchAgent(session) else { return nil }
+    return { model.beginAgentSwitch(session.id) }
+  }
+
+  private func restartAction(for id: SessionID?) -> (() -> Void)? {
+    guard let session = session(id), model.canRestart(session) else { return nil }
+    return { Task { await model.restart(session.id) } }
+  }
+
   /// Which sheet the window is showing, out of the ones asking to be shown.
   ///
   /// One modifier, not two. SwiftUI presents a single sheet per view and drops the rest on the
@@ -189,10 +203,10 @@ public struct RootView: View {
             failure: failure,
             detect: { Task { await model.refreshAgents(forceRefresh: true) } },
             isDetecting: model.isRefreshingAgents,
-            // An agent that cannot run is exactly when another one is wanted.
-            switchAgent: model.selectedSession.flatMap { session in
-              model.canSwitchAgent(session) ? { model.beginAgentSwitch(session.id) } : nil
-            },
+            restart: nil,
+            // An agent that cannot run is exactly when another one is wanted — for the session
+            // the banner names, whichever one is selected by now.
+            switchAgent: switchAction(for: failure.sessionID),
             dismiss: { model.dismissRestartFailure() }
           )
           Divider()
@@ -202,7 +216,10 @@ public struct RootView: View {
             failure: failure,
             detect: { Task { await model.refreshAgents(forceRefresh: true) } },
             isDetecting: model.isRefreshingAgents,
-            switchAgent: nil,
+            // Back on its previous agent, the session resumes its own conversation with Restart;
+            // or another switch can be tried.
+            restart: restartAction(for: failure.sessionID),
+            switchAgent: switchAction(for: failure.sessionID),
             dismiss: { model.dismissSwitchFailure() }
           )
           Divider()
@@ -521,6 +538,7 @@ private struct RestartFailureBanner: View {
   let failure: AppModel.RestartFailure
   let detect: () -> Void
   let isDetecting: Bool
+  let restart: (() -> Void)?
   let switchAgent: (() -> Void)?
   let dismiss: () -> Void
 
@@ -543,6 +561,10 @@ private struct RestartFailureBanner: View {
       Button("Detect Again", action: detect)
         .controlSize(.small)
         .disabled(isDetecting)
+      if let restart {
+        Button("Restart", action: restart)
+          .controlSize(.small)
+      }
       if let switchAgent {
         Button("Switch Agent…", action: switchAgent)
           .controlSize(.small)

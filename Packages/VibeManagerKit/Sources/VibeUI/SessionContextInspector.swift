@@ -957,18 +957,23 @@ private struct AgentHistoryList: View {
       ForEach(session.agentHistory.reversed()) { change in
         entry(change)
       }
-      if let first = session.agentHistory.first {
-        let start = session.startedAt ?? session.createdAt
+      if let first = firstAgent, let start = session.startedAt {
         row(
           date: start,
-          text: "Started with \(Self.label(first.previous, names: names))",
+          text: "Started with \(Self.label(first, names: names))",
           detail: nil,
           failed: false,
-          spoken: "\(Self.spoken(start)), started with \(Self.label(first.previous, names: names))"
+          spoken: "\(Self.spoken(start)), started with \(Self.label(first, names: names))"
         )
       }
     }
     .padding(.vertical, 2)
+  }
+
+  /// The agent that first ran: the one the first real switch left, or the current one. A switch
+  /// made before the session ever ran does not count — the agent it left never started.
+  private var firstAgent: SessionAgentConfiguration? {
+    session.agentHistory.first(where: \.leftAgentThatRan)?.previous ?? session.agent
   }
 
   @ViewBuilder

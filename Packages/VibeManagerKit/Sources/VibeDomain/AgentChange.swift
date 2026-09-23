@@ -53,6 +53,12 @@ public struct AgentChange: Identifiable, Hashable, Codable, Sendable {
     self.outcome = outcome
   }
 
+  /// Whether the agent it left had actually worked: a switch made before the session ever ran
+  /// handed over its initial prompt, and the agent it left never started.
+  public var leftAgentThatRan: Bool {
+    outcome == .completed && handover != .initialPrompt
+  }
+
   /// Whether the provider changed, rather than only the model.
   public var changesProvider: Bool {
     previous.providerID != next.providerID

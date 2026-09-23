@@ -407,14 +407,20 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     // actor — by a detach, or by a relaunch that installed its own. Only the current one speaks.
     guard exitGenerations[id] == generation else { return }
     await recorder?.stopped(id)
+    // Asked again after every suspension: a switch can stop, record and relaunch the session
+    // while this watch waits, and what follows would then finish the *new* agent's observer,
+    // close the session under it and report its exit.
+    guard exitGenerations[id] == generation else { return }
     exitTasks[id] = nil
     outputTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
       await observer.finished()
     }
+    guard exitGenerations[id] == generation else { return }
     // A session that was never marked active — a launch that failed — has nothing to close, and
     // `close` says so by refusing the transition rather than by inventing a second rule here.
     _ = try? await changeStatus(id: id, action: .close)
+    guard exitGenerations[id] == generation else { return }
     sessionDidClose?(id, state)
   }
 

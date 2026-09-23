@@ -255,6 +255,31 @@ struct AgentSwitchWorkspaceTests {
     #expect(back.modelID == "fast")
   }
 
+  @Test("A stop that cannot be confirmed abandons the switch before anything is written")
+  func unconfirmedStopAbandonsTheSwitch() async throws {
+    let path = folder()
+    let subject = session(path: path)
+    let supervisor = WorkspaceSupervisor(
+      stopState: .failed(.processOutcomeUnknown(processIdentifier: 4242)))
+    let (model, launcher, _, repository) = await makeWorkspace(
+      session: subject, supervisor: supervisor)
+    let plan = try await WorkspaceProvider().launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: path))
+    await launcher.launch(session: subject, plan: plan)
+    await model.reload()
+    let sheet = try await openSheet(model, for: subject.id)
+    await sheet.select(agent: "other")
+
+    await model.confirmAgentSwitch()
+
+    let stored = try #require(await repository.session(id: subject.id))
+    #expect(stored.agent == subject.agent)
+    #expect(stored.agentHistory.isEmpty)
+    #expect(await supervisor.startCount == 1)
+    #expect(model.switchFailure?.message.contains("4242") == true)
+    #expect(model.switchFailure?.sessionID == subject.id)
+  }
+
   @Test("Two confirmations start one agent")
   func doubleConfirmationStartsOnce() async throws {
     let subject = session(path: folder())

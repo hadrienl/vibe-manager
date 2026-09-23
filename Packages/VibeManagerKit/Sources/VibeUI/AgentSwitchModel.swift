@@ -115,6 +115,16 @@ public final class AgentSwitchModel {
     return .summary
   }
 
+  /// The mode the sheet is showing, for the switch to confirm it is still the one it would take.
+  public var expectedModeKind: AgentSwitchMode.Kind {
+    switch handover {
+    case .resumesConversation: return .resumeWithModel
+    case .firstLaunch: return .firstLaunch
+    case .summary: return isSummaryEmptied ? .freshWithoutContext : .handover
+    case .nothing: return .freshWithoutContext
+    }
+  }
+
   public var summaryByteCount: Int { summaryText.utf8.count }
 
   public var summaryOverflow: Int {
@@ -215,6 +225,12 @@ public final class AgentSwitchModel {
     regenerateUnlessEdited()
   }
 
+  /// What the summary is built from has changed — a branch report arrived. The text follows,
+  /// unless the user has edited it.
+  public func contextChanged() {
+    regenerateUnlessEdited()
+  }
+
   /// Throws the user's edits away for the text generated for the current target.
   public func regenerateSummary() {
     let summary = planner.summary(for: context(session, agentNames), to: target)
@@ -244,7 +260,7 @@ public final class AgentSwitchModel {
 
   // MARK: - Names
 
-  private var agentNames: [String: String] {
+  var agentNames: [String: String] {
     Dictionary(agents.map { ($0.id.rawValue, $0.name) }, uniquingKeysWith: { first, _ in first })
   }
 

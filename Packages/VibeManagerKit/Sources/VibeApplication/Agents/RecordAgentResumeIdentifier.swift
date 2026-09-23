@@ -36,12 +36,33 @@ public enum RecordAgentResumeIdentifierOutcome: Sendable, Equatable {
 public struct RecordAgentResumeIdentifier: Sendable {
   private let repository: any SessionRepository
   private let providerID: String?
+  private let launchedAt: Date?
 
-  /// - Parameter providerID: the agent whose launch revealed the identifier. When given, nothing is
-  ///   written on a session whose agent is no longer that one.
-  public init(repository: any SessionRepository, providerID: String? = nil) {
+  /// - Parameters:
+  ///   - providerID: the agent whose launch revealed the identifier. When given, nothing is written
+  ///     on a session whose agent is no longer that one.
+  ///   - launchedAt: when that launch started. When given, nothing is written on a session that was
+  ///     switched since — to another agent, or to another model of the same one, whose conversation
+  ///     this identifier does not name either.
+  public init(
+    repository: any SessionRepository,
+    providerID: String? = nil,
+    launchedAt: Date? = nil
+  ) {
     self.repository = repository
     self.providerID = providerID
+    self.launchedAt = launchedAt
+  }
+
+  /// Whether the session's agent is still the one this launch started.
+  private func isStillLaunched(on session: WorkSession) -> Bool {
+    if let providerID, session.agent?.providerID != providerID { return false }
+    if let launchedAt,
+      session.agentHistory.contains(where: { $0.outcome == .completed && $0.date > launchedAt })
+    {
+      return false
+    }
+    return true
   }
 
   @discardableResult
@@ -54,19 +75,18 @@ public struct RecordAgentResumeIdentifier: Sendable {
 
     guard let current = try await repository.session(id: sessionID) else { return .sessionMissing }
     guard let agent = current.agent else { return .agentMissing }
-    if let providerID, agent.providerID != providerID { return .agentChanged }
+    guard isStillLaunched(on: current) else { return .agentChanged }
     guard agent.resumeIdentifier != identifier else { return .unchanged }
 
-    let providerID = providerID
-    let updated = try await repository.mutate(id: sessionID) { session in
+    let updated = try await repository.mutate(id: sessionID) { [self] session in
       guard var agent = session.agent, agent.resumeIdentifier != identifier else { return }
       // Decided again on the copy the write is made on: a switch may have landed in between.
-      if let providerID, agent.providerID != providerID { return }
+      guard isStillLaunched(on: session) else { return }
       agent.resumeIdentifier = identifier
       session.agent = agent
     }
     guard let updated else { return .sessionMissing }
-    if let providerID, updated.agent?.providerID != providerID { return .agentChanged }
+    guard isStillLaunched(on: updated) else { return .agentChanged }
     guard updated.agent?.resumeIdentifier == identifier else { return .agentMissing }
     return .recorded
   }

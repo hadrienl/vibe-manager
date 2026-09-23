@@ -27,6 +27,20 @@ public enum AgentSwitchMode: Equatable, Sendable {
   /// A new process, told nothing: the summary was emptied, or the agent takes no prompt.
   case freshWithoutContext
 
+  /// The mode without what it carries: what the sheet showed, compared with what the plan chose.
+  public enum Kind: Equatable, Sendable {
+    case resumeWithModel, firstLaunch, handover, freshWithoutContext
+  }
+
+  public var kind: Kind {
+    switch self {
+    case .resumeWithModel: return .resumeWithModel
+    case .firstLaunch: return .firstLaunch
+    case .handover: return .handover
+    case .freshWithoutContext: return .freshWithoutContext
+    }
+  }
+
   public var brief: SessionContextBrief? {
     guard case .handover(let brief) = self else { return nil }
     return brief
@@ -68,6 +82,9 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
   case stopUnconfirmed(processIdentifier: Int32)
   /// The session was archived or removed while its agent was being stopped.
   case sessionMoved
+  /// The session changed while the sheet was open, and the switch would no longer do what the
+  /// sheet said: resume a conversation it announced a summary for, or the reverse.
+  case planChanged
 
   public var errorDescription: String? {
     switch self {
@@ -107,6 +124,8 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
       return "The running agent (process \(pid)) could not be confirmed stopped."
     case .sessionMoved:
       return "This session was archived while its agent was being stopped."
+    case .planChanged:
+      return "This session changed while the switch was being prepared, so nothing was switched."
     }
   }
 
@@ -114,6 +133,8 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
     switch self {
     case .sessionMissing, .sessionMoved:
       return "Reload the workspace."
+    case .planChanged:
+      return "Open Switch Agent again to review what will be handed over."
     case .storeUnreadable:
       return "Try again, and restore a backup if it persists."
     case .notSwitchable(.archived):
@@ -223,11 +244,28 @@ public struct PlanAgentSwitch: Sendable {
   ///   - context: the branch report and Git states known right now, and the agents' names.
   ///   - summaryOverride: the summary as the user left it in the sheet. Empty means "tell it
   ///     nothing"; `nil` means the generated one.
+  ///   - expecting: the mode the sheet showed. A plan that turns out otherwise is refused rather
+  ///     than run: a summary nobody read must not be sent, nor one somebody read be dropped.
   public func callAsFunction(
     id: SessionID,
     to target: AgentTarget,
     context: SessionBriefInput? = nil,
-    summaryOverride: String? = nil
+    summaryOverride: String? = nil,
+    expecting: AgentSwitchMode.Kind? = nil
+  ) async throws -> AgentSwitchPlan {
+    let planned = try await plan(
+      id: id, to: target, context: context, summaryOverride: summaryOverride)
+    if let expecting, planned.mode.kind != expecting {
+      throw AgentSwitchRefusal.planChanged
+    }
+    return planned
+  }
+
+  private func plan(
+    id: SessionID,
+    to target: AgentTarget,
+    context: SessionBriefInput?,
+    summaryOverride: String?
   ) async throws -> AgentSwitchPlan {
     let stored: WorkSession?
     do {

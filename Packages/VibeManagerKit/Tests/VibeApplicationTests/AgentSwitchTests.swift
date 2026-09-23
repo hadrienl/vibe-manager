@@ -242,6 +242,28 @@ struct AgentSwitchTests {
         == .summaryTooLong(overBy: 1_000))
   }
 
+  @Test("A plan that would not do what the sheet showed is refused, never run")
+  func planThatChangedIsRefused() async throws {
+    // The sheet showed a summary — no identifier yet — and the agent revealed one meanwhile.
+    let stored = session()
+    let (plan, _) = subject(stored)
+
+    await #expect(throws: AgentSwitchRefusal.planChanged) {
+      _ = try await plan(
+        id: stored.id,
+        to: AgentTarget(providerID: "claude-code", modelID: "sonnet"),
+        summaryOverride: "The summary the user read.",
+        expecting: .handover
+      )
+    }
+    let resumed = try await plan(
+      id: stored.id,
+      to: AgentTarget(providerID: "claude-code", modelID: "sonnet"),
+      expecting: .resumeWithModel
+    )
+    #expect(resumed.mode.kind == .resumeWithModel)
+  }
+
   // MARK: - Writing it
 
   @Test("Recording writes the agent and its history, then undoing puts everything back")
@@ -424,5 +446,32 @@ struct HandoverBriefTests {
 
     #expect(
       brief.text.contains("Agent: claude-code · sonnet (previously claude-code · sonnet, codex)"))
+  }
+
+  @Test("An agent switched away from before the session ever ran is not said to have worked")
+  func switchBeforeTheFirstRunOpensNoPeriod() throws {
+    var session = SessionDraft(
+      name: "Audit deps",
+      initialPrompt: "Audit.",
+      providerID: "claude-code",
+      workingDirectoryPath: "/work/app"
+    )
+    .session(createdAt: Date(timeIntervalSince1970: 1_699_000_000))
+    try session.switchAgent(
+      to: SessionAgentConfiguration(providerID: "codex"),
+      handover: .initialPrompt,
+      at: Date(timeIntervalSince1970: 1_699_000_010)
+    )
+    try session.reopen(at: Date(timeIntervalSince1970: 1_699_000_020))
+    try session.close(at: Date(timeIntervalSince1970: 1_699_100_000))
+
+    let brief = SessionContextBriefBuilder().handover(
+      input(session), to: SessionAgentConfiguration(providerID: "claude-code"))
+    let restart = SessionContextBriefBuilder()(for: session)
+
+    let lines = brief.text.components(separatedBy: "\n").filter { $0.hasPrefix("- ") }
+    #expect(lines.first?.hasPrefix("- Codex, from ") == true)
+    #expect(!brief.text.contains("Claude Code, from"))
+    #expect(!restart.text.contains("previously"))
   }
 }

@@ -153,7 +153,7 @@ public struct SessionContextBriefBuilder: Sendable {
     var line = "Agent: \(Self.label(agent, names: [:]))"
     // After a switch, a restarted agent is told another one worked here: the files may hold work
     // its own conversation knows nothing about.
-    let previous = session.agentHistory.filter { $0.outcome == .completed }.map(\.previous)
+    let previous = session.agentHistory.filter(\.leftAgentThatRan).map(\.previous)
     if !previous.isEmpty {
       line += " (previously \(previous.map { Self.label($0, names: [:]) }.joined(separator: ", ")))"
     }

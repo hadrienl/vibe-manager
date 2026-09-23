@@ -15,13 +15,17 @@ actor WorkspaceSupervisor: TerminalSupervisor {
   private var sessions: [SessionID: WorkspaceTerminal] = [:]
   private let failure: TerminalError?
   private var initialState: TerminalProcessState
+  /// What a stop leaves behind: a clean exit, or a process group the kernel would not let go of.
+  private let stopState: TerminalProcessState
 
   init(
     failure: TerminalError? = nil,
-    initialState: TerminalProcessState = .running(processIdentifier: 4242)
+    initialState: TerminalProcessState = .running(processIdentifier: 4242),
+    stopState: TerminalProcessState = .exited(code: 0)
   ) {
     self.failure = failure
     self.initialState = initialState
+    self.stopState = stopState
   }
 
   /// What the next process starts in, for a test whose second launch must not repeat the fate
@@ -44,7 +48,7 @@ actor WorkspaceSupervisor: TerminalSupervisor {
   func stop(id: SessionID, gracePeriod: Duration) async {
     // Released as well as finished, exactly as `PTYTerminalSupervisor` does: a double that kept
     // the entry would let a test claim nothing is attached while the supervisor still holds it.
-    await sessions.removeValue(forKey: id)?.finish(state: .exited(code: 0))
+    await sessions.removeValue(forKey: id)?.finish(state: stopState)
   }
 
   func stopAll(gracePeriod: Duration) {}

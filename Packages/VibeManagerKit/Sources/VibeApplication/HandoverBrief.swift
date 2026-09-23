@@ -125,10 +125,11 @@ extension SessionContextBriefBuilder {
   }
 
   /// Who worked here, and when: one period per agent that actually ran, the current one last and
-  /// open. A switch that failed started nothing, so it opens no period.
+  /// open. A switch that failed started nothing, and one made before the session ever ran left an
+  /// agent that never worked, so neither opens a period.
   private func agentPeriods(of session: WorkSession) -> [AgentPeriod] {
     guard let current = session.agent, session.hasEverStarted else { return [] }
-    let completed = session.agentHistory.filter { $0.outcome == .completed }
+    let completed = session.agentHistory.filter(\.leftAgentThatRan)
     var periods: [AgentPeriod] = []
     var agent = completed.first?.previous ?? current
     var start = session.startedAt ?? session.createdAt
