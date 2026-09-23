@@ -99,7 +99,7 @@ struct AbandonedV3StoreTests {
     #expect(worktree.status == .archived)
   }
 
-  @Test("Reading it rewrites it as v2")
+  @Test("Reading it rewrites it in the current schema")
   func documentIsRewritten() async throws {
     let storeURL = try makeStoreURL()
     defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
@@ -108,6 +108,6 @@ struct AbandonedV3StoreTests {
     _ = try await FileSessionRepository(storeURL: storeURL).sessions()
 
     let object = try JSONSerialization.jsonObject(with: Data(contentsOf: storeURL))
-    #expect((object as? [String: Any])?["schemaVersion"] as? Int == 2)
+    #expect((object as? [String: Any])?["schemaVersion"] as? Int == 4)
   }
 }

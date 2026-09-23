@@ -279,6 +279,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   public var repositories: [RepositoryContext]
   public var notes: String?
   public var template: PromptTemplateReference?
+  /// Every switch of agent or model, oldest first. Appended to and never rewritten, except for the
+  /// outcome of the last one when it is undone.
+  public private(set) var agentHistory: [AgentChange]
 
   public var status: SessionStatus {
     lifecycle.status
@@ -324,7 +327,8 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     startedAt: Date? = nil,
     repositories: [RepositoryContext] = [],
     notes: String? = nil,
-    template: PromptTemplateReference? = nil
+    template: PromptTemplateReference? = nil,
+    agentHistory: [AgentChange] = []
   ) {
     self.id = id
     self.name = name
@@ -342,6 +346,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     self.repositories = repositories
     self.notes = notes
     self.template = template
+    self.agentHistory = agentHistory
   }
 
   public mutating func close(at date: Date) throws {
@@ -358,6 +363,65 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
 
   public mutating func restore(at date: Date) throws {
     try lifecycle.restore(at: date)
+  }
+
+  /// Every conversation this session has had, oldest first — the agents it was switched away from,
+  /// then the current one. Only those that were given an identifier: a conversation that never
+  /// had one left nothing that could be read back.
+  public var conversations: [SessionAgentConfiguration] {
+    var result: [SessionAgentConfiguration] = []
+    func add(_ agent: SessionAgentConfiguration?) {
+      guard let agent, let identifier = agent.resumeIdentifier, !identifier.isEmpty else { return }
+      guard
+        !result.contains(where: {
+          $0.providerID == agent.providerID && $0.resumeIdentifier == identifier
+        })
+      else { return }
+      result.append(agent)
+    }
+    for change in agentHistory { add(change.previous) }
+    add(agent)
+    return result
+  }
+
+  /// Hands the session to another agent or model, keeping the one it leaves in the history.
+  ///
+  /// Neither the lifecycle nor anything else the user wrote is touched: the lifecycle records when
+  /// agents ran, which `reopen` will say, and the history records which ones.
+  @discardableResult
+  public mutating func switchAgent(
+    to next: SessionAgentConfiguration,
+    handover: AgentChange.Handover,
+    at date: Date,
+    id: UUID = UUID()
+  ) throws -> AgentChange {
+    guard status == .closed else { throw AgentSwitchError.notClosed(status) }
+    guard let previous = agent else { throw AgentSwitchError.noAgent }
+    guard previous.providerID != next.providerID || previous.modelID != next.modelID else {
+      throw AgentSwitchError.nothingToChange
+    }
+    let change = AgentChange(
+      id: id,
+      date: date,
+      previous: previous,
+      next: next,
+      handover: handover
+    )
+    agentHistory.append(change)
+    agent = next
+    return change
+  }
+
+  /// Puts the session back on the agent the last switch left, because the next one never ran.
+  ///
+  /// The entry stays, marked failed: the switch was attempted, and the history says so.
+  public mutating func revertAgentSwitch(_ id: UUID, reason: String) throws {
+    guard status == .closed else { throw AgentSwitchError.notClosed(status) }
+    guard let index = agentHistory.indices.last, agentHistory[index].id == id,
+      agentHistory[index].outcome == .completed
+    else { throw AgentSwitchError.notRevertible }
+    agentHistory[index].outcome = .failed(reason: reason)
+    agent = agentHistory[index].previous
   }
 
   public func validate() throws {

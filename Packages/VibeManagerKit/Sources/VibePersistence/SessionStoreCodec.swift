@@ -12,18 +12,21 @@ struct SessionStoreDecodeResult {
 }
 
 struct SessionStoreCodec {
-  static let currentSchemaVersion = 2
+  /// v4 adds the history of agent switches (#15). A build that only knows v2 would read such a
+  /// document, ignore the history as an unknown key, and erase it at its first write; refusing
+  /// the document is louder, and loses nothing.
+  static let currentSchemaVersion = 4
+  static let previousSchemaVersion = 2
   /// Written only by a build of #12 that created a worktree per session, and was reworked before
-  /// release. Read back into v2 so that the sessions it migrated are not lost; the next schema
-  /// change has to skip it and be v4.
+  /// release. Read back so that the sessions it migrated are not lost; it is never written again.
   static let abandonedSchemaVersion = 3
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV2(
+    let envelope = StoreEnvelopeV4(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV2.init)
+      sessions: sessions.map(StoredSessionV4.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -48,8 +51,12 @@ struct SessionStoreCodec {
         let previous = try Self.makeDecoder().decode(StoreEnvelopeV1.self, from: data)
         sessions = previous.sessions.map(\.workSession)
         requiresRewrite = true
+      case Self.previousSchemaVersion:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
+        sessions = previous.sessions.map(\.workSession)
+        requiresRewrite = true
       case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV4.self, from: data)
         sessions = current.sessions.map(\.workSession)
         requiresRewrite = false
       case Self.abandonedSchemaVersion:
@@ -119,6 +126,134 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
+private struct StoreEnvelopeV4: Codable {
+  let schemaVersion: Int
+  let savedAt: Date
+  let sessions: [StoredSessionV4]
+}
+
+/// A v2 session and the history of its agent switches.
+private struct StoredSessionV4: Codable {
+  let id: UUID
+  let name: String
+  let initialPrompt: String
+  let agent: StoredAgentV2?
+  let appearance: StoredAppearanceV2
+  let lifecycle: StoredLifecycleV2
+  let repositories: [StoredRepositoryV2]
+  let notes: String?
+  let template: StoredTemplateV2?
+  let agentHistory: [StoredAgentChangeV4]?
+
+  init(_ session: WorkSession) {
+    id = session.id.rawValue
+    name = session.name
+    initialPrompt = session.initialPrompt
+    agent = session.agent.map(StoredAgentV2.init)
+    appearance = StoredAppearanceV2(session.appearance)
+    lifecycle = StoredLifecycleV2(session.lifecycle)
+    repositories = session.repositories.map(StoredRepositoryV2.init)
+    notes = session.notes
+    template = session.template.map(StoredTemplateV2.init)
+    agentHistory = session.agentHistory.map(StoredAgentChangeV4.init)
+  }
+
+  var workSession: WorkSession {
+    WorkSession(
+      id: SessionID(rawValue: id),
+      name: name,
+      initialPrompt: initialPrompt,
+      agent: agent?.domainValue,
+      appearance: appearance.domainValue,
+      status: lifecycle.status,
+      createdAt: lifecycle.createdAt,
+      updatedAt: lifecycle.updatedAt,
+      closedAt: lifecycle.closedAt,
+      archivedAt: lifecycle.archivedAt,
+      startedAt: lifecycle.startedAt,
+      repositories: repositories.map(\.domainValue),
+      notes: notes,
+      template: template?.domainValue,
+      agentHistory: (agentHistory ?? []).map(\.domainValue)
+    )
+  }
+}
+
+/// One switch, spelled out field by field rather than through the enums' synthesized coding: a
+/// kind written by a later build is read as the closest thing this one knows, instead of taking
+/// the whole store down with it.
+private struct StoredAgentChangeV4: Codable {
+  let id: UUID
+  let date: Date
+  let previous: StoredAgentV2
+  let next: StoredAgentV2
+  let handover: String
+  let summaryByteCount: Int?
+  let summaryIsTruncated: Bool?
+  let summaryWasEdited: Bool?
+  let outcome: String
+  let failureReason: String?
+
+  init(_ change: AgentChange) {
+    id = change.id
+    date = change.date
+    previous = StoredAgentV2(change.previous)
+    next = StoredAgentV2(change.next)
+    switch change.handover {
+    case .resumedConversation:
+      handover = "resumedConversation"
+      summaryByteCount = nil
+      summaryIsTruncated = nil
+      summaryWasEdited = nil
+    case .summary(let byteCount, let isTruncated, let wasEdited):
+      handover = "summary"
+      summaryByteCount = byteCount
+      summaryIsTruncated = isTruncated
+      summaryWasEdited = wasEdited
+    case .nothing:
+      handover = "nothing"
+      summaryByteCount = nil
+      summaryIsTruncated = nil
+      summaryWasEdited = nil
+    }
+    switch change.outcome {
+    case .completed:
+      outcome = "completed"
+      failureReason = nil
+    case .failed(let reason):
+      outcome = "failed"
+      failureReason = reason
+    }
+  }
+
+  var domainValue: AgentChange {
+    let handover: AgentChange.Handover
+    switch self.handover {
+    case "resumedConversation":
+      handover = .resumedConversation
+    case "summary":
+      handover = .summary(
+        byteCount: summaryByteCount ?? 0,
+        isTruncated: summaryIsTruncated ?? false,
+        wasEdited: summaryWasEdited ?? false
+      )
+    default:
+      handover = .nothing
+    }
+    let outcome: AgentChange.Outcome =
+      self.outcome == "completed" ? .completed : .failed(reason: failureReason ?? "")
+    return AgentChange(
+      id: id,
+      date: date,
+      previous: previous.domainValue,
+      next: next.domainValue,
+      handover: handover,
+      outcome: outcome
+    )
+  }
+}
+
+/// The schema v2 document, kept only to be read: v4 is v2 with the history of agent switches.
 private struct StoreEnvelopeV2: Codable {
   let schemaVersion: Int
   let savedAt: Date
