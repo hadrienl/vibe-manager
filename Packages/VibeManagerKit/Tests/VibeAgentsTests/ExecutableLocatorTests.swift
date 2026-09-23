@@ -275,4 +275,112 @@ struct ExecutableLocatorTests {
 
     #expect(location == .notFound)
   }
+  @Test("A native build further down the search order wins over one that needs Rosetta")
+  func nativeBuildWinsOverTranslatedOne() async {
+    // The Mac this was found on: an Intel Homebrew under /usr/local, and the native standalone
+    // install under ~/.local/bin. The first costs half a minute of translation after each update.
+    let fileSystem = StubFileSystem(
+      executables: ["/usr/local/bin/stub-agent", "/Users/test/.local/bin/stub-agent"],
+      translatedExecutables: ["/usr/local/bin/stub-agent"]
+    )
+    let locator = FileSystemExecutableLocator(fileSystem: fileSystem, environment: environment)
+
+    let location = await locator.locate(
+      ExecutableSearchPlan(
+        binaryName: "stub-agent",
+        candidateDirectories: ["/usr/local/bin", "~/.local/bin"],
+        allowsLoginShellFallback: false
+      )
+    )
+
+    #expect(
+      location == .found(path: "/Users/test/.local/bin/stub-agent", source: .candidateDirectory)
+    )
+  }
+
+  @Test("A build that needs Rosetta is still used when it is the only one")
+  func translatedBuildIsALastResort() async {
+    let fileSystem = StubFileSystem(
+      executables: ["/usr/local/bin/stub-agent"],
+      nonExecutableFiles: ["/Users/test/.local/bin/stub-agent"],
+      translatedExecutables: ["/usr/local/bin/stub-agent"]
+    )
+    let locator = FileSystemExecutableLocator(fileSystem: fileSystem, environment: environment)
+
+    let location = await locator.locate(
+      ExecutableSearchPlan(
+        binaryName: "stub-agent",
+        candidateDirectories: ["/usr/local/bin", "~/.local/bin"],
+        allowsLoginShellFallback: false
+      )
+    )
+
+    // A binary that runs, however slowly, says more than a file that cannot run at all.
+    #expect(location == .found(path: "/usr/local/bin/stub-agent", source: .candidateDirectory))
+  }
+
+  @Test("A path the user chose is kept even when it needs Rosetta")
+  func userDefinedPathIsNeverSecondGuessed() async {
+    let fileSystem = StubFileSystem(
+      executables: ["/custom/stub-agent", "/opt/homebrew/bin/stub-agent"],
+      translatedExecutables: ["/custom/stub-agent"]
+    )
+    let locator = FileSystemExecutableLocator(fileSystem: fileSystem, environment: environment)
+
+    let location = await locator.locate(
+      ExecutableSearchPlan(
+        binaryName: "stub-agent",
+        candidateDirectories: ["/opt/homebrew/bin"],
+        userDefinedPath: "/custom/stub-agent"
+      )
+    )
+
+    #expect(location == .found(path: "/custom/stub-agent", source: .userDefined))
+  }
+}
+
+@Suite("Mach-O architectures")
+struct MachOArchitecturesTests {
+  private func thin(cpuType: UInt32) -> Data {
+    var data = Data([0xCF, 0xFA, 0xED, 0xFE])
+    withUnsafeBytes(of: cpuType.littleEndian) { data.append(contentsOf: $0) }
+    return data + Data(count: 24)
+  }
+
+  private func fat(cpuTypes: [UInt32]) -> Data {
+    var data = Data([0xCA, 0xFE, 0xBA, 0xBE])
+    withUnsafeBytes(of: UInt32(cpuTypes.count).bigEndian) { data.append(contentsOf: $0) }
+    for cpuType in cpuTypes {
+      withUnsafeBytes(of: cpuType.bigEndian) { data.append(contentsOf: $0) }
+      data.append(Data(count: 16))
+    }
+    return data
+  }
+
+  @Test("A thin binary names its one architecture")
+  func thinBinary() {
+    #expect(
+      MachOArchitectures(header: thin(cpuType: MachOArchitectures.x86))?.cpuTypes
+        == [MachOArchitectures.x86])
+    #expect(
+      MachOArchitectures(header: thin(cpuType: MachOArchitectures.arm64))?.cpuTypes
+        == [MachOArchitectures.arm64])
+  }
+
+  @Test("A universal binary names every slice")
+  func universalBinary() {
+    let header = fat(cpuTypes: [MachOArchitectures.x86, MachOArchitectures.arm64])
+    #expect(
+      MachOArchitectures(header: header)?.cpuTypes
+        == [MachOArchitectures.x86, MachOArchitectures.arm64])
+  }
+
+  @Test("A script, a Java class file and a truncated header are not read as binaries")
+  func notAMachO() {
+    #expect(MachOArchitectures(header: Data("#!/usr/bin/env node\n".utf8)) == nil)
+    // Java class files open with the same magic, then a version where the slice count would be.
+    let javaClass = Data([0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x41])
+    #expect(MachOArchitectures(header: javaClass) == nil)
+    #expect(MachOArchitectures(header: Data([0xCF, 0xFA])) == nil)
+  }
 }

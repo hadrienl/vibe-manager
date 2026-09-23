@@ -38,10 +38,19 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
     // the search order: a leftover from a failed install would otherwise mask the real binary.
     // It is only reported when nothing else matches.
     var shadowed: ExecutableLocation?
+    // A binary built for another architecture runs, but through Rosetta, and the first run after
+    // every install or update pays for translating the whole of it: half a minute for a CLI of a
+    // few hundred megabytes, which no version probe budget survives. A native build further down
+    // the search order is what the user's own terminal would have run anyway on a clean `PATH`,
+    // so it wins; the translated one is only kept for when nothing else runs.
+    var translated: ExecutableLocation?
 
     func consider(path: String, source: AgentDetectionSource) -> ExecutableLocation? {
       let location = inspect(path: path, source: source)
       switch location {
+      case .found(let resolved, _) where fileSystem.needsTranslation(atPath: resolved):
+        translated = translated ?? location
+        return nil
       case .found:
         return location
       case .notExecutable:
@@ -64,16 +73,16 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
       if let location = consider(path: path, source: .processPath) { return location }
     }
 
-    guard plan.allowsLoginShellFallback else { return shadowed ?? .notFound }
+    guard plan.allowsLoginShellFallback else { return translated ?? shadowed ?? .notFound }
 
     switch await loginShellPath(for: plan.binaryName) {
     case .path(let path):
-      return consider(path: path, source: .loginShell) ?? shadowed ?? .notFound
+      return consider(path: path, source: .loginShell) ?? translated ?? shadowed ?? .notFound
     case .noAnswer:
       // A file found earlier, even a non executable one, says more than a silent shell.
-      return shadowed ?? .timedOut
+      return translated ?? shadowed ?? .timedOut
     case .unavailable:
-      return shadowed ?? .notFound
+      return translated ?? shadowed ?? .notFound
     }
   }
 
@@ -149,6 +158,9 @@ public protocol ExecutableFileSystem: Sendable {
   func fileExists(atPath path: String) -> Bool
   func isExecutableFile(atPath path: String) -> Bool
   func resolvedPath(for path: String) -> String
+  /// Whether this Mac can only run the file through Rosetta. `false` whenever that is not
+  /// established — a script, an unreadable file, a format this does not recognise.
+  func needsTranslation(atPath path: String) -> Bool
 }
 
 public struct DefaultExecutableFileSystem: ExecutableFileSystem {
@@ -166,5 +178,58 @@ public struct DefaultExecutableFileSystem: ExecutableFileSystem {
 
   public func resolvedPath(for path: String) -> String {
     URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+  }
+
+  public func needsTranslation(atPath path: String) -> Bool {
+    #if arch(arm64)
+      guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+      defer { try? handle.close() }
+      // The largest header read below: a fat header and a few dozen 32 byte slice entries.
+      guard let header = try? handle.read(upToCount: 4096) else { return false }
+      guard let architectures = MachOArchitectures(header: header) else { return false }
+      return !architectures.cpuTypes.contains(MachOArchitectures.arm64)
+    #else
+      return false
+    #endif
+  }
+}
+
+/// The CPU types a Mach-O file carries, read from its header alone.
+struct MachOArchitectures: Equatable {
+  static let arm64: UInt32 = 0x0100_000C
+  static let x86: UInt32 = 0x0100_0007
+
+  let cpuTypes: [UInt32]
+
+  /// `nil` for anything that is not a Mach-O executable this can read.
+  init?(header: Data) {
+    let bytes = [UInt8](header)
+    func bigEndian(_ offset: Int) -> UInt32? {
+      guard offset + 4 <= bytes.count else { return nil }
+      return bytes[offset..<offset + 4].reduce(0) { $0 << 8 | UInt32($1) }
+    }
+    func littleEndian(_ offset: Int) -> UInt32? {
+      bigEndian(offset).map(\.byteSwapped)
+    }
+
+    switch bigEndian(0) {
+    case 0xCFFA_EDFE, 0xCEFA_EDFE:
+      // A thin 64 or 32 bit Mach-O, written little endian as every Mac binary is.
+      guard let cpuType = littleEndian(4) else { return nil }
+      cpuTypes = [cpuType]
+    case 0xCAFE_BABE, 0xCAFE_BABF:
+      // A universal binary, whose headers are big endian. Java class files share this magic;
+      // their version fields read as an absurd slice count, which is what the bound turns away.
+      let entrySize = bigEndian(0) == 0xCAFE_BABE ? 20 : 32
+      guard let count = bigEndian(4), (1...32).contains(count) else { return nil }
+      var types: [UInt32] = []
+      for index in 0..<Int(count) {
+        guard let cpuType = bigEndian(8 + index * entrySize) else { return nil }
+        types.append(cpuType)
+      }
+      cpuTypes = types
+    default:
+      return nil
+    }
   }
 }
