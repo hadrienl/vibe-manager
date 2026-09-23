@@ -85,7 +85,8 @@ struct ClaudeCodeTerminalIntegrationTests {
     )
 
     let attachment = await session.attach()
-    var bytes: [UInt8] = []
+    // What the process wrote before the attachment is in its history, not in its events.
+    var bytes = attachment.history.bytes
     let watchdog = Task {
       try? await Task.sleep(for: .seconds(10))
       await session.kill()

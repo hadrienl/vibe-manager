@@ -228,7 +228,8 @@ struct GitStatusReaderTests {
       await reader.status(atPath: closed, limit: 10) == .failure(.permissionDenied(path: closed)))
   }
 
-  @Test("A large output is cut to the limit with exact counts, and the main actor never waits")
+  @MainActor
+  @Test("A large output is cut to the limit with exact counts, and never needs the main actor")
   func largeOutputOffTheMainActor() async throws {
     let records = (0..<200_000).map { "? generated/file-\($0).txt" }
     let output = Data((records.joined(separator: "\0") + "\0").utf8)
@@ -237,16 +238,20 @@ struct GitStatusReaderTests {
     defer { sandbox.remove() }
 
     let box = StatusBox()
-    let longest = await MainActorStall.measure {
-      box.value = try? await reader.status(atPath: sandbox.root, limit: 5_000).get()
+    let finished = DispatchSemaphore(value: 0)
+    let root = sandbox.root
+    Task.detached {
+      box.value = try? await reader.status(atPath: root, limit: 5_000).get()
+      finished.signal()
     }
+    // The main actor is held for the whole reading. A parse that needed it would never finish;
+    // one that runs elsewhere finishes however slow the machine. Measuring how long the main
+    // actor waited instead would measure every other suite sharing it in this process.
+    #expect(MainActorHold.until(finished, atMost: .seconds(60)))
 
     #expect(box.value?.entries.count == 5_000)
     #expect(box.value?.counts.untracked == 200_000)
     #expect(box.value?.isTruncated == true)
-    // Generous on purpose: other suites share the main actor in this process. A parse on it would
-    // hold it for the whole of 200 000 records, far beyond this.
-    #expect(longest < .milliseconds(250))
   }
 }
 
@@ -273,33 +278,10 @@ private final class StatusBox: @unchecked Sendable {
   }
 }
 
-/// How long the main actor went without being able to run, while `work` ran elsewhere.
-@MainActor
-enum MainActorStall {
-  static func measure(_ work: @escaping @Sendable () async -> Void) async -> Duration {
-    let finished = FinishedFlag()
-    Task.detached {
-      await work()
-      finished.set()
-    }
-    let clock = ContinuousClock()
-    let tick = Duration.milliseconds(5)
-    var longest: Duration = .zero
-    var last = clock.now
-    while !finished.isSet {
-      try? await Task.sleep(for: tick)
-      let now = clock.now
-      longest = max(longest, now - last - tick)
-      last = now
-    }
-    return longest
+/// Blocks the calling thread — the main one, in the test above — until `semaphore` is signalled.
+enum MainActorHold {
+  static func until(_ semaphore: DispatchSemaphore, atMost limit: Duration) -> Bool {
+    let seconds = Double(limit.components.seconds)
+    return semaphore.wait(timeout: .now() + seconds) == .success
   }
-}
-
-private final class FinishedFlag: @unchecked Sendable {
-  private let lock = NSLock()
-  private var value = false
-
-  var isSet: Bool { lock.withLock { value } }
-  func set() { lock.withLock { value = true } }
 }

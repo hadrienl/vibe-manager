@@ -12,12 +12,13 @@ struct RepositoryStatusMonitorTests {
     reader: ScriptedStatusReader,
     events: ManualFileChanges = ManualFileChanges(),
     transcripts: TableTranscriptSource? = nil,
+    clock: any SessionClock = SystemSessionClock(),
     limits: RepositoryStatusLimits = RepositoryStatusLimits(
       minimumInterval: .milliseconds(80), maximumInterval: .milliseconds(200),
       lockGrace: .milliseconds(200))
   ) -> RepositoryStatusMonitor {
     RepositoryStatusMonitor(
-      reader: reader, events: events, transcripts: transcripts, limits: limits)
+      reader: reader, events: events, transcripts: transcripts, clock: clock, limits: limits)
   }
 
   @Test("Each repository is read once when it is first watched, and its changes attributed")
@@ -137,9 +138,12 @@ struct RepositoryStatusMonitorTests {
   @Test("A lock held a moment is not a failure; one held past the grace is said, with its age")
   func lockGrace() async {
     let reader = ScriptedStatusReader()
-    let monitor = makeMonitor(reader: reader)
-    let recorder = StatusUpdateRecorder.listening(to: monitor)
     let lock = IndexLock(path: "/work/api/.git/index.lock", since: Date())
+    // The first reading sees the lock just taken, the next one long after: however slow the
+    // machine, the grace has not run out at the first and has at the second.
+    let clock = SteppingClock(lock.since, then: lock.since.addingTimeInterval(3_600))
+    let monitor = makeMonitor(reader: reader, clock: clock)
+    let recorder = StatusUpdateRecorder.listening(to: monitor)
     await reader.answer("/work/api", entries: [], lock: lock)
 
     await monitor.observe(session, repositories: [ObservedRepository(path: "/work/api")])

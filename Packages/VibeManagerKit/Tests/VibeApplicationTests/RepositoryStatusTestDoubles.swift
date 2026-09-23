@@ -143,9 +143,26 @@ actor StatusUpdateRecorder {
   }
 }
 
+/// A clock that says one moment once, then another from then on.
+final class SteppingClock: SessionClock, @unchecked Sendable {
+  private let lock = NSLock()
+  private var moments: [Date]
+
+  init(_ first: Date, then later: Date) {
+    moments = [first, later]
+  }
+
+  func now() -> Date {
+    lock.withLock { moments.count > 1 ? moments.removeFirst() : moments[0] }
+  }
+}
+
 /// Waits for a condition that an actor elsewhere will make true, and fails after `timeout`.
+///
+/// The timeout is only ever reached by a test that fails: a loaded CI runner may take seconds to
+/// schedule what takes milliseconds here.
 func eventually(
-  timeout: Duration = .seconds(3),
+  timeout: Duration = .seconds(10),
   _ condition: @Sendable () async -> Bool
 ) async -> Bool {
   let deadline = ContinuousClock.now + timeout
