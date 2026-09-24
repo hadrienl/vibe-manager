@@ -6,24 +6,8 @@ import VibeDomain
 @MainActor
 @Observable
 public final class NewSessionModel {
-  public struct AgentOption: Identifiable, Sendable {
-    public let descriptor: AgentDescriptor
-    public let availability: AgentAvailability
-
-    public var id: AgentProviderID { descriptor.id }
-    public var isUsable: Bool { availability.isUsable }
-    public var name: String { descriptor.displayName }
-    public var status: String { availability.diagnostic.summary }
-    public var remediations: [AgentRemediation] { availability.diagnostic.remediations }
-    /// Shown next to an agent that cannot run: a diagnostic without a way out is a dead end.
-    public var remedy: String { AgentRemediation.sentence(for: remediations) }
-
-    /// Usable, yet worth a warning: the CLI runs, and asks for credentials itself in the
-    /// terminal. Hiding that would make the first screen of the session a surprise.
-    public var warnsBeforeLaunch: Bool {
-      availability.state == .unauthenticated
-    }
-  }
+  /// Shared with the switch of agent: one list, one wording, whichever sheet shows it.
+  public typealias AgentOption = VibeUI.AgentOption
 
   public private(set) var agents: [AgentOption] = []
   public private(set) var models: [AgentModel] = []
@@ -106,13 +90,7 @@ public final class NewSessionModel {
     isLoadingAgents = true
     defer { isLoadingAgents = false }
 
-    let descriptors = await registry.descriptors()
-    let availabilities = await registry.availabilities(forceRefresh: forceRefresh)
-    agents = descriptors.compactMap { descriptor in
-      availabilities[descriptor.id].map {
-        AgentOption(descriptor: descriptor, availability: $0)
-      }
-    }
+    agents = await AgentOption.detect(in: registry, forceRefresh: forceRefresh)
 
     // Every agent stays listed, including the ones that cannot run — disappearing teaches the
     // user nothing. Only the default selection skips them.

@@ -162,3 +162,66 @@ func concurrentChangeIsPreserved() async throws {
   #expect(saved?.agent?.resumeIdentifier == identifier)
   #expect(saved?.name == "Nouveau nom")
 }
+
+@Test("An identifier revealed by the agent a session was switched away from is not written")
+func lateIdentifierOfThePreviousAgentIsRefused() async throws {
+  // The session now runs Codex; a Claude Code capture still in flight answers late.
+  let stored = session()
+  let repository = RecordingRepository(stored: stored)
+  let record = RecordAgentResumeIdentifier(repository: repository, providerID: "claude-code")
+
+  let outcome = try await record(
+    sessionID: stored.id, identifier: "8c1d0b7e-1111-4222-8333-444455556666")
+
+  #expect(outcome == .agentChanged)
+  #expect(!outcome.isRetryable)
+  #expect(await repository.saveCount == 0)
+  #expect(await repository.session(id: stored.id)?.agent?.resumeIdentifier == nil)
+}
+
+@Test("An identifier revealed by the session's own agent is written")
+func identifierOfTheCurrentAgentIsWritten() async throws {
+  let stored = session()
+  let repository = RecordingRepository(stored: stored)
+  let record = RecordAgentResumeIdentifier(repository: repository, providerID: "codex")
+
+  #expect(try await record(sessionID: stored.id, identifier: "thread-1") == .recorded)
+}
+
+@Test("An identifier revealed by a launch older than the last switch is not written")
+func identifierOfALaunchBeforeTheSwitchIsRefused() async throws {
+  // Codex → Codex, another model: the previous launch's capture answers after the switch.
+  var stored = session()
+  let launchedAt = Date(timeIntervalSince1970: 1_700_000_000)
+  try stored.switchAgent(
+    to: SessionAgentConfiguration(providerID: "codex", modelID: "gpt-5.5"),
+    handover: .nothing,
+    at: launchedAt.addingTimeInterval(30)
+  )
+  let repository = RecordingRepository(stored: stored)
+
+  let stale = RecordAgentResumeIdentifier(
+    repository: repository, providerID: "codex", launchedAt: launchedAt)
+  #expect(try await stale(sessionID: stored.id, identifier: "thread-old") == .agentChanged)
+
+  let fresh = RecordAgentResumeIdentifier(
+    repository: repository, providerID: "codex", launchedAt: launchedAt.addingTimeInterval(31))
+  #expect(try await fresh(sessionID: stored.id, identifier: "thread-new") == .recorded)
+}
+
+@Test("A switch that failed does not disown the launch it was undone for")
+func failedSwitchKeepsThePreviousLaunch() async throws {
+  var stored = session()
+  let launchedAt = Date(timeIntervalSince1970: 1_700_000_000)
+  let change = try stored.switchAgent(
+    to: SessionAgentConfiguration(providerID: "claude-code"),
+    handover: .nothing,
+    at: launchedAt.addingTimeInterval(30)
+  )
+  try stored.revertAgentSwitch(change.id, reason: "Could not start.")
+  let repository = RecordingRepository(stored: stored)
+
+  let record = RecordAgentResumeIdentifier(
+    repository: repository, providerID: "codex", launchedAt: launchedAt)
+  #expect(try await record(sessionID: stored.id, identifier: "thread-1") == .recorded)
+}

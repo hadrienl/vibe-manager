@@ -240,7 +240,9 @@ public struct RestartSession: Sendable {
       )
     }
 
-    let path = try workingDirectoryPath(of: session)
+    guard let path = Self.workingDirectoryPath(of: session) else {
+      throw SessionRestartRefusal.noRepository
+    }
     // Checked before the launch rather than discovered by it: a worktree deleted between two
     // sessions is ordinary, and finding out through a terminal that dies on `chdir` tells the
     // user nothing they can act on.
@@ -422,10 +424,8 @@ public struct RestartSession: Sendable {
   ///
   /// The first repository, and it is said out loud rather than left to be discovered: several
   /// repositories per session are #12, and until then a session has exactly one place to run.
-  private func workingDirectoryPath(of session: WorkSession) throws -> String {
-    guard let repository = session.repositories.first else {
-      throw SessionRestartRefusal.noRepository
-    }
+  static func workingDirectoryPath(of session: WorkSession) -> String? {
+    guard let repository = session.repositories.first else { return nil }
     return repository.git?.worktreePath ?? repository.path
   }
 }

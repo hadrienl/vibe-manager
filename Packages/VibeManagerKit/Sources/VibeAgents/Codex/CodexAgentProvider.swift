@@ -116,7 +116,8 @@ public struct CodexAgentProvider: AgentProvider {
       sessionID: sessionID,
       workingDirectoryPath: workingDirectoryPath,
       discovery: discovery,
-      record: RecordAgentResumeIdentifier(repository: repository),
+      record: RecordAgentResumeIdentifier(
+        repository: repository, providerID: Self.id.rawValue, launchedAt: Date()),
       timeout: timeout
     )
   }

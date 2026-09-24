@@ -116,8 +116,12 @@ struct RestorationProvider: AgentProvider {
   let launchFailure: AgentLaunchError?
   /// Raised only when a resume is asked for, as a CLI refusing a stored identifier would.
   let resumeFailure: AgentLaunchError?
+  let catalog: [AgentModel]
 
   init(
+    id: String = "stub",
+    displayName: String = "Stub Agent",
+    models: [AgentModel] = [],
     state: AgentAvailabilityState = .available,
     capabilities: AgentCapabilities = AgentCapabilities(
       supportsModelSelection: true,
@@ -128,10 +132,11 @@ struct RestorationProvider: AgentProvider {
     resumeFailure: AgentLaunchError? = nil
   ) {
     descriptor = AgentDescriptor(
-      id: AgentProviderID("stub"),
-      displayName: "Stub Agent",
+      id: AgentProviderID(id),
+      displayName: displayName,
       capabilities: capabilities
     )
+    catalog = models
     self.state = state
     self.launchFailure = launchFailure
     self.resumeFailure = resumeFailure
@@ -145,17 +150,21 @@ struct RestorationProvider: AgentProvider {
         providerID: descriptor.id,
         providerName: descriptor.displayName,
         state: state,
-        summary: "Stub Agent is \(state == .available ? "ready" : "unusable").",
+        summary: "\(descriptor.displayName) is \(state == .available ? "ready" : "unusable").",
         probedAt: Date(timeIntervalSince1970: 0),
         remediations: state == .available ? [] : [.install(documentationURL: nil)]
       )
     )
   }
 
-  func models() async -> [AgentModel] { [] }
+  func models() async -> [AgentModel] { catalog }
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
     if let launchFailure { throw launchFailure }
+    if let prompt = request.initialPrompt, prompt.utf8.count > AgentPromptLimits.argumentByteLimit {
+      throw AgentLaunchError.promptTooLarge(
+        byteCount: prompt.utf8.count, limit: AgentPromptLimits.argumentByteLimit)
+    }
     if case .identifier = request.resume, let resumeFailure { throw resumeFailure }
 
     var arguments: [String] = []
@@ -164,6 +173,9 @@ struct RestorationProvider: AgentProvider {
     }
     if let modelID = request.modelID {
       arguments.append(contentsOf: ["--model", modelID])
+    }
+    if let prompt = request.initialPrompt {
+      arguments.append(contentsOf: ["--", prompt])
     }
     return AgentLaunchPlan(
       providerID: descriptor.id,

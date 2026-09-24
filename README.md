@@ -102,6 +102,16 @@ the locks against a double launch and what happens when a resumed conversation t
 are documented in
 [`docs/architecture/0010-session-restart.md`](docs/architecture/0010-session-restart.md).
 
+A session can change agent or model without losing its work. Another model of the same agent
+resumes the same conversation and sends nothing; another agent starts a new one, handed a summary
+of the session — who worked in it, where the work is on each branch and worktree, its notes and the
+prompt it was created with — shown and editable before it is sent, and never presented as the
+conversation itself. Everything that can refuse the switch refuses it while the running agent is
+still at work; the agent is stopped only once the switch is confirmed, and a launch that fails puts
+the session back on its previous agent, resumable as before. Every switch is kept in the session's
+history, and the transcripts of every agent it had are still read. The decisions are documented in
+[`docs/architecture/0015-agent-switch.md`](docs/architecture/0015-agent-switch.md).
+
 Quitting is not a way to lose a day of context. On the way out, every running session is stopped,
 closed in the store and left behind as the intention to resume it; at the next launch those
 sessions come back with their provider's own resume, and nothing is asked again. A session the

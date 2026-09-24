@@ -58,7 +58,9 @@ discovered.
 
 An unknown or unusable agent is a typed refusal, never a substitution: restarting someone's work in
 an agent they did not choose, without their conversation, would be a worse outcome than not
-restarting it. Changing agent or model is #15, and it is a decision, not a fallback. The command is
+restarting it. Changing agent or model is #15, and it is a decision, not a fallback. *(ADR 0015:
+the refusal's banner now offers **Switch Agent…** beside **Detect Again**; Restart itself still
+never substitutes an agent.)* The command is
 withheld rather than offered and then refused, using the resolution the detections already left on
 the model — no probe is run to draw a sidebar row, and a session whose agent has not been resolved
 yet keeps its command, because "not asked yet" is not "unusable". When a refusal does reach the
@@ -240,6 +242,6 @@ working.
 ## Out of scope
 
 Resuming automatically at launch (#11), several repositories and worktrees (#12), changing the agent
-or model while restarting (#15), summarising the conversation with a model, persisting terminal
+or model (#15, its own command — ADR 0015), summarising the conversation with a model, persisting terminal
 scrollback, and restarting several sessions at once. An archived session still has to be unarchived
 first (#9), deliberately.

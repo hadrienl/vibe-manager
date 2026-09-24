@@ -21,6 +21,8 @@ struct SessionContextInspector: View {
   private let split: Double
   private let splitChanged: (Double) -> Void
   private let openPrivacySettings: (() -> Void)?
+  private let agentNames: [String: String]
+  private let switchAgent: (() -> Void)?
 
   init(
     session: WorkSession,
@@ -32,7 +34,9 @@ struct SessionContextInspector: View {
     git: GitInspectorModel,
     split: Double = 0.6,
     splitChanged: @escaping (Double) -> Void = { _ in },
-    openPrivacySettings: (() -> Void)? = nil
+    openPrivacySettings: (() -> Void)? = nil,
+    agentNames: [String: String] = [:],
+    switchAgent: (() -> Void)? = nil
   ) {
     self.session = session
     self.resolution = resolution
@@ -48,6 +52,8 @@ struct SessionContextInspector: View {
     self.split = split
     self.splitChanged = splitChanged
     self.openPrivacySettings = openPrivacySettings
+    self.agentNames = agentNames
+    self.switchAgent = switchAgent
   }
 
   var body: some View {
@@ -62,7 +68,9 @@ struct SessionContextInspector: View {
         git: git
       )
     } bottom: {
-      SessionPane(session: session, resolution: resolution)
+      SessionPane(
+        session: session, resolution: resolution, agentNames: agentNames,
+        switchAgent: switchAgent)
     }
   }
 }
@@ -161,6 +169,8 @@ private struct InspectorSplit<Top: View, Bottom: View>: View {
 private struct SessionPane: View {
   let session: WorkSession
   let resolution: SessionAgentResolution?
+  let agentNames: [String: String]
+  let switchAgent: (() -> Void)?
 
   var body: some View {
     List {
@@ -174,8 +184,22 @@ private struct SessionPane: View {
         }
       }
 
-      Section("Agent") {
-        AgentRow(agent: session.agent, resolution: resolution)
+      Section {
+        AgentRow(agent: session.agent, resolution: resolution, names: agentNames)
+        if !session.agentHistory.isEmpty {
+          AgentHistoryList(session: session, names: agentNames)
+        }
+      } header: {
+        HStack {
+          Text("Agent")
+          Spacer()
+          if let switchAgent {
+            Button("Switch…", action: switchAgent)
+              .buttonStyle(.borderless)
+              .controlSize(.small)
+              .accessibilityLabel("Switch the agent of \(session.name)")
+          }
+        }
       }
 
       Section("Initial prompt") {
@@ -883,15 +907,13 @@ private struct Pill: View {
 private struct AgentRow: View {
   let agent: SessionAgentConfiguration?
   let resolution: SessionAgentResolution?
+  let names: [String: String]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       if let agent {
-        Label(
-          agent.modelID.map { "\(agent.providerID) · \($0)" } ?? agent.providerID,
-          systemImage: "cpu"
-        )
-        .lineLimit(1)
+        Label(AgentHistoryList.label(agent, names: names), systemImage: "cpu")
+          .lineLimit(1)
       } else {
         Label("No agent recorded", systemImage: "cpu")
           .lineLimit(1)
@@ -918,6 +940,118 @@ private struct AgentRow: View {
     case .none:
       return "Detection has not answered yet."
     }
+  }
+}
+
+/// Every agent the session had, newest first: each switch, the failed ones included, and where it
+/// started.
+private struct AgentHistoryList: View {
+  let session: WorkSession
+  let names: [String: String]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("History")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+      ForEach(session.agentHistory.reversed()) { change in
+        entry(change)
+      }
+      if let first = firstAgent, let start = session.startedAt {
+        row(
+          date: start,
+          text: "Started with \(Self.label(first, names: names))",
+          detail: nil,
+          failed: false,
+          spoken: "\(Self.spoken(start)), started with \(Self.label(first, names: names))"
+        )
+      }
+    }
+    .padding(.vertical, 2)
+  }
+
+  /// The agent that first ran: the one the first real switch left, or the current one. A switch
+  /// made before the session ever ran does not count — the agent it left never started.
+  private var firstAgent: SessionAgentConfiguration? {
+    session.agentHistory.first(where: \.leftAgentThatRan)?.previous ?? session.agent
+  }
+
+  @ViewBuilder
+  private func entry(_ change: AgentChange) -> some View {
+    let from = Self.label(change.previous, names: names)
+    // Another model of the same agent names the model alone: the agent is already on the line.
+    let to =
+      change.changesProvider
+      ? Self.label(change.next, names: names) : (change.next.modelID ?? "default model")
+    switch change.outcome {
+    case .completed:
+      row(
+        date: change.date,
+        text: "\(from) → \(to)",
+        detail: Self.handover(change.handover),
+        failed: false,
+        spoken: "\(Self.spoken(change.date)), switched from \(from) to \(to), "
+          + Self.handover(change.handover)
+      )
+    case .failed(let reason):
+      row(
+        date: change.date,
+        text: "→ \(to) failed",
+        detail: reason.isEmpty ? nil : reason,
+        failed: true,
+        spoken: "\(Self.spoken(change.date)), switch to \(to) failed. \(reason)"
+      )
+    }
+  }
+
+  private func row(
+    date: Date, text: String, detail: String?, failed: Bool, spoken: String
+  ) -> some View {
+    // The change first and whole, on as many lines as it takes; when and how below it.
+    VStack(alignment: .leading, spacing: 1) {
+      HStack(alignment: .firstTextBaseline, spacing: 4) {
+        if failed {
+          Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundStyle(.orange)
+        }
+        Text(text)
+          .foregroundStyle(failed ? Color.orange : .primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .font(.caption)
+      Text(
+        [date.formatted(date: .abbreviated, time: .shortened), detail]
+          .compactMap { $0 }.joined(separator: " · ")
+      )
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(spoken)
+  }
+
+  static func label(_ agent: SessionAgentConfiguration, names: [String: String]) -> String {
+    let name = names[agent.providerID] ?? agent.providerID
+    return agent.modelID.map { "\(name) · \($0)" } ?? name
+  }
+
+  static func handover(_ handover: AgentChange.Handover) -> String {
+    switch handover {
+    case .resumedConversation:
+      return "same conversation"
+    case .summary(let bytes, _, let wasEdited):
+      let size = AgentSwitchSheet.size(bytes)
+      return wasEdited ? "edited summary, \(size)" : "summary, \(size)"
+    case .initialPrompt:
+      return "initial prompt"
+    case .nothing:
+      return "nothing handed over"
+    }
+  }
+
+  private static func spoken(_ date: Date) -> String {
+    date.formatted(date: .long, time: .shortened)
   }
 }
 

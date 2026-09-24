@@ -132,4 +132,44 @@ struct AgentTranscriptReaderTests {
         == [sessions.path])
     #expect(await reader.transcriptDirectories(for: WorkSession(name: "Bare")).isEmpty)
   }
+
+  @Test("After a switch of agent, the work of the previous one is still read and watched")
+  func everyConversationIsRead() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let claude = "28538616-9a27-4cae-92a7-150d7511fc9d"
+    let codex = "01a0cd8c-0224-7721-8fff-e7b7647eff14"
+    let folder = root.appendingPathComponent("projects/-Users-a-Projects", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try append(
+      [
+        #"{"cwd":"/Users/a/Projects/api","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/Users/a/Projects/api/a.swift"}}]}}"#
+      ], to: folder.appendingPathComponent("\(claude).jsonl"))
+    let parts = Calendar(identifier: .gregorian).dateComponents(in: .current, from: Date())
+    let day = root.appendingPathComponent(
+      String(format: "sessions/%04d/%02d/%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0),
+      isDirectory: true)
+    try FileManager.default.createDirectory(at: day, withIntermediateDirectories: true)
+    try append(
+      [#"{"type":"session_meta","payload":{"id":"x","cwd":"/Users/a/Projects/web"}}"#],
+      to: day.appendingPathComponent("rollout-2026-09-23T09-15-00-\(codex).jsonl"))
+    let projects = root.appendingPathComponent("projects")
+    let sessions = root.appendingPathComponent("sessions")
+    let reader = AgentTranscriptReader(claudeProjects: projects, codexSessions: sessions)
+
+    var switched = WorkSession(
+      name: "Switched",
+      agent: SessionAgentConfiguration(providerID: "claude-code", resumeIdentifier: claude),
+      startedAt: Date())
+    try switched.switchAgent(
+      to: SessionAgentConfiguration(providerID: "codex", resumeIdentifier: codex),
+      handover: .nothing,
+      at: Date())
+
+    let activity = try #require(await reader.activity(for: switched))
+
+    #expect(activity.editedPaths == ["/Users/a/Projects/api/a.swift"])
+    #expect(activity.workingDirectories == ["/Users/a/Projects/api", "/Users/a/Projects/web"])
+    #expect(await reader.transcriptDirectories(for: switched) == [projects.path, sessions.path])
+  }
 }

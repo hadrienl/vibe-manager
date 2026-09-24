@@ -26,6 +26,12 @@ public final class AppModel {
   public private(set) var state: State = .idle
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
+  /// The name of each detected agent, by provider identifier, for the places that name one.
+  public var agentNames: [String: String] {
+    Dictionary(
+      agentDiagnostics.map { ($0.providerID.rawValue, $0.providerName) },
+      uniquingKeysWith: { first, _ in first })
+  }
   public private(set) var isRefreshingAgents = false
   public private(set) var selectedSessionID: SessionID?
   public private(set) var isPresentingNewSession = false
@@ -160,6 +166,26 @@ public final class AppModel {
     public let sessionName: String
     public let message: String
     public let suggestion: String?
+    /// The session it is about. The banner outlives the selection, so its buttons act on this one
+    /// rather than on whichever session is on screen by the time they are pressed.
+    public var sessionID: SessionID?
+  }
+
+  /// The Switch Agent sheet, while it is open.
+  public private(set) var pendingSwitch: AgentSwitchModel?
+  /// A switch that did not happen, and why. Nothing was lost by it: the session is left on the
+  /// agent it had, and says so.
+  public private(set) var switchFailure: RestartFailure?
+  /// The agent a session was switched away from, offered back when the new one stopped within
+  /// seconds of starting without anybody using it — a model the account may not run, a CLI that
+  /// is not signed in. The pane shows why; the bar above it offers the way back.
+  public private(set) var switchBackOffers: [SessionID: SwitchBack] = [:]
+  /// When each switch started its agent, kept only long enough to tell a quick failure.
+  private var switchAttempts: [SessionID: (date: Date, previous: SwitchBack)] = [:]
+
+  public struct SwitchBack: Equatable {
+    public let target: AgentTarget
+    public let label: String
   }
 
   /// A restoration under way, from the first session to the last.
@@ -285,6 +311,9 @@ public final class AppModel {
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
   private let restartSession: RestartSession?
+  private let planAgentSwitch: PlanAgentSwitch?
+  private let recordAgentSwitch: RecordAgentSwitch
+  private let revertAgentSwitch: RevertAgentSwitch
   private let detectPreviousShutdown: DetectPreviousShutdown?
   private let restoreSessions: RestoreSessions?
   private let clock: any SessionClock
@@ -352,6 +381,9 @@ public final class AppModel {
     // and saying that with an optional is clearer than a use case that would refuse every call.
     let restart = agents.map { RestartSession(repository: repository, agents: $0) }
     restartSession = restart
+    planAgentSwitch = agents.map { PlanAgentSwitch(repository: repository, agents: $0) }
+    recordAgentSwitch = RecordAgentSwitch(repository: repository, clock: clock)
+    revertAgentSwitch = RevertAgentSwitch(repository: repository)
     // The two halves of #11: what the previous run left behind, and the queue that honours it.
     // Both are absent together, because a workspace that cannot launch has nothing to restore.
     detectPreviousShutdown = runtimeRecorder.map {
@@ -368,6 +400,7 @@ public final class AppModel {
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
       self.noteProcessDidFinish(id, state: state)
+      self.noteSwitchedAgentDidFinish(id, state: state)
       // The store already says the session is closed; the list on screen is what has to catch up.
       Task { await self.reload() }
       // An agent that stops has often just committed: its repositories are read once more.
@@ -646,6 +679,7 @@ public final class AppModel {
     // ⌃⌘R again would build a second plan and replace the question under the user, leaving the
     // text they had started editing attached to nothing.
     guard pendingRestart?.sessionID != session.id else { return false }
+    guard pendingSwitch?.sessionID != session.id else { return false }
     // An agent that cannot run has nothing to restart into, and the ticket asks for the command to
     // be withheld rather than offered and then refused. The answer is the one the detections
     // already left here, so no probe is run to draw a row: a session whose agent has not been
@@ -730,6 +764,8 @@ public final class AppModel {
     defer { restartingSessionIDs.remove(id) }
 
     restartFailure = nil
+    // Restarting is an answer to the offer too: the session goes back to work on the agent it has.
+    switchBackOffers[id] = nil
     do {
       let restart = try await restartSession(
         id: id,
@@ -787,14 +823,16 @@ public final class AppModel {
         restartFailure = RestartFailure(
           sessionName: restart.session.name,
           message: reason ?? failure?.message ?? "This session could not be restarted.",
-          suggestion: reason == nil ? failure?.suggestion : nil
+          suggestion: reason == nil ? failure?.suggestion : nil,
+          sessionID: id
         )
       }
     } catch let refusal as SessionRestartRefusal {
       restartFailure = RestartFailure(
         sessionName: sessions.first { $0.id == id }?.name ?? "This session",
         message: refusal.errorDescription ?? "This session could not be restarted.",
-        suggestion: refusal.recoverySuggestion
+        suggestion: refusal.recoverySuggestion,
+        sessionID: id
       )
     } catch {
       await report(error)
@@ -841,6 +879,240 @@ public final class AppModel {
       return
     }
     resumeRefusals.insert(id)
+  }
+
+  // MARK: - Switching agent
+
+  /// Whether Switch Agent is offered for this session.
+  ///
+  /// A running session can be switched — the sheet says its agent will be stopped — and so can a
+  /// closed one whose agent is not installed any more: that is precisely when another is wanted.
+  /// Not an archived one, and not one whose restart, close or switch is already on its way.
+  public func canSwitchAgent(_ session: WorkSession) -> Bool {
+    guard planAgentSwitch != nil, launcher != nil, session.agent != nil else { return false }
+    guard session.status != .archived else { return false }
+    // A restoration walks its queue with plans built from the stored agent: switching a session
+    // under it would record one agent while the queue starts the other.
+    guard restoration == nil else { return false }
+    guard !restartingSessionIDs.contains(session.id), !closingSessionIDs.contains(session.id)
+    else { return false }
+    return pendingRestart?.sessionID != session.id && pendingSwitch?.sessionID != session.id
+  }
+
+  /// Opens the Switch Agent sheet. `preselected` is the agent to offer first: the one a quick
+  /// failure is offering back.
+  public func beginAgentSwitch(_ id: SessionID, preselected: AgentTarget? = nil) {
+    guard let agents, let planAgentSwitch,
+      let session = sessions.first(where: { $0.id == id }), canSwitchAgent(session)
+    else { return }
+    let sheet = AgentSwitchModel(
+      session: session,
+      stopsRunningAgent: launcher?.isRunning(id) == true,
+      resumeFailedBefore: resumeRefusals.contains(id),
+      registry: agents,
+      planner: planAgentSwitch,
+      preselected: preselected,
+      context: { [weak self] session, names in
+        self?.briefInput(for: session, names: names) ?? SessionBriefInput(session: session)
+      }
+    )
+    pendingSwitch = sheet
+    Task { await sheet.load() }
+    // A session not on screen has no report yet. It is read once, in the background: the sheet
+    // opens on what the session recorded, and the summary catches up — unless the user has
+    // started editing it, which is theirs to keep.
+    if branchReports[id] == nil, let readBranchReport {
+      Task { [weak self] in
+        let report = await readBranchReport(for: session)
+        guard let self else { return }
+        if self.branchReports[id] == nil { self.branchReports[id] = report }
+        if self.pendingSwitch === sheet { sheet.contextChanged() }
+      }
+    }
+  }
+
+  public func cancelAgentSwitch() {
+    pendingSwitch = nil
+  }
+
+  public func dismissSwitchFailure() {
+    switchFailure = nil
+  }
+
+  /// Offers the agent a quick failure left behind, in the sheet, for the user to confirm.
+  public func switchBack(_ id: SessionID) {
+    guard let offer = switchBackOffers[id] else { return }
+    beginAgentSwitch(id, preselected: offer.target)
+  }
+
+  /// Runs the switch the sheet describes, with the summary as the user left it.
+  public func confirmAgentSwitch() async {
+    guard let sheet = pendingSwitch, sheet.canSwitch else { return }
+    pendingSwitch = nil
+    let summary: String? = sheet.handover == .summary ? sheet.summaryText : nil
+    await performAgentSwitch(
+      id: sheet.sessionID,
+      to: sheet.target,
+      previous: sheet.currentLabel,
+      summary: summary,
+      wasEdited: sheet.isSummaryEdited,
+      skippingResume: sheet.skipsResume,
+      expecting: sheet.expectedModeKind,
+      names: sheet.agentNames
+    )
+  }
+
+  /// Plan, stop, re-read, record, launch — in that order, so that everything that can refuse
+  /// refuses while the current agent still runs, and a launch that fails can put the session back
+  /// exactly as it was.
+  private func performAgentSwitch(
+    id: SessionID,
+    to target: AgentTarget,
+    previous: String,
+    summary: String?,
+    wasEdited: Bool,
+    skippingResume: Bool,
+    expecting: AgentSwitchMode.Kind?,
+    names: [String: String]
+  ) async {
+    guard let launcher, let planAgentSwitch, restoration == nil else { return }
+    // The restart lock: a switch and a restart of one session must never cross.
+    guard restartingSessionIDs.insert(id).inserted else { return }
+    defer { restartingSessionIDs.remove(id) }
+    switchFailure = nil
+    switchBackOffers[id] = nil
+    let name = sessions.first { $0.id == id }?.name ?? "This session"
+
+    do {
+      // 1. Everything that can refuse, while the agent still runs.
+      let current = sessions.first { $0.id == id }
+      let plan = try await planAgentSwitch(
+        id: id,
+        to: target,
+        context: current.map { briefInput(for: $0, names: names) },
+        summaryOverride: summary,
+        skippingResume: skippingResume,
+        expecting: expecting
+      )
+
+      // 2. The running agent is stopped, and the session closed, before anything is written.
+      if launcher.isRunning(id) || plan.session.status == .active {
+        closingSessionIDs.insert(id)
+        defer { closingSessionIDs.remove(id) }
+        let closure = try await closeSession(id: id)
+        if case .unreachable(let pid) = closure.detachment {
+          throw AgentSwitchRefusal.stopUnconfirmed(processIdentifier: pid)
+        }
+      }
+
+      // 3 and 4. Recorded on a fresh read of the store; an archive that landed during the stop
+      // is refused there.
+      let change = try await recordAgentSwitch(plan, wasEdited: wasEdited)
+      guard let switched = try await repository.session(id: id) else {
+        throw AgentSwitchRefusal.sessionMissing
+      }
+
+      // 5. The new agent, in the same pane, under a separator naming both. The attempts are
+      // recorded before the launch: a CLI that refuses at once can exit — and its close be
+      // reported — while the launch is still wiring the pane up.
+      if plan.mode.keepsConversation {
+        resumeAttempts[id] = clock.now()
+      } else {
+        resumeAttempts[id] = nil
+        // This process starts a conversation of its own: a refusal of the previous one is moot.
+        resumeRefusals.remove(id)
+      }
+      let back = SwitchBack(
+        target: AgentTarget(
+          providerID: change.previous.providerID, modelID: change.previous.modelID),
+        label: previous
+      )
+      switchAttempts[id] = (clock.now(), back)
+
+      let outcome = await launcher.launchSwitch(plan, session: switched, previous: previous)
+      if outcome != .started {
+        resumeAttempts[id] = nil
+        switchAttempts[id] = nil
+        // `alreadyRunning` is a failure here: something else started this session between the
+        // stop and the launch, and it is not the agent the store now names.
+        let why: String
+        switch outcome {
+        case .failed(let reason?):
+          why = reason
+        case .alreadyRunning:
+          why = "Another launch started this session in the meantime."
+        default:
+          why = launcher.failure(for: id)?.message ?? "\(plan.targetName) could not be started."
+        }
+        await undoSwitch(
+          id: id, change: change, reason: why, target: plan.targetName, previous: previous,
+          name: name)
+      }
+    } catch let refusal as AgentSwitchRefusal {
+      switchFailure = RestartFailure(
+        sessionName: name,
+        message: refusal.errorDescription ?? "The agent could not be switched.",
+        suggestion: refusal.recoverySuggestion,
+        sessionID: id
+      )
+    } catch {
+      await report(error)
+    }
+    await reload()
+    follow(id)
+  }
+
+  /// Puts the session back on the agent the switch left, and says what actually happened: back
+  /// on it, or — when even that write was refused — still on the new one, which Restart then
+  /// starts with a summary.
+  private func undoSwitch(
+    id: SessionID,
+    change: AgentChange,
+    reason: String,
+    target: String,
+    previous: String,
+    name: String
+  ) async {
+    let suggestion: String
+    do {
+      try await revertAgentSwitch(id: id, change: change.id, reason: reason)
+      suggestion = "The session is back on \(previous)."
+    } catch {
+      suggestion =
+        "The session could not be put back on \(previous): it stays on \(target), and Restart "
+        + "will start it with a summary."
+    }
+    switchFailure = RestartFailure(
+      sessionName: name,
+      message: "Could not switch to \(target): \(reason)",
+      suggestion: suggestion,
+      sessionID: id
+    )
+  }
+
+  /// What the summary is built from: the branch report and the Git states this window holds for
+  /// the session. The sheet never waits on Git: a session never looked at is summarised from what
+  /// it recorded until its report, read in the background, arrives.
+  private func briefInput(for session: WorkSession, names: [String: String]) -> SessionBriefInput {
+    SessionBriefInput(
+      session: session,
+      branches: branchReports[session.id],
+      statuses: repositoryStatuses.values.filter { $0.key.sessionID == session.id },
+      agentNames: names
+    )
+  }
+
+  /// A switched agent that stopped within seconds of starting, with nobody having typed into it
+  /// and nothing having stopped it on purpose, is offered back: the pane says why it stopped.
+  private func noteSwitchedAgentDidFinish(_ id: SessionID, state: TerminalProcessState) {
+    guard let attempt = switchAttempts.removeValue(forKey: id) else { return }
+    guard clock.now().timeIntervalSince(attempt.date) < Self.resumeProbation else { return }
+    if let pane = launcher?.pane(for: id) {
+      guard !pane.hasReceivedInput, !pane.wasStoppedOnPurpose else { return }
+    }
+    if case .exited(0) = state { return }
+    guard state.isFinished else { return }
+    switchBackOffers[id] = attempt.previous
   }
 
   // MARK: - Restoration at launch

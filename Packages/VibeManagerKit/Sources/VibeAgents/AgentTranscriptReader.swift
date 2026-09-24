@@ -32,37 +32,37 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
     self.codexSessions = codexSessions
   }
 
+  /// Every conversation the session has had is read, not only the current one: after a switch of
+  /// agent, what the previous one edited and where it worked is still this session's work.
   public func activity(for session: WorkSession) async -> TranscriptActivity? {
-    guard let agent = session.agent,
-      let identifier = agent.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
-      !identifier.isEmpty
-    else { return nil }
-
-    let files: [URL]
-    let isCodex: Bool
-    switch agent.providerID {
-    case ClaudeCodeAgentProvider.id.rawValue:
-      files = claudeTranscripts(for: identifier)
-      isCodex = false
-    case CodexAgentProvider.id.rawValue:
-      files = codexRollouts(for: identifier, since: session.createdAt)
-      isCodex = true
-    default:
-      return nil
-    }
-    guard !files.isEmpty else { return nil }
-
     var activity = TranscriptActivity()
-    for file in files {
-      let read = advance(file, isCodex: isCodex)
-      activity.editedPaths.formUnion(read.editedPaths)
-      activity.workingDirectories.formUnion(read.workingDirectories)
+    var foundAny = false
+    for conversation in session.conversations {
+      guard let identifier = Self.identifier(of: conversation) else { continue }
+      let files: [URL]
+      let isCodex: Bool
+      switch conversation.providerID {
+      case ClaudeCodeAgentProvider.id.rawValue:
+        files = claudeTranscripts(for: identifier)
+        isCodex = false
+      case CodexAgentProvider.id.rawValue:
+        files = codexRollouts(for: identifier, since: session.createdAt)
+        isCodex = true
+      default:
+        continue
+      }
+      for file in files {
+        foundAny = true
+        let read = advance(file, isCodex: isCodex)
+        activity.editedPaths.formUnion(read.editedPaths)
+        activity.workingDirectories.formUnion(read.workingDirectories)
+      }
     }
-    return activity
+    return foundAny ? activity : nil
   }
 
-  /// The folders to watch for the session's transcript to grow: the whole Claude Code projects
-  /// folder, or the whole Codex sessions folder.
+  /// The folders to watch for the session's transcripts to grow: the whole Claude Code projects
+  /// folder, the whole Codex sessions folder, or both after a switch between them.
   ///
   /// Not the folders its files are in today. A Claude Code session selected before its agent wrote
   /// a word has no file yet, so no folder; a Codex session writes in the folder of the day, which
@@ -70,18 +70,29 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
   /// exactly when it starts to matter. Events from other sessions' transcripts wake the monitor for
   /// a comparison of names, nothing more: only files named after this session count.
   public func transcriptDirectories(for session: WorkSession) async -> [String] {
-    guard let agent = session.agent,
-      let identifier = agent.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
-      !identifier.isEmpty
-    else { return [] }
-    switch agent.providerID {
-    case ClaudeCodeAgentProvider.id.rawValue:
-      return [claudeProjects.path]
-    case CodexAgentProvider.id.rawValue:
-      return [codexSessions.path]
-    default:
-      return []
+    var directories: [String] = []
+    for conversation in session.conversations where Self.identifier(of: conversation) != nil {
+      let directory: String
+      switch conversation.providerID {
+      case ClaudeCodeAgentProvider.id.rawValue:
+        directory = claudeProjects.path
+      case CodexAgentProvider.id.rawValue:
+        directory = codexSessions.path
+      default:
+        continue
+      }
+      if !directories.contains(directory) { directories.append(directory) }
     }
+    return directories
+  }
+
+  private static func identifier(of conversation: SessionAgentConfiguration) -> String? {
+    guard
+      let identifier = conversation.resumeIdentifier?.trimmingCharacters(
+        in: .whitespacesAndNewlines),
+      !identifier.isEmpty
+    else { return nil }
+    return identifier
   }
 
   // MARK: - Finding the files

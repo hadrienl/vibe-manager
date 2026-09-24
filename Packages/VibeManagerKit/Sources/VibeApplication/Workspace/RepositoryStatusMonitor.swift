@@ -642,7 +642,7 @@ public actor RepositoryStatusMonitor {
     case .transcript:
       // The folder holds the transcripts of every session opened in the same place: only this
       // session's own files say anything about it.
-      guard let identifier = transcriptIdentifier, path.contains(identifier) else { return }
+      guard transcriptIdentifiers.contains(where: { path.contains($0) }) else { return }
       transcriptGrew = true
     }
   }
@@ -659,13 +659,16 @@ public actor RepositoryStatusMonitor {
     return path
   }
 
-  /// The identifier the session's transcript files are named after.
-  private var transcriptIdentifier: String? {
-    guard
-      let identifier = session?.agent?.resumeIdentifier?.trimmingCharacters(
-        in: .whitespacesAndNewlines), !identifier.isEmpty
-    else { return nil }
-    return identifier
+  /// The identifiers the session's transcript files are named after: one per conversation it has
+  /// had, so that the files of an agent it was switched away from still count as its own.
+  private var transcriptIdentifiers: [String] {
+    (session?.conversations ?? []).compactMap { conversation in
+      guard
+        let identifier = conversation.resumeIdentifier?.trimmingCharacters(
+          in: .whitespacesAndNewlines), !identifier.isEmpty
+      else { return nil }
+      return identifier
+    }
   }
 
   private static func isReference(_ relative: String) -> Bool {

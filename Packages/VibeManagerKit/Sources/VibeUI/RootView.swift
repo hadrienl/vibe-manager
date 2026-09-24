@@ -99,8 +99,31 @@ public struct RootView: View {
           // re-presented for another session would open on the previous session's summary.
           .id(pending.sessionID)
         }
+      case .agentSwitch:
+        if let sheetModel = model.pendingSwitch {
+          AgentSwitchSheet(
+            model: sheetModel,
+            confirm: { Task { await model.confirmAgentSwitch() } },
+            cancel: { model.cancelAgentSwitch() }
+          )
+          .id(sheetModel.sessionID)
+        }
       }
     }
+  }
+
+  private func session(_ id: SessionID?) -> WorkSession? {
+    id.flatMap { id in model.sessions.first { $0.id == id } }
+  }
+
+  private func switchAction(for id: SessionID?) -> (() -> Void)? {
+    guard let session = session(id), model.canSwitchAgent(session) else { return nil }
+    return { model.beginAgentSwitch(session.id) }
+  }
+
+  private func restartAction(for id: SessionID?) -> (() -> Void)? {
+    guard let session = session(id), model.canRestart(session) else { return nil }
+    return { Task { await model.restart(session.id) } }
   }
 
   /// Which sheet the window is showing, out of the ones asking to be shown.
@@ -113,6 +136,7 @@ public struct RootView: View {
     if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
     if model.isPresentingNewSession { return .newSession }
     if model.pendingRestart != nil { return .restartContext }
+    if model.pendingSwitch != nil { return .agentSwitch }
     return nil
   }
 
@@ -128,6 +152,8 @@ public struct RootView: View {
       model.cancelNewSession()
     case .restartContext:
       model.cancelRestart()
+    case .agentSwitch:
+      model.cancelAgentSwitch()
     case nil:
       break
     }
@@ -142,6 +168,8 @@ public struct RootView: View {
     /// was torn down by a refresh that failed, leaving a pending restart nobody could answer or
     /// call off — and a session whose Restart command stayed withheld.
     case restartContext
+    /// Presented from the root for the same reason as the restart's summary.
+    case agentSwitch
 
     var id: Self { self }
   }
@@ -175,7 +203,24 @@ public struct RootView: View {
             failure: failure,
             detect: { Task { await model.refreshAgents(forceRefresh: true) } },
             isDetecting: model.isRefreshingAgents,
+            restart: nil,
+            // An agent that cannot run is exactly when another one is wanted — for the session
+            // the banner names, whichever one is selected by now.
+            switchAgent: switchAction(for: failure.sessionID),
             dismiss: { model.dismissRestartFailure() }
+          )
+          Divider()
+        }
+        if let failure = model.switchFailure {
+          RestartFailureBanner(
+            failure: failure,
+            detect: { Task { await model.refreshAgents(forceRefresh: true) } },
+            isDetecting: model.isRefreshingAgents,
+            // Back on its previous agent, the session resumes its own conversation with Restart;
+            // or another switch can be tried.
+            restart: restartAction(for: failure.sessionID),
+            switchAgent: switchAction(for: failure.sessionID),
+            dismiss: { model.dismissSwitchFailure() }
           )
           Divider()
         }
@@ -249,7 +294,10 @@ public struct RootView: View {
               splitChanged: { model.layout.inspectorSplitChanged(to: $0) },
               openPrivacySettings: model.permissions.map { permissions in
                 { permissions.openSystemSettings() }
-              }
+              },
+              agentNames: model.agentNames,
+              switchAgent: model.canSwitchAgent(session)
+                ? { model.beginAgentSwitch(session.id) } : nil
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
@@ -372,7 +420,11 @@ public struct RootView: View {
             title: model.restartTitle(for: session),
             isRestarting: model.restartingSessionIDs.contains(session.id),
             canRestart: model.canRestart(session),
-            restart: { Task { await model.restart(session.id) } }
+            restart: { Task { await model.restart(session.id) } },
+            switchBack: model.switchBackOffers[session.id].flatMap { offer in
+              model.canSwitchAgent(session)
+                ? (offer.label, { model.switchBack(session.id) }) : nil
+            }
           )
           Divider()
         }
@@ -447,6 +499,8 @@ private struct ClosedSessionBar: View {
   let isRestarting: Bool
   let canRestart: Bool
   let restart: () -> Void
+  /// The agent a switch left, offered back when the new one stopped at once.
+  var switchBack: (label: String, action: () -> Void)?
 
   var body: some View {
     HStack(spacing: 10) {
@@ -461,6 +515,10 @@ private struct ClosedSessionBar: View {
         Text("Starting…")
           .font(.callout)
           .foregroundStyle(.secondary)
+      }
+      if let switchBack, !isRestarting {
+        Button("Switch Back to \(switchBack.label)…", action: switchBack.action)
+          .controlSize(.small)
       }
       Button(title, action: restart)
         .controlSize(.small)
@@ -480,6 +538,8 @@ private struct RestartFailureBanner: View {
   let failure: AppModel.RestartFailure
   let detect: () -> Void
   let isDetecting: Bool
+  let restart: (() -> Void)?
+  let switchAgent: (() -> Void)?
   let dismiss: () -> Void
 
   var body: some View {
@@ -501,6 +561,14 @@ private struct RestartFailureBanner: View {
       Button("Detect Again", action: detect)
         .controlSize(.small)
         .disabled(isDetecting)
+      if let restart {
+        Button("Restart", action: restart)
+          .controlSize(.small)
+      }
+      if let switchAgent {
+        Button("Switch Agent…", action: switchAgent)
+          .controlSize(.small)
+      }
       Button {
         dismiss()
       } label: {
@@ -1096,11 +1164,13 @@ struct SessionCommands {
   var restartTitle: String { model.restartTitle(for: session) }
   /// Spoken rather than read, so it says what the command will actually do.
   var restartAnnouncement: String { model.expectedRestartMode(for: session) }
+  var canSwitchAgent: Bool { model.canSwitchAgent(session) }
 
   func close() { Task { await model.requestClose(session.id) } }
   func requestArchive() { model.requestArchive(session.id) }
   func restore() { Task { await model.restore(session.id) } }
   func restart() { Task { await model.restart(session.id) } }
+  func switchAgent() { model.beginAgentSwitch(session.id) }
 }
 
 private struct SessionCommandButtons: View {
@@ -1109,6 +1179,9 @@ private struct SessionCommandButtons: View {
   var body: some View {
     if commands.canRestart {
       Button(commands.restartTitle) { commands.restart() }
+    }
+    if commands.canSwitchAgent {
+      Button("Switch Agent…") { commands.switchAgent() }
     }
     if commands.canClose {
       Button("Close Session") { commands.close() }
@@ -1172,6 +1245,10 @@ private struct SessionRow: View {
     .accessibilityAction(named: Text(commands.restartAnnouncement)) {
       guard commands.canRestart else { return }
       commands.restart()
+    }
+    .accessibilityAction(named: "Switch Agent") {
+      guard commands.canSwitchAgent else { return }
+      commands.switchAgent()
     }
     .accessibilityAction(named: "Close Session") {
       guard commands.canClose else { return }

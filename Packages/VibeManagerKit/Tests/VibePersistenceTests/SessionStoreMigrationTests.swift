@@ -74,7 +74,7 @@ struct SessionStoreMigrationTests {
     #expect(session.repositories.map(\.path) == ["/projects/app"])
   }
 
-  @Test("Reading a v1 document rewrites it as v2")
+  @Test("Reading a v1 document rewrites it in the current schema")
   func v1DocumentIsRewritten() async throws {
     let storeURL = try makeStoreURL()
     defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
@@ -84,7 +84,7 @@ struct SessionStoreMigrationTests {
 
     let rewritten = try JSONSerialization.jsonObject(with: try Data(contentsOf: storeURL))
     let object = try #require(rewritten as? [String: Any])
-    #expect(object["schemaVersion"] as? Int == 2)
+    #expect(object["schemaVersion"] as? Int == 4)
   }
 
   @Test("An empty v1 model becomes no model, never a model named nothing")

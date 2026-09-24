@@ -87,6 +87,20 @@ struct ClaudeCodeArgumentBuilderTests {
     #expect(!arguments.contains("--fork-session"))
   }
 
+  @Test("Switching model keeps the conversation: the resume and the new model travel together")
+  func resumeWithAnotherModel() throws {
+    let identifier = "8C1D0B7E-1111-4222-8333-444455556666"
+    let arguments = try arguments(
+      AgentLaunchRequest(
+        workingDirectoryPath: "/Users/a/dev/app",
+        modelID: "claude-sonnet-5",
+        resume: .identifier(identifier)
+      )
+    )
+
+    #expect(arguments == ["--resume", identifier.lowercased(), "--model", "claude-sonnet-5"])
+  }
+
   @Test("Only a UUID is accepted as a resume identifier")
   func rejectsNonUUIDIdentifiers() {
     for identifier in ["--last", " ", "last", "3f2b6c1e-8a4d-4f7b-9c2e", "/tmp/session"] {

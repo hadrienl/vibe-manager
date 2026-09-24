@@ -132,6 +132,15 @@ private struct SessionHistoryCommands: Commands {
       .keyboardShortcut("r", modifiers: [.command, .control])
       .disabled(!(model.selectedSession.map(model.canRestart) ?? false))
 
+      // Another agent or another model for the same work. Offered on a running session too: the
+      // sheet says the agent will be stopped, and nothing is stopped before it is confirmed.
+      Button("Switch Agent…") {
+        guard let session = model.selectedSession else { return }
+        model.beginAgentSwitch(session.id)
+      }
+      .keyboardShortcut("m", modifiers: [.command, .control])
+      .disabled(!(model.selectedSession.map(model.canSwitchAgent) ?? false))
+
       Divider()
 
       Button("Close Session") {
