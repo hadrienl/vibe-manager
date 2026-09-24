@@ -118,14 +118,22 @@ struct DiagnosticsExportTests {
     #expect(logs.first?.contents == recent)
   }
 
-  @Test("A crash report's paths under the home folder are redacted, and so is the user name")
+  @Test("A crash report's paths are redacted, escaped, spaced or on a volume, and the user name")
   func redactsCrashReports() throws {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let report = """
-      {"procPath":"/Users/alice/Applications/Vibe Manager.app/Contents/MacOS/Vibe Manager",
-      "cwd":"/Users/alice/Projects/secret-client","user":"alice"}
-      """
+    // As the system writes them: a header line, then JSON whose slashes are escaped.
+    let report = #"""
+      {"app_name":"Vibe Manager","bug_type":"309","os_version":"macOS 15.1"}
+      {
+        "procPath" : "\/Users\/alice\/Applications\/Vibe Manager.app\/Contents\/MacOS\/Vibe Manager",
+        "cwd" : "\/Users\/alice\/Documents\/Client Project\/api",
+        "volume" : "\/Volumes\/Acme Secret\/work",
+        "usedImages" : [{"path" : "\/usr\/lib\/system\/libsystem_kernel.dylib"}],
+        "note" : "opened /Users/alice/Desktop/plan.txt and /Volumes/Acme/x",
+        "user" : "alice"
+      }
+      """#
     try Data(report.utf8).write(
       to: directory.appendingPathComponent("Vibe Manager-2026-09-24-101010.ips"))
     try Data(report.utf8).write(to: directory.appendingPathComponent("Other App-2026.ips"))
@@ -134,10 +142,12 @@ struct DiagnosticsExportTests {
 
     #expect(reports.map(\.name) == ["Vibe Manager-2026-09-24-101010.ips"])
     let text = String(decoding: reports[0].contents, as: UTF8.self)
-    #expect(!text.contains("alice"))
-    #expect(!text.contains("secret-client"))
-    #expect(!text.contains("Projects"))
-    #expect(text.contains("\"cwd\":\"~/"))
+    for secret in ["alice", "Client", "Project", "Documents", "Acme", "Secret", "Desktop", "plan"] {
+      #expect(!text.contains(secret), "\(secret) survived")
+    }
+    #expect(text.contains("\"cwd\" : \"~/"))
+    #expect(text.contains("/usr/lib/system/libsystem_kernel.dylib"))
+    #expect(text.contains("\"bug_type\":\"309\""))
   }
 
   @Test("The store is sizes and counts, never a session")

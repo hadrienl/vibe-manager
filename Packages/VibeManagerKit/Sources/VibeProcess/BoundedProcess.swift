@@ -151,25 +151,35 @@ public enum BoundedProcess {
     // The child leads its group: the group identifier is its process identifier.
     let group = processIdentifier
     ChildProcessGroupGuard.register(group)
-    defer { ChildProcessGroupGuard.unregister(group) }
     // A cancellation that arrived while spawning is applied here.
     handle.adopt(group)
+    // Once this returns, a late cancellation must not signal a number another group may have.
+    defer { handle.release() }
 
     let reader = OutputReader(
       descriptors: [output[0], errors[0]], limit: max(0, request.outputByteLimit))
     reader.start()
 
-    let exit = ExitWaiter(processIdentifier: processIdentifier)
+    // The group stays registered until the child is reaped, whenever that is.
+    let exit = ExitWaiter(processIdentifier: processIdentifier) {
+      ChildProcessGroupGuard.unregister(group)
+    }
     exit.start()
 
     var timedOut = false
+    var reaped = true
     if !exit.wait(seconds: request.timeout.secondsValue) {
       timedOut = true
       handle.stop()
-      exit.waitForever()
+      // A process in an uninterruptible wait — `git` on a stalled network volume — survives even
+      // SIGKILL until the kernel lets go. The caller is not held for it: the waiter's thread
+      // reaps it whenever that happens.
+      reaped = exit.wait(seconds: handle.grace * 2)
     }
     // Whatever the command left in its group goes with it: nothing else will ever collect it.
-    terminateGroup(group, grace: handle.grace)
+    if reaped {
+      terminateGroup(group, grace: handle.grace)
+    }
 
     // A process that left the group — a daemon that called `setsid` — may still hold a pipe. It is
     // not waited for.
@@ -288,17 +298,23 @@ private final class ProcessGroupHandle: @unchecked Sendable {
     guard let group = lock.withLock({ self.group }) else { return }
     BoundedProcess.terminateGroup(group, grace: grace)
   }
+
+  func release() {
+    lock.withLock { group = nil }
+  }
 }
 
 /// Reaps the child on a thread of its own, so the caller can wait with a deadline.
 private final class ExitWaiter: @unchecked Sendable {
   private let processIdentifier: pid_t
+  private let onExit: @Sendable () -> Void
   private let exited = DispatchSemaphore(value: 0)
   private let lock = NSLock()
   private var status: Int32 = 0
 
-  init(processIdentifier: pid_t) {
+  init(processIdentifier: pid_t, onExit: @escaping @Sendable () -> Void) {
     self.processIdentifier = processIdentifier
+    self.onExit = onExit
   }
 
   func start() {
@@ -306,6 +322,7 @@ private final class ExitWaiter: @unchecked Sendable {
       var status: Int32 = 0
       while waitpid(self.processIdentifier, &status, 0) == -1, errno == EINTR {}
       self.lock.withLock { self.status = status }
+      self.onExit()
       self.exited.signal()
     }
   }
@@ -315,11 +332,6 @@ private final class ExitWaiter: @unchecked Sendable {
     guard exited.wait(timeout: .now() + seconds) == .success else { return false }
     exited.signal()
     return true
-  }
-
-  func waitForever() {
-    exited.wait()
-    exited.signal()
   }
 
   var termination: BoundedProcessResult.Termination {

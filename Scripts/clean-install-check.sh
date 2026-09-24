@@ -79,11 +79,28 @@ for _ in {1..100}; do
   sleep 0.1
 done
 [[ -S "$socket" ]] || fail "the terminal host did not start listening"
-# Any client will do; what matters is how it is signed.
+# Any client will do; what matters is how it is signed. Built here rather than copied from the
+# system: a platform binary re-signed ad hoc is refused at exec on Apple silicon, and would never
+# reach the host at all.
 readonly impostor="$work/impostor"
-cp /usr/bin/nc "$impostor"
+cat > "$impostor.c" <<'SOURCE'
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+  struct sockaddr_un address = {.sun_family = AF_UNIX};
+  strncpy(address.sun_path, argv[1], sizeof(address.sun_path) - 1);
+  int descriptor = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (connect(descriptor, (struct sockaddr *)&address, sizeof(address)) != 0) return 2;
+  write(descriptor, "impostor", 8);
+  sleep(1);
+  return 0;
+}
+SOURCE
+xcrun clang -o "$impostor" "$impostor.c"
 codesign --force --sign - --identifier "$bundle_identifier" "$impostor"
-print "impostor" | "$impostor" -U -w 2 "$socket" >/dev/null 2>&1 || true
+"$impostor" "$socket" || fail "the ad hoc binary could not reach the terminal host"
 for _ in {1..50}; do
   grep -q '"host.peerRefused"' "$logs/host.jsonl" 2>/dev/null && break
   sleep 0.1

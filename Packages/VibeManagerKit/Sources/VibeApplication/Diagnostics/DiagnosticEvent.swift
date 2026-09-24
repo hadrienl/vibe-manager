@@ -191,7 +191,8 @@ public struct RedactedPath: Hashable, Sendable {
   static let clearPrefixes = [
     "/usr/bin", "/usr/local/bin", "/usr/local/Cellar", "/opt/homebrew/bin",
     "/opt/homebrew/Cellar", "/bin", "/sbin", "/usr/sbin", "/Applications/Xcode.app",
-    "/Library/Developer/CommandLineTools", "/System",
+    "/Library/Developer/CommandLineTools", "/System", "/usr/lib",
+    "/Applications/Vibe Manager.app",
   ]
 
   /// Directories under the home folder whose names say nothing about the user.

@@ -330,6 +330,8 @@ public final class AppEnvironment {
     await appModel.stopRestoring()
     if keepingAgentsRunning {
       await detachForQuit()
+      // The lines of this very path are the ones worth reading if the agents are not found again.
+      diagnostics.flush()
       return
     }
     await prepareForQuit()

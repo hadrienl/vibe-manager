@@ -93,7 +93,7 @@ detection: state, version, redacted directory, authentication as a token — the
 agent again), `store.txt` (schema, counts by status, sizes, backup, damaged copies), `runtime.txt`
 (the runtime document's phase, the previous verdict, the host's identity and each session's state by
 pseudonym), the log lines of the last 7 days, and the system's crash reports of the last 30 days
-with every path under the home folder redacted and the user's short name replaced.
+with every path redacted — escaped, spaced or on another volume — and the user's short name replaced.
 
 Building the files is a pure function of `DiagnosticSnapshot`, which can only hold the types above.
 The archive is a ZIP written in memory (deflated with the Compression framework, CRC-32 computed

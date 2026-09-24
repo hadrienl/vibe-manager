@@ -66,7 +66,7 @@ public enum DiagnosticsCollector {
   }
 
   /// The system's crash reports of the application, from the last `crashReportAge`, with every
-  /// path under the home folder redacted. They carry stacks and paths, never the environment.
+  /// path redacted. They carry stacks and paths, never the environment.
   public static func crashReports(
     in directory: URL = FileManager.default.homeDirectoryForCurrentUser
       .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true),
@@ -86,24 +86,39 @@ public enum DiagnosticsCollector {
     }
   }
 
-  /// Every path under `home` in `text`, replaced by its `RedactedPath`, and the user's short name
+  /// Every absolute path in `text` replaced by its `RedactedPath`, and the user's short name
   /// wherever else it appears.
+  ///
+  /// A crash report is a header line and a JSON document, whose strings escape their slashes
+  /// (`"\/Users\/…"`): those are read unescaped first. A path is a whole JSON string when it
+  /// starts one — spaces and all, `Client Project` included — and runs to the next blank, quote or
+  /// bracket otherwise. Paths outside the home folder are redacted too: a volume is named after
+  /// whatever its owner called it.
   public static func redactingPaths(in text: String, home: String) -> String {
-    guard home.count > 1 else { return text }
-    let escaped = NSRegularExpression.escapedPattern(for: home)
-    guard
-      let expression = try? NSRegularExpression(pattern: escaped + "(/[^\\s\"'<>,;)\\]]*)?")
-    else { return text }
-    let source = text as NSString
-    var result = ""
-    var cursor = 0
-    for match in expression.matches(in: text, range: NSRange(location: 0, length: source.length)) {
-      result += source.substring(
-        with: NSRange(location: cursor, length: match.range.location - cursor))
-      result += RedactedPath(source.substring(with: match.range), home: home).rawValue
-      cursor = match.range.location + match.range.length
+    let unescaped = text.replacingOccurrences(of: "\\/", with: "/")
+    let patterns = [
+      // A JSON string that is a path, from its opening quote to its closing one.
+      "(?<=\")/(?:[^\"\\\\]|\\\\.)*(?=\")",
+      // A path in plain text.
+      "(?<=[\\s(=:\\[,])/[^\\s\"'<>,;)\\]]+",
+    ]
+    var result = unescaped
+    for pattern in patterns {
+      guard let expression = try? NSRegularExpression(pattern: pattern) else { continue }
+      let source = result as NSString
+      var rewritten = ""
+      var cursor = 0
+      for match in expression.matches(
+        in: result, range: NSRange(location: 0, length: source.length))
+      {
+        rewritten += source.substring(
+          with: NSRange(location: cursor, length: match.range.location - cursor))
+        rewritten += RedactedPath(source.substring(with: match.range), home: home).rawValue
+        cursor = match.range.location + match.range.length
+      }
+      rewritten += source.substring(from: cursor)
+      result = rewritten
     }
-    result += source.substring(from: cursor)
     let user = (home as NSString).lastPathComponent
     guard user.count > 2 else { return result }
     return result.replacingOccurrences(of: user, with: "<user>")
