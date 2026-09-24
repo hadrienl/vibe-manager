@@ -112,10 +112,12 @@ struct RepositoryStatusMonitorTests {
     }
     try await Task.sleep(for: .milliseconds(200))
     await reader.release()
-    try await Task.sleep(for: .milliseconds(600))
 
     // The first event starts a reading; the other 999 all land during it or its pause, and
-    // together ask for exactly one more.
+    // together ask for exactly one more. Waited for rather than slept on: a busy runner took
+    // longer than 600 ms to get to it. Then a pause of several intervals shows no fourth.
+    #expect(await eventually { await reader.readCount("/work/api") >= 3 })
+    try await Task.sleep(for: .milliseconds(600))
     #expect(await reader.readCount("/work/api") == 3)
   }
 

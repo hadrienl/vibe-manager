@@ -90,6 +90,13 @@ struct AgentLaunchPlanTests {
     #expect(!plan.arguments.contains(prompt))
   }
 
+  @Test("A prompt holding a NUL is refused rather than sent cut short")
+  func refusesNullCharacter() {
+    #expect(throws: AgentLaunchError.promptContainsNullCharacter) {
+      try plan(initialPrompt: "Review this\u{0} and not that")
+    }
+  }
+
   @Test("A prompt above the hard limit is refused")
   func refusesOversizedPrompt() {
     let prompt = String(repeating: "a", count: AgentPromptLimits.maximumByteLimit + 1)

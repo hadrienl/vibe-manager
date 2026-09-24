@@ -230,6 +230,11 @@ public enum AgentLaunchValidation {
       throw AgentLaunchError.initialPromptUnsupported
     }
 
+    // Arguments reach `posix_spawn` as C strings, where a NUL ends the string: refused here, for
+    // every prompt, rather than sent cut short.
+    guard !prompt.unicodeScalars.contains("\u{0}") else {
+      throw AgentLaunchError.promptContainsNullCharacter
+    }
     let byteCount = prompt.utf8.count
     guard byteCount <= AgentPromptLimits.maximumByteLimit else {
       throw AgentLaunchError.promptTooLarge(

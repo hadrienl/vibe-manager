@@ -123,7 +123,7 @@ struct NewSessionModelTests {
     #expect(model.issues.isEmpty)
   }
 
-  @Test("A burst of keystrokes is checked once, when the typing stops")
+  @Test("A burst of keystrokes is checked once, when the typing stops", .timeLimit(.minutes(1)))
   func revalidationIsDebounced() async throws {
     let plans = PlanCounter()
     let model = makeModel(
@@ -138,7 +138,9 @@ struct NewSessionModelTests {
       model.draft.name.append(character)
       model.draftChanged()
     }
-    try await Task.sleep(for: .milliseconds(300))
+    await waitUntil { model.issues.isEmpty }
+    // Long enough for any other check the burst might have started to land as well.
+    try await Task.sleep(for: .milliseconds(100))
 
     #expect(await plans.count == beforeTyping + 1)
     #expect(model.issues.isEmpty)
@@ -234,7 +236,10 @@ struct NewSessionModelTests {
     #expect(model.protectedLocationNotice == nil)
   }
 
-  @Test("A folder that disappeared stays reported while the next field is fixed")
+  @Test(
+    "A folder that disappeared stays reported while the next field is fixed",
+    .timeLimit(.minutes(1))
+  )
   func folderVerdictSurvivesTheNextEdit() async throws {
     // The folder was opened by Create, so re-checking it raises nothing new. Skipping the check
     // instead made the problem vanish as soon as the name was edited, and come back at the next
@@ -246,13 +251,16 @@ struct NewSessionModelTests {
 
     model.draft.name = "Refactor the webhook"
     model.draftChanged()
-    try await Task.sleep(for: .milliseconds(200))
+    await waitUntil { model.issues(for: .name).isEmpty }
 
     #expect(model.issues.contains(.workingDirectoryNotFound))
     #expect(model.issues(for: .name).isEmpty)
   }
 
-  @Test("A folder chosen while the form is already red does not republish a stale verdict")
+  @Test(
+    "A folder chosen while the form is already red does not republish a stale verdict",
+    .timeLimit(.minutes(1))
+  )
   func chosenFolderDoesNotRestoreAStaleVerdict() async throws {
     // A folder on a network volume takes long enough to check for a name to be typed under it.
     // The answer that comes back describes the older draft, so only the part of it that was
@@ -269,7 +277,7 @@ struct NewSessionModelTests {
     model.draftChanged()
     await folders.open()
     await choosing.value
-    try await Task.sleep(for: .milliseconds(200))
+    await waitUntil { model.issues.isEmpty }
 
     #expect(model.issues.isEmpty)
   }
@@ -367,6 +375,17 @@ private actor SpyRepository: SessionRepository {
 
 /// Counts the checks that reach the agent, which is what a revalidation costs now that the
 /// working folder is left alone until the user designates one.
+/// Waits for the debounced check to land, however long a busy runner takes to get there.
+///
+/// No deadline of its own: a fixed wait of 200 ms ran out on a CI runner where these tests took
+/// seven seconds. The time limit of each test stops a check that never comes.
+@MainActor
+private func waitUntil(_ condition: @MainActor () -> Bool) async {
+  while !condition() {
+    try? await Task.sleep(for: .milliseconds(10))
+  }
+}
+
 private actor PlanCounter {
   private(set) var count = 0
 
@@ -498,5 +517,144 @@ private actor GatedFolders: WorkingDirectoryProbe {
     }
     isChecking = false
     return .usable
+  }
+}
+
+private let templateReview = PromptTemplate(
+  name: "Review", sessionNamePattern: "Review {{url}}", body: "Review {{url}}.\n\n{{focus?}}")
+private let templateFeedback = PromptTemplate(
+  name: "Feedback", sessionNamePattern: "Feedback {{url}}", body: "Address comments on {{url}}.")
+
+@MainActor
+@Suite("Filling a template in the new session sheet")
+struct NewSessionTemplateTests {
+  private func makeModel(templates: [PromptTemplate] = [templateReview, templateFeedback])
+    -> NewSessionModel
+  {
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let model = NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(), agents: registry, folders: StubFolders(status: .usable)),
+      registry: registry,
+      templates: templates
+    )
+    model.draft.workingDirectoryPath = "/workspace"
+    return model
+  }
+
+  @Test("Create stays out of reach while a required field is empty")
+  func requiredFieldBlocksSubmission() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    #expect(model.draft.name == "Review")
+    #expect(!model.canSubmit)
+
+    model.setValue("https://x/1", for: "url")
+    #expect(model.canSubmit)
+    #expect(model.draft.name == "Review https://x/1")
+  }
+
+  @Test("The name follows the template until the user types their own")
+  func nameStopsFollowingOnceTyped() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.draft.name = "My own name"
+    model.setValue("https://x/1", for: "url")
+    #expect(model.draft.name == "My own name")
+  }
+
+  @Test("Changing template keeps the values of fields sharing a name")
+  func switchingKeepsSharedValues() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.setValue("https://x/1", for: "url")
+    model.setValue("the migration", for: "focus")
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.value(for: "url") == "https://x/1")
+    #expect(model.draft.templateFill?.values["focus"] == nil)
+    #expect(model.draft.name == "Feedback https://x/1")
+  }
+
+  @Test("Edit as Text turns the rendering into the free prompt, and drops the template")
+  func editAsText() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.editAsText()
+    #expect(model.draft.templateFill == nil)
+    #expect(model.draft.initialPrompt == "Review {{url}}.")
+    #expect(model.draft.session().template == nil)
+  }
+
+  @Test("A template saved elsewhere is said, and only swapped in on Reload")
+  func staleTemplateReloads() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.setValue("https://x/1", for: "url")
+    var changed = templateReview
+    changed.body = "Look at {{url}} closely."
+    changed.revision = 2
+
+    model.templatesChanged([changed, templateFeedback])
+    #expect(model.isTemplateStale)
+    #expect(model.renderedPrompt?.prompt == "Review https://x/1.")
+
+    model.reloadTemplate()
+    #expect(!model.isTemplateStale)
+    #expect(model.renderedPrompt?.prompt == "Look at https://x/1 closely.")
+  }
+
+  @Test("A template's folder is proposed while the field is free, and follows the template")
+  func folderPresetFollowsTemplate() {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(templates: [api, templateFeedback])
+    model.draft.workingDirectoryPath = nil
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.workingDirectoryPath == "~/Projects/api")
+    #expect(model.folderComesFromTemplate)
+
+    // A template without a folder gives back the one that was there before.
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.workingDirectoryPath == nil)
+    #expect(!model.folderComesFromTemplate)
+  }
+
+  @Test("A template's symbol and colour follow it, and never replace the user's")
+  func appearancePreset() {
+    var api = templateReview
+    let given = SessionAppearance(symbolName: "bolt", colorHex: "#0B63E5")
+    api.appearance = given
+    let model = makeModel(templates: [api, templateFeedback])
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.appearance == given)
+    #expect(model.appearanceComesFromTemplate)
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.appearance == nil)
+
+    let mine = SessionAppearance(symbolName: "flask", colorHex: "#B42318")
+    model.draft.appearance = mine
+    model.selectTemplate(api.id)
+    #expect(model.draft.appearance == mine)
+  }
+
+  @Test("A folder the user chose is never replaced by a template's")
+  func userFolderWins() {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(templates: [api, templateFeedback])
+    model.draft.workingDirectoryPath = "/workspace/mine"
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.workingDirectoryPath == "/workspace/mine")
+
+    // Chosen after the template proposed one, it stays through a change of template too.
+    model.draft.workingDirectoryPath = nil
+    model.selectTemplate(templateFeedback.id)
+    model.selectTemplate(api.id)
+    model.draft.workingDirectoryPath = "/workspace/other"
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.workingDirectoryPath == "/workspace/other")
   }
 }

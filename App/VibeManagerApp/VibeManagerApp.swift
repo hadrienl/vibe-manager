@@ -37,6 +37,8 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("n", modifiers: .command)
         .disabled(!environment.appModel.canCreateSession)
+
+        TemplateCommands(model: environment.appModel)
       }
 
       // SwiftUI's own Close sits here on ⌘W, which now belongs to the session. The window keeps
@@ -96,6 +98,39 @@ struct VibeManagerApp: App {
 
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
+    }
+  }
+}
+
+/// Starting a session from a template, and managing them.
+///
+/// ⇧⌘N opens the sheet on the first template, its fields ready to type in; the picker at the top
+/// of the sheet changes it. The submenu goes straight to any of them.
+private struct TemplateCommands: View {
+  let model: AppModel
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    Button("New Session from Template") {
+      model.beginNewSession(template: model.templates.all.first?.id)
+    }
+    .keyboardShortcut("n", modifiers: [.command, .shift])
+    .disabled(!model.canCreateSession || model.templates.all.isEmpty)
+
+    Menu("New Session from") {
+      ForEach(model.templates.all) { template in
+        Button(template.trimmedName) {
+          model.beginNewSession(template: template.id)
+        }
+      }
+    }
+    .disabled(!model.canCreateSession || model.templates.all.isEmpty)
+
+    Divider()
+
+    Button("Manage Prompt Templates…") {
+      model.settingsTab = .templates
+      openSettings()
     }
   }
 }
@@ -248,6 +283,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // the next launch without the intention to resume them. The deadline starts after the
     // question: it bounds the tidying, not the time the user takes to answer.
     Task {
+      // A template being edited is saved explicitly, so quitting asks what to do with it — before
+      // anything is stopped, since Cancel must leave everything as it was.
+      guard await confirmTemplateChanges(environment.appModel.templates) else {
+        isFlushingNotes = false
+        NSApplication.shared.reply(toApplicationShouldTerminate: false)
+        return
+      }
       // The notes first, and before the deadline starts: the one thing that can be lost here is
       // what the user typed, and they are asked before it is.
       // Bounded: a write stuck on a stalled volume must not keep the application from quitting.
@@ -273,6 +315,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var isFlushingNotes = false
   /// How long quitting waits for the notes before asking about those still not on disk.
   private static let notesDeadline: Duration = .seconds(2)
+
+  /// Changes to a prompt template are only ever lost on purpose: Save, Don't Save or Cancel, as
+  /// for any document. A template that cannot be saved as it is says why, and offers only to go
+  /// back to it or to quit without it.
+  private func confirmTemplateChanges(_ templates: PromptTemplateLibraryModel) async -> Bool {
+    guard templates.isEdited, let editing = templates.editing else { return true }
+    let name = editing.trimmedName.isEmpty ? "Untitled Template" : editing.trimmedName
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    if templates.canSave {
+      alert.messageText = "Save the changes to the template “\(name)” before quitting?"
+      alert.informativeText = "Your changes are lost if you don't save them."
+      alert.addButton(withTitle: "Save")
+      alert.addButton(withTitle: "Cancel")
+      alert.addButton(withTitle: "Don't Save").hasDestructiveAction = true
+      switch alert.runModal() {
+      case .alertFirstButtonReturn:
+        // A save that fails keeps the application open, with the reason in the templates window.
+        return await templates.save()
+      case .alertThirdButtonReturn:
+        return true
+      default:
+        return false
+      }
+    }
+    let issue = templates.issues.first.map { "\($0.message) \($0.remedy)" }
+    alert.messageText = "The template “\(name)” has changes that can't be saved."
+    alert.informativeText =
+      (issue.map { $0 + " " } ?? "") + "Go back to it to finish them, or quit without them."
+    // Cancel is the default: Return must not be the key that loses what was typed.
+    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: "Quit Anyway").hasDestructiveAction = true
+    return alert.runModal() == .alertSecondButtonReturn
+  }
 
   /// Notes that could not be written are only ever lost on purpose.
   private func confirmQuit(losing unsaved: [NotesDocument], names sessions: [WorkSession]) -> Bool {

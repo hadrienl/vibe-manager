@@ -7,22 +7,35 @@ public struct NewSessionSheet: View {
   /// Bindable, not `@State`: the fields need bindings, but the model belongs to `AppModel` and
   /// must not be frozen at the value this view was first given.
   @Bindable private var model: NewSessionModel
-  @FocusState private var focus: SessionDraftField?
+  @FocusState private var focus: FocusTarget?
+  /// The prompt areas are AppKit text views, which SwiftUI's focus does not reach: where the caret
+  /// was sent is kept here too, and they take it themselves.
+  @State private var editorRequest: FocusTarget?
+
+  /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
+  enum FocusTarget: Hashable {
+    case draft(SessionDraftField)
+    case templateField(String)
+  }
 
   private let defaultWorkingDirectoryPath: String?
   private let created: (SessionCreation) -> Void
   private let cancelled: () -> Void
+  /// Opens the templates in the settings. `nil`: the sheet offers no way there.
+  private let manageTemplates: (() -> Void)?
 
   public init(
     model: NewSessionModel,
     defaultWorkingDirectoryPath: String? = nil,
     created: @escaping (SessionCreation) -> Void,
-    cancelled: @escaping () -> Void
+    cancelled: @escaping () -> Void,
+    manageTemplates: (() -> Void)? = nil
   ) {
     _model = Bindable(model)
     self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
     self.created = created
     self.cancelled = cancelled
+    self.manageTemplates = manageTemplates
   }
 
   public var body: some View {
@@ -33,10 +46,10 @@ public struct NewSessionSheet: View {
       Divider()
       footer
     }
-    .frame(width: 640, height: 700)
+    .frame(width: 640, height: 760)
     .task {
       await model.load(defaultWorkingDirectoryPath: defaultWorkingDirectoryPath)
-      focus = .name
+      moveFocus(to: model.draft.templateFill.flatMap(firstEmptyField) ?? .draft(.name))
     }
   }
 
@@ -59,8 +72,14 @@ public struct NewSessionSheet: View {
   private var form: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
+        templateField
         nameField
-        promptField
+        if model.draft.templateFill != nil {
+          templateFields
+          previewField
+        } else {
+          promptField
+        }
         folderField
         agentField
         modelField
@@ -78,7 +97,143 @@ public struct NewSessionSheet: View {
     LabeledField("Name", issues: model.issues(for: .name)) {
       TextField("What are you working on?", text: $model.draft.name)
         .textFieldStyle(.roundedBorder)
-        .focused($focus, equals: .name)
+        .focused($focus, equals: .draft(.name))
+    }
+  }
+
+  @ViewBuilder
+  private var templateField: some View {
+    LabeledField(
+      "Template",
+      help: model.templates.isEmpty
+        ? "No templates yet — Manage… to write one, or add the examples." : nil,
+      issues: []
+    ) {
+      HStack(spacing: 8) {
+        Picker(
+          "Template",
+          selection: Binding(
+            get: { model.selectedTemplateID },
+            set: { id in
+              model.selectTemplate(id)
+              if let fill = model.draft.templateFill {
+                moveFocus(to: firstEmptyField(in: fill))
+              }
+            }
+          )
+        ) {
+          Text("None — free prompt").tag(PromptTemplateID?.none)
+          if !model.templates.isEmpty {
+            Divider()
+          }
+          ForEach(model.templates) { template in
+            Label(
+              template.trimmedName,
+              systemImage: template.appearance?.symbolName ?? "text.badge.plus"
+            )
+            .tag(PromptTemplateID?.some(template.id))
+          }
+        }
+        .labelsHidden()
+        .frame(maxWidth: 280, alignment: .leading)
+
+        if let manageTemplates {
+          Button("Manage…", action: manageTemplates)
+            .controlSize(.small)
+        }
+      }
+    }
+    if model.isTemplateStale {
+      HStack(spacing: 8) {
+        Image(systemName: "arrow.triangle.2.circlepath")
+          .foregroundStyle(.secondary)
+        Text("This template changed since you picked it.")
+          .font(.caption)
+        Button("Reload") { model.reloadTemplate() }
+          .controlSize(.small)
+      }
+      .padding(.leading, 130)
+      .accessibilityElement(children: .combine)
+    }
+  }
+
+  /// One control per field of the template, in the order the text reads them.
+  @ViewBuilder
+  private var templateFields: some View {
+    if let fill = model.draft.templateFill {
+      ForEach(fill.template.fields) { field in
+        LabeledField(
+          field.isRequired ? "\(field.label) *" : field.label,
+          issues: model.issues(forTemplateField: field.name)
+        ) {
+          let text = Binding(
+            get: { model.value(for: field.name) },
+            set: { model.setValue($0, for: field.name) }
+          )
+          Group {
+            if field.isMultiline {
+              PromptTextEditor(
+                text: text,
+                minimumLines: 2,
+                placeholder: field.help,
+                accessibilityLabel: field.label,
+                focusRequested: editorRequest == .templateField(field.name)
+              )
+            } else {
+              TextField(field.help ?? "", text: text)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel(field.label)
+            }
+          }
+          .focused($focus, equals: .templateField(field.name))
+          .accessibilityValue(field.isRequired ? "Required" : "")
+          // What the patterns of the template keep of the value, once there is one.
+          if !model.value(for: field.name).isEmpty {
+            ExtractionResultsView(results: fill.extractions(for: field.name))
+          }
+        }
+      }
+    }
+  }
+
+  /// The prompt exactly as it will be sent, with what was typed in bold and what is still missing
+  /// named in its place.
+  @ViewBuilder
+  private var previewField: some View {
+    if let rendered = model.renderedPrompt, let fill = model.draft.templateFill {
+      LabeledField("Prompt", issues: model.issues(for: .initialPrompt)) {
+        VStack(alignment: .leading, spacing: 6) {
+          ScrollView {
+            PromptPreviewText(rendered: rendered)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(8)
+          }
+          .frame(maxHeight: 180)
+          .fixedSize(horizontal: false, vertical: true)
+          .background(
+            Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6)
+          )
+          .overlay {
+            RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
+          }
+
+          HStack(spacing: 6) {
+            Text(
+              "\(PromptSize.label(rendered.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit)) · From “\(fill.template.trimmedName)”, revision \(fill.template.revision)"
+            )
+            .font(.caption)
+            .foregroundStyle(
+              rendered.byteCount > AgentPromptLimits.argumentByteLimit ? Color.red : .secondary)
+            Spacer()
+            Button("Edit as Text") {
+              model.editAsText()
+              moveFocus(to: .draft(.initialPrompt))
+            }
+            .controlSize(.small)
+            .help("Turn the prompt into free text. The session will not refer to the template.")
+          }
+        }
+      }
     }
   }
 
@@ -88,14 +243,24 @@ public struct NewSessionSheet: View {
       help: "Optional — handed to the agent as its first message.",
       issues: model.issues(for: .initialPrompt)
     ) {
-      TextEditor(text: $model.draft.initialPrompt)
-        .font(.body)
-        .frame(height: 54)
-        .overlay {
-          RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
-        }
-        .focused($focus, equals: .initialPrompt)
+      PromptTextEditor(
+        text: $model.draft.initialPrompt,
+        accessibilityLabel: "Initial prompt",
+        focusRequested: editorRequest == .draft(.initialPrompt)
+      )
+      .focused($focus, equals: .draft(.initialPrompt))
     }
+  }
+
+  private func moveFocus(to target: FocusTarget?) {
+    focus = target
+    editorRequest = target
+  }
+
+  private func firstEmptyField(in fill: PromptTemplateFill) -> FocusTarget? {
+    let fields = fill.template.fields
+    let empty = fields.first { fill.value(for: $0.name).isEmpty } ?? fields.first
+    return empty.map { .templateField($0.name) }
   }
 
   private var agentField: some View {
@@ -152,7 +317,8 @@ public struct NewSessionSheet: View {
       "Appearance",
       help: model.draft.appearance == nil
         ? "Derived from the name until you pick one."
-        : nil,
+        : model.appearanceComesFromTemplate
+          ? "Given by the template — pick another if needed." : nil,
       issues: model.issues(for: .appearance)
     ) {
       HStack(alignment: .top, spacing: 14) {
@@ -185,7 +351,9 @@ public struct NewSessionSheet: View {
   private var folderField: some View {
     LabeledField(
       "Working folder",
-      help: model.protectedLocationNotice,
+      help: model.protectedLocationNotice
+        ?? (model.folderComesFromTemplate
+          ? "Proposed by the template — change it if needed." : nil),
       issues: model.issues(for: .workingDirectory)
     ) {
       HStack(spacing: 8) {
@@ -197,7 +365,7 @@ public struct NewSessionSheet: View {
           )
         )
         .textFieldStyle(.roundedBorder)
-        .focused($focus, equals: .workingDirectory)
+        .focused($focus, equals: .draft(.workingDirectory))
 
         Button("Choose…", action: chooseFolder)
       }
@@ -227,6 +395,13 @@ public struct NewSessionSheet: View {
         .keyboardShortcut(.defaultAction)
         .buttonStyle(.borderedProminent)
         .disabled(!model.canSubmit)
+        // Return goes to the line in a prompt; ⌘↩ creates from anywhere in the form.
+        .background {
+          Button("Create & Launch", action: submit)
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(!model.canSubmit)
+            .hidden()
+        }
     }
     .padding(.horizontal, 24)
     .padding(.vertical, 13)
@@ -241,7 +416,14 @@ public struct NewSessionSheet: View {
   private func submit() {
     Task {
       guard let creation = await model.submit() else {
-        focus = model.issues.map(\.field).first { Self.focusableFields.contains($0) }
+        let target =
+          model.issues.lazy.compactMap { issue -> FocusTarget? in
+            if issue.field == .templateField, let key = issue.fieldKey {
+              return .templateField(key)
+            }
+            return Self.focusableFields.contains(issue.field) ? .draft(issue.field) : nil
+          }.first
+        moveFocus(to: target)
         return
       }
       created(creation)
@@ -402,7 +584,7 @@ struct AgentChoiceRow: View {
   }
 }
 
-private struct SymbolChoice: View {
+struct SymbolChoice: View {
   let symbol: String
   let isSelected: Bool
   let select: () -> Void
@@ -426,7 +608,7 @@ private struct SymbolChoice: View {
   }
 }
 
-private struct ColorChoice: View {
+struct ColorChoice: View {
   let hex: String
   let isSelected: Bool
   let select: () -> Void
@@ -445,5 +627,47 @@ private struct ColorChoice: View {
     .buttonStyle(.plain)
     .accessibilityLabel(Text("Accent \(hex)"))
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+  }
+}
+
+/// The rendered prompt, with the values typed in bold and the fields still empty named in their
+/// place — `‹Merge request URL›` — so what is missing is seen where it is missing.
+struct PromptPreviewText: View {
+  let rendered: RenderedPrompt
+
+  var body: some View {
+    Text(attributed)
+      .font(.callout)
+      .textSelection(.enabled)
+      .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private var attributed: AttributedString {
+    var result = AttributedString()
+    for part in rendered.parts {
+      switch part {
+      case .text(let text):
+        result += AttributedString(text)
+      case .value(_, let text):
+        var value = AttributedString(text)
+        value.inlinePresentationIntent = .stronglyEmphasized
+        result += value
+      case .unmatched(_, let label, _):
+        var unmatched = AttributedString("‹\(label): no match›")
+        unmatched.foregroundColor = .orange
+        result += unmatched
+      case .missing(_, let label, _, let isRequired):
+        guard isRequired else { continue }
+        var missing = AttributedString("‹\(label)›")
+        missing.foregroundColor = .secondary
+        result += missing
+      }
+    }
+    if result.characters.isEmpty {
+      var empty = AttributedString("The prompt is empty.")
+      empty.foregroundColor = .secondary
+      return empty
+    }
+    return result
   }
 }

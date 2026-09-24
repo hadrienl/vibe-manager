@@ -90,6 +90,11 @@ public final class AppModel {
   let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
+  /// The prompt templates, shared by their settings tab and the New Session sheet.
+  public let templates: PromptTemplateLibraryModel
+  /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
+  /// menu — can open them on the right one.
+  public var settingsTab: SettingsTab = .general
   /// A process the system would not let go of. Reported rather than swallowed: the promise that
   /// nothing stays attached to an archived session is only worth making if its failure is said.
   public private(set) var detachWarning: DetachWarning?
@@ -392,8 +397,15 @@ public final class AppModel {
     notesStore: any SessionNotesStore = NoSessionNotes(),
     /// Where a session's notes file is, for Reveal in Finder when it cannot be read.
     notesFileLocation: (@Sendable (SessionID) -> URL)? = nil,
-    quitPreferences: any QuitPreferences = InMemoryQuitPreferences()
+    quitPreferences: any QuitPreferences = InMemoryQuitPreferences(),
+    /// Where the prompt templates are kept. A workspace assembled without one keeps them in
+    /// memory for the run.
+    templateRepository: any PromptTemplateRepository = InMemoryPromptTemplateRepository(),
+    /// The file format templates are exported to and imported from, when there is one.
+    templateExchange: (any PromptTemplateExchangeFormat)? = nil
   ) {
+    templates = PromptTemplateLibraryModel(
+      repository: templateRepository, exchange: templateExchange, clock: clock)
     notes = NotesModel(
       store: notesStore, fileLocation: notesFileLocation, opener: WorkspaceFileOpener())
     importLegacyNotes = ImportLegacyNotes(repository: repository, notes: notesStore)
@@ -455,6 +467,11 @@ public final class AppModel {
           RestoreSessions(restart: $0, launcher: launcher, repository: repository)
         }
       }
+
+    // A template saved while the sheet is open is said there, never swapped in under the user.
+    templates.libraryDidChange = { [weak self] library in
+      self?.newSessionModel?.templatesChanged(library.templates)
+    }
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
@@ -1455,6 +1472,7 @@ public final class AppModel {
     // Beside the load rather than before it: the notes only serve the search, and the list must
     // not wait on reading them.
     notes.startPreparing(importing: importLegacyNotes)
+    await templates.load()
     // Before the sessions, and never from the creation flow: the point of the whole step is that
     // pressing Create leaves nothing left to ask. Reading the store first left a window in which
     // ⌘N opened a sheet that did not yet know whether the access was there, and warned anyway.
@@ -1619,13 +1637,19 @@ public final class AppModel {
 
   /// The sheet's model lives here, not in the sheet: SwiftUI may evaluate the presentation
   /// closure more than once, and a draft must survive that without being typed twice.
-  public func beginNewSession() {
+  /// Opens the New Session sheet, on a template when one is given.
+  public func beginNewSession(template: PromptTemplateID? = nil) {
     guard let agents, canCreateSession else { return }
-    newSessionModel = NewSessionModel(
+    let model = NewSessionModel(
       create: CreateSession(repository: repository, agents: agents),
       registry: agents,
-      fullDiskAccess: permissions?.status
+      fullDiskAccess: permissions?.status,
+      templates: templates.all
     )
+    if let template {
+      model.selectTemplate(template)
+    }
+    newSessionModel = model
     isPresentingNewSession = true
   }
 

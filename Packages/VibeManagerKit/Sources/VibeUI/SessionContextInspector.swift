@@ -255,6 +255,16 @@ private struct SessionPane: View {
       }
 
       Section("Initial prompt") {
+        // The name and revision the session was created with: the template may since have been
+        // renamed, changed or deleted, and none of that changes what this session was sent.
+        if let template = session.template {
+          Text(
+            template.revision.map { "From template “\(template.name)”, revision \($0)" }
+              ?? "From template “\(template.name)”"
+          )
+          .font(.callout)
+          .foregroundStyle(.secondary)
+        }
         if session.initialPrompt.isEmpty {
           InspectorPlaceholder("This session was started without a prompt.")
         } else {

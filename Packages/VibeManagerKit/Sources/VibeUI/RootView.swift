@@ -13,6 +13,7 @@ public struct RootView: View {
   /// The "Don't ask again" box of the close confirmation, unticked each time it opens.
   @State private var suppressesCloseConfirmation = false
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.openSettings) private var openSettings
 
   public init(model: AppModel) {
     self.model = model
@@ -88,7 +89,11 @@ public struct RootView: View {
             model: sheetModel,
             defaultWorkingDirectoryPath: model.newSessionDefaultWorkingDirectoryPath,
             created: { creation in Task { await model.complete(creation) } },
-            cancelled: { model.cancelNewSession() }
+            cancelled: { model.cancelNewSession() },
+            manageTemplates: {
+              model.settingsTab = .templates
+              openSettings()
+            }
           )
         }
       case .restartContext:

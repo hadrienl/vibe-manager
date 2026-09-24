@@ -86,7 +86,7 @@ struct SessionStoreCodec {
     }
   }
 
-  private static func makeEncoder() -> JSONEncoder {
+  static func makeEncoder() -> JSONEncoder {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     encoder.dateEncodingStrategy = .custom { date, encoder in
@@ -98,7 +98,7 @@ struct SessionStoreCodec {
     return encoder
   }
 
-  private static func makeDecoder() -> JSONDecoder {
+  static func makeDecoder() -> JSONDecoder {
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .custom { decoder in
       let container = try decoder.singleValueContainer()

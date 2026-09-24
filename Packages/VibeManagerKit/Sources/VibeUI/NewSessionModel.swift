@@ -23,6 +23,22 @@ public final class NewSessionModel {
   /// agent they just picked, not the scheduler.
   public var draft = SessionDraft()
 
+  /// The templates offered, in the user's order.
+  public private(set) var templates: [PromptTemplate] = []
+  /// Whether the template being filled was saved elsewhere since it was picked. The fill keeps
+  /// the copy it took, so what is previewed stays what is launched until the user reloads.
+  public private(set) var isTemplateStale = false
+  /// The name the template made last. The name follows the template as long as it is empty or
+  /// still that name: once the user types their own, it is theirs.
+  private var generatedName: String?
+  /// The folder a template put in the field last, and the one that was there before any did.
+  /// Like the name, the folder follows the template until the user picks their own.
+  private var presetFolder: String?
+  private var folderBeforePreset: String??
+  /// The same for the symbol and colour: `nil` in the draft means "derived from the name".
+  private var presetAppearance: SessionAppearance?
+  private var appearanceBeforePreset: SessionAppearance??
+
   private let create: CreateSession
   private let registry: any AgentProviderResolving
   private let revalidationDelay: Duration
@@ -39,8 +55,10 @@ public final class NewSessionModel {
     create: CreateSession,
     registry: any AgentProviderResolving,
     revalidationDelay: Duration = .milliseconds(250),
-    fullDiskAccess: FullDiskAccessStatus? = nil
+    fullDiskAccess: FullDiskAccessStatus? = nil,
+    templates: [PromptTemplate] = []
   ) {
+    self.templates = templates
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
@@ -72,6 +90,138 @@ public final class NewSessionModel {
 
   public var canSubmit: Bool {
     !isSubmitting && !draft.trimmedName.isEmpty && draft.resolvedWorkingDirectoryPath != nil
+      && (draft.templateFill?.missingRequiredFields.isEmpty ?? true)
+  }
+
+  // MARK: - Templates
+
+  public var selectedTemplateID: PromptTemplateID? {
+    draft.templateFill?.template.id
+  }
+
+  /// The prompt as it will be sent, part by part, when a template is filled in.
+  public var renderedPrompt: RenderedPrompt? {
+    draft.templateFill?.render()
+  }
+
+  public func issues(forTemplateField key: String) -> [SessionDraftIssue] {
+    issues.filter { $0.field == .templateField && $0.fieldKey == key }
+  }
+
+  /// Picks a template, or goes back to a free prompt with `nil`.
+  ///
+  /// Nothing on screen is lost either way: values of fields sharing a name carry over to the next
+  /// template, and leaving the templates turns what was rendered into the free prompt.
+  public func selectTemplate(_ id: PromptTemplateID?) {
+    guard id != selectedTemplateID else { return }
+    guard let id, let template = templates.first(where: { $0.id == id }) else {
+      editAsText()
+      return
+    }
+    let previous = draft.templateFill?.values ?? [:]
+    let keys = Set(template.fields.map(\.name))
+    draft.templateFill = PromptTemplateFill(
+      template: template, values: previous.filter { keys.contains($0.key) })
+    isTemplateStale = false
+    refreshName()
+    applyFolderPreset(of: template)
+    applyAppearancePreset(of: template)
+  }
+
+  /// Whether the symbol and colour are the ones the template gave.
+  public var appearanceComesFromTemplate: Bool {
+    presetAppearance != nil && draft.appearance == presetAppearance
+  }
+
+  /// Gives the session the template's symbol and colour, unless the user picked their own; a
+  /// template without any gives back what a previous one replaced.
+  private func applyAppearancePreset(of template: PromptTemplate) {
+    let isFree = draft.appearance == nil
+    guard isFree || appearanceComesFromTemplate else { return }
+    if let appearance = template.appearance {
+      if appearanceBeforePreset == nil {
+        appearanceBeforePreset = .some(draft.appearance)
+      }
+      draft.appearance = appearance
+      presetAppearance = appearance
+    } else if appearanceComesFromTemplate, let before = appearanceBeforePreset {
+      draft.appearance = before
+      presetAppearance = nil
+      appearanceBeforePreset = nil
+    }
+  }
+
+  /// Whether the folder in the field is the one the template proposed.
+  public var folderComesFromTemplate: Bool {
+    presetFolder != nil && draft.workingDirectoryPath == presetFolder
+  }
+
+  /// Puts the template's folder in the field — unless the user chose one of their own — and,
+  /// for a template that proposes none, gives back the folder a previous template replaced.
+  private func applyFolderPreset(of template: PromptTemplate) {
+    let current = draft.workingDirectoryPath
+    let isFree = current?.isEmpty ?? true
+    guard isFree || folderComesFromTemplate else { return }
+    if let folder = template.folder {
+      if folderBeforePreset == nil {
+        folderBeforePreset = .some(isFree ? nil : current)
+      }
+      draft.workingDirectoryPath = folder
+      presetFolder = folder
+    } else if folderComesFromTemplate, let before = folderBeforePreset {
+      draft.workingDirectoryPath = before
+      presetFolder = nil
+      folderBeforePreset = nil
+    }
+  }
+
+  public func setValue(_ value: String, for key: String) {
+    draft.templateFill?.setValue(value, for: key)
+    refreshName()
+  }
+
+  public func value(for key: String) -> String {
+    draft.templateFill?.value(for: key) ?? ""
+  }
+
+  /// The rendered prompt becomes free text to edit by hand, and the template reference goes: it
+  /// promised this prompt was that template filled in, which is no longer true.
+  public func editAsText() {
+    guard let fill = draft.templateFill else { return }
+    draft.initialPrompt = fill.render().editableText
+    draft.templateFill = nil
+    isTemplateStale = false
+    generatedName = nil
+  }
+
+  /// The templates as the library now holds them.
+  public func templatesChanged(_ library: [PromptTemplate]) {
+    templates = library
+    guard let fill = draft.templateFill else { return }
+    let current = library.first { $0.id == fill.template.id }
+    isTemplateStale = current.map { !$0.hasSameContent(as: fill.template) } ?? false
+  }
+
+  /// Takes the template as it now is, keeping the values of the fields it still has.
+  public func reloadTemplate() {
+    guard let fill = draft.templateFill,
+      let current = templates.first(where: { $0.id == fill.template.id })
+    else {
+      isTemplateStale = false
+      return
+    }
+    let keys = Set(current.fields.map(\.name))
+    draft.templateFill = PromptTemplateFill(
+      template: current, values: fill.values.filter { keys.contains($0.key) })
+    isTemplateStale = false
+    refreshName()
+  }
+
+  private func refreshName() {
+    guard let name = draft.templateFill?.sessionName() else { return }
+    guard draft.name.isEmpty || draft.name == generatedName else { return }
+    draft.name = name
+    generatedName = name
   }
 
   public func issues(for field: SessionDraftField) -> [SessionDraftIssue] {

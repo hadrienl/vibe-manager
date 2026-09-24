@@ -47,6 +47,40 @@ struct CreateSessionTests {
     #expect(await repository.savedSessions.count == 1)
   }
 
+  @Test("A session made from a template keeps the rendered prompt and where it came from")
+  func templateSessionKeepsRenderedPrompt() async throws {
+    let (create, repository) = makeSubject()
+    var template = PromptTemplate(name: "Review", body: "Review {{url}} now.")
+    template.revision = 3
+    var draft = draft(prompt: "")
+    draft.templateFill = PromptTemplateFill(template: template, values: ["url": "https://x/1"])
+
+    let creation = try await create(draft)
+
+    #expect(creation.session.initialPrompt == "Review https://x/1 now.")
+    #expect(
+      creation.session.template
+        == PromptTemplateReference(
+          id: template.id.description, name: "Review", revision: "3"))
+    #expect(creation.plan.promptDelivery == .argument)
+    #expect(await repository.savedSessions.first?.initialPrompt == "Review https://x/1 now.")
+  }
+
+  @Test("A required template field left empty stops the creation, and nothing is written")
+  func missingTemplateFieldStopsCreation() async {
+    let (create, repository) = makeSubject()
+    var draft = draft(prompt: "")
+    draft.templateFill = PromptTemplateFill(
+      template: PromptTemplate(name: "Review", body: "Review {{url}}."))
+
+    await #expect(throws: SessionCreationRejected.self) {
+      try await create(draft)
+    }
+    let problems = await create.problems(with: draft)
+    #expect(problems.map(\.fieldKey) == ["url"])
+    #expect(await repository.savedSessions.isEmpty)
+  }
+
   @Test("A folder that disappeared is reported, and nothing is written")
   func missingFolderStopsCreation() async throws {
     let (create, repository) = makeSubject(folder: .missing)

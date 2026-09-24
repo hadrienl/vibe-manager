@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
 
-/// The application's settings.
+/// The application's settings, in tabs: General, and the prompt templates.
 ///
 /// Both lines are ways back to a question asked once. The Full Disk Access step at launch is never
 /// asked again, and neither is the close confirmation once "Don't ask again" was ticked: refusing
@@ -18,6 +18,21 @@ public struct SettingsView: View {
   }
 
   public var body: some View {
+    if let model {
+      TabView(selection: Bindable(model).settingsTab) {
+        general
+          .tabItem { Label("General", systemImage: "gearshape") }
+          .tag(SettingsTab.general)
+        PromptTemplatesView(model: model.templates)
+          .tabItem { Label("Templates", systemImage: "text.badge.plus") }
+          .tag(SettingsTab.templates)
+      }
+    } else {
+      general
+    }
+  }
+
+  private var general: some View {
     Form {
       if let model {
         Section("Sessions") {
@@ -38,9 +53,21 @@ public struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: 460)
+    // As tall as what it holds: the settings window takes each tab's size, and a form that
+    // scrolls gives none, which left General in a window as tall as Templates.
+    .scrollDisabled(true)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(width: 500)
     .task { await permissions?.recheck() }
   }
+}
+
+/// The tabs of the settings window.
+public enum SettingsTab: String, Hashable, Sendable {
+  case general
+  /// The prompt templates: a list, an editor and a preview, which need the room of a tab of their
+  /// own rather than a section of a form.
+  case templates
 }
 
 private struct FullDiskAccessRow: View {

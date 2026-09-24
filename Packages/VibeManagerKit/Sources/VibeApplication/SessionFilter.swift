@@ -132,6 +132,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     // ignored, so "refacto" finds "Réfactoring" without the user learning a syntax.
     var haystack = [session.name, session.initialPrompt]
     if let notes { haystack.append(notes) }
+    if let template = session.template { haystack.append(template.name) }
     haystack.append(contentsOf: session.repositories.map(\.path))
     return haystack.contains { $0.localizedStandardContains(query) }
   }
