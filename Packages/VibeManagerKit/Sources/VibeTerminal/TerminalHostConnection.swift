@@ -92,6 +92,8 @@ enum UnixSocket {
 /// reading blocks the writer, never the reader.
 final class TerminalHostConnection: @unchecked Sendable {
   private static let readBufferSize = 64 * 1_024
+  /// How long a closing connection waits for a peer that reads nothing, before dropping the rest.
+  private static let drainLimit: Duration = .seconds(2)
 
   let descriptor: Int32
   let frames: AsyncStream<TerminalHostFrame>
@@ -102,6 +104,9 @@ final class TerminalHostConnection: @unchecked Sendable {
   private let source: DispatchSourceRead
   private let lock = NSLock()
   private var isClosed = false
+  /// Set while closing: until then a peer that reads nothing is waited for, since it may only be
+  /// paused — the application under a debugger — and giving up would read as its crash.
+  private var drainDeadline: ContinuousClock.Instant?
   /// Only ever touched on the read queue.
   private var decoder = TerminalHostFrameDecoder()
 
@@ -152,7 +157,21 @@ final class TerminalHostConnection: @unchecked Sendable {
     }
   }
 
-  /// Ends the connection in both directions. The stream of frames finishes when the reader sees it.
+  /// Ends the connection once every frame already sent has left — or could not, within its bound.
+  ///
+  /// `close()` alone drops what is still queued, and the frame a departure is made of is the last
+  /// one queued: a goodbye cut off by its own close reads, to the host, as the crash of its
+  /// client, and it stops the agents it was just asked to keep.
+  func closeAfterPendingWrites() async {
+    lock.withLock { drainDeadline = ContinuousClock.now + Self.drainLimit }
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      writeQueue.async { continuation.resume() }
+    }
+    close()
+  }
+
+  /// Ends the connection in both directions, dropping whatever is still queued. The stream of
+  /// frames finishes when the reader sees it.
   func close() {
     lock.lock()
     let wasClosed = isClosed
@@ -191,9 +210,13 @@ final class TerminalHostConnection: @unchecked Sendable {
         continue
       case EAGAIN:
         // The peer is not reading. Waiting here is the back pressure: the writer is its own queue,
-        // so nothing else stalls behind it.
+        // so nothing else stalls behind it. Once closing, not for ever: the departure must leave.
+        if let deadline = lock.withLock({ drainDeadline }), ContinuousClock.now > deadline {
+          close()
+          return false
+        }
         var descriptorSet = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
-        _ = poll(&descriptorSet, 1, 1_000)
+        _ = poll(&descriptorSet, 1, 250)
       default:
         close()
         return false

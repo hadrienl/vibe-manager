@@ -194,8 +194,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     // Short: this is said on the way out, under the application's own deadline, and the host acts
     // on the frame, not on whether its acknowledgement made it back.
     _ = await request(.goodbye(keepRunning: keepRunning), timeout: .seconds(1))
-    connection.close()
     self.connection = nil
+    // After the goodbye has left, and not merely been queued: the application exits right after.
+    await connection.closeAfterPendingWrites()
   }
 
   /// Closes the connection without a word, the way a crash of the application does.

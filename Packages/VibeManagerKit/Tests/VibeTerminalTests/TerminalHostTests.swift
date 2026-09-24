@@ -36,10 +36,13 @@ final class InProcessTerminalHost: @unchecked Sendable {
     source = TerminalHost.accept(on: listener, into: server)
   }
 
+  /// Generous replies: on a loaded CI runner a handshake past the default deadline falls back to
+  /// a terminal in the test process, and every test about the host would then test nothing.
   func supervisor() -> HostedTerminalSupervisor {
     HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
-        location: location, launcher: nil, verifier: SameUserPeerVerifier()))
+        location: location, launcher: nil, verifier: SameUserPeerVerifier(),
+        replyTimeout: .seconds(30)))
   }
 
   var becameIdle: Bool { idle.isSet }
@@ -245,6 +248,7 @@ struct TerminalHostTests {
     let id = SessionID()
     let session = try await first.start(
       TerminalTestSupport.spec(script: "printf 'before\\n'; sleep 1; printf 'after\\n'"), for: id)
+    try #require(session is HostedTerminalSession)
     #expect(await Transcript.follow(session).waitFor("before"))
 
     await first.relinquish(keepRunning: true)
@@ -262,6 +266,29 @@ struct TerminalHostTests {
     #expect(await transcript.waitFor("after"))
     #expect(await transcript.waitForEnd())
     #expect(await adopted.state() == .exited(code: 0))
+    await second.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("A goodbye queued behind a large write still leaves before the connection closes")
+  func goodbyeIsNotCutOff() async throws {
+    let host = try InProcessTerminalHost()
+    let first = host.supervisor()
+    let id = SessionID()
+    let session = try await first.start(TerminalTestSupport.spec(script: idleScript), for: id)
+    // Megabytes queued ahead of the goodbye: closing as soon as it is queued would drop it, and the
+    // host would take the departure for a crash — stopping the agent it was asked to keep.
+    await session.write([UInt8](repeating: UInt8(ascii: "z"), count: 3_000_000))
+
+    await first.relinquish(keepRunning: true)
+
+    let second = host.supervisor()
+    guard case .connected(_, let sessions) = await second.reconnect() else {
+      Issue.record("The host was not found again")
+      return
+    }
+    #expect(sessions.map(\.id) == [id])
+    #expect(sessions.first?.state.isFinished == false)
     await second.relinquish(keepRunning: false)
     await host.shutDown()
   }
@@ -441,7 +468,7 @@ struct TerminalHostProcessTests {
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
-        launchTimeout: Self.launchTimeout))
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
     let session = try await application.start(
       TerminalTestSupport.spec(script: "sleep 1; printf 'long command done\\n'"), for: id)
     #expect(session is HostedTerminalSession)
@@ -476,7 +503,7 @@ struct TerminalHostProcessTests {
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
-        launchTimeout: Self.launchTimeout))
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
     let session = try await application.start(
       TerminalTestSupport.spec(script: idleScript), for: SessionID())
     let identity = try #require(await application.hostIdentity())
@@ -494,7 +521,7 @@ struct TerminalHostProcessTests {
     let next = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
-        launchTimeout: Self.launchTimeout))
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
     _ = try await next.start(TerminalTestSupport.spec(script: "true"), for: SessionID())
     #expect(location.lastStopRequest() == nil)
     await next.relinquish(keepRunning: false)
@@ -510,7 +537,7 @@ struct TerminalHostProcessTests {
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
-        launchTimeout: Self.launchTimeout))
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
     let first = try await application.start(
       TerminalTestSupport.spec(script: idleScript), for: SessionID())
 
