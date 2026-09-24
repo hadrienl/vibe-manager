@@ -100,17 +100,13 @@ struct VibeManagerApp: App {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
 
-    // One window, reopened rather than duplicated.
-    Window("Usage", id: UsageWindowCommand.windowID) {
+    // One window, reopened rather than duplicated. SwiftUI lists it in the Window menu itself,
+    // so the shortcut goes on the scene rather than on a second menu item.
+    Window("Usage", id: "usage") {
       UsageWindow(model: environment.appModel)
     }
     .defaultSize(width: 820, height: 560)
-    .commands {
-      CommandGroup(before: .windowList) {
-        UsageWindowCommand()
-        Divider()
-      }
-    }
+    .keyboardShortcut("u", modifiers: [.command, .option])
   }
 }
 
@@ -449,18 +445,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard !hasRepliedToTermination else { return }
     hasRepliedToTermination = true
     NSApplication.shared.reply(toApplicationShouldTerminate: true)
-  }
-}
-
-/// Window › Usage (⌥⌘U).
-private struct UsageWindowCommand: View {
-  static let windowID = "usage"
-  @Environment(\.openWindow) private var openWindow
-
-  var body: some View {
-    Button("Usage") {
-      openWindow(id: Self.windowID)
-    }
-    .keyboardShortcut("u", modifiers: [.command, .option])
   }
 }
