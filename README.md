@@ -178,7 +178,8 @@ the top of the New Session sheet or from File ▸ New Session from (⇧⌘N for 
 becomes a control, a required one keeps Create out of reach until it is filled, and the prompt is
 previewed exactly as the agent will receive it. `{{url|/merge_requests\/(\d+)/}}` keeps only part
 of a value — the number of a merge request to name the session after it — and each such pattern
-can be tried beside its field while the template is written. The session keeps the rendered text
+can be tried beside its field while the template is written. A template may also propose the
+working folder it is meant for. The session keeps the rendered text
 and the template's name and revision, so changing the template later changes nothing already
 created. Templates are edited, duplicated, ordered and deleted in the Templates tab of the settings
 (also File ▸ Manage Prompt Templates…), stored beside the sessions, and exported and imported in a format documented in

@@ -48,6 +48,8 @@ private struct StoredTemplateV1: Codable {
   let name: String
   let sessionNamePattern: String
   let body: String
+  /// Absent from the files written before templates proposed a folder.
+  let folder: String?
   let fields: [StoredFieldSettingsV1]
   let revision: Int
   let createdAt: Date
@@ -58,6 +60,7 @@ private struct StoredTemplateV1: Codable {
     name = template.name
     sessionNamePattern = template.sessionNamePattern
     body = template.body
+    folder = template.folder
     fields = template.fieldSettings.map(StoredFieldSettingsV1.init)
     revision = template.revision
     createdAt = template.createdAt
@@ -70,6 +73,7 @@ private struct StoredTemplateV1: Codable {
       name: name,
       sessionNamePattern: sessionNamePattern,
       body: body,
+      workingDirectoryPath: folder,
       fieldSettings: fields.map(\.domainValue),
       revision: revision,
       createdAt: createdAt,
@@ -178,6 +182,7 @@ private struct ExchangeTemplateV1: Codable {
   let name: String
   let sessionName: String?
   let body: String
+  let folder: String?
   let fields: [ExchangeFieldV1]?
 
   init(_ template: PromptTemplate) {
@@ -185,6 +190,7 @@ private struct ExchangeTemplateV1: Codable {
     name = template.name
     sessionName = template.sessionNamePattern
     body = template.body
+    folder = template.folder
     fields = template.trimmedFieldSettings.map(ExchangeFieldV1.init)
   }
 
@@ -194,6 +200,7 @@ private struct ExchangeTemplateV1: Codable {
       name: name,
       sessionNamePattern: sessionName ?? "",
       body: body,
+      workingDirectoryPath: folder,
       fieldSettings: (fields ?? []).map(\.domainValue),
       revision: 1,
       createdAt: date

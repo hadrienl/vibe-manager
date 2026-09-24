@@ -83,6 +83,10 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   /// Makes the session's name from the same fields; empty leaves the name to the user.
   public var sessionNamePattern: String
   public var body: String
+  /// The folder the New Session sheet proposes with this template, as written — `~/Projects/api`
+  /// stays that, so a template exported to another Mac still means the same folder there. `nil`:
+  /// the sheet's folder is left as it is.
+  public var workingDirectoryPath: String?
   /// Only the settings of fields present in the text are kept when the template is saved.
   public var fieldSettings: [PromptTemplateFieldSettings]
   /// One more at each save, and recorded by the sessions created from it.
@@ -95,6 +99,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     name: String,
     sessionNamePattern: String = "",
     body: String,
+    workingDirectoryPath: String? = nil,
     fieldSettings: [PromptTemplateFieldSettings] = [],
     revision: Int = 1,
     createdAt: Date = Date(),
@@ -104,6 +109,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     self.name = name
     self.sessionNamePattern = sessionNamePattern
     self.body = body
+    self.workingDirectoryPath = workingDirectoryPath
     self.fieldSettings = fieldSettings
     self.revision = revision
     self.createdAt = createdAt.storageRounded
@@ -186,7 +192,16 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   /// Whether two templates say the same thing, whatever their history.
   public func hasSameContent(as other: PromptTemplate) -> Bool {
     name == other.name && sessionNamePattern == other.sessionNamePattern && body == other.body
+      && folder == other.folder
       && Set(trimmedFieldSettings) == Set(other.trimmedFieldSettings)
+  }
+
+  /// The folder to propose, trimmed; `nil` when there is none.
+  public var folder: String? {
+    guard let path = workingDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !path.isEmpty
+    else { return nil }
+    return path
   }
 
   /// Everything that keeps this template from being saved, all at once.
@@ -204,6 +219,11 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     }
     if body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       issues.append(.bodyMissing)
+    }
+    // Only its shape: whether the folder exists is for the sheet to find out, on the Mac and at
+    // the moment the session is created.
+    if let folder, !(folder.hasPrefix("/") || folder == "~" || folder.hasPrefix("~/")) {
+      issues.append(.folderNotAbsolute)
     }
     let byteCount = body.utf8.count
     if byteCount > PromptTemplateLimits.bodyByteLimit {
@@ -274,6 +294,7 @@ public enum PromptTemplateIssueField: String, Hashable, Sendable {
   case name
   case sessionName
   case body
+  case folder
 }
 
 /// One reason a template cannot be saved, and the way out of it — the shape of
@@ -329,6 +350,12 @@ public struct PromptTemplateIssue: Hashable, Sendable, Identifiable {
       remedy: "Fix it, or remove the |/…/ to use the whole value."
     )
   }
+
+  public static let folderNotAbsolute = PromptTemplateIssue(
+    field: .folder,
+    message: "The folder must be an absolute path.",
+    remedy: "Choose it again, or type a path starting with / or ~."
+  )
 
   public static func tooManyFields(_ count: Int) -> PromptTemplateIssue {
     PromptTemplateIssue(

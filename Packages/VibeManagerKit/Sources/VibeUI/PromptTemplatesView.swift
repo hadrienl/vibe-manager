@@ -279,6 +279,34 @@ public struct PromptTemplatesView: View {
                 .font(.body.monospaced())
             }
             EditorRow(
+              "Folder",
+              help: "Optional — proposed as the working folder when this template is picked.",
+              issues: issues(for: .folder)
+            ) {
+              HStack(spacing: 8) {
+                TextField(
+                  "None — the sheet keeps its folder",
+                  text: Binding(
+                    get: { model.editing?.workingDirectoryPath ?? "" },
+                    set: { model.editing?.workingDirectoryPath = $0.isEmpty ? nil : $0 }
+                  )
+                )
+                .textFieldStyle(.roundedBorder)
+                Button("Choose…", action: chooseFolder)
+                if model.editing?.folder != nil {
+                  Button {
+                    model.editing?.workingDirectoryPath = nil
+                  } label: {
+                    Image(systemName: "xmark.circle.fill")
+                  }
+                  .buttonStyle(.borderless)
+                  .foregroundStyle(.secondary)
+                  .help("No folder")
+                  .accessibilityLabel("Remove the folder")
+                }
+              }
+            }
+            EditorRow(
               "Prompt",
               help:
                 "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text.",
@@ -511,6 +539,21 @@ public struct PromptTemplatesView: View {
         model.updateSettings(for: key) { $0[keyPath: keyPath] = value.isEmpty ? nil : value }
       }
     )
+  }
+
+  /// Written with a `~` when it is in the home folder, so an exported template means the same
+  /// folder on another Mac.
+  private func chooseFolder() {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = false
+    panel.canCreateDirectories = true
+    panel.prompt = "Choose"
+    let current = model.editing?.folder.map { ($0 as NSString).expandingTildeInPath }
+    panel.directoryURL = URL(fileURLWithPath: current ?? NSHomeDirectory(), isDirectory: true)
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    model.editing?.workingDirectoryPath = (url.path as NSString).abbreviatingWithTildeInPath
   }
 
   /// A template never saved is only discarded; a saved one is deleted once the user confirms.

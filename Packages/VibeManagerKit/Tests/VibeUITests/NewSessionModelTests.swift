@@ -602,4 +602,40 @@ struct NewSessionTemplateTests {
     #expect(!model.isTemplateStale)
     #expect(model.renderedPrompt?.prompt == "Look at https://x/1 closely.")
   }
+
+  @Test("A template's folder is proposed while the field is free, and follows the template")
+  func folderPresetFollowsTemplate() {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(templates: [api, templateFeedback])
+    model.draft.workingDirectoryPath = nil
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.workingDirectoryPath == "~/Projects/api")
+    #expect(model.folderComesFromTemplate)
+
+    // A template without a folder gives back the one that was there before.
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.workingDirectoryPath == nil)
+    #expect(!model.folderComesFromTemplate)
+  }
+
+  @Test("A folder the user chose is never replaced by a template's")
+  func userFolderWins() {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(templates: [api, templateFeedback])
+    model.draft.workingDirectoryPath = "/workspace/mine"
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.workingDirectoryPath == "/workspace/mine")
+
+    // Chosen after the template proposed one, it stays through a change of template too.
+    model.draft.workingDirectoryPath = nil
+    model.selectTemplate(templateFeedback.id)
+    model.selectTemplate(api.id)
+    model.draft.workingDirectoryPath = "/workspace/other"
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.workingDirectoryPath == "/workspace/other")
+  }
 }

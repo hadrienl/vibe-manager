@@ -350,3 +350,28 @@ struct PromptTemplateExtractionTests {
     #expect(template.body == #"{{url?|/\d+/}}"#)
   }
 }
+
+@Suite("The folder a template proposes")
+struct PromptTemplateFolderTests {
+  @Test(
+    "A folder is an absolute path, or one in the home folder",
+    arguments: [
+      ("/Users/me/api", true), ("~/Projects/api", true), ("~", true), ("Projects/api", false),
+      ("  ", true),
+    ])
+  func folderShape(_ path: String, _ valid: Bool) {
+    let template = PromptTemplate(name: "T", body: "x", workingDirectoryPath: path)
+    #expect(template.problems(among: []).contains(.folderNotAbsolute) == !valid)
+  }
+
+  @Test("The folder is part of what a template says, and a copy keeps it")
+  func folderIsContent() {
+    let a = PromptTemplate(name: "T", body: "x", workingDirectoryPath: "~/api")
+    var b = a
+    b.workingDirectoryPath = "~/web"
+    #expect(!a.hasSameContent(as: b))
+    var library = PromptTemplateLibrary(templates: [a])
+    let copy = library.duplicate(a.id, at: Date())
+    #expect(copy?.workingDirectoryPath == "~/api")
+  }
+}

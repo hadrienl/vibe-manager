@@ -110,6 +110,15 @@ The templates are a tab of the settings, beside General: they are something conf
 reached from time to time, which is what the settings are. Manage… in the sheet and File ▸ Manage
 Prompt Templates… open the settings on that tab.
 
+### A folder, proposed rather than imposed
+
+A template may name a folder, which the sheet puts in its folder field when the template is picked.
+It follows the template the way the session name does: only while the field holds nothing of the
+user's own, and a template without a folder gives back what the previous one replaced. The folder is
+kept as written, `~` included, so an exported template means the same folder on another Mac; the
+sheet checks it like any other folder, at creation. Agent and model stay the user's choice: the
+folder is where a task happens, the agent is how the user likes to work.
+
 ### No archive
 
 A template the user no longer wants is deleted, after a confirmation, from the − button, ⌫ in the
@@ -132,5 +141,5 @@ the sheet or saves the template, and nothing is autocorrected: `--force` must no
 ## Out of scope
 
 Automatic variables (`{{branch}}`, `{{date}}`), conditions and loops, remembered values, templates
-that choose an agent, a model or a folder, templates for restarts and switches, and syncing
+that choose an agent or a model, templates for restarts and switches, and syncing
 libraries between Macs other than through a file.

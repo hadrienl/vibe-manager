@@ -41,6 +41,11 @@ In the template editor, the **Try it** column on the right has a value to try pe
 patterns applied to that field are listed under it with what they keep of the value typed there,
 and where they are used. The same values make the preview below them.
 
+The optional **folder** is proposed as the working folder when the template is picked. Like the
+session name, it follows the template only while the field holds no folder of the user's own, and a
+template without one gives back the folder another template replaced. Written with `~` for the home
+folder, it means the same folder on another Mac.
+
 The optional **session name** uses the same fields (`Review {{url}}`) and names the session until
 you type a name of your own.
 
@@ -84,6 +89,7 @@ new revision, and sessions keep theirs.
       "name": "Review",
       "sessionName": "Review {{url|/(?:merge_requests|pull)\\/(\\d+)/}}",
       "body": "Review the merge request at {{url}}. Report correctness issues first.\n\n{{focus?}}",
+      "folder": "~/Projects/api",
       "fields": [
         { "name": "url", "label": "Merge request URL" },
         { "name": "focus", "label": "What to look at", "help": "Optional", "multiline": true }
@@ -102,6 +108,7 @@ new revision, and sessions keep theirs.
 | `templates[].name` | string, required | Not empty. Suffixed ` 2`, ` 3`… on import when the name is taken. |
 | `templates[].sessionName` | string | The session name pattern; empty or absent for none. |
 | `templates[].body` | string, required | The prompt, not empty, at most 16 KB. |
+| `templates[].folder` | string | The working folder proposed with the template, absolute or starting with `~`. |
 | `templates[].fields[]` | array | Settings of the fields in the text; the fields themselves come from the text. |
 | `fields[].name` | string, required | The field's name, as in `{{name}}`. |
 | `fields[].label` | string | Shown next to the control; derived from the name when absent. |
@@ -136,6 +143,7 @@ JSON Schema:
           "name": { "type": "string", "minLength": 1 },
           "sessionName": { "type": "string" },
           "body": { "type": "string", "minLength": 1 },
+          "folder": { "type": "string" },
           "fields": {
             "type": "array",
             "items": {

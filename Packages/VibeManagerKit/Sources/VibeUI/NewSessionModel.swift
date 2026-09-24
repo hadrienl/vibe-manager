@@ -31,6 +31,10 @@ public final class NewSessionModel {
   /// The name the template made last. The name follows the template as long as it is empty or
   /// still that name: once the user types their own, it is theirs.
   private var generatedName: String?
+  /// The folder a template put in the field last, and the one that was there before any did.
+  /// Like the name, the folder follows the template until the user picks their own.
+  private var presetFolder: String?
+  private var folderBeforePreset: String??
 
   private let create: CreateSession
   private let registry: any AgentProviderResolving
@@ -117,6 +121,31 @@ public final class NewSessionModel {
       template: template, values: previous.filter { keys.contains($0.key) })
     isTemplateStale = false
     refreshName()
+    applyFolderPreset(of: template)
+  }
+
+  /// Whether the folder in the field is the one the template proposed.
+  public var folderComesFromTemplate: Bool {
+    presetFolder != nil && draft.workingDirectoryPath == presetFolder
+  }
+
+  /// Puts the template's folder in the field — unless the user chose one of their own — and,
+  /// for a template that proposes none, gives back the folder a previous template replaced.
+  private func applyFolderPreset(of template: PromptTemplate) {
+    let current = draft.workingDirectoryPath
+    let isFree = current?.isEmpty ?? true
+    guard isFree || folderComesFromTemplate else { return }
+    if let folder = template.folder {
+      if folderBeforePreset == nil {
+        folderBeforePreset = .some(isFree ? nil : current)
+      }
+      draft.workingDirectoryPath = folder
+      presetFolder = folder
+    } else if folderComesFromTemplate, let before = folderBeforePreset {
+      draft.workingDirectoryPath = before
+      presetFolder = nil
+      folderBeforePreset = nil
+    }
   }
 
   public func setValue(_ value: String, for key: String) {

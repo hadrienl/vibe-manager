@@ -346,7 +346,9 @@ public struct NewSessionSheet: View {
   private var folderField: some View {
     LabeledField(
       "Working folder",
-      help: model.protectedLocationNotice,
+      help: model.protectedLocationNotice
+        ?? (model.folderComesFromTemplate
+          ? "Proposed by the template — change it if needed." : nil),
       issues: model.issues(for: .workingDirectory)
     ) {
       HStack(spacing: 8) {

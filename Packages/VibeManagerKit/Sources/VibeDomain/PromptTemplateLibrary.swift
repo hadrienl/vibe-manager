@@ -52,6 +52,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
       name: uniqueName(startingWith: "\(original.trimmedName) copy"),
       sessionNamePattern: original.sessionNamePattern,
       body: original.body,
+      workingDirectoryPath: original.workingDirectoryPath,
       fieldSettings: original.fieldSettings,
       revision: 1,
       createdAt: date
@@ -172,6 +173,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           name: uniqueName(startingWith: template.trimmedName),
           sessionNamePattern: template.sessionNamePattern,
           body: template.body,
+          workingDirectoryPath: template.workingDirectoryPath,
           fieldSettings: template.fieldSettings,
           createdAt: date
         )
@@ -182,6 +184,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           name: uniqueName(startingWith: template.trimmedName),
           sessionNamePattern: template.sessionNamePattern,
           body: template.body,
+          workingDirectoryPath: template.workingDirectoryPath,
           fieldSettings: template.fieldSettings,
           createdAt: date
         )
