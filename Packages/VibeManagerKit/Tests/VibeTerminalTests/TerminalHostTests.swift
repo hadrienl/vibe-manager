@@ -88,17 +88,17 @@ actor Transcript {
 
   var text: String { String(decoding: bytes, as: UTF8.self) }
 
-  func waitFor(_ needle: String, timeout: Duration = .seconds(10)) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while !text.contains(needle), ContinuousClock.now < deadline {
+  // No deadline of their own: on a busy runner a terminal took more than ten seconds to print a
+  // word and end. The time limit of the suites stops a wait that never comes.
+  func waitFor(_ needle: String) async -> Bool {
+    while !text.contains(needle), !Task.isCancelled {
       try? await Task.sleep(for: .milliseconds(20))
     }
     return text.contains(needle)
   }
 
-  func waitForEnd(timeout: Duration = .seconds(10)) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while !isFinished, ContinuousClock.now < deadline {
+  func waitForEnd() async -> Bool {
+    while !isFinished, !Task.isCancelled {
       try? await Task.sleep(for: .milliseconds(20))
     }
     return isFinished
@@ -130,7 +130,7 @@ func eventually(
   return await condition()
 }
 
-@Suite("The terminal host, in process")
+@Suite("The terminal host, in process", .timeLimit(.minutes(1)))
 struct TerminalHostTests {
   @Test("A terminal started through the host runs, is read, and reports how it ended")
   func runsThroughTheHost() async throws {
@@ -179,7 +179,7 @@ struct TerminalHostTests {
       for: SessionID())
     let transcript = await Transcript.follow(session)
 
-    #expect(await transcript.waitFor("end-of-output", timeout: .seconds(20)))
+    #expect(await transcript.waitFor("end-of-output"))
     #expect(await transcript.waitForEnd())
     #expect(await session.state() == .exited(code: 0))
     await supervisor.relinquish(keepRunning: false)
@@ -435,7 +435,7 @@ struct TerminalHostTests {
 /// Any symbol of this test image will do: its address says which file the image was loaded from.
 nonisolated(unsafe) private var fixtureAnchor = 0
 
-@Suite("The terminal host, in a process of its own")
+@Suite("The terminal host, in a process of its own", .timeLimit(.minutes(2)))
 struct TerminalHostProcessTests {
   /// The first launch of a freshly linked binary that answers for itself to the system waits for
   /// the system to assess it, which after a rebuild takes seconds. The application's host is the
