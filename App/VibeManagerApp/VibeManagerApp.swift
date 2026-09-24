@@ -21,6 +21,9 @@ enum Entry {
 }
 
 struct VibeManagerApp: App {
+  private static let troubleshooting = URL(
+    string: "https://github.com/hadrienl/vibe-manager/blob/main/docs/operations.md")
+
   @State private var environment = AppEnvironment()
   @State private var windowFocus = WindowFocus()
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -128,6 +131,10 @@ struct VibeManagerApp: App {
 
       // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
       CommandGroup(after: .help) {
+        // Known limits, and how to recover from each thing that can go wrong.
+        if let troubleshooting = Self.troubleshooting {
+          Link("Troubleshooting", destination: troubleshooting)
+        }
         Button("Export Diagnostics…") {
           environment.appModel.beginDiagnosticsExport()
         }

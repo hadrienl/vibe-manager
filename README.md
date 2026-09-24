@@ -45,6 +45,21 @@ Run only the package tests:
 swift test --package-path Packages/VibeManagerKit
 ```
 
+They include `VibeScenarioTests`, which compose the real application on a temporary folder — file
+store, runtime document, a terminal host in a process of its own, two mock agents — and drive it as
+the interface does. Inside a sandbox that kills a child which disclaims its responsibility (an
+agent's command sandbox), set `VIBE_TESTS_WITHOUT_DISCLAIM=1` to run the host tests without it.
+
+The performance budgets are opt-in, because a shared runner turns them into noise:
+
+```sh
+VIBE_PERFORMANCE=1 swift test --package-path Packages/VibeManagerKit \
+  --filter "PerformanceBudgetTests|ScrollbackMemoryTests"
+```
+
+The interface smoke test (XCUITest) needs a graphical session: `Scripts/ui-smoke.sh`. CI compiles
+it on every pull request and runs it on `main` and on demand.
+
 Build only the application without signing:
 
 ```sh
@@ -58,8 +73,9 @@ xcodebuild \
 
 ## Architecture
 
-The Xcode app target is a thin composition root. A local Swift package holds seven modules with
-dependencies directed toward the application and domain layers. See
+The Xcode app target is a thin shell around `VibeComposition`, the composition root, which lives in
+the local Swift package with the other nine modules, dependencies directed toward the application
+and domain layers. `VibeProcess` is the one way to start a process that is not a terminal. See
 [`docs/architecture/0001-project-foundation.md`](docs/architecture/0001-project-foundation.md)
 for the decision record and rationale.
 
@@ -208,6 +224,26 @@ Two real agents ship with the application, each documented with the choices its 
 [`docs/architecture/0006-claude-code-provider.md`](docs/architecture/0006-claude-code-provider.md).
 Neither reads a credential, injects an API key, or passes a flag that lowers the permissions the
 user configured for their own CLI.
+
+## Diagnostics, security and releases
+
+The application keeps a local log that cannot contain what the user typed — its events are made
+of types with no room for free text — in `~/Library/Logs/Vibe Manager`, for two weeks at most.
+Help ▸ Export Diagnostics… shows the whole archive before it is saved, and nothing is ever sent.
+The decisions are documented in
+[`docs/architecture/0020-diagnostics.md`](docs/architecture/0020-diagnostics.md).
+
+Every process the application starts, with its arguments, environment, timeout and how it is
+stopped, is listed in [`docs/security-review.md`](docs/security-review.md), with the findings of
+the #19 audit. Recovering from each thing that can go wrong, and the known limits, are in
+[`docs/operations.md`](docs/operations.md) (Help ▸ Troubleshooting). What VoiceOver reads and what
+the keyboard reaches is in [`docs/accessibility.md`](docs/accessibility.md).
+
+Releases are signed with a Developer ID, notarized, and published as a disk image on GitHub
+Releases by `Scripts/release.sh <version>`, run on the maintainer's Mac, then checked with
+`Scripts/clean-install-check.sh` and [`docs/release-checklist.md`](docs/release-checklist.md). The
+decisions are documented in
+[`docs/architecture/0021-distribution.md`](docs/architecture/0021-distribution.md).
 
 ## Configuration
 

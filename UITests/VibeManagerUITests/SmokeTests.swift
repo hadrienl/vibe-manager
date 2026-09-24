@@ -31,7 +31,12 @@ final class SmokeTests: XCTestCase {
   }
 
   private func launch() -> XCUIApplication {
-    let app = XCUIApplication()
+    // `Scripts/clean-install-check.sh` points it at the notarized application it installed:
+    // `TEST_RUNNER_VIBE_SMOKE_APP` reaches this process as `VIBE_SMOKE_APP`.
+    let app =
+      ProcessInfo.processInfo.environment["VIBE_SMOKE_APP"].map {
+        XCUIApplication(url: URL(fileURLWithPath: $0))
+      } ?? XCUIApplication()
     app.launchEnvironment = [
       "VIBE_DATA_DIRECTORY": dataDirectory.path,
       "VIBE_DEFAULTS_SUITE": suite,
