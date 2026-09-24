@@ -71,7 +71,7 @@ struct BranchCommitsTests {
     try await git(["commit", "-q", "-m", "A"], in: repository)
 
     let runner = CountingRunner()
-    let reader = GitStatusReader(git: runner)
+    let reader = GitStatusReader(git: runner, commitsRetryDelay: .zero)
     let first = try await reader.status(atPath: repository, limit: 100).get().committed
     try write("saved, not committed\n", to: repository + "/a.txt")
     let second = try await reader.status(atPath: repository, limit: 100).get().committed
@@ -86,6 +86,82 @@ struct BranchCommitsTests {
     await runner.setFailing(false)
     let recovered = try await reader.status(atPath: repository, limit: 100).get().committed
     #expect(recovered?.commitCount == 2)
+  }
+
+  @Test("A diff that failed is not run again for the same revisions before its wait is over")
+  func failureWaits() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("api")
+    try await makeRepository(at: repository)
+    try await git(["checkout", "-q", "-b", "feat/x"], in: repository)
+    try write("new\n", to: repository + "/a.txt")
+    try await git(["add", "."], in: repository)
+    try await git(["commit", "-q", "-m", "A"], in: repository)
+
+    let runner = CountingRunner()
+    await runner.setFailing(true)
+    let reader = GitStatusReader(git: runner, commitsRetryDelay: .seconds(60))
+    _ = try await reader.status(atPath: repository, limit: 100).get()
+    try write("saved\n", to: repository + "/a.txt")
+    _ = try await reader.status(atPath: repository, limit: 100).get()
+    #expect(await runner.diffs == 1)
+
+    // New revisions are new questions: they are asked at once.
+    await runner.setFailing(false)
+    try await git(["commit", "-q", "-am", "B"], in: repository)
+    let read = try await reader.status(atPath: repository, limit: 100).get().committed
+    #expect(await runner.diffs == 2)
+    #expect(read?.commitCount == 2)
+  }
+
+  @Test("The wait after a failure doubles, up to its longest, and a success ends it")
+  func retryDelays() async {
+    let cache = BranchCommitsCache()
+    let key = BranchCommitsCache.Key(head: "h", base: "main", baseRevision: "b")
+    let start = ContinuousClock.now
+    await cache.failed("r", key, at: start, firstDelay: .seconds(60))
+    #expect(await !cache.mayRetry("r", key, at: start + .seconds(59)))
+    #expect(await cache.mayRetry("r", key, at: start + .seconds(60)))
+    let other = BranchCommitsCache.Key(head: "h2", base: "main", baseRevision: "b")
+    #expect(await cache.mayRetry("r", other, at: start))
+
+    await cache.failed("r", key, at: start, firstDelay: .seconds(60))
+    #expect(await !cache.mayRetry("r", key, at: start + .seconds(119)))
+    for _ in 0..<10 { await cache.failed("r", key, at: start, firstDelay: .seconds(60)) }
+    #expect(await cache.mayRetry("r", key, at: start + BranchCommitsCache.longestRetryDelay))
+
+    await cache.remember(nil, for: "r", key, branch: "feat/x")
+    #expect(await cache.mayRetry("r", key, at: start))
+  }
+
+  @Test("After a checkout, a Git that fails shows nothing rather than the other branch's files")
+  func failureAfterCheckout() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("api")
+    try await makeRepository(at: repository)
+    try await git(["checkout", "-q", "-b", "feat/x"], in: repository)
+    try write("x\n", to: repository + "/x.txt")
+    try await git(["add", "."], in: repository)
+    try await git(["commit", "-q", "-m", "X"], in: repository)
+
+    let runner = CountingRunner()
+    let reader = GitStatusReader(git: runner, commitsRetryDelay: .zero)
+    let onX = try await reader.status(atPath: repository, limit: 100).get().committed
+    #expect(onX?.files == [CommittedFile(path: "x.txt", change: .added)])
+
+    try await git(["checkout", "-q", "main"], in: repository)
+    try await git(["checkout", "-q", "-b", "feat/y"], in: repository)
+    try write("y\n", to: repository + "/y.txt")
+    try await git(["add", "."], in: repository)
+    try await git(["commit", "-q", "-m", "Y"], in: repository)
+    await runner.setFailing(true)
+    #expect(try await reader.status(atPath: repository, limit: 100).get().committed == nil)
+
+    // Back on feat/x, whose list it was: it stands in again.
+    try await git(["checkout", "-q", "feat/x"], in: repository)
+    #expect(try await reader.status(atPath: repository, limit: 100).get().committed == onX)
   }
 
   @Test("On main, with nothing the base lacks, nothing is listed")

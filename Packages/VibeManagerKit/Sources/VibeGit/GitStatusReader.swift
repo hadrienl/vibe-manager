@@ -12,11 +12,19 @@ public struct GitStatusReader: RepositoryStatusReading {
   private let directories = GitDirectoryCache()
   private let commits = BranchCommitsCache()
   private let parser = GitStatusParser()
+  private let commitsRetryDelay: Duration
 
   /// A runner of its own by default, bounded to 30 s: a repository on a network volume, or a
   /// damaged one, must not keep a reading — and the repository's slot — for two minutes.
-  public init(git: any GitCommandRunner = ProcessGitCommandRunner(timeout: .seconds(30))) {
+  ///
+  /// `commitsRetryDelay` is how long a diff that failed is left alone before it is tried again for
+  /// the same revisions; the wait doubles at each new failure.
+  public init(
+    git: any GitCommandRunner = ProcessGitCommandRunner(timeout: .seconds(30)),
+    commitsRetryDelay: Duration = .seconds(60)
+  ) {
     self.git = git
+    self.commitsRetryDelay = commitsRetryDelay
   }
 
   public static let arguments = [
@@ -55,7 +63,8 @@ public struct GitStatusReader: RepositoryStatusReading {
       lock = Self.indexLock(in: found.gitDirectory)
     }
     let committed = await branchCommits(
-      atPath: path, head: parsed.branch.headRevision, limit: limit)
+      atPath: path, branch: parsed.branch.branchName, head: parsed.branch.headRevision,
+      limit: limit)
     // What the monitor paces its readings by: the commits read beside the status cost as much.
     duration = clock.now - started
     return .success(
@@ -110,9 +119,12 @@ public struct GitStatusReader: RepositoryStatusReading {
   /// diff itself only when `HEAD` or the base moved, because a file saved moves neither.
   ///
   /// A Git that failed — timed out on a large diff, a shallow clone without the merge base — is not
-  /// "nothing committed": the last list read stays, and nothing is remembered for these revisions,
-  /// so the next reading tries again.
-  func branchCommits(atPath path: String, head: String?, limit: Int) async -> BranchCommits? {
+  /// "nothing committed": the last list read on this branch stays. It is not tried again for the
+  /// same revisions before a wait that doubles at each failure: a diff that takes Git more than its
+  /// 30 s would otherwise hold every reading, and the repository's slot, that long.
+  func branchCommits(atPath path: String, branch: String?, head: String?, limit: Int) async
+    -> BranchCommits?
+  {
     guard let head else {
       await commits.forget(path)
       return nil
@@ -122,16 +134,22 @@ public struct GitStatusReader: RepositoryStatusReading {
         ["for-each-ref", "--format=%(refname)%00%(objectname)%00%(symref)"]
           + Self.baseReferences, in: path),
       references.succeeded
-    else { return await commits.last(path) }
+    else { return await commits.last(path, branch: branch, head: head) }
     guard let base = Self.base(from: references.text) else {
       await commits.forget(path)
       return nil
     }
     let key = BranchCommitsCache.Key(head: head, base: base.name, baseRevision: base.revision)
     if let known = await commits.known(path, key) { return known }
+    guard await commits.mayRetry(path, key, at: .now) else {
+      return await commits.last(path, branch: branch, head: head)
+    }
     guard let value = await readBranchCommits(atPath: path, head: head, base: base, limit: limit)
-    else { return await commits.last(path) }
-    await commits.remember(value, for: path, key)
+    else {
+      await commits.failed(path, key, at: .now, firstDelay: commitsRetryDelay)
+      return await commits.last(path, branch: branch, head: head)
+    }
+    await commits.remember(value, for: path, key, branch: branch)
     return value
   }
 
@@ -252,7 +270,8 @@ public struct GitStatusReader: RepositoryStatusReading {
   }
 }
 
-/// The last committed files of each repository, and the two revisions they were read between.
+/// The last committed files of each repository, the two revisions they were read between and the
+/// branch they were read on; and the revisions Git last failed to read, with when to try again.
 actor BranchCommitsCache {
   struct Key: Hashable {
     let head: String
@@ -260,7 +279,23 @@ actor BranchCommitsCache {
     let baseRevision: String
   }
 
-  private var values: [String: (key: Key, value: BranchCommits?)] = [:]
+  private struct Entry {
+    let key: Key
+    let branch: String?
+    let value: BranchCommits?
+  }
+
+  private struct Failure {
+    let key: Key
+    let delay: Duration
+    let retryAt: ContinuousClock.Instant
+  }
+
+  /// The longest a failed diff is left alone: a repository that grew past Git's 30 s can shrink.
+  static let longestRetryDelay: Duration = .seconds(30 * 60)
+
+  private var values: [String: Entry] = [:]
+  private var failures: [String: Failure] = [:]
 
   /// `.some(nil)` is an answer too: nothing committed since the base.
   func known(_ path: String, _ key: Key) -> BranchCommits?? {
@@ -268,17 +303,40 @@ actor BranchCommitsCache {
     return .some(entry.value)
   }
 
-  /// The last list read, whatever it was read between: what is shown while Git fails.
-  func last(_ path: String) -> BranchCommits? {
-    values[path]?.value
+  /// What is shown while Git fails: the last list read, if it was read on this branch — a commit
+  /// since does not make it wrong, a checkout does. A detached `HEAD` has no branch to go by, so
+  /// only a list read at this very commit stands in.
+  func last(_ path: String, branch: String?, head: String) -> BranchCommits? {
+    guard let entry = values[path], entry.branch == branch else { return nil }
+    guard branch != nil || entry.key.head == head else { return nil }
+    return entry.value
   }
 
-  func remember(_ value: BranchCommits?, for path: String, _ key: Key) {
-    values[path] = (key, value)
+  func remember(_ value: BranchCommits?, for path: String, _ key: Key, branch: String?) {
+    values[path] = Entry(key: key, branch: branch, value: value)
+    failures[path] = nil
+  }
+
+  /// False while the wait set by the last failure on these same revisions runs.
+  func mayRetry(_ path: String, _ key: Key, at now: ContinuousClock.Instant) -> Bool {
+    guard let failure = failures[path], failure.key == key else { return true }
+    return now >= failure.retryAt
+  }
+
+  /// A first failure on these revisions waits `firstDelay`; each next one twice the last wait.
+  func failed(
+    _ path: String, _ key: Key, at now: ContinuousClock.Instant, firstDelay: Duration
+  ) {
+    var delay = firstDelay
+    if let previous = failures[path], previous.key == key {
+      delay = min(previous.delay * 2, Self.longestRetryDelay)
+    }
+    failures[path] = Failure(key: key, delay: delay, retryAt: now + delay)
   }
 
   func forget(_ path: String) {
     values[path] = nil
+    failures[path] = nil
   }
 }
 
