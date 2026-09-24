@@ -649,9 +649,10 @@ struct GitInspectorModelTests {
       worst = max(worst, clock.now - started)
     }
     // The 50 ms hold on a Mac. The CI runner, virtualised and older in its compiler, runs this
-    // about 25 times slower: there the bound only catches a presentation no longer cached.
+    // about 25 times slower: there the bound only catches a presentation no longer cached. A
+    // second was too close — a busy runner has reached 1.06 s — so it is given three.
     let budget: Duration =
-      ProcessInfo.processInfo.environment["CI"] == "true" ? .seconds(1) : .milliseconds(50)
+      ProcessInfo.processInfo.environment["CI"] == "true" ? .seconds(3) : .milliseconds(50)
     #expect(worst < budget)
     #expect(git.selection(in: session) == row(.unstaged, "Sources/Module7/File4007.swift"))
   }
