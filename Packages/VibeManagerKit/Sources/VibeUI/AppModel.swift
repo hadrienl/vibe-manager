@@ -908,6 +908,7 @@ public final class AppModel {
     let sheet = AgentSwitchModel(
       session: session,
       stopsRunningAgent: launcher?.isRunning(id) == true,
+      resumeFailedBefore: resumeRefusals.contains(id),
       registry: agents,
       planner: planAgentSwitch,
       preselected: preselected,
@@ -955,6 +956,7 @@ public final class AppModel {
       previous: sheet.currentLabel,
       summary: summary,
       wasEdited: sheet.isSummaryEdited,
+      skippingResume: sheet.skipsResume,
       expecting: sheet.expectedModeKind,
       names: sheet.agentNames
     )
@@ -969,6 +971,7 @@ public final class AppModel {
     previous: String,
     summary: String?,
     wasEdited: Bool,
+    skippingResume: Bool,
     expecting: AgentSwitchMode.Kind?,
     names: [String: String]
   ) async {
@@ -988,6 +991,7 @@ public final class AppModel {
         to: target,
         context: current.map { briefInput(for: $0, names: names) },
         summaryOverride: summary,
+        skippingResume: skippingResume,
         expecting: expecting
       )
 

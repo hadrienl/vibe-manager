@@ -96,6 +96,38 @@ struct AgentSwitchWorkspaceTests {
     #expect(sheet.canSwitch)
   }
 
+  @Test("A conversation the agent dropped last time is not retried unless asked")
+  func failedResumeIsOnlyRetriedOnRequest() async throws {
+    let subject = session(path: folder())
+    let registry = WorkspaceRegistry(providers: [Self.stub, Self.other])
+    let sheet = AgentSwitchModel(
+      session: subject,
+      stopsRunningAgent: false,
+      resumeFailedBefore: true,
+      registry: registry,
+      planner: PlanAgentSwitch(
+        repository: WorkspaceRepository(sessions: [subject]), agents: registry),
+      context: { session, names in SessionBriefInput(session: session, agentNames: names) }
+    )
+    await sheet.load()
+
+    sheet.select(model: "deep")
+    #expect(sheet.offersResumeRetry)
+    #expect(sheet.skipsResume)
+    #expect(sheet.handover == .summary)
+    #expect(sheet.expectedModeKind == .handover)
+    #expect(sheet.continuityNotice.contains("stopped as soon as this conversation was resumed"))
+
+    sheet.retriesFailedResume = true
+    #expect(!sheet.skipsResume)
+    #expect(sheet.handover == .resumesConversation)
+    #expect(sheet.expectedModeKind == .resumeWithModel)
+
+    // Another agent resumes nothing, so there is nothing to ask.
+    await sheet.select(agent: "other")
+    #expect(!sheet.offersResumeRetry)
+  }
+
   @Test("Another agent gets a summary, and the user's edits survive a change of model")
   func anotherAgentGetsAnEditableSummary() async throws {
     let subject = session(path: folder())

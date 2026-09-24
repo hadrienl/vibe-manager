@@ -26,6 +26,12 @@ running agent can only be told apart from a stopped one, not a busy one from an 
 | Same agent without an identifier, or another agent | a new process, handed a summary | not transferred, and said so |
 | A session that never ran | its first launch, initial prompt included | none existed |
 
+A conversation the agent dropped within seconds the last time it was resumed (#10's
+`resumeRefusals`) is not retried on a change of model unless the user asks: the sheet says so,
+plans a handover, and offers **Try resuming the conversation anyway**, unchecked. The application
+cannot tell a conversation that is gone from a model the account may not run — both are a quick
+non-zero exit — and only in the second case is switching the model the fix.
+
 Going back to an agent the session had before is a handover like any other. Its old conversation
 knows nothing of what the other agent did since, and resuming it silently would have it work from a
 stale picture; its identifier is kept for a later ticket to offer that deliberately.

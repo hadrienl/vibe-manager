@@ -244,6 +244,8 @@ public struct PlanAgentSwitch: Sendable {
   ///   - context: the branch report and Git states known right now, and the agents' names.
   ///   - summaryOverride: the summary as the user left it in the sheet. Empty means "tell it
   ///     nothing"; `nil` means the generated one.
+  ///   - skippingResume: do not try the agent's own resume — it dropped this conversation last
+  ///     time, and the user did not ask to try again.
   ///   - expecting: the mode the sheet showed. A plan that turns out otherwise is refused rather
   ///     than run: a summary nobody read must not be sent, nor one somebody read be dropped.
   public func callAsFunction(
@@ -251,10 +253,12 @@ public struct PlanAgentSwitch: Sendable {
     to target: AgentTarget,
     context: SessionBriefInput? = nil,
     summaryOverride: String? = nil,
+    skippingResume: Bool = false,
     expecting: AgentSwitchMode.Kind? = nil
   ) async throws -> AgentSwitchPlan {
     let planned = try await plan(
-      id: id, to: target, context: context, summaryOverride: summaryOverride)
+      id: id, to: target, context: context, summaryOverride: summaryOverride,
+      skippingResume: skippingResume)
     if let expecting, planned.mode.kind != expecting {
       throw AgentSwitchRefusal.planChanged
     }
@@ -265,7 +269,8 @@ public struct PlanAgentSwitch: Sendable {
     id: SessionID,
     to target: AgentTarget,
     context: SessionBriefInput?,
-    summaryOverride: String?
+    summaryOverride: String?,
+    skippingResume: Bool
   ) async throws -> AgentSwitchPlan {
     let stored: WorkSession?
     do {
@@ -342,7 +347,8 @@ public struct PlanAgentSwitch: Sendable {
       return planned(launch, .firstLaunch)
     }
 
-    if current.providerID == target.providerID, descriptor.capabilities.supportsResume,
+    if !skippingResume, current.providerID == target.providerID,
+      descriptor.capabilities.supportsResume,
       let identifier = current.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
       !identifier.isEmpty
     {

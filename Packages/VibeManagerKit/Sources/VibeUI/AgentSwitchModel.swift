@@ -29,6 +29,13 @@ public final class AgentSwitchModel {
   public let current: SessionAgentConfiguration
   /// Whether the session's agent runs now, and will be stopped by the switch.
   public let stopsRunningAgent: Bool
+  /// Whether the agent dropped this conversation within seconds the last time it was resumed.
+  public let resumeFailedBefore: Bool
+  /// The user's answer when it did: try resuming it once more, with the new model, rather than
+  /// handing over. Off by default — what failed is not retried unless asked.
+  public var retriesFailedResume = false {
+    didSet { regenerateUnlessEdited() }
+  }
 
   public private(set) var agents: [AgentOption] = []
   public private(set) var models: [AgentModel] = []
@@ -53,6 +60,7 @@ public final class AgentSwitchModel {
   public init(
     session: WorkSession,
     stopsRunningAgent: Bool,
+    resumeFailedBefore: Bool = false,
     registry: any AgentProviderResolving,
     planner: PlanAgentSwitch,
     preselected: AgentTarget? = nil,
@@ -63,6 +71,7 @@ public final class AgentSwitchModel {
     sessionName = session.name
     current = session.agent ?? SessionAgentConfiguration(providerID: "")
     self.stopsRunningAgent = stopsRunningAgent
+    self.resumeFailedBefore = resumeFailedBefore
     self.registry = registry
     self.planner = planner
     self.context = context
@@ -101,12 +110,29 @@ public final class AgentSwitchModel {
     !target.matches(session.agent)
   }
 
+  /// Whether the conversation could be resumed with the new model: same agent, an identifier, and
+  /// an agent that resumes. Before the answer to a failed resume is taken into account.
+  public var canResumeConversation: Bool {
+    guard session.hasEverStarted, providerID == current.providerID else { return false }
+    let identifier = current.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return identifier?.isEmpty == false
+      && selectedAgent?.descriptor.capabilities.supportsResume ?? true
+  }
+
+  /// Whether the sheet asks if a conversation the agent dropped last time should be tried again.
+  public var offersResumeRetry: Bool {
+    resumeFailedBefore && canResumeConversation
+  }
+
+  /// Whether the switch skips the agent's own resume: it failed last time, and nobody asked to try
+  /// it again.
+  public var skipsResume: Bool {
+    offersResumeRetry && !retriesFailedResume
+  }
+
   public var handover: Handover {
     if !session.hasEverStarted { return .firstLaunch }
-    let identifier = current.resumeIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-    if providerID == current.providerID, identifier?.isEmpty == false,
-      selectedAgent?.descriptor.capabilities.supportsResume ?? true
-    {
+    if canResumeConversation, !skipsResume {
       return .resumesConversation
     }
     if let agent = selectedAgent, !agent.descriptor.capabilities.supportsInitialPrompt {
@@ -172,6 +198,12 @@ public final class AgentSwitchModel {
         \(currentName)'s conversation, and nothing is sent to it.
         """
     case .summary:
+      if skipsResume {
+        return """
+          \(currentName) stopped as soon as this conversation was resumed last time, so \
+          \(targetName) starts a new one with the summary below.
+          """
+      }
       let whose =
         providerID == current.providerID
         ? "the previous conversation" : "\(currentName)'s conversation"

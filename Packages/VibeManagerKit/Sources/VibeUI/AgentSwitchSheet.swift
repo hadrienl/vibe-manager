@@ -29,6 +29,16 @@ struct AgentSwitchSheet: View {
       }
       notice(model.continuityNotice, symbol: "info.circle", tint: .secondary)
 
+      if model.offersResumeRetry {
+        // Off by default: what failed is not retried unless asked. Worth asking when the model
+        // was what the agent refused, and switching it is precisely the fix.
+        Toggle("Try resuming the conversation anyway", isOn: $model.retriesFailedResume)
+          .toggleStyle(.checkbox)
+          .help(
+            "Worth trying when the previous model is what the agent refused, rather than the "
+              + "conversation itself.")
+      }
+
       if model.handover == .summary {
         summaryField
       }

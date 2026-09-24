@@ -242,6 +242,22 @@ struct AgentSwitchTests {
         == .summaryTooLong(overBy: 1_000))
   }
 
+  @Test("A resume that failed last time is skipped when asked, and the model change hands over")
+  func skippingResumeHandsOver() async throws {
+    let stored = session()
+    let (plan, _) = subject(stored)
+
+    let planned = try await plan(
+      id: stored.id,
+      to: AgentTarget(providerID: "claude-code", modelID: "sonnet"),
+      skippingResume: true
+    )
+
+    #expect(planned.mode.kind == .handover)
+    #expect(planned.nextConfiguration.resumeIdentifier == nil)
+    #expect(!planned.plan.arguments.contains("--resume"))
+  }
+
   @Test("A plan that would not do what the sheet showed is refused, never run")
   func planThatChangedIsRefused() async throws {
     // The sheet showed a summary — no identifier yet — and the agent revealed one meanwhile.
