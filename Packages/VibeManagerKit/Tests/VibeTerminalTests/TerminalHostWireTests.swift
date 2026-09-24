@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 import VibeApplication
@@ -96,5 +97,24 @@ struct TerminalHostWireTests {
       request: 4, body: .startFailed(.executableNotFound(path: "/nowhere/claude")))
 
     #expect(TerminalHostFrame.control(message).decode(TerminalHostMessage.self) == message)
+  }
+
+  @Test("The kernel says what a running process was signed as, whatever is on disk now")
+  func kernelIdentityOfThisProcess() throws {
+    var token = audit_token_t()
+    var count = mach_msg_type_number_t(
+      MemoryLayout<audit_token_t>.size / MemoryLayout<natural_t>.size)
+    let status = withUnsafeMutablePointer(to: &token) { pointer in
+      pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+        task_info(mach_task_self_, task_flavor_t(TASK_AUDIT_TOKEN), $0, &count)
+      }
+    }
+    try #require(status == KERN_SUCCESS)
+
+    let identity = KernelCodeIdentity.read(token)
+
+    // The test binary is signed ad hoc by the linker: an identifier, and no team.
+    #expect(identity?.identifier.isEmpty == false)
+    #expect(identity?.team == nil)
   }
 }

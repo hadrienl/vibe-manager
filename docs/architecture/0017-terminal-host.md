@@ -209,8 +209,16 @@ Measured while building this:
   is precisely what this host is for. The identifier lets through a process of the same user signed
   ad hoc under that name; such a process can already open the terminal devices the user owns, or
   rewrite the development binary itself, so nothing is given away that was not already.
-- Measured on a development build: the binary rebuilt while its host ran (a new inode), the host
-  kept running its session, and still passed `identifier "com.hadrienl.VibeManager"`.
+- **A binary replaced on disk** — a rebuild, an update — makes `SecCodeCheckValidity` fail with
+  `errSecCSStaticCodeChanged` on the host that was started from it, since that call also checks
+  the file against the running process. That host is the very one to keep. On that error, and only
+  on it, the check falls back on what the kernel says of the running process through
+  `csops_audittoken`: a valid signature, the same identifier and, when the application has one,
+  the same team. It is what the process was launched as, validated then.
+- Measured on a development build: the host kept its session across the replacement of its
+  binary; the check by audit token then failed with `-67034`, which is what made a relaunch after a
+  rebuild kill the agents it was meant to take back. With the fallback it passes, while a process
+  signed under another identifier is still refused.
 - **What this does not cover:** a process of the same user can already open `/dev/ttysNNN`, which
   the user owns, and read from it. That is true of every terminal on macOS, and this design does
   not make it worse. "A third-party process can neither connect to the host nor read a terminal"

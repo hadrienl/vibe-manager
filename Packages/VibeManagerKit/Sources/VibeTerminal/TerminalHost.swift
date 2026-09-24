@@ -162,9 +162,13 @@ public enum TerminalHost {
         // Said first, before the agents are given their grace period: the system may not wait
         // for it, and the next launch must know this was not a crash.
         location.recordStopRequest()
+        // Nobody may attach to a host on its way out: an application relaunched meanwhile would
+        // take back agents about to be stopped, and then lose them with this host. Gone from the
+        // socket, it leaves room for the next host instead.
+        unlink(socketPath)
+        acceptSource.cancel()
         Task {
           await server.stopEverything()
-          unlink(socketPath)
           exit(0)
         }
       }
