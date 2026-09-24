@@ -36,6 +36,21 @@ struct PromptTemplateLibraryModelTests {
     #expect(!model.isEdited)
   }
 
+  @Test("A new template left blank has nothing to save or lose")
+  func blankNewTemplateIsNotEdited() async {
+    let model = await makeModel([review])
+    model.newTemplate()
+    #expect(model.isNew)
+    #expect(!model.isEdited)
+    model.requestSelect(review.id)
+    #expect(model.pendingNavigation == nil)
+    #expect(model.editing?.id == review.id)
+
+    model.newTemplate()
+    model.editing?.name = "Mine"
+    #expect(model.isEdited)
+  }
+
   @Test("Going to another template with changes asks first")
   func unsavedChangesAsk() async {
     let model = await makeModel([review, feedback])

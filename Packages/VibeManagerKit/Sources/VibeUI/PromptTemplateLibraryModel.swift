@@ -54,6 +54,8 @@ public final class PromptTemplateLibraryModel {
   private let clock: any SessionClock
   private let exchange: (any PromptTemplateExchangeFormat)?
   private var hasLoaded = false
+  /// The blank a new template started as: left untouched, there is nothing to save or lose.
+  private var newTemplateStart: PromptTemplate?
 
   public init(
     repository: any PromptTemplateRepository,
@@ -90,7 +92,8 @@ public final class PromptTemplateLibraryModel {
 
   public var isEdited: Bool {
     guard let editing else { return false }
-    guard let saved = savedEditing else { return true }
+    let start = newTemplateStart?.id == editing.id ? newTemplateStart : nil
+    guard let saved = savedEditing ?? start else { return true }
     return !saved.hasSameContent(as: editing)
   }
 
@@ -182,6 +185,7 @@ public final class PromptTemplateLibraryModel {
       createdAt: clock.now())
     selectedID = template.id
     editing = template
+    newTemplateStart = template
     sampleValues = [:]
   }
 
