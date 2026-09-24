@@ -1,6 +1,7 @@
 # 0011 — Restoring sessions after a relaunch
 
-- Status: accepted
+- Status: accepted; its first principle, "an agent does not outlive the application that spawned
+  it", is superseded by [0016](0016-terminal-host.md), which adds a fifth verdict
 - Date: 2026-09-22
 - Issue: [#11](https://github.com/hadrienl/vibe-manager/issues/11)
 

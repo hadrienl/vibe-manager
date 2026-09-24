@@ -124,6 +124,18 @@ stops nothing already running, and a restoration that sends a text to an agent i
 The runtime document, the four verdicts and the bounded exit are documented in
 [`docs/architecture/0011-session-restoration.md`](docs/architecture/0011-session-restoration.md).
 
+Quitting can also leave the agents working. Every terminal runs in a terminal host — the
+application's own binary started with `--terminal-host`, one per data directory, with no window
+and no Dock icon — so when agents are running, quitting asks whether to keep them running or stop
+them, and the answer can be remembered in Settings. Agents left running go on with their turn; at
+the next launch each one is back on screen as it was, nothing relaunched and nothing sent to it, and
+one that finished meanwhile shows its last output. The host accepts only a client signed like
+itself, stops everything when its client vanishes without saying goodbye, and leaves by itself
+once it holds nothing. A restart of the Mac falls back to #11's native resume. The protocol, the
+fifth verdict and who TCC holds responsible are documented in
+[`docs/architecture/0016-terminal-host.md`](docs/architecture/0016-terminal-host.md). Set
+`VIBE_TERMINAL_HOST=off` to keep every terminal inside the application, as a debugger expects.
+
 The application never creates a branch or a worktree: the agent makes those it needs. The
 inspector's Git section reports what it did — each branch the session worked on, the repositories
 it is checked out in (worktrees the agent made for itself included), and whether it was created,
