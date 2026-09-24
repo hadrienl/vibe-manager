@@ -152,6 +152,15 @@ double-click opens a file in the editor chosen in Settings, and only reveals it 
 one is chosen. The decisions are documented in
 [`docs/architecture/0014-git-inspector.md`](docs/architecture/0014-git-inspector.md).
 
+Below Git, each session has its notes: plain text, typed straight into the inspector (⌥⌘N from
+the terminal, Escape back), saved a moment after the typing stops and whenever the session is left,
+with the header saying whether they are on disk. Undo belongs to the session, links open, and
+nothing is corrected behind the user's back. Each session's notes are a file of their own beside
+the session store, 64 KB at most, written atomically, never written over when they cannot be read,
+kept through close, relaunch and archive, and searched by the sidebar. Quitting with notes that
+could not be saved asks first. The decisions are documented in
+[`docs/architecture/0016-session-notes.md`](docs/architecture/0016-session-notes.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the
