@@ -68,7 +68,8 @@ them would break a restart.
 A template is saved with **Save**, and each save is a revision. A half-typed template must not be
 offered in the sheet, and a revision per keystroke would make the number the session records
 meaningless. Edits live in the library model for the length of the run, so closing the window
-loses nothing; leaving a changed template for another asks first.
+loses nothing; leaving a changed template for another asks first, and so does quitting — Save,
+Don't Save or Cancel, before anything is stopped.
 
 ### A store of its own, and a format of its own for exchange
 
