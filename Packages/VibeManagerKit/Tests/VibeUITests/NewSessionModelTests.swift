@@ -620,6 +620,25 @@ struct NewSessionTemplateTests {
     #expect(!model.folderComesFromTemplate)
   }
 
+  @Test("A template's symbol and colour follow it, and never replace the user's")
+  func appearancePreset() {
+    var api = templateReview
+    let given = SessionAppearance(symbolName: "bolt", colorHex: "#0B63E5")
+    api.appearance = given
+    let model = makeModel(templates: [api, templateFeedback])
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.appearance == given)
+    #expect(model.appearanceComesFromTemplate)
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.appearance == nil)
+
+    let mine = SessionAppearance(symbolName: "flask", colorHex: "#B42318")
+    model.draft.appearance = mine
+    model.selectTemplate(api.id)
+    #expect(model.draft.appearance == mine)
+  }
+
   @Test("A folder the user chose is never replaced by a template's")
   func userFolderWins() {
     var api = templateReview

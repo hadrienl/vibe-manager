@@ -50,6 +50,7 @@ private struct StoredTemplateV1: Codable {
   let body: String
   /// Absent from the files written before templates proposed a folder.
   let folder: String?
+  let appearance: TemplateAppearanceV1?
   let fields: [StoredFieldSettingsV1]
   let revision: Int
   let createdAt: Date
@@ -61,6 +62,7 @@ private struct StoredTemplateV1: Codable {
     sessionNamePattern = template.sessionNamePattern
     body = template.body
     folder = template.folder
+    appearance = template.appearance.map(TemplateAppearanceV1.init)
     fields = template.fieldSettings.map(StoredFieldSettingsV1.init)
     revision = template.revision
     createdAt = template.createdAt
@@ -74,11 +76,27 @@ private struct StoredTemplateV1: Codable {
       sessionNamePattern: sessionNamePattern,
       body: body,
       workingDirectoryPath: folder,
+      appearance: appearance?.domainValue,
       fieldSettings: fields.map(\.domainValue),
       revision: revision,
       createdAt: createdAt,
       updatedAt: updatedAt
     )
+  }
+}
+
+/// A symbol and a colour, the same shape in the store and in an exported file.
+private struct TemplateAppearanceV1: Codable {
+  let symbol: String
+  let color: String
+
+  init(_ appearance: SessionAppearance) {
+    symbol = appearance.symbolName
+    color = appearance.colorHex
+  }
+
+  var domainValue: SessionAppearance {
+    SessionAppearance(symbolName: symbol, colorHex: color)
   }
 }
 
@@ -183,6 +201,7 @@ private struct ExchangeTemplateV1: Codable {
   let sessionName: String?
   let body: String
   let folder: String?
+  let appearance: TemplateAppearanceV1?
   let fields: [ExchangeFieldV1]?
 
   init(_ template: PromptTemplate) {
@@ -191,6 +210,7 @@ private struct ExchangeTemplateV1: Codable {
     sessionName = template.sessionNamePattern
     body = template.body
     folder = template.folder
+    appearance = template.appearance.map(TemplateAppearanceV1.init)
     fields = template.trimmedFieldSettings.map(ExchangeFieldV1.init)
   }
 
@@ -201,6 +221,7 @@ private struct ExchangeTemplateV1: Codable {
       sessionNamePattern: sessionName ?? "",
       body: body,
       workingDirectoryPath: folder,
+      appearance: appearance?.domainValue,
       fieldSettings: (fields ?? []).map(\.domainValue),
       revision: 1,
       createdAt: date

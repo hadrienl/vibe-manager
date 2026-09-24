@@ -375,3 +375,22 @@ struct PromptTemplateFolderTests {
     #expect(copy?.workingDirectoryPath == "~/api")
   }
 }
+
+@Suite("The symbol and colour a template gives")
+struct PromptTemplateAppearanceTests {
+  @Test("Only the symbols and colours the sheet offers are accepted")
+  func offeredOnly() {
+    let offered = PromptTemplate(
+      name: "T", body: "x", appearance: SessionAppearance(symbolName: "bolt", colorHex: "#0B63E5"))
+    let other = PromptTemplate(
+      name: "T", body: "x", appearance: SessionAppearance(symbolName: "star", colorHex: "#123456"))
+    #expect(offered.problems(among: []).isEmpty)
+    #expect(other.problems(among: []) == [.appearanceNotOffered])
+    #expect(!offered.hasSameContent(as: PromptTemplate(name: "T", body: "x")))
+  }
+
+  @Test("The examples each have one")
+  func examplesHaveOne() {
+    #expect(PromptTemplateExamples.all(createdAt: Date()).allSatisfy { $0.appearance != nil })
+  }
+}

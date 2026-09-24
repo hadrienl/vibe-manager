@@ -157,10 +157,19 @@ public struct PromptTemplatesView: View {
   }
 
   private func row(_ template: PromptTemplate) -> some View {
-    Text(template.trimmedName)
-      .lineLimit(1)
-      .tag(Optional(template.id))
-      .contextMenu { templateActions(for: template) }
+    HStack(spacing: 8) {
+      if let appearance = template.appearance {
+        SessionBadge(appearance: appearance, size: 18)
+      } else {
+        Image(systemName: "text.badge.plus")
+          .foregroundStyle(.secondary)
+          .frame(width: 18)
+      }
+      Text(template.trimmedName)
+        .lineLimit(1)
+    }
+    .tag(Optional(template.id))
+    .contextMenu { templateActions(for: template) }
   }
 
   @ViewBuilder
@@ -305,6 +314,15 @@ public struct PromptTemplatesView: View {
                   .accessibilityLabel("Remove the folder")
                 }
               }
+            }
+            EditorRow(
+              "Appearance",
+              help: editing.appearance == nil
+                ? "Optional — the symbol and colour of the sessions made from it."
+                : nil,
+              issues: issues(for: .appearance)
+            ) {
+              appearancePicker(editing)
             }
             EditorRow(
               "Prompt",
@@ -539,6 +557,47 @@ public struct PromptTemplatesView: View {
         model.updateSettings(for: key) { $0[keyPath: keyPath] = value.isEmpty ? nil : value }
       }
     )
+  }
+
+  /// The symbols and colours the New Session sheet offers, and None to leave the sessions their
+  /// own. Picking one of the two when there is none yet starts from the template's name.
+  private func appearancePicker(_ editing: PromptTemplate) -> some View {
+    let current = editing.appearance
+    let base = current ?? SessionAppearanceCatalog.derived(forName: editing.trimmedName)
+    return HStack(alignment: .top, spacing: 14) {
+      SessionBadge(appearance: current ?? SessionAppearanceCatalog.placeholder, size: 40)
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 6) {
+          ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
+            SymbolChoice(
+              symbol: symbol,
+              isSelected: current?.symbolName == symbol,
+              select: {
+                model.editing?.appearance = SessionAppearance(
+                  symbolName: symbol, colorHex: base.colorHex)
+              }
+            )
+          }
+        }
+        HStack(spacing: 6) {
+          ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
+            ColorChoice(
+              hex: hex,
+              isSelected: current?.colorHex == hex,
+              select: {
+                model.editing?.appearance = SessionAppearance(
+                  symbolName: base.symbolName, colorHex: hex)
+              }
+            )
+          }
+          if current != nil {
+            Button("None") { model.editing?.appearance = nil }
+              .controlSize(.small)
+              .help("Sessions made from it keep their own symbol and colour.")
+          }
+        }
+      }
+    }
   }
 
   /// Written with a `~` when it is in the home folder, so an exported template means the same

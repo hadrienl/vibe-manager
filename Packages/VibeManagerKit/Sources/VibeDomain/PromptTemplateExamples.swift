@@ -33,6 +33,7 @@ public enum PromptTemplateExamples {
 
         {{focus?}}
         """,
+      appearance: SessionAppearance(symbolName: "doc.text", colorHex: "#0B63E5"),
       fieldSettings: [
         PromptTemplateFieldSettings(name: "url", label: "Merge request URL"),
         PromptTemplateFieldSettings(
@@ -52,6 +53,7 @@ public enum PromptTemplateExamples {
         Address the unresolved review comments on the merge request at {{url}}. For each one, \
         change the code or explain why not, run the tests, and summarise what you did per comment.
         """,
+      appearance: SessionAppearance(symbolName: "wrench.and.screwdriver", colorHex: "#1E7F4D"),
       fieldSettings: [
         PromptTemplateFieldSettings(name: "url", label: "Merge request URL")
       ],

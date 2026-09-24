@@ -127,7 +127,11 @@ public struct NewSessionSheet: View {
             Divider()
           }
           ForEach(model.templates) { template in
-            Text(template.trimmedName).tag(PromptTemplateID?.some(template.id))
+            Label(
+              template.trimmedName,
+              systemImage: template.appearance?.symbolName ?? "text.badge.plus"
+            )
+            .tag(PromptTemplateID?.some(template.id))
           }
         }
         .labelsHidden()
@@ -313,7 +317,8 @@ public struct NewSessionSheet: View {
       "Appearance",
       help: model.draft.appearance == nil
         ? "Derived from the name until you pick one."
-        : nil,
+        : model.appearanceComesFromTemplate
+          ? "Given by the template — pick another if needed." : nil,
       issues: model.issues(for: .appearance)
     ) {
       HStack(alignment: .top, spacing: 14) {
@@ -579,7 +584,7 @@ struct AgentChoiceRow: View {
   }
 }
 
-private struct SymbolChoice: View {
+struct SymbolChoice: View {
   let symbol: String
   let isSelected: Bool
   let select: () -> Void
@@ -603,7 +608,7 @@ private struct SymbolChoice: View {
   }
 }
 
-private struct ColorChoice: View {
+struct ColorChoice: View {
   let hex: String
   let isSelected: Bool
   let select: () -> Void

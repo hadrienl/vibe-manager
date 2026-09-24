@@ -46,6 +46,9 @@ session name, it follows the template only while the field holds no folder of th
 template without one gives back the folder another template replaced. Written with `~` for the home
 folder, it means the same folder on another Mac.
 
+The optional **appearance** — one of the symbols and colours the New Session sheet offers — is given
+to the session when the template is picked, by the same rule: unless the user picked their own.
+
 The optional **session name** uses the same fields (`Review {{url}}`) and names the session until
 you type a name of your own.
 
@@ -109,6 +112,7 @@ new revision, and sessions keep theirs.
 | `templates[].sessionName` | string | The session name pattern; empty or absent for none. |
 | `templates[].body` | string, required | The prompt, not empty, at most 16 KB. |
 | `templates[].folder` | string | The working folder proposed with the template, absolute or starting with `~`. |
+| `templates[].appearance` | object | `{ "symbol": "doc.text", "color": "#0B63E5" }`, one of the symbols and colours the sheet offers. |
 | `templates[].fields[]` | array | Settings of the fields in the text; the fields themselves come from the text. |
 | `fields[].name` | string, required | The field's name, as in `{{name}}`. |
 | `fields[].label` | string | Shown next to the control; derived from the name when absent. |
@@ -144,6 +148,11 @@ JSON Schema:
           "sessionName": { "type": "string" },
           "body": { "type": "string", "minLength": 1 },
           "folder": { "type": "string" },
+          "appearance": {
+            "type": "object",
+            "required": ["symbol", "color"],
+            "properties": { "symbol": { "type": "string" }, "color": { "type": "string" } }
+          },
           "fields": {
             "type": "array",
             "items": {

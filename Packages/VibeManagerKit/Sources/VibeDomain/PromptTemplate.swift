@@ -87,6 +87,9 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   /// stays that, so a template exported to another Mac still means the same folder there. `nil`:
   /// the sheet's folder is left as it is.
   public var workingDirectoryPath: String?
+  /// The symbol and colour given to the sessions made from it; `nil`: they keep their own. Only
+  /// the ones the New Session sheet offers.
+  public var appearance: SessionAppearance?
   /// Only the settings of fields present in the text are kept when the template is saved.
   public var fieldSettings: [PromptTemplateFieldSettings]
   /// One more at each save, and recorded by the sessions created from it.
@@ -100,6 +103,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     sessionNamePattern: String = "",
     body: String,
     workingDirectoryPath: String? = nil,
+    appearance: SessionAppearance? = nil,
     fieldSettings: [PromptTemplateFieldSettings] = [],
     revision: Int = 1,
     createdAt: Date = Date(),
@@ -110,6 +114,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     self.sessionNamePattern = sessionNamePattern
     self.body = body
     self.workingDirectoryPath = workingDirectoryPath
+    self.appearance = appearance
     self.fieldSettings = fieldSettings
     self.revision = revision
     self.createdAt = createdAt.storageRounded
@@ -192,7 +197,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   /// Whether two templates say the same thing, whatever their history.
   public func hasSameContent(as other: PromptTemplate) -> Bool {
     name == other.name && sessionNamePattern == other.sessionNamePattern && body == other.body
-      && folder == other.folder
+      && folder == other.folder && appearance == other.appearance
       && Set(trimmedFieldSettings) == Set(other.trimmedFieldSettings)
   }
 
@@ -224,6 +229,9 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     // the moment the session is created.
     if let folder, !(folder.hasPrefix("/") || folder == "~" || folder.hasPrefix("~/")) {
       issues.append(.folderNotAbsolute)
+    }
+    if let appearance, !SessionAppearanceCatalog.contains(appearance) {
+      issues.append(.appearanceNotOffered)
     }
     let byteCount = body.utf8.count
     if byteCount > PromptTemplateLimits.bodyByteLimit {
@@ -295,6 +303,7 @@ public enum PromptTemplateIssueField: String, Hashable, Sendable {
   case sessionName
   case body
   case folder
+  case appearance
 }
 
 /// One reason a template cannot be saved, and the way out of it — the shape of
@@ -350,6 +359,12 @@ public struct PromptTemplateIssue: Hashable, Sendable, Identifiable {
       remedy: "Fix it, or remove the |/…/ to use the whole value."
     )
   }
+
+  public static let appearanceNotOffered = PromptTemplateIssue(
+    field: .appearance,
+    message: "This symbol or colour is not one Vibe Manager offers.",
+    remedy: "Pick one of those shown, or none."
+  )
 
   public static let folderNotAbsolute = PromptTemplateIssue(
     field: .folder,

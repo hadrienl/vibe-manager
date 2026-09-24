@@ -107,18 +107,22 @@ struct PromptTemplateFolderStoreTests {
       .appendingPathComponent("templates-\(UUID().uuidString)", isDirectory: true)
       .appendingPathComponent("templates.json")
     defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-    let template = PromptTemplate(name: "API", body: "x", workingDirectoryPath: "~/Projects/api")
+    let template = PromptTemplate(
+      name: "API", body: "x", workingDirectoryPath: "~/Projects/api",
+      appearance: SessionAppearance(symbolName: "bolt", colorHex: "#0B63E5"))
     let now = Date()
     try await FilePromptTemplateRepository(storeURL: url).update { library in
       _ = try library.save(template, at: now)
     }
     let stored = try await FilePromptTemplateRepository(storeURL: url).library()
     #expect(stored.templates.first?.workingDirectoryPath == "~/Projects/api")
+    #expect(stored.templates.first?.appearance == template.appearance)
 
     let codec = PromptTemplateExchangeCodec()
     let exported = try codec.encode(stored.templates, exportedAt: now)
     #expect(
       try codec.decode(exported, importedAt: now).first?.workingDirectoryPath == "~/Projects/api")
+    #expect(try codec.decode(exported, importedAt: now).first?.appearance == template.appearance)
 
     let withoutFolder = Data(
       #"{"format":"vibe-manager.prompt-templates","version":1,"templates":[{"id":"6F1C2A4E-7D35-4B8A-9E61-2C0D5B7A1E09","name":"N","body":"b"}]}"#

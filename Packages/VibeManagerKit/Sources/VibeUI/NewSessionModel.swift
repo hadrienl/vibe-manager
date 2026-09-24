@@ -35,6 +35,9 @@ public final class NewSessionModel {
   /// Like the name, the folder follows the template until the user picks their own.
   private var presetFolder: String?
   private var folderBeforePreset: String??
+  /// The same for the symbol and colour: `nil` in the draft means "derived from the name".
+  private var presetAppearance: SessionAppearance?
+  private var appearanceBeforePreset: SessionAppearance??
 
   private let create: CreateSession
   private let registry: any AgentProviderResolving
@@ -122,6 +125,30 @@ public final class NewSessionModel {
     isTemplateStale = false
     refreshName()
     applyFolderPreset(of: template)
+    applyAppearancePreset(of: template)
+  }
+
+  /// Whether the symbol and colour are the ones the template gave.
+  public var appearanceComesFromTemplate: Bool {
+    presetAppearance != nil && draft.appearance == presetAppearance
+  }
+
+  /// Gives the session the template's symbol and colour, unless the user picked their own; a
+  /// template without any gives back what a previous one replaced.
+  private func applyAppearancePreset(of template: PromptTemplate) {
+    let isFree = draft.appearance == nil
+    guard isFree || appearanceComesFromTemplate else { return }
+    if let appearance = template.appearance {
+      if appearanceBeforePreset == nil {
+        appearanceBeforePreset = .some(draft.appearance)
+      }
+      draft.appearance = appearance
+      presetAppearance = appearance
+    } else if appearanceComesFromTemplate, let before = appearanceBeforePreset {
+      draft.appearance = before
+      presetAppearance = nil
+      appearanceBeforePreset = nil
+    }
   }
 
   /// Whether the folder in the field is the one the template proposed.

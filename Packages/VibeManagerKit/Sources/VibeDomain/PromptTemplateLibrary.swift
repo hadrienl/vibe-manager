@@ -53,6 +53,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
       sessionNamePattern: original.sessionNamePattern,
       body: original.body,
       workingDirectoryPath: original.workingDirectoryPath,
+      appearance: original.appearance,
       fieldSettings: original.fieldSettings,
       revision: 1,
       createdAt: date
@@ -174,6 +175,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           sessionNamePattern: template.sessionNamePattern,
           body: template.body,
           workingDirectoryPath: template.workingDirectoryPath,
+          appearance: template.appearance,
           fieldSettings: template.fieldSettings,
           createdAt: date
         )
@@ -185,6 +187,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           sessionNamePattern: template.sessionNamePattern,
           body: template.body,
           workingDirectoryPath: template.workingDirectoryPath,
+          appearance: template.appearance,
           fieldSettings: template.fieldSettings,
           createdAt: date
         )

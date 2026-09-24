@@ -116,8 +116,10 @@ A template may name a folder, which the sheet puts in its folder field when the 
 It follows the template the way the session name does: only while the field holds nothing of the
 user's own, and a template without a folder gives back what the previous one replaced. The folder is
 kept as written, `~` included, so an exported template means the same folder on another Mac; the
-sheet checks it like any other folder, at creation. Agent and model stay the user's choice: the
-folder is where a task happens, the agent is how the user likes to work.
+sheet checks it like any other folder, at creation. A symbol and a colour, taken from the sheet's own
+catalogue, follow the same rule, so that sessions of one kind are told apart at a glance in the
+sidebar. Agent and model stay the user's choice: the folder is where a task happens, the agent is
+how the user likes to work.
 
 ### No archive
 
