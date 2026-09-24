@@ -451,6 +451,48 @@ struct SessionHistoryTests {
     #expect(!model.visibleSessions.contains { $0.id == second.id })
   }
 
+  @Test("Closing a session that stays listed leaves the selection on it")
+  func closingAListedSessionKeepsTheSelection() async throws {
+    let stopped = session(name: "Stopped", status: .active)
+    let other = session(name: "Other", status: .closed)
+    let repository = MutableRepository(sessions: [stopped, other])
+    let launcher = launcher(supervisor: SpySupervisor(), repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
+    await model.load()
+    await launcher.launch(session: stopped, plan: plan())
+    // Closed on record while its agent still runs: the Closed list shows it, and it can be closed.
+    var closed = try #require(await repository.session(id: stopped.id))
+    try closed.close(at: Date())
+    await repository.save(closed)
+    await model.reload()
+    model.setScope(.closed)
+    model.select(stopped.id)
+    #expect(model.canClose(closed))
+
+    await model.confirmClose(stopped.id)
+
+    #expect(model.visibleSessions.contains { $0.id == stopped.id })
+    #expect(model.selectedSessionID == stopped.id)
+  }
+
+  @Test("Closing a selected session hidden by a search leaves the selection on it")
+  func closingAHiddenSessionKeepsTheSelection() async {
+    let hidden = session(name: "Refactor", status: .active)
+    let shown = session(name: "Documentation", status: .active)
+    let repository = MutableRepository(sessions: [hidden, shown])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.select(hidden.id)
+    model.setSearchText("documentation")
+
+    await model.requestClose(hidden.id)
+
+    #expect(model.sessions.first { $0.id == hidden.id }?.status == .closed)
+    // It was never taken from under the user: the sidebar follows it to Closed, as it did.
+    #expect(model.selectedSessionID == hidden.id)
+    #expect(model.filter.scope == .closed)
+  }
+
   @Test("A session picked while an agent is stopping keeps the selection")
   func pickingAnotherSessionDuringACloseKeepsIt() async {
     let first = session(name: "First", status: .active)

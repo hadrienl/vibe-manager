@@ -618,24 +618,34 @@ public final class AppModel {
     } catch {
       await report(error)
     }
+    // Still on it only if the user was not looking at its row: listed whatever its state, or
+    // hidden by a search. The sidebar then follows it rather than dropping it.
+    let isStillSelected = selectedSessionID == id
     await reload()
     // Only once the reload has the session closed: dropped earlier, it would flash back in.
     dismissedSessionIDs.remove(id)
-    // A close that failed leaves the session active, and back in the list: the selection is
-    // left where the user is now rather than pulled back to it.
-    reconcileSelection()
+    if isStillSelected {
+      follow(id)
+    } else {
+      // A close that failed leaves the session active, and back in the list: the selection is
+      // left where the user is now rather than pulled back to it.
+      reconcileSelection()
+    }
   }
 
-  /// Takes a session off the list, and moves the selection off it if it was there.
+  /// Takes a session off the list, and moves the selection off it if its row was there and has
+  /// gone. A session that is not active stays listed, and one hidden by a search was not where the
+  /// user was looking: either way the selection stays on it.
   private func dismiss(_ id: SessionID) {
     let visible = visibleSessions
     let index = visible.firstIndex { $0.id == id }
     dismissedSessionIDs.insert(id)
-    guard selectedSessionID == id else { return }
-    let neighbour = index.flatMap { index -> WorkSession? in
-      if visible.indices.contains(index + 1) { return visible[index + 1] }
-      return index > 0 ? visible[index - 1] : nil
-    }
+    guard selectedSessionID == id, let index,
+      !visibleSessions.contains(where: { $0.id == id })
+    else { return }
+    let neighbour =
+      visible.indices.contains(index + 1)
+      ? visible[index + 1] : (index > 0 ? visible[index - 1] : nil)
     select(neighbour?.id)
   }
 
