@@ -343,6 +343,19 @@ struct PromptTemplateExtractionTests {
     #expect(uses.first?.placesLabel == "Session name, Prompt")
   }
 
+  @Test("A pattern on a multiline field shows what the prompt and the session name keep")
+  func multilineExtractionMatchesPrompt() {
+    var fill = PromptTemplateFill(
+      template: PromptTemplate(
+        name: "T", sessionNamePattern: "Fix {{log|/Error: (.*)/}}",
+        body: "Fix {{log|/Error: (.*)/}}",
+        fieldSettings: [PromptTemplateFieldSettings(name: "log", isMultiline: true)]))
+    fill.setValue("Error: boom\nat foo.swift:12", for: "log")
+    #expect(fill.render().prompt == "Fix boom")
+    #expect(fill.sessionName() == "Fix boom")
+    #expect(fill.extractions(for: "log").map(\.outcome) == [.extracted("boom")])
+  }
+
   @Test("Making the field optional keeps its pattern")
   func optionalKeepsPattern() {
     var template = PromptTemplate(name: "T", body: #"{{url|/\d+/}}"#)

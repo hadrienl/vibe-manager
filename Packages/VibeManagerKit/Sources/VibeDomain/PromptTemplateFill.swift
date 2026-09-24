@@ -109,8 +109,7 @@ public struct PromptTemplateFill: Hashable, Sendable {
         parts.append(.text(PromptText.sanitized(text)))
       case .placeholder(let placeholder):
         let field = fields[placeholder.key]
-        let whole = PromptText.fieldValue(
-          value(for: placeholder.key), isMultiline: field?.isMultiline ?? false)
+        let whole = patternInput(for: placeholder.key)
         var filled = whole
         if let pattern = placeholder.pattern, !whole.isEmpty {
           switch PromptTemplateExtraction(pattern: pattern).apply(to: whole) {
@@ -151,7 +150,9 @@ public struct PromptTemplateFill: Hashable, Sendable {
       case .text(let text):
         name += text
       case .placeholder(let placeholder):
-        let whole = PromptText.fieldValue(value(for: placeholder.key), isMultiline: false)
+        // The words are put back on one line below, once the pattern has read the value as the
+        // prompt does: a pattern must keep the same part of a field wherever it is used.
+        let whole = patternInput(for: placeholder.key)
         if let pattern = placeholder.pattern {
           if case .extracted(let part) = PromptTemplateExtraction(pattern: pattern).apply(to: whole)
           {
@@ -173,10 +174,18 @@ public struct PromptTemplateFill: Hashable, Sendable {
   public func extractions(for key: String) -> [(
     use: PromptTemplateExtractionUse, outcome: PromptTemplateExtraction.Outcome
   )] {
-    let value = PromptText.fieldValue(self.value(for: key), isMultiline: false)
+    let value = patternInput(for: key)
     return template.extractions(for: key).map { use in
       (use, PromptTemplateExtraction(pattern: use.pattern).apply(to: value))
     }
+  }
+
+  /// A field's value as the patterns read it: kept on several lines for a multiline field, so
+  /// what the form shows a pattern keeping is what the agent is sent.
+  private func patternInput(for key: String) -> String {
+    let key = key.lowercased()
+    let field = template.fields.first { $0.name == key }
+    return PromptText.fieldValue(value(for: key), isMultiline: field?.isMultiline ?? false)
   }
 
   /// The reference a session created from this fill keeps.
