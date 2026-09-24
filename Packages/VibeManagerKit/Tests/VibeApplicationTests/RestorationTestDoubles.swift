@@ -25,17 +25,23 @@ actor RestorationJournal {
 actor RestorationRepository: SessionRepository {
   private var stored: [WorkSession]
   private let journal: RestorationJournal?
+  /// A store that cannot be listed, as a volume that has gone away is.
+  private let listingFails: Bool
 
-  init(sessions: [WorkSession], journal: RestorationJournal? = nil) {
+  init(sessions: [WorkSession], journal: RestorationJournal? = nil, listingFails: Bool = false) {
     stored = sessions
     self.journal = journal
+    self.listingFails = listingFails
   }
 
   func status(of id: SessionID) -> SessionStatus? {
     stored.first { $0.id == id }?.status
   }
 
-  func sessions() -> [WorkSession] { stored }
+  func sessions() throws -> [WorkSession] {
+    if listingFails { throw CocoaError(.fileReadNoPermission) }
+    return stored
+  }
 
   func session(id: SessionID) -> WorkSession? { stored.first { $0.id == id } }
 

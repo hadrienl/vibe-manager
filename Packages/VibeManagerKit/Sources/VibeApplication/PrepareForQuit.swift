@@ -55,7 +55,14 @@ public struct PrepareForQuit: Sendable {
 
   @discardableResult
   public func callAsFunction() async -> SessionShutdown {
-    let ids = await candidates()
+    let shutdown = await stopAndClose(await candidates())
+    await recorder.markStopped(resuming: shutdown.closed.map(\.id))
+    return shutdown
+  }
+
+  /// Stops these sessions and closes them in the store, in that order, and writes nothing else.
+  /// Leaving the agents running shares this with a plain quit, for the sessions it cannot leave.
+  func stopAndClose(_ ids: [SessionID]) async -> SessionShutdown {
     // Stopped first, always — including for a session the store turns out not to hold any more:
     // the process is ours whatever the document says.
     let detachments = await detachAll(ids)
@@ -73,8 +80,6 @@ public struct PrepareForQuit: Sendable {
       guard let session = updated, session.status == .closed else { continue }
       closed.append(session)
     }
-
-    await recorder.markStopped(resuming: closed.map(\.id))
     return SessionShutdown(closed: closed, detachments: detachments)
   }
 
@@ -97,7 +102,7 @@ public struct PrepareForQuit: Sendable {
   /// The two are asked for together because neither is enough on its own. A store that cannot be
   /// read would otherwise take the whole intention down with it, and a session the launcher
   /// started but the store never heard about would be left running.
-  private func candidates() async -> [SessionID] {
+  func candidates() async -> [SessionID] {
     // A copy that found the document held by another instance closes only what it started
     // itself. The sessions the store calls active are the other copy's, running under its own
     // agents, and closing them here would be a status written about somebody else's process.

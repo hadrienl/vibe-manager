@@ -2,9 +2,20 @@ import AppKit
 import SwiftUI
 import VibeApplication
 import VibeDomain
+import VibeTerminal
 import VibeUI
 
+/// The one binary is two programs. Given `--terminal-host`, it is the terminal host (ADR 0017) and
+/// never returns: no `NSApplication` is created, so it has no Dock icon, no menu bar and no window.
+/// Being the same signed binary is the point: TCC and the host's peer check both see Vibe Manager.
 @main
+enum Entry {
+  static func main() {
+    TerminalHost.runIfRequested()
+    VibeManagerApp.main()
+  }
+}
+
 struct VibeManagerApp: App {
   @State private var environment = AppEnvironment()
   @State private var windowFocus = WindowFocus()
@@ -206,19 +217,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private var hasRepliedToTermination = false
 
+  /// Whether this quit is the Mac shutting down, restarting or logging out: nothing survives that,
+  /// and a question on screen would hold the logout up for an answer that changes nothing.
+  ///
+  /// Read from the quit event itself rather than remembered from `willPowerOffNotification`: a
+  /// logout another application cancels leaves that notification behind, and every later quit
+  /// would have stopped the agents without asking.
+  private var isPoweringOff: Bool {
+    guard let event = NSAppleEventManager.shared().currentAppleEvent,
+      let reason = event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
+    else { return false }
+    return [kAEShutDown, kAERestart, kAEReallyLogOut, kAELogOut].map { OSType($0) }
+      .contains(reason)
+  }
+
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     guard let environment else { return .terminateNow }
     // Asked a second time — a quit the system retries, a quit the user repeats — the work has
     // already been done, and the reply for it has already been consumed. Another `terminateLater`
     // would wait for an answer nothing is left to send, and the application would never quit.
     guard !hasRepliedToTermination else { return .terminateNow }
-
     // A quit already on its way — flushing the notes, or asking about them — answers for this one.
     guard !isFlushingNotes else { return .terminateCancel }
+    guard let keepingAgentsRunning = decideAboutRunningAgents(in: environment) else {
+      return .terminateCancel
+    }
     isFlushingNotes = true
 
     // Terminating immediately would orphan the process tree of every open terminal, and leave
-    // the next launch without the intention to resume them.
+    // the next launch without the intention to resume them. The deadline starts after the
+    // question: it bounds the tidying, not the time the user takes to answer.
     Task {
       // The notes first, and before the deadline starts: the one thing that can be lost here is
       // what the user typed, and they are asked before it is.
@@ -236,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try? await Task.sleep(for: Self.shutdownDeadline)
         replyToTermination()
       }
-      await environment.shutdown()
+      await environment.shutdown(keepingAgentsRunning: keepingAgentsRunning)
       replyToTermination()
     }
     return .terminateLater
@@ -280,6 +308,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     default:
       return false
     }
+  }
+
+  /// Whether to leave the agents running, or `nil` when the user cancelled the quit.
+  ///
+  /// Asked only when there is something to leave: an agent running in the terminal host. The
+  /// answer remembered by "Don't ask again" is changed in the settings.
+  private func decideAboutRunningAgents(in environment: AppEnvironment) -> Bool? {
+    let count = environment.hostedRunningCount
+    guard count > 0, !isPoweringOff else { return false }
+    switch environment.appModel.quitBehavior {
+    case .keepRunning: return true
+    case .stopAll: return false
+    case .ask: break
+    }
+
+    let alert = NSAlert()
+    alert.messageText =
+      count == 1 ? "An agent is still running." : "Agents are running in \(count) sessions."
+    var information = """
+      You can leave them working in the background and find them as they are the next time you \
+      open Vibe Manager. A restart of the Mac stops them.
+      """
+    let inProcess = environment.inProcessRunningCount
+    if inProcess > 0 {
+      information +=
+        inProcess == 1
+        ? "\n\n1 other agent runs inside Vibe Manager and will stop either way."
+        : "\n\n\(inProcess) other agents run inside Vibe Manager and will stop either way."
+    }
+    alert.informativeText = information
+    alert.addButton(withTitle: "Keep Running")
+    alert.addButton(withTitle: "Stop All")
+    alert.addButton(withTitle: "Cancel")
+    alert.showsSuppressionButton = true
+    alert.suppressionButton?.title = "Don't ask again"
+
+    let keep: Bool
+    switch alert.runModal() {
+    case .alertFirstButtonReturn: keep = true
+    case .alertSecondButtonReturn: keep = false
+    default: return nil
+    }
+    if alert.suppressionButton?.state == .on {
+      environment.appModel.quitBehavior = keep ? .keepRunning : .stopAll
+    }
+    return keep
   }
 
   /// Answered once, whichever of the two tasks gets here first.

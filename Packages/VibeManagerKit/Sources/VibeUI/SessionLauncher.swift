@@ -30,7 +30,7 @@ public enum SessionStartOutcome: Equatable, Sendable {
 
 @MainActor
 @Observable
-public final class SessionLauncher: SessionRuntime, SessionRestarting {
+public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHandOff {
   private let supervisor: any TerminalSupervisor
   private let repository: any SessionRepository
   private let agents: any AgentProviderResolving
@@ -264,11 +264,73 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting {
     return "\r\n\u{1B}[2m── Restart · \(stamp) · \(what) ──\u{1B}[0m\r\n"
   }
 
+  /// Takes back a session whose process the terminal host kept while the application was closed,
+  /// or one that ended in the meantime, to show its last output.
+  ///
+  /// Nothing is launched and nothing is written to the store: a running session is still `active`
+  /// there, and one that ended was closed by the detection that found it. No agent observer is
+  /// started either — it needs the launch plan, which only the launch had — so an identifier the
+  /// agent had not yet written by the time the application quit is not captured afterwards.
+  @discardableResult
+  public func adopt(_ session: WorkSession) async -> Bool {
+    guard let terminal = await supervisor.session(for: session.id) else { return false }
+    let pane = pane(for: session.id) ?? makePane(for: session.id, spec: nil)
+    await pane.adopt(terminal)
+    guard case .running(let processIdentifier) = await terminal.state() else { return true }
+    watchForExit(id: session.id, terminal: terminal)
+    await recorder?.started(session.id, processGroup: processIdentifier)
+    return true
+  }
+
+  /// How many sessions are running in the terminal host, and so could be left running on quit.
+  public var hostedRunningCount: Int {
+    panes.values.filter { pane in
+      (pane.status == .running || pane.status == .starting) && pane.session is any HostedTerminal
+    }.count
+  }
+
+  /// How many sessions run their agent inside the application — the host could not be used —
+  /// and so will stop with it whatever the answer to the question asked on quit.
+  public var inProcessRunningCount: Int {
+    panes.keys.filter(willStopWithApplication).count
+  }
+
+  /// Whether this session's agent runs inside the application, and so cannot be left running.
+  public func willStopWithApplication(_ id: SessionID) -> Bool {
+    guard let pane = panes[id], let session = pane.session else { return false }
+    return (pane.status == .running || pane.status == .starting)
+      && !(session is any HostedTerminal)
+  }
+
+  // MARK: - SessionHandOff
+
+  /// Lets go of a session without stopping it, when the terminal host runs it.
+  ///
+  /// Its exit watch is retired, so the store is not told of an exit nobody here will see, and its
+  /// observer is finished. The record of its process group stays: it is what the next launch looks
+  /// for if the host turns out to be gone.
+  public func handOff(_ id: SessionID) async -> Bool {
+    guard let terminal = panes[id]?.session, terminal is any HostedTerminal,
+      await !terminal.state().isFinished
+    else { return false }
+    exitTasks.removeValue(forKey: id)?.cancel()
+    _ = nextExitGeneration(for: id)
+    outputTasks.removeValue(forKey: id)?.cancel()
+    if let observer = observers.removeValue(forKey: id) {
+      await observer.finished()
+    }
+    return true
+  }
+
   private func makePane(for id: SessionID, plan: AgentLaunchPlan) -> TerminalPaneModel {
+    makePane(for: id, spec: .agent(plan: plan))
+  }
+
+  private func makePane(for id: SessionID, spec: TerminalSpec?) -> TerminalPaneModel {
     let pane = TerminalPaneModel(
       sessionID: id,
       supervisor: supervisor,
-      spec: .agent(plan: plan),
+      spec: spec,
       viewportTimeout: viewportTimeout
     )
     panes[id] = pane

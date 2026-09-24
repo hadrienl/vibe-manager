@@ -255,6 +255,19 @@ public struct RootView: View {
           RestoreReportBanner(report: report, dismiss: { model.dismissRestoreReport() })
           Divider()
         }
+        if let reason = model.hostUnavailableReason {
+          HostUnavailableBanner(
+            reason: reason,
+            isRetrying: model.isRetryingHost,
+            retry: { Task { await model.retryHostReattach() } },
+            dismiss: { model.dismissHostUnavailableNotice() }
+          )
+          Divider()
+        }
+        if let notice = model.detachedNotice {
+          DetachedNoticeBanner(notice: notice, dismiss: { model.dismissDetachedNotice() })
+          Divider()
+        }
         detail
       }
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
@@ -435,6 +448,12 @@ public struct RootView: View {
                 ? (offer.label, { model.switchBack(session.id) }) : nil
             }
           )
+          Divider()
+        }
+        // Said where the agent is, and only when it is true: the user who counts on leaving it
+        // running when they quit must learn now that this one cannot be.
+        if model.willStopWithApplication(session.id) {
+          InProcessAgentBar()
           Divider()
         }
         terminalStack(for: session)
@@ -785,6 +804,99 @@ private struct OtherInstanceBanner: View {
         Text("Nothing was restored or changed here. Quit that copy before working from this one.")
           .font(.caption)
           .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// An agent running inside the application, because the terminal host could not be used.
+private struct InProcessAgentBar: View {
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: "exclamationmark.triangle")
+        .foregroundStyle(.orange)
+      Text("This agent will stop when Vibe Manager quits.")
+        .font(.callout)
+      Text("The background terminal host could not be used for it.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 6)
+    .background(.quaternary)
+    .accessibilityElement(children: .combine)
+  }
+}
+
+/// Agents still working in the background whose host would not let this copy reattach.
+///
+/// Said as it is: they are running, nothing was stopped or closed, and trying again is the way
+/// back. Calling it "another copy of Vibe Manager" would be wrong — it is the host.
+private struct HostUnavailableBanner: View {
+  let reason: String
+  let isRetrying: Bool
+  let retry: () -> Void
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+        .foregroundStyle(.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(
+          "Your agents are still running in the background, but Vibe Manager could not reattach."
+        )
+        .font(.callout)
+        Text("\(reason) Nothing was stopped or closed.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      Button(isRetrying ? "Retrying…" : "Retry", action: retry)
+        .disabled(isRetrying)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// Agents that went on working while the application was closed, back on screen as they are.
+private struct DetachedNoticeBanner: View {
+  let notice: AppModel.DetachedNotice
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "arrow.triangle.2.circlepath")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(notice.message)
+          .font(.callout)
+        if notice.endedCount > 0 {
+          Text("A finished session shows its last output, and can be restarted.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
       }
       Spacer(minLength: 8)
       Button {

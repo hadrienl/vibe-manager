@@ -12,7 +12,10 @@ import VibeDomain
 /// It is not kept in the user defaults either: `cfprefsd` writes when it decides to, and this
 /// document is written immediately before the application dies.
 public actor FileSessionRuntimeStateStore: SessionRuntimeStateStore {
-  private static let currentSchemaVersion = 1
+  /// 2 added the `detached` phase, the host and the sessions to resume beside it (ADR 0017). A
+  /// build that only knows 1 reads a 2 as nothing to honour, which is the safe way to downgrade.
+  private static let currentSchemaVersion = 2
+  private static let readableSchemaVersions: Set<Int> = [1, 2]
 
   private let url: URL
 
@@ -29,7 +32,7 @@ public actor FileSessionRuntimeStateStore: SessionRuntimeStateStore {
   public func read() -> SessionRuntimeState? {
     guard let data = try? Data(contentsOf: url) else { return nil }
     guard let document = try? Self.decoder().decode(Document.self, from: data) else { return nil }
-    guard document.schemaVersion == Self.currentSchemaVersion else { return nil }
+    guard Self.readableSchemaVersions.contains(document.schemaVersion) else { return nil }
     return document.state
   }
 

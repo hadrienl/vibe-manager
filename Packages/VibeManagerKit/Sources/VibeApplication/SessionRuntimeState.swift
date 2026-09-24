@@ -56,6 +56,9 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
     case running
     /// The instance stopped on purpose, and `sessions` is the intention to resume.
     case stopped
+    /// The instance quit and left `sessions` running in the terminal host, each with its process
+    /// group; `resuming` holds the ones it stopped instead, to resume as a clean quit would.
+    case detached
   }
 
   public var phase: Phase
@@ -72,6 +75,11 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
   public var updatedAt: Date
   public var stoppedAt: Date?
   public var sessions: [SessionRuntimeRecord]
+  /// The host the sessions were left running in, when the phase is `detached`.
+  public var host: TerminalHostIdentity?
+  /// Sessions a `detached` quit stopped rather than left running — their process would have died
+  /// with the application — and which are resumed the way a clean quit resumes its own.
+  public var resuming: [SessionRuntimeRecord]?
 
   public init(
     phase: Phase,
@@ -80,7 +88,9 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
     launchedAt: Date,
     updatedAt: Date,
     stoppedAt: Date? = nil,
-    sessions: [SessionRuntimeRecord] = []
+    sessions: [SessionRuntimeRecord] = [],
+    host: TerminalHostIdentity? = nil,
+    resuming: [SessionRuntimeRecord]? = nil
   ) {
     self.phase = phase
     self.processIdentifier = processIdentifier
@@ -89,6 +99,8 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
     self.updatedAt = updatedAt.storageRounded
     self.stoppedAt = stoppedAt?.storageRounded
     self.sessions = sessions
+    self.host = host
+    self.resuming = resuming
   }
 
   /// The last instant this document is known to have been written, which is as close as anything
@@ -147,6 +159,9 @@ public protocol ProcessLivenessProbe: Sendable {
   /// Sends `SIGKILL` to the whole group. Answers whether the kernel accepted the signal.
   @discardableResult
   func terminate(processGroup: Int32) -> Bool
+  /// When the Mac last started. A host missing after a restart is not a crash: nothing survives a
+  /// restart, and quitting with the agents left running was an intention to carry on.
+  func bootTime() -> Date?
 }
 
 extension ProcessLivenessProbe {
@@ -161,6 +176,10 @@ extension ProcessLivenessProbe {
     guard let startedAt, let actual = startTime(of: processGroup) else { return .unknown }
     return abs(actual.timeIntervalSince(startedAt)) < 1 ? .matches : .differs
   }
+
+  /// Unknown unless a probe says otherwise: without it, a missing host always reads as a crash,
+  /// which is the answer that asks before resuming anything.
+  public func bootTime() -> Date? { nil }
 }
 
 public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
@@ -193,5 +212,15 @@ public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
   public func terminate(processGroup: Int32) -> Bool {
     guard processGroup > 0 else { return false }
     return kill(-processGroup, SIGKILL) == 0
+  }
+
+  public func bootTime() -> Date? {
+    var name: [Int32] = [CTL_KERN, KERN_BOOTTIME]
+    var value = timeval()
+    var size = MemoryLayout<timeval>.stride
+    guard sysctl(&name, UInt32(name.count), &value, &size, nil, 0) == 0, value.tv_sec > 0 else {
+      return nil
+    }
+    return Date(timeIntervalSince1970: Double(value.tv_sec) + Double(value.tv_usec) / 1_000_000)
   }
 }

@@ -41,6 +41,13 @@ let package = Package(
       name: "VibeUI",
       dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"]
     ),
+    // The terminal host in a process of its own, for the tests that need one to outlive their
+    // client or to be killed. The application runs the same code from its own binary.
+    .executableTarget(
+      name: "VibeTerminalHostFixture",
+      dependencies: ["VibeTerminal"],
+      path: "Tests/VibeTerminalHostFixture"
+    ),
     .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
     .testTarget(
       name: "VibeApplicationTests",
@@ -63,7 +70,8 @@ let package = Package(
     ),
     .testTarget(
       name: "VibeTerminalTests",
-      dependencies: ["VibeTerminal", "VibeApplication", "VibeDomain"]
+      // The fixture is listed so that it is built before the tests that spawn it.
+      dependencies: ["VibeTerminal", "VibeApplication", "VibeDomain", "VibeTerminalHostFixture"]
     ),
     .testTarget(
       name: "VibeTerminalUITests",

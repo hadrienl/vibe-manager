@@ -15,16 +15,25 @@ final class AppEnvironment {
   /// must read the same status the workspace read rather than probe the system a second time.
   let permissions: PermissionsModel
 
-  private let terminalSupervisor: PTYTerminalSupervisor
+  private let terminalSupervisor: HostedTerminalSupervisor
   private let launcher: SessionLauncher
   private let prepareForQuit: PrepareForQuit
+  private let detachForQuit: DetachForQuit
 
   init() {
     let data = Self.dataLocation()
     let repository = FileSessionRepository(storeURL: data.store)
     let notes = FileSessionNotesStore(directory: data.notes)
     let registry = AgentProviderRegistry(providers: Self.providers())
-    let supervisor = PTYTerminalSupervisor()
+    // Every terminal runs in the terminal host, so its agent can be left running when the
+    // application quits (ADR 0017). One host per data directory: an isolated copy has its own.
+    let supervisor = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: TerminalHostLocation(dataDirectory: data.store.deletingLastPathComponent()),
+        launcher: Self.hostLauncher(),
+        verifier: CodeSigningPeerVerifier()
+      )
+    )
 
     terminalSupervisor = supervisor
     // The runtime document: what this copy of the application is running, so the next launch can
@@ -41,6 +50,13 @@ final class AppEnvironment {
     prepareForQuit = PrepareForQuit(
       repository: repository,
       runtime: launcher,
+      recorder: recorder
+    )
+    detachForQuit = DetachForQuit(
+      repository: repository,
+      runtime: launcher,
+      handOff: launcher,
+      host: supervisor,
       recorder: recorder
     )
     // The only permission the application ever asks for, wired to the system that answers it:
@@ -67,6 +83,7 @@ final class AppEnvironment {
         store: UserDefaultsWorkspaceLayoutStore(suiteName: data.defaultsSuite)),
       permissions: permissions,
       runtimeRecorder: recorder,
+      terminalHost: supervisor,
       // Read only: the application reports the branches and worktrees the agent made, and never
       // makes one itself.
       branchReader: ReadSessionBranchReport(reader: GitActivityReader(), transcripts: transcripts),
@@ -80,8 +97,19 @@ final class AppEnvironment {
       closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite),
       fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite),
       notesStore: notes,
-      notesFileLocation: { notes.fileURL(for: $0) }
+      notesFileLocation: { notes.fileURL(for: $0) },
+      quitPreferences: UserDefaultsQuitPreferences(suiteName: data.defaultsSuite)
     )
+  }
+
+  /// Sessions whose agent could be left running when the application quits.
+  var hostedRunningCount: Int {
+    launcher.hostedRunningCount
+  }
+
+  /// Sessions whose agent runs inside the application, and will stop with it regardless.
+  var inProcessRunningCount: Int {
+    launcher.inProcessRunningCount
   }
 
   /// Everything quitting owes the next launch, in the order it is owed.
@@ -90,7 +118,10 @@ final class AppEnvironment {
   /// that intention can only name sessions that really stopped. The two `stopAll` calls behind it
   /// are the safety net: a terminal the launcher never knew about, or a session the store could
   /// not be asked about, still has its process taken down.
-  func shutdown() async {
+  ///
+  /// Leaving the agents running replaces the stops with a hand-off: nothing is stopped that the
+  /// terminal host can keep, and the store keeps calling those sessions active, because they are.
+  func shutdown(keepingAgentsRunning: Bool) async {
     // The pending layout is written first: quitting is exactly when the delayed save that keeps
     // a separator drag cheap would otherwise be thrown away.
     await appModel.layout.flush()
@@ -100,9 +131,25 @@ final class AppEnvironment {
     // already in flight would otherwise write `reopen` after this shutdown had decided what to
     // close.
     await appModel.stopRestoring()
+    if keepingAgentsRunning {
+      await detachForQuit()
+      return
+    }
     await prepareForQuit()
     await launcher.stopAll()
     await terminalSupervisor.stopAll(gracePeriod: .seconds(3))
+    // Said rather than left to the host to infer: a client that simply vanished reads as a crash.
+    await terminalSupervisor.relinquish(keepRunning: false)
+  }
+
+  /// The application's own binary, started with `--terminal-host`. `VIBE_TERMINAL_HOST=off` starts
+  /// none — every terminal then runs in the application, as before ADR 0017 — which is how a
+  /// development build keeps its agents inside the process a debugger is attached to.
+  private static func hostLauncher(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> (any TerminalHostLaunching)? {
+    guard environment["VIBE_TERMINAL_HOST"] != "off" else { return nil }
+    return ExecutableTerminalHostLauncher.bundled()
   }
 
   /// Where this copy of the application keeps what it writes.

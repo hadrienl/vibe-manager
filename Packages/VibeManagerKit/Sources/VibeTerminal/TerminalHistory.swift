@@ -28,6 +28,12 @@ struct TerminalHistory {
     return TerminalHistorySnapshot(bytes: bytes, droppedByteCount: droppedByteCount)
   }
 
+  /// Output that never reached this buffer at all — trimmed from another one before it was copied
+  /// here — still counts as lost, and the snapshot has to say so.
+  mutating func noteDropped(_ byteCount: Int) {
+    droppedByteCount += max(0, byteCount)
+  }
+
   @discardableResult
   mutating func append(_ bytes: [UInt8]) -> Int {
     guard !bytes.isEmpty else { return 0 }

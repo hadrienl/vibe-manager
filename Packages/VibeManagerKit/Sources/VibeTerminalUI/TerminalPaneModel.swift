@@ -41,7 +41,9 @@ public final class TerminalPaneModel {
 
   private let sessionID: SessionID
   private let supervisor: any TerminalSupervisor
-  private var spec: TerminalSpec
+  /// What `start()` launches. `nil` for a pane that took over a process it never started — one the
+  /// terminal host kept running while the application was closed — until a restart hands it one.
+  private var spec: TerminalSpec?
   private let viewportTimeout: Duration
   private var stateTask: Task<Void, Never>?
   private var isStarting = false
@@ -51,7 +53,7 @@ public final class TerminalPaneModel {
   public init(
     sessionID: SessionID,
     supervisor: any TerminalSupervisor,
-    spec: TerminalSpec,
+    spec: TerminalSpec?,
     viewportTimeout: Duration = .milliseconds(500)
   ) {
     self.sessionID = sessionID
@@ -76,6 +78,7 @@ public final class TerminalPaneModel {
   /// a given `spec` replaces the one the pane was built with rather than being ignored.
   public func start(spec: TerminalSpec? = nil) async {
     guard !isStarting, session == nil || !status.isRunning else { return }
+    guard spec != nil || self.spec != nil else { return }
     isStarting = true
     defer { isStarting = false }
 
@@ -101,7 +104,7 @@ public final class TerminalPaneModel {
       await waitForViewport()
     }
 
-    var launchSpec = self.spec
+    guard var launchSpec = self.spec else { return }
     if let viewportSize {
       launchSpec.initialSize = viewportSize
     }
@@ -120,6 +123,20 @@ public final class TerminalPaneModel {
       failure = Failure(message: "The terminal could not be started.", suggestion: nil)
       status = .failed(message: "The terminal could not be started.")
     }
+  }
+
+  /// Shows a process this pane did not start: one the terminal host kept running while the
+  /// application was closed, or one that ended in the meantime. Nothing is launched and nothing is
+  /// sent to it; the surface replays its history and follows it from there.
+  public func adopt(_ session: any TerminalSession) async {
+    stateTask?.cancel()
+    stateTask = nil
+    self.session = session
+    failure = nil
+    wasStoppedOnPurpose = false
+    hasReceivedInput = false
+    apply(await session.state())
+    observe(session)
   }
 
   /// Holds a line the application itself writes into the terminal, above the next process.

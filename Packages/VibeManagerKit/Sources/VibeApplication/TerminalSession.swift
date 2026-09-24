@@ -1,7 +1,7 @@
 import Foundation
 import VibeDomain
 
-public struct TerminalSize: Hashable, Sendable {
+public struct TerminalSize: Hashable, Codable, Sendable {
   public let columns: Int
   public let rows: Int
 
@@ -19,7 +19,7 @@ public struct TerminalSize: Hashable, Sendable {
   }
 }
 
-public struct TerminalScrollbackLimits: Hashable, Sendable {
+public struct TerminalScrollbackLimits: Hashable, Codable, Sendable {
   public let maximumLineCount: Int
   public let maximumByteCount: Int
 
@@ -35,7 +35,9 @@ public struct TerminalScrollbackLimits: Hashable, Sendable {
   )
 }
 
-public struct TerminalSpec: Hashable, Sendable {
+/// `Codable`, like the values around it, because it crosses to the terminal host as it is
+/// (ADR 0017): the agent is started there with exactly the environment computed here.
+public struct TerminalSpec: Hashable, Codable, Sendable {
   public var executableURL: URL
   public var arguments: [String]
   public var environment: [String: String]
@@ -63,7 +65,7 @@ public struct TerminalSpec: Hashable, Sendable {
   }
 }
 
-public enum TerminalProcessState: Hashable, Sendable {
+public enum TerminalProcessState: Hashable, Codable, Sendable {
   case starting
   case running(processIdentifier: Int32)
   case exited(code: Int32)
@@ -96,7 +98,7 @@ public struct TerminalHistorySnapshot: Equatable, Sendable {
   }
 }
 
-public enum TerminalError: Error, Hashable, LocalizedError, Sendable {
+public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
   case executableNotFound(path: String)
   case executableNotPermitted(path: String)
   case notExecutable(path: String)
