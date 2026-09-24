@@ -82,7 +82,10 @@ func appModelExposesAgentDiagnostics() async {
 }
 
 @MainActor
-@Test("An agent that answered is shown without waiting for one that has not")
+@Test(
+  "An agent that answered is shown without waiting for one that has not",
+  .timeLimit(.minutes(1))
+)
 func aFastAgentIsNotHeldBehindASlowOne() async {
   let slow = ProbeGate()
   let model = AppModel(
@@ -94,9 +97,10 @@ func aFastAgentIsNotHeldBehindASlowOne() async {
   )
 
   let refresh = Task { await model.refreshAgents() }
-  // Claude answers only once the test says so, whatever the speed of the machine.
-  let deadline = ContinuousClock.now + .seconds(10)
-  while model.agentDiagnostics.isEmpty, ContinuousClock.now < deadline {
+  // Claude answers only once the test says so, whatever the speed of the machine. No deadline
+  // of its own: a test holding the main actor for seconds on a busy runner ran it out before
+  // Codex's answer could land. The time limit above stops a detection that never comes.
+  while model.agentDiagnostics.isEmpty {
     try? await Task.sleep(for: .milliseconds(10))
   }
 
