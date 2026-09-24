@@ -376,6 +376,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   /// A session that has ended is read, and the host has no reason to keep it any longer. The
   /// mirror stays: it is what the pane shows, and the last output with it.
   private func release(_ id: SessionID) {
+    // A client on its way out has not shown that output to anybody: the session is left for the
+    // next launch to read, as one that ended while nobody was attached.
+    guard !isClosed else { return }
     send(.release(session: id))
   }
 

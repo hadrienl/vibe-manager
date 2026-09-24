@@ -247,7 +247,7 @@ struct TerminalHostTests {
     let first = host.supervisor()
     let id = SessionID()
     let session = try await first.start(
-      TerminalTestSupport.spec(script: "printf 'before\\n'; sleep 1; printf 'after\\n'"), for: id)
+      TerminalTestSupport.spec(script: "printf 'before\\n'; read go; printf 'after\\n'"), for: id)
     try #require(session is HostedTerminalSession)
     #expect(await Transcript.follow(session).waitFor("before"))
 
@@ -263,6 +263,8 @@ struct TerminalHostTests {
     let adopted = try #require(await second.session(for: id))
     let transcript = await Transcript.follow(adopted)
     #expect(await transcript.text.contains("before"))
+    // Told to go on only now, so that it is still running whatever the machine's pace.
+    await adopted.write("go\r")
     #expect(await transcript.waitFor("after"))
     #expect(await transcript.waitForEnd())
     #expect(await adopted.state() == .exited(code: 0))
