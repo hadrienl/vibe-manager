@@ -300,12 +300,23 @@ struct TerminalHostTests {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
     let id = SessionID()
-    _ = try await first.start(
-      TerminalTestSupport.spec(script: "sleep 0.2; printf 'last words\\n'; exit 4"), for: id)
+    // Told to end only once its client has left: ending on a timer, it ended before the goodbye on
+    // a loaded runner, and the client still attached read it and released it.
+    let go = host.location.directory.appendingPathComponent("go").path
+    let session = try await first.start(
+      TerminalTestSupport.spec(
+        script: "while [ ! -e '\(go)' ]; do sleep 0.05; done; printf 'last words\\n'; exit 4"),
+      for: id)
+    guard case .running(let processIdentifier) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
     await first.relinquish(keepRunning: true)
 
-    #expect(await eventually { await host.server.sessionCount == 1 })
-    try await Task.sleep(for: .milliseconds(800))
+    #expect(await host.server.sessionCount == 1)
+    #expect(FileManager.default.createFile(atPath: go, contents: nil))
+    #expect(await eventually { !isProcessAlive(processIdentifier) })
+    try await Task.sleep(for: .milliseconds(300))
     let second = host.supervisor()
     guard case .connected(_, let sessions) = await second.reconnect() else {
       Issue.record("The host was not found again")
@@ -554,13 +565,25 @@ struct TerminalHostProcessTests {
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
         launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
+    // Told to finish only once the application has quit, whatever the pace of the machine.
+    let go = NSTemporaryDirectory() + "vmp-go-\(UUID().uuidString.prefix(8))"
+    defer { try? FileManager.default.removeItem(atPath: go) }
     let session = try await application.start(
-      TerminalTestSupport.spec(script: "sleep 1; printf 'long command done\\n'"), for: id)
+      TerminalTestSupport.spec(
+        script: "while [ ! -e '\(go)' ]; do sleep 0.05; done; printf 'long command done\\n'"),
+      for: id)
     #expect(session is HostedTerminalSession)
+    guard case .running(let processIdentifier) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
     // The application quits, leaving it running.
     await application.relinquish(keepRunning: true)
 
-    try await Task.sleep(for: .milliseconds(1_500))
+    #expect(isProcessAlive(processIdentifier))
+    #expect(FileManager.default.createFile(atPath: go, contents: nil))
+    #expect(await eventually { !isProcessAlive(processIdentifier) })
+    try await Task.sleep(for: .milliseconds(300))
     let relaunched = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: nil, verifier: SameUserPeerVerifier()))
