@@ -19,7 +19,7 @@ private func workedSession(status: SessionStatus = .closed) -> WorkSession {
     archivedAt: status == .archived ? createdAt.addingTimeInterval(60) : nil,
     startedAt: createdAt,
     repositories: [RepositoryContext(path: "/tmp/audit")],
-    notes: "Keep lodash."
+    legacyNotes: "Keep lodash."
   )
 }
 
@@ -43,7 +43,7 @@ func switchingRecordsThePreviousAgent() throws {
   // A switch writes the agent and its history, and nothing the user wrote.
   #expect(session.name == before.name)
   #expect(session.initialPrompt == before.initialPrompt)
-  #expect(session.notes == before.notes)
+  #expect(session.legacyNotes == before.legacyNotes)
   #expect(session.appearance == before.appearance)
   #expect(session.repositories == before.repositories)
   #expect(session.lifecycle == before.lifecycle)

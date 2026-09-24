@@ -37,7 +37,7 @@ struct AgentSwitchWorkspaceTests {
       updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
       closedAt: Date(timeIntervalSince1970: 1_700_000_000),
       repositories: [RepositoryContext(path: path)],
-      notes: "Keep lodash."
+      legacyNotes: "Keep lodash."
     )
   }
 
@@ -181,7 +181,7 @@ struct AgentSwitchWorkspaceTests {
     #expect(stored.agent == SessionAgentConfiguration(providerID: "other", modelID: "o1"))
     #expect(stored.agentHistory.count == 1)
     #expect(stored.agentHistory.first?.previous == subject.agent)
-    #expect(stored.notes == subject.notes)
+    #expect(stored.legacyNotes == subject.legacyNotes)
     #expect(await supervisor.startCount == 1)
     #expect(await supervisor.lastSpec?.arguments.contains("o1") == true)
     #expect(model.pendingSwitch == nil)

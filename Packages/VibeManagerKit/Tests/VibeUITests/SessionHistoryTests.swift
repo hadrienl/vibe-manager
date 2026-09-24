@@ -37,7 +37,7 @@ struct SessionHistoryTests {
           git: GitSnapshot(repositoryRootPath: "/workspace", branchName: "main", isDirty: true)
         )
       ],
-      notes: notes
+      legacyNotes: notes
     )
   }
 
@@ -230,17 +230,19 @@ struct SessionHistoryTests {
   }
 
   @Test("Archiving keeps the notes and the Git metadata")
-  func archivingKeepsTheRecord() async {
-    let stored = session()
+  func archivingKeepsTheRecord() async throws {
+    let stored = session(notes: nil)
     let repository = MutableRepository(sessions: [stored])
-    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    let notes = InMemorySessionNotesStore(notes: [stored.id: "Three retries, then it gives up."])
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), notesStore: notes)
     await model.load()
 
     model.requestArchive(stored.id)
     await model.archive(stored.id)
 
     let archived = await repository.session(id: stored.id)
-    #expect(archived?.notes == stored.notes)
+    #expect(archived?.status == .archived)
+    #expect(try await notes.notes(for: stored.id).text == "Three retries, then it gives up.")
     #expect(archived?.repositories.first?.git?.branchName == "main")
     #expect(archived?.agent?.resumeIdentifier == "abc-123")
     #expect(archived?.initialPrompt == stored.initialPrompt)

@@ -23,6 +23,10 @@ struct SessionContextInspector: View {
   private let openPrivacySettings: (() -> Void)?
   private let agentNames: [String: String]
   private let switchAgent: (() -> Void)?
+  private let notes: NotesModel?
+  private let leaveNotes: () -> Void
+  private let isDetailsExpanded: Bool
+  private let detailsExpandedChanged: (Bool) -> Void
 
   init(
     session: WorkSession,
@@ -36,9 +40,17 @@ struct SessionContextInspector: View {
     splitChanged: @escaping (Double) -> Void = { _ in },
     openPrivacySettings: (() -> Void)? = nil,
     agentNames: [String: String] = [:],
-    switchAgent: (() -> Void)? = nil
+    switchAgent: (() -> Void)? = nil,
+    notes: NotesModel? = nil,
+    leaveNotes: @escaping () -> Void = {},
+    isDetailsExpanded: Bool = true,
+    detailsExpandedChanged: @escaping (Bool) -> Void = { _ in }
   ) {
     self.session = session
+    self.notes = notes
+    self.leaveNotes = leaveNotes
+    self.isDetailsExpanded = isDetailsExpanded
+    self.detailsExpandedChanged = detailsExpandedChanged
     self.resolution = resolution
     self.branchReport = branchReport
     var byPath: [String: RepositoryStatusState] = [:]
@@ -70,7 +82,8 @@ struct SessionContextInspector: View {
     } bottom: {
       SessionPane(
         session: session, resolution: resolution, agentNames: agentNames,
-        switchAgent: switchAgent)
+        switchAgent: switchAgent, notes: notes, leaveNotes: leaveNotes,
+        isDetailsExpanded: isDetailsExpanded, detailsExpandedChanged: detailsExpandedChanged)
     }
   }
 }
@@ -165,25 +178,64 @@ private struct InspectorSplit<Top: View, Bottom: View>: View {
   }
 }
 
-/// The session's own context: its notes, its agent, the prompt it started from.
+/// The session's own context: its notes first, taking the room there is, then its agent and the
+/// prompt it started from, which fold away.
+///
+/// Not one `List`: an editor inside a list fights it for the scrolling, and the notes are what
+/// this pane is looked at for.
 private struct SessionPane: View {
   let session: WorkSession
   let resolution: SessionAgentResolution?
   let agentNames: [String: String]
   let switchAgent: (() -> Void)?
+  let notes: NotesModel?
+  let leaveNotes: () -> Void
+  let isDetailsExpanded: Bool
+  let detailsExpandedChanged: (Bool) -> Void
 
   var body: some View {
-    List {
-      Section("Notes") {
-        if let notes = session.notes, !notes.isEmpty {
-          Text(notes)
-            .font(.callout)
-            .textSelection(.enabled)
-        } else {
-          InspectorPlaceholder("No notes yet.")
+    GeometryReader { proxy in
+      VStack(spacing: 0) {
+        if let notes {
+          SessionNotesSection(
+            session: session, document: notes.document(for: session.id), notes: notes,
+            leave: leaveNotes)
+        }
+        Divider()
+        detailsHeader
+        if isDetailsExpanded {
+          details
+            .frame(height: notes == nil ? nil : max(proxy.size.height * 0.45, 60))
+            .frame(maxHeight: notes == nil ? .infinity : nil)
         }
       }
+    }
+  }
 
+  private var detailsHeader: some View {
+    Button {
+      detailsExpandedChanged(!isDetailsExpanded)
+    } label: {
+      HStack(spacing: 4) {
+        Image(systemName: "chevron.right")
+          .rotationEffect(.degrees(isDetailsExpanded ? 90 : 0))
+          .font(.caption2.weight(.semibold))
+        Text("Agent & initial prompt")
+          .font(.subheadline.weight(.semibold))
+        Spacer()
+      }
+      .foregroundStyle(.secondary)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .accessibilityLabel("Agent and initial prompt")
+    .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
+  }
+
+  private var details: some View {
+    List {
       Section {
         AgentRow(agent: session.agent, resolution: resolution, names: agentNames)
         if !session.agentHistory.isEmpty {

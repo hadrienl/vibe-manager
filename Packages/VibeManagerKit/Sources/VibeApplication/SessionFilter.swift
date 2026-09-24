@@ -100,11 +100,16 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     searchText.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  public func apply(to sessions: [WorkSession]) -> [WorkSession] {
-    sessions.filter(matches).sorted(by: ordering)
+  /// - Parameter notes: each session's notes, which live apart from the sessions and are searched
+  ///   like their names.
+  public func apply(
+    to sessions: [WorkSession],
+    notes: [SessionID: String] = [:]
+  ) -> [WorkSession] {
+    sessions.filter { matches($0, notes: notes[$0.id]) }.sorted(by: ordering)
   }
 
-  public func matches(_ session: WorkSession) -> Bool {
+  public func matches(_ session: WorkSession, notes: String? = nil) -> Bool {
     guard scope.includes(session.status) else { return false }
 
     if !agentProviderIDs.isEmpty {
@@ -126,7 +131,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     // `localizedStandardContains` is the search a Finder user already knows: case and accents are
     // ignored, so "refacto" finds "Réfactoring" without the user learning a syntax.
     var haystack = [session.name, session.initialPrompt]
-    if let notes = session.notes { haystack.append(notes) }
+    if let notes { haystack.append(notes) }
     haystack.append(contentsOf: session.repositories.map(\.path))
     return haystack.contains { $0.localizedStandardContains(query) }
   }

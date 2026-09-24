@@ -51,6 +51,8 @@ public final class AgentSwitchModel {
   }
   public private(set) var isSummaryEdited = false
   public private(set) var generatedSummary: SessionContextBrief?
+  /// Said when the session's notes did not fit in the generated summary.
+  public private(set) var leftOutNotes: String?
 
   private let session: WorkSession
   private let registry: any AgentProviderResolving
@@ -265,8 +267,10 @@ public final class AgentSwitchModel {
 
   /// Throws the user's edits away for the text generated for the current target.
   public func regenerateSummary() {
-    let summary = planner.summary(for: context(session, agentNames), to: target)
+    let input = context(session, agentNames)
+    let summary = planner.summary(for: input, to: target)
     generatedSummary = summary
+    leftOutNotes = NotesInSummary.leftOut(notes: input.notes, brief: summary)
     summaryText = summary.text
   }
 

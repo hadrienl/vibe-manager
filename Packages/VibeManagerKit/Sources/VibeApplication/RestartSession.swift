@@ -194,14 +194,17 @@ public struct RestartSession: Sendable {
   private let agents: any AgentProviderResolving
   private let folders: any WorkingDirectoryProbe
   private let brief: SessionContextBriefBuilder
+  private let notes: any SessionNotesStore
 
   public init(
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     folders: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
-    brief: SessionContextBriefBuilder = SessionContextBriefBuilder()
+    brief: SessionContextBriefBuilder = SessionContextBriefBuilder(),
+    notes: any SessionNotesStore = NoSessionNotes()
   ) {
     self.repository = repository
+    self.notes = notes
     self.agents = agents
     self.folders = folders
     self.brief = brief
@@ -210,10 +213,13 @@ public struct RestartSession: Sendable {
   /// - Parameters:
   ///   - contextOverride: the summary the user edited, used in place of the generated one.
   ///   - skippingResume: do not try the agent's own resume, and say why in the explanation.
+  ///   - notesOverride: the notes to write the summary with in place of the stored ones — what
+  ///     the editor holds when it could not be written. Empty means none.
   public func callAsFunction(
     id: SessionID,
     contextOverride: String? = nil,
-    skippingResume: SessionResumeSkip? = nil
+    skippingResume: SessionResumeSkip? = nil,
+    notesOverride: String? = nil
   ) async throws -> SessionRestart {
     // Read from the store, never from the list on screen: a session the sidebar still draws as
     // closed may have been reopened or archived since that list was loaded.
@@ -288,6 +294,7 @@ public struct RestartSession: Sendable {
           provider: provider,
           path: path,
           contextOverride: contextOverride,
+          notesOverride: notesOverride,
           explanation: .identifierRejected(agentName: descriptor.displayName)
         )
       } catch let error as AgentLaunchError {
@@ -308,6 +315,7 @@ public struct RestartSession: Sendable {
       provider: provider,
       path: path,
       contextOverride: contextOverride,
+      notesOverride: notesOverride,
       explanation: explanation
     )
   }
@@ -337,6 +345,7 @@ public struct RestartSession: Sendable {
     provider: any AgentProvider,
     path: String,
     contextOverride: String?,
+    notesOverride: String?,
     explanation: SessionRestartExplanation
   ) async throws -> SessionRestart {
     guard provider.descriptor.capabilities.supportsInitialPrompt else {
@@ -389,7 +398,13 @@ public struct RestartSession: Sendable {
         includedSections: []
       )
     } else {
-      summary = brief(for: session)
+      let sessionNotes: String?
+      if let notesOverride {
+        sessionNotes = notesOverride.isEmpty ? nil : notesOverride
+      } else {
+        sessionNotes = await notes.briefNotes(for: session.id)
+      }
+      summary = brief(for: session, notes: sessionNotes)
     }
 
     let plan = try await launchPlan(

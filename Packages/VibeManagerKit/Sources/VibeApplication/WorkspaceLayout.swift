@@ -26,6 +26,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// The share of the inspector given to Git, above the notes. Bounded both ways so that neither
   /// pane can be dragged out of reach.
   public var inspectorSplit: Double
+  /// Whether the agent and the initial prompt are shown under the notes. The notes come first in
+  /// that pane; the rest folds away for whoever wants the room.
+  public var isSessionDetailsExpanded: Bool
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -34,7 +37,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     sidebarWidth: Double = 280,
     inspectorWidth: Double = 300,
     sessionFilter: SessionFilter = SessionFilter(),
-    inspectorSplit: Double = 0.6
+    inspectorSplit: Double = 0.6,
+    isSessionDetailsExpanded: Bool = true
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -43,11 +47,12 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.inspectorWidth = Self.bounded(inspectorWidth, in: Self.inspectorWidthRange, fallback: 300)
     self.sessionFilter = sessionFilter
     self.inspectorSplit = Self.bounded(inspectorSplit, in: Self.inspectorSplitRange, fallback: 0.6)
+    self.isSessionDetailsExpanded = isSessionDetailsExpanded
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
-    case sessionFilter, inspectorSplit
+    case sessionFilter, inspectorSplit, isSessionDetailsExpanded
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -63,7 +68,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       inspectorWidth: try container.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? 300,
       sessionFilter: try container.decodeIfPresent(SessionFilter.self, forKey: .sessionFilter)
         ?? SessionFilter(),
-      inspectorSplit: try container.decodeIfPresent(Double.self, forKey: .inspectorSplit) ?? 0.6
+      inspectorSplit: try container.decodeIfPresent(Double.self, forKey: .inspectorSplit) ?? 0.6,
+      isSessionDetailsExpanded: try container.decodeIfPresent(
+        Bool.self, forKey: .isSessionDetailsExpanded) ?? true
     )
   }
 }

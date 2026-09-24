@@ -12,11 +12,19 @@ public struct TerminalSurface: NSViewRepresentable {
   private let session: (any TerminalSession)?
   /// Panes that are not on screen stay mounted, so they must not keep the keyboard.
   private let isActive: Bool
+  /// See `TerminalPaneModel.focusRequest`.
+  private let focusRequest: Int
 
-  public init(pane: TerminalPaneModel, session: (any TerminalSession)?, isActive: Bool = true) {
+  public init(
+    pane: TerminalPaneModel,
+    session: (any TerminalSession)?,
+    isActive: Bool = true,
+    focusRequest: Int = 0
+  ) {
     self.pane = pane
     self.session = session
     self.isActive = isActive
+    self.focusRequest = focusRequest
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
@@ -39,6 +47,7 @@ public struct TerminalSurface: NSViewRepresentable {
       context.coordinator.attachIfNeeded(to: session)
     }
     context.coordinator.followActivation(isActive, in: nsView)
+    context.coordinator.followFocusRequest(focusRequest, isActive: isActive, in: nsView)
   }
 
   public static func dismantleNSView(
@@ -63,6 +72,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   // process started for it, so it cannot tell a restarted session from the one already attached.
   private var attachedSession: ObjectIdentifier?
   private var wasActive: Bool?
+  private var lastFocusRequest: Int?
   private let commands: AsyncStream<TerminalCommand>.Continuation
   private var commandTask: Task<Void, Never>?
 
@@ -150,6 +160,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     } else if window.firstResponder === view {
       window.makeFirstResponder(nil)
     }
+  }
+
+  /// Takes the keyboard when asked to, and only when this terminal is the one on screen. Like
+  /// activation, only a *new* request moves it: a redraw must not steal the focus back.
+  func followFocusRequest(_ request: Int, isActive: Bool, in view: TerminalView) {
+    guard let window = view.window else { return }
+    guard lastFocusRequest != request else { return }
+    lastFocusRequest = request
+    if isActive { window.makeFirstResponder(view) }
   }
 
   func attachIfNeeded(to session: any TerminalSession) {

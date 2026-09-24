@@ -153,7 +153,7 @@ private struct StoredSessionV4: Codable {
     appearance = StoredAppearanceV2(session.appearance)
     lifecycle = StoredLifecycleV2(session.lifecycle)
     repositories = session.repositories.map(StoredRepositoryV2.init)
-    notes = session.notes
+    notes = session.legacyNotes
     template = session.template.map(StoredTemplateV2.init)
     agentHistory = session.agentHistory.map(StoredAgentChangeV4.init)
   }
@@ -172,7 +172,7 @@ private struct StoredSessionV4: Codable {
       archivedAt: lifecycle.archivedAt,
       startedAt: lifecycle.startedAt,
       repositories: repositories.map(\.domainValue),
-      notes: notes,
+      legacyNotes: notes,
       template: template?.domainValue,
       agentHistory: (agentHistory ?? []).map(\.domainValue)
     )
@@ -286,7 +286,7 @@ private struct StoredSessionV2: Codable {
     appearance = StoredAppearanceV2(session.appearance)
     lifecycle = StoredLifecycleV2(session.lifecycle)
     repositories = session.repositories.map(StoredRepositoryV2.init)
-    notes = session.notes
+    notes = session.legacyNotes
     template = session.template.map(StoredTemplateV2.init)
   }
 
@@ -304,7 +304,7 @@ private struct StoredSessionV2: Codable {
       archivedAt: lifecycle.archivedAt,
       startedAt: lifecycle.startedAt,
       repositories: repositories.map(\.domainValue),
-      notes: notes,
+      legacyNotes: notes,
       template: template?.domainValue
     )
   }
@@ -365,7 +365,7 @@ private struct StoredSessionV1: Decodable {
       archivedAt: lifecycle.archivedAt,
       startedAt: lifecycle.startedAt,
       repositories: repositories.map(\.domainValue),
-      notes: notes,
+      legacyNotes: notes,
       template: template?.domainValue
     )
   }
@@ -407,7 +407,7 @@ private struct StoredSessionV3: Decodable {
       archivedAt: lifecycle.archivedAt,
       startedAt: lifecycle.startedAt,
       repositories: repositories.map(\.domainValue),
-      notes: notes,
+      legacyNotes: notes,
       template: template?.domainValue
     )
   }

@@ -58,6 +58,11 @@ public struct RootView: View {
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { model.applicationDidBecomeActive() }
     }
+    .onReceive(
+      NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)
+    ) {
+      _ in model.applicationWillResignActive()
+    }
     .sheet(
       item: Binding(
         get: { presentedSheet },
@@ -297,7 +302,11 @@ public struct RootView: View {
               },
               agentNames: model.agentNames,
               switchAgent: model.canSwitchAgent(session)
-                ? { model.beginAgentSwitch(session.id) } : nil
+                ? { model.beginAgentSwitch(session.id) } : nil,
+              notes: model.notes,
+              leaveNotes: { model.focusTerminal() },
+              isDetailsExpanded: model.layout.intent.isSessionDetailsExpanded,
+              detailsExpandedChanged: { model.layout.setSessionDetailsExpanded($0) }
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
@@ -627,6 +636,12 @@ private struct RestartContextSheet: View {
           Text("This summary was shortened to fit what the agent accepts.")
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+        if let leftOut = pending.leftOutNotes {
+          Text(leftOut)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
 

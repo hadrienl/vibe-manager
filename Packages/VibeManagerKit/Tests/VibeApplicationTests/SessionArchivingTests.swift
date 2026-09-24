@@ -133,7 +133,7 @@ private func runningSession(name: String = "Refactor the webhook") -> WorkSessio
         )
       )
     ],
-    notes: "The webhook retries three times, then gives up.",
+    legacyNotes: "The webhook retries three times, then gives up.",
     template: PromptTemplateReference(id: "tpl-1", name: "Bug fix", revision: "3")
   )
 }
@@ -321,7 +321,7 @@ struct ArchiveSessionTests {
     #expect(restored.status == .closed)
     #expect(restored.name == session.name)
     #expect(restored.initialPrompt == session.initialPrompt)
-    #expect(restored.notes == session.notes)
+    #expect(restored.legacyNotes == session.legacyNotes)
     #expect(restored.appearance == session.appearance)
     #expect(restored.agent == session.agent)
     #expect(restored.agent?.resumeIdentifier == "abc-123")

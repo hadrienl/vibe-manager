@@ -66,6 +66,10 @@ The persisted schema is an allowlist. It contains no terminal output, command hi
 environment, access token, credential-bearing remote URL or runtime adapter. Prompts, notes and
 local paths are user data and must remain private in logs.
 
+Since #16 the notes are no longer kept in this document: they are saved while the user types, and
+live in a file per session next to it (ADR 0016). The v4 `notes` field is only read, once, to import
+what an older store held; nothing writes it any more.
+
 ## Consequences
 
 - Session metadata survives application restarts without adding a third-party dependency.

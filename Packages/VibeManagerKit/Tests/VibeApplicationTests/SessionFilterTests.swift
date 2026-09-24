@@ -12,7 +12,6 @@ private func session(
   providerID: String? = "claude-code",
   repositoryPaths: [String] = ["/work/api"],
   prompt: String = "",
-  notes: String? = nil,
   createdAt: Date = Date(timeIntervalSince1970: 100),
   updatedAt: Date = Date(timeIntervalSince1970: 100)
 ) -> WorkSession {
@@ -26,8 +25,7 @@ private func session(
     updatedAt: updatedAt,
     closedAt: status == .closed || status == .archived ? createdAt : nil,
     archivedAt: status == .archived ? updatedAt : nil,
-    repositories: repositoryPaths.map { RepositoryContext(path: $0) },
-    notes: notes
+    repositories: repositoryPaths.map { RepositoryContext(path: $0) }
   )
 }
 
@@ -68,14 +66,17 @@ struct SessionFilterSearchTests {
   func searchSpansNamePromptNotesAndPaths() {
     let byName = session(name: "Réfactoring PTY")
     let byPrompt = session(name: "Other", prompt: "Rewrite the RÉFACTORING plan")
-    let byNotes = session(name: "Third", notes: "refactoring was rolled back")
+    let byNotes = session(name: "Third")
+    let notes = [byNotes.id: "refactoring was rolled back"]
     let byPath = session(name: "Fourth", repositoryPaths: ["/work/refactoring-tools"])
     let unrelated = session(name: "Docs", prompt: "Write the ADR")
     let all = [byName, byPrompt, byNotes, byPath, unrelated]
 
     let filter = SessionFilter(searchText: "refacto")
 
-    #expect(filter.apply(to: all).count == 4)
+    #expect(filter.apply(to: all, notes: notes).count == 4)
+    #expect(filter.matches(byNotes, notes: notes[byNotes.id]))
+    #expect(!filter.matches(byNotes))
     #expect(!filter.matches(unrelated))
   }
 

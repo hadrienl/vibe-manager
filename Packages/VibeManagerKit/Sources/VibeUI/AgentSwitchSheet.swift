@@ -147,6 +147,12 @@ struct AgentSwitchSheet: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+      if let leftOut = model.leftOutNotes, !model.isSummaryEdited {
+        Text(leftOut)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 

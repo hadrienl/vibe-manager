@@ -28,7 +28,7 @@ struct RestartSessionTests {
       closedAt: closedAt,
       archivedAt: status == .archived ? Date(timeIntervalSince1970: 1_700_000_100) : nil,
       repositories: repositories,
-      notes: "The retry path is still untested."
+      legacyNotes: "The retry path is still untested."
     )
   }
 
@@ -168,6 +168,31 @@ struct RestartSessionTests {
 
     #expect(outcome.explanation == .resumeDeclined(agentName: "Stub Agent"))
     #expect(outcome.mode.brief != nil)
+  }
+
+  @Test("Notes the editor could not write are the ones summarised, not an older copy on disk")
+  func notesOverrideTakesThePlaceOfTheStoredOnes() async throws {
+    let stored = session(resumeIdentifier: nil)
+    let repository = SpyRepository(sessions: [stored])
+    let notes = InMemorySessionNotesStore(notes: [stored.id: "Stale: use lodash."])
+    let restart = RestartSession(
+      repository: repository,
+      agents: RestorationRegistry(providers: [RestorationProvider()]),
+      folders: RestorationFolders(status: .usable),
+      notes: notes
+    )
+
+    let edited = try #require(
+      try await restart(id: stored.id, notesOverride: "Fresh: drop lodash.").mode.brief)
+    #expect(edited.text.contains("Fresh: drop lodash."))
+    #expect(!edited.text.contains("Stale"))
+
+    // Cleared in the editor: no notes at all, rather than the ones the user deleted.
+    let cleared = try #require(try await restart(id: stored.id, notesOverride: "").mode.brief)
+    #expect(!cleared.text.contains("Stale"))
+
+    let fromDisk = try #require(try await restart(id: stored.id).mode.brief)
+    #expect(fromDisk.text.contains("Stale: use lodash."))
   }
 
   @Test("A conversation the agent dropped last time is not handed back, and the summary says so")

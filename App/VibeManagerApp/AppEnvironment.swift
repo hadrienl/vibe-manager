@@ -22,6 +22,7 @@ final class AppEnvironment {
   init() {
     let data = Self.dataLocation()
     let repository = FileSessionRepository(storeURL: data.store)
+    let notes = FileSessionNotesStore(directory: data.notes)
     let registry = AgentProviderRegistry(providers: Self.providers())
     let supervisor = PTYTerminalSupervisor()
 
@@ -77,7 +78,9 @@ final class AppEnvironment {
         transcripts: transcripts
       ),
       closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite),
-      fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite)
+      fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite),
+      notesStore: notes,
+      notesFileLocation: { notes.fileURL(for: $0) }
     )
   }
 
@@ -109,16 +112,18 @@ final class AppEnvironment {
   /// either taking the other for a second instance, or migrating the other's sessions.
   private static func dataLocation(
     environment: [String: String] = ProcessInfo.processInfo.environment
-  ) -> (store: URL, runtime: URL, defaultsSuite: String?) {
+  ) -> (store: URL, runtime: URL, notes: URL, defaultsSuite: String?) {
     guard let directory = environment["VIBE_DATA_DIRECTORY"], directory.hasPrefix("/") else {
       return (
-        FileSessionRepository.defaultStoreURL(), FileSessionRuntimeStateStore.defaultURL(), nil
+        FileSessionRepository.defaultStoreURL(), FileSessionRuntimeStateStore.defaultURL(),
+        FileSessionNotesStore.defaultDirectory(), nil
       )
     }
     let folder = URL(fileURLWithPath: directory, isDirectory: true)
     return (
       folder.appendingPathComponent("sessions.json"),
       folder.appendingPathComponent("runtime.json"),
+      folder.appendingPathComponent("Notes", isDirectory: true),
       "com.hadrienl.VibeManager.isolated"
     )
   }
