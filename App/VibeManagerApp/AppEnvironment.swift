@@ -107,6 +107,11 @@ final class AppEnvironment {
     launcher.hostedRunningCount
   }
 
+  /// Sessions whose agent runs inside the application, and will stop with it regardless.
+  var inProcessRunningCount: Int {
+    launcher.inProcessRunningCount
+  }
+
   /// Everything quitting owes the next launch, in the order it is owed.
   ///
   /// The sessions are stopped and closed **before** the intention to resume them is written, so

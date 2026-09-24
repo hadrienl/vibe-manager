@@ -44,6 +44,11 @@ public actor SessionRuntimeRecorder {
     isSealed = true
   }
 
+  /// Takes writing back up, to try again what made this instance give it up.
+  public func unseal() {
+    isSealed = false
+  }
+
   /// Whether this instance has given up writing. Quitting reads it to know that the sessions the
   /// store calls active are not its own to close.
   public func isReadOnly() -> Bool {

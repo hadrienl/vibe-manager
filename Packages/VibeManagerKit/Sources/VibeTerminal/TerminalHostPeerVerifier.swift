@@ -22,19 +22,26 @@ public struct SameUserPeerVerifier: TerminalHostPeerVerifier {
   }
 }
 
-/// The same user, running code that satisfies this process's own designated requirement.
+/// The same user, running code signed as this very application.
 ///
-/// The host is the application's own binary in another mode (ADR 0016), so each end can demand of
-/// the other exactly what it is itself, without a team identifier written anywhere: a build signed
-/// by a team requires that bundle identifier and that team, and an ad-hoc build requires its own
-/// hash — which a later ad-hoc build does not have, and so cannot pass for.
+/// The host is the application's own binary in another mode (ADR 0016), so each end demands of
+/// the other what it is itself, without a team identifier written anywhere:
+///
+/// - **signed by a team**, the designated requirement: that bundle identifier and that team. It
+///   survives an update, so an application updated while its agents ran reattaches to them;
+/// - **signed ad hoc** — a development build — the bundle identifier alone. The designated
+///   requirement of such a build is its own hash, which the next build does not have: requiring
+///   it would kill every agent left running at each compilation, which is precisely the work this
+///   host exists to keep. What the identifier alone lets through is a process of the same user
+///   signed ad hoc under that name; such a process can already open the terminal devices it owns,
+///   or rewrite the development binary itself, so nothing is given away that was not already.
 ///
 /// Unchecked because a `SecRequirement` is an immutable Core Foundation object, safe to share.
 public final class CodeSigningPeerVerifier: TerminalHostPeerVerifier, @unchecked Sendable {
   private let requirement: SecRequirement?
 
   public init() {
-    requirement = Self.ownDesignatedRequirement()
+    requirement = Self.ownRequirement()
   }
 
   public func accepts(peerOf descriptor: Int32) -> Bool {
@@ -51,17 +58,37 @@ public final class CodeSigningPeerVerifier: TerminalHostPeerVerifier, @unchecked
     return SecCodeCheckValidity(guest, [], requirement) == errSecSuccess
   }
 
-  private static func ownDesignatedRequirement() -> SecRequirement? {
+  private static func ownRequirement() -> SecRequirement? {
     var code: SecCode?
     guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return nil }
     var staticCode: SecStaticCode?
     guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else {
       return nil
     }
-    var requirement: SecRequirement?
-    guard SecCodeCopyDesignatedRequirement(staticCode, [], &requirement) == errSecSuccess else {
-      return nil
+    var information: CFDictionary?
+    guard
+      SecCodeCopySigningInformation(
+        staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &information)
+        == errSecSuccess,
+      let information = information as? [String: Any]
+    else { return nil }
+
+    // A team, and the designated requirement names it: it holds across builds and updates.
+    if information[kSecCodeInfoTeamIdentifier as String] is String {
+      var requirement: SecRequirement?
+      guard SecCodeCopyDesignatedRequirement(staticCode, [], &requirement) == errSecSuccess else {
+        return nil
+      }
+      return requirement
     }
+    guard let identifier = information[kSecCodeInfoIdentifier as String] as? String,
+      !identifier.contains("\"")
+    else { return nil }
+    var requirement: SecRequirement?
+    guard
+      SecRequirementCreateWithString("identifier \"\(identifier)\"" as CFString, [], &requirement)
+        == errSecSuccess
+    else { return nil }
     return requirement
   }
 }

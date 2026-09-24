@@ -466,6 +466,39 @@ struct TerminalHostProcessTests {
     #expect(await eventually { !FileManager.default.fileExists(atPath: location.socketPath) })
   }
 
+  @Test("A host told to stop says so as it goes, and the next host clears it")
+  func recordsItsStopRequest() async throws {
+    let location = TerminalHostLocation(
+      directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
+    defer { try? FileManager.default.removeItem(at: location.directory) }
+    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let application = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout))
+    let session = try await application.start(
+      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+    let identity = try #require(await application.hostIdentity())
+    await application.relinquish(keepRunning: true)
+    let before = Date()
+
+    kill(identity.processIdentifier, SIGTERM)
+
+    #expect(await eventually { location.lastStopRequest() != nil })
+    #expect((location.lastStopRequest() ?? .distantPast) >= before.addingTimeInterval(-1))
+    guard case .running(let agent) = await session.state() else { return }
+    #expect(await eventually { !isProcessAlive(agent) })
+
+    let next = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout))
+    _ = try await next.start(TerminalTestSupport.spec(script: "true"), for: SessionID())
+    #expect(location.lastStopRequest() == nil)
+    await next.relinquish(keepRunning: false)
+  }
+
   @Test("A second host for the same place leaves at once, and the first one keeps serving")
   func oneHostPerPlace() async throws {
     let location = TerminalHostLocation(

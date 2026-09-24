@@ -36,6 +36,26 @@ public struct TerminalHostLocation: Hashable, Sendable {
     directory.appendingPathComponent("host.lock").path
   }
 
+  /// Written by a host told to stop — a logout, a shutdown, `kill` — as it goes. A host that
+  /// crashes writes nothing, which is how the next launch tells the two apart.
+  var stopRequestPath: String {
+    directory.appendingPathComponent("stop-requested").path
+  }
+
+  /// When a host was last told to stop, if one said so.
+  public func lastStopRequest() -> Date? {
+    guard let data = FileManager.default.contents(atPath: stopRequestPath),
+      let seconds = Double(String(decoding: data, as: UTF8.self))
+    else { return nil }
+    return Date(timeIntervalSince1970: seconds)
+  }
+
+  func recordStopRequest(at date: Date = Date()) {
+    let text = String(date.timeIntervalSince1970)
+    FileManager.default.createFile(
+      atPath: stopRequestPath, contents: Data(text.utf8), attributes: [.posixPermissions: 0o600])
+  }
+
   /// Creates the directory, private to the user.
   func prepare() throws {
     try FileManager.default.createDirectory(
@@ -111,6 +131,9 @@ public enum TerminalHost {
       logger.info("Another terminal host holds the lock.")
       exit(0)
     }
+    // Whatever the previous host said about its end has been read by now: an application only
+    // starts a host after it has looked for the one it left.
+    unlink(location.stopRequestPath)
     // Held, the lock proves any socket left there belongs to a host that is gone.
     unlink(location.socketPath)
     let listener: Int32
@@ -136,6 +159,9 @@ public enum TerminalHost {
     for signalNumber in [SIGTERM, SIGINT] {
       let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: queue)
       source.setEventHandler {
+        // Said first, before the agents are given their grace period: the system may not wait
+        // for it, and the next launch must know this was not a crash.
+        location.recordStopRequest()
         Task {
           await server.stopEverything()
           unlink(socketPath)

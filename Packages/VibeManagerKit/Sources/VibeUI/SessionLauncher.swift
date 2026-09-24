@@ -289,6 +289,19 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     }.count
   }
 
+  /// How many sessions run their agent inside the application — the host could not be used —
+  /// and so will stop with it whatever the answer to the question asked on quit.
+  public var inProcessRunningCount: Int {
+    panes.keys.filter(willStopWithApplication).count
+  }
+
+  /// Whether this session's agent runs inside the application, and so cannot be left running.
+  public func willStopWithApplication(_ id: SessionID) -> Bool {
+    guard let pane = panes[id], let session = pane.session else { return false }
+    return (pane.status == .running || pane.status == .starting)
+      && !(session is any HostedTerminal)
+  }
+
   // MARK: - SessionHandOff
 
   /// Lets go of a session without stopping it, when the terminal host runs it.

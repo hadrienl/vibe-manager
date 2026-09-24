@@ -209,6 +209,11 @@ public final class AppModel {
   public private(set) var otherInstanceProcessIdentifier: Int32?
   /// Agents that kept running while the application was closed, taken back at launch.
   public private(set) var detachedNotice: DetachedNotice?
+  /// Agents left running whose host is alive but would not let this copy reattach. Why, as the
+  /// host or the attempt said it.
+  public private(set) var hostUnavailableReason: String?
+  /// Set while a retry is under way, so the button cannot start a second one.
+  public private(set) var isRetryingHost = false
   /// What did not come back, once the queue is done. `nil` when everything did: a restoration
   /// that worked has nothing to say and says nothing.
   public private(set) var restoreReport: RestoreReport?
@@ -351,6 +356,7 @@ public final class AppModel {
   private let recordAgentSwitch: RecordAgentSwitch
   private let revertAgentSwitch: RevertAgentSwitch
   private let detectPreviousShutdown: DetectPreviousShutdown?
+  private let runtimeRecorder: SessionRuntimeRecorder?
   private let restoreSessions: RestoreSessions?
   private let clock: any SessionClock
   private let readBranchReport: ReadSessionBranchReport?
@@ -437,6 +443,7 @@ public final class AppModel {
     revertAgentSwitch = RevertAgentSwitch(repository: repository)
     // The two halves of #11: what the previous run left behind, and the queue that honours it.
     // Both are absent together, because a workspace that cannot launch has nothing to restore.
+    self.runtimeRecorder = runtimeRecorder
     detectPreviousShutdown = runtimeRecorder.map {
       DetectPreviousShutdown(
         repository: repository, recorder: $0, processes: processes, clock: clock,
@@ -1242,6 +1249,27 @@ public final class AppModel {
     detachedNotice = nil
   }
 
+  public func dismissHostUnavailableNotice() {
+    hostUnavailableReason = nil
+  }
+
+  /// Asks the host again for the agents left running, and takes them back if it answers.
+  ///
+  /// Nothing was touched when it did not — neither the store nor the runtime document — so this
+  /// is the launch sequence's own detection, run once more.
+  public func retryHostReattach() async {
+    guard hostUnavailableReason != nil, !isRetryingHost else { return }
+    isRetryingHost = true
+    defer { isRetryingHost = false }
+    await runtimeRecorder?.unseal()
+    let shutdown = await detectPreviousShutdown?()
+    hostUnavailableReason = nil
+    await reload()
+    await reattach(shutdown)
+    announce(shutdown)
+    await resume(shutdown)
+  }
+
   /// Empties the queue. What is already running keeps running: stopping an agent that has just
   /// been handed its conversation back, to honour a cancellation, would destroy the very work
   /// this was restoring.
@@ -1285,6 +1313,8 @@ public final class AppModel {
         guard self?.detachedNotice == notice else { return }
         self?.detachedNotice = nil
       }
+    case .hostUnavailable(let reason):
+      hostUnavailableReason = reason
     case .none, .nothingToDo, .clean:
       return
     }
@@ -1575,6 +1605,12 @@ public final class AppModel {
 
   public func pane(for id: SessionID) -> TerminalPaneModel? {
     launcher?.pane(for: id)
+  }
+
+  /// Whether this session's agent runs inside the application — the terminal host could not be
+  /// used for it — and so will stop when the application quits, whatever is answered then.
+  public func willStopWithApplication(_ id: SessionID) -> Bool {
+    launcher?.willStopWithApplication(id) ?? false
   }
 
   public func launchFailure(for id: SessionID) -> TerminalPaneModel.Failure? {

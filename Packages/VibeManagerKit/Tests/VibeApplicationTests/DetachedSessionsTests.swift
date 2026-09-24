@@ -36,12 +36,16 @@ private func session(
 /// A terminal host a test decides on, and which says what it was asked.
 actor FakeTerminalHost: TerminalHosting {
   private let status: TerminalHostStatus
+  private let stopRequest: Date?
   private(set) var discarded: [SessionID] = []
   private(set) var goodbyes: [Bool] = []
 
-  init(_ status: TerminalHostStatus) {
+  init(_ status: TerminalHostStatus, stopRequestedAt stopRequest: Date? = nil) {
     self.status = status
+    self.stopRequest = stopRequest
   }
+
+  func lastStopRequest() -> Date? { stopRequest }
 
   func reconnect() -> TerminalHostStatus { status }
 
@@ -252,6 +256,35 @@ struct DetachedShutdownTests {
     #expect(await repository.status(of: running.id) == .closed)
   }
 
+  @Test("A host told to stop after the quit — a logout — reads as a clean quit, too")
+  func hostStoppedOnPurposeResumes() async {
+    let running = session("Running")
+    let (verdict, _, _) = await detect(
+      sessions: [running],
+      document: detachedDocument(running: [SessionRuntimeRecord(sessionID: running.id)]),
+      host: FakeTerminalHost(.absent, stopRequestedAt: Date(timeIntervalSince1970: 1_700_004_000)),
+      booted: Date(timeIntervalSince1970: 1_699_000_000)
+    )
+
+    #expect(verdict == .clean(SessionRestoreIntent(sessionIDs: [running.id])))
+  }
+
+  @Test("A stop request older than the quit says nothing about this host")
+  func staleStopRequestIsIgnored() async {
+    let running = session("Running")
+    let (verdict, _, _) = await detect(
+      sessions: [running],
+      document: detachedDocument(running: [SessionRuntimeRecord(sessionID: running.id)]),
+      host: FakeTerminalHost(.absent, stopRequestedAt: Date(timeIntervalSince1970: 1_699_500_000)),
+      booted: Date(timeIntervalSince1970: 1_699_000_000)
+    )
+
+    guard case .unexpected = verdict else {
+      Issue.record("Expected the sessions to be offered, got \(verdict)")
+      return
+    }
+  }
+
   @Test("A host gone without a restart crashed: the sessions are offered, leftovers stopped")
   func hostLostWithoutARestartOffers() async {
     let running = session("Running")
@@ -299,7 +332,7 @@ struct DetachedShutdownTests {
       processes: processes
     )
 
-    #expect(verdict == .otherInstance(processIdentifier: 815))
+    #expect(verdict == .hostUnavailable(reason: "Busy"))
     #expect(processes.terminated.isEmpty)
     #expect(await repository.status(of: running.id) == .active)
     // Still the quit's document: the next launch asks the host again.

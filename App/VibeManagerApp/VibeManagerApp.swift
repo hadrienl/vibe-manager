@@ -326,10 +326,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let alert = NSAlert()
     alert.messageText =
       count == 1 ? "An agent is still running." : "Agents are running in \(count) sessions."
-    alert.informativeText = """
+    var information = """
       You can leave them working in the background and find them as they are the next time you \
       open Vibe Manager. A restart of the Mac stops them.
       """
+    let inProcess = environment.inProcessRunningCount
+    if inProcess > 0 {
+      information +=
+        inProcess == 1
+        ? "\n\n1 other agent runs inside Vibe Manager and will stop either way."
+        : "\n\n\(inProcess) other agents run inside Vibe Manager and will stop either way."
+    }
+    alert.informativeText = information
     alert.addButton(withTitle: "Keep Running")
     alert.addButton(withTitle: "Stop All")
     alert.addButton(withTitle: "Cancel")

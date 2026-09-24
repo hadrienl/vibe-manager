@@ -174,6 +174,10 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     return .connected(host, sessions: summaries)
   }
 
+  public func lastStopRequest() -> Date? {
+    configuration.location.lastStopRequest()
+  }
+
   public func hostIdentity() -> TerminalHostIdentity? {
     connection == nil ? nil : identity
   }

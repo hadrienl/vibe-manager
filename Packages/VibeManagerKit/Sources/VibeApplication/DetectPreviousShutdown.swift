@@ -32,6 +32,10 @@ public enum PreviousShutdown: Equatable, Sendable {
   /// The application was quit with its agents left running, and the terminal host still holds
   /// them. Nothing is relaunched and nothing is sent to an agent: they are taken back as they are.
   case detached(DetachedSessions)
+  /// The application was quit with its agents left running, and their host is alive and ours,
+  /// but would not serve this copy: another copy is attached, or it did not answer in time. Nothing
+  /// is reconciled, killed or claimed, so that trying again finds everything as it was.
+  case hostUnavailable(reason: String)
 }
 
 /// What a quit that left the agents running finds at the next launch.
@@ -98,13 +102,15 @@ public struct DetectPreviousShutdown: Sendable {
       case .connected(_, let hosted):
         return await reattach(detached, hosted: hosted)
       case .absent:
-        previous = Self.hostLost(detached, restarted: restartedSince(detached))
-      case .unavailable:
+        let stoppedOnPurpose = await hostWasStopped(since: detached)
+        previous = Self.hostLost(
+          detached, intended: stoppedOnPurpose || restartedSince(detached))
+      case .unavailable(let reason):
         // Ours, alive, and holding the agents the user chose to keep: nothing about them can be
         // decided from here, so nothing is. Like a second copy of the application, this one
-        // touches neither the store nor the document, and the next launch asks again.
+        // touches neither the store nor the document until it is asked to try again.
         await recorder.seal()
-        return .otherInstance(processIdentifier: detached.host?.processIdentifier ?? 0)
+        return .hostUnavailable(reason: reason)
       case .refused:
         // A host that will not prove it is ours cannot be asked to stop anything, and its agents
         // are working in the folders the sessions are about to be resumed in. It is killed the
@@ -117,7 +123,7 @@ public struct DetectPreviousShutdown: Sendable {
         {
           processes.terminate(processGroup: identity.processIdentifier)
         }
-        previous = Self.hostLost(detached, restarted: false)
+        previous = Self.hostLost(detached, intended: false)
       }
     }
 
@@ -255,19 +261,27 @@ public struct DetectPreviousShutdown: Sendable {
     return booted > state.lastSeenAt
   }
 
+  /// Whether the host said, on its way out, that it was told to stop after this document was
+  /// written: a logout, a shutdown, a `kill`.
+  private func hostWasStopped(since state: SessionRuntimeState) async -> Bool {
+    guard let requested = await host?.lastStopRequest() else { return false }
+    return requested >= state.lastSeenAt
+  }
+
   /// A `detached` document whose host is gone, rewritten as what that loss amounts to.
   ///
-  /// After a restart of the Mac nothing could have survived, and leaving the agents running was
-  /// an intention to carry on: it reads as a clean quit, and the sessions are resumed. Without a
-  /// restart the host crashed or was killed, which is a crash, and the sessions are offered — with
-  /// their process groups, so that an agent that outlived its host is found before a second one is
-  /// started in the same folder.
+  /// When the host was stopped on purpose — the Mac restarted, the user logged out, the host said
+  /// it was told to stop — leaving the agents running was an intention to carry on that the system
+  /// cut short: it reads as a clean quit, and the sessions are resumed. Otherwise the host crashed
+  /// or was killed outright, which is a crash, and the sessions are offered — with their process
+  /// groups, so that an agent that outlived its host is found before a second one is started in the
+  /// same folder.
   private static func hostLost(
     _ state: SessionRuntimeState,
-    restarted: Bool
+    intended: Bool
   ) -> SessionRuntimeState {
     var lost = state
-    lost.phase = restarted ? .stopped : .running
+    lost.phase = intended ? .stopped : .running
     lost.sessions = state.sessions + (state.resuming ?? [])
     lost.resuming = nil
     lost.host = nil

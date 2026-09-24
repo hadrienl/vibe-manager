@@ -107,6 +107,31 @@ private actor HostSupervisor: TerminalSupervisor, TerminalHosting {
   func relinquish(keepRunning: Bool) {}
 }
 
+/// A host that will not serve until the test lets it.
+private actor ReluctantHost: TerminalHosting {
+  private var isAvailable = false
+  private let running: SessionID
+
+  init(running: SessionID) {
+    self.running = running
+  }
+
+  func open() { isAvailable = true }
+
+  func reconnect() -> TerminalHostStatus {
+    guard isAvailable else { return .unavailable(reason: "The terminal host did not answer.") }
+    return .connected(
+      TerminalHostIdentity(processIdentifier: 815, processStartedAt: nil),
+      sessions: [HostedSessionSummary(id: running, state: .running(processIdentifier: 902))])
+  }
+
+  func hostIdentity() -> TerminalHostIdentity? { nil }
+
+  func discard(_ id: SessionID) {}
+
+  func relinquish(keepRunning: Bool) {}
+}
+
 @MainActor
 @Suite("Taking back the agents the terminal host kept")
 struct SessionAdoptionTests {
@@ -142,6 +167,7 @@ struct SessionAdoptionTests {
 
     #expect(launcher.isRunning(stored.id))
     #expect(launcher.hostedRunningCount == 1)
+    #expect(!launcher.willStopWithApplication(stored.id))
     #expect(await supervisor.startCount == 0)
     #expect(await repository.status(of: stored.id) == .active)
   }
@@ -197,7 +223,53 @@ struct SessionAdoptionTests {
 
     #expect(launcher.isRunning(stored.id))
     #expect(launcher.hostedRunningCount == 0)
+    #expect(launcher.willStopWithApplication(stored.id))
+    #expect(launcher.inProcessRunningCount == 1)
     #expect(await launcher.handOff(stored.id) == false)
+  }
+
+  @Test("A host that would not answer is said so, nothing is touched, and Retry takes them back")
+  func retriesAnUnavailableHost() async {
+    let running = session()
+    let host = ReluctantHost(running: running.id)
+    let supervisor = HostSupervisor([
+      HostedWorkspaceTerminal(id: running.id, state: .running(processIdentifier: 902))
+    ])
+    let repository = WorkspaceRepository(sessions: [running])
+    let launcher = SessionLauncher(
+      supervisor: supervisor, repository: repository, agents: WorkspaceRegistry(providers: []),
+      viewportTimeout: .zero)
+    let store = EphemeralSessionRuntimeStateStore(
+      state: SessionRuntimeState(
+        phase: .detached,
+        processIdentifier: 1_001,
+        launchedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        updatedAt: Date(timeIntervalSince1970: 1_700_000_600),
+        stoppedAt: Date(timeIntervalSince1970: 1_700_000_600),
+        sessions: [SessionRuntimeRecord(sessionID: running.id)]
+      ))
+    let model = AppModel(
+      repository: repository,
+      agents: WorkspaceRegistry(providers: []),
+      launcher: launcher,
+      runtimeRecorder: SessionRuntimeRecorder(store: store, processIdentifier: 4242),
+      terminalHost: host
+    )
+
+    await model.load()
+
+    #expect(model.hostUnavailableReason == "The terminal host did not answer.")
+    #expect(await repository.status(of: running.id) == .active)
+    #expect(await store.read()?.phase == .detached)
+    #expect(!launcher.isRunning(running.id))
+
+    await host.open()
+    await model.retryHostReattach()
+
+    #expect(model.hostUnavailableReason == nil)
+    #expect(model.detachedNotice == AppModel.DetachedNotice(runningCount: 1, endedCount: 0))
+    #expect(launcher.isRunning(running.id))
+    #expect(await store.read()?.phase == .running)
   }
 
   @Test("At launch, agents left running are back on screen and said to have kept running")
