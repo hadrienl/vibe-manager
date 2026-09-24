@@ -3,6 +3,7 @@ import Dispatch
 import Foundation
 import VibeApplication
 import VibeDomain
+import VibeProcess
 
 public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private static let forcedStopTimeout = Duration.seconds(2)
@@ -57,7 +58,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     historyBuffer = TerminalHistory(limits: spec.scrollback)
     currentState = .starting
     lastSize = spec.initialSize
-    TerminalProcessGroupGuard.register(terminal.processGroupIdentifier)
+    ChildProcessGroupGuard.register(terminal.processGroupIdentifier)
   }
 
   private func begin() {
@@ -316,7 +317,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     reader.finish()
     terminal.closeSlave()
     if didReapProcess {
-      TerminalProcessGroupGuard.unregister(terminal.processGroupIdentifier)
+      ChildProcessGroupGuard.unregister(terminal.processGroupIdentifier)
     }
     endIfDrained()
   }

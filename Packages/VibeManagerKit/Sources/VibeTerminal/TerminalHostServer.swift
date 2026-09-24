@@ -24,19 +24,26 @@ public actor TerminalHostServer {
     /// How long a session that ended with nobody attached waits to be read.
     public var endedRetention: Duration
     public var build: String
+    /// Sessions running at once. Each holds a terminal and a handful of descriptors: past this, the
+    /// host would run out of them in the middle of serving the others rather than refuse one.
+    public var maximumRunningSessions: Int
 
     public init(
       verifier: any TerminalHostPeerVerifier,
       idleGracePeriod: Duration = .seconds(5),
       endedRetention: Duration = .seconds(24 * 60 * 60),
-      build: String = TerminalHostServer.currentBuild
+      build: String = TerminalHostServer.currentBuild,
+      maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions
     ) {
       self.verifier = verifier
       self.idleGracePeriod = idleGracePeriod
       self.endedRetention = endedRetention
       self.build = build
+      self.maximumRunningSessions = maximumRunningSessions
     }
   }
+
+  public static let defaultMaximumRunningSessions = 64
 
   public static var currentBuild: String {
     let info = Bundle.main.infoDictionary
@@ -241,6 +248,13 @@ public actor TerminalHostServer {
         return .startFailed(.sessionAlreadyRunning(id))
       }
       await release(id)
+    }
+    var running = 0
+    for hosted in sessions.values where await !hosted.session.state().isFinished {
+      running += 1
+    }
+    guard running < configuration.maximumRunningSessions else {
+      return .startFailed(.tooManySessions(limit: configuration.maximumRunningSessions))
     }
     do {
       let session = try PTYTerminalSession.start(id: id, spec: spec)

@@ -159,6 +159,30 @@ func corruptStoreRecovery() async throws {
   #expect(await repository.recoveryStatus() == .notNeeded)
 }
 
+@Test("The damaged bytes are kept owner only, whatever mode the damaged store had")
+func quarantinedStoreIsPrivate() async throws {
+  let storeURL = try makeStoreURL()
+  let directory = storeURL.deletingLastPathComponent()
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let repository = FileSessionRepository(storeURL: storeURL)
+  try await repository.save(makeCompleteSession(name: "Original"))
+  try await repository.save(makeCompleteSession(name: "Updated"))
+  try Data("{truncated".utf8).write(to: storeURL)
+  try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: storeURL.path)
+  _ = try? await repository.sessions()
+
+  try await repository.restoreBackup()
+
+  let quarantined = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    .filter { $0.contains(".corrupt-") }
+  #expect(quarantined.count == 1)
+  for name in quarantined {
+    let attributes = try FileManager.default.attributesOfItem(
+      atPath: directory.appendingPathComponent(name).path)
+    #expect(attributes[.posixPermissions] as? Int == 0o600)
+  }
+}
+
 @Test("An interruption before replacement preserves the previous store")
 func interruptedWritePreservesStore() async throws {
   let storeURL = try makeStoreURL()

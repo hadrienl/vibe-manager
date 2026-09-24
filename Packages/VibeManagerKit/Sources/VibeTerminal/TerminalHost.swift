@@ -109,6 +109,7 @@ public enum TerminalHost {
     signal(SIGHUP, SIG_IGN)
     signal(SIGTERM, SIG_IGN)
     signal(SIGINT, SIG_IGN)
+    raiseDescriptorLimit()
 
     do {
       try location.prepare()
@@ -184,6 +185,27 @@ public enum TerminalHost {
 }
 
 extension TerminalHost {
+  /// Descriptors the host asks for. Every session holds its master, its slave, a dispatch source
+  /// and a client's share of the socket: launchd's soft limit of 256 runs out at a few dozen
+  /// sessions, and the host would fail in the middle of serving the others.
+  static let descriptorLimit: rlim_t = 4096
+
+  /// Raises the soft limit on open descriptors to `descriptorLimit`, never beyond the hard one,
+  /// and never lowers it. Returns the soft limit in force afterwards.
+  @discardableResult
+  static func raiseDescriptorLimit() -> rlim_t {
+    var limit = rlimit()
+    guard getrlimit(RLIMIT_NOFILE, &limit) == 0 else { return 0 }
+    let wanted = min(limit.rlim_max, descriptorLimit)
+    guard limit.rlim_cur < wanted else { return limit.rlim_cur }
+    limit.rlim_cur = wanted
+    guard setrlimit(RLIMIT_NOFILE, &limit) == 0 else {
+      getrlimit(RLIMIT_NOFILE, &limit)
+      return limit.rlim_cur
+    }
+    return wanted
+  }
+
   /// Hands every connection made to `listener` to `server`. The source is the only thing keeping
   /// the loop alive: cancelling it stops accepting, and closes the listener.
   static func accept(on listener: Int32, into server: TerminalHostServer) -> any DispatchSourceRead

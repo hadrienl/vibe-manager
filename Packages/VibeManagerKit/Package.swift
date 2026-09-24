@@ -9,6 +9,7 @@ let package = Package(
     .library(name: "VibeDomain", targets: ["VibeDomain"]),
     .library(name: "VibeApplication", targets: ["VibeApplication"]),
     .library(name: "VibePersistence", targets: ["VibePersistence"]),
+    .library(name: "VibeProcess", targets: ["VibeProcess"]),
     .library(name: "VibeAgents", targets: ["VibeAgents"]),
     .library(name: "VibeTerminal", targets: ["VibeTerminal"]),
     .library(name: "VibeGit", targets: ["VibeGit"]),
@@ -24,13 +25,16 @@ let package = Package(
     .target(name: "VibeDomain"),
     .target(name: "VibeApplication", dependencies: ["VibeDomain"]),
     .target(name: "VibePersistence", dependencies: ["VibeApplication", "VibeDomain"]),
+    // The one way to run a child that is not a terminal, and the guard that stops every child
+    // group the application started when it exits. Depends on nothing: it is infrastructure.
+    .target(name: "VibeProcess"),
     .target(
       name: "VibeAgents",
-      dependencies: ["VibeApplication", "VibeDomain"],
+      dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"],
       resources: [.copy("Resources/mock-agent.sh")]
     ),
-    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain"]),
-    .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain"]),
+    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"]),
+    .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"]),
     .target(
       name: "VibeTerminalUI",
       dependencies: [
@@ -49,6 +53,7 @@ let package = Package(
       path: "Tests/VibeTerminalHostFixture"
     ),
     .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
+    .testTarget(name: "VibeProcessTests", dependencies: ["VibeProcess"]),
     .testTarget(
       name: "VibeApplicationTests",
       dependencies: ["VibeApplication", "VibeDomain"]

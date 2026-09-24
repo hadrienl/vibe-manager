@@ -22,6 +22,11 @@ final class AppEnvironment {
 
   init() {
     let data = Self.dataLocation()
+    // A folder made by an early build or restored from a backup keeps whatever mode it had; the
+    // application's own are brought back to owner only before anything is read from them.
+    DataDirectoryPermissions.repair([
+      data.store.deletingLastPathComponent(), data.notes, data.usage,
+    ])
     let repository = FileSessionRepository(storeURL: data.store)
     let notes = FileSessionNotesStore(directory: data.notes)
     let registry = AgentProviderRegistry(providers: Self.providers())

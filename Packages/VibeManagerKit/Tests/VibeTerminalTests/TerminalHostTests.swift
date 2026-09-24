@@ -21,7 +21,10 @@ final class InProcessTerminalHost: @unchecked Sendable {
   private let source: any DispatchSourceRead
   private let idle = IdleFlag()
 
-  init(idleGracePeriod: Duration = .seconds(60)) throws {
+  init(
+    idleGracePeriod: Duration = .seconds(60),
+    maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions
+  ) throws {
     location = TerminalHostLocation(
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmh-\(UUID().uuidString.prefix(8))", isDirectory: true))
@@ -30,7 +33,8 @@ final class InProcessTerminalHost: @unchecked Sendable {
     let idle = idle
     server = TerminalHostServer(
       configuration: TerminalHostServer.Configuration(
-        verifier: SameUserPeerVerifier(), idleGracePeriod: idleGracePeriod),
+        verifier: SameUserPeerVerifier(), idleGracePeriod: idleGracePeriod,
+        maximumRunningSessions: maximumRunningSessions),
       onIdle: { idle.set() }
     )
     source = TerminalHost.accept(on: listener, into: server)
@@ -225,6 +229,39 @@ struct TerminalHostTests {
     #expect(await session.state().isFinished)
     await supervisor.relinquish(keepRunning: false)
     await host.shutDown()
+  }
+
+  @Test("Past its limit, the host refuses a session instead of running out of descriptors")
+  func refusesPastTheLimit() async throws {
+    let host = try InProcessTerminalHost(maximumRunningSessions: 2)
+    let supervisor = host.supervisor()
+    let first = try await supervisor.start(
+      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+    _ = try await supervisor.start(TerminalTestSupport.spec(script: idleScript), for: SessionID())
+
+    await #expect(throws: TerminalError.tooManySessions(limit: 2)) {
+      _ = try await supervisor.start(TerminalTestSupport.spec(script: "true"), for: SessionID())
+    }
+
+    // A session that ends makes room again.
+    await first.stop(gracePeriod: .seconds(3))
+    let next = try await supervisor.start(
+      TerminalTestSupport.spec(script: "printf room"), for: SessionID())
+    #expect(await Transcript.follow(next).waitFor("room"))
+    await supervisor.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("The host raises its descriptor limit, never above the hard one")
+  func raisesDescriptorLimit() {
+    var before = rlimit()
+    getrlimit(RLIMIT_NOFILE, &before)
+
+    let raised = TerminalHost.raiseDescriptorLimit()
+
+    #expect(raised >= min(before.rlim_max, TerminalHost.descriptorLimit))
+    #expect(raised <= before.rlim_max)
+    #expect(raised >= before.rlim_cur)
   }
 
   @Test("A start the host refuses fails with the host's reason")

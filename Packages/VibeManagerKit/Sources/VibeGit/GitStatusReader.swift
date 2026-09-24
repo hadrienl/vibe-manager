@@ -169,7 +169,10 @@ public struct GitStatusReader: RepositoryStatusReading {
     guard commitCount > 0 else { return .some(nil) }
     guard
       let diff = try? await git.run(
-        ["diff", "--no-color", "--name-status", "-z", "--find-renames", fork, head], in: path),
+        [
+          "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--name-status", "-z",
+          "--find-renames", fork, head,
+        ], in: path),
       diff.succeeded
     else { return nil }
     let (files, total) = GitDiffParser.parse(diff.output, limit: limit)
