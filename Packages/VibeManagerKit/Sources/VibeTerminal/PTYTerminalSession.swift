@@ -117,6 +117,17 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     terminal.resize(to: size)
   }
 
+  /// Tells the program to draw itself again, at the size it already has.
+  ///
+  /// A view that attaches to a program already running is given its history, and a full-screen
+  /// program's history is a stream of redraws cut wherever the replay buffer was trimmed. The
+  /// kernel only raises `SIGWINCH` when the size changes, and a view reopened at the same size
+  /// changes nothing — so the signal is sent here, to the group the child leads.
+  public func redraw() {
+    guard !isFinalized else { return }
+    terminal.signalProcessGroup(SIGWINCH)
+  }
+
   public func stop(gracePeriod: Duration) async {
     guard !isFinalized else { return await waitForEnd() }
     // A process cannot finish exiting while its output waits to be read.

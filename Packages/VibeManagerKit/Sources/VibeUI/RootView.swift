@@ -255,6 +255,10 @@ public struct RootView: View {
           RestoreReportBanner(report: report, dismiss: { model.dismissRestoreReport() })
           Divider()
         }
+        if let notice = model.detachedNotice {
+          DetachedNoticeBanner(notice: notice, dismiss: { model.dismissDetachedNotice() })
+          Divider()
+        }
         detail
       }
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
@@ -785,6 +789,39 @@ private struct OtherInstanceBanner: View {
         Text("Nothing was restored or changed here. Quit that copy before working from this one.")
           .font(.caption)
           .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// Agents that went on working while the application was closed, back on screen as they are.
+private struct DetachedNoticeBanner: View {
+  let notice: AppModel.DetachedNotice
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "arrow.triangle.2.circlepath")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(notice.message)
+          .font(.callout)
+        if notice.endedCount > 0 {
+          Text("A finished session shows its last output, and can be restarted.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
       }
       Spacer(minLength: 8)
       Button {

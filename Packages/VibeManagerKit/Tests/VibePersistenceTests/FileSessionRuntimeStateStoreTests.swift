@@ -57,7 +57,7 @@ struct FileSessionRuntimeStateStoreTests {
 
     let text = try String(contentsOf: location, encoding: .utf8)
     #expect(text.contains("\"sessionID\" : \"\(id.rawValue.uuidString)\""))
-    #expect(text.contains("\"schemaVersion\" : 1"))
+    #expect(text.contains("\"schemaVersion\" : 2"))
   }
 
   @Test("A damaged document is an absence, not an error")
@@ -90,6 +90,54 @@ struct FileSessionRuntimeStateStoreTests {
     try Data(document.utf8).write(to: location)
 
     #expect(await FileSessionRuntimeStateStore(url: location).read() == nil)
+  }
+
+  @Test("A detached quit comes back with its host and what it stopped")
+  func detachedRoundTrip() async {
+    let store = FileSessionRuntimeStateStore(url: url())
+    var written = state(
+      phase: .detached,
+      sessions: [
+        SessionRuntimeRecord(
+          sessionID: SessionID(),
+          processGroup: 7_001,
+          processStartedAt: Date(timeIntervalSince1970: 1_700_000_050.75)
+        )
+      ]
+    )
+    written.stoppedAt = Date(timeIntervalSince1970: 1_700_000_600.5)
+    written.host = TerminalHostIdentity(
+      processIdentifier: 815, processStartedAt: Date(timeIntervalSince1970: 1_700_000_001.25))
+    written.resuming = [SessionRuntimeRecord(sessionID: SessionID())]
+
+    await store.write(written)
+
+    #expect(await store.read() == written)
+  }
+
+  @Test("A document written before the terminal host is still read")
+  func readsSchemaOne() async throws {
+    let location = url()
+    try FileManager.default.createDirectory(
+      at: location.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let document = """
+      {
+        "schemaVersion" : 1,
+        "state" : {
+          "phase" : "stopped",
+          "processIdentifier" : 4242,
+          "launchedAt" : "2026-09-22T09:12:04.118Z",
+          "updatedAt" : "2026-09-22T11:47:31.002Z",
+          "sessions" : []
+        }
+      }
+      """
+    try Data(document.utf8).write(to: location)
+
+    let read = await FileSessionRuntimeStateStore(url: location).read()
+    #expect(read?.phase == .stopped)
+    #expect(read?.host == nil)
+    #expect(read?.resuming == nil)
   }
 
   @Test("A missing document is an absence too")

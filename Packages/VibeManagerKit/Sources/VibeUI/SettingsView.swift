@@ -22,6 +22,7 @@ public struct SettingsView: View {
       if let model {
         Section("Sessions") {
           SessionCloseRow(model: model)
+          QuitBehaviorRow(model: model)
         }
         Section("Git") {
           EditorRow(model: model)
@@ -96,6 +97,31 @@ private struct SessionCloseRow: View {
       "Ask before closing a session whose agent is running",
       isOn: $model.confirmsStoppingRunningAgent
     )
+  }
+}
+
+/// The question asked when quitting with agents running, and the way back to it once
+/// "Don't ask again" was ticked.
+private struct QuitBehaviorRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Picker("When quitting with agents running", selection: $model.quitBehavior) {
+        Text("Ask").tag(QuitBehavior.ask)
+        Text("Keep them running").tag(QuitBehavior.keepRunning)
+        Text("Stop them").tag(QuitBehavior.stopAll)
+      }
+      Text(
+        """
+        Agents kept running go on working in the background, and are back on screen as they are \
+        the next time Vibe Manager is opened. A restart of the Mac stops them.
+        """
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+    }
   }
 }
 

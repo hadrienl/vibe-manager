@@ -115,6 +115,31 @@ public actor SessionRuntimeRecorder {
     state.stoppedAt = now.storageRounded
     state.updatedAt = now.storageRounded
     state.sessions = ids.map { SessionRuntimeRecord(sessionID: $0) }
+    state.resuming = nil
+    state.host = nil
+    await store.write(state)
+  }
+
+  /// Says this instance quit and left `kept` running in the terminal host.
+  ///
+  /// Their process groups are kept, unlike on a plain quit: if the host is gone at the next
+  /// launch, those groups are what is looked for — and, identified, stopped — before anything is
+  /// resumed in their place.
+  public func markDetached(
+    keeping kept: [SessionID],
+    resuming closed: [SessionID],
+    host: TerminalHostIdentity?
+  ) async {
+    guard !isSealed else { return }
+    let now = clock.now()
+    let recorded = Dictionary(
+      state.sessions.map { ($0.sessionID, $0) }, uniquingKeysWith: { first, _ in first })
+    state.phase = .detached
+    state.stoppedAt = now.storageRounded
+    state.updatedAt = now.storageRounded
+    state.sessions = kept.map { recorded[$0] ?? SessionRuntimeRecord(sessionID: $0) }
+    state.resuming = closed.map { SessionRuntimeRecord(sessionID: $0) }
+    state.host = host
     await store.write(state)
   }
 

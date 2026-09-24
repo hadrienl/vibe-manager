@@ -73,6 +73,11 @@ public final class AppModel {
   public var confirmsStoppingRunningAgent: Bool {
     didSet { closePreferences.confirmsStoppingRunningAgent = confirmsStoppingRunningAgent }
   }
+  /// What quitting does to running agents, when the user asked not to be asked again. Mirrored
+  /// here so that the settings window and the question's "Don't ask again" change the same answer.
+  public var quitBehavior: QuitBehavior {
+    didSet { quitPreferences.behavior = quitBehavior }
+  }
   /// Where a changed file listed in the inspector opens. `nil`: it is only revealed. Mirrored
   /// here so that the settings window and the inspector read and change the same answer.
   public var fileEditor: EditorChoice? {
@@ -202,6 +207,8 @@ public final class AppModel {
   public private(set) var restoreOffer: RestoreOffer?
   /// Another copy of the application holds these sessions. Nothing was reconciled, nothing taken.
   public private(set) var otherInstanceProcessIdentifier: Int32?
+  /// Agents that kept running while the application was closed, taken back at launch.
+  public private(set) var detachedNotice: DetachedNotice?
   /// What did not come back, once the queue is done. `nil` when everything did: a restoration
   /// that worked has nothing to say and says nothing.
   public private(set) var restoreReport: RestoreReport?
@@ -253,6 +260,26 @@ public final class AppModel {
         A process from that run may still be running (pid \(pids)) and was left alone; check \
         Activity Monitor.
         """
+    }
+  }
+
+  /// Agents left running when the application quit, found again at launch.
+  ///
+  /// Said, not asked: the user chose to leave them, and they are already back on screen. It is
+  /// the one place the application admits it was not watching while they worked.
+  public struct DetachedNotice: Equatable {
+    public let runningCount: Int
+    public let endedCount: Int
+
+    public var message: String {
+      let total = runningCount + endedCount
+      let subject =
+        total == 1
+        ? "1 agent kept running while Vibe Manager was closed"
+        : "\(total) agents kept running while Vibe Manager was closed"
+      guard endedCount > 0 else { return "\(subject)." }
+      let ended = endedCount == 1 ? "1 has finished since" : "\(endedCount) have finished since"
+      return "\(subject); \(ended)."
     }
   }
 
@@ -315,6 +342,7 @@ public final class AppModel {
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
+  private let quitPreferences: any QuitPreferences
   private let fileOpeningPreferences: any FileOpeningPreferences
   private let archiveSession: ArchiveSession
   private let restoreSession: RestoreSession
@@ -340,6 +368,8 @@ public final class AppModel {
     /// Where the previous run wrote what it was running. Absent in a workspace assembled without
     /// the system around it, and nothing is then detected or restored at launch.
     runtimeRecorder: SessionRuntimeRecorder? = nil,
+    /// The terminal host that may have kept agents running while the application was closed.
+    terminalHost: (any TerminalHosting)? = nil,
     processes: any ProcessLivenessProbe = SystemProcessLivenessProbe(),
     // Only the resume probation reads it, and it is the one rule here measured in seconds of real
     // time: without a clock to move, its far side could only be tested by waiting eight seconds.
@@ -355,12 +385,15 @@ public final class AppModel {
     /// Where the notes are kept. A workspace assembled without one keeps none.
     notesStore: any SessionNotesStore = NoSessionNotes(),
     /// Where a session's notes file is, for Reveal in Finder when it cannot be read.
-    notesFileLocation: (@Sendable (SessionID) -> URL)? = nil
+    notesFileLocation: (@Sendable (SessionID) -> URL)? = nil,
+    quitPreferences: any QuitPreferences = InMemoryQuitPreferences()
   ) {
     notes = NotesModel(
       store: notesStore, fileLocation: notesFileLocation, opener: WorkspaceFileOpener())
     importLegacyNotes = ImportLegacyNotes(repository: repository, notes: notesStore)
     self.closePreferences = closePreferences
+    self.quitPreferences = quitPreferences
+    quitBehavior = quitPreferences.behavior
     self.fileOpeningPreferences = fileOpeningPreferences
     fileEditor = fileOpeningPreferences.editor
     var listUntracked: GitInspectorModel.ListUntracked?
@@ -406,7 +439,8 @@ public final class AppModel {
     // Both are absent together, because a workspace that cannot launch has nothing to restore.
     detectPreviousShutdown = runtimeRecorder.map {
       DetectPreviousShutdown(
-        repository: repository, recorder: $0, processes: processes, clock: clock)
+        repository: repository, recorder: $0, processes: processes, clock: clock,
+        host: terminalHost)
     }
     restoreSessions =
       launcher.flatMap { launcher in
@@ -1204,6 +1238,10 @@ public final class AppModel {
     otherInstanceProcessIdentifier = nil
   }
 
+  public func dismissDetachedNotice() {
+    detachedNotice = nil
+  }
+
   /// Empties the queue. What is already running keeps running: stopping an agent that has just
   /// been handed its conversation back, to honour a cancellation, would destroy the very work
   /// this was restoring.
@@ -1235,15 +1273,43 @@ public final class AppModel {
         leftoverProcessIdentifiers: leftovers.compactMap(\.processGroup),
         interruptedAt: intent.interruptedAt
       )
+    case .detached(let sessions):
+      guard !sessions.running.isEmpty || !sessions.ended.isEmpty else { return }
+      let notice = DetachedNotice(
+        runningCount: sessions.running.count, endedCount: sessions.ended.count)
+      detachedNotice = notice
+      // Nothing to act on when everything is simply back: the sentence goes away by itself.
+      guard sessions.ended.isEmpty else { return }
+      Task { [weak self] in
+        try? await Task.sleep(for: .seconds(8))
+        guard self?.detachedNotice == notice else { return }
+        self?.detachedNotice = nil
+      }
     case .none, .nothingToDo, .clean:
       return
     }
   }
 
-  /// The one verdict that puts sessions back to work by itself.
+  /// Puts back on screen what the terminal host kept: the running agents, and the last output of
+  /// the ones that ended while the application was closed. Nothing is started or sent.
+  private func reattach(_ shutdown: PreviousShutdown?) async {
+    guard case .detached(let detached) = shutdown, let launcher else { return }
+    for id in detached.running + detached.ended {
+      guard let session = sessions.first(where: { $0.id == id }) else { continue }
+      await launcher.adopt(session)
+    }
+  }
+
+  /// The verdicts that put sessions back to work by themselves.
   private func resume(_ shutdown: PreviousShutdown?) async {
-    guard case .clean(let intent) = shutdown else { return }
-    await beginRestore(intent)
+    switch shutdown {
+    case .clean(let intent):
+      await beginRestore(intent)
+    case .detached(let detached):
+      await beginRestore(detached.resume)
+    default:
+      return
+    }
   }
 
   private func beginRestore(_ intent: SessionRestoreIntent) async {
@@ -1368,6 +1434,9 @@ public final class AppModel {
     // frame — is the lie this whole ticket is about.
     let shutdown = await detectPreviousShutdown?()
     await reload()
+    // Before anything is said or probed: these agents are running now, and their panes are how
+    // the list shows it.
+    await reattach(shutdown)
     // Said as soon as the list is on screen. An offer asks no provider anything, and waiting for
     // the detections to announce it meant a minute of silence after a crash — on a cold cache,
     // with a CLI that answers none of its probes, the banner arrived long after the user had

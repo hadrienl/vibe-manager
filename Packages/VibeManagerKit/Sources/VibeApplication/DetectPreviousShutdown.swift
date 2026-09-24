@@ -29,6 +29,27 @@ public enum PreviousShutdown: Equatable, Sendable {
   /// Another copy of the application holds these sessions. Nothing is reconciled and nothing is
   /// resumed: they are not ours to take.
   case otherInstance(processIdentifier: Int32)
+  /// The application was quit with its agents left running, and the terminal host still holds
+  /// them. Nothing is relaunched and nothing is sent to an agent: they are taken back as they are.
+  case detached(DetachedSessions)
+}
+
+/// What a quit that left the agents running finds at the next launch.
+public struct DetachedSessions: Equatable, Sendable {
+  /// Still running in the host, and still `active` in the store: to be attached to, as they are.
+  public let running: [SessionID]
+  /// Ended while the application was closed. Closed in the store, dated from when the host saw
+  /// them end, and their last output is there to read.
+  public let ended: [SessionID]
+  /// What the quit had to stop rather than leave running, and what the host lost: resumed the
+  /// way a clean quit resumes its own.
+  public let resume: SessionRestoreIntent
+
+  public init(running: [SessionID], ended: [SessionID], resume: SessionRestoreIntent) {
+    self.running = running
+    self.ended = ended
+    self.resume = resume
+  }
 }
 
 /// Reads what the previous run left behind, makes the store honest again, and consumes the
@@ -49,23 +70,56 @@ public struct DetectPreviousShutdown: Sendable {
   private let processes: any ProcessLivenessProbe
   private let clock: any SessionClock
   private let processIdentifier: Int32
+  private let host: (any TerminalHosting)?
 
   public init(
     repository: any SessionRepository,
     recorder: SessionRuntimeRecorder,
     processes: any ProcessLivenessProbe = SystemProcessLivenessProbe(),
     clock: any SessionClock = SystemSessionClock(),
-    processIdentifier: Int32 = ProcessInfo.processInfo.processIdentifier
+    processIdentifier: Int32 = ProcessInfo.processInfo.processIdentifier,
+    host: (any TerminalHosting)? = nil
   ) {
     self.repository = repository
     self.recorder = recorder
     self.processes = processes
     self.clock = clock
     self.processIdentifier = processIdentifier
+    self.host = host
   }
 
   public func callAsFunction() async -> PreviousShutdown {
-    let previous = await recorder.peek()
+    var previous = await recorder.peek()
+
+    // Asked of the host before anything else is decided: a session it still runs is the one
+    // thing in the store that `active` is true of, and the reconciliation below must not close it.
+    if let detached = previous, detached.phase == .detached {
+      switch await host?.reconnect() ?? .absent {
+      case .connected(_, let hosted):
+        return await reattach(detached, hosted: hosted)
+      case .absent:
+        previous = Self.hostLost(detached, restarted: restartedSince(detached))
+      case .unavailable:
+        // Ours, alive, and holding the agents the user chose to keep: nothing about them can be
+        // decided from here, so nothing is. Like a second copy of the application, this one
+        // touches neither the store nor the document, and the next launch asks again.
+        await recorder.seal()
+        return .otherInstance(processIdentifier: detached.host?.processIdentifier ?? 0)
+      case .refused:
+        // A host that will not prove it is ours cannot be asked to stop anything, and its agents
+        // are working in the folders the sessions are about to be resumed in. It is killed the
+        // way a leftover is — only once its identity is confirmed — its agents' groups with it,
+        // and what it ran is offered.
+        if let identity = detached.host,
+          processes.identify(
+            processGroup: identity.processIdentifier, startedAt: identity.processStartedAt)
+            == .matches
+        {
+          processes.terminate(processGroup: identity.processIdentifier)
+        }
+        previous = Self.hostLost(detached, restarted: false)
+      }
+    }
 
     // A document that says `running` is only about a living copy of the application if the pid it
     // names is still *that* process. Confronted with nothing but the number, a pid recycled by any
@@ -110,7 +164,9 @@ public struct DetectPreviousShutdown: Sendable {
     guard !ids.isEmpty else { return .nothingToDo }
 
     switch previous?.phase {
-    case .stopped:
+    // `detached` never gets this far: it was reattached, or rewritten as what losing its host
+    // amounts to. It is grouped with the one phase that asks nothing, for the compiler's sake.
+    case .stopped, .detached:
       // The order a clean quit wrote is already the order to come back in: it closed its sessions
       // most recently worked first.
       return .clean(SessionRestoreIntent(sessionIDs: ids))
@@ -193,6 +249,88 @@ public struct DetectPreviousShutdown: Sendable {
     return result
   }
 
+  /// Whether the Mac has restarted since this document was written.
+  private func restartedSince(_ state: SessionRuntimeState) -> Bool {
+    guard let booted = processes.bootTime() else { return false }
+    return booted > state.lastSeenAt
+  }
+
+  /// A `detached` document whose host is gone, rewritten as what that loss amounts to.
+  ///
+  /// After a restart of the Mac nothing could have survived, and leaving the agents running was
+  /// an intention to carry on: it reads as a clean quit, and the sessions are resumed. Without a
+  /// restart the host crashed or was killed, which is a crash, and the sessions are offered — with
+  /// their process groups, so that an agent that outlived its host is found before a second one is
+  /// started in the same folder.
+  private static func hostLost(
+    _ state: SessionRuntimeState,
+    restarted: Bool
+  ) -> SessionRuntimeState {
+    var lost = state
+    lost.phase = restarted ? .stopped : .running
+    lost.sessions = state.sessions + (state.resuming ?? [])
+    lost.resuming = nil
+    lost.host = nil
+    return lost
+  }
+
+  /// Takes back what the host still holds, and settles the rest.
+  private func reattach(
+    _ previous: SessionRuntimeState,
+    hosted: [HostedSessionSummary]
+  ) async -> PreviousShutdown {
+    let byID = Dictionary(hosted.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    // Only a session the host lost can have left a process nobody holds.
+    // Identified, they are stopped here, as after a crash; one that cannot be identified is left
+    // alone, and a reattach has no offer on screen to carry that warning.
+    _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID] == nil })
+    await recorder.claim()
+
+    let stored = (try? await repository.sessions()) ?? []
+    let storedByID = Dictionary(
+      stored.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    let active = Self.mostRecentlyWorkedFirst(stored.filter { $0.status == .active })
+
+    var running: [SessionID] = []
+    var ended: [SessionID] = []
+    var stale: [WorkSession] = []
+    for session in active {
+      guard let summary = byID[session.id] else {
+        stale.append(session)
+        continue
+      }
+      if !summary.state.isFinished {
+        running.append(session.id)
+      } else if await close(session, at: summary.endedAt ?? previous.lastSeenAt) {
+        ended.append(session.id)
+      }
+    }
+    // What the host holds for a session the store no longer calls active — archived, deleted by
+    // hand, closed by a copy that could not reach the host — has nobody left to show it to.
+    for summary in hosted where storedByID[summary.id]?.status != .active {
+      await host?.discard(summary.id)
+    }
+
+    let reconciled = await reconcileStaleSessions(stale, lastSeenAt: previous.lastSeenAt)
+    let queued = (previous.resuming ?? []).map(\.sessionID)
+    let resume = await restorable(queued + reconciled.filter { !queued.contains($0) })
+    return .detached(
+      DetachedSessions(
+        running: running,
+        ended: ended,
+        resume: SessionRestoreIntent(sessionIDs: resume)
+      )
+    )
+  }
+
+  private func close(_ session: WorkSession, at date: Date) async -> Bool {
+    let updated = try? await repository.mutate(id: session.id) { session in
+      guard session.status == .active else { return }
+      try session.close(at: max(date, session.updatedAt))
+    }
+    return updated?.status == .closed
+  }
+
   /// Process groups from the previous run that are still alive.
   ///
   /// A group whose identity is confirmed is stopped here and now: an agent that survived the
@@ -200,9 +338,12 @@ public struct DetectPreviousShutdown: Sendable {
   /// but cannot be identified is **reported and left alone** — pids are recycled, and tidying up
   /// on the strength of a number would kill somebody else's program.
   private func leftovers(of previous: SessionRuntimeState?) -> [SessionRuntimeRecord] {
-    guard let previous else { return [] }
+    leftovers(of: previous?.sessions ?? [])
+  }
+
+  private func leftovers(of records: [SessionRuntimeRecord]) -> [SessionRuntimeRecord] {
     var reported: [SessionRuntimeRecord] = []
-    for record in previous.sessions {
+    for record in records {
       guard let group = record.processGroup else { continue }
       switch processes.identify(processGroup: group, startedAt: record.processStartedAt) {
       case .matches:
