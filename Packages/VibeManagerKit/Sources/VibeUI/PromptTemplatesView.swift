@@ -7,8 +7,6 @@ import VibeDomain
 /// The Prompt Templates window: the list on the left, in the user's order, and the template being
 /// edited on the right, with a preview of what it gives.
 public struct PromptTemplatesView: View {
-  public static let windowID = "prompt-templates"
-
   @Bindable private var model: PromptTemplateLibraryModel
   @State private var pendingDelete: PromptTemplate?
   @State private var isImporting = false
@@ -273,7 +271,7 @@ public struct PromptTemplatesView: View {
           EditorRow(
             "Prompt",
             help:
-              "{{name}} is a field, {{name?}} an optional one. Write \\{{ to keep the braces as text.",
+              "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text.",
             issues: issues(for: .body)
           ) {
             VStack(alignment: .leading, spacing: 5) {
@@ -355,6 +353,30 @@ public struct PromptTemplatesView: View {
             }
             .toggleStyle(.checkbox)
             .controlSize(.small)
+            // One value to try, for this field's patterns and for the preview below alike.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+              Text("Try")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 90, alignment: .trailing)
+              VStack(alignment: .leading, spacing: 4) {
+                TextField(
+                  field.help ?? "A value to try — not saved",
+                  text: Binding(
+                    get: { model.sampleValues[field.name] ?? "" },
+                    set: { model.sampleValues[field.name] = $0 }
+                  )
+                )
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .accessibilityLabel("Value to try for \(field.label)")
+                ExtractionResultsView(
+                  results: PromptTemplateFill(template: editing, values: model.sampleValues)
+                    .extractions(for: field.name),
+                  showsPlaces: true
+                )
+              }
+            }
           }
         }
       }
@@ -364,25 +386,13 @@ public struct PromptTemplatesView: View {
   @ViewBuilder
   private func previewSection(_ editing: PromptTemplate) -> some View {
     EditorRow(
-      "Preview", help: "Try values here — they are not saved.", issues: []
+      "Preview", help: "Made with the values tried above.", issues: []
     ) {
       VStack(alignment: .leading, spacing: 8) {
-        ForEach(editing.fields) { field in
-          HStack {
-            Text(field.label)
-              .foregroundStyle(.secondary)
-              .frame(width: 120, alignment: .trailing)
-              .lineLimit(1)
-            TextField(
-              field.help ?? "",
-              text: Binding(
-                get: { model.sampleValues[field.name] ?? "" },
-                set: { model.sampleValues[field.name] = $0 }
-              )
-            )
-            .textFieldStyle(.roundedBorder)
-            .accessibilityLabel("Sample \(field.label)")
-          }
+        if let name = model.preview?.sessionName, !name.isEmpty {
+          Text("Session: \(name)")
+            .font(.callout.weight(.medium))
+            .textSelection(.enabled)
         }
         if let preview = model.preview {
           PromptPreviewText(rendered: preview)

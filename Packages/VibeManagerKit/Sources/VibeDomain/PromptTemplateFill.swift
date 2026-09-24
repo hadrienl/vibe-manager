@@ -109,8 +109,21 @@ public struct PromptTemplateFill: Hashable, Sendable {
         parts.append(.text(PromptText.sanitized(text)))
       case .placeholder(let placeholder):
         let field = fields[placeholder.key]
-        let filled = PromptText.fieldValue(
+        let whole = PromptText.fieldValue(
           value(for: placeholder.key), isMultiline: field?.isMultiline ?? false)
+        var filled = whole
+        if let pattern = placeholder.pattern, !whole.isEmpty {
+          switch PromptTemplateExtraction(pattern: pattern).apply(to: whole) {
+          case .extracted(let part):
+            filled = PromptText.sanitized(part)
+          case .noMatch, .invalid:
+            parts.append(
+              .unmatched(
+                key: placeholder.key, label: field?.label ?? placeholder.spelling,
+                pattern: pattern))
+            continue
+          }
+        }
         if filled.isEmpty {
           parts.append(
             .missing(
@@ -138,7 +151,15 @@ public struct PromptTemplateFill: Hashable, Sendable {
       case .text(let text):
         name += text
       case .placeholder(let placeholder):
-        name += PromptText.fieldValue(value(for: placeholder.key), isMultiline: false)
+        let whole = PromptText.fieldValue(value(for: placeholder.key), isMultiline: false)
+        if let pattern = placeholder.pattern {
+          if case .extracted(let part) = PromptTemplateExtraction(pattern: pattern).apply(to: whole)
+          {
+            name += part
+          }
+        } else {
+          name += whole
+        }
       }
     }
     let words = PromptText.sanitized(name)
@@ -146,6 +167,16 @@ public struct PromptTemplateFill: Hashable, Sendable {
       .filter { !$0.isEmpty }
       .joined(separator: " ")
     return String(words.prefix(PromptTemplateLimits.sessionNameLength))
+  }
+
+  /// What each pattern applied to a field keeps of its value, in the order the text uses them.
+  public func extractions(for key: String) -> [(
+    use: PromptTemplateExtractionUse, outcome: PromptTemplateExtraction.Outcome
+  )] {
+    let value = PromptText.fieldValue(self.value(for: key), isMultiline: false)
+    return template.extractions(for: key).map { use in
+      (use, PromptTemplateExtraction(pattern: use.pattern).apply(to: value))
+    }
   }
 
   /// The reference a session created from this fill keeps.
@@ -190,6 +221,8 @@ public struct RenderedPrompt: Hashable, Sendable {
     /// the session from being created, and is written back as `{{name}}` when the prompt is
     /// turned into free text.
     case missing(key: String, label: String, spelling: String, isRequired: Bool)
+    /// A value the field's pattern found nothing in: it adds nothing, and the form says so.
+    case unmatched(key: String, label: String, pattern: String)
   }
 
   public let parts: [Part]
@@ -200,7 +233,7 @@ public struct RenderedPrompt: Hashable, Sendable {
     parts.map { part in
       switch part {
       case .text(let text), .value(_, let text): return text
-      case .missing: return ""
+      case .missing, .unmatched: return ""
       }
     }.joined()
   }
@@ -211,6 +244,7 @@ public struct RenderedPrompt: Hashable, Sendable {
     parts.map { part in
       switch part {
       case .text(let text), .value(_, let text): return text
+      case .unmatched: return ""
       case .missing(_, _, let spelling, let isRequired):
         return isRequired ? "{{\(spelling)}}" : ""
       }

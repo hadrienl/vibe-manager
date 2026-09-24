@@ -2,6 +2,9 @@ import Foundation
 
 /// Two templates offered to start from, never installed on their own.
 ///
+/// Both name the session after the number in the merge request's URL — GitLab's
+/// `merge_requests/1315` or GitHub's `pull/64` — which is what a review is usually called.
+///
 /// Their identifiers are fixed, so adding them twice adds nothing, and one the user deleted comes
 /// back only if they ask for the examples again.
 public enum PromptTemplateExamples {
@@ -22,7 +25,7 @@ public enum PromptTemplateExamples {
     PromptTemplate(
       id: reviewID,
       name: "Review",
-      sessionNamePattern: "Review {{url}}",
+      sessionNamePattern: #"Review {{url|/(?:merge_requests|pull)\/(\d+)/}}"#,
       body: """
         Review the merge request at {{url}}. Read the description and the diff, check out the \
         branch if needed, and report correctness issues first, then missing tests, then style. \
@@ -44,7 +47,7 @@ public enum PromptTemplateExamples {
     PromptTemplate(
       id: feedbackID,
       name: "Address review feedback",
-      sessionNamePattern: "Feedback {{url}}",
+      sessionNamePattern: #"Feedback {{url|/(?:merge_requests|pull)\/(\d+)/}}"#,
       body: """
         Address the unresolved review comments on the merge request at {{url}}. For each one, \
         change the code or explain why not, run the tests, and summarise what you did per comment.

@@ -90,8 +90,11 @@ public final class AppModel {
   let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
-  /// The prompt templates, shared by their window and the New Session sheet.
+  /// The prompt templates, shared by their settings tab and the New Session sheet.
   public let templates: PromptTemplateLibraryModel
+  /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
+  /// menu — can open them on the right one.
+  public var settingsTab: SettingsTab = .general
   /// A process the system would not let go of. Reported rather than swallowed: the promise that
   /// nothing stays attached to an archived session is only worth making if its failure is said.
   public private(set) var detachWarning: DetachWarning?

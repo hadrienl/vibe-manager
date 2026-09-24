@@ -11,7 +11,6 @@ public struct NewSessionSheet: View {
   /// The prompt areas are AppKit text views, which SwiftUI's focus does not reach: where the caret
   /// was sent is kept here too, and they take it themselves.
   @State private var editorRequest: FocusTarget?
-  @Environment(\.openWindow) private var openWindow
 
   /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
   enum FocusTarget: Hashable {
@@ -22,17 +21,21 @@ public struct NewSessionSheet: View {
   private let defaultWorkingDirectoryPath: String?
   private let created: (SessionCreation) -> Void
   private let cancelled: () -> Void
+  /// Opens the templates in the settings. `nil`: the sheet offers no way there.
+  private let manageTemplates: (() -> Void)?
 
   public init(
     model: NewSessionModel,
     defaultWorkingDirectoryPath: String? = nil,
     created: @escaping (SessionCreation) -> Void,
-    cancelled: @escaping () -> Void
+    cancelled: @escaping () -> Void,
+    manageTemplates: (() -> Void)? = nil
   ) {
     _model = Bindable(model)
     self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
     self.created = created
     self.cancelled = cancelled
+    self.manageTemplates = manageTemplates
   }
 
   public var body: some View {
@@ -130,10 +133,10 @@ public struct NewSessionSheet: View {
         .labelsHidden()
         .frame(maxWidth: 280, alignment: .leading)
 
-        Button("Manage…") {
-          openWindow(id: PromptTemplatesView.windowID)
+        if let manageTemplates {
+          Button("Manage…", action: manageTemplates)
+            .controlSize(.small)
         }
-        .controlSize(.small)
       }
     }
     if model.isTemplateStale {
@@ -180,6 +183,10 @@ public struct NewSessionSheet: View {
           }
           .focused($focus, equals: .templateField(field.name))
           .accessibilityValue(field.isRequired ? "Required" : "")
+          // What the patterns of the template keep of the value, once there is one.
+          if !model.value(for: field.name).isEmpty {
+            ExtractionResultsView(results: fill.extractions(for: field.name))
+          }
         }
       }
     }
@@ -638,6 +645,10 @@ struct PromptPreviewText: View {
         var value = AttributedString(text)
         value.inlinePresentationIntent = .stronglyEmphasized
         result += value
+      case .unmatched(_, let label, _):
+        var unmatched = AttributedString("‹\(label): no match›")
+        unmatched.foregroundColor = .orange
+        result += unmatched
       case .missing(_, let label, _, let isRequired):
         guard isRequired else { continue }
         var missing = AttributedString("‹\(label)›")

@@ -96,12 +96,6 @@ struct VibeManagerApp: App {
       SessionHistoryCommands(model: environment.appModel, focus: windowFocus)
     }
 
-    // A window of its own: an editor, a list and a preview do not fit in the settings.
-    Window("Prompt Templates", id: PromptTemplatesView.windowID) {
-      PromptTemplatesView(model: environment.appModel.templates)
-    }
-    .defaultSize(width: 900, height: 640)
-
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
@@ -114,7 +108,7 @@ struct VibeManagerApp: App {
 /// of the sheet changes it. The submenu goes straight to any of them.
 private struct TemplateCommands: View {
   let model: AppModel
-  @Environment(\.openWindow) private var openWindow
+  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     Button("New Session from Template") {
@@ -135,7 +129,8 @@ private struct TemplateCommands: View {
     Divider()
 
     Button("Manage Prompt Templates…") {
-      openWindow(id: PromptTemplatesView.windowID)
+      model.settingsTab = .templates
+      openSettings()
     }
   }
 }

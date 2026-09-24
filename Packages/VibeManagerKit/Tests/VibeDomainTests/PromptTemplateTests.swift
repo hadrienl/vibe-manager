@@ -241,7 +241,7 @@ struct PromptTemplateLibraryTests {
     #expect(fill.missingRequiredFields.map(\.label) == ["Merge request URL"])
     fill.setValue("https://gitlab.com/g/p/-/merge_requests/1", for: "url")
     #expect(fill.missingRequiredFields.isEmpty)
-    #expect(fill.sessionName() == "Review https://gitlab.com/g/p/-/merge_requests/1")
+    #expect(fill.sessionName() == "Review 1")
     #expect(fill.render().prompt.hasSuffix("Do not push anything."))
   }
 
@@ -266,5 +266,87 @@ struct PromptTemplateLibraryTests {
     both.apply(plan, at: now)
     #expect(both.templates.map(\.name) == ["A", "B", "B 2", "C"])
     #expect(both.templates[1].body == "Do B")
+  }
+}
+
+@Suite("Keeping part of a value")
+struct PromptTemplateExtractionTests {
+  private let mergeRequest = "https://gitlab.com/group/project/-/merge_requests/1315/diffs#note_42"
+
+  @Test("A pattern is read up to its unescaped slash, braces and bars included")
+  func patternIsParsed() {
+    let parsed = PromptTemplateSyntax.parse(
+      #"MR {{ url? | /(?:merge_requests|pull)\/(\d{1,6})/ }}!"#)
+    let placeholder = parsed.placeholders.first
+    #expect(placeholder?.key == "url")
+    #expect(placeholder?.isOptional == true)
+    #expect(placeholder?.pattern == #"(?:merge_requests|pull)\/(\d{1,6})"#)
+    #expect(parsed.segments.last == .text("!"))
+    #expect(parsed.malformed.isEmpty)
+  }
+
+  @Test(
+    "A pattern left open, or split over two lines, is text",
+    arguments: [
+      #"{{url|/\d+}}"#, "{{url|/\\d\n+/}}", "{{url|}}", "{{url|x/}}",
+    ])
+  func unfinishedPatternIsText(_ text: String) {
+    #expect(PromptTemplateSyntax.parse(text).placeholders.isEmpty)
+  }
+
+  @Test("The first match is kept, or its first group when there is one")
+  func firstMatchOrGroup() {
+    #expect(PromptTemplateExtraction(pattern: #"\d+$"#).apply(to: "a/12/34") == .extracted("34"))
+    #expect(
+      PromptTemplateExtraction(pattern: #"merge_requests\/(\d+)"#).apply(to: mergeRequest)
+        == .extracted("1315"))
+    #expect(PromptTemplateExtraction(pattern: #"\d+$"#).apply(to: mergeRequest) == .extracted("42"))
+    #expect(PromptTemplateExtraction(pattern: #"pull\/(\d+)"#).apply(to: mergeRequest) == .noMatch)
+  }
+
+  @Test("An invalid pattern says why, and keeps the template from being saved")
+  func invalidPattern() {
+    #expect(PromptTemplateExtraction(pattern: "(").problem != nil)
+    let template = PromptTemplate(name: "T", sessionNamePattern: "R {{url|/(/}}", body: "{{url}}")
+    #expect(template.problems(among: []).map(\.field) == [.sessionName])
+  }
+
+  @Test("The session name and the prompt use what the pattern keeps")
+  func renderingExtracts() {
+    var fill = PromptTemplateFill(
+      template: PromptTemplate(
+        name: "Review", sessionNamePattern: #"Review !{{url|/merge_requests\/(\d+)/}}"#,
+        body: #"Review {{url}} (MR {{url|/merge_requests\/(\d+)/}})."#))
+    fill.setValue(mergeRequest, for: "url")
+    #expect(fill.sessionName() == "Review !1315")
+    #expect(fill.render().prompt == "Review \(mergeRequest) (MR 1315).")
+  }
+
+  @Test("A value the pattern does not match adds nothing, and is said, not refused")
+  func noMatchIsSaid() {
+    var fill = PromptTemplateFill(
+      template: PromptTemplate(name: "T", body: #"MR {{url|/pull\/(\d+)/}}."#))
+    fill.setValue(mergeRequest, for: "url")
+    let rendered = fill.render()
+    #expect(rendered.prompt == "MR .")
+    #expect(rendered.parts.contains(.unmatched(key: "url", label: "Url", pattern: #"pull\/(\d+)"#)))
+    #expect(fill.missingRequiredFields.isEmpty)
+  }
+
+  @Test("Each pattern of a field is listed once, with where it is used")
+  func extractionsOfAField() {
+    let template = PromptTemplate(
+      name: "T", sessionNamePattern: #"R {{url|/\d+$/}}"#,
+      body: #"{{url|/\d+$/}} {{url|/(\w+)$/}} {{url}}"#)
+    let uses = template.extractions(for: "url")
+    #expect(uses.map(\.pattern) == [#"\d+$"#, #"(\w+)$"#])
+    #expect(uses.first?.placesLabel == "Session name, Prompt")
+  }
+
+  @Test("Making the field optional keeps its pattern")
+  func optionalKeepsPattern() {
+    var template = PromptTemplate(name: "T", body: #"{{url|/\d+/}}"#)
+    template.setRequired(false, for: "url")
+    #expect(template.body == #"{{url?|/\d+/}}"#)
   }
 }

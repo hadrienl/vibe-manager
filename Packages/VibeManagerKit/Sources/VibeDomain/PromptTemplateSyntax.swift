@@ -7,9 +7,15 @@ import Foundation
 /// `{{#each}}` — is text, because prompts are full of code that uses the same braces, and a field
 /// the user never meant to create is worse than no field. `\{{` writes the braces themselves.
 ///
+/// `{{url|/merge_requests\/(\d+)/}}` keeps only part of the field's value: the regular expression
+/// runs from `|/` to the next `/` that is not escaped, so a slash inside it is written `\/`, and
+/// braces or bars inside it are its own.
+///
 /// Positions are counted in UTF-16 code units, the unit an `NSTextView` highlights by.
 public enum PromptTemplateSyntax {
   public static let maximumNameLength = 40
+  /// Past this, what follows `|/` is not read as a pattern.
+  public static let maximumPatternLength = 300
 
   public struct Placeholder: Hashable, Sendable {
     /// The field's identity, lowercased.
@@ -17,6 +23,8 @@ public enum PromptTemplateSyntax {
     /// The name as written, for a label derived from it.
     public let spelling: String
     public let isOptional: Bool
+    /// The regular expression written after `|`, without its slashes; `nil` for the whole value.
+    public let pattern: String?
     public let range: Range<Int>
   }
 
@@ -65,27 +73,24 @@ public enum PromptTemplateSyntax {
         index += 1
         continue
       }
-      guard let close = closingBraces(in: units, from: index + 2) else {
-        index += 2
-        continue
-      }
-      let range = index..<(close + 2)
-      if let (spelling, isOptional) = name(in: decode((index + 2)..<close)) {
+      if let placeholder = placeholder(in: units, at: index) {
         flushRun(upTo: index)
         if !buffer.isEmpty {
           segments.append(.text(buffer))
           buffer = ""
         }
-        let placeholder = Placeholder(
-          key: spelling.lowercased(), spelling: spelling, isOptional: isOptional, range: range)
         segments.append(.placeholder(placeholder))
         placeholders.append(placeholder)
-        index = range.upperBound
+        index = placeholder.range.upperBound
         runStart = index
-      } else {
-        malformed.append(range)
-        index = range.upperBound
+        continue
       }
+      guard let close = closingBraces(in: units, from: index + 2) else {
+        index += 2
+        continue
+      }
+      malformed.append(index..<(close + 2))
+      index = close + 2
     }
     flushRun(upTo: count)
     if !buffer.isEmpty {
@@ -103,29 +108,59 @@ public enum PromptTemplateSyntax {
     guard !targets.isEmpty else { return text }
     var units = Array(text.utf16)
     for placeholder in targets.reversed() {
-      let replacement = "{{\(placeholder.spelling)\(isOptional ? "?" : "")}}"
+      let pattern = placeholder.pattern.map { "|/\($0)/" } ?? ""
+      let replacement = "{{\(placeholder.spelling)\(isOptional ? "?" : "")\(pattern)}}"
       units.replaceSubrange(placeholder.range, with: Array(replacement.utf16))
     }
     return String(decoding: units, as: UTF16.self)
   }
 
-  /// A name and its `?`, or `nil` when the braces hold anything else.
-  static func name(in inner: String) -> (spelling: String, isOptional: Bool)? {
-    var name = inner.trimmingCharacters(in: CharacterSet(charactersIn: " \t"))
+  /// The placeholder opened by the `{{` at `start` — `{{ name? |/pattern/ }}` — or `nil` when the
+  /// braces hold anything else.
+  static func placeholder(in units: [UInt16], at start: Int) -> Placeholder? {
+    var index = start + 2
+    func skipSpaces() {
+      while index < units.count, units[index] == space || units[index] == tab { index += 1 }
+    }
+    skipSpaces()
+    let nameStart = index
+    guard index < units.count, isASCIILetter(units[index]) else { return nil }
+    while index < units.count, isNameCharacter(units[index]) { index += 1 }
+    guard index - nameStart <= maximumNameLength else { return nil }
+    let spelling = String(decoding: units[nameStart..<index], as: UTF16.self)
     var isOptional = false
-    if name.hasSuffix("?") {
+    if index < units.count, units[index] == question {
       isOptional = true
-      name.removeLast()
+      index += 1
     }
-    guard let first = name.unicodeScalars.first, isASCIILetter(first),
-      name.unicodeScalars.count <= maximumNameLength,
-      name.unicodeScalars.allSatisfy({
-        isASCIILetter($0) || ("0"..."9").contains($0) || $0 == "_" || $0 == "-"
-      })
-    else {
-      return nil
+    skipSpaces()
+    var pattern: String?
+    if index < units.count, units[index] == bar {
+      index += 1
+      skipSpaces()
+      guard index < units.count, units[index] == slash else { return nil }
+      index += 1
+      let patternStart = index
+      while true {
+        guard index < units.count, index - patternStart <= maximumPatternLength,
+          units[index] != newline
+        else { return nil }
+        if units[index] == backslash {
+          index += 2
+          continue
+        }
+        if units[index] == slash { break }
+        index += 1
+      }
+      pattern = String(decoding: units[patternStart..<index], as: UTF16.self)
+      index += 1
+      skipSpaces()
     }
-    return (name, isOptional)
+    guard index + 1 < units.count, units[index] == closeBrace, units[index + 1] == closeBrace
+    else { return nil }
+    return Placeholder(
+      key: spelling.lowercased(), spelling: spelling, isOptional: isOptional, pattern: pattern,
+      range: start..<(index + 2))
   }
 
   /// Where the `}}` closing the braces opened just before `start` is, on the same line and not
@@ -143,12 +178,23 @@ public enum PromptTemplateSyntax {
     return nil
   }
 
-  private static func isASCIILetter(_ scalar: Unicode.Scalar) -> Bool {
-    ("a"..."z").contains(scalar) || ("A"..."Z").contains(scalar)
+  private static func isASCIILetter(_ unit: UInt16) -> Bool {
+    (0x61...0x7A).contains(unit) || (0x41...0x5A).contains(unit)
+  }
+
+  private static func isNameCharacter(_ unit: UInt16) -> Bool {
+    isASCIILetter(unit) || (0x30...0x39).contains(unit) || unit == underscore || unit == hyphen
   }
 
   private static let backslash = UInt16(UInt8(ascii: "\\"))
   private static let openBrace = UInt16(UInt8(ascii: "{"))
   private static let closeBrace = UInt16(UInt8(ascii: "}"))
   private static let newline = UInt16(UInt8(ascii: "\n"))
+  private static let space = UInt16(UInt8(ascii: " "))
+  private static let tab = UInt16(UInt8(ascii: "\t"))
+  private static let question = UInt16(UInt8(ascii: "?"))
+  private static let bar = UInt16(UInt8(ascii: "|"))
+  private static let slash = UInt16(UInt8(ascii: "/"))
+  private static let underscore = UInt16(UInt8(ascii: "_"))
+  private static let hyphen = UInt16(UInt8(ascii: "-"))
 }

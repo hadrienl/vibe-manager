@@ -155,6 +155,7 @@ struct PromptTemplateExchangeTests {
     #expect(review.fields.map(\.name) == ["url", "focus"])
     #expect(review.fields.map(\.isRequired) == [true, false])
     #expect(review.fields.last?.isMultiline == true)
-    #expect(review.sessionNamePattern == "Review {{url}}")
+    #expect(review.sessionNamePattern == #"Review {{url|/(?:merge_requests|pull)\/(\d+)/}}"#)
+    #expect(review.extractions(for: "url").count == 1)
   }
 }

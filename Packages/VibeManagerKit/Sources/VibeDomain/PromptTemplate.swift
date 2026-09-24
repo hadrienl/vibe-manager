@@ -213,7 +213,60 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     if fieldCount > PromptTemplateLimits.fieldLimit {
       issues.append(.tooManyFields(fieldCount))
     }
+    for (text, field) in [
+      (sessionNamePattern, PromptTemplateIssueField.sessionName), (body, .body),
+    ] {
+      var seen: Set<String> = []
+      for placeholder in PromptTemplateSyntax.parse(text).placeholders {
+        guard let pattern = placeholder.pattern, seen.insert(pattern).inserted,
+          let reason = PromptTemplateExtraction(pattern: pattern).problem
+        else { continue }
+        issues.append(.invalidPattern(pattern, reason: reason, in: field))
+      }
+    }
     return issues
+  }
+
+  /// The patterns applied to a field, each once, with where they are used.
+  public func extractions(for key: String) -> [PromptTemplateExtractionUse] {
+    let key = key.lowercased()
+    var uses: [PromptTemplateExtractionUse] = []
+    for (text, place) in [
+      (sessionNamePattern, PromptTemplateExtractionUse.Place.sessionName), (body, .prompt),
+    ] {
+      for placeholder in PromptTemplateSyntax.parse(text).placeholders
+      where placeholder.key == key {
+        guard let pattern = placeholder.pattern else { continue }
+        if let index = uses.firstIndex(where: { $0.pattern == pattern }) {
+          uses[index].places.insert(place)
+        } else {
+          uses.append(PromptTemplateExtractionUse(pattern: pattern, places: [place]))
+        }
+      }
+    }
+    return uses
+  }
+}
+
+/// A pattern applied to a field, and where in the template.
+public struct PromptTemplateExtractionUse: Hashable, Sendable, Identifiable {
+  public enum Place: String, Hashable, Sendable, Comparable {
+    case sessionName = "Session name"
+    case prompt = "Prompt"
+
+    public static func < (lhs: Place, rhs: Place) -> Bool {
+      lhs == .sessionName && rhs == .prompt
+    }
+  }
+
+  public let pattern: String
+  public var places: Set<Place>
+
+  public var id: String { pattern }
+
+  /// "Session name, Prompt".
+  public var placesLabel: String {
+    places.sorted().map(\.rawValue).joined(separator: ", ")
   }
 }
 
@@ -264,6 +317,16 @@ public struct PromptTemplateIssue: Hashable, Sendable, Identifiable {
       message:
         "The prompt weighs \(PromptSize.label(byteCount)); agents accept \(PromptSize.label(PromptTemplateLimits.bodyByteLimit)).",
       remedy: "Shorten it."
+    )
+  }
+
+  public static func invalidPattern(
+    _ pattern: String, reason: String, in field: PromptTemplateIssueField
+  ) -> PromptTemplateIssue {
+    PromptTemplateIssue(
+      field: field,
+      message: "/\(pattern)/ is not a valid regular expression: \(reason)",
+      remedy: "Fix it, or remove the |/…/ to use the whole value."
     )
   }
 

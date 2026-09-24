@@ -10,6 +10,7 @@ Session sheet, or straight from **File ▸ New Session from** (⇧⌘N opens the
 |---|---|
 | `{{url}}` | A required field named `url`. `{{ url }}` and `{{URL}}` are the same field. |
 | `{{focus?}}` | An optional field. Marked optional once, a field is optional everywhere it appears. |
+| `{{url\|/merge_requests\/(\d+)/}}` | Only part of the field's value — here `1315` out of `…/merge_requests/1315/diffs`. |
 | `\{{` | Two literal braces: `\{{url}}` is the text `{{url}}`, not a field. |
 
 A name starts with a letter and holds letters, digits, `-` and `_`, 40 characters at most. Anything
@@ -19,6 +20,26 @@ fields.
 
 The same field used twice is asked for once. A template has at most 20 fields, and its text at most
 16 KB, the most either agent accepts.
+
+### Keeping part of a value
+
+`{{url|/pattern/}}` does not add a field: it uses the value of `url`, and keeps what a regular
+expression finds in it — the first match, or its first group `( )` when the pattern has one. The
+pattern runs from `|/` to the next `/` that is not escaped, so a slash inside it is written `\/`.
+The syntax is ICU's, the one of `NSRegularExpression`.
+
+A group lets the pattern say *where* the part is without keeping what surrounds it:
+`{{url|/(?:merge_requests|pull)\/(\d+)/}}` gives the number of a GitLab merge request or a GitHub
+pull request, whatever follows it in the URL — where `{{url|/\d+$/}}` would give the `42` of a
+`#note_42` at its end.
+
+A value the pattern finds nothing in adds nothing: the New Session sheet says so under the field,
+and the preview shows `‹Url: no match›`, but the session can still be created. A pattern that is
+not a regular expression keeps the template from being saved.
+
+In the template editor, each field has a **Try** box: the patterns applied to that field are listed
+under it with what they keep of the value typed there, and where they are used. The same values
+make the preview.
 
 The optional **session name** uses the same fields (`Review {{url}}`) and names the session until
 you type a name of your own.
@@ -61,7 +82,7 @@ new revision, and sessions keep theirs.
     {
       "id": "6F1C2A4E-7D35-4B8A-9E61-2C0D5B7A1E01",
       "name": "Review",
-      "sessionName": "Review {{url}}",
+      "sessionName": "Review {{url|/(?:merge_requests|pull)\\/(\\d+)/}}",
       "body": "Review the merge request at {{url}}. Report correctness issues first.\n\n{{focus?}}",
       "fields": [
         { "name": "url", "label": "Merge request URL" },

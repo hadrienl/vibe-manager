@@ -29,7 +29,7 @@ session stores. There is no second implementation that could drift. A value is i
 never read again, so a value that holds `{{x}}` stays that text.
 
 The fill holds a *copy* of the template, taken when it is picked. A template saved in the other
-window while the sheet is open is said there, with **Reload**; it is never swapped in under the
+settings while the sheet is open is said there, with **Reload**; it is never swapped in under the
 user, because the preview would then no longer describe what they were about to send.
 
 ### A starting point, never a link
@@ -67,7 +67,7 @@ them would break a restart.
 
 A template is saved with **Save**, and each save is a revision. A half-typed template must not be
 offered in the sheet, and a revision per keystroke would make the number the session records
-meaningless. Edits live in the library model for the length of the run, so closing the window
+meaningless. Edits live in the library model for the length of the run, so closing the settings
 loses nothing; leaving a changed template for another asks first, and so does quitting — Save,
 Don't Save or Cancel, before anything is stopped.
 
@@ -84,6 +84,29 @@ dates. An import is laid out before it is applied — new, identical, changed, s
 template is kept beside the existing one unless the user chooses **Replace**. A test imports the
 example of the documentation, so the documentation cannot drift from the code. The files are plain
 `.json`: declaring a document type of our own would need an `Info.plist` the project generates.
+
+### Keeping part of a value, and trying it where it is written
+
+`{{url|/pattern/}}` keeps what a regular expression finds in the field's value: the first match,
+or its first group. It is the one computation a template allows, because the most common template
+names its session after the number in a merge request's URL, and a separate field for that number
+would ask for what the URL already says. The pattern lives in the text, like the `?`: nothing
+changed in the store or the exchange format. It runs to the next unescaped `/`, so braces and bars
+inside it are its own.
+
+A value the pattern does not match gives nothing, and the sheet says so under the field. Refusing
+it would stop a session over a URL that is merely shaped differently — the user sees what the name
+will be before creating it. A pattern that does not compile keeps the template from being saved.
+
+Each field of the editor has one **Try** value, shared with the preview: under it, every pattern
+applied to that field shows what it keeps and where it is used. The sheet shows the same lines
+under the field being filled.
+
+### In the settings, not a window of their own
+
+The templates are a tab of the settings, beside General: they are something configured once and
+reached from time to time, which is what the settings are. Manage… in the sheet and File ▸ Manage
+Prompt Templates… open the settings on that tab.
 
 ### No archive
 
