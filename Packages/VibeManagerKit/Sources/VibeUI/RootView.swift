@@ -1095,14 +1095,20 @@ private struct IdealColumnWidths: Equatable {
 
 /// Reports the width of whatever it is placed behind, because SwiftUI never reports back the
 /// width a split view was actually dragged to.
+///
+/// The width is handed over on the next turn of the main actor, never from inside the layout
+/// pass that measured it. Written there, it invalidated the whole workspace — the root reads the
+/// layout — and the toolbar with it, which asked AppKit for one more constraints pass in the same
+/// display cycle. A window snapped into a tile resizes in a single cycle: AppKit counted past its
+/// loop guard and threw, which with an application built for development is a crash.
 private struct WidthReporter: View {
-  let report: (Double) -> Void
+  let report: @MainActor (Double) -> Void
 
   var body: some View {
     GeometryReader { proxy in
       Color.clear
         .onChange(of: proxy.size.width, initial: true) { _, width in
-          report(Double(width))
+          Task { @MainActor in report(Double(width)) }
         }
     }
   }
