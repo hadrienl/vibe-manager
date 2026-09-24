@@ -65,6 +65,9 @@ public protocol TerminalHosting: Sendable {
   /// Says goodbye. `keepRunning` is the one way a session outlives the application: a host that
   /// loses its client without it stops everything, as a crash always has.
   func relinquish(keepRunning: Bool) async
+  /// Lets go of a host `reconnect` found, its sessions running and nothing decided about them, so
+  /// that trying again finds everything as it was. Until then, no terminal is started in it.
+  func stepAway() async
   /// When the last host was told to stop — a logout, a shutdown, `kill` — if it had the time to say
   /// so. A host that crashed says nothing.
   func lastStopRequest() async -> Date?

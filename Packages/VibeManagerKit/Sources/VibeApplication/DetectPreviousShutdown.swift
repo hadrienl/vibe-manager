@@ -293,6 +293,19 @@ public struct DetectPreviousShutdown: Sendable {
     _ previous: SessionRuntimeState,
     hosted: [HostedSessionSummary]
   ) async -> PreviousShutdown {
+    // Read before anything is decided: every session the host holds is weighed against the store,
+    // and a store that did not answer would make each of them look abandoned, and be stopped.
+    // Like a host that will not serve this copy, nothing is touched until the user tries again.
+    let stored: [WorkSession]
+    do {
+      stored = try await repository.sessions()
+    } catch {
+      await host?.stepAway()
+      await recorder.seal()
+      return .hostUnavailable(
+        reason: "The sessions could not be read: \(error.localizedDescription)")
+    }
+
     let byID = Dictionary(hosted.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     // Only a session the host lost can have left a process nobody holds.
     // Identified, they are stopped here, as after a crash; one that cannot be identified is left
@@ -300,7 +313,6 @@ public struct DetectPreviousShutdown: Sendable {
     _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID] == nil })
     await recorder.claim()
 
-    let stored = (try? await repository.sessions()) ?? []
     let storedByID = Dictionary(
       stored.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     let active = Self.mostRecentlyWorkedFirst(stored.filter { $0.status == .active })

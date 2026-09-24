@@ -39,6 +39,7 @@ actor FakeTerminalHost: TerminalHosting {
   private let stopRequest: Date?
   private(set) var discarded: [SessionID] = []
   private(set) var goodbyes: [Bool] = []
+  private(set) var steppedAway = false
 
   init(_ status: TerminalHostStatus, stopRequestedAt stopRequest: Date? = nil) {
     self.status = status
@@ -57,6 +58,8 @@ actor FakeTerminalHost: TerminalHosting {
   func discard(_ id: SessionID) { discarded.append(id) }
 
   func relinquish(keepRunning: Bool) { goodbyes.append(keepRunning) }
+
+  func stepAway() { steppedAway = true }
 }
 
 /// Liveness from `RestorationProcesses`, and a boot time of the test's choosing.
@@ -104,9 +107,10 @@ struct DetachedShutdownTests {
     document: SessionRuntimeState,
     host: FakeTerminalHost,
     processes: RestorationProcesses = RestorationProcesses(),
-    booted: Date? = nil
+    booted: Date? = nil,
+    listingFails: Bool = false
   ) async -> (PreviousShutdown, RestorationRepository, EphemeralSessionRuntimeStateStore) {
-    let repository = RestorationRepository(sessions: sessions)
+    let repository = RestorationRepository(sessions: sessions, listingFails: listingFails)
     let store = EphemeralSessionRuntimeStateStore(state: document)
     let probe = BootingProcesses(processes: processes, booted: booted)
     let recorder = SessionRuntimeRecorder(
@@ -147,6 +151,29 @@ struct DetachedShutdownTests {
     // Claimed, so a crash from here on is read as this launch's crash, not as the quit's intention.
     #expect(await store.read()?.phase == .running)
     #expect(await store.read()?.processIdentifier == 4242)
+  }
+
+  @Test("A store that cannot be read stops nothing the host kept, and leaves it to a retry")
+  func unreadableStoreDecidesNothing() async {
+    let running = session("Running")
+    let host = FakeTerminalHost(
+      .connected(
+        hostIdentity,
+        sessions: [HostedSessionSummary(id: running.id, state: .running(processIdentifier: 902))]
+      ))
+    let document = detachedDocument(running: [SessionRuntimeRecord(sessionID: running.id)])
+
+    let (verdict, _, store) = await detect(
+      sessions: [running], document: document, host: host, listingFails: true)
+
+    guard case .hostUnavailable = verdict else {
+      Issue.record("Expected the host to be left for a retry, got \(verdict)")
+      return
+    }
+    #expect(await host.discarded.isEmpty)
+    #expect(await host.steppedAway)
+    // Not claimed: trying again reads the same `detached` document.
+    #expect(await store.read()?.phase == .detached)
   }
 
   @Test("An agent that ended while the application was closed is closed from when it ended")

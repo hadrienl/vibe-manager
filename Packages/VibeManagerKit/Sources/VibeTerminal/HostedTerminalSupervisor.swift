@@ -55,6 +55,14 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private var isUnavailable = false
   /// Set by `relinquish`: the application is on its way out and nothing may reconnect.
   private var isClosed = false
+  /// Set while the host holds agents the user chose to keep and this copy has not taken them back:
+  /// only `reconnect` may connect then. Connecting to start a terminal would make this copy the
+  /// host's client without the kept sessions, and its next goodbye would stop agents nobody had
+  /// seen again.
+  private var awaitsReattach = false
+  /// The connection under way, which a terminal started meanwhile waits for: a second `hello`
+  /// from this copy would be refused as another client, and that terminal run in the application.
+  private var connecting: Task<Bool, Never>?
   private var mirrors: [SessionID: HostedTerminalSession] = [:]
   private var pending: [UInt64: CheckedContinuation<TerminalHostMessage.Body?, Never>] = [:]
   private var nextRequest: UInt64 = 1
@@ -72,7 +80,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       throw TerminalError.sessionAlreadyRunning(id)
     }
     guard await ensureConnected(launching: true) else {
-      return try await local.start(spec, for: id)
+      return try await startLocally(spec, for: id)
     }
 
     switch await request(.start(session: id, spec: spec)) {
@@ -93,7 +101,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       guard connection != nil else {
         // The host went away between the connection and the start. The terminal is started
         // here, rather than failing a launch the user asked for over a helper they never see.
-        return try await local.start(spec, for: id)
+        return try await startLocally(spec, for: id)
       }
       // No answer in time, from a host that is still there: it may well have started the agent.
       // A second one started here would work in the same folder, so the first is stopped and the
@@ -101,6 +109,15 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       send(.kill(session: id))
       throw TerminalError.spawnFailed(code: ETIMEDOUT)
     }
+  }
+
+  /// The mirror of an earlier run of this session in the host would stand in front of the local
+  /// terminal: `session(for:)` and `stop(id:)` would find it, finished, and never reach the process.
+  private func startLocally(_ spec: TerminalSpec, for id: SessionID) async throws
+    -> any TerminalSession
+  {
+    mirrors[id] = nil
+    return try await local.start(spec, for: id)
   }
 
   public func session(for id: SessionID) async -> (any TerminalSession)? {
@@ -140,10 +157,13 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     }
     switch found {
     case .absent:
+      awaitsReattach = false
       return .absent
     case .unavailable(let reason):
+      awaitsReattach = true
       return .unavailable(reason: reason)
     case .refused(let reason):
+      awaitsReattach = false
       return .refused(reason: reason)
     case .connected(let connection, let identity):
       adopt(connection, identity)
@@ -151,12 +171,14 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     }
 
     // A host that answered and then did not list its sessions is still there, and so are they:
-    // saying it is absent would have them looked for as leftovers, and killed.
+    // saying it is absent would have them looked for as leftovers, and killed. It has taken this
+    // copy as its client, and is left with a goodbye: a silent close reads as a crash, which
+    // stops everything.
     guard case .sessions(let records) = await request(.list) else {
-      connection?.close()
-      connection = nil
+      await stepAway()
       return .unavailable(reason: "The terminal host did not list its sessions.")
     }
+    awaitsReattach = false
     var summaries: [HostedSessionSummary] = []
     for record in records {
       let mirror = HostedTerminalSession(
@@ -186,6 +208,16 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     guard let mirror = mirrors.removeValue(forKey: id) else { return }
     await mirror.stop(gracePeriod: .seconds(3))
     _ = await request(.release(session: id))
+  }
+
+  public func stepAway() async {
+    awaitsReattach = true
+    // Only what `reconnect` took: nothing is started before the launch has decided.
+    mirrors.removeAll()
+    guard let connection else { return }
+    _ = await request(.goodbye(keepRunning: true), timeout: .seconds(1))
+    self.connection = nil
+    await connection.closeAfterPendingWrites()
   }
 
   public func relinquish(keepRunning: Bool) async {
@@ -243,7 +275,15 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
 
   private func ensureConnected(launching: Bool) async -> Bool {
     if connection != nil { return true }
-    guard !isUnavailable, !isClosed else { return false }
+    guard !isUnavailable, !isClosed, !awaitsReattach else { return false }
+    if let connecting { return await connecting.value }
+    let attempt = Task { await self.connect(launching: launching) }
+    connecting = attempt
+    defer { connecting = nil }
+    return await attempt.value
+  }
+
+  private func connect(launching: Bool) async -> Bool {
     // Twice: a host on its way out, idle, can take the connection and leave with it, and giving
     // up on the first attempt would keep every terminal of this run in the application.
     for _ in 0..<2 {
@@ -318,7 +358,14 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       }
       let first = await group.next() ?? nil
       group.cancelAll()
-      if first == nil { connection.close() }
+      if first == nil {
+        // The host may still read the `hello` and take this copy as its client. Behind it on the
+        // wire, the goodbye lets that client go with the agents running, rather than as a crash
+        // that stops them all.
+        connection.send(
+          .control(TerminalHostRequest(request: 0, body: .goodbye(keepRunning: true))))
+        await connection.closeAfterPendingWrites()
+      }
       return first
     }
   }

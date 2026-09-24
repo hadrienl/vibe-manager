@@ -105,6 +105,8 @@ private actor HostSupervisor: TerminalSupervisor, TerminalHosting {
   func discard(_ id: SessionID) {}
 
   func relinquish(keepRunning: Bool) {}
+
+  func stepAway() {}
 }
 
 /// A host that will not serve until the test lets it.
@@ -130,6 +132,8 @@ private actor ReluctantHost: TerminalHosting {
   func discard(_ id: SessionID) {}
 
   func relinquish(keepRunning: Bool) {}
+
+  func stepAway() {}
 }
 
 @MainActor

@@ -373,6 +373,89 @@ struct TerminalHostTests {
     await host.shutDown()
   }
 
+  @Test("Stepping away from a host leaves its agents running, for the next attempt to find")
+  func steppingAwayKeepsTheAgents() async throws {
+    let host = try InProcessTerminalHost()
+    let first = host.supervisor()
+    let id = SessionID()
+    let session = try await first.start(TerminalTestSupport.spec(script: idleScript), for: id)
+    guard case .running(let processIdentifier) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
+    await first.relinquish(keepRunning: true)
+
+    let second = host.supervisor()
+    guard case .connected = await second.reconnect() else {
+      Issue.record("The host was not found again")
+      return
+    }
+    await second.stepAway()
+
+    let third = host.supervisor()
+    guard case .connected(_, let sessions) = await third.reconnect() else {
+      Issue.record("The host was not found after stepping away")
+      return
+    }
+    #expect(sessions.map(\.id) == [id])
+    #expect(isProcessAlive(processIdentifier))
+    await third.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("Until the kept agents are taken back, a new terminal runs in the application")
+  func keptAgentsAreNotOverridden() async throws {
+    let host = try InProcessTerminalHost()
+    let first = host.supervisor()
+    let kept = SessionID()
+    _ = try await first.start(TerminalTestSupport.spec(script: idleScript), for: kept)
+    await first.relinquish(keepRunning: true)
+    // Another copy holds the host while this one launches.
+    let other = host.supervisor()
+    guard case .connected = await other.reconnect() else {
+      Issue.record("The host was not found again")
+      return
+    }
+    let supervisor = host.supervisor()
+    guard case .unavailable = await supervisor.reconnect() else {
+      Issue.record("A second client was served")
+      return
+    }
+    await other.stepAway()
+
+    // Connecting for it would make this copy the host's client without the kept agent, and its
+    // goodbye would stop an agent nobody had seen again.
+    let started = try await supervisor.start(
+      TerminalTestSupport.spec(script: "printf local"), for: SessionID())
+    #expect(started is PTYTerminalSession)
+
+    guard case .connected(_, let sessions) = await supervisor.reconnect() else {
+      Issue.record("Trying again did not find the host")
+      return
+    }
+    #expect(sessions.map(\.id) == [kept])
+    await supervisor.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("A terminal started again without its host is the one found and stopped")
+  func localRestartIsNotShadowed() async throws {
+    let host = try InProcessTerminalHost()
+    let supervisor = host.supervisor()
+    let id = SessionID()
+    let hosted = try await supervisor.start(TerminalTestSupport.spec(script: "exit 0"), for: id)
+    #expect(await Transcript.follow(hosted).waitForEnd())
+    await host.shutDown()
+    #expect(await eventually { await supervisor.hostIdentity() == nil })
+
+    let local = try await supervisor.start(
+      TerminalTestSupport.spec(script: idleScript), for: id)
+    #expect(local is PTYTerminalSession)
+    #expect(await supervisor.session(for: id) is PTYTerminalSession)
+    await supervisor.stop(id: id, gracePeriod: .seconds(1))
+    #expect(await local.state().isFinished)
+  }
+
   @Test("Reattached, a program is told to draw itself again even at the same size")
   func redrawsAfterReattaching() async throws {
     let host = try InProcessTerminalHost()

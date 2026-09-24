@@ -216,19 +216,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private static let shutdownDeadline: Duration = .seconds(6)
 
   private var hasRepliedToTermination = false
-  /// Set when the Mac is shutting down, restarting or logging out: nothing survives that, and a
-  /// question on screen would hold the logout up for an answer that changes nothing.
-  private var isPoweringOff = false
-  private var powerOffObserver: (any NSObjectProtocol)?
 
-  func applicationDidFinishLaunching(_ notification: Notification) {
-    powerOffObserver = NSWorkspace.shared.notificationCenter.addObserver(
-      forName: NSWorkspace.willPowerOffNotification,
-      object: nil,
-      queue: .main
-    ) { [weak self] _ in
-      MainActor.assumeIsolated { self?.isPoweringOff = true }
-    }
+  /// Whether this quit is the Mac shutting down, restarting or logging out: nothing survives that,
+  /// and a question on screen would hold the logout up for an answer that changes nothing.
+  ///
+  /// Read from the quit event itself rather than remembered from `willPowerOffNotification`: a
+  /// logout another application cancels leaves that notification behind, and every later quit
+  /// would have stopped the agents without asking.
+  private var isPoweringOff: Bool {
+    guard let event = NSAppleEventManager.shared().currentAppleEvent,
+      let reason = event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
+    else { return false }
+    return [kAEShutDown, kAERestart, kAEReallyLogOut, kAELogOut].map { OSType($0) }
+      .contains(reason)
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
