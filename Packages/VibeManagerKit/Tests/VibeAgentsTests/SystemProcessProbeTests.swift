@@ -43,7 +43,9 @@ struct SystemProcessProbeTests {
     let elapsed = clock.now - start
 
     #expect(result.didTimeOut)
-    #expect(elapsed < .seconds(5))
+    // Well under the 30 seconds the command sleeps: that is what shows it was stopped. A tighter
+    // bound measured the runner's load instead, and failed at 6 and 8 seconds on a busy one.
+    #expect(elapsed < .seconds(20))
   }
 
   @Test("Cancelling the task reaps the child instead of waiting for the timeout")
