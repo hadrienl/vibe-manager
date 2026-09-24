@@ -103,6 +103,9 @@ struct SessionNotesEditor: NSViewRepresentable {
         Task { await document.save() }
       }
       document = next
+      // Typing is grouped into one undo action as long as nothing breaks it: left open, the next
+      // session's first keystrokes would join the action registered in this one's undo manager.
+      textView.breakUndoCoalescing()
       textView.layoutManager?.replaceTextStorage(next.storage)
       textView.typingAttributes = NotesStyle.attributes
       let length = next.storage.length
@@ -117,6 +120,10 @@ struct SessionNotesEditor: NSViewRepresentable {
     func detach() {
       guard let document, let textView else { return }
       document.selection = textView.selectedRange()
+      textView.breakUndoCoalescing()
+      // The actions recorded so far act through this text view, which is going away: kept, a ⌘Z
+      // in the next one would do nothing, or edit a layout manager nothing shows any more.
+      document.undoManager.removeAllActions()
       // An empty storage of its own, so the document's is held by one layout manager fewer.
       textView.layoutManager?.replaceTextStorage(NSTextStorage())
       self.document = nil

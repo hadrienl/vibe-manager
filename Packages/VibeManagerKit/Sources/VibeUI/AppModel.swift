@@ -815,7 +815,10 @@ public final class AppModel {
 
     restartFailure = nil
     // The summary is written from the notes on disk: what was just typed has to be there first.
-    await notes.flush(id)
+    // When it cannot be written, the summary takes what the editor holds rather than an older
+    // copy the user can no longer see — and the sheet then judges the same text it shows.
+    let notesOverride: String? =
+      await notes.flush(id) ? nil : (notes.text(for: id) ?? "")
     // Restarting is an answer to the offer too: the session goes back to work on the agent it has.
     switchBackOffers[id] = nil
     do {
@@ -825,7 +828,8 @@ public final class AppModel {
         // A conversation this agent already dropped is not handed back. The user is told so in
         // the summary they are about to read, which is where the news belongs: at the moment
         // they ask for the session again, not as a banner over the one they just closed.
-        skippingResume: skippingResume ?? (resumeRefusals.contains(id) ? .failedLastTime : nil)
+        skippingResume: skippingResume ?? (resumeRefusals.contains(id) ? .failedLastTime : nil),
+        notesOverride: notesOverride
       )
       guard !restart.needsConfirmation || confirmed else {
         pendingRestart = PendingRestart(
