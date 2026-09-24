@@ -23,7 +23,10 @@ private func state(
   branch: BranchStatus = BranchStatus(headRevision: "abc1234def", branchName: "main"),
   operation: RepositoryOperation? = nil,
   phase: RepositoryStatusState.Phase = .fresh,
-  isTruncated: Bool = false
+  isTruncated: Bool = false,
+  committed: [(CommittedFile, Bool)] = [],
+  commitCount: Int = 7,
+  committedTotal: Int? = nil
 ) -> RepositoryStatusState {
   var counts = WorkingTreeCounts()
   for (entry, _) in entries {
@@ -37,11 +40,18 @@ private func state(
   }
   let status = WorkingTreeStatus(
     repositoryPath: path, branch: branch, operation: operation, entries: entries.map(\.0),
-    counts: counts, isTruncated: isTruncated, observedAt: Date(timeIntervalSince1970: 1_000))
+    counts: counts, isTruncated: isTruncated,
+    committed: committed.isEmpty
+      ? nil
+      : BranchCommits(
+        base: "origin/main", mergeBase: "1a2b3c4d5e6f", commitCount: commitCount,
+        files: committed.map(\.0), totalCount: committedTotal ?? committed.count),
+    observedAt: Date(timeIntervalSince1970: 1_000))
   return RepositoryStatusState(
     key: RepositoryStatusKey(sessionID: session, repositoryPath: path), lastValid: status,
-    entries: entries.map { AttributedEntry(entry: $0.0, touchedByAgent: $0.1) }, phase: phase,
-    sharedWith: [])
+    entries: entries.map { AttributedEntry(entry: $0.0, touchedByAgent: $0.1) },
+    committed: committed.map { AttributedCommittedFile(file: $0.0, touchedByAgent: $0.1) },
+    phase: phase, sharedWith: [])
 }
 
 private func tracked(_ path: String, _ staged: FileChange?, _ unstaged: FileChange?)
@@ -107,6 +117,52 @@ struct RepositoryGroupPresentationTests {
     #expect(submodule.change == "submodule, modified content")
     #expect(group.changeCount == 8)
     #expect(group.isExpandedByDefault)
+  }
+
+  @Test("A clean tree on a branch that committed lists its files, and no longer says No changes")
+  func committed() {
+    let group = RepositoryGroupPresentation(
+      report: report(branch: "feat/x"),
+      state: state(
+        [],
+        committed: [
+          (CommittedFile(path: "Sources/App.swift", change: .modified), true),
+          (
+            CommittedFile(path: "new.swift", change: .renamed(from: "old.swift", similarity: 90)),
+            true
+          ),
+          (CommittedFile(path: "gone.txt", change: .deleted), false),
+        ]))
+
+    #expect(group.summary == "Working tree clean — 3 files committed since origin/main")
+    #expect(group.sections.map(\.column) == [.committed])
+    #expect(rows(group, .committed).map(\.letter) == ["M", "R", "D"])
+    #expect(rows(group, .committed)[1].renamedFrom == "old.swift")
+    #expect(!rows(group, .committed)[2].isOnDisk)
+    #expect(
+      rows(group, .committed)[2].accessibilityLabel
+        == "gone.txt, committed: deleted, not in this session's transcript")
+    #expect(group.sections[0].help == "7 commits since origin/main (merge base 1a2b3c4)")
+    // The count is what is not committed yet; the group opens all the same.
+    #expect(group.changeCount == 0)
+    #expect(!group.hasChanges)
+    #expect(group.committedCount == 3)
+    #expect(group.isExpandedByDefault)
+  }
+
+  @Test("Changes and commits are both said; past the limit, the total is kept")
+  func committedBesideChanges() {
+    let group = RepositoryGroupPresentation(
+      report: report(),
+      state: state(
+        [(tracked("a.swift", nil, .modified), true)],
+        committed: [(CommittedFile(path: "b.swift", change: .added), true)],
+        commitCount: 1, committedTotal: 6_000))
+
+    #expect(group.summary == "1 unstaged · 6000 files committed since origin/main")
+    #expect(group.sections.map(\.column) == [.unstaged, .committed])
+    #expect(group.sections[1].totalCount == 6_000)
+    #expect(group.sections[1].help == "1 commit since origin/main (merge base 1a2b3c4)")
   }
 
   @Test("A name macOS wrote decomposed reads composed, and keeps Git's spelling as its key")
@@ -299,6 +355,31 @@ struct GitInspectorModelTests {
 
     git.statesChanged([state([], session: session)])
     #expect(git.selection(in: session) == nil)
+  }
+
+  @Test("A file selected when it is committed follows into Committed, and leaves with it")
+  func selectionFollowsIntoCommitted() {
+    let git = makeModel()
+    git.statesChanged([state([(tracked("a.swift", .modified, nil), true)], session: session)])
+    git.select(row(.staged, "a.swift"), in: session)
+
+    let committed = [(CommittedFile(path: "a.swift", change: .modified), true)]
+    git.statesChanged([state([], session: session, committed: committed)])
+    #expect(git.selection(in: session) == row(.committed, "a.swift"))
+
+    git.statesChanged([state([], session: session)])
+    #expect(git.selection(in: session) == nil)
+  }
+
+  @Test("A long committed list starts folded")
+  func longCommittedList() {
+    let git = makeModel()
+    let many = (0..<60).map { (CommittedFile(path: "f\($0)", change: .added), true) }
+    let few = [(CommittedFile(path: "f", change: .added), true)]
+    let long = RepositoryGroupPresentation(report: report(), state: state([], committed: many))
+    let short = RepositoryGroupPresentation(report: report(), state: state([], committed: few))
+    #expect(!git.isExpanded(long.sections[0], in: session))
+    #expect(git.isExpanded(short.sections[0], in: session))
   }
 
   @Test("Another repository's state leaves the selection alone")

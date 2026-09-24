@@ -2,13 +2,14 @@ import Foundation
 import VibeApplication
 import VibeDomain
 
-/// The four lists a repository's changes fall into, in the order they are shown: what blocks the
-/// agent first, then what `git status` says, in its order.
+/// The five lists a repository's changes fall into, in the order they are shown: what blocks the
+/// agent first, then what `git status` says, in its order, then what the branch already committed.
 enum ChangeColumn: Int, CaseIterable, Hashable, Sendable, Comparable {
   case conflicts
   case staged
   case unstaged
   case untracked
+  case committed
 
   var title: String {
     switch self {
@@ -16,6 +17,7 @@ enum ChangeColumn: Int, CaseIterable, Hashable, Sendable, Comparable {
     case .staged: return "Staged"
     case .unstaged: return "Unstaged"
     case .untracked: return "Untracked"
+    case .committed: return "Committed"
     }
   }
 
@@ -113,6 +115,10 @@ struct FileRow: Equatable, Identifiable, Sendable {
 struct FileSection: Equatable, Identifiable, Sendable {
   let id: GitSectionID
   let rows: [FileRow]
+  /// "7 commits since origin/main (merge base 1a2b3c4)", for the committed list.
+  var help: String?
+  /// Every file of the list, even past the reader's limit.
+  var totalCount: Int?
 
   var column: ChangeColumn { id.column }
 }
@@ -189,7 +195,10 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
   let summary: String
   let details: [String]
   let sections: [FileSection]
+  /// The working tree's entries: what is not committed yet.
   let changeCount: Int
+  /// Files the branch committed since its base, every one counted.
+  let committedCount: Int
   let isTruncated: Bool
   let isLoading: Bool
   let isUnreadable: Bool
@@ -207,8 +216,10 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
   var id: String { repositoryPath }
   var hasChanges: Bool { changeCount > 0 }
 
-  /// Unfolded when there is something to see: changes, or a failure to read about.
-  var isExpandedByDefault: Bool { hasChanges || banner != nil || isUnreadable }
+  /// Unfolded when there is something to see: changes, committed work, or a failure to read about.
+  var isExpandedByDefault: Bool {
+    hasChanges || committedCount > 0 || banner != nil || isUnreadable
+  }
 
   var accessibilityLabel: String {
     var parts = ["Repository \(title)"]
@@ -288,7 +299,7 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
       // they no longer fit the column and the half that matters most is the one cut.
       var details: [String] = []
       if let status {
-        summary = RepositoryStatusPresentation.summary(of: status, unattributed: 0)
+        summary = Self.summary(of: status)
         let unattributed = state.unattributedCount
         if unattributed > 0, !status.isTruncated {
           details.append(
@@ -306,8 +317,15 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
       details = []
     }
 
-    sections = state.map { Self.sections(of: $0.entries, in: report.path) } ?? []
+    var sections = state.map { Self.sections(of: $0.entries, in: report.path) } ?? []
+    if let state, let committed = status?.committed,
+      let section = Self.section(of: state.committed, committed, in: report.path)
+    {
+      sections.append(section)
+    }
+    self.sections = sections
     changeCount = state?.entries.count ?? 0
+    committedCount = status?.committed?.totalCount ?? 0
     isTruncated = status?.isTruncated ?? false
     isLoading = state == nil || (state?.lastValid == nil && state?.phase == .refreshing)
 
@@ -325,6 +343,31 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
       issue = nil
       asOf = nil
     }
+  }
+
+  /// The counts in words; a clean tree on a branch that committed says so rather than "No changes"
+  /// beside a `+7`.
+  static func summary(of status: WorkingTreeStatus) -> String {
+    let summary = RepositoryStatusPresentation.summary(of: status, unattributed: 0)
+    guard let committed = status.committed, committed.totalCount > 0 else { return summary }
+    let files = committed.totalCount == 1 ? "1 file" : "\(committed.totalCount) files"
+    let sentence = "\(files) committed since \(committed.base)"
+    return status.isClean ? "Working tree clean — \(sentence)" : "\(summary) · \(sentence)"
+  }
+
+  /// The files the branch committed, as one list: attributed like the others, since a branch may
+  /// carry commits from before the session.
+  static func section(
+    of files: [AttributedCommittedFile], _ committed: BranchCommits, in repositoryPath: String
+  ) -> FileSection? {
+    guard !files.isEmpty else { return nil }
+    let rows = files.map { FileRow(repositoryPath: repositoryPath, committed: $0) }
+    let commits = committed.commitCount == 1 ? "1 commit" : "\(committed.commitCount) commits"
+    return FileSection(
+      id: GitSectionID(repositoryPath: repositoryPath, column: .committed),
+      rows: rows,
+      help: "\(commits) since \(committed.base) (merge base \(committed.mergeBase.prefix(7)))",
+      totalCount: committed.totalCount)
   }
 
   /// Git's entries, split into their lists. An entry indexed and changed again since (`MM`) is in
@@ -389,26 +432,8 @@ extension FileRow {
     repositoryPath: String, column: ChangeColumn, entry: AttributedEntry, change: FileChange,
     isOnDisk: Bool, submodule: SubmoduleChange? = nil
   ) {
-    var renamedFrom: String?
-    var sentence: String
-    let letter: String
-    let tone: ChangeTone
-    switch change {
-    case .added:
-      (letter, tone, sentence) = ("A", .added, "added")
-    case .modified:
-      (letter, tone, sentence) = ("M", .modified, "modified")
-    case .deleted:
-      (letter, tone, sentence) = ("D", .deleted, "deleted")
-    case .typeChanged:
-      (letter, tone, sentence) = ("T", .modified, "type changed")
-    case .renamed(let from, let similarity):
-      (letter, tone, sentence) = ("R", .renamed, "renamed, \(similarity) % similar")
-      renamedFrom = from.precomposedStringWithCanonicalMapping
-    case .copied(let from, let similarity):
-      (letter, tone, sentence) = ("C", .added, "copied, \(similarity) % similar")
-      renamedFrom = from.precomposedStringWithCanonicalMapping
-    }
+    let (letter, tone, renamedFrom) = (change.letter, change.tone, change.origin)
+    var sentence = change.sentence
     if let submodule {
       var parts: [String] = []
       if submodule.contains(.commitChanged) { parts.append("commit changed") }
@@ -445,6 +470,29 @@ extension FileRow {
       accessibilityLabel: Self.label(
         name: name, directory: directory, column: column, change: change,
         renamedFrom: renamedFrom, isAttributed: entry.touchedByAgent)
+    )
+  }
+
+  /// A file the branch committed. On disk unless the commits deleted it; the gestures check again.
+  fileprivate init(repositoryPath: String, committed: AttributedCommittedFile) {
+    let file = committed.file
+    let (sentence, renamedFrom) = (file.change.sentence, file.change.origin)
+    let (name, directory) = Self.split(file.path)
+    self.init(
+      id: GitInspectorRowID(repositoryPath: repositoryPath, column: .committed, path: file.path),
+      letter: file.change.letter,
+      tone: file.change.tone,
+      name: name,
+      directory: directory,
+      renamedFrom: renamedFrom,
+      change: sentence,
+      isAttributed: committed.touchedByAgent,
+      isOnDisk: file.change != .deleted,
+      isDirectory: false,
+      isSubmodule: false,
+      accessibilityLabel: Self.label(
+        name: name, directory: directory, column: .committed, change: sentence,
+        renamedFrom: renamedFrom, isAttributed: committed.touchedByAgent)
     )
   }
 
@@ -496,6 +544,50 @@ extension FileRow {
         ? change : "\(column.title.lowercased()): \(change)")
     if !isAttributed { parts.append("not in this session's transcript") }
     return parts.joined(separator: ", ")
+  }
+}
+
+extension FileChange {
+  /// The letter `git status --short` and `git diff --name-status` print.
+  fileprivate var letter: String {
+    switch self {
+    case .added: return "A"
+    case .modified: return "M"
+    case .deleted: return "D"
+    case .typeChanged: return "T"
+    case .renamed: return "R"
+    case .copied: return "C"
+    }
+  }
+
+  fileprivate var tone: ChangeTone {
+    switch self {
+    case .added, .copied: return .added
+    case .modified, .typeChanged: return .modified
+    case .deleted: return .deleted
+    case .renamed: return .renamed
+    }
+  }
+
+  fileprivate var sentence: String {
+    switch self {
+    case .added: return "added"
+    case .modified: return "modified"
+    case .deleted: return "deleted"
+    case .typeChanged: return "type changed"
+    case .renamed(_, let similarity): return "renamed, \(similarity) % similar"
+    case .copied(_, let similarity): return "copied, \(similarity) % similar"
+    }
+  }
+
+  /// The path a rename or a copy came from, in NFC for display.
+  fileprivate var origin: String? {
+    switch self {
+    case .renamed(let from, _), .copied(let from, _):
+      return from.precomposedStringWithCanonicalMapping
+    default:
+      return nil
+    }
   }
 }
 

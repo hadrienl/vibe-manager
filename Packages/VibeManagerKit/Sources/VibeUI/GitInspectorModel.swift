@@ -21,7 +21,8 @@ enum DirectoryListingState: Equatable, Sendable {
 final class GitInspectorModel {
   /// How many rows a section shows before "Show More".
   static let pageSize = 200
-  /// An untracked list longer than this starts folded: it is usually a folder `.gitignore` forgot.
+  /// An untracked or committed list longer than this starts folded: a folder `.gitignore` forgot,
+  /// or a branch that carries a long history.
   static let foldedUntrackedThreshold = 50
 
   private struct SessionState {
@@ -130,7 +131,10 @@ final class GitInspectorModel {
 
   private func isExpanded(_ section: GitSectionID, rowCount: Int, in session: SessionID) -> Bool {
     if let chosen = sessions[session]?.sections[section] { return chosen }
-    return section.column != .untracked || rowCount <= Self.foldedUntrackedThreshold
+    switch section.column {
+    case .untracked, .committed: return rowCount <= Self.foldedUntrackedThreshold
+    case .conflicts, .staged, .unstaged: return true
+    }
   }
 
   func setExpanded(_ section: GitSectionID, _ isExpanded: Bool, in session: SessionID) {
@@ -241,6 +245,7 @@ final class GitInspectorModel {
       let session = state.key.sessionID
       let path = state.key.repositoryPath
       entriesByRepository[state.key] = state.entries
+      committedByRepository[state.key] = state.committed
       if let current = sessions[session] {
         let folders = Set(
           state.entries.filter { $0.entry.kind == .untrackedDirectory }.map(\.entry.path))
@@ -261,6 +266,8 @@ final class GitInspectorModel {
   /// The last entries of each repository, to place a selection against.
   @ObservationIgnored private var entriesByRepository: [RepositoryStatusKey: [AttributedEntry]] =
     [:]
+  @ObservationIgnored private var committedByRepository:
+    [RepositoryStatusKey: [AttributedCommittedFile]] = [:]
 
   private func reconcileSelection(in session: SessionID, repositoryPath: String) {
     let key = RepositoryStatusKey(sessionID: session, repositoryPath: repositoryPath)
@@ -270,8 +277,10 @@ final class GitInspectorModel {
     // Only the selected path is looked for: building every row, labels and all, to place one
     // selection would cost more than the publication it follows. Every entry of it counts: Git
     // can list one path twice, a staged deletion beside the untracked file kept on disk.
-    let columns = entries.filter { $0.entry.path == selected.path }
+    let committed = committedByRepository[key] ?? []
+    var columns = entries.filter { $0.entry.path == selected.path }
       .flatMap { ChangeColumn.of($0.entry) }
+    if committed.contains(where: { $0.file.path == selected.path }) { columns.append(.committed) }
     if let child = selected.child {
       // A file of an unfolded folder: kept while its folder is listed and still holds it.
       let parent = GitInspectorRowID(
@@ -288,8 +297,8 @@ final class GitInspectorModel {
       return
     }
     if columns.contains(selected.column) { return }
-    // Staged since, or unstaged again: the file the user picked, not the list it was in.
-    let order: [ChangeColumn] = [.staged, .unstaged, .conflicts, .untracked]
+    // Staged since, unstaged again or committed: the file the user picked, not the list it was in.
+    let order: [ChangeColumn] = [.staged, .unstaged, .conflicts, .untracked, .committed]
     guard let column = order.first(where: columns.contains) else {
       selections[session] = nil
       return
@@ -301,8 +310,12 @@ final class GitInspectorModel {
     // show it, rather than keeping a selection nobody can see.
     var index: Int?
     var rowCount = 0
-    for attributed in entries where ChangeColumn.of(attributed.entry).contains(column) {
-      if index == nil, attributed.entry.path == selected.path { index = rowCount }
+    let paths =
+      column == .committed
+      ? committed.map(\.file.path)
+      : entries.filter { ChangeColumn.of($0.entry).contains(column) }.map(\.entry.path)
+    for path in paths {
+      if index == nil, path == selected.path { index = rowCount }
       rowCount += 1
     }
     if let index, index >= rowLimit(moved.section, in: session) {

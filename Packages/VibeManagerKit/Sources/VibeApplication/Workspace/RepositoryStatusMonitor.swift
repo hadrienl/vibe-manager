@@ -31,6 +31,20 @@ public struct AttributedEntry: Hashable, Sendable, Identifiable {
   public var id: String { entry.id }
 }
 
+/// A file the branch committed, and whether the session's own transcript names it. The branch may
+/// carry commits from before the session: those files are unattributed, not someone else's.
+public struct AttributedCommittedFile: Hashable, Sendable, Identifiable {
+  public let file: CommittedFile
+  public let touchedByAgent: Bool
+
+  public init(file: CommittedFile, touchedByAgent: Bool) {
+    self.file = file
+    self.touchedByAgent = touchedByAgent
+  }
+
+  public var id: String { file.id }
+}
+
 /// What is known of one repository of the session on screen.
 public struct RepositoryStatusState: Equatable, Sendable {
   public enum Phase: Equatable, Sendable {
@@ -49,6 +63,8 @@ public struct RepositoryStatusState: Equatable, Sendable {
   public let lastValid: WorkingTreeStatus?
   /// `lastValid`'s entries, attributed for this session.
   public let entries: [AttributedEntry]
+  /// `lastValid`'s committed files, attributed for this session.
+  public let committed: [AttributedCommittedFile]
   public let phase: Phase
   /// Other sessions working in the same repository: the entries not attributed to this agent may
   /// be theirs.
@@ -58,12 +74,14 @@ public struct RepositoryStatusState: Equatable, Sendable {
     key: RepositoryStatusKey,
     lastValid: WorkingTreeStatus?,
     entries: [AttributedEntry],
+    committed: [AttributedCommittedFile] = [],
     phase: Phase,
     sharedWith: [SessionID]
   ) {
     self.key = key
     self.lastValid = lastValid
     self.entries = entries
+    self.committed = committed
     self.phase = phase
     self.sharedWith = sharedWith
   }
@@ -76,7 +94,7 @@ public struct RepositoryStatusState: Equatable, Sendable {
   /// The same state, whatever the clock said when each was read.
   func hasSameContent(as other: RepositoryStatusState) -> Bool {
     guard key == other.key, phase == other.phase, sharedWith == other.sharedWith,
-      entries == other.entries
+      entries == other.entries, committed == other.committed
     else { return false }
     switch (lastValid, other.lastValid) {
     case (nil, nil): return true
@@ -465,10 +483,14 @@ public actor RepositoryStatusMonitor {
     let entries = (watched.lastValid?.entries ?? []).map { entry in
       AttributedEntry(entry: entry, touchedByAgent: isEdited(entry, in: watched.path))
     }
+    let committed = (watched.lastValid?.committed?.files ?? []).map { file in
+      AttributedCommittedFile(file: file, touchedByAgent: isEdited(file, in: watched.path))
+    }
     return RepositoryStatusState(
       key: RepositoryStatusKey(sessionID: session, repositoryPath: watched.path),
       lastValid: watched.lastValid,
       entries: entries,
+      committed: committed,
       phase: watched.phase,
       sharedWith: watched.sharedWith
     )
@@ -482,6 +504,14 @@ public actor RepositoryStatusMonitor {
     }
     if editedPaths.contains(absolute) { return true }
     if case .tracked(.renamed(let from, _)?, _) = entry.kind {
+      return editedPaths.contains((root as NSString).appendingPathComponent(from))
+    }
+    return false
+  }
+
+  private func isEdited(_ file: CommittedFile, in root: String) -> Bool {
+    if editedPaths.contains((root as NSString).appendingPathComponent(file.path)) { return true }
+    if case .renamed(let from, _) = file.change {
       return editedPaths.contains((root as NSString).appendingPathComponent(from))
     }
     return false
@@ -677,7 +707,8 @@ public actor RepositoryStatusMonitor {
 extension RepositoryStatusState {
   func with(phase: Phase) -> RepositoryStatusState {
     RepositoryStatusState(
-      key: key, lastValid: lastValid, entries: entries, phase: phase, sharedWith: sharedWith)
+      key: key, lastValid: lastValid, entries: entries, committed: committed, phase: phase,
+      sharedWith: sharedWith)
   }
 }
 
