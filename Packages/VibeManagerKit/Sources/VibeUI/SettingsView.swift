@@ -42,6 +42,11 @@ public struct SettingsView: View {
         Section("Git") {
           EditorRow(model: model)
         }
+        if let usage = model.usage {
+          Section("Usage") {
+            UsageSettingsRow(usage: usage)
+          }
+        }
       }
       Section("Privacy") {
         if let permissions {
@@ -248,5 +253,49 @@ private struct EditorRow: View {
       return
     }
     model.fileEditor = .application(bundleIdentifier: identifier)
+  }
+}
+
+/// Turning usage tracking off, and forgetting what it recorded.
+///
+/// Off, nothing is written and no transcript is read for usage; what was recorded stays visible.
+/// Clearing deletes what the application recorded, never the agents' own transcripts.
+private struct UsageSettingsRow: View {
+  let usage: UsageModel
+  @State private var isConfirmingClear = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Toggle(
+        "Track agent usage",
+        isOn: Binding(
+          get: { usage.isTrackingEnabled },
+          set: { enabled in Task { await usage.setTracking(enabled) } }
+        ))
+      Text(
+        """
+        Running time, runs and the tokens your agents' transcripts report, kept on this Mac only. \
+        Nothing is sent anywhere, and what the agents were asked or answered is never read.
+        """
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      Button("Clear Usage Data…") { isConfirmingClear = true }
+        .confirmationDialog(
+          "Clear usage data?", isPresented: $isConfirmingClear
+        ) {
+          Button("Clear Usage Data", role: .destructive) {
+            Task { await usage.clear() }
+          }
+        } message: {
+          Text(
+            """
+            Running times, runs and token totals recorded on this Mac will be deleted. Your \
+            agents' own transcripts are not touched.
+            """
+          )
+        }
+    }
   }
 }

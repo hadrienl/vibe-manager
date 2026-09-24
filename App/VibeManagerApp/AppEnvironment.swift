@@ -40,11 +40,22 @@ final class AppEnvironment {
     // tell a quit from a crash and knows what to put back to work. Deliberately a document of its
     // own, next to the session store and never inside it.
     let recorder = SessionRuntimeRecorder(store: FileSessionRuntimeStateStore(url: data.runtime))
+    let usageLedger = FileUsageLedger(directory: data.usage)
+    let usageTracking = FileUsageTrackingStore(directory: data.usage)
+    let usageRecorder = UsageRecorder(ledger: usageLedger, tracking: usageTracking)
+    let usage = UsageService(
+      recorder: usageRecorder,
+      ledger: usageLedger,
+      tracking: usageTracking,
+      tokenStore: FileTokenUsageStore(directory: data.usage),
+      reader: AgentUsageReader()
+    )
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
       agents: registry,
-      recorder: recorder
+      recorder: recorder,
+      usage: usageRecorder
     )
     self.launcher = launcher
     prepareForQuit = PrepareForQuit(
@@ -100,7 +111,8 @@ final class AppEnvironment {
       notesFileLocation: { notes.fileURL(for: $0) },
       quitPreferences: UserDefaultsQuitPreferences(suiteName: data.defaultsSuite),
       templateRepository: FilePromptTemplateRepository(storeURL: data.templates),
-      templateExchange: PromptTemplateExchangeCodec()
+      templateExchange: PromptTemplateExchangeCodec(),
+      usage: UsageModel(service: usage)
     )
   }
 
@@ -161,12 +173,12 @@ final class AppEnvironment {
   /// either taking the other for a second instance, or migrating the other's sessions.
   private static func dataLocation(
     environment: [String: String] = ProcessInfo.processInfo.environment
-  ) -> (store: URL, runtime: URL, notes: URL, templates: URL, defaultsSuite: String?) {
+  ) -> (store: URL, runtime: URL, notes: URL, templates: URL, usage: URL, defaultsSuite: String?) {
     guard let directory = environment["VIBE_DATA_DIRECTORY"], directory.hasPrefix("/") else {
       return (
         FileSessionRepository.defaultStoreURL(), FileSessionRuntimeStateStore.defaultURL(),
         FileSessionNotesStore.defaultDirectory(), FilePromptTemplateRepository.defaultStoreURL(),
-        nil
+        UsageStorage.defaultDirectory(), nil
       )
     }
     let folder = URL(fileURLWithPath: directory, isDirectory: true)
@@ -175,6 +187,7 @@ final class AppEnvironment {
       folder.appendingPathComponent("runtime.json"),
       folder.appendingPathComponent("Notes", isDirectory: true),
       folder.appendingPathComponent("templates.json"),
+      folder.appendingPathComponent("Usage", isDirectory: true),
       "com.hadrienl.VibeManager.isolated"
     )
   }

@@ -266,6 +266,6 @@ struct CodexAgentProviderTests {
     #expect(capabilities.supportsModelSelection)
     #expect(capabilities.supportsInitialPrompt)
     #expect(capabilities.supportsResume)
-    #expect(!capabilities.reportsUsage)
+    #expect(capabilities.reportsUsage)
   }
 }

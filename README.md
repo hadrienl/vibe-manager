@@ -186,6 +186,15 @@ created. Templates are edited, duplicated, ordered and deleted in the Templates 
 [`docs/prompt-templates.md`](docs/prompt-templates.md). The decisions are documented in
 [`docs/architecture/0018-prompt-templates.md`](docs/architecture/0018-prompt-templates.md).
 
+What the agents used is shown in the Session pane of the inspector and in Window ▸ Usage (⌥⌘U), by
+session, agent or model, over a period. Running time and runs are measured by the application,
+sleep excluded; tokens are read from the transcripts Claude Code and Codex write, marked `≈`, and
+counted from their counters alone — what the agents were asked or answered is never decoded. No
+cost is shown: neither CLI reports one that holds together. Everything stays in `Usage/` beside the
+session store, nothing is sent anywhere, and Settings ▸ General turns tracking off or clears it
+without touching the transcripts. The decisions are documented in
+[`docs/architecture/0019-llm-usage.md`](docs/architecture/0019-llm-usage.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the

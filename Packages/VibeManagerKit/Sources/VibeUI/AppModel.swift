@@ -92,6 +92,8 @@ public final class AppModel {
   public let notes: NotesModel
   /// The prompt templates, shared by their settings tab and the New Session sheet.
   public let templates: PromptTemplateLibraryModel
+  /// The usage figures (#18). Absent in a workspace assembled without them.
+  public let usage: UsageModel?
   /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
   /// menu — can open them on the right one.
   public var settingsTab: SettingsTab = .general
@@ -402,8 +404,11 @@ public final class AppModel {
     /// memory for the run.
     templateRepository: any PromptTemplateRepository = InMemoryPromptTemplateRepository(),
     /// The file format templates are exported to and imported from, when there is one.
-    templateExchange: (any PromptTemplateExchangeFormat)? = nil
+    templateExchange: (any PromptTemplateExchangeFormat)? = nil,
+    /// Where runs are recorded and tokens read. A workspace assembled without it shows no usage.
+    usage: UsageModel? = nil
   ) {
+    self.usage = usage
     templates = PromptTemplateLibraryModel(
       repository: templateRepository, exchange: templateExchange, clock: clock)
     notes = NotesModel(
@@ -472,6 +477,8 @@ public final class AppModel {
     templates.libraryDidChange = { [weak self] library in
       self?.newSessionModel?.templatesChanged(library.templates)
     }
+
+    usage?.connect { [weak self] in self?.sessions ?? [] }
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
@@ -1283,8 +1290,20 @@ public final class AppModel {
     hostUnavailableReason = nil
     await reload()
     await reattach(shutdown)
+    // The first attempt sealed the usage too: settled now, before anything is resumed, or the
+    // runs of this whole launch would go unrecorded.
+    await settleUsage()
     announce(shutdown)
     await resume(shutdown)
+  }
+
+  /// Once the host has said which agents it kept: those runs go on, the others ended while away.
+  private func settleUsage() async {
+    guard let usage else { return }
+    let running = Set(sessions.map(\.id).filter { launcher?.isRunning($0) == true })
+    // A copy of the application that found another one working here only reads.
+    let readOnly = await runtimeRecorder?.isReadOnly() ?? false
+    await usage.settleLaunch(running: running, sessions: sessions, readOnly: readOnly)
   }
 
   /// Empties the queue. What is already running keeps running: stopping an agent that has just
@@ -1482,9 +1501,15 @@ public final class AppModel {
     // frame — is the lie this whole ticket is about.
     let shutdown = await detectPreviousShutdown?()
     await reload()
+    // Which agents write a usage is part of their description, known without probing any of them.
+    if let usage, let agents {
+      usage.reportingProviderIDs = Set(
+        await agents.descriptors().filter(\.capabilities.reportsUsage).map(\.id.rawValue))
+    }
     // Before anything is said or probed: these agents are running now, and their panes are how
     // the list shows it.
     await reattach(shutdown)
+    await settleUsage()
     // Said as soon as the list is on screen. An offer asks no provider anything, and waiting for
     // the detections to announce it meant a minute of silence after a crash — on a cold cache,
     // with a CLI that answers none of its probes, the banner arrived long after the user had
@@ -1510,6 +1535,8 @@ public final class AppModel {
     defer { isRefreshingAgents = false }
 
     let descriptors = await agents.descriptors()
+    usage?.reportingProviderIDs = Set(
+      descriptors.filter(\.capabilities.reportsUsage).map(\.id.rawValue))
     var diagnostics: [AgentProviderID: AgentDiagnostic] = [:]
 
     await withTaskGroup(of: (AgentProviderID, AgentAvailability?).self) { group in

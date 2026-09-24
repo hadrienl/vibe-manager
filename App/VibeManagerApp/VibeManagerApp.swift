@@ -99,6 +99,14 @@ struct VibeManagerApp: App {
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
+
+    // One window, reopened rather than duplicated. SwiftUI lists it in the Window menu itself,
+    // so the shortcut goes on the scene rather than on a second menu item.
+    Window("Usage", id: "usage") {
+      UsageWindow(model: environment.appModel)
+    }
+    .defaultSize(width: 820, height: 560)
+    .keyboardShortcut("u", modifiers: [.command, .option])
   }
 }
 
