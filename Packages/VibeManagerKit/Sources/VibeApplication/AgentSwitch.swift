@@ -373,8 +373,9 @@ public struct PlanAgentSwitch: Sendable {
       return planned(try await plan(prompt: nil, resume: .none), .freshWithoutContext)
     }
 
+    let generated = self.summary(for: context ?? SessionBriefInput(session: session), to: target)
     let summary: SessionContextBrief
-    if let summaryOverride {
+    if let summaryOverride, summaryOverride != generated.text {
       guard !summaryOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         return planned(try await plan(prompt: nil, resume: .none), .freshWithoutContext)
       }
@@ -386,7 +387,8 @@ public struct PlanAgentSwitch: Sendable {
         overflowByteCount: max(0, overflow)
       )
     } else {
-      summary = self.summary(for: context ?? SessionBriefInput(session: session), to: target)
+      // The text the sheet showed untouched keeps what is known of it — shortened, and from what.
+      summary = generated
     }
     // Never cut here: the user is told by how much, and shortens it themselves.
     guard summary.fits else {

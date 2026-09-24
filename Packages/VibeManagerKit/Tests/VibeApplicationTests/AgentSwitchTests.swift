@@ -132,6 +132,24 @@ struct AgentSwitchTests {
         == SessionAgentConfiguration(providerID: "codex", modelID: "gpt-5.5"))
   }
 
+  @Test("The summary sent as the sheet showed it stays known as shortened; an edited one does not")
+  func unchangedSummaryKeepsItsTruncation() async throws {
+    let stored = session(notes: String(repeating: "note. ", count: 200_000))
+    let (plan, _) = subject(stored)
+    let context = SessionBriefInput(session: stored, agentNames: Self.names)
+    let target = AgentTarget(providerID: "codex")
+    let shown = plan.summary(for: context, to: target)
+    #expect(shown.isTruncated)
+
+    let unchanged = try await plan(
+      id: stored.id, to: target, context: context, summaryOverride: shown.text)
+    let edited = try await plan(
+      id: stored.id, to: target, context: context, summaryOverride: "Keep lodash.")
+
+    #expect(try #require(unchanged.mode.brief) == shown)
+    #expect(try #require(edited.mode.brief).isTruncated == false)
+  }
+
   @Test("An emptied summary tells the new agent nothing")
   func emptiedSummaryStartsFresh() async throws {
     let stored = session()

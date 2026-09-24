@@ -276,11 +276,15 @@ public final class AgentSwitchModel {
   }
 
   private func loadModels() async {
+    // Another agent may be picked while this one's models load: its list is not this one's.
+    let providerID = providerID
     guard let provider = await registry.provider(id: AgentProviderID(providerID)) else {
-      models = []
+      if providerID == self.providerID { models = [] }
       return
     }
-    models = await provider.models()
+    let loaded = await provider.models()
+    guard providerID == self.providerID else { return }
+    models = loaded
     // A model this agent does not list is dropped, as at creation — except the one the session
     // runs, which it may still be running whatever the catalogue says today.
     if let modelID, !models.isEmpty, !models.contains(where: { $0.id == modelID }),
