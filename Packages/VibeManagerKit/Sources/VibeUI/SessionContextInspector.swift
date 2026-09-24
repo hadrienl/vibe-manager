@@ -446,7 +446,7 @@ private struct RepositoryGroupView: View, Equatable {
       if showsBanner, let banner = group.banner {
         IssueBannerView(banner: banner, actions: bannerActions)
       }
-      if let asOf = group.asOf, group.hasChanges {
+      if let asOf = group.asOf, group.hasChanges || group.committedCount > 0 {
         Text("As of \(asOf.formatted(date: .omitted, time: .shortened))")
           .font(.caption2)
           .foregroundStyle(.tertiary)
@@ -599,6 +599,11 @@ private struct FileSectionView: View {
           DirectoryContents(row: row, listing: git.listing(of: row.id, in: session))
         }
       }
+      if let total = section.totalCount, total > section.rows.count, section.rows.count <= limit {
+        Text("and \(total - section.rows.count) more, not listed")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
       if section.rows.count > limit {
         HStack(spacing: 10) {
           Button("Show \(min(GitInspectorModel.pageSize, section.rows.count - limit)) More") {
@@ -616,12 +621,15 @@ private struct FileSectionView: View {
         Text(section.column.title)
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
-        Text("\(section.rows.count)")
+        Text("\(section.totalCount ?? section.rows.count)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(.tertiary)
       }
+      .help(section.help ?? "")
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel("\(section.column.title), \(section.rows.count)")
+      .accessibilityLabel(
+        ["\(section.column.title), \(section.totalCount ?? section.rows.count)", section.help]
+          .compactMap { $0 }.joined(separator: ", "))
     }
   }
 

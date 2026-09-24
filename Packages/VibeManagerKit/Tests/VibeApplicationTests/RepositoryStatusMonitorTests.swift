@@ -48,6 +48,38 @@ struct RepositoryStatusMonitorTests {
     #expect(await reader.readCount("/work/api") == 1)
   }
 
+  @Test("The files a branch committed are attributed like the others, renames by their origin")
+  func committedAttribution() async {
+    let reader = ScriptedStatusReader()
+    await reader.answer(
+      "/work/api",
+      with: .success(
+        WorkingTreeStatus(
+          repositoryPath: "/work/api", branch: BranchStatus(headRevision: "abc", branchName: "x"),
+          entries: [], counts: WorkingTreeCounts(),
+          committed: BranchCommits(
+            base: "origin/main", mergeBase: "def", commitCount: 2,
+            files: [
+              CommittedFile(path: "Sources/A.swift", change: .modified),
+              CommittedFile(path: "B.swift", change: .renamed(from: "Old.swift", similarity: 95)),
+              CommittedFile(path: "C.swift", change: .added),
+            ], totalCount: 3),
+          observedAt: Date())))
+    let transcripts = TableTranscriptSource(edited: [
+      "/work/api/Sources/A.swift", "/work/api/Old.swift",
+    ])
+    let monitor = makeMonitor(reader: reader, transcripts: transcripts)
+    let recorder = StatusUpdateRecorder.listening(to: monitor)
+
+    await monitor.observe(session, repositories: [ObservedRepository(path: "/work/api")])
+
+    #expect(await eventually { await recorder.latest("/work/api")?.phase == .fresh })
+    let state = await recorder.latest("/work/api")
+    #expect(state?.committed.map(\.touchedByAgent) == [true, true, false])
+    // Only what is not committed yet counts as unattributed: nothing, here.
+    #expect(state?.unattributedCount == 0)
+  }
+
   @Test("Without a signal from the disk, nothing is read again")
   func noPolling() async throws {
     let reader = ScriptedStatusReader()
