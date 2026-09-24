@@ -12,7 +12,7 @@ import VibeDomain
 /// It is not kept in the user defaults either: `cfprefsd` writes when it decides to, and this
 /// document is written immediately before the application dies.
 public actor FileSessionRuntimeStateStore: SessionRuntimeStateStore {
-  /// 2 added the `detached` phase, the host and the sessions to resume beside it (ADR 0016). A
+  /// 2 added the `detached` phase, the host and the sessions to resume beside it (ADR 0017). A
   /// build that only knows 1 reads a 2 as nothing to honour, which is the safe way to downgrade.
   private static let currentSchemaVersion = 2
   private static let readableSchemaVersions: Set<Int> = [1, 2]

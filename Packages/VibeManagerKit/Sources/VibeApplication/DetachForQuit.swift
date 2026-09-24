@@ -17,7 +17,7 @@ public struct SessionDetachment: Equatable, Sendable {
 /// Quits and leaves the agents working: the other answer to the question `PrepareForQuit` answers.
 ///
 /// Nothing is written to the store for a session that is left running, because it *is* active:
-/// the whole point of ADR 0016 is that the store may now say so of a process the application no
+/// the whole point of ADR 0017 is that the store may now say so of a process the application no
 /// longer holds. A session whose process lives in the application itself — the host could not be
 /// started for it — cannot be left, and goes the way of a plain quit: stopped, closed, and named
 /// in the intention to resume.

@@ -24,7 +24,7 @@ public struct SameUserPeerVerifier: TerminalHostPeerVerifier {
 
 /// The same user, running code signed as this very application.
 ///
-/// The host is the application's own binary in another mode (ADR 0016), so each end demands of
+/// The host is the application's own binary in another mode (ADR 0017), so each end demands of
 /// the other what it is itself, without a team identifier written anywhere:
 ///
 /// - **signed by a team**, the designated requirement: that bundle identifier and that team. It

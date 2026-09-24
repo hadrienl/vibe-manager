@@ -1,4 +1,4 @@
-# 0016 — A terminal host, so the agents can outlive the application
+# 0017 — A terminal host, so the agents can outlive the application
 
 - Status: accepted
 - Date: 2026-09-24

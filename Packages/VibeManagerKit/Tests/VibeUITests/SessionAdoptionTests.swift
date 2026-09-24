@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 // Taking back what the terminal host kept while the application was closed, and letting go of it
-// on the way out (ADR 0016).
+// on the way out (ADR 0017).
 
 /// A terminal that runs in the host, as far as the launcher can tell.
 private actor HostedWorkspaceTerminal: HostedTerminal {

@@ -3,7 +3,7 @@ import Testing
 import VibeApplication
 import VibeDomain
 
-// Leaving the agents running when the application quits, and finding them again (ADR 0016).
+// Leaving the agents running when the application quits, and finding them again (ADR 0017).
 
 private let launch = Date(timeIntervalSince1970: 1_700_000_000)
 private let quitAt = Date(timeIntervalSince1970: 1_700_000_600)

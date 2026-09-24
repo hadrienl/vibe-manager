@@ -1,6 +1,6 @@
 # ADR 0004: Terminal pseudo terminals and process supervision
 
-- Status: Accepted; partly superseded by [0016](0016-terminal-host.md), where the sessions now run
+- Status: Accepted; partly superseded by [0017](0017-terminal-host.md), where the sessions now run
   in a terminal host that can outlive the application
 - Date: 2026-09-21
 - Decision owners: Vibe Manager maintainers

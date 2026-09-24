@@ -4,7 +4,7 @@ import VibeApplication
 import VibeDomain
 
 /// The application's side of the terminal host: a `TerminalSupervisor` whose terminals run in
-/// another process, so they can be left running when the application quits (ADR 0016).
+/// another process, so they can be left running when the application quits (ADR 0017).
 ///
 /// Every terminal goes through the host — there is one road to a process, not two. When the host
 /// cannot be started or will not prove it is ours, a terminal is started here instead, exactly as

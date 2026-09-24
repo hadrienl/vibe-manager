@@ -5,7 +5,7 @@ import VibeDomain
 import VibeTerminal
 import VibeUI
 
-/// The one binary is two programs. Given `--terminal-host`, it is the terminal host (ADR 0016) and
+/// The one binary is two programs. Given `--terminal-host`, it is the terminal host (ADR 0017) and
 /// never returns: no `NSApplication` is created, so it has no Dock icon, no menu bar and no window.
 /// Being the same signed binary is the point: TCC and the host's peer check both see Vibe Manager.
 @main

@@ -36,7 +36,7 @@ public struct TerminalScrollbackLimits: Hashable, Codable, Sendable {
 }
 
 /// `Codable`, like the values around it, because it crosses to the terminal host as it is
-/// (ADR 0016): the agent is started there with exactly the environment computed here.
+/// (ADR 0017): the agent is started there with exactly the environment computed here.
 public struct TerminalSpec: Hashable, Codable, Sendable {
   public var executableURL: URL
   public var arguments: [String]

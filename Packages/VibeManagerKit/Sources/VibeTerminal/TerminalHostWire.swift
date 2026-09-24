@@ -2,7 +2,7 @@ import Foundation
 import VibeApplication
 import VibeDomain
 
-/// The wire between the application and the terminal host (ADR 0016).
+/// The wire between the application and the terminal host (ADR 0017).
 ///
 /// A frame is a big-endian `u32` length, a `u8` kind and a payload. Control messages are JSON, so
 /// a capture can be read by hand the way `runtime.json` can; terminal bytes travel raw, behind the

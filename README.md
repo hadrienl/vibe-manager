@@ -133,7 +133,7 @@ one that finished meanwhile shows its last output. The host accepts only a clien
 itself, stops everything when its client vanishes without saying goodbye, and leaves by itself
 once it holds nothing. A restart of the Mac falls back to #11's native resume. The protocol, the
 fifth verdict and who TCC holds responsible are documented in
-[`docs/architecture/0016-terminal-host.md`](docs/architecture/0016-terminal-host.md). Set
+[`docs/architecture/0017-terminal-host.md`](docs/architecture/0017-terminal-host.md). Set
 `VIBE_TERMINAL_HOST=off` to keep every terminal inside the application, as a debugger expects.
 
 The application never creates a branch or a worktree: the agent makes those it needs. The

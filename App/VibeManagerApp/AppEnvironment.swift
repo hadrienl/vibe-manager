@@ -26,7 +26,7 @@ final class AppEnvironment {
     let notes = FileSessionNotesStore(directory: data.notes)
     let registry = AgentProviderRegistry(providers: Self.providers())
     // Every terminal runs in the terminal host, so its agent can be left running when the
-    // application quits (ADR 0016). One host per data directory: an isolated copy has its own.
+    // application quits (ADR 0017). One host per data directory: an isolated copy has its own.
     let supervisor = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: TerminalHostLocation(dataDirectory: data.store.deletingLastPathComponent()),
@@ -143,7 +143,7 @@ final class AppEnvironment {
   }
 
   /// The application's own binary, started with `--terminal-host`. `VIBE_TERMINAL_HOST=off` starts
-  /// none — every terminal then runs in the application, as before ADR 0016 — which is how a
+  /// none — every terminal then runs in the application, as before ADR 0017 — which is how a
   /// development build keeps its agents inside the process a debugger is attached to.
   private static func hostLauncher(
     environment: [String: String] = ProcessInfo.processInfo.environment
