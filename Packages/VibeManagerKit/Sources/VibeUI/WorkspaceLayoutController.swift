@@ -11,9 +11,26 @@ import VibeDomain
 @MainActor
 @Observable
 public final class WorkspaceLayoutController {
-  public private(set) var intent: WorkspaceLayout
+  /// What the user asked for, with the column widths last measured.
+  public var intent: WorkspaceLayout {
+    var layout = settings
+    layout.sidebarWidth = measuredWidths.sidebar
+    layout.inspectorWidth = measuredWidths.inspector
+    return layout
+  }
   public private(set) var columns: WorkspaceColumns
   public private(set) var windowWidth: Double = 0
+
+  /// Everything in the layout but the column widths — what the views read.
+  private var settings: WorkspaceLayout
+  /// Measured during layout, and only ever written back to the store: no view draws from them.
+  ///
+  /// Kept out of observation on purpose. The root reads the layout, so a width written into it
+  /// invalidated the whole window from inside the layout pass that measured it — split view,
+  /// inspector and toolbar — and they measured again. A window snapped to half the screen
+  /// resizes in a single display cycle: AppKit counted past its loop guard and threw, which with
+  /// an application built for development is a crash.
+  @ObservationIgnored private var measuredWidths: (sidebar: Double, inspector: Double)
 
   /// A column the user asked for while the window was too narrow for it.
   ///
@@ -35,7 +52,8 @@ public final class WorkspaceLayoutController {
   ) {
     self.store = store
     self.saveDelay = saveDelay
-    intent = layout
+    settings = layout
+    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth)
     columns = WorkspaceLayoutPolicy.resolve(windowWidth: 0, intent: layout)
   }
 
@@ -49,8 +67,8 @@ public final class WorkspaceLayoutController {
   }
 
   public func select(_ id: SessionID?) {
-    guard intent.selectedSessionID != id else { return }
-    intent.selectedSessionID = id
+    guard settings.selectedSessionID != id else { return }
+    settings.selectedSessionID = id
     scheduleSave()
   }
 
@@ -130,21 +148,21 @@ public final class WorkspaceLayoutController {
   /// on its way out reports widths under its own minimum, and those are not an arrangement.
   public func sidebarWidthChanged(to width: Double) {
     guard let measured = WorkspaceLayout.measured(width, in: WorkspaceLayout.sidebarWidthRange),
-      abs(measured - intent.sidebarWidth) >= 1
+      abs(measured - measuredWidths.sidebar) >= 1
     else {
       return
     }
-    intent.sidebarWidth = measured
+    measuredWidths.sidebar = measured
     scheduleSave()
   }
 
   public func inspectorWidthChanged(to width: Double) {
     guard let measured = WorkspaceLayout.measured(width, in: WorkspaceLayout.inspectorWidthRange),
-      abs(measured - intent.inspectorWidth) >= 1
+      abs(measured - measuredWidths.inspector) >= 1
     else {
       return
     }
-    intent.inspectorWidth = measured
+    measuredWidths.inspector = measured
     scheduleSave()
   }
 
@@ -152,16 +170,16 @@ public final class WorkspaceLayoutController {
   public func inspectorSplitChanged(to fraction: Double) {
     guard fraction.isFinite else { return }
     let bounded = WorkspaceLayout.bounded(
-      fraction, in: WorkspaceLayout.inspectorSplitRange, fallback: intent.inspectorSplit)
-    guard abs(bounded - intent.inspectorSplit) >= 0.005 else { return }
-    intent.inspectorSplit = bounded
+      fraction, in: WorkspaceLayout.inspectorSplitRange, fallback: settings.inspectorSplit)
+    guard abs(bounded - settings.inspectorSplit) >= 0.005 else { return }
+    settings.inspectorSplit = bounded
     scheduleSave()
   }
 
   /// Whether the agent and the initial prompt are unfolded under the notes.
   public func setSessionDetailsExpanded(_ isExpanded: Bool) {
-    guard intent.isSessionDetailsExpanded != isExpanded else { return }
-    intent.isSessionDetailsExpanded = isExpanded
+    guard settings.isSessionDetailsExpanded != isExpanded else { return }
+    settings.isSessionDetailsExpanded = isExpanded
     scheduleSave()
   }
 
@@ -174,7 +192,8 @@ public final class WorkspaceLayoutController {
   }
 
   private func apply(_ layout: WorkspaceLayout) {
-    intent = layout
+    settings = layout
+    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth)
     resolveColumns()
   }
 
@@ -189,10 +208,10 @@ public final class WorkspaceLayoutController {
   }
 
   private func updateIntent(_ change: (inout WorkspaceLayout) -> Void) {
-    var updated = intent
+    var updated = settings
     change(&updated)
-    guard updated != intent else { return }
-    intent = updated
+    guard updated != settings else { return }
+    settings = updated
     scheduleSave()
   }
 
