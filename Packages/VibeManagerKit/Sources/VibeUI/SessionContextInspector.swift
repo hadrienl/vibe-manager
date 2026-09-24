@@ -25,6 +25,7 @@ struct SessionContextInspector: View {
   private let switchAgent: (() -> Void)?
   private let notes: NotesModel?
   private let leaveNotes: () -> Void
+  private let usage: UsageModel?
   private let isDetailsExpanded: Bool
   private let detailsExpandedChanged: (Bool) -> Void
 
@@ -43,12 +44,14 @@ struct SessionContextInspector: View {
     switchAgent: (() -> Void)? = nil,
     notes: NotesModel? = nil,
     leaveNotes: @escaping () -> Void = {},
+    usage: UsageModel? = nil,
     isDetailsExpanded: Bool = true,
     detailsExpandedChanged: @escaping (Bool) -> Void = { _ in }
   ) {
     self.session = session
     self.notes = notes
     self.leaveNotes = leaveNotes
+    self.usage = usage
     self.isDetailsExpanded = isDetailsExpanded
     self.detailsExpandedChanged = detailsExpandedChanged
     self.resolution = resolution
@@ -82,7 +85,7 @@ struct SessionContextInspector: View {
     } bottom: {
       SessionPane(
         session: session, resolution: resolution, agentNames: agentNames,
-        switchAgent: switchAgent, notes: notes, leaveNotes: leaveNotes,
+        switchAgent: switchAgent, notes: notes, leaveNotes: leaveNotes, usage: usage,
         isDetailsExpanded: isDetailsExpanded, detailsExpandedChanged: detailsExpandedChanged)
     }
   }
@@ -190,6 +193,7 @@ private struct SessionPane: View {
   let switchAgent: (() -> Void)?
   let notes: NotesModel?
   let leaveNotes: () -> Void
+  let usage: UsageModel?
   let isDetailsExpanded: Bool
   let detailsExpandedChanged: (Bool) -> Void
 
@@ -220,7 +224,7 @@ private struct SessionPane: View {
         Image(systemName: "chevron.right")
           .rotationEffect(.degrees(isDetailsExpanded ? 90 : 0))
           .font(.caption2.weight(.semibold))
-        Text("Agent & initial prompt")
+        Text(usage == nil ? "Agent & initial prompt" : "Agent, usage & initial prompt")
           .font(.subheadline.weight(.semibold))
         Spacer()
       }
@@ -230,7 +234,9 @@ private struct SessionPane: View {
     .buttonStyle(.plain)
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
-    .accessibilityLabel("Agent and initial prompt")
+    .accessibilityLabel(
+      usage == nil ? "Agent and initial prompt" : "Agent, usage and initial prompt"
+    )
     .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
   }
 
@@ -252,6 +258,10 @@ private struct SessionPane: View {
               .accessibilityLabel("Switch the agent of \(session.name)")
           }
         }
+      }
+
+      if let usage {
+        SessionUsageSection(session: session, usage: usage, agentNames: agentNames)
       }
 
       Section("Initial prompt") {

@@ -323,6 +323,7 @@ public struct RootView: View {
                 ? { model.beginAgentSwitch(session.id) } : nil,
               notes: model.notes,
               leaveNotes: { model.focusTerminal() },
+              usage: model.usage,
               isDetailsExpanded: model.layout.intent.isSessionDetailsExpanded,
               detailsExpandedChanged: { model.layout.setSessionDetailsExpanded($0) }
             )

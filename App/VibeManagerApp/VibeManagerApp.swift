@@ -99,6 +99,18 @@ struct VibeManagerApp: App {
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
+
+    // One window, reopened rather than duplicated.
+    Window("Usage", id: UsageWindowCommand.windowID) {
+      UsageWindow(model: environment.appModel)
+    }
+    .defaultSize(width: 820, height: 560)
+    .commands {
+      CommandGroup(before: .windowList) {
+        UsageWindowCommand()
+        Divider()
+      }
+    }
   }
 }
 
@@ -437,5 +449,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard !hasRepliedToTermination else { return }
     hasRepliedToTermination = true
     NSApplication.shared.reply(toApplicationShouldTerminate: true)
+  }
+}
+
+/// Window › Usage (⌥⌘U).
+private struct UsageWindowCommand: View {
+  static let windowID = "usage"
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    Button("Usage") {
+      openWindow(id: Self.windowID)
+    }
+    .keyboardShortcut("u", modifiers: [.command, .option])
   }
 }

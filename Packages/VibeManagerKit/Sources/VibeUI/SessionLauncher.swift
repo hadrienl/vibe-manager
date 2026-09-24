@@ -38,6 +38,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// Where what is running is written down, for the next launch to read. Absent in a workspace
   /// assembled without the system around it, and the launcher then simply keeps no record.
   private let recorder: SessionRuntimeRecorder?
+  /// Where each run of an agent is written down for the usage figures (#18). Absent in a workspace
+  /// assembled without it, and no run is then recorded.
+  private let usage: UsageRecorder?
 
   private var panes: [SessionID: TerminalPaneModel] = [:]
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
@@ -68,6 +71,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     recorder: SessionRuntimeRecorder? = nil,
+    usage: UsageRecorder? = nil,
     clock: any SessionClock = SystemSessionClock(),
     viewportTimeout: Duration = .milliseconds(500)
   ) {
@@ -75,6 +79,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     self.repository = repository
     self.agents = agents
     self.recorder = recorder
+    self.usage = usage
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
@@ -93,7 +98,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// Create twice, or restoring a session that is already up, must not fork a second agent.
   @discardableResult
   public func launch(session: WorkSession, plan: AgentLaunchPlan) async -> Bool {
-    await start(session: session, plan: plan, notice: nil).isRunningNow
+    await start(session: session, plan: plan, notice: nil, run: UsageRunContext(kind: .start))
+      .isRunningNow
   }
 
   /// - Parameter notice: a line written into the terminal just above the process, for a restart.
@@ -103,7 +109,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private func start(
     session: WorkSession,
     plan: AgentLaunchPlan,
-    notice: String?
+    notice: String?,
+    run: UsageRunContext
   ) async -> SessionStartOutcome {
     // An archived session is out of reach by design. Refusing here, rather than only hiding the
     // command, is what lets #10's Restart and #11's restore walk the whole store without having
@@ -154,6 +161,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
         )
       }
     }
+    // The run is recorded before the exit is watched: a process that ends at once — a resume the
+    // CLI refuses — has its exit seen during the awaits below, and a start written after that
+    // would open a run nothing ever closes. The session read back from the store names the model
+    // the switch or the restart settled on.
+    let model = ((try? await repository.session(id: session.id)) ?? nil)?.agent?.modelID
+    await usage?.started(
+      session.id, providerID: plan.providerID.rawValue, modelID: model ?? session.agent?.modelID,
+      context: run)
     watchForExit(id: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     // Recorded once there is something to record, and from the terminal rather than from the
@@ -168,7 +183,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
 
   /// The port #11 restores through. One road to a process, and this is the door on it.
   public func attemptRestart(_ restart: SessionRestart) async -> SessionRestartAttempt {
-    switch await self.restart(restart) {
+    switch await self.restart(restart, afterRelaunch: true) {
     case .started, .alreadyRunning:
       return .started
     case .failed(let reason):
@@ -193,13 +208,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// A session that turns out to be running already answers `alreadyRunning`, not a failure: the
   /// agent the user asked for is up, and reporting that as an error put a banner over it.
   @discardableResult
-  public func restart(_ restart: SessionRestart, at date: Date = Date())
-    async -> SessionStartOutcome
-  {
+  public func restart(
+    _ restart: SessionRestart, at date: Date = Date(), afterRelaunch: Bool = false
+  ) async -> SessionStartOutcome {
     await start(
       session: restart.session,
       plan: restart.plan,
-      notice: Self.separator(for: restart.mode, at: date)
+      notice: Self.separator(for: restart.mode, at: date),
+      run: UsageRunContext(kind: Self.usageKind(for: restart.mode), afterRelaunch: afterRelaunch)
     )
   }
 
@@ -217,8 +233,28 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     await start(
       session: session,
       plan: plan.plan,
-      notice: Self.switchSeparator(for: plan, previous: previous, at: date)
+      notice: Self.switchSeparator(for: plan, previous: previous, at: date),
+      run: UsageRunContext(kind: Self.usageKind(for: plan.mode), afterSwitch: true)
     )
+  }
+
+  /// What a restart is, for the usage figures.
+  static func usageKind(for mode: SessionRestartMode) -> UsageRunKind {
+    switch mode {
+    case .firstLaunch: return .start
+    case .native: return .resume
+    case .freshWithContext: return .restartWithSummary
+    case .freshWithoutContext: return .restartFresh
+    }
+  }
+
+  static func usageKind(for mode: AgentSwitchMode) -> UsageRunKind {
+    switch mode {
+    case .firstLaunch: return .start
+    case .resumeWithModel: return .resume
+    case .handover: return .restartWithSummary
+    case .freshWithoutContext: return .restartFresh
+    }
   }
 
   /// The line written into the terminal above the agent a session was switched to.
@@ -319,6 +355,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     if let observer = observers.removeValue(forKey: id) {
       await observer.finished()
     }
+    // The run goes on without the application: the next launch says how it ended.
+    await usage?.detached(id)
     return true
   }
 
@@ -402,6 +440,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // identifiers have just been erased: nothing to look for at the next launch, and nothing to
     // tell the user about.
     await recorder?.stopped(id)
+    await usage?.ended(id, exit: .stopped)
 
     // Asked before "was it running": a terminal whose group could not be reaped is already
     // finished, so answering `wasNotRunning` first would drop the warning on exactly the session
@@ -469,6 +508,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // actor — by a detach, or by a relaunch that installed its own. Only the current one speaks.
     guard exitGenerations[id] == generation else { return }
     await recorder?.stopped(id)
+    await usage?.ended(id, exit: .exited)
     // Asked again after every suspension: a switch can stop, record and relaunch the session
     // while this watch waits, and what follows would then finish the *new* agent's observer,
     // close the session under it and report its exit.
