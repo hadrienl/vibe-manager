@@ -381,10 +381,11 @@ struct SessionHistoryTests {
 
     let closed = model.sessions.first { $0.id == running.id }
     #expect(closed?.status == .closed)
-    #expect(model.selectedSession.map(model.canClose) == false)
+    // The last running session is gone from the list, and the selection with it: ⌘W beeps.
+    #expect((model.selectedSession.map(model.canClose) ?? false) == false)
   }
 
-  @Test("A session whose agent has stopped closes without asking, and stays selected")
+  @Test("A session whose agent has stopped closes without asking, and the next one is selected")
   func closingAStoppedAgentDoesNotAsk() async {
     let stored = session(name: "Idle", status: .active)
     let other = session(name: "Next", status: .active)
@@ -397,12 +398,13 @@ struct SessionHistoryTests {
 
     #expect(model.pendingClose == nil)
     #expect(model.sessions.first { $0.id == stored.id }?.status == .closed)
-    // The closed session keeps the detail column, with its closed bar; nothing moves on.
-    #expect(model.selectedSessionID == stored.id)
+    // The user closed it to get on with the next one.
+    #expect(model.selectedSessionID == other.id)
+    #expect(model.filter.scope == .active)
   }
 
-  @Test("Two ⌘W in a row close one session, not the next one")
-  func twoCloseCommandsCloseOneSession() async {
+  @Test("Two ⌘W in a row close the selected session, then the next one")
+  func twoCloseCommandsCloseTwoSessions() async {
     let first = session(name: "First", status: .active)
     let second = session(name: "Second", status: .active)
     let repository = MutableRepository(sessions: [first, second])
@@ -415,9 +417,38 @@ struct SessionHistoryTests {
       await model.requestClose(selected.id)
     }
 
-    #expect(model.selectedSessionID == first.id)
     #expect(model.sessions.first { $0.id == first.id }?.status == .closed)
-    #expect(model.sessions.first { $0.id == second.id }?.status == .active)
+    #expect(model.sessions.first { $0.id == second.id }?.status == .closed)
+  }
+
+  @Test("A closed session leaves the list and the selection before its agent has stopped")
+  func closingMovesOnBeforeTheStop() async {
+    let first = session(name: "First", status: .active)
+    let second = session(name: "Second", status: .active)
+    let third = session(name: "Third", status: .active)
+    let repository = MutableRepository(sessions: [first, second, third])
+    let supervisor = SpySupervisor(holdsStop: true)
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
+    await model.load()
+    await launcher.launch(session: second, plan: plan())
+    await model.reload()
+    let order = model.visibleSessions.map(\.id)
+    model.select(second.id)
+
+    let closing = Task { await model.confirmClose(second.id) }
+    while await supervisor.stopped.isEmpty {
+      await Task.yield()
+    }
+
+    #expect(!model.visibleSessions.contains { $0.id == second.id })
+    let index = order.firstIndex(of: second.id)!
+    #expect(model.selectedSessionID == order[index + 1 < order.count ? index + 1 : index - 1])
+
+    await supervisor.releaseStop()
+    await closing.value
+    #expect(model.sessions.first { $0.id == second.id }?.status == .closed)
+    #expect(!model.visibleSessions.contains { $0.id == second.id })
   }
 
   @Test("A session picked while an agent is stopping keeps the selection")
