@@ -120,6 +120,17 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
   /// active terminal would steal the focus back from the sidebar mid-keystroke.
   func followActivation(_ isActive: Bool, in view: TerminalView) {
+    // Every pane stays mounted, and a pane at zero opacity is still drawn: each busy agent behind
+    // the visible one repainted its whole screen on the main thread at every spinner frame, and the
+    // terminal being typed in waited behind them for its echo. A hidden view is not drawn at all.
+    // Its output is still fed, so it is up to date when it comes back, and redrawn whole then.
+    if view.isHidden == isActive {
+      view.isHidden = !isActive
+      if isActive {
+        view.needsDisplay = true
+      }
+    }
+
     // No window yet: nothing can hold the keyboard, and this is not the change we are waiting
     // for — leave the state untouched so the next update still acts on it.
     guard let window = view.window else { return }

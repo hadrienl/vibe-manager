@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTerm
 import Testing
 import VibeApplication
 import VibeDomain
@@ -122,4 +123,19 @@ func adoptedPaneIsAttached() async {
   coordinator.attachIfNeeded(to: restarted)
 
   #expect(await attachCount(of: restarted) == 1)
+}
+
+@MainActor
+@Test("A pane behind the visible one is hidden, so it is not drawn, and shown again when active")
+func inactivePaneIsHidden() {
+  // Every pane stays mounted: at zero opacity alone, each busy agent behind the visible one kept
+  // repainting on the main thread, and typing in the visible terminal lagged behind them.
+  let coordinator = makeCoordinator(sessionID: SessionID())
+  let view = TerminalView()
+
+  coordinator.followActivation(false, in: view)
+  #expect(view.isHidden)
+
+  coordinator.followActivation(true, in: view)
+  #expect(!view.isHidden)
 }
