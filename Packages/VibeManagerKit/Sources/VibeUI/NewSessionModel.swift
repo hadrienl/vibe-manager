@@ -23,7 +23,7 @@ public final class NewSessionModel {
   /// agent they just picked, not the scheduler.
   public var draft = SessionDraft()
 
-  /// The templates offered, in the user's order. Archived ones are not.
+  /// The templates offered, in the user's order.
   public private(set) var templates: [PromptTemplate] = []
   /// Whether the template being filled was saved elsewhere since it was picked. The fill keeps
   /// the copy it took, so what is previewed stays what is launched until the user reloads.
@@ -51,7 +51,7 @@ public final class NewSessionModel {
     fullDiskAccess: FullDiskAccessStatus? = nil,
     templates: [PromptTemplate] = []
   ) {
-    self.templates = templates.filter { !$0.isArchived }
+    self.templates = templates
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
@@ -140,7 +140,7 @@ public final class NewSessionModel {
 
   /// The templates as the library now holds them.
   public func templatesChanged(_ library: [PromptTemplate]) {
-    templates = library.filter { !$0.isArchived }
+    templates = library
     guard let fill = draft.templateFill else { return }
     let current = library.first { $0.id == fill.template.id }
     isTemplateStale = current.map { !$0.hasSameContent(as: fill.template) } ?? false

@@ -69,12 +69,9 @@ public final class PromptTemplateLibraryModel {
     repository.fileURL
   }
 
-  public var active: [PromptTemplate] {
-    library.active
-  }
-
-  public var archived: [PromptTemplate] {
-    library.archived
+  /// Every template, in the user's order.
+  public var all: [PromptTemplate] {
+    library.templates
   }
 
   public var isReadOnly: Bool {
@@ -240,8 +237,8 @@ public final class PromptTemplateLibraryModel {
     }
   }
 
-  public func move(_ id: PromptTemplateID, toActivePosition position: Int) async {
-    await change { $0.move(id, toActivePosition: position) }
+  public func move(_ id: PromptTemplateID, toPosition position: Int) async {
+    await change { $0.move(id, toPosition: position) }
   }
 
   public func move(_ id: PromptTemplateID, by offset: Int) async {
@@ -249,31 +246,8 @@ public final class PromptTemplateLibraryModel {
   }
 
   public func canMove(_ id: PromptTemplateID, by offset: Int) -> Bool {
-    guard let index = active.firstIndex(where: { $0.id == id }) else { return false }
-    return active.indices.contains(index + offset)
-  }
-
-  public func archive(_ id: PromptTemplateID) async {
-    let now = clock.now()
-    let previousName = library.template(id: id)?.name
-    await change { $0.archive(id, at: now) }
-    followStoredState(of: id, previousName: previousName)
-  }
-
-  public func unarchive(_ id: PromptTemplateID) async {
-    let previousName = library.template(id: id)?.name
-    await change { $0.unarchive(id) }
-    followStoredState(of: id, previousName: previousName)
-  }
-
-  /// Archiving says nothing about the text: changes being typed stay, and only the state — and a
-  /// name changed to come back beside another — follows the store.
-  private func followStoredState(of id: PromptTemplateID, previousName: String?) {
-    guard editing?.id == id, let stored = library.template(id: id) else { return }
-    editing?.archivedAt = stored.archivedAt
-    if editing?.name == previousName {
-      editing?.name = stored.name
-    }
+    guard let index = all.firstIndex(where: { $0.id == id }) else { return false }
+    return all.indices.contains(index + offset)
   }
 
   public func delete(_ id: PromptTemplateID) async {
@@ -294,16 +268,14 @@ public final class PromptTemplateLibraryModel {
 
   // MARK: - Exchange
 
-  /// The file to export `ids`, or every template, archived ones only when asked.
   public var canExchange: Bool {
     exchange != nil
   }
 
-  public func exportData(ids: Set<PromptTemplateID>? = nil, includingArchived: Bool) -> Data? {
+  /// The file to export `ids`, or every template.
+  public func exportData(ids: Set<PromptTemplateID>? = nil) -> Data? {
     guard let exchange else { return nil }
-    let chosen = library.templates.filter { template in
-      (ids?.contains(template.id) ?? true) && (includingArchived || !template.isArchived)
-    }
+    let chosen = library.templates.filter { ids?.contains($0.id) ?? true }
     do {
       failure = nil
       return try exchange.encode(chosen, exportedAt: clock.now())

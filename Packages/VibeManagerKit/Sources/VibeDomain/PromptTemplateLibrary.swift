@@ -4,19 +4,11 @@ import Foundation
 ///
 /// A value: the store applies these to what it holds, and the tests to what they build.
 public struct PromptTemplateLibrary: Hashable, Sendable {
-  /// Active and archived alike, in the order shown; the archived ones are listed apart.
+  /// In the order shown, which is the order they are offered in.
   public private(set) var templates: [PromptTemplate]
 
   public init(templates: [PromptTemplate] = []) {
     self.templates = templates
-  }
-
-  public var active: [PromptTemplate] {
-    templates.filter { !$0.isArchived }
-  }
-
-  public var archived: [PromptTemplate] {
-    templates.filter(\.isArchived)
   }
 
   public func template(id: PromptTemplateID) -> PromptTemplate? {
@@ -37,7 +29,6 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
     if let index = templates.firstIndex(where: { $0.id == template.id }) {
       saved.revision = templates[index].revision + 1
       saved.createdAt = templates[index].createdAt
-      saved.archivedAt = templates[index].archivedAt
       saved.updatedAt = date.storageRounded
       templates[index] = saved
     } else {
@@ -69,52 +60,29 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
     return copy
   }
 
-  /// Moves an active template to `position` among the active ones.
-  public mutating func move(_ id: PromptTemplateID, toActivePosition position: Int) {
-    guard let from = templates.firstIndex(where: { $0.id == id }), !templates[from].isArchived
-    else { return }
+  /// Moves a template to `position` in the list.
+  public mutating func move(_ id: PromptTemplateID, toPosition position: Int) {
+    guard let from = templates.firstIndex(where: { $0.id == id }) else { return }
     let template = templates.remove(at: from)
-    let activeIndices = templates.indices.filter { !templates[$0].isArchived }
-    let clamped = max(0, min(position, activeIndices.count))
-    let destination =
-      clamped < activeIndices.count
-      ? activeIndices[clamped] : (activeIndices.last.map { $0 + 1 } ?? templates.count)
-    templates.insert(template, at: destination)
+    templates.insert(template, at: max(0, min(position, templates.count)))
   }
 
-  /// One place up or down among the active templates.
+  /// One place up or down.
   public mutating func move(_ id: PromptTemplateID, by offset: Int) {
-    guard let position = active.firstIndex(where: { $0.id == id }) else { return }
-    move(id, toActivePosition: position + offset)
+    guard let position = templates.firstIndex(where: { $0.id == id }) else { return }
+    move(id, toPosition: position + offset)
   }
 
-  public mutating func archive(_ id: PromptTemplateID, at date: Date) {
-    guard let index = templates.firstIndex(where: { $0.id == id }),
-      !templates[index].isArchived
-    else { return }
-    templates[index].archivedAt = date.storageRounded
-  }
-
-  /// Back among the active ones, last — under another name if its own was taken meanwhile.
-  public mutating func unarchive(_ id: PromptTemplateID) {
-    guard let index = templates.firstIndex(where: { $0.id == id }), templates[index].isArchived
-    else { return }
-    var template = templates.remove(at: index)
-    template.archivedAt = nil
-    template.name = uniqueName(startingWith: template.trimmedName)
-    templates.append(template)
-  }
-
-  /// Only an archived template can be deleted: destroying one takes two gestures.
+  /// Deletes a template for good. Sessions created from it keep their prompt: they never pointed at
+  /// its text, only at its name and revision.
   @discardableResult
   public mutating func delete(_ id: PromptTemplateID) -> Bool {
-    guard let index = templates.firstIndex(where: { $0.id == id }), templates[index].isArchived
-    else { return false }
+    guard let index = templates.firstIndex(where: { $0.id == id }) else { return false }
     templates.remove(at: index)
     return true
   }
 
-  /// Adds the examples that are not here, active or archived. Their identifiers are fixed, so
+  /// Adds the examples that are not here. Their identifiers are fixed, so
   /// asking twice adds nothing, and nothing but this gesture ever adds them.
   @discardableResult
   public mutating func addExamples(at date: Date) -> [PromptTemplate] {
@@ -133,9 +101,9 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
     PromptTemplateExamples.identifiers.contains { template(id: $0) == nil }
   }
 
-  /// `base`, or `base 2`, `base 3`… — the first no active template is called.
+  /// `base`, or `base 2`, `base 3`… — the first no template is called.
   public func uniqueName(startingWith base: String) -> String {
-    let taken = Set(active.map { $0.trimmedName.lowercased() })
+    let taken = Set(templates.map { $0.trimmedName.lowercased() })
     guard taken.contains(base.lowercased()) else { return base }
     var number = 2
     while taken.contains("\(base) \(number)".lowercased()) {
@@ -205,20 +173,17 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           sessionNamePattern: template.sessionNamePattern,
           body: template.body,
           fieldSettings: template.fieldSettings,
-          createdAt: date,
-          archivedAt: template.archivedAt.map { _ in date }
+          createdAt: date
         )
         templates.append(template)
       case .new:
         template = PromptTemplate(
           id: template.id,
-          name: template.isArchived
-            ? template.trimmedName : uniqueName(startingWith: template.trimmedName),
+          name: uniqueName(startingWith: template.trimmedName),
           sessionNamePattern: template.sessionNamePattern,
           body: template.body,
           fieldSettings: template.fieldSettings,
-          createdAt: date,
-          archivedAt: template.archivedAt.map { _ in date }
+          createdAt: date
         )
         templates.append(template)
       }

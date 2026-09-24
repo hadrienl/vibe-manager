@@ -36,7 +36,7 @@ user, because the preview would then no longer describe what they were about to 
 
 The session stores the rendered prompt in `initialPrompt`, and the template's identifier, name and
 revision in the existing `PromptTemplateReference`. Restart, the summaries of #10 and #15 and the
-search all read `initialPrompt`, so none of them changed, and editing, archiving or deleting a
+search all read `initialPrompt`, so none of them changed, and editing or deleting a
 template later changes no session. The schema did not move: the reference was already stored.
 
 **Edit as Text** turns the rendering into the free prompt and drops the reference. The reference
@@ -84,6 +84,12 @@ dates. An import is laid out before it is applied — new, identical, changed, s
 template is kept beside the existing one unless the user chooses **Replace**. A test imports the
 example of the documentation, so the documentation cannot drift from the code. The files are plain
 `.json`: declaring a document type of our own would need an `Info.plist` the project generates.
+
+### No archive
+
+A template the user no longer wants is deleted, after a confirmation, from the − button, ⌫ in the
+list or its context menu. An archive between the two would only be a second place to look: a
+session never depends on its template, so deleting one loses nothing but the template itself.
 
 ### Examples offered, never installed
 

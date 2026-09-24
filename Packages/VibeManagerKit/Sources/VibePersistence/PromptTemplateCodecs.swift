@@ -52,7 +52,6 @@ private struct StoredTemplateV1: Codable {
   let revision: Int
   let createdAt: Date
   let updatedAt: Date
-  let archivedAt: Date?
 
   init(_ template: PromptTemplate) {
     id = template.id.rawValue
@@ -63,7 +62,6 @@ private struct StoredTemplateV1: Codable {
     revision = template.revision
     createdAt = template.createdAt
     updatedAt = template.updatedAt
-    archivedAt = template.archivedAt
   }
 
   var domainValue: PromptTemplate {
@@ -75,8 +73,7 @@ private struct StoredTemplateV1: Codable {
       fieldSettings: fields.map(\.domainValue),
       revision: revision,
       createdAt: createdAt,
-      updatedAt: updatedAt,
-      archivedAt: archivedAt
+      updatedAt: updatedAt
     )
   }
 }
@@ -182,7 +179,6 @@ private struct ExchangeTemplateV1: Codable {
   let sessionName: String?
   let body: String
   let fields: [ExchangeFieldV1]?
-  let archived: Bool?
 
   init(_ template: PromptTemplate) {
     id = template.id.rawValue
@@ -190,7 +186,6 @@ private struct ExchangeTemplateV1: Codable {
     sessionName = template.sessionNamePattern
     body = template.body
     fields = template.trimmedFieldSettings.map(ExchangeFieldV1.init)
-    archived = template.isArchived
   }
 
   func domainValue(at date: Date) -> PromptTemplate {
@@ -201,8 +196,7 @@ private struct ExchangeTemplateV1: Codable {
       body: body,
       fieldSettings: (fields ?? []).map(\.domainValue),
       revision: 1,
-      createdAt: date,
-      archivedAt: archived == true ? date : nil
+      createdAt: date
     )
   }
 }

@@ -167,7 +167,7 @@ struct PromptTemplateLibraryTests {
     #expect(template.revision == 2)
   }
 
-  @Test("A name already used by another active template is refused")
+  @Test("A name already used by another template is refused")
   func duplicateNameRefused() {
     var library = library(["Review"])
     #expect(throws: PromptTemplateRejected.self) {
@@ -195,30 +195,27 @@ struct PromptTemplateLibraryTests {
     #expect(library.templates[1].name == "A copy 2")
   }
 
-  @Test("Moving and archiving keep the order the user chose")
-  func moveAndArchive() {
+  @Test("Moving keeps the order the user chose")
+  func move() {
     var library = library(["A", "B", "C"])
     let c = library.templates[2].id
-    library.move(c, toActivePosition: 0)
-    #expect(library.active.map(\.name) == ["C", "A", "B"])
+    library.move(c, toPosition: 0)
+    #expect(library.templates.map(\.name) == ["C", "A", "B"])
     library.move(c, by: 1)
-    #expect(library.active.map(\.name) == ["A", "C", "B"])
-    library.archive(library.templates[0].id, at: now)
-    #expect(library.active.map(\.name) == ["C", "B"])
-    library.unarchive(library.archived[0].id)
-    #expect(library.active.map(\.name) == ["C", "B", "A"])
+    #expect(library.templates.map(\.name) == ["A", "C", "B"])
+    library.move(c, by: 5)
+    #expect(library.templates.map(\.name) == ["A", "B", "C"])
   }
 
-  @Test("Only an archived template can be deleted")
-  func deleteNeedsArchive() {
-    var library = library(["A"])
-    let id = library.templates[0].id
-    let refused = library.delete(id)
-    #expect(refused == false)
-    library.archive(id, at: now)
-    let deleted = library.delete(id)
+  @Test("A template is deleted once, for good")
+  func delete() {
+    var library = library(["A", "B"])
+    let a = library.templates[0].id
+    let deleted = library.delete(a)
+    let deletedTwice = library.delete(a)
     #expect(deleted)
-    #expect(library.templates.isEmpty)
+    #expect(!deletedTwice)
+    #expect(library.templates.map(\.name) == ["B"])
   }
 
   @Test("The examples are added once, and only when asked")
@@ -231,7 +228,6 @@ struct PromptTemplateLibraryTests {
     #expect(second.isEmpty)
     #expect(!library.isMissingExamples)
     let review = PromptTemplateExamples.reviewID
-    library.archive(review, at: now)
     library.delete(review)
     #expect(library.templates.count == 1)
     let again = library.addExamples(at: now)

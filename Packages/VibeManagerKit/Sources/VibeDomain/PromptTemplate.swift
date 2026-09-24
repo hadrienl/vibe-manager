@@ -76,7 +76,7 @@ public struct PromptTemplateField: Hashable, Sendable, Identifiable {
 /// A prompt the user fills in rather than writes: `Review {{url}}`.
 ///
 /// A starting point, never a link. A session keeps the text it was launched with and a reference
-/// to the template, so editing, archiving or deleting a template changes no session.
+/// to the template, so editing or deleting a template changes no session.
 public struct PromptTemplate: Identifiable, Hashable, Sendable {
   public let id: PromptTemplateID
   public var name: String
@@ -89,7 +89,6 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   public var revision: Int
   public var createdAt: Date
   public var updatedAt: Date
-  public var archivedAt: Date?
 
   public init(
     id: PromptTemplateID = PromptTemplateID(),
@@ -99,8 +98,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     fieldSettings: [PromptTemplateFieldSettings] = [],
     revision: Int = 1,
     createdAt: Date = Date(),
-    updatedAt: Date? = nil,
-    archivedAt: Date? = nil
+    updatedAt: Date? = nil
   ) {
     self.id = id
     self.name = name
@@ -110,11 +108,6 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     self.revision = revision
     self.createdAt = createdAt.storageRounded
     self.updatedAt = (updatedAt ?? createdAt).storageRounded
-    self.archivedAt = archivedAt?.storageRounded
-  }
-
-  public var isArchived: Bool {
-    archivedAt != nil
   }
 
   public var trimmedName: String {
@@ -203,12 +196,10 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     var issues: [PromptTemplateIssue] = []
     if trimmedName.isEmpty {
       issues.append(.nameMissing)
-    } else if !isArchived,
-      others.contains(where: {
-        $0.id != id && !$0.isArchived
-          && $0.trimmedName.caseInsensitiveCompare(trimmedName) == .orderedSame
-      })
-    {
+    } else if others.contains(where: {
+      $0.id != id
+        && $0.trimmedName.caseInsensitiveCompare(trimmedName) == .orderedSame
+    }) {
       issues.append(.nameTaken(trimmedName))
     }
     if body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

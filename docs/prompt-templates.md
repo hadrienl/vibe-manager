@@ -36,8 +36,8 @@ The prompt is rendered once, then sent exactly as the sheet previews it:
 - A one-line field is kept on one line, without its surrounding spaces; a multiline field only
   loses what trails it. An optional field left empty adds nothing.
 
-The session keeps that rendered text, with the template's name and revision. Editing, archiving or
-deleting the template later changes neither the session nor what **Restart** sends.
+The session keeps that rendered text, with the template's name and revision. Editing or deleting
+the template later changes neither the session nor what **Restart** sends.
 
 ## Storage
 
@@ -66,8 +66,7 @@ new revision, and sessions keep theirs.
       "fields": [
         { "name": "url", "label": "Merge request URL" },
         { "name": "focus", "label": "What to look at", "help": "Optional", "multiline": true }
-      ],
-      "archived": false
+      ]
     }
   ]
 }
@@ -87,7 +86,6 @@ new revision, and sessions keep theirs.
 | `fields[].label` | string | Shown next to the control; derived from the name when absent. |
 | `fields[].help` | string | Shown in the empty control. |
 | `fields[].multiline` | boolean | A text area rather than a single line. |
-| `templates[].archived` | boolean | Imported into the archive. |
 
 Whether a field is required is not a key: it is the `?` in the text. Revisions and dates are not
 exported — a file has no history to impose on the library it lands in.
@@ -117,7 +115,6 @@ JSON Schema:
           "name": { "type": "string", "minLength": 1 },
           "sessionName": { "type": "string" },
           "body": { "type": "string", "minLength": 1 },
-          "archived": { "type": "boolean" },
           "fields": {
             "type": "array",
             "items": {

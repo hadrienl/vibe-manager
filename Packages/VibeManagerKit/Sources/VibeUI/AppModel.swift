@@ -1641,7 +1641,7 @@ public final class AppModel {
       create: CreateSession(repository: repository, agents: agents),
       registry: agents,
       fullDiskAccess: permissions?.status,
-      templates: templates.active
+      templates: templates.all
     )
     if let template {
       model.selectTemplate(template)

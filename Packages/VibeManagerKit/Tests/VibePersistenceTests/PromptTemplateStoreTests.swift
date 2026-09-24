@@ -25,7 +25,7 @@ struct FilePromptTemplateRepositoryTests {
 
     try await store.update { library in
       library.addExamples(at: now)
-      library.move(PromptTemplateExamples.feedbackID, toActivePosition: 0)
+      library.move(PromptTemplateExamples.feedbackID, toPosition: 0)
     }
 
     let reopened = FilePromptTemplateRepository(
@@ -47,7 +47,7 @@ struct FilePromptTemplateRepositoryTests {
     let now = self.now
 
     try await store.update { _ = $0.addExamples(at: now) }
-    try await store.update { $0.archive(PromptTemplateExamples.reviewID, at: now) }
+    try await store.update { $0.delete(PromptTemplateExamples.reviewID) }
 
     let manager = FileManager.default
     let fileMode = try manager.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
@@ -56,7 +56,7 @@ struct FilePromptTemplateRepositoryTests {
     #expect(folderMode == 0o700)
     let backup = directory.appendingPathComponent("templates.backup.json")
     let previous = try PromptTemplateStoreCodec().decode(Data(contentsOf: backup))
-    #expect(previous.archived.isEmpty)
+    #expect(previous.templates.count == 2)
   }
 
   @Test(
@@ -93,7 +93,7 @@ struct FilePromptTemplateRepositoryTests {
     let failing = FilePromptTemplateRepository(
       storeURL: url, beforeReplace: { throw Interrupted() })
     await #expect(throws: (any Error).self) {
-      try await failing.update { $0.archive(PromptTemplateExamples.reviewID, at: now) }
+      try await failing.update { $0.delete(PromptTemplateExamples.reviewID) }
     }
     #expect(try Data(contentsOf: url) == before)
   }

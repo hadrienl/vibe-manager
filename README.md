@@ -178,7 +178,7 @@ the top of the New Session sheet or from File ▸ New Session from (⇧⌘N for 
 becomes a control, a required one keeps Create out of reach until it is filled, and the prompt is
 previewed exactly as the agent will receive it. The session keeps that rendered text and the
 template's name and revision, so changing the template later changes nothing already created.
-Templates are edited, duplicated, ordered and archived in their own window (File ▸ Manage Prompt
+Templates are edited, duplicated, ordered and deleted in their own window (File ▸ Manage Prompt
 Templates…), stored beside the sessions, and exported and imported in a format documented in
 [`docs/prompt-templates.md`](docs/prompt-templates.md). The decisions are documented in
 [`docs/architecture/0018-prompt-templates.md`](docs/architecture/0018-prompt-templates.md).

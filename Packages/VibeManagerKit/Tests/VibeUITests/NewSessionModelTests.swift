@@ -602,12 +602,4 @@ struct NewSessionTemplateTests {
     #expect(!model.isTemplateStale)
     #expect(model.renderedPrompt?.prompt == "Look at https://x/1 closely.")
   }
-
-  @Test("Archived templates are not offered")
-  func archivedAreNotOffered() {
-    var archived = templateFeedback
-    archived.archivedAt = Date()
-    let model = makeModel(templates: [templateReview, archived])
-    #expect(model.templates.map(\.id) == [templateReview.id])
-  }
 }

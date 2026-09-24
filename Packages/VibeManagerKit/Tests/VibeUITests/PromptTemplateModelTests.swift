@@ -28,11 +28,11 @@ struct PromptTemplateLibraryModelTests {
     #expect(!model.canSave)
     model.editing?.body = "Review {{url}}"
     #expect(model.canSave)
-    #expect(model.active.isEmpty)
+    #expect(model.all.isEmpty)
 
     let saved = await model.save()
     #expect(saved)
-    #expect(model.active.map(\.revision) == [1])
+    #expect(model.all.map(\.revision) == [1])
     #expect(!model.isEdited)
   }
 
@@ -74,14 +74,14 @@ struct PromptTemplateLibraryModelTests {
     #expect(model.editing?.body == "Changed {{url}}")
   }
 
-  @Test("Archiving keeps the changes being typed")
-  func archiveKeepsEdits() async {
-    let model = await makeModel([review])
+  @Test("Deleting the template on screen removes it and leaves nothing selected")
+  func deleteSelected() async {
+    let model = await makeModel([review, feedback])
     model.requestSelect(review.id)
-    model.editing?.body = "Changed {{url}}"
-    await model.archive(review.id)
-    #expect(model.editing?.body == "Changed {{url}}")
-    #expect(model.editing?.isArchived == true)
+    await model.delete(review.id)
+    #expect(model.all.map(\.id) == [feedback.id])
+    #expect(model.selectedID == nil)
+    #expect(model.editing == nil)
   }
 
   @Test("Add Examples adds them once")
@@ -89,7 +89,7 @@ struct PromptTemplateLibraryModelTests {
     let model = await makeModel()
     #expect(model.canAddExamples)
     await model.addExamples()
-    #expect(model.active.count == 2)
+    #expect(model.all.count == 2)
     #expect(!model.canAddExamples)
   }
 
@@ -98,8 +98,8 @@ struct PromptTemplateLibraryModelTests {
     let model = await makeModel([review])
     var heard: [PromptTemplateLibrary] = []
     model.libraryDidChange = { heard.append($0) }
-    await model.archive(review.id)
+    await model.delete(review.id)
     #expect(heard.count == 1)
-    #expect(heard.first?.active.isEmpty == true)
+    #expect(heard.first?.templates.isEmpty == true)
   }
 }

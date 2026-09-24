@@ -118,19 +118,19 @@ private struct TemplateCommands: View {
 
   var body: some View {
     Button("New Session from Template") {
-      model.beginNewSession(template: model.templates.active.first?.id)
+      model.beginNewSession(template: model.templates.all.first?.id)
     }
     .keyboardShortcut("n", modifiers: [.command, .shift])
-    .disabled(!model.canCreateSession || model.templates.active.isEmpty)
+    .disabled(!model.canCreateSession || model.templates.all.isEmpty)
 
     Menu("New Session from") {
-      ForEach(model.templates.active) { template in
+      ForEach(model.templates.all) { template in
         Button(template.trimmedName) {
           model.beginNewSession(template: template.id)
         }
       }
     }
-    .disabled(!model.canCreateSession || model.templates.active.isEmpty)
+    .disabled(!model.canCreateSession || model.templates.all.isEmpty)
 
     Divider()
 

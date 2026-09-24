@@ -102,27 +102,19 @@ public struct PromptTemplatesView: View {
           .italic()
           .tag(Optional(editing.id))
         }
-        Section {
-          ForEach(model.active) { template in
-            row(template)
-          }
-          .onMove { source, destination in
-            guard let first = source.first else { return }
-            let id = model.active[first].id
-            let position = destination > first ? destination - 1 : destination
-            Task { await model.move(id, toActivePosition: position) }
-          }
+        ForEach(model.all) { template in
+          row(template)
         }
-        if !model.archived.isEmpty {
-          Section("Archived") {
-            ForEach(model.archived) { template in
-              row(template)
-                .foregroundStyle(.secondary)
-            }
-          }
+        .onMove { source, destination in
+          guard let first = source.first else { return }
+          let id = model.all[first].id
+          let position = destination > first ? destination - 1 : destination
+          Task { await model.move(id, toPosition: position) }
         }
       }
       .listStyle(.sidebar)
+      // ⌫ in the list, as in the Finder and Mail: the same question as the − button.
+      .onDeleteCommand(perform: requestDeleteSelection)
 
       Divider()
       HStack(spacing: 4) {
@@ -135,6 +127,13 @@ public struct PromptTemplatesView: View {
         .help("New Template")
         .accessibilityLabel("New Template")
         .disabled(model.isReadOnly)
+
+        Button(action: requestDeleteSelection) {
+          Image(systemName: "minus")
+        }
+        .help(model.isNew ? "Discard This Template" : "Delete Template")
+        .accessibilityLabel(model.isNew ? "Discard This Template" : "Delete Template")
+        .disabled(model.isReadOnly || model.editing == nil)
 
         Menu {
           actionsMenu
@@ -170,32 +169,24 @@ public struct PromptTemplatesView: View {
     Divider()
     Button("Import…") { isImporting = true }
       .disabled(model.isReadOnly || !model.canExchange)
-    Button("Export All…") { requestExport(ids: nil, includingArchived: false) }
-      .disabled(model.active.isEmpty || !model.canExchange)
-    Button("Export All, Including Archived…") {
-      requestExport(ids: nil, includingArchived: true)
-    }
-    .disabled(model.archived.isEmpty || !model.canExchange)
+    Button("Export All…") { requestExport(ids: nil) }
+      .disabled(model.all.isEmpty || !model.canExchange)
   }
 
   @ViewBuilder
   private func templateActions(for template: PromptTemplate) -> some View {
     Button("Duplicate") { Task { await model.duplicate(template.id) } }
       .disabled(model.isReadOnly)
-    if template.isArchived {
-      Button("Unarchive") { Task { await model.unarchive(template.id) } }
-      Button("Delete…", role: .destructive) { pendingDelete = template }
-    } else {
-      Button("Move Up") { Task { await model.move(template.id, by: -1) } }
-        .keyboardShortcut(.upArrow, modifiers: [.command, .control])
-        .disabled(!model.canMove(template.id, by: -1))
-      Button("Move Down") { Task { await model.move(template.id, by: 1) } }
-        .keyboardShortcut(.downArrow, modifiers: [.command, .control])
-        .disabled(!model.canMove(template.id, by: 1))
-      Button("Archive") { Task { await model.archive(template.id) } }
-    }
+    Button("Move Up") { Task { await model.move(template.id, by: -1) } }
+      .keyboardShortcut(.upArrow, modifiers: [.command, .control])
+      .disabled(!model.canMove(template.id, by: -1))
+    Button("Move Down") { Task { await model.move(template.id, by: 1) } }
+      .keyboardShortcut(.downArrow, modifiers: [.command, .control])
+      .disabled(!model.canMove(template.id, by: 1))
+    Button("Delete…", role: .destructive) { pendingDelete = template }
+      .disabled(model.isReadOnly)
     Button("Export “\(template.trimmedName)”…") {
-      requestExport(ids: [template.id], includingArchived: true)
+      requestExport(ids: [template.id])
     }
     .disabled(!model.canExchange)
   }
@@ -208,7 +199,7 @@ public struct PromptTemplatesView: View {
       banners
       if let editing = model.editing {
         editor(editing)
-      } else if model.active.isEmpty && model.archived.isEmpty && model.state == .ready {
+      } else if model.all.isEmpty && model.state == .ready {
         emptyLibrary
       } else {
         Text(model.state == .loading ? "Loading templates…" : "Select a template.")
@@ -416,7 +407,7 @@ public struct PromptTemplatesView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       } else if let saved = model.savedEditing {
-        Text("Revision \(saved.revision)\(saved.isArchived ? " · Archived" : "")")
+        Text("Revision \(saved.revision)")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
@@ -463,6 +454,16 @@ public struct PromptTemplatesView: View {
     )
   }
 
+  /// A template never saved is only discarded; a saved one is deleted once the user confirms.
+  private func requestDeleteSelection() {
+    guard !model.isReadOnly else { return }
+    if model.isNew {
+      model.revert()
+    } else if let saved = model.savedEditing {
+      pendingDelete = saved
+    }
+  }
+
   private func importFile(at url: URL) {
     let accessing = url.startAccessingSecurityScopedResource()
     defer { if accessing { url.stopAccessingSecurityScopedResource() } }
@@ -470,8 +471,8 @@ public struct PromptTemplatesView: View {
     model.prepareImport(data)
   }
 
-  private func requestExport(ids: Set<PromptTemplateID>?, includingArchived: Bool) {
-    guard let data = model.exportData(ids: ids, includingArchived: includingArchived) else {
+  private func requestExport(ids: Set<PromptTemplateID>?) {
+    guard let data = model.exportData(ids: ids) else {
       return
     }
     var name = "Prompt Templates"
