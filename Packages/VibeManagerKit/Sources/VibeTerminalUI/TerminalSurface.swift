@@ -124,13 +124,21 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     // the visible one repainted its whole screen on the main thread at every spinner frame, and the
     // terminal being typed in waited behind them for its echo. A hidden view is not drawn at all.
     // Its output is still fed, so it is up to date when it comes back, and redrawn whole then.
-    if view.isHidden == isActive {
-      view.isHidden = !isActive
-      if isActive {
-        view.needsDisplay = true
-      }
+    //
+    // The keyboard moves between the two: shown before it can take the keyboard, and hidden only
+    // once it has let go of it. Hiding the first responder makes AppKit hand the keyboard to the
+    // next key view — a sidebar field or a button that would then receive what was typed.
+    if isActive, view.isHidden {
+      view.isHidden = false
+      view.needsDisplay = true
     }
+    moveKeyboard(following: isActive, in: view)
+    if !isActive, !view.isHidden {
+      view.isHidden = true
+    }
+  }
 
+  private func moveKeyboard(following isActive: Bool, in view: TerminalView) {
     // No window yet: nothing can hold the keyboard, and this is not the change we are waiting
     // for — leave the state untouched so the next update still acts on it.
     guard let window = view.window else { return }

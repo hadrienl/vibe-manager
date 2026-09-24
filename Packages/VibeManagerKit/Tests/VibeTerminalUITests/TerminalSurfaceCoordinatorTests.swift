@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftTerm
 import Testing
@@ -138,4 +139,29 @@ func inactivePaneIsHidden() {
 
   coordinator.followActivation(true, in: view)
   #expect(!view.isHidden)
+}
+
+@MainActor
+@Test("A pane put away gives the keyboard back to no one, not to the next control in the window")
+func hiddenPaneDoesNotPassTheKeyboardOn() {
+  let coordinator = makeCoordinator(sessionID: SessionID())
+  let window = NSWindow(
+    contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+    styleMask: [.titled],
+    backing: .buffered,
+    defer: true
+  )
+  let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 200, height: 300))
+  let neighbour = NSTextField(frame: NSRect(x: 220, y: 0, width: 160, height: 24))
+  window.contentView?.addSubview(view)
+  window.contentView?.addSubview(neighbour)
+  view.nextKeyView = neighbour
+
+  coordinator.followActivation(true, in: view)
+  #expect(window.firstResponder === view)
+
+  coordinator.followActivation(false, in: view)
+
+  #expect(view.isHidden)
+  #expect(window.firstResponder === window)
 }
