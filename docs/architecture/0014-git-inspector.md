@@ -2,7 +2,8 @@
 
 - Status: accepted
 - Date: 2026-09-23
-- Issue: [#14](https://github.com/hadrienl/vibe-manager/issues/14)
+- Issue: [#14](https://github.com/hadrienl/vibe-manager/issues/14), extended by
+  [#56](https://github.com/hadrienl/vibe-manager/issues/56)
 
 ## Context
 
@@ -41,9 +42,10 @@ says the name, the branch — whole, on as many lines as it takes; "detached at 
 its tooltip, which says nothing was fetched), an operation in progress, how many changes, the
 counts in words from ADR 0013, and the sessions it is shared with.
 
-Under it, up to four lists, absent when empty: **Conflicts** first, since they are what stops the
+Under it, up to five lists, absent when empty: **Conflicts** first, since they are what stops the
 agent, then **Staged**, **Unstaged** and **Untracked**, each in Git's order. A file staged and
 changed again since (`MM`) is in both lists: what the commit will hold is not what is on disk.
+**Committed** comes last (below).
 
 A row is a status letter (`M A D R C T UU ?`) coloured by the kind of change — the letter carries
 the meaning, the colour only repeats it — then the file's name, and its folder beneath it,
@@ -54,6 +56,36 @@ to another session.
 
 Names are shown in NFC and keyed as Git wrote them: a name macOS stored decomposed reads like one
 typed, and still matches itself from one reading to the next.
+
+### What the branch already committed
+
+`git status` forgets a file the moment it is committed, and an agent commits at the end of nearly
+every task: a finished session would show "No changes" beside a `+7`. A fifth list, **Committed**,
+after the others, holds what the branch's commits changed — what a pull request of it would show:
+
+```
+git for-each-ref --format='%(refname)%00%(objectname)%00%(symref)' <base references>
+git merge-base <base> HEAD
+git rev-list --count <merge-base>..HEAD
+git diff --name-status -z --find-renames <merge-base> HEAD
+```
+
+- The base is the first that exists of the branch `origin/HEAD` points to, `origin/main`,
+  `origin/master`, `main`, `master`. Local references only: nothing is fetched. On `main` ahead of
+  `origin/main`, the list is what is not pushed yet.
+- No base, or no commit the base lacks: no list, and the summary says "No changes" as before.
+  Otherwise a clean tree says "Working tree clean — 12 files committed since origin/main", and a
+  dirty one adds the same to its counts. The count in the header stays the working tree's.
+- The list is read with each `git status`, but the diff only when `HEAD` or the base moved: the
+  reader keeps the last one per repository with the two revisions it was read between. A file saved
+  costs one `for-each-ref`. A Git that fails — a diff past its 30 s, a shallow clone without the merge
+  base — is not "nothing committed": the last list stays, and the next reading tries again.
+- Its tooltip names the commits and the merge base. It is attributed like the others: a branch may
+  carry commits from before the session, and those files carry the `?`. Five thousand files are
+  kept, all counted; a list longer than 50 starts folded, and a group with committed files starts
+  unfolded.
+- A file selected when it is committed follows into Committed, like a file staged follows into
+  Staged.
 
 ### Identity is what keeps expansion and selection
 
@@ -124,7 +156,8 @@ The application still never acts on Git (ADR 0012): no staging, discarding or co
 - **No repository**: said. **Report not read yet**: "Reading the repositories…", with a spinner,
   never a skeleton. **A repository read for the first time**: a spinner in its header, no list.
 - **Reading again**: nothing moves — ADR 0013 publishes only what changed.
-- **Clean**: folded, "No changes"; every repository clean is said once, above the groups.
+- **Clean**: folded, "No changes" — or, on a branch that committed, unfolded on its Committed
+  list; every repository clean is said once, above the groups.
 - **Failure**: in its group, the sentence, the suggestion, the command to copy with a **Copy**
   button, and the one action that helps — **Refresh**, **Reveal Parent Folder** for a repository
   gone, **Open Privacy Settings** for a refusal. The last list stays, dimmed, "as of 14:02". The
@@ -140,9 +173,11 @@ The application still never acts on Git (ADR 0012): no staging, discarding or co
 - `RepositoryStatusReading` gains `untrackedFiles(in:atPath:limit:)`, and the monitor
   `untrackedFiles(in:of:)`.
 - The branch grouping of ADR 0012 and the `modified` pill are gone.
+- `WorkingTreeStatus` gains `committed` (`BranchCommits`), read by `GitStatusReader` with the
+  status, and `RepositoryStatusState` its attributed files.
 
 ## Out of scope
 
-Diffs and Quick Look; a tree of folders, filtering and searching the list; Git actions; opening a
+Diffs and Quick Look; choosing the base by hand, and the commits themselves (messages, authors); a tree of folders, filtering and searching the list; Git actions; opening a
 terminal in a repository (#43); keeping the folding across launches; a Git state per session in
 the sidebar, which would mean watching sessions not on screen; the notes editor itself (#16).

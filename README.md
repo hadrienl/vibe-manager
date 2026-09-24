@@ -134,7 +134,9 @@ documented in
 The inspector shows it one repository at a time, above the session's notes, each pane scrolling on
 its own: the branch, the distance from upstream and an operation left half done in the header, then
 the conflicted, staged, unstaged and untracked files in Git's own order — a file staged and changed
-again is in both lists. Folding, "Show More", the selection and the scroll position survive every
+again is in both lists — and, last, the files the branch already committed since `origin/main` (or
+whichever branch `origin/HEAD` names), so that a session whose agent committed its work still shows
+what it changed. Folding, "Show More", the selection and the scroll position survive every
 update, and a file keeps its selection as it moves from one list to another. Return or a
 double-click opens a file in the editor chosen in Settings, and only reveals it in the Finder until
 one is chosen. The decisions are documented in
