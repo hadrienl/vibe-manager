@@ -449,20 +449,11 @@ public final class AppModel {
   /// What the sidebar lists. Every session is still held — and every terminal still mounted —
   /// so narrowing the list never stops an agent or throws away what one has already said.
   public var visibleSessions: [WorkSession] {
-<<<<<<< Updated upstream
-    filter.apply(to: sessions)
-=======
-    let filter = filter
     // A session being closed still reads as active until the stop is done. It is already gone
     // as far as the user is concerned.
-    let sessions = self.sessions.filter {
+    filter.apply(to: sessions.filter {
       !($0.status == .active && dismissedSessionIDs.contains($0.id))
-    }
-    // The notes are only read when there is something to look for in them: read every time, each
-    // keystroke typed in the notes would redraw the sidebar.
-    guard !filter.trimmedSearchText.isEmpty else { return filter.apply(to: sessions) }
-    return filter.apply(to: sessions, notes: notes.searchIndex)
->>>>>>> Stashed changes
+    })
   }
 
   public var archivedSessionCount: Int {
