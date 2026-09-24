@@ -95,6 +95,33 @@ struct VibeManagerApp: App {
           environment.appModel.cycleScope()
         }
         .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+
+        Divider()
+
+        // Between the three zones of the window, from the keyboard alone. An agent in the
+        // terminal loses these three combinations, which full-screen programs rarely use.
+        Button("Focus Sidebar") {
+          environment.appModel.focusSidebar()
+        }
+        .keyboardShortcut("1", modifiers: [.command, .option])
+
+        Button("Focus Terminal") {
+          environment.appModel.focusTerminal()
+        }
+        .keyboardShortcut("2", modifiers: [.command, .option])
+        .disabled(environment.appModel.selectedSessionID == nil)
+
+        Button("Focus Inspector") {
+          environment.appModel.focusInspector()
+        }
+        .keyboardShortcut("3", modifiers: [.command, .option])
+        .disabled(environment.appModel.selectedSessionID == nil)
+
+        // What the terminal said last, read by VoiceOver on demand rather than as it arrives.
+        Button("Read Last Output") {
+          Task { await environment.appModel.readLastOutput() }
+        }
+        .keyboardShortcut("o", modifiers: [.command, .option, .control])
       }
 
       SessionHistoryCommands(model: environment.appModel, focus: windowFocus)

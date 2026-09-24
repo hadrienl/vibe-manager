@@ -98,6 +98,7 @@ public struct NewSessionSheet: View {
       TextField("What are you working on?", text: $model.draft.name)
         .textFieldStyle(.roundedBorder)
         .focused($focus, equals: .draft(.name))
+        .accessibilityIdentifier("new-session-name")
     }
   }
 
@@ -249,6 +250,7 @@ public struct NewSessionSheet: View {
         focusRequested: editorRequest == .draft(.initialPrompt)
       )
       .focused($focus, equals: .draft(.initialPrompt))
+      .accessibilityIdentifier("new-session-prompt")
     }
   }
 
@@ -366,6 +368,7 @@ public struct NewSessionSheet: View {
         )
         .textFieldStyle(.roundedBorder)
         .focused($focus, equals: .draft(.workingDirectory))
+        .accessibilityIdentifier("new-session-folder")
 
         Button("Choose…", action: chooseFolder)
       }
@@ -395,6 +398,7 @@ public struct NewSessionSheet: View {
         .keyboardShortcut(.defaultAction)
         .buttonStyle(.borderedProminent)
         .disabled(!model.canSubmit)
+        .accessibilityIdentifier("new-session-create")
         // Return goes to the line in a prompt; ⌘↩ creates from anywhere in the form.
         .background {
           Button("Create & Launch", action: submit)

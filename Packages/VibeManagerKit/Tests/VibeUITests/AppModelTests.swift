@@ -89,3 +89,33 @@ func appModelSurfacesStoreFailure() async {
 
   #expect(model.state == .loaded([session]))
 }
+
+@MainActor
+@Suite("Moving between the zones of the window")
+struct ZoneNavigationTests {
+  @Test("Focus Sidebar and Focus Inspector ask their zone for the keyboard, showing it if hidden")
+  func focusRequests() async {
+    let session = WorkSession(name: "Zones", status: .closed)
+    let model = AppModel(repository: FakeSessionRepository(values: [session]))
+    await model.load()
+    model.select(session.id)
+    model.layout.setInspectorVisible(false)
+
+    model.focusSidebar()
+    model.focusInspector()
+
+    #expect(model.sidebarFocusRequest == 1)
+    #expect(model.gitInspector.focusRequest == 1)
+    #expect(model.layout.columns.isInspectorVisible)
+  }
+
+  @Test("Read Last Output says so when there is no terminal to read")
+  func readWithoutTerminal() async {
+    let model = AppModel(repository: FakeSessionRepository(values: []))
+    await model.load()
+
+    await model.readLastOutput()
+
+    #expect(Announcer.lastAnnouncement == "No terminal is selected.")
+  }
+}

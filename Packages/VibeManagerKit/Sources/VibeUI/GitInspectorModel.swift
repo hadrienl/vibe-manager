@@ -19,6 +19,13 @@ enum DirectoryListingState: Equatable, Sendable {
 @MainActor
 @Observable
 final class GitInspectorModel {
+  /// Bumped to move the keyboard to the inspector's list: Focus Inspector, ⌥⌘3.
+  private(set) var focusRequest = 0
+
+  func requestFocus() {
+    focusRequest += 1
+  }
+
   /// How many rows a section shows before "Show More".
   static let pageSize = 200
   /// An untracked or committed list longer than this starts folded: a folder `.gitignore` forgot,

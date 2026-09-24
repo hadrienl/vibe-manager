@@ -359,6 +359,8 @@ private struct GitPane: View {
     }
     .listStyle(.sidebar)
     .focused($isListFocused)
+    .onChange(of: git.focusRequest) { isListFocused = true }
+    .accessibilityIdentifier("inspector-git")
     .contextMenu(forSelectionType: GitInspectorRowID.self) { ids in
       if let id = ids.first {
         FileRowMenu(id: id, row: row(id, in: groups), git: git)

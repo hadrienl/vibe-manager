@@ -77,6 +77,7 @@ struct SessionNotesEditor: NSViewRepresentable {
     coordinator.attach(document, to: textView)
     textView.isEditable = isEditable
     textView.setAccessibilityLabel(label)
+    textView.setAccessibilityIdentifier("notes-editor")
     if wantsFocus {
       coordinator.takeFocus(in: textView, attempts: 5)
     }

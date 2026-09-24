@@ -361,6 +361,8 @@ public final class AppModel {
   public let diagnostics: Diagnostics
   private let collectDiagnostics: (@MainActor (AppModel) async -> DiagnosticSnapshot)?
   private let archiveDiagnostics: @Sendable ([DiagnosticFile], Date) -> Data
+  /// Bumped to give the keyboard to the session list: Focus Sidebar, ⌥⌘1.
+  public private(set) var sidebarFocusRequest = 0
   /// The export under way, from its preview to the file saved.
   public private(set) var diagnosticsExport: DiagnosticsExportModel?
   /// How the previous run ended, as this launch found it: for the export.
@@ -1989,6 +1991,35 @@ extension AppModel {
   public func focusTerminal() {
     guard let id = selectedSessionID else { return }
     launcher?.pane(for: id)?.requestFocus()
+  }
+
+  public func focusSidebar() {
+    if !layout.columns.isSidebarVisible {
+      layout.setSidebarVisible(true)
+    }
+    sidebarFocusRequest += 1
+  }
+
+  /// Focus Inspector, ⌥⌘3: the inspector is shown if it was hidden, and its list takes the
+  /// keyboard.
+  public func focusInspector() {
+    guard selectedSessionID != nil else { return }
+    if !layout.columns.isInspectorVisible {
+      layout.setInspectorVisible(true)
+    }
+    gitInspector.requestFocus()
+  }
+
+  /// Read Last Output, ⌃⌥⌘O: VoiceOver says the last lines the selected session's terminal
+  /// showed. On demand only — never as output arrives.
+  public func readLastOutput() async {
+    guard let id = selectedSessionID, let session = pane(for: id)?.session else {
+      Announcer.announce("No terminal is selected.")
+      return
+    }
+    let lines = TerminalText.lastLines(of: await session.history().bytes, count: 5)
+    Announcer.announce(
+      lines.isEmpty ? "The terminal has shown nothing yet." : lines.joined(separator: "\n"))
   }
 
   /// Stops every watch, for good. Called on the way out.

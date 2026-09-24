@@ -79,7 +79,9 @@ public final class AppEnvironment {
 
   public init(configuration: Configuration = Configuration()) {
     let data = Self.dataLocation(
-      environment: configuration.environment, defaultsSuite: configuration.defaultsSuite)
+      environment: configuration.environment,
+      defaultsSuite: configuration.defaultsSuite
+        ?? configuration.environment["VIBE_DEFAULTS_SUITE"].flatMap { $0.isEmpty ? nil : $0 })
     dataDirectory = data.store.deletingLastPathComponent()
     // A folder made by an early build or restored from a backup keeps whatever mode it had; the
     // application's own are brought back to owner only before anything is read from them.
@@ -174,7 +176,8 @@ public final class AppEnvironment {
     let permissions = PermissionsModel(
       gate: FullDiskAccessGate(
         probe: configuration.fullDiskAccessProbe,
-        preferences: UserDefaultsPermissionPreferences()
+        // An isolated copy keeps its answer apart, like its other preferences.
+        preferences: UserDefaultsPermissionPreferences(suiteName: data.defaultsSuite)
       )
     )
     self.permissions = permissions
@@ -395,9 +398,14 @@ public final class AppEnvironment {
       defaultsSuite: defaultsSuite ?? "com.hadrienl.VibeManager.isolated")
   }
 
+  /// `VIBE_ENABLE_MOCK_AGENT=only` offers the mock alone, the way the interface smoke test runs:
+  /// on a Mac with Claude Code or Codex installed, they would otherwise come first.
   private static func providers(
     environment: [String: String], diagnostics: any DiagnosticLog
   ) -> [any AgentProvider] {
+    if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
+      return [MockAgentProvider(environment: environment)]
+    }
     var providers: [any AgentProvider] = [
       ClaudeCodeAgentProvider.make(environment: environment, diagnostics: diagnostics),
       CodexAgentProvider.make(environment: environment, diagnostics: diagnostics),
