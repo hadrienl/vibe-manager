@@ -201,9 +201,16 @@ Measured while building this:
   socket first is handed neither a keystroke nor an agent's environment.
 - The audit token is used rather than the pid, which could be worn by another process between the
   moment it is read and the moment it is checked.
-- An ad-hoc build is verifiable against itself, since both ends have the same hash. A later ad-hoc
-  build is not, and so cannot reattach to the previous build's host (next section). A build signed
-  by a team requires that bundle identifier and that team, which survive an update.
+- **Signed by a team**, the requirement is the designated one: that bundle identifier and that team.
+  Both survive an update, so an application updated while its agents ran reattaches to them.
+- **Signed ad hoc** — a development build — it is the bundle identifier alone. The designated
+  requirement of such a build is its own hash, which the next build does not have: requiring it
+  would kill every agent left running at each compilation, and carrying one's work across builds
+  is precisely what this host is for. The identifier lets through a process of the same user signed
+  ad hoc under that name; such a process can already open the terminal devices the user owns, or
+  rewrite the development binary itself, so nothing is given away that was not already.
+- Measured on a development build: the binary rebuilt while its host ran (a new inode), the host
+  kept running its session, and still passed `identifier "com.hadrienl.VibeManager"`.
 - **What this does not cover:** a process of the same user can already open `/dev/ttysNNN`, which
   the user owns, and read from it. That is true of every terminal on macOS, and this design does
   not make it worse. "A third-party process can neither connect to the host nor read a terminal"
@@ -262,9 +269,9 @@ reconciliation must not close it.
 | Found | Verdict | What happens |
 |---|---|---|
 | `detached`, host connected and verified | `detached(running, ended, resume)` | running sessions are **adopted**; one that ended while away is closed, dated from when the host saw it end, and shown with its last output; `resuming`, and what the host lost, are resumed as a clean quit would |
-| `detached`, no host, **and the Mac restarted since** (`kern.boottime` after the quit) | `clean` | resumed natively (#11): leaving them running was an intention to carry on, and a restart is not a crash |
-| `detached`, no host, without a restart | `unexpected` | the host crashed or was killed: the sessions are **offered**, and their process groups are looked for as leftovers first |
-| `detached`, a host that is ours but will not answer now (another copy attached, no reply in time, no list) | `otherInstance` | nothing is decided: neither the store nor the document is touched, nothing is killed, and the next launch asks again |
+| `detached`, no host, **and the Mac restarted since** (`kern.boottime` after the quit), **or the host said it was told to stop** (a logout, a shutdown, `kill`) | `clean` | resumed natively (#11): leaving them running was an intention to carry on that the system cut short, which is not a crash |
+| `detached`, no host, and nothing says why | `unexpected` | the host crashed or was killed outright: the sessions are **offered**, and their process groups are looked for as leftovers first |
+| `detached`, a host that is ours but will not answer now (another copy attached, no reply in time, no list) | `hostUnavailable` | nothing is decided: neither the store nor the document is touched and nothing is killed. A banner says the agents are still running and offers **Retry**, which runs the detection again |
 | `detached`, a host that will not verify (another build) | `unexpected` | the host is killed once its identity is confirmed, its agents' groups too, and the sessions are offered |
 | anything else | ADR 0011's four | unchanged |
 
@@ -274,6 +281,12 @@ process group are armed again, and the surface replays the history and follows t
 The first size the view reports is followed by a `redraw`: `SIGWINCH` to the group the child leads.
 The kernel raises nothing for a size that did not change, and a full-screen program redraws itself
 for the window it is now in rather than showing a history cut wherever the buffer was trimmed.
+
+A host told to stop — `SIGTERM` or `SIGINT`, which is what a logout or a shutdown sends — writes
+the instant into `stop-requested`, next to its socket, **before** giving its agents their grace
+period, since the system may not wait for it. A host that crashes writes nothing. The next launch
+reads that file when it finds no host; the next host deletes it once it holds the lock, by which
+time the application has already looked.
 
 A banner says it once: "3 agents kept running while Vibe Manager was closed; 1 has finished since."
 When nothing has finished it goes away by itself, since there is nothing to act on.
@@ -285,8 +298,10 @@ It is killed, and the launch fails.
 ### When the host cannot be used
 
 When the host cannot be started, or will not prove it is ours, the terminal is started in the
-application exactly as before this ADR. It will stop with the application, and quitting asks only
-about the sessions that can be left. A broken helper the user never sees must not keep anybody
+application exactly as before this ADR. It will stop with the application, and it says so where
+the agent is: a bar above the terminal reads "This agent will stop when Vibe Manager quits." The
+question asked on quit counts only the agents that can be left, and names the others as stopping
+either way. A broken helper the user never sees must not keep anybody
 from working. `VIBE_TERMINAL_HOST=off` starts no host, which keeps a development build's agents
 inside the process a debugger is attached to.
 
