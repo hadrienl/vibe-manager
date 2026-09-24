@@ -64,6 +64,10 @@ public final class AppModel {
   /// Closes under way, from the command to the reload that shows the session closed. Until then
   /// the session still reads as running, and a second ⌘W would stop it a second time.
   public private(set) var closingSessionIDs: Set<SessionID> = []
+  /// Sessions the user closed, taken off the Active list the moment they asked. Stopping the
+  /// agent happens behind it, and nothing of it is theirs to watch. Kept apart from
+  /// `closingSessionIDs`, which an agent switch also sets while the session stays on screen.
+  private var dismissedSessionIDs: Set<SessionID> = []
   /// Whether closing a session whose agent runs asks first. Mirrored here so that the settings
   /// window and the dialog's "Don't ask again" read and change the same answer.
   public var confirmsStoppingRunningAgent: Bool {
@@ -445,7 +449,11 @@ public final class AppModel {
   /// What the sidebar lists. Every session is still held — and every terminal still mounted —
   /// so narrowing the list never stops an agent or throws away what one has already said.
   public var visibleSessions: [WorkSession] {
-    filter.apply(to: sessions)
+    // A session being closed still reads as active until the stop is done. It is already gone
+    // as far as the user is concerned.
+    filter.apply(to: sessions.filter {
+      !($0.status == .active && dismissedSessionIDs.contains($0.id))
+    })
   }
 
   public var archivedSessionCount: Int {
@@ -593,29 +601,52 @@ public final class AppModel {
     session.status == .archived
   }
 
-  /// Stops the agent and keeps everything else. The pane stays mounted so the last thing the
-  /// agent said is still on screen.
+  /// Stops the agent and keeps everything else, the terminal included.
   ///
-  /// The session stays selected, and the sidebar follows it to Closed. Left to the reload, the
-  /// selection fell to the next running session — and a second ⌘W then closed that one too.
-  ///
-  /// The selection is read once the agent has stopped, not before: stopping can take a while,
-  /// and a session the user picked in the meantime is theirs to keep.
+  /// The session leaves the list at once and the selection moves to the row that takes its
+  /// place — the one below, or the one above at the end of the list. Stopping the agent can take
+  /// a while, and the user closed the session to get on with the next one, not to watch a shell
+  /// being killed. It is reported only if it goes wrong.
   public func close(_ id: SessionID) async {
     guard !closingSessionIDs.contains(id) else { return }
     closingSessionIDs.insert(id)
     defer { closingSessionIDs.remove(id) }
+    dismiss(id)
     do {
       let closure = try await closeSession(id: id)
       report(closure.detachment, for: closure.session, action: .closed)
     } catch {
       await report(error)
     }
+    // Still on it only if the user was not looking at its row: listed whatever its state, or
+    // hidden by a search. The sidebar then follows it rather than dropping it.
     let isStillSelected = selectedSessionID == id
     await reload()
+    // Only once the reload has the session closed: dropped earlier, it would flash back in.
+    dismissedSessionIDs.remove(id)
     if isStillSelected {
       follow(id)
+    } else {
+      // A close that failed leaves the session active, and back in the list: the selection is
+      // left where the user is now rather than pulled back to it.
+      reconcileSelection()
     }
+  }
+
+  /// Takes a session off the list, and moves the selection off it if its row was there and has
+  /// gone. A session that is not active stays listed, and one hidden by a search was not where the
+  /// user was looking: either way the selection stays on it.
+  private func dismiss(_ id: SessionID) {
+    let visible = visibleSessions
+    let index = visible.firstIndex { $0.id == id }
+    dismissedSessionIDs.insert(id)
+    guard selectedSessionID == id, let index,
+      !visibleSessions.contains(where: { $0.id == id })
+    else { return }
+    let neighbour =
+      visible.indices.contains(index + 1)
+      ? visible[index + 1] : (index > 0 ? visible[index - 1] : nil)
+    select(neighbour?.id)
   }
 
   /// Opens the confirmation rather than archiving. The command is reversible, but it takes a
