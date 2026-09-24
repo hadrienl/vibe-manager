@@ -1,4 +1,4 @@
-# 0017 — Prompt templates
+# 0018 — Prompt templates
 
 - Status: accepted
 - Date: 2026-09-24

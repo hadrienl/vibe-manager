@@ -73,7 +73,7 @@ what an older store held; nothing writes it any more.
 Since #17 the `template` reference is filled in when a session is created from a prompt template:
 the template's identifier, its name and its revision (an integer, written as text), as they were at
 creation. The prompt the session keeps is the rendered one; the templates themselves live in their
-own `templates.json` next to this document (ADR 0017), written with the same recipe.
+own `templates.json` next to this document (ADR 0018), written with the same recipe.
 
 ## Consequences
 

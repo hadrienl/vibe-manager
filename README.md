@@ -181,7 +181,7 @@ template's name and revision, so changing the template later changes nothing alr
 Templates are edited, duplicated, ordered and archived in their own window (File ▸ Manage Prompt
 Templates…), stored beside the sessions, and exported and imported in a format documented in
 [`docs/prompt-templates.md`](docs/prompt-templates.md). The decisions are documented in
-[`docs/architecture/0017-prompt-templates.md`](docs/architecture/0017-prompt-templates.md).
+[`docs/architecture/0018-prompt-templates.md`](docs/architecture/0018-prompt-templates.md).
 
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
