@@ -98,9 +98,11 @@ A value the pattern does not match gives nothing, and the sheet says so under th
 it would stop a session over a URL that is merely shaped differently — the user sees what the name
 will be before creating it. A pattern that does not compile keeps the template from being saved.
 
-Each field of the editor has one **Try** value, shared with the preview: under it, every pattern
-applied to that field shows what it keeps and where it is used. The sheet shows the same lines
-under the field being filled.
+The editor is laid out in three columns: the list, the template being written — its fields in a
+table — and a **Try it** column. That column holds one value per field, shared with the preview
+below it: under each, every pattern applied to that field shows what it keeps and where it is
+used. What the template gives stays in sight while it is written, at the price of a wide window.
+The sheet shows the same lines under the field being filled.
 
 ### In the settings, not a window of their own
 

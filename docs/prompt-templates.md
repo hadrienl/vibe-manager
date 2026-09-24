@@ -37,9 +37,9 @@ A value the pattern finds nothing in adds nothing: the New Session sheet says so
 and the preview shows `‹Url: no match›`, but the session can still be created. A pattern that is
 not a regular expression keeps the template from being saved.
 
-In the template editor, each field has a **Try** box: the patterns applied to that field are listed
-under it with what they keep of the value typed there, and where they are used. The same values
-make the preview.
+In the template editor, the **Try it** column on the right has a value to try per field: the
+patterns applied to that field are listed under it with what they keep of the value typed there,
+and where they are used. The same values make the preview below them.
 
 The optional **session name** uses the same fields (`Review {{url}}`) and names the session until
 you type a name of your own.

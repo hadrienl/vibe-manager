@@ -22,9 +22,9 @@ public struct PromptTemplatesView: View {
       sidebar
         .frame(minWidth: 200, idealWidth: 230, maxWidth: 320)
       detail
-        .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 760, maxWidth: .infinity, maxHeight: .infinity)
     }
-    .frame(minWidth: 720, minHeight: 520)
+    .frame(minWidth: 1000, idealWidth: 1180, minHeight: 600, idealHeight: 700)
     .task { await model.load() }
     .confirmationDialog(
       "Save the changes to “\(model.editing?.trimmedName ?? "")”?",
@@ -251,46 +251,55 @@ public struct PromptTemplatesView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
+  /// The template being written in the middle, and on the right what it gives: a value to try per
+  /// field, what the patterns keep of it, and the session and prompt made with those values.
   private func editor(_ editing: PromptTemplate) -> some View {
     VStack(spacing: 0) {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 14) {
-          EditorRow("Name", issues: issues(for: .name)) {
-            TextField("What is it for?", text: binding(\.name))
-              .textFieldStyle(.roundedBorder)
-              .focused($isNameFocused)
-          }
-          EditorRow(
-            "Session name",
-            help: "Optional — the name of the sessions made from it, with the same {{fields}}.",
-            issues: issues(for: .sessionName)
-          ) {
-            TextField("Review {{url}}", text: binding(\.sessionNamePattern))
-              .textFieldStyle(.roundedBorder)
-          }
-          EditorRow(
-            "Prompt",
-            help:
-              "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text.",
-            issues: issues(for: .body)
-          ) {
-            VStack(alignment: .leading, spacing: 5) {
-              PromptTextEditor(
-                text: binding(\.body),
-                accessibilityLabel: "Prompt",
-                highlightsPlaceholders: true,
-                isEditable: !model.isReadOnly
-              )
-              // A text view of its own per template, so ⌘Z never brings back another one's text.
-              .id(editing.id)
-              malformedNotice(editing)
+      HStack(spacing: 0) {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 16) {
+            EditorRow("Name", issues: issues(for: .name)) {
+              TextField("What is it for?", text: binding(\.name))
+                .textFieldStyle(.roundedBorder)
+                .focused($isNameFocused)
             }
+            EditorRow(
+              "Session name",
+              help: "Optional — names the sessions made from it, with the same {{fields}}.",
+              issues: issues(for: .sessionName)
+            ) {
+              TextField("Review {{url}}", text: binding(\.sessionNamePattern))
+                .textFieldStyle(.roundedBorder)
+                .font(.body.monospaced())
+            }
+            EditorRow(
+              "Prompt",
+              help:
+                "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text.",
+              issues: issues(for: .body)
+            ) {
+              VStack(alignment: .leading, spacing: 5) {
+                PromptTextEditor(
+                  text: binding(\.body),
+                  accessibilityLabel: "Prompt",
+                  highlightsPlaceholders: true,
+                  isEditable: !model.isReadOnly
+                )
+                // A text view of its own per template, so ⌘Z never brings back another one's text.
+                .id(editing.id)
+                malformedNotice(editing)
+              }
+            }
+            fieldsTable(editing)
           }
-          fieldsSection(editing)
-          previewSection(editing)
+          .padding(20)
+          .disabled(model.isReadOnly)
         }
-        .padding(20)
-        .disabled(model.isReadOnly)
+        .frame(minWidth: 440, maxWidth: .infinity)
+
+        Divider()
+        tryColumn(editing)
+          .frame(width: 300)
       }
       Divider()
       footer(editing)
@@ -310,96 +319,125 @@ public struct PromptTemplatesView: View {
     }
   }
 
+  /// One row per field, as the text first reads them: what the form calls it, the hint inside the
+  /// empty control, and its two switches.
   @ViewBuilder
-  private func fieldsSection(_ editing: PromptTemplate) -> some View {
+  private func fieldsTable(_ editing: PromptTemplate) -> some View {
     let fields = editing.fields
     EditorRow(
       "Fields",
       help: fields.isEmpty ? "Fields appear here as you write {{name}} in the text." : nil,
       issues: []
     ) {
-      VStack(alignment: .leading, spacing: 10) {
-        ForEach(fields) { field in
-          VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+      if !fields.isEmpty {
+        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+          GridRow {
+            Text("Field")
+            Text("Label")
+            Text("Hint")
+            Text("Required").gridColumnAlignment(.center)
+            Text("Multiline").gridColumnAlignment(.center)
+          }
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          Divider()
+          ForEach(fields) { field in
+            GridRow {
               Text(field.name)
-                .font(.callout.monospaced())
-                .frame(width: 90, alignment: .leading)
+                .font(.callout.monospaced().weight(.semibold))
                 .lineLimit(1)
+                .frame(minWidth: 60, alignment: .leading)
               TextField(
                 PromptTemplateField.derivedLabel(for: field.name),
                 text: settingsBinding(field.name, \.label)
               )
               .textFieldStyle(.roundedBorder)
               .accessibilityLabel("Label of \(field.name)")
-            }
-            HStack(spacing: 12) {
-              Spacer().frame(width: 90)
+              TextField("Hint", text: settingsBinding(field.name, \.help))
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Hint of \(field.name)")
               Toggle(
                 "Required",
                 isOn: Binding(
                   get: { field.isRequired },
                   set: { model.setRequired($0, for: field.name) }
-                ))
+                )
+              )
+              .labelsHidden()
+              .accessibilityLabel("\(field.name) is required")
               Toggle(
                 "Multiline",
                 isOn: Binding(
                   get: { field.isMultiline },
                   set: { value in model.updateSettings(for: field.name) { $0.isMultiline = value } }
-                ))
-              TextField("Hint", text: settingsBinding(field.name, \.help))
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Hint of \(field.name)")
-            }
-            .toggleStyle(.checkbox)
-            .controlSize(.small)
-            // One value to try, for this field's patterns and for the preview below alike.
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-              Text("Try")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 90, alignment: .trailing)
-              VStack(alignment: .leading, spacing: 4) {
-                TextField(
-                  field.help ?? "A value to try — not saved",
-                  text: Binding(
-                    get: { model.sampleValues[field.name] ?? "" },
-                    set: { model.sampleValues[field.name] = $0 }
-                  )
                 )
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .accessibilityLabel("Value to try for \(field.label)")
-                ExtractionResultsView(
-                  results: PromptTemplateFill(template: editing, values: model.sampleValues)
-                    .extractions(for: field.name),
-                  showsPlaces: true
-                )
-              }
+              )
+              .labelsHidden()
+              .accessibilityLabel("\(field.name) is multiline")
             }
           }
         }
+        .toggleStyle(.checkbox)
+        .padding(10)
+        .background(
+          RoundedRectangle(cornerRadius: 8).strokeBorder(Color(nsColor: .separatorColor)))
       }
     }
   }
 
-  @ViewBuilder
-  private func previewSection(_ editing: PromptTemplate) -> some View {
-    EditorRow(
-      "Preview", help: "Made with the values tried above.", issues: []
-    ) {
-      VStack(alignment: .leading, spacing: 8) {
-        if let name = model.preview?.sessionName, !name.isEmpty {
-          Text("Session: \(name)")
-            .font(.callout.weight(.medium))
-            .textSelection(.enabled)
+  /// A value to try per field — shared by the patterns and the preview, never saved — and what
+  /// the template gives with them.
+  private func tryColumn(_ editing: PromptTemplate) -> some View {
+    let fill = PromptTemplateFill(template: editing, values: model.sampleValues)
+    return ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        Text("Try it")
+          .font(.headline)
+        if editing.fields.isEmpty {
+          Text("Values to try appear here for each field of the template.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        ForEach(editing.fields) { field in
+          VStack(alignment: .leading, spacing: 5) {
+            Text(field.label)
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+            let value = Binding(
+              get: { model.sampleValues[field.name] ?? "" },
+              set: { model.sampleValues[field.name] = $0 }
+            )
+            if field.isMultiline {
+              PromptTextEditor(
+                text: value, minimumLines: 2, placeholder: field.help,
+                accessibilityLabel: "Value to try for \(field.label)")
+            } else {
+              TextField(field.help ?? "A value to try", text: value)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Value to try for \(field.label)")
+            }
+            ExtractionResultsView(results: fill.extractions(for: field.name), showsPlaces: true)
+          }
         }
         if let preview = model.preview {
+          Divider()
+          Text("Preview")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+          if let name = preview.sessionName, !name.isEmpty {
+            (Text("Session ") + Text(name).bold())
+              .font(.callout)
+              .textSelection(.enabled)
+          }
           PromptPreviewText(rendered: preview)
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-              Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+              Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6)
+            )
+            .overlay {
+              RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor))
+            }
           Text(
             "\(PromptSize.label(preview.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit))"
           )
@@ -407,7 +445,10 @@ public struct PromptTemplatesView: View {
           .foregroundStyle(.secondary)
         }
       }
+      .padding(18)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .background(Color(nsColor: .underPageBackgroundColor).opacity(0.35))
   }
 
   private func footer(_ editing: PromptTemplate) -> some View {
@@ -633,26 +674,24 @@ private struct EditorRow<Content: View>: View {
   }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
+    VStack(alignment: .leading, spacing: 5) {
       Text(title)
+        .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
-        .frame(width: 100, alignment: .trailing)
-      VStack(alignment: .leading, spacing: 5) {
-        content
-        ForEach(issues) { issue in
-          Label("\(issue.message) \(issue.remedy)", systemImage: "exclamationmark.circle.fill")
-            .font(.caption)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        if let help, issues.isEmpty {
-          Text(help)
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
+      content
+      ForEach(issues) { issue in
+        Label("\(issue.message) \(issue.remedy)", systemImage: "exclamationmark.circle.fill")
+          .font(.caption)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      if let help, issues.isEmpty {
+        Text(help)
+          .font(.caption)
+          .foregroundStyle(.tertiary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
