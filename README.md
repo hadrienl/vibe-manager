@@ -173,6 +173,16 @@ kept through close, relaunch and archive, and searched by the sidebar. Quitting 
 could not be saved asks first. The decisions are documented in
 [`docs/architecture/0016-session-notes.md`](docs/architecture/0016-session-notes.md).
 
+A session can start from a prompt template: a prompt with fields — `Review {{url}}` — picked at
+the top of the New Session sheet or from File ▸ New Session from (⇧⌘N for the first). Each field
+becomes a control, a required one keeps Create out of reach until it is filled, and the prompt is
+previewed exactly as the agent will receive it. The session keeps that rendered text and the
+template's name and revision, so changing the template later changes nothing already created.
+Templates are edited, duplicated, ordered and archived in their own window (File ▸ Manage Prompt
+Templates…), stored beside the sessions, and exported and imported in a format documented in
+[`docs/prompt-templates.md`](docs/prompt-templates.md). The decisions are documented in
+[`docs/architecture/0017-prompt-templates.md`](docs/architecture/0017-prompt-templates.md).
+
 The agents run as children of the application, so macOS asks *the application* for permission
 whenever one of them reads a protected folder. That question is asked once, at launch, as a single
 step explaining Full Disk Access and opening the right pane of System Settings — never in the

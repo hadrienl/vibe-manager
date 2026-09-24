@@ -123,4 +123,5 @@ and a stream of output without knowing which of the two it is talking to.
 
 The three-column workspace (#8 — the sidebar here is the minimum the ticket needs), several
 repositories and worktrees (#12 — one folder, stored as the first `RepositoryContext`), the live
-Git context (#13, #14), notes (#16) and prompt templates (#17 — the prompt stays free text).
+Git context (#13, #14), notes (#16) and prompt templates (#17, ADR 0017 — the prompt stayed free text here; since #17 a
+template can fill it, and the free prompt is written in an area that grows with it).
