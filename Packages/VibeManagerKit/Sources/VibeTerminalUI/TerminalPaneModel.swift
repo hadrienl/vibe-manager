@@ -22,6 +22,9 @@ public final class TerminalPaneModel {
   public private(set) var status: Status = .starting
   public private(set) var session: (any TerminalSession)?
   public private(set) var failure: Failure?
+  /// The error behind `failure`, when the terminal said which: for the diagnostics log, which
+  /// records its name and never its message.
+  public private(set) var launchError: TerminalError?
   /// The size the surface last measured, in character cells.
   public private(set) var viewportSize: TerminalSize?
   /// Whether this process ended because the application asked it to.
@@ -96,6 +99,7 @@ public final class TerminalPaneModel {
     session = nil
     status = .starting
     failure = nil
+    launchError = nil
     // A new process: whatever ended the previous one says nothing about how this one will end.
     wasStoppedOnPurpose = false
     hasReceivedInput = false
@@ -114,6 +118,7 @@ public final class TerminalPaneModel {
       self.session = session
       observe(session)
     } catch let error as TerminalError {
+      launchError = error
       failure = Failure(
         message: error.errorDescription ?? "The terminal could not be started.",
         suggestion: error.recoverySuggestion

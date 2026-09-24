@@ -2,6 +2,7 @@ import CryptoKit
 import Darwin
 import Dispatch
 import Foundation
+import VibeApplication
 import os
 
 /// Where one terminal host lives: a private directory holding its socket and its lock.
@@ -91,15 +92,28 @@ public enum TerminalHost {
   /// `NSApplication`, so no Dock icon, no menu bar and no window.
   public static func runIfRequested(
     arguments: [String] = CommandLine.arguments,
-    verifier: @autoclosure () -> any TerminalHostPeerVerifier = CodeSigningPeerVerifier()
+    verifier: @autoclosure () -> any TerminalHostPeerVerifier = CodeSigningPeerVerifier(),
+    diagnostics: (URL) -> Diagnostics = { _ in .disabled }
   ) {
     guard let index = arguments.firstIndex(of: argument), index + 1 < arguments.count else {
       return
     }
     let location = TerminalHostLocation(
       directory: URL(fileURLWithPath: arguments[index + 1], isDirectory: true))
-    run(at: location, configuration: TerminalHostServer.Configuration(verifier: verifier()))
+    // Given by the application, never guessed: an isolated copy logs beside its own data.
+    var log = Diagnostics.disabled
+    if let logIndex = arguments.firstIndex(of: logDirectoryArgument),
+      logIndex + 1 < arguments.count, arguments[logIndex + 1].hasPrefix("/")
+    {
+      log = diagnostics(URL(fileURLWithPath: arguments[logIndex + 1], isDirectory: true))
+    }
+    run(
+      at: location,
+      configuration: TerminalHostServer.Configuration(verifier: verifier(), diagnostics: log))
   }
+
+  /// Followed by the folder the host writes `host.jsonl` in.
+  public static let logDirectoryArgument = "--log-directory"
 
   public static func run(
     at location: TerminalHostLocation,
@@ -109,7 +123,8 @@ public enum TerminalHost {
     signal(SIGHUP, SIG_IGN)
     signal(SIGTERM, SIG_IGN)
     signal(SIGINT, SIG_IGN)
-    raiseDescriptorLimit()
+    let descriptors = raiseDescriptorLimit()
+    let diagnostics = configuration.diagnostics
 
     do {
       try location.prepare()
@@ -130,8 +145,12 @@ public enum TerminalHost {
     }
     guard isLocked else {
       logger.info("Another terminal host holds the lock.")
+      diagnostics.record(.host, .info, "host.alreadyRunning")
+      diagnostics.flush()
       exit(0)
     }
+    diagnostics.record(
+      .host, .info, "host.started", ["descriptorLimit": .count(Int(clamping: descriptors))])
     // Whatever the previous host said about its end has been read by now: an application only
     // starts a host after it has looked for the one it left.
     unlink(location.stopRequestPath)
@@ -163,6 +182,8 @@ public enum TerminalHost {
         // Said first, before the agents are given their grace period: the system may not wait
         // for it, and the next launch must know this was not a crash.
         location.recordStopRequest()
+        diagnostics.record(
+          .host, .notice, "host.stopRequested", ["signal": .code(signalNumber)])
         // Nobody may attach to a host on its way out: an application relaunched meanwhile would
         // take back agents about to be stopped, and then lose them with this host. Gone from the
         // socket, it leaves room for the next host instead.
@@ -170,6 +191,7 @@ public enum TerminalHost {
         acceptSource.cancel()
         Task {
           await server.stopEverything()
+          diagnostics.flush()
           exit(0)
         }
       }
@@ -241,14 +263,18 @@ public protocol TerminalHostLaunching: Sendable {
 /// costs a visible, revocable background item for neither.
 public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
   private let executableURL: URL
+  private let logDirectory: URL?
 
-  public init(executableURL: URL) {
+  public init(executableURL: URL, logDirectory: URL? = nil) {
     self.executableURL = executableURL
+    self.logDirectory = logDirectory
   }
 
   /// The application's own binary.
-  public static func bundled() -> ExecutableTerminalHostLauncher? {
-    Bundle.main.executableURL.map(ExecutableTerminalHostLauncher.init(executableURL:))
+  public static func bundled(logDirectory: URL? = nil) -> ExecutableTerminalHostLauncher? {
+    Bundle.main.executableURL.map {
+      ExecutableTerminalHostLauncher(executableURL: $0, logDirectory: logDirectory)
+    }
   }
 
   public func launch(at location: TerminalHostLocation) throws {
@@ -280,7 +306,10 @@ public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
     ResponsibilityDisclaimer.apply(to: &attributes)
 
     let path = executableURL.path
-    let arguments = [path, TerminalHost.argument, location.directory.path]
+    var arguments = [path, TerminalHost.argument, location.directory.path]
+    if let logDirectory {
+      arguments += [TerminalHost.logDirectoryArgument, logDirectory.path]
+    }
     let environment = Self.environment()
     var processIdentifier: pid_t = 0
     let result = withCStrings(arguments) { argv in

@@ -357,6 +357,14 @@ public final class AppModel {
   private let quitPreferences: any QuitPreferences
   private let fileOpeningPreferences: any FileOpeningPreferences
   private let archiveSession: ArchiveSession
+  /// Where what happens to the sessions is noted, by pseudonym.
+  public let diagnostics: Diagnostics
+  private let collectDiagnostics: (@MainActor (AppModel) async -> DiagnosticSnapshot)?
+  private let archiveDiagnostics: @Sendable ([DiagnosticFile], Date) -> Data
+  /// The export under way, from its preview to the file saved.
+  public private(set) var diagnosticsExport: DiagnosticsExportModel?
+  /// How the previous run ended, as this launch found it: for the export.
+  public private(set) var previousShutdownVerdict: DiagnosticToken?
   private let restoreSession: RestoreSession
   private let restartSession: RestartSession?
   private let planAgentSwitch: PlanAgentSwitch?
@@ -406,8 +414,17 @@ public final class AppModel {
     /// The file format templates are exported to and imported from, when there is one.
     templateExchange: (any PromptTemplateExchangeFormat)? = nil,
     /// Where runs are recorded and tokens read. A workspace assembled without it shows no usage.
-    usage: UsageModel? = nil
+    usage: UsageModel? = nil,
+    /// The diagnostics log. Nothing the user typed ever reaches it: see `DiagnosticEvent`.
+    diagnostics: Diagnostics = .disabled,
+    /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
+    collectDiagnostics: (@MainActor (AppModel) async -> DiagnosticSnapshot)? = nil,
+    /// Writes the archive of an export.
+    archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() }
   ) {
+    self.diagnostics = diagnostics
+    self.collectDiagnostics = collectDiagnostics
+    self.archiveDiagnostics = archiveDiagnostics
     self.usage = usage
     templates = PromptTemplateLibraryModel(
       repository: templateRepository, exchange: templateExchange, clock: clock)
@@ -696,6 +713,8 @@ public final class AppModel {
     closingSessionIDs.insert(id)
     defer { closingSessionIDs.remove(id) }
     dismiss(id)
+    diagnostics.record(
+      .lifecycle, .info, "session.closeRequested", ["session": diagnostics.pseudonym(id)])
     do {
       let closure = try await closeSession(id: id)
       report(closure.detachment, for: closure.session, action: .closed)
@@ -753,6 +772,8 @@ public final class AppModel {
     pendingArchive = nil
     do {
       let archival = try await archiveSession(id: id)
+      diagnostics.record(
+        .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)
     } catch {
       // An archive that failed is not a silent no-op. The dialog is already gone, so the banner
@@ -768,6 +789,8 @@ public final class AppModel {
   public func restore(_ id: SessionID) async {
     do {
       _ = try await restoreSession(id: id)
+      diagnostics.record(
+        .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(id)])
     } catch {
       await report(error)
     }
@@ -1152,6 +1175,13 @@ public final class AppModel {
       )
       switchAttempts[id] = (clock.now(), back)
 
+      diagnostics.record(
+        .session, .info, "session.agentSwitched",
+        [
+          "session": diagnostics.pseudonym(id),
+          "from": .token(AgentProviderID(change.previous.providerID).diagnosticToken),
+          "to": .token(plan.plan.providerID.diagnosticToken),
+        ])
       let outcome = await launcher.launchSwitch(plan, session: switched, previous: previous)
       if outcome != .started {
         resumeAttempts[id] = nil
@@ -1287,6 +1317,7 @@ public final class AppModel {
     defer { isRetryingHost = false }
     await runtimeRecorder?.unseal()
     let shutdown = await detectPreviousShutdown?()
+    note(shutdown)
     hostUnavailableReason = nil
     await reload()
     await reattach(shutdown)
@@ -1354,6 +1385,30 @@ public final class AppModel {
     case .none, .nothingToDo, .clean:
       return
     }
+  }
+
+  /// The verdict on the previous run, with how many sessions it concerns: never which.
+  private func note(_ shutdown: PreviousShutdown?) {
+    guard let shutdown else { return }
+    previousShutdownVerdict = shutdown.diagnosticToken
+    var fields: [(name: StaticString, value: DiagnosticValue)] = [
+      ("verdict", .token(shutdown.diagnosticToken))
+    ]
+    switch shutdown {
+    case .clean(let intent):
+      fields.append(("sessions", .count(intent.sessionIDs.count)))
+    case .unexpected(let intent, let leftovers):
+      fields.append(("sessions", .count(intent.sessionIDs.count)))
+      fields.append(("leftovers", .count(leftovers.count)))
+    case .detached(let detached):
+      fields.append(("running", .count(detached.running.count)))
+      fields.append(("ended", .count(detached.ended.count)))
+      fields.append(("sessions", .count(detached.resume.sessionIDs.count)))
+    case .nothingToDo, .otherInstance, .hostUnavailable:
+      break
+    }
+    diagnostics.log.record(
+      DiagnosticEvent(.lifecycle, .notice, "app.previousShutdown", fields: fields))
   }
 
   /// Puts back on screen what the terminal host kept: the running agents, and the last output of
@@ -1500,6 +1555,7 @@ public final class AppModel {
     // left `active` has nothing running behind it, and drawing it as running once — even for one
     // frame — is the lie this whole ticket is about.
     let shutdown = await detectPreviousShutdown?()
+    note(shutdown)
     await reload()
     // Which agents write a usage is part of their description, known without probing any of them.
     if let usage, let agents {
@@ -1698,6 +1754,12 @@ public final class AppModel {
     newSessionModel = nil
     insert(creation.session)
     select(creation.session.id)
+    diagnostics.record(
+      .session, .info, "session.created",
+      [
+        "session": diagnostics.pseudonym(creation.session.id),
+        "provider": .token(AgentProviderID(creation.plan.providerID.rawValue).diagnosticToken),
+      ])
     guard let launcher else { return }
     await launcher.launch(session: creation.session, plan: creation.plan)
     await reload()
@@ -1788,6 +1850,23 @@ public final class AppModel {
         return lhs.updatedAt > rhs.updatedAt
       }
     )
+  }
+
+  public var canExportDiagnostics: Bool { collectDiagnostics != nil }
+
+  /// Opens the export sheet, and gathers what it shows. Nothing is written until the user saves.
+  public func beginDiagnosticsExport() {
+    guard let collectDiagnostics, diagnosticsExport == nil else { return }
+    let export = DiagnosticsExportModel(archive: archiveDiagnostics, diagnostics: diagnostics)
+    diagnosticsExport = export
+    Task { [weak self] in
+      guard let self else { return }
+      export.load(await collectDiagnostics(self))
+    }
+  }
+
+  public func endDiagnosticsExport() {
+    diagnosticsExport = nil
   }
 
   public func restoreBackup() async {

@@ -50,7 +50,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
   }
 
   public static func make(
-    environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) -> ClaudeCodeAgentProvider {
     // The CLI and the catalog reader must agree on where the configuration lives, so a value
     // that cannot be resolved into an absolute path is dropped rather than forwarded.
@@ -62,7 +63,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
       specification: specification,
       locator: locator,
       probe: probe,
-      environment: environment
+      environment: environment,
+      diagnostics: diagnostics
     )
 
     return ClaudeCodeAgentProvider(

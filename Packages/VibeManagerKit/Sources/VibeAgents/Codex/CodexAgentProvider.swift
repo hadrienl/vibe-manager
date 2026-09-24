@@ -70,7 +70,8 @@ public struct CodexAgentProvider: AgentProvider {
   /// Wires the provider to the real file system, the real process probe and the user's
   /// `CODEX_HOME`. The only place that touches the machine.
   public static func make(
-    environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) -> CodexAgentProvider {
     // A `CODEX_HOME` this application cannot resolve is dropped rather than forwarded: the
     // CLI would then write its sessions where nothing watches for them.
@@ -82,7 +83,8 @@ public struct CodexAgentProvider: AgentProvider {
       specification: specification,
       locator: locator,
       probe: probe,
-      environment: environment
+      environment: environment,
+      diagnostics: diagnostics
     )
 
     return CodexAgentProvider(

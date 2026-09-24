@@ -256,3 +256,103 @@ private struct EmptyRegistry: AgentProviderResolving {
 
   func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] { [:] }
 }
+
+@MainActor
+@Suite("What the launcher notes in the diagnostics log")
+struct SessionDiagnosticsTests {
+  private let secret = "VIBE-CANARY-launcher"
+
+  private func plan() -> AgentLaunchPlan {
+    AgentLaunchPlan(
+      providerID: AgentProviderID("codex"),
+      executablePath: "/usr/bin/true",
+      arguments: ["--", secret],
+      environment: ["HTTPS_PROXY": "http://\(secret)@proxy"],
+      workingDirectoryPath: "/workspace/\(secret)",
+      promptDelivery: .argument
+    )
+  }
+
+  private func storedSession() -> WorkSession {
+    WorkSession(
+      name: secret,
+      initialPrompt: secret,
+      agent: SessionAgentConfiguration(providerID: "codex"),
+      status: .closed,
+      repositories: [RepositoryContext(path: "/workspace/\(secret)")]
+    )
+  }
+
+  private func text(of events: [DiagnosticEvent]) -> String {
+    events.map { String(decoding: DiagnosticLine.encode($0, origin: .app), as: UTF8.self) }
+      .joined()
+  }
+
+  @Test("A launch is noted by pseudonym, provider and kind, and names nothing the user typed")
+  func launchIsPseudonymous() async {
+    let log = RecordingDiagnosticLog()
+    let salt = Data(repeating: 3, count: 32)
+    let repository = MutableRepository(sessions: [storedSession()])
+    let launcher = SessionLauncher(
+      supervisor: SpySupervisor(),
+      repository: repository,
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero,
+      diagnostics: Diagnostics(log: log, pseudonym: SessionPseudonymizer(salt: salt))
+    )
+    let session = await repository.sessions().first!
+
+    await launcher.launch(session: session, plan: plan())
+
+    let launched = log.events(named: "session.launched")
+    #expect(launched.count == 1)
+    #expect(
+      launched.first?.value(of: "session") == .session(SessionPseudonym(session.id, salt: salt)))
+    #expect(launched.first?.value(of: "provider") == .token("codex"))
+    #expect(launched.first?.value(of: "kind") == .token("start"))
+    let written = text(of: log.events)
+    #expect(!written.contains(secret))
+    #expect(!written.contains(session.id.rawValue.uuidString))
+  }
+
+  @Test("A launch that fails is noted with the terminal's error by name")
+  func failureIsNamed() async {
+    let log = RecordingDiagnosticLog()
+    let repository = MutableRepository(sessions: [storedSession()])
+    let launcher = SessionLauncher(
+      supervisor: SpySupervisor(failure: .executableNotFound(path: "/Users/\(secret)/bin/agent")),
+      repository: repository,
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero,
+      diagnostics: Diagnostics(log: log, pseudonym: .ephemeral())
+    )
+    let session = await repository.sessions().first!
+
+    await launcher.launch(session: session, plan: plan())
+
+    let failed = log.events(named: "session.launchFailed")
+    #expect(failed.first?.value(of: "error") == .token("executableNotFound"))
+    #expect(!text(of: log.events).contains(secret))
+  }
+
+  @Test("An archived session is refused, and the refusal is noted")
+  func refusalIsNoted() async {
+    let log = RecordingDiagnosticLog()
+    var archived = storedSession()
+    try? archived.archive(at: Date())
+    let repository = MutableRepository(sessions: [archived])
+    let launcher = SessionLauncher(
+      supervisor: SpySupervisor(),
+      repository: repository,
+      agents: EmptyRegistry(),
+      viewportTimeout: .zero,
+      diagnostics: Diagnostics(log: log, pseudonym: .ephemeral())
+    )
+    let session = await repository.sessions().first!
+
+    await launcher.launch(session: session, plan: plan())
+
+    #expect(
+      log.events(named: "session.launchRefused").first?.value(of: "reason") == .token("archived"))
+  }
+}

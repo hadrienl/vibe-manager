@@ -158,8 +158,8 @@ public struct AgentDiagnostic: Hashable, Sendable {
 
   /// A plain text report the user can copy into a bug report.
   ///
-  /// Executable paths are reduced to their parent directory so the export never leaks a user
-  /// name or a project layout.
+  /// Executable paths are reduced to their parent directory, redacted as the diagnostics log
+  /// redacts them (`RedactedPath`), so the export never leaks a user name or a project layout.
   public func exportText() -> String {
     var lines = [
       "Provider: \(providerName) (\(providerID))",
@@ -167,7 +167,9 @@ public struct AgentDiagnostic: Hashable, Sendable {
       "Summary: \(summary)",
     ]
     if let installation {
-      lines.append("Executable directory: \(Self.redact(path: installation.executablePath))")
+      let directory = URL(fileURLWithPath: installation.executablePath)
+        .deletingLastPathComponent().path
+      lines.append("Executable directory: \(RedactedPath(directory).rawValue)")
       lines.append(
         "Executable name: \(URL(fileURLWithPath: installation.executablePath).lastPathComponent)")
       lines.append("Detection source: \(installation.source.rawValue)")
@@ -178,14 +180,6 @@ public struct AgentDiagnostic: Hashable, Sendable {
     }
     lines.append("Probed at: \(ISO8601DateFormatter().string(from: probedAt))")
     return lines.joined(separator: "\n")
-  }
-
-  /// Reduces a path to its parent directory, with the home directory abbreviated.
-  public static func redact(path: String) -> String {
-    let directory = URL(fileURLWithPath: path).deletingLastPathComponent().path
-    let home = NSHomeDirectory()
-    guard !home.isEmpty, directory.hasPrefix(home) else { return directory }
-    return "~" + directory.dropFirst(home.count)
   }
 
   private static func label(for state: AgentAvailabilityState) -> String {

@@ -15,6 +15,7 @@ let package = Package(
     .library(name: "VibeGit", targets: ["VibeGit"]),
     .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
+    .library(name: "VibeComposition", targets: ["VibeComposition"]),
   ],
   dependencies: [
     // Pinned exactly: the emulator parses untrusted output, so its version is a deliberate
@@ -45,6 +46,14 @@ let package = Package(
       name: "VibeUI",
       dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"]
     ),
+    // The application, composed. Out of the application target so that a test can compose it.
+    .target(
+      name: "VibeComposition",
+      dependencies: [
+        "VibeAgents", "VibeApplication", "VibeDomain", "VibeGit", "VibePersistence",
+        "VibeTerminal", "VibeTerminalUI", "VibeUI",
+      ]
+    ),
     // The terminal host in a process of its own, for the tests that need one to outlive their
     // client or to be killed. The application runs the same code from its own binary.
     .executableTarget(
@@ -60,7 +69,8 @@ let package = Package(
     ),
     .testTarget(
       name: "VibePersistenceTests",
-      dependencies: ["VibePersistence", "VibeApplication", "VibeDomain"]
+      // VibeProcess reads the diagnostics archive back with the system's `unzip`.
+      dependencies: ["VibePersistence", "VibeApplication", "VibeDomain", "VibeProcess"]
     ),
     .testTarget(
       name: "VibeAgentsTests",

@@ -15,13 +15,16 @@ import VibeProcess
 public struct ProcessGitCommandRunner: GitCommandRunner {
   private let executable: GitExecutable
   private let timeout: Duration
+  private let diagnostics: any DiagnosticLog
 
   public init(
     candidates: [String] = ProcessGitCommandRunner.defaultCandidates,
-    timeout: Duration = .seconds(120)
+    timeout: Duration = .seconds(120),
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) {
     executable = GitExecutable(candidates: candidates)
     self.timeout = timeout
+    self.diagnostics = diagnostics
   }
 
   public static let defaultCandidates = [
@@ -43,6 +46,7 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
 
   public func run(_ arguments: [String], in directory: String) async throws -> GitCommandResult {
     let path = try await executable.resolve()
+    let startedAt = ContinuousClock.now
     let result: BoundedProcessResult
     do {
       result = try await BoundedProcess.run(
@@ -56,8 +60,12 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
         )
       )
     } catch BoundedProcessError.launchFailed(let code) {
+      diagnostics.record(
+        .git, .error, "git.launchFailed",
+        ["verb": .token(Self.verb(of: arguments)), "errno": .code(code)])
       throw GitUnavailable.failedToStart(String(cString: strerror(code)))
     }
+    note(result, arguments: arguments, directory: directory, duration: .now - startedAt)
 
     if result.didTimeOut {
       return GitCommandResult(
@@ -74,6 +82,40 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
       output: result.standardOutput,
       errorOutput: String(decoding: result.standardError, as: UTF8.self)
     )
+  }
+
+  /// The verb alone: every other argument may be a path, a branch name or a revision.
+  static func verb(of arguments: [String]) -> DiagnosticToken {
+    switch arguments.first {
+    case "status": return DiagnosticToken("status")
+    case "rev-parse": return DiagnosticToken("rev-parse")
+    case "symbolic-ref": return DiagnosticToken("symbolic-ref")
+    case "reflog": return DiagnosticToken("reflog")
+    case "for-each-ref": return DiagnosticToken("for-each-ref")
+    case "merge-base": return DiagnosticToken("merge-base")
+    case "rev-list": return DiagnosticToken("rev-list")
+    case "diff": return DiagnosticToken("diff")
+    case "--no-optional-locks": return verb(of: Array(arguments.dropFirst()))
+    default: return DiagnosticToken("other")
+    }
+  }
+
+  /// Every command at `debug`: `git status` runs whenever a repository moves. A command that
+  /// timed out or wrote too much is an error, with the repository it was run in, redacted.
+  private func note(
+    _ result: BoundedProcessResult, arguments: [String], directory: String, duration: Duration
+  ) {
+    let failed = result.didTimeOut || result.outputTruncated
+    diagnostics.record(
+      .git, failed ? .error : .debug, failed ? "git.commandFailed" : "git.command",
+      [
+        "verb": .token(Self.verb(of: arguments)),
+        "code": .code(result.exitCode),
+        "timedOut": .flag(result.didTimeOut),
+        "truncated": .flag(result.outputTruncated),
+        "duration": .duration(duration),
+        "repository": .path(RedactedPath(directory)),
+      ])
   }
 
   static func environment(

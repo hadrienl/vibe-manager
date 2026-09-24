@@ -21,14 +21,17 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     public var launchTimeout: Duration
     /// How long any reply that is not a stop may take.
     public var replyTimeout: Duration
+    public var diagnostics: Diagnostics
 
     public init(
       location: TerminalHostLocation,
       launcher: (any TerminalHostLaunching)?,
       verifier: any TerminalHostPeerVerifier,
       launchTimeout: Duration = .seconds(10),
-      replyTimeout: Duration = .seconds(5)
+      replyTimeout: Duration = .seconds(5),
+      diagnostics: Diagnostics = .disabled
     ) {
+      self.diagnostics = diagnostics
       self.location = location
       self.launcher = launcher
       self.verifier = verifier
@@ -47,6 +50,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   }
 
   private let configuration: Configuration
+  private var diagnostics: Diagnostics { configuration.diagnostics }
   private let local: PTYTerminalSupervisor
   private var connection: TerminalHostConnection?
   private var identity: TerminalHostIdentity?
@@ -116,6 +120,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private func startLocally(_ spec: TerminalSpec, for id: SessionID) async throws
     -> any TerminalSession
   {
+    diagnostics.record(
+      .host, .notice, "host.fallbackInProcess", ["session": diagnostics.pseudonym(id)])
     mirrors[id] = nil
     return try await local.start(spec, for: id)
   }
@@ -202,6 +208,24 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
 
   public func hostIdentity() -> TerminalHostIdentity? {
     connection == nil ? nil : identity
+  }
+
+  /// The host as the export reports it: its identity, and the state of each session it runs for
+  /// this copy, by pseudonym. Read from what the host last said, never asked again.
+  public func diagnosticReport() async -> DiagnosticSnapshot.Host? {
+    guard connection != nil, let identity else { return nil }
+    var sessions: [DiagnosticSnapshot.HostSession] = []
+    for (id, mirror) in mirrors {
+      guard case .session(let pseudonym) = diagnostics.pseudonym(id) else { continue }
+      sessions.append(
+        DiagnosticSnapshot.HostSession(
+          session: pseudonym, state: await mirror.state().diagnosticToken))
+    }
+    return DiagnosticSnapshot.Host(
+      processIdentifier: identity.processIdentifier,
+      startedAt: identity.processStartedAt,
+      protocolVersion: TerminalHostWire.protocolVersion,
+      sessions: sessions.sorted { $0.session.rawValue < $1.session.rawValue })
   }
 
   public func discard(_ id: SessionID) async {
@@ -301,12 +325,23 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     let path = configuration.location.socketPath
     var descriptor = UnixSocket.connect(to: path)
     if descriptor == nil, launching, let launcher = configuration.launcher {
-      guard (try? launcher.launch(at: configuration.location)) != nil else { return .absent }
+      let launchedAt = ContinuousClock.now
+      do {
+        try launcher.launch(at: configuration.location)
+      } catch {
+        var fields: [(name: StaticString, value: DiagnosticValue)] = []
+        if let code = DiagnosticValue.posixCode(of: error) { fields.append(("errno", code)) }
+        diagnostics.log.record(DiagnosticEvent(.host, .error, "host.launchFailed", fields: fields))
+        return .absent
+      }
       let deadline = ContinuousClock.now + configuration.launchTimeout
       while descriptor == nil, ContinuousClock.now < deadline {
         try? await Task.sleep(for: .milliseconds(20))
         descriptor = UnixSocket.connect(to: path)
       }
+      diagnostics.record(
+        .host, descriptor == nil ? .error : .info, "host.launched",
+        ["listening": .flag(descriptor != nil), "duration": .duration(.now - launchedAt)])
     }
     guard let descriptor else { return .absent }
 
@@ -314,6 +349,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     // carry keystrokes and an agent's environment.
     guard configuration.verifier.accepts(peerOf: descriptor) else {
       close(descriptor)
+      diagnostics.record(.host, .error, "host.verifyFailed")
       return .refused("The terminal host could not prove it belongs to this application.")
     }
     let connection = TerminalHostConnection(descriptor: descriptor)
@@ -331,15 +367,20 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     switch reply?.body {
     case .welcome(let version, _, _, let processIdentifier, let startedAt)
     where version == TerminalHostWire.protocolVersion:
+      diagnostics.record(.host, .info, "host.connected", ["protocol": .code(Int32(version))])
       return .connected(
         connection,
         TerminalHostIdentity(processIdentifier: processIdentifier, processStartedAt: startedAt)
       )
-    case .refused(let reason, _):
+    case .refused(let reason, let refusal):
       connection.close()
+      diagnostics.record(
+        .host, .notice, "host.unavailable",
+        ["reason": .token(refusal == .otherClient ? "otherClient" : "incompatible")])
       return .unavailable(reason)
     default:
       connection.close()
+      diagnostics.record(.host, .notice, "host.unavailable", ["reason": .token("noAnswer")])
       return .unavailable("The terminal host did not answer.")
     }
   }
@@ -411,6 +452,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       await mirrors[id]?.receive(state: state)
       if state.isFinished { release(id) }
     case .truncated(let id, let count):
+      diagnostics.record(
+        .host, .notice, "host.outputTruncated",
+        ["session": diagnostics.pseudonym(id), "bytes": .bytes(count)])
       await mirrors[id]?.receive(truncated: count)
     default:
       break
@@ -436,6 +480,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private func connectionEnded(_ ended: TerminalHostConnection) async {
     guard connection === ended else { return }
     connection = nil
+    diagnostics.record(
+      .host, .error, "host.connectionLost", ["sessions": .count(mirrors.count)])
     for continuation in pending.values {
       continuation.resume(returning: nil)
     }

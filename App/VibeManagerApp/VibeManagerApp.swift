@@ -1,7 +1,9 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeComposition
 import VibeDomain
+import VibePersistence
 import VibeTerminal
 import VibeUI
 
@@ -11,7 +13,9 @@ import VibeUI
 @main
 enum Entry {
   static func main() {
-    TerminalHost.runIfRequested()
+    TerminalHost.runIfRequested(diagnostics: { directory in
+      Diagnostics.standard(location: DiagnosticsLocation(directory: directory), origin: .host).0
+    })
     VibeManagerApp.main()
   }
 }
@@ -94,6 +98,14 @@ struct VibeManagerApp: App {
       }
 
       SessionHistoryCommands(model: environment.appModel, focus: windowFocus)
+
+      // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
+      CommandGroup(after: .help) {
+        Button("Export Diagnostics…") {
+          environment.appModel.beginDiagnosticsExport()
+        }
+        .disabled(!environment.appModel.canExportDiagnostics)
+      }
     }
 
     Settings {
@@ -312,6 +324,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
       Task {
         try? await Task.sleep(for: Self.shutdownDeadline)
+        guard !hasRepliedToTermination else { return }
+        environment.diagnostics.record(.lifecycle, .error, "app.quitDeadlineReached")
         replyToTermination()
       }
       await environment.shutdown(keepingAgentsRunning: keepingAgentsRunning)
@@ -444,6 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func replyToTermination() {
     guard !hasRepliedToTermination else { return }
     hasRepliedToTermination = true
+    environment?.diagnostics.flush()
     NSApplication.shared.reply(toApplicationShouldTerminate: true)
   }
 }

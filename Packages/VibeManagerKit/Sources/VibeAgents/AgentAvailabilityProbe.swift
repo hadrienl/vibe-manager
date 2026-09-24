@@ -12,6 +12,7 @@ public actor AgentAvailabilityProbe {
   private let environment: [String: String]
   private let timeToLive: Duration
   private let now: @Sendable () -> Date
+  private let diagnostics: any DiagnosticLog
 
   private var cached: AgentAvailability?
   private var cachedAt: Date?
@@ -27,8 +28,10 @@ public actor AgentAvailabilityProbe {
     probe: any ProcessProbe,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     timeToLive: Duration = .seconds(20),
-    now: @escaping @Sendable () -> Date = Date.init
+    now: @escaping @Sendable () -> Date = Date.init,
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) {
+    self.diagnostics = diagnostics
     self.descriptor = descriptor
     self.specification = specification
     self.locator = locator
@@ -88,6 +91,7 @@ public actor AgentAvailabilityProbe {
         )
       }
       inFlight = task
+      let detectionStartedAt = ContinuousClock.now
       let availability = await task.value
 
       // The actor can be re-entered while the detection runs: only the task that still
@@ -96,8 +100,28 @@ public actor AgentAvailabilityProbe {
       inFlight = nil
       cached = availability
       cachedAt = now()
+      note(availability, duration: .now - detectionStartedAt, forced: forceRefresh)
       return availability
     }
+  }
+
+  /// The verdict, where the binary was found and its version: never its path, which the export
+  /// gives redacted.
+  private func note(_ availability: AgentAvailability, duration: Duration, forced: Bool) {
+    var fields: [(name: StaticString, value: DiagnosticValue)] = [
+      ("provider", .token(descriptor.id.diagnosticToken)),
+      ("state", .token(availability.state.diagnosticToken)),
+      ("duration", .duration(duration)),
+      ("forced", .flag(forced)),
+    ]
+    if let installation = availability.installation {
+      fields.append(("source", .token(installation.source.diagnosticToken)))
+      if let version = installation.version.flatMap({ DiagnosticVersion("\($0)") }) {
+        fields.append(("version", .version(version)))
+      }
+    }
+    let level: DiagnosticLevel = availability.state.isUsable ? .info : .notice
+    diagnostics.record(DiagnosticEvent(.agentProbe, level, "agentProbe.detected", fields: fields))
   }
 
   /// An agent found ready stays ready for the whole session; anything else is re-detected.

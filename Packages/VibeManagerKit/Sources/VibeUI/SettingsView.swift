@@ -56,6 +56,19 @@ public struct SettingsView: View {
             .foregroundStyle(.secondary)
         }
       }
+      if let model, model.canExportDiagnostics {
+        Section("Diagnostics") {
+          LabeledContent {
+            Button("Export Diagnostics…") { model.beginDiagnosticsExport() }
+          } label: {
+            Text("Diagnostics")
+            Text(
+              "A local log of what the application did, never of what you typed, kept for two "
+                + "weeks. Exported only when you save it yourself."
+            )
+          }
+        }
+      }
     }
     .formStyle(.grouped)
     // As tall as what it holds: the settings window takes each tab's size, and a form that

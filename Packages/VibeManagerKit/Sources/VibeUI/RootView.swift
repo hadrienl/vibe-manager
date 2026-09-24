@@ -42,6 +42,11 @@ public struct RootView: View {
           Button("Try Again") {
             Task { await model.reload() }
           }
+          if model.canExportDiagnostics {
+            Button("Export Diagnostics…") {
+              model.beginDiagnosticsExport()
+            }
+          }
         }
       }
     }
@@ -118,6 +123,11 @@ public struct RootView: View {
           )
           .id(sheetModel.sessionID)
         }
+      case .diagnosticsExport:
+        if let export = model.diagnosticsExport {
+          DiagnosticsExportSheet(model: export, close: { model.endDiagnosticsExport() })
+            .id(export.id)
+        }
       }
     }
   }
@@ -147,6 +157,7 @@ public struct RootView: View {
     if model.isPresentingNewSession { return .newSession }
     if model.pendingRestart != nil { return .restartContext }
     if model.pendingSwitch != nil { return .agentSwitch }
+    if model.diagnosticsExport != nil { return .diagnosticsExport }
     return nil
   }
 
@@ -164,6 +175,8 @@ public struct RootView: View {
       model.cancelRestart()
     case .agentSwitch:
       model.cancelAgentSwitch()
+    case .diagnosticsExport:
+      model.endDiagnosticsExport()
     case nil:
       break
     }
@@ -180,6 +193,9 @@ public struct RootView: View {
     case restartContext
     /// Presented from the root for the same reason as the restart's summary.
     case agentSwitch
+    /// From the Help menu, Settings, or a store that could not be read: the last case has no
+    /// workspace to attach a sheet to.
+    case diagnosticsExport
 
     var id: Self { self }
   }
@@ -200,6 +216,7 @@ public struct RootView: View {
             failure: failure,
             retry: { Task { await model.reload() } },
             restore: { Task { await model.restoreBackup() } },
+            export: model.canExportDiagnostics ? { model.beginDiagnosticsExport() } : nil,
             dismiss: { model.dismissRefreshFailure() }
           )
           Divider()
@@ -702,6 +719,7 @@ private struct RefreshFailureBanner: View {
   let failure: AppModel.RefreshFailure
   let retry: () -> Void
   let restore: () -> Void
+  let export: (() -> Void)?
   let dismiss: () -> Void
 
   var body: some View {
@@ -718,6 +736,10 @@ private struct RefreshFailureBanner: View {
       }
       Button("Try Again", action: retry)
         .controlSize(.small)
+      if let export {
+        Button("Export Diagnostics…", action: export)
+          .controlSize(.small)
+      }
       Button {
         dismiss()
       } label: {
