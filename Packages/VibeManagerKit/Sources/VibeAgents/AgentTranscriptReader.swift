@@ -13,8 +13,7 @@ import VibeDomain
 /// Only read, never written, and read incrementally: a transcript grows to megabytes and is read
 /// again each time it grows, so each file is resumed where the last reading stopped.
 public actor AgentTranscriptReader: SessionTranscriptSource {
-  private let claudeProjects: URL
-  private let codexSessions: URL
+  private let locator: AgentTranscriptLocator
   private var progress: [String: FileProgress] = [:]
 
   struct FileProgress {
@@ -28,8 +27,7 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
     claudeProjects: URL = ClaudeCodeHome.projectsDirectory(),
     codexSessions: URL = CodexHome.sessionsDirectory()
   ) {
-    self.claudeProjects = claudeProjects
-    self.codexSessions = codexSessions
+    locator = AgentTranscriptLocator(claudeProjects: claudeProjects, codexSessions: codexSessions)
   }
 
   /// Every conversation the session has had is read, not only the current one: after a switch of
@@ -43,10 +41,10 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       let isCodex: Bool
       switch conversation.providerID {
       case ClaudeCodeAgentProvider.id.rawValue:
-        files = claudeTranscripts(for: identifier)
+        files = locator.claudeTranscripts(for: identifier)
         isCodex = false
       case CodexAgentProvider.id.rawValue:
-        files = codexRollouts(for: identifier, since: session.createdAt)
+        files = locator.codexRollouts(for: identifier, since: session.createdAt)
         isCodex = true
       default:
         continue
@@ -75,9 +73,9 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       let directory: String
       switch conversation.providerID {
       case ClaudeCodeAgentProvider.id.rawValue:
-        directory = claudeProjects.path
+        directory = locator.claudeProjects.path
       case CodexAgentProvider.id.rawValue:
-        directory = codexSessions.path
+        directory = locator.codexSessions.path
       default:
         continue
       }
@@ -93,58 +91,6 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       !identifier.isEmpty
     else { return nil }
     return identifier
-  }
-
-  // MARK: - Finding the files
-
-  private func claudeTranscripts(for identifier: String) -> [URL] {
-    let manager = FileManager.default
-    guard
-      let folders = try? manager.contentsOfDirectory(
-        at: claudeProjects, includingPropertiesForKeys: nil)
-    else { return [] }
-    var found: [URL] = []
-    for folder in folders {
-      let main = folder.appendingPathComponent("\(identifier).jsonl")
-      guard manager.fileExists(atPath: main.path) else { continue }
-      found.append(main)
-      let subagents = folder.appendingPathComponent(identifier).appendingPathComponent(
-        "subagents")
-      if let files = try? manager.contentsOfDirectory(
-        at: subagents, includingPropertiesForKeys: nil)
-      {
-        found.append(contentsOf: files.filter { $0.pathExtension == "jsonl" })
-      }
-    }
-    return found
-  }
-
-  /// Only the days the session can have written in are listed, from the day before it was
-  /// created: a Codex home holds months of rollouts.
-  private func codexRollouts(for identifier: String, since created: Date) -> [URL] {
-    let manager = FileManager.default
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = .current
-    var day = calendar.startOfDay(for: created.addingTimeInterval(-86_400))
-    let today = calendar.startOfDay(for: Date())
-    var found: [URL] = []
-    while day <= today {
-      let parts = calendar.dateComponents([.year, .month, .day], from: day)
-      let folder =
-        codexSessions
-        .appendingPathComponent(String(format: "%04d", parts.year ?? 0))
-        .appendingPathComponent(String(format: "%02d", parts.month ?? 0))
-        .appendingPathComponent(String(format: "%02d", parts.day ?? 0))
-      if let files = try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
-        found.append(
-          contentsOf: files.filter {
-            $0.lastPathComponent.contains(identifier) && $0.pathExtension == "jsonl"
-          })
-      }
-      guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-      day = next
-    }
-    return found
   }
 
   // MARK: - Reading them

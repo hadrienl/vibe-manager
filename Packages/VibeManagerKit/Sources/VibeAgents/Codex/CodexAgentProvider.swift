@@ -29,7 +29,7 @@ public struct CodexAgentProvider: AgentProvider {
       supportsInitialPrompt: true,
       supportsResume: true,
       // #18 owns usage metrics; nothing is collected here.
-      reportsUsage: false
+      reportsUsage: true
     )
   )
 
