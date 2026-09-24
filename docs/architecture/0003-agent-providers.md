@@ -160,6 +160,7 @@ to be registered by default in Debug.)*
   `CommandLineAgentArgumentBuilder`, then registering the provider in `AppEnvironment`.
 - #4 consumes `AgentLaunchPlan` and is responsible for writing the prompt on the standard input
   when `promptDelivery` says so.
-- #18 will fill the `reportsUsage` capability, which is only declared here.
+- #18 filled the `reportsUsage` capability: true for Claude Code and Codex, whose transcripts
+  carry a usage per answer (ADR 0019).
 - Storing a user defined executable path in the settings, and the provider pickers, belong to
   #7 and #8; the probe already accepts the path through `setUserDefinedPath(_:)`.
