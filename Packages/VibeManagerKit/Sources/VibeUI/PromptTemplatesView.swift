@@ -17,12 +17,19 @@ public struct PromptTemplatesView: View {
     _model = Bindable(model)
   }
 
+  /// Laid out inside the settings window, under its tabs: nothing here draws in the title bar.
+  /// A sidebar list, or a background that is not bounded by a shape, would reach up behind the
+  /// tabs and cut the window's top into bands.
   public var body: some View {
-    HSplitView {
-      sidebar
-        .frame(minWidth: 200, idealWidth: 230, maxWidth: 320)
-      detail
-        .frame(minWidth: 760, maxWidth: .infinity, maxHeight: .infinity)
+    VStack(spacing: 0) {
+      banners
+      HStack(alignment: .top, spacing: 16) {
+        sidebar
+          .frame(width: 220)
+        detail
+          .frame(minWidth: 740, maxWidth: .infinity, maxHeight: .infinity)
+      }
+      .padding(16)
     }
     .frame(minWidth: 1000, idealWidth: 1180, minHeight: 600, idealHeight: 700)
     .task { await model.load() }
@@ -110,11 +117,11 @@ public struct PromptTemplatesView: View {
           Task { await model.move(id, toPosition: position) }
         }
       }
-      .listStyle(.sidebar)
+      .listStyle(.bordered(alternatesRowBackgrounds: false))
       // ⌫ in the list, as in the Finder and Mail: the same question as the − button.
       .onDeleteCommand(perform: requestDeleteSelection)
 
-      Divider()
+      // Under the list, as in the Accounts settings of macOS: add, remove, and the rest.
       HStack(spacing: 4) {
         Button {
           model.newTemplate()
@@ -145,7 +152,7 @@ public struct PromptTemplatesView: View {
         Spacer()
       }
       .buttonStyle(.borderless)
-      .padding(8)
+      .padding(.top, 6)
     }
   }
 
@@ -194,7 +201,6 @@ public struct PromptTemplatesView: View {
   @ViewBuilder
   private var detail: some View {
     VStack(spacing: 0) {
-      banners
       if let editing = model.editing {
         editor(editing)
       } else if model.all.isEmpty && model.state == .ready {
@@ -255,7 +261,7 @@ public struct PromptTemplatesView: View {
   /// field, what the patterns keep of it, and the session and prompt made with those values.
   private func editor(_ editing: PromptTemplate) -> some View {
     VStack(spacing: 0) {
-      HStack(spacing: 0) {
+      HStack(alignment: .top, spacing: 16) {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
             EditorRow("Name", issues: issues(for: .name)) {
@@ -292,16 +298,15 @@ public struct PromptTemplatesView: View {
             }
             fieldsTable(editing)
           }
-          .padding(20)
+          .padding(.horizontal, 4)
+          .padding(.bottom, 12)
           .disabled(model.isReadOnly)
         }
-        .frame(minWidth: 440, maxWidth: .infinity)
+        .frame(minWidth: 420, maxWidth: .infinity)
 
-        Divider()
         tryColumn(editing)
           .frame(width: 300)
       }
-      Divider()
       footer(editing)
     }
   }
@@ -445,10 +450,14 @@ public struct PromptTemplatesView: View {
           .foregroundStyle(.secondary)
         }
       }
-      .padding(18)
+      .padding(16)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .background(Color(nsColor: .underPageBackgroundColor).opacity(0.35))
+    // Bounded by its shape, so it stays in the column rather than reaching under the tabs.
+    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+    .overlay {
+      RoundedRectangle(cornerRadius: 10).strokeBorder(Color(nsColor: .separatorColor))
+    }
   }
 
   private func footer(_ editing: PromptTemplate) -> some View {
@@ -476,8 +485,7 @@ public struct PromptTemplatesView: View {
             .hidden()
         }
     }
-    .padding(.horizontal, 20)
-    .padding(.vertical, 12)
+    .padding(.top, 12)
   }
 
   // MARK: -
@@ -652,8 +660,8 @@ private struct Banner<Actions: View>: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .overlay(alignment: .bottom) { Divider() }
+    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    .padding([.horizontal, .top], 16)
   }
 }
 

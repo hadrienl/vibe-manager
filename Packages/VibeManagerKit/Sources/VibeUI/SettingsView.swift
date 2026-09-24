@@ -53,7 +53,11 @@ public struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: 460)
+    // As tall as what it holds: the settings window takes each tab's size, and a form that
+    // scrolls gives none, which left General in a window as tall as Templates.
+    .scrollDisabled(true)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(width: 500)
     .task { await permissions?.recheck() }
   }
 }
