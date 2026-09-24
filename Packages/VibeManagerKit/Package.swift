@@ -58,7 +58,7 @@ let package = Package(
     // client or to be killed. The application runs the same code from its own binary.
     .executableTarget(
       name: "VibeTerminalHostFixture",
-      dependencies: ["VibeTerminal"],
+      dependencies: ["VibeTerminal", "VibeApplication", "VibePersistence"],
       path: "Tests/VibeTerminalHostFixture"
     ),
     .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
@@ -93,6 +93,16 @@ let package = Package(
       dependencies: [
         "VibeTerminalUI", "VibeApplication", "VibeDomain",
         .product(name: "SwiftTerm", package: "SwiftTerm"),
+      ]
+    ),
+    // The application composed for real — file store, runtime document, terminal host in a process
+    // of its own, real Git repositories — driven the way the interface drives it (#19).
+    .testTarget(
+      name: "VibeScenarioTests",
+      dependencies: [
+        "VibeComposition", "VibeUI", "VibeApplication", "VibeDomain", "VibeAgents",
+        "VibeTerminal", "VibeTerminalUI", "VibePersistence", "VibeGit", "VibeProcess",
+        "VibeTerminalHostFixture",
       ]
     ),
     .testTarget(

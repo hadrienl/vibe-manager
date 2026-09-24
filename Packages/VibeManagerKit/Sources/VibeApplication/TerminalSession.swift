@@ -110,6 +110,8 @@ public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
   case processOutcomeUnknown(processIdentifier: Int32)
   /// The terminal host already runs as many sessions as it accepts.
   case tooManySessions(limit: Int)
+  /// The terminal host went away without a word, and the agent it ran was stopped with it.
+  case hostStopped
 
   public var errorDescription: String? {
     switch self {
@@ -133,6 +135,8 @@ public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
       return "The terminal process stopped responding and its outcome is unknown."
     case .tooManySessions(let limit):
       return "Vibe Manager already runs \(limit) terminals, the most it runs at once."
+    case .hostStopped:
+      return "The terminal host stopped, and this agent was stopped with it."
     }
   }
 
@@ -156,6 +160,8 @@ public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
       return "Check Activity Monitor for a leftover process, then start a new terminal."
     case .tooManySessions:
       return "Close a session you no longer need, then try again."
+    case .hostStopped:
+      return "Restart the session: its conversation is resumed where the agent supports it."
     }
   }
 
@@ -170,7 +176,7 @@ public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
     case .tooManySessions(let limit):
       return "limit \(limit)"
     case .executableNotFound, .executableNotPermitted, .notExecutable,
-      .workingDirectoryUnavailable, .sessionAlreadyRunning:
+      .workingDirectoryUnavailable, .sessionAlreadyRunning, .hostStopped:
       return nil
     }
   }

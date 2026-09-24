@@ -39,3 +39,18 @@ xcodebuild \
   -skipPackagePluginValidation \
   CODE_SIGNING_ALLOWED=NO \
   build
+
+echo "Building the macOS application in Release"
+# Whole-module optimization, -O and dead stripping are otherwise first compiled on the day of a
+# release. Unsigned here: signing and notarization are `Scripts/release.sh`'s, on the maintainer's
+# Mac.
+xcodebuild \
+  -project VibeManager.xcodeproj \
+  -scheme VibeManager \
+  -configuration Release \
+  -destination 'platform=macOS' \
+  -derivedDataPath "$derived_data_path" \
+  -clonedSourcePackagesDirPath "$source_packages_path" \
+  -skipPackagePluginValidation \
+  CODE_SIGNING_ALLOWED=NO \
+  build

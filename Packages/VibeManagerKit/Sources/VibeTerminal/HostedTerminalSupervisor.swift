@@ -22,6 +22,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     /// How long any reply that is not a stop may take.
     public var replyTimeout: Duration
     public var diagnostics: Diagnostics
+    /// Tells a process group that is still ours from one that took its number.
+    public var processes: any ProcessLivenessProbe
 
     public init(
       location: TerminalHostLocation,
@@ -29,9 +31,11 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       verifier: any TerminalHostPeerVerifier,
       launchTimeout: Duration = .seconds(10),
       replyTimeout: Duration = .seconds(5),
-      diagnostics: Diagnostics = .disabled
+      diagnostics: Diagnostics = .disabled,
+      processes: any ProcessLivenessProbe = SystemProcessLivenessProbe()
     ) {
       self.diagnostics = diagnostics
+      self.processes = processes
       self.location = location
       self.launcher = launcher
       self.verifier = verifier
@@ -68,6 +72,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   /// from this copy would be refused as another client, and that terminal run in the application.
   private var connecting: Task<Bool, Never>?
   private var mirrors: [SessionID: HostedTerminalSession] = [:]
+  /// The process group of each agent the host runs for this copy, and when the kernel says it
+  /// started: what is stopped, after checking it is still the same, if the host dies.
+  private var groups: [SessionID: (group: Int32, startedAt: Date?)] = [:]
   private var pending: [UInt64: CheckedContinuation<TerminalHostMessage.Body?, Never>] = [:]
   private var nextRequest: UInt64 = 1
 
@@ -89,6 +96,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
 
     switch await request(.start(session: id, spec: spec)) {
     case .started(let processIdentifier):
+      remember(processIdentifier, for: id)
       let mirror = HostedTerminalSession(
         id: id,
         supervisor: self,
@@ -123,6 +131,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     diagnostics.record(
       .host, .notice, "host.fallbackInProcess", ["session": diagnostics.pseudonym(id)])
     mirrors[id] = nil
+    groups[id] = nil
     return try await local.start(spec, for: id)
   }
 
@@ -195,6 +204,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
         needsRedraw: !record.state.isFinished
       )
       mirrors[record.session] = mirror
+      if case .running(let processIdentifier) = record.state {
+        remember(processIdentifier, for: record.session)
+      }
       await attach(mirror)
       summaries.append(
         HostedSessionSummary(id: record.session, state: record.state, endedAt: record.endedAt))
@@ -229,6 +241,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   }
 
   public func discard(_ id: SessionID) async {
+    groups[id] = nil
     guard let mirror = mirrors.removeValue(forKey: id) else { return }
     await mirror.stop(gracePeriod: .seconds(3))
     _ = await request(.release(session: id))
@@ -255,9 +268,12 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     await connection.closeAfterPendingWrites()
   }
 
-  /// Closes the connection without a word, the way a crash of the application does.
+  /// Closes the connection without a word, the way a crash of the application does — and, like
+  /// a crash, does nothing about it on this side: what happens next is the host's to decide.
   func dropConnection() {
-    connection?.close()
+    let dropped = connection
+    connection = nil
+    dropped?.close()
   }
 
   // MARK: - Used by the mirrors
@@ -446,9 +462,11 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private func route(_ message: TerminalHostMessage) async {
     switch message.body {
     case .attached(let id, let state, let dropped):
+      noteGroup(of: state, for: id)
       await mirrors[id]?.receiveAttached(state: state, droppedByteCount: dropped)
       if state.isFinished { release(id) }
     case .state(let id, let state, _):
+      noteGroup(of: state, for: id)
       await mirrors[id]?.receive(state: state)
       if state.isFinished { release(id) }
     case .truncated(let id, let count):
@@ -477,17 +495,77 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     pending.removeValue(forKey: number)?.resume(returning: body)
   }
 
+  /// A start the host answered before its process was running says so with a pid of 0: the group
+  /// is learnt from the state that follows.
+  private func noteGroup(of state: TerminalProcessState, for id: SessionID) {
+    guard mirrors[id] != nil else { return }
+    switch state {
+    case .running(let processIdentifier) where groups[id]?.group != processIdentifier:
+      remember(processIdentifier, for: id)
+    case .exited, .terminated, .failed:
+      groups[id] = nil
+    case .starting, .running:
+      break
+    }
+  }
+
+  private func remember(_ processIdentifier: Int32, for id: SessionID) {
+    guard processIdentifier > 0 else { return }
+    groups[id] = (processIdentifier, configuration.processes.startTime(of: processIdentifier))
+  }
+
+  /// The host closed the connection without a `done`: it crashed, or was killed. Its terminals
+  /// closed with it and sent their groups a hang-up, but an agent that ignores it would run on,
+  /// with no terminal and nobody to see it, until the next launch found it. Every group the host
+  /// ran for this copy is stopped now, once it is shown to still be ours (ADR 0011's rule: the
+  /// group and the instant it started), and its session ends saying why.
   private func connectionEnded(_ ended: TerminalHostConnection) async {
     guard connection === ended else { return }
     connection = nil
-    diagnostics.record(
-      .host, .error, "host.connectionLost", ["sessions": .count(mirrors.count)])
     for continuation in pending.values {
       continuation.resume(returning: nil)
     }
     pending.removeAll()
-    for mirror in mirrors.values {
-      await mirror.connectionLost()
+    var stopped = 0
+    for (id, mirror) in mirrors {
+      guard await !mirror.state().isFinished else { continue }
+      if let known = groups[id], stopGroup(known.group, startedAt: known.startedAt, for: id) {
+        stopped += 1
+      }
+      await mirror.hostStopped()
     }
+    groups.removeAll()
+    diagnostics.record(
+      .host, .error, "host.connectionLost",
+      ["sessions": .count(mirrors.count), "stopped": .count(stopped)])
+  }
+
+  /// `SIGKILL` to a group, when it is the one this copy recorded. A group whose leader has exited
+  /// is still ours while it has members: the kernel gives no process a pid that names a live group.
+  private func stopGroup(_ group: Int32, startedAt: Date?, for id: SessionID) -> Bool {
+    let identity = configuration.processes.identify(processGroup: group, startedAt: startedAt)
+    let stopped: Bool
+    switch identity {
+    case .matches:
+      stopped = configuration.processes.terminate(processGroup: group)
+    case .gone:
+      stopped = kill(-group, 0) == 0 && configuration.processes.terminate(processGroup: group)
+    case .differs, .unknown:
+      stopped = false
+    }
+    let token: DiagnosticToken
+    switch identity {
+    case .matches: token = "matches"
+    case .gone: token = "gone"
+    case .differs: token = "differs"
+    case .unknown: token = "unknown"
+    }
+    diagnostics.record(
+      .host, .notice, "host.agentStopped",
+      [
+        "session": diagnostics.pseudonym(id), "identity": .token(token),
+        "stopped": .flag(stopped), "errno": .code(stopped ? 0 : errno),
+      ])
+    return stopped
   }
 }

@@ -264,10 +264,16 @@ public protocol TerminalHostLaunching: Sendable {
 public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
   private let executableURL: URL
   private let logDirectory: URL?
+  private let disclaimsResponsibility: Bool
 
-  public init(executableURL: URL, logDirectory: URL? = nil) {
+  /// - Parameter disclaimsResponsibility: `false` only for a test whose own sandbox refuses a child
+  ///   that answers for itself; the application always disclaims (see `ResponsibilityDisclaimer`).
+  public init(
+    executableURL: URL, logDirectory: URL? = nil, disclaimsResponsibility: Bool = true
+  ) {
     self.executableURL = executableURL
     self.logDirectory = logDirectory
+    self.disclaimsResponsibility = disclaimsResponsibility
   }
 
   /// The application's own binary.
@@ -303,7 +309,9 @@ public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
       POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
       | POSIX_SPAWN_SETSIGMASK
     posix_spawnattr_setflags(&attributes, Int16(flags))
-    ResponsibilityDisclaimer.apply(to: &attributes)
+    if disclaimsResponsibility {
+      ResponsibilityDisclaimer.apply(to: &attributes)
+    }
 
     let path = executableURL.path
     var arguments = [path, TerminalHost.argument, location.directory.path]

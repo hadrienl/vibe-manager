@@ -52,6 +52,7 @@ extension TerminalError: DiagnosticTokenConvertible {
     case .sessionAlreadyRunning: return DiagnosticToken("sessionAlreadyRunning")
     case .processOutcomeUnknown: return DiagnosticToken("processOutcomeUnknown")
     case .tooManySessions: return DiagnosticToken("tooManySessions")
+    case .hostStopped: return DiagnosticToken("hostStopped")
     }
   }
 
@@ -64,7 +65,7 @@ extension TerminalError: DiagnosticTokenConvertible {
     case .tooManySessions(let limit):
       return Int32(clamping: limit)
     case .executableNotFound, .executableNotPermitted, .notExecutable,
-      .workingDirectoryUnavailable, .sessionAlreadyRunning, .processOutcomeUnknown:
+      .workingDirectoryUnavailable, .sessionAlreadyRunning, .processOutcomeUnknown, .hostStopped:
       return nil
     }
   }

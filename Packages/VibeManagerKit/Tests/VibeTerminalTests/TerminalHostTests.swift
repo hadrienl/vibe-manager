@@ -371,20 +371,34 @@ struct TerminalHostTests {
     await host.shutDown()
   }
 
-  @Test("A client that vanishes without saying goodbye takes its agents with it")
+  @Test("A client that vanishes without saying goodbye takes its agents with it, children too")
   func abruptDisconnectStopsEverything() async throws {
     let host = try InProcessTerminalHost()
     let supervisor = host.supervisor()
+    let childFile = NSTemporaryDirectory() + "vmh-child-\(UUID().uuidString.prefix(8))"
+    defer { try? FileManager.default.removeItem(atPath: childFile) }
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(
+        script: """
+          /bin/sh -c 'trap "" HUP TERM; while :; do sleep 1; done' &
+          echo $! > '\(childFile)'
+          \(idleScript)
+          """),
+      for: SessionID())
     guard case .running(let processIdentifier) = await session.state() else {
       Issue.record("The session did not start")
       return
     }
+    #expect(await eventually { FileManager.default.fileExists(atPath: childFile) })
+    let child =
+      Int32(
+        (try? String(contentsOfFile: childFile, encoding: .utf8))?
+          .trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
 
     await supervisor.dropConnection()
 
     #expect(await eventually { !isProcessAlive(processIdentifier) })
+    #expect(await eventually { !isProcessAlive(child) })
     #expect(await eventually { await host.server.sessionCount == 0 })
     await host.shutDown()
   }
@@ -595,7 +609,9 @@ struct TerminalHostProcessTests {
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
     defer { try? FileManager.default.removeItem(at: location.directory) }
-    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let id = SessionID()
 
     let application = HostedTerminalSupervisor(
@@ -644,7 +660,9 @@ struct TerminalHostProcessTests {
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
     defer { try? FileManager.default.removeItem(at: location.directory) }
-    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
@@ -678,7 +696,9 @@ struct TerminalHostProcessTests {
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
     defer { try? FileManager.default.removeItem(at: location.directory) }
-    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
@@ -696,5 +716,54 @@ struct TerminalHostProcessTests {
     #expect(second is HostedTerminalSession)
     #expect(await Transcript.follow(second).waitFor("served"))
     await application.relinquish(keepRunning: false)
+  }
+
+  @Test("A host killed under a running application takes its agents with it, at once")
+  func hostDeathStopsItsAgents() async throws {
+    let location = TerminalHostLocation(
+      directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
+    defer { try? FileManager.default.removeItem(at: location.directory) }
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
+    let log = RecordingDiagnosticLog()
+    let application = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30),
+        diagnostics: Diagnostics(log: log, pseudonym: .ephemeral())))
+    let childFile = NSTemporaryDirectory() + "vmp-child-\(UUID().uuidString.prefix(8))"
+    defer { try? FileManager.default.removeItem(atPath: childFile) }
+    // An agent that survives the hang-up of its terminal, with a child that survives it too.
+    let session = try await application.start(
+      TerminalTestSupport.spec(
+        script: """
+          trap '' HUP
+          /bin/sh -c 'trap "" HUP TERM; while :; do sleep 1; done' &
+          echo $! > '\(childFile)'
+          while :; do sleep 0.1; done
+          """),
+      for: SessionID())
+    #expect(session is HostedTerminalSession)
+    guard case .running(let agent) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
+    #expect(await eventually { FileManager.default.fileExists(atPath: childFile) })
+    let child = try #require(
+      Int32(
+        (try? String(contentsOfFile: childFile, encoding: .utf8))?
+          .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
+    let identity = try #require(await application.hostIdentity())
+
+    kill(identity.processIdentifier, SIGKILL)
+
+    let clock = ContinuousClock()
+    let start = clock.now
+    #expect(await eventually { !isProcessAlive(agent) && !isProcessAlive(child) })
+    #expect(clock.now - start < .seconds(10))
+    #expect(await eventually { await session.state() == .failed(.hostStopped) })
+    #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(1))
   }
 }
