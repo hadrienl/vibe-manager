@@ -65,17 +65,24 @@ private func makePaneModel(sessionID: SessionID) -> TerminalPaneModel {
   )
 }
 
+/// Waits for the session to be attached, however long a busy runner takes to get there.
+///
+/// No deadline of its own: bounded to one second of wall-clock time, it ran out on a CI runner
+/// where each of these tests took eight. The time limit of the tests stops an attach that never
+/// comes.
 private func attachCount(of session: CountingSession) async -> Int {
-  for _ in 0..<200 {
+  while true {
     let count = await session.attachCount
     if count > 0 { return count }
     try? await Task.sleep(for: .milliseconds(5))
   }
-  return await session.attachCount
 }
 
 @MainActor
-@Test("A restarted session is attached again, although it carries the same session id")
+@Test(
+  "A restarted session is attached again, although it carries the same session id",
+  .timeLimit(.minutes(1))
+)
 func restartedSessionIsAttachedAgain() async {
   // `TerminalSession.id` identifies the work session, not the process: a restart hands out a new
   // session object under the same id, and a surface that compared ids would stay attached to the
@@ -94,7 +101,10 @@ func restartedSessionIsAttachedAgain() async {
 }
 
 @MainActor
-@Test("Attaching twice to the same session reads its history once")
+@Test(
+  "Attaching twice to the same session reads its history once",
+  .timeLimit(.minutes(1))
+)
 func repeatedAttachIsIgnored() async {
   let id = SessionID()
   let coordinator = makeCoordinator(sessionID: id)
@@ -110,7 +120,10 @@ func repeatedAttachIsIgnored() async {
 }
 
 @MainActor
-@Test("A pane installed under an unchanged view is adopted, and its session attached")
+@Test(
+  "A pane installed under an unchanged view is adopted, and its session attached",
+  .timeLimit(.minutes(1))
+)
 func adoptedPaneIsAttached() async {
   // A relaunch replaces the pane while SwiftUI keeps the same view identity.
   let id = SessionID()

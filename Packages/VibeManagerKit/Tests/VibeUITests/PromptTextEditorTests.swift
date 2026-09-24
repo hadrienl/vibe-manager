@@ -5,7 +5,7 @@ import Testing
 @testable import VibeUI
 
 @MainActor
-@Suite("A prompt area that grows with its text")
+@Suite("A prompt area that grows with its text", .timeLimit(.minutes(1)))
 struct PromptTextEditorTests {
   /// Hosts the editor in a window that is never shown, and returns its height once laid out.
   private func height(of text: String, width: CGFloat = 400, minimumLines: Int = 3) async
@@ -23,12 +23,19 @@ struct PromptTextEditorTests {
       window.contentView = nil
       window.close()
     }
-    for _ in 0..<6 {
+    // The height is published after the layout pass that measured it, so it is read once it has
+    // stopped moving — with no deadline of its own, which a busy runner outlasts: the suite's time
+    // limit stops a height that never settles.
+    var height = host.fittingSize.height
+    var stableRounds = 0
+    while stableRounds < 3 {
       host.layoutSubtreeIfNeeded()
-      // The height is published after the layout pass that measured it.
       try? await Task.sleep(for: .milliseconds(20))
+      let next = host.fittingSize.height
+      stableRounds = next == height ? stableRounds + 1 : 0
+      height = next
     }
-    return host.fittingSize.height
+    return height
   }
 
   private struct Host: View {
