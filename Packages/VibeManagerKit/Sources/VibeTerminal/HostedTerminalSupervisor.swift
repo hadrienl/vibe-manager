@@ -58,6 +58,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private let local: PTYTerminalSupervisor
   private var connection: TerminalHostConnection?
   private var identity: TerminalHostIdentity?
+  /// What the connected host said it speaks beyond the core.
+  private var hostCapabilities: Set<String> = []
   /// Set once starting a host has failed, so every later terminal falls back at once rather than
   /// paying the launch timeout again.
   private var isUnavailable = false
@@ -161,6 +163,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   // MARK: - TerminalHosting
 
   public func reconnect() async -> TerminalHostStatus {
+    let signpost = Signposts.begin("host.attach")
+    defer { Signposts.end("host.attach", signpost) }
     let host: TerminalHostIdentity
     // A host still busy with the previous client — one that crashed a moment ago, whose closed
     // socket it has not read yet — is asked again a few times before the answer is taken.
@@ -220,6 +224,14 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
 
   public func hostIdentity() -> TerminalHostIdentity? {
     connection == nil ? nil : identity
+  }
+
+  /// The host's physical footprint in bytes, when a host that can say it is connected.
+  public func hostFootprint() async -> Int? {
+    guard connection != nil, hostCapabilities.contains(TerminalHostCapability.stats),
+      case .stats(let bytes, _) = await request(.stats)
+    else { return nil }
+    return bytes
   }
 
   /// The host as the export reports it: its identity, and the state of each session it runs for
@@ -376,14 +388,20 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
           body: .hello(
             protocolVersion: TerminalHostWire.protocolVersion,
             build: TerminalHostServer.currentBuild,
-            capabilities: [])
+            capabilities: TerminalHostCapability.all)
         )))
 
     let reply = await firstMessage(on: connection)
     switch reply?.body {
-    case .welcome(let version, _, _, let processIdentifier, let startedAt)
+    case .welcome(let version, _, let capabilities, let processIdentifier, let startedAt)
     where version == TerminalHostWire.protocolVersion:
-      diagnostics.record(.host, .info, "host.connected", ["protocol": .code(Int32(version))])
+      hostCapabilities = Set(capabilities)
+      diagnostics.record(
+        .host, .info, "host.connected",
+        [
+          "protocol": .code(Int32(version)),
+          "stats": .flag(capabilities.contains(TerminalHostCapability.stats)),
+        ])
       return .connected(
         connection,
         TerminalHostIdentity(processIdentifier: processIdentifier, processStartedAt: startedAt)

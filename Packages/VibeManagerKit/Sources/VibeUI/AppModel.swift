@@ -1540,6 +1540,7 @@ public final class AppModel {
     // runtime document, and both started a restoration of the same sessions.
     guard !hasLoaded else { return }
     hasLoaded = true
+    let firstList = Signposts.begin("launch.firstList")
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
@@ -1557,6 +1558,7 @@ public final class AppModel {
     let shutdown = await detectPreviousShutdown?()
     note(shutdown)
     await reload()
+    Signposts.end("launch.firstList", firstList)
     // Which agents write a usage is part of their description, known without probing any of them.
     if let usage, let agents {
       usage.reportingProviderIDs = Set(

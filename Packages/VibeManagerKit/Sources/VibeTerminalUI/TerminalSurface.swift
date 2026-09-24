@@ -33,6 +33,10 @@ public struct TerminalSurface: NSViewRepresentable {
 
   public func makeNSView(context: Context) -> TerminalView {
     let view = TerminalView()
+    // As long as the history the application keeps: at SwiftTerm's default of 500 lines, a history
+    // replayed after a relaunch was cut on screen. Measured at about 17 MB for a full terminal of
+    // 120 columns, which three sessions afford within the memory budget (#19).
+    view.getTerminal().changeScrollback(TerminalScrollbackLimits.default.maximumLineCount)
     view.terminalDelegate = context.coordinator
     view.configureNativeColors()
     context.coordinator.bind(to: view)

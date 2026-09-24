@@ -212,8 +212,10 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   }
 
   private func persist(_ sessions: [WorkSession]) throws {
-    let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
-    try commit(data, preservingCurrentAsBackup: true)
+    try Signposts.interval("store.save") {
+      let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
+      try commit(data, preservingCurrentAsBackup: true)
+    }
   }
 
   private func commit(_ data: Data, preservingCurrentAsBackup: Bool) throws {

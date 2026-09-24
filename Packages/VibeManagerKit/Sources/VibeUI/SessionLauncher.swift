@@ -193,6 +193,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       session.id, providerID: plan.providerID.rawValue, modelID: model ?? session.agent?.modelID,
       context: run)
     watchForExit(id: session.id, terminal: terminal)
+    signpostFirstOutput(of: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     // Recorded once there is something to record, and from the terminal rather than from the
     // plan: the process group is the child's own pid, which only exists after the spawn. A
@@ -212,6 +213,20 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
         "duration": .duration(ContinuousClock.now - launchedAt),
       ])
     return .started
+  }
+
+  /// From the launch to the first byte the agent writes, for Instruments.
+  private func signpostFirstOutput(of terminal: any TerminalSession) {
+    let state = Signposts.begin("session.firstOutput")
+    Task.detached {
+      let attachment = await terminal.attach()
+      if attachment.history.bytes.isEmpty {
+        for await event in attachment.events {
+          if case .output = event { break }
+        }
+      }
+      Signposts.end("session.firstOutput", state)
+    }
   }
 
   private func refused(_ id: SessionID, _ reason: DiagnosticToken) {

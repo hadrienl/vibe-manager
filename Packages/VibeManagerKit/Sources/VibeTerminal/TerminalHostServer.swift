@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import VibeApplication
 import VibeDomain
+import VibeProcess
 
 /// The terminal host's side of the wire: the sessions it runs, and the one client it serves.
 ///
@@ -165,7 +166,7 @@ public actor TerminalHostServer {
       .welcome(
         protocolVersion: TerminalHostWire.protocolVersion,
         build: configuration.build,
-        capabilities: [],
+        capabilities: TerminalHostCapability.all,
         processIdentifier: getpid(),
         startedAt: startedAt
       ),
@@ -223,6 +224,11 @@ public actor TerminalHostServer {
     case .release(let id):
       await release(id)
       await reply(number, .done, to: client)
+    case .stats:
+      await reply(
+        number,
+        .stats(footprintBytes: ProcessMetrics.physicalFootprint() ?? 0, sessions: sessions.count),
+        to: client)
     case .goodbye(let keepRunning):
       keepsRunning = keepRunning
       await reply(number, .done, to: client)

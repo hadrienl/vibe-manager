@@ -174,6 +174,7 @@ public actor MockLaunchObserver: AgentLaunchObserver {
   private let sessionID: SessionID
   private let extractor = MockResumeIdentifierExtractor()
   private var pending = ""
+  private var observed = 0
   private var isRecorded = false
 
   public init(sessionID: SessionID, record: RecordAgentResumeIdentifier) {
@@ -199,11 +200,16 @@ public actor MockLaunchObserver: AgentLaunchObserver {
       ?? false
   }
 
+  /// The identifier is printed first: past this much output, nothing is looked for any more.
+  static let observedLimit = 64 * 1024
+
   public func observe(output: String) async {
-    guard !isRecorded else { return }
+    guard !isRecorded, observed < Self.observedLimit else { return }
+    observed += output.utf8.count
     pending += output
-    // Only whole lines: an identifier cut by a read would be recorded cut.
-    guard let end = pending.lastIndex(of: "\n") else { return }
+    // Only whole lines: an identifier cut by a read would be recorded cut. A terminal ends its
+    // lines with `\r\n`, one `Character`, which `isNewline` recognises and `"\n"` does not.
+    guard let end = pending.lastIndex(where: \.isNewline) else { return }
     let complete = String(pending[..<end])
     pending = String(pending[pending.index(after: end)...])
     guard let identifier = extractor.resumeIdentifier(in: complete) else { return }
@@ -232,7 +238,7 @@ public struct MockResumeIdentifierExtractor: AgentResumeIdentifierExtractor {
   public init() {}
 
   public func resumeIdentifier(in chunk: String) -> String? {
-    for line in chunk.split(separator: "\n") where line.hasPrefix(Self.marker) {
+    for line in chunk.split(whereSeparator: \.isNewline) where line.hasPrefix(Self.marker) {
       let identifier = line.dropFirst(Self.marker.count).trimmingCharacters(in: .whitespaces)
       guard !identifier.isEmpty else { continue }
       return identifier

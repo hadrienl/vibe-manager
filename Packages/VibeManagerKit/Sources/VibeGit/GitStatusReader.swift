@@ -41,7 +41,9 @@ public struct GitStatusReader: RepositoryStatusReading {
     let started = clock.now
     let result: GitCommandResult
     do {
-      result = try await git.run(Self.arguments, in: path)
+      result = try await Signposts.interval("git.status") {
+        try await git.run(Self.arguments, in: path)
+      }
     } catch let unavailable as GitUnavailable {
       return .failure(.gitUnavailable(unavailable))
     } catch {

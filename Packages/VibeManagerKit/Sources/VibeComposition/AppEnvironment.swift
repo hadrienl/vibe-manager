@@ -72,6 +72,10 @@ public final class AppEnvironment {
   public let launcher: SessionLauncher
   private let prepareForQuit: PrepareForQuit
   private let detachForQuit: DetachForQuit
+  /// On in Debug and with `DiagnosticsVerbose`: a timer that asks the main thread ten times a
+  /// second is not free, and a release build has Instruments for that.
+  private let hangDetector: MainThreadHangDetector?
+  private let memorySampler: MemorySampler
 
   public init(configuration: Configuration = Configuration()) {
     let data = Self.dataLocation(
@@ -121,6 +125,14 @@ public final class AppEnvironment {
     // The runtime document: what this copy of the application is running, so the next launch can
     // tell a quit from a crash and knows what to put back to work. Deliberately a document of its
     // own, next to the session store and never inside it.
+    #if DEBUG
+      hangDetector = MainThreadHangDetector(log: diagnostics.log)
+    #else
+      hangDetector =
+        DiagnosticsVerbosity.minimumLevel() == .debug
+        ? MainThreadHangDetector(log: diagnostics.log) : nil
+    #endif
+    hangDetector?.start()
     let runtimeStore = FileSessionRuntimeStateStore(url: data.runtime)
     let recorder = SessionRuntimeRecorder(store: runtimeStore)
     let usageLedger = FileUsageLedger(directory: data.usage)
@@ -142,6 +154,9 @@ public final class AppEnvironment {
       diagnostics: diagnostics
     )
     self.launcher = launcher
+    memorySampler = MemorySampler(
+      diagnostics: diagnostics, launcher: launcher, supervisor: supervisor)
+    memorySampler.start()
     prepareForQuit = PrepareForQuit(
       repository: repository,
       runtime: launcher,
@@ -299,6 +314,8 @@ public final class AppEnvironment {
         "route": .token(keepingAgentsRunning ? "keepRunning" : "stopAll"),
         "hosted": .count(hostedRunningCount), "inProcess": .count(inProcessRunningCount),
       ])
+    memorySampler.stop()
+    hangDetector?.stop()
     // The pending layout is written first: quitting is exactly when the delayed save that keeps
     // a separator drag cheap would otherwise be thrown away.
     await appModel.layout.flush()

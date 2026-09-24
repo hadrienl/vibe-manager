@@ -51,7 +51,7 @@ let package = Package(
       name: "VibeComposition",
       dependencies: [
         "VibeAgents", "VibeApplication", "VibeDomain", "VibeGit", "VibePersistence",
-        "VibeTerminal", "VibeTerminalUI", "VibeUI",
+        "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeUI",
       ]
     ),
     // The terminal host in a process of its own, for the tests that need one to outlive their

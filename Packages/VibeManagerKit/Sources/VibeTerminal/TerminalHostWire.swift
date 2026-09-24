@@ -152,6 +152,8 @@ struct TerminalHostRequest: Codable, Equatable, Sendable {
     /// Forgets a session that has ended and whose last output has been read.
     case release(session: SessionID)
     case goodbye(keepRunning: Bool)
+    /// What the host costs. Only sent to a host whose `welcome` listed `stats`.
+    case stats
   }
 }
 
@@ -192,5 +194,15 @@ struct TerminalHostMessage: Codable, Equatable, Sendable {
     case unknownSession
     case state(session: SessionID, state: TerminalProcessState, endedAt: Date?)
     case truncated(session: SessionID, droppedByteCount: Int)
+    /// The host's physical footprint, and the sessions it holds.
+    case stats(footprintBytes: Int, sessions: Int)
   }
+}
+
+/// What an end speaks beyond the frozen core, named in `hello` and `welcome`. A request that needs
+/// one is only sent to a host that listed it: an older host, kept running across an update, is
+/// never asked what it cannot answer.
+enum TerminalHostCapability {
+  static let stats = "stats"
+  static let all = [stats]
 }
