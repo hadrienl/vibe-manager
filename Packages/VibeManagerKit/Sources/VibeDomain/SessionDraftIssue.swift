@@ -7,6 +7,8 @@ public enum SessionDraftField: String, Hashable, Sendable, CaseIterable {
   case model
   case workingDirectory
   case appearance
+  /// One of the fields a template adds to the form; the issue names which in `fieldKey`.
+  case templateField
 }
 
 /// One reason a draft cannot be created, and the way out of it.
@@ -17,15 +19,18 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   public let field: SessionDraftField
   public let message: String
   public let remedy: String
+  /// The template field this is about, when `field` is `.templateField`.
+  public let fieldKey: String?
 
-  public init(field: SessionDraftField, message: String, remedy: String) {
+  public init(field: SessionDraftField, message: String, remedy: String, fieldKey: String? = nil) {
     self.field = field
     self.message = message
     self.remedy = remedy
+    self.fieldKey = fieldKey
   }
 
   public var id: String {
-    "\(field.rawValue)|\(message)"
+    "\(field.rawValue)|\(fieldKey ?? "")|\(message)"
   }
 
   public var errorDescription: String? {
@@ -107,6 +112,21 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   public static func promptRejected(message: String, remedy: String) -> SessionDraftIssue {
     SessionDraftIssue(field: .initialPrompt, message: message, remedy: remedy)
   }
+
+  public static func templateFieldMissing(_ field: PromptTemplateField) -> SessionDraftIssue {
+    SessionDraftIssue(
+      field: .templateField,
+      message: "\(field.label) is required.",
+      remedy: "Fill it in, or pick another template.",
+      fieldKey: field.name
+    )
+  }
+
+  public static let promptControlCharacters = SessionDraftIssue(
+    field: .initialPrompt,
+    message: "The prompt contains invisible control characters the agent would not read as text.",
+    remedy: "Remove them — they usually come with text pasted from a coloured terminal."
+  )
 
   public static let appearanceInvalid = SessionDraftIssue(
     field: .appearance,

@@ -118,6 +118,26 @@ struct ClaudeCodeTerminalIntegrationTests {
       .map(String.init)
   }
 
+  @Test("A prompt filled from a template reaches the process exactly as previewed")
+  func launchesTemplatePrompt() async throws {
+    let fake = try makeFakeClaude()
+    defer { try? FileManager.default.removeItem(at: fake.directory) }
+
+    var fill = PromptTemplateFill(
+      template: PromptTemplate(name: "Review", body: "Review {{url}} carefully."))
+    fill.setValue(#"--help "; rm -rf ~ $(whoami) 'x' "y" `z` {{url}}"#, for: "url")
+    let preview = fill.render().prompt
+    let plan = try await provider(
+      environment: fake.environment, directory: fake.directory, identifier: UUID()
+    ).launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: fake.directory.path, initialPrompt: preview)
+    )
+
+    let lines = lines(of: try await run(plan))
+    #expect(plan.arguments.suffix(2) == ["--", preview])
+    #expect(lines.contains("arg:\(preview)"))
+  }
+
   @Test("A difficult prompt reaches the process as one untouched argument")
   func launchesWithDifficultPrompt() async throws {
     let fake = try makeFakeClaude()

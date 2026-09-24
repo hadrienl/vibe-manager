@@ -136,3 +136,55 @@ struct SessionDraftTests {
     }
   }
 }
+
+@Suite("A draft filled from a template")
+struct TemplateDraftTests {
+  private func draft(url: String) -> SessionDraft {
+    var fill = PromptTemplateFill(
+      template: PromptTemplate(
+        name: "Review", sessionNamePattern: "Review {{url}}", body: "Review {{url}}.",
+        revision: 3))
+    fill.setValue(url, for: "url")
+    return SessionDraft(
+      name: "Review", initialPrompt: "ignored", providerID: "claude-code",
+      workingDirectoryPath: "/tmp", templateFill: fill)
+  }
+
+  @Test("An empty required field is a problem of its own")
+  func requiredFieldMissing() {
+    let issues = draft(url: " ").validate()
+    #expect(issues.count == 1)
+    #expect(issues.first?.field == .templateField)
+    #expect(issues.first?.fieldKey == "url")
+  }
+
+  @Test("The session keeps the rendered prompt and where it came from")
+  func sessionKeepsRenderedPrompt() {
+    let draft = draft(url: "https://x/1")
+    let session = draft.session()
+    #expect(session.initialPrompt == "Review https://x/1.")
+    #expect(session.template?.name == "Review")
+    #expect(session.template?.revision == "3")
+    #expect(session.template?.id == draft.templateFill?.template.id.description)
+  }
+
+  @Test("A free prompt carrying control characters is refused")
+  func controlCharactersInFreePrompt() {
+    let draft = SessionDraft(
+      name: "S", initialPrompt: "colour \u{1B}[31m", providerID: "claude-code",
+      workingDirectoryPath: "/tmp")
+    #expect(draft.validate() == [.promptControlCharacters])
+  }
+}
+
+@Suite("Line breaks pasted into a free prompt")
+struct FreePromptLineBreakTests {
+  @Test("\\r\\n and \\r are line breaks, not control characters to refuse")
+  func carriageReturnsAreLineBreaks() {
+    let draft = SessionDraft(
+      name: "S", initialPrompt: "one\r\ntwo\rthree", providerID: "claude-code",
+      workingDirectoryPath: "/tmp")
+    #expect(draft.validate().isEmpty)
+    #expect(draft.session().initialPrompt == "one\ntwo\nthree")
+  }
+}

@@ -23,6 +23,15 @@ public final class NewSessionModel {
   /// agent they just picked, not the scheduler.
   public var draft = SessionDraft()
 
+  /// The templates offered, in the user's order. Archived ones are not.
+  public private(set) var templates: [PromptTemplate] = []
+  /// Whether the template being filled was saved elsewhere since it was picked. The fill keeps
+  /// the copy it took, so what is previewed stays what is launched until the user reloads.
+  public private(set) var isTemplateStale = false
+  /// The name the template made last. The name follows the template as long as it is empty or
+  /// still that name: once the user types their own, it is theirs.
+  private var generatedName: String?
+
   private let create: CreateSession
   private let registry: any AgentProviderResolving
   private let revalidationDelay: Duration
@@ -39,8 +48,10 @@ public final class NewSessionModel {
     create: CreateSession,
     registry: any AgentProviderResolving,
     revalidationDelay: Duration = .milliseconds(250),
-    fullDiskAccess: FullDiskAccessStatus? = nil
+    fullDiskAccess: FullDiskAccessStatus? = nil,
+    templates: [PromptTemplate] = []
   ) {
+    self.templates = templates.filter { !$0.isArchived }
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
@@ -72,6 +83,89 @@ public final class NewSessionModel {
 
   public var canSubmit: Bool {
     !isSubmitting && !draft.trimmedName.isEmpty && draft.resolvedWorkingDirectoryPath != nil
+      && (draft.templateFill?.missingRequiredFields.isEmpty ?? true)
+  }
+
+  // MARK: - Templates
+
+  public var selectedTemplateID: PromptTemplateID? {
+    draft.templateFill?.template.id
+  }
+
+  /// The prompt as it will be sent, part by part, when a template is filled in.
+  public var renderedPrompt: RenderedPrompt? {
+    draft.templateFill?.render()
+  }
+
+  public func issues(forTemplateField key: String) -> [SessionDraftIssue] {
+    issues.filter { $0.field == .templateField && $0.fieldKey == key }
+  }
+
+  /// Picks a template, or goes back to a free prompt with `nil`.
+  ///
+  /// Nothing on screen is lost either way: values of fields sharing a name carry over to the next
+  /// template, and leaving the templates turns what was rendered into the free prompt.
+  public func selectTemplate(_ id: PromptTemplateID?) {
+    guard id != selectedTemplateID else { return }
+    guard let id, let template = templates.first(where: { $0.id == id }) else {
+      editAsText()
+      return
+    }
+    let previous = draft.templateFill?.values ?? [:]
+    let keys = Set(template.fields.map(\.name))
+    draft.templateFill = PromptTemplateFill(
+      template: template, values: previous.filter { keys.contains($0.key) })
+    isTemplateStale = false
+    refreshName()
+  }
+
+  public func setValue(_ value: String, for key: String) {
+    draft.templateFill?.setValue(value, for: key)
+    refreshName()
+  }
+
+  public func value(for key: String) -> String {
+    draft.templateFill?.value(for: key) ?? ""
+  }
+
+  /// The rendered prompt becomes free text to edit by hand, and the template reference goes: it
+  /// promised this prompt was that template filled in, which is no longer true.
+  public func editAsText() {
+    guard let fill = draft.templateFill else { return }
+    draft.initialPrompt = fill.render().editableText
+    draft.templateFill = nil
+    isTemplateStale = false
+    generatedName = nil
+  }
+
+  /// The templates as the library now holds them.
+  public func templatesChanged(_ library: [PromptTemplate]) {
+    templates = library.filter { !$0.isArchived }
+    guard let fill = draft.templateFill else { return }
+    let current = library.first { $0.id == fill.template.id }
+    isTemplateStale = current.map { !$0.hasSameContent(as: fill.template) } ?? false
+  }
+
+  /// Takes the template as it now is, keeping the values of the fields it still has.
+  public func reloadTemplate() {
+    guard let fill = draft.templateFill,
+      let current = templates.first(where: { $0.id == fill.template.id })
+    else {
+      isTemplateStale = false
+      return
+    }
+    let keys = Set(current.fields.map(\.name))
+    draft.templateFill = PromptTemplateFill(
+      template: current, values: fill.values.filter { keys.contains($0.key) })
+    isTemplateStale = false
+    refreshName()
+  }
+
+  private func refreshName() {
+    guard let name = draft.templateFill?.sessionName() else { return }
+    guard draft.name.isEmpty || draft.name == generatedName else { return }
+    draft.name = name
+    generatedName = name
   }
 
   public func issues(for field: SessionDraftField) -> [SessionDraftIssue] {

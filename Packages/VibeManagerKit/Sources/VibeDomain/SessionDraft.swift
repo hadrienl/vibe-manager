@@ -14,6 +14,9 @@ public struct SessionDraft: Hashable, Sendable {
   /// `nil` means "not chosen yet", so the identity keeps following the name.
   public var appearance: SessionAppearance?
   public var workingDirectoryPath: String?
+  /// The template being filled in, if any. While there is one, the prompt is its rendering and
+  /// `initialPrompt` is not read.
+  public var templateFill: PromptTemplateFill?
 
   public init(
     name: String = "",
@@ -21,7 +24,8 @@ public struct SessionDraft: Hashable, Sendable {
     providerID: String? = nil,
     modelID: String? = nil,
     appearance: SessionAppearance? = nil,
-    workingDirectoryPath: String? = nil
+    workingDirectoryPath: String? = nil,
+    templateFill: PromptTemplateFill? = nil
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
@@ -29,14 +33,20 @@ public struct SessionDraft: Hashable, Sendable {
     self.modelID = modelID
     self.appearance = appearance
     self.workingDirectoryPath = workingDirectoryPath
+    self.templateFill = templateFill
   }
 
   public var trimmedName: String {
     name.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// The prompt the agent is sent: the template's rendering, or what was typed.
+  public var effectivePrompt: String {
+    templateFill?.render().prompt ?? PromptText.normalizingLineBreaks(initialPrompt)
+  }
+
   public var trimmedPrompt: String {
-    initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    effectivePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   public var effectiveAppearance: SessionAppearance {
@@ -72,6 +82,13 @@ public struct SessionDraft: Hashable, Sendable {
     if providerID?.isEmpty ?? true {
       issues.append(.agentMissing)
     }
+    if let templateFill {
+      issues += templateFill.missingRequiredFields.map(SessionDraftIssue.templateFieldMissing)
+    } else if PromptText.containsForbiddenCharacters(
+      PromptText.normalizingLineBreaks(initialPrompt))
+    {
+      issues.append(.promptControlCharacters)
+    }
     if !isStorableAppearance {
       issues.append(.appearanceInvalid)
     }
@@ -84,14 +101,16 @@ public struct SessionDraft: Hashable, Sendable {
     WorkSession(
       id: id,
       name: trimmedName,
-      initialPrompt: initialPrompt,
+      initialPrompt: effectivePrompt,
       agent: providerID.map { SessionAgentConfiguration(providerID: $0, modelID: modelID) },
       appearance: effectiveAppearance,
       status: .closed,
       createdAt: createdAt,
       updatedAt: createdAt,
       closedAt: createdAt,
-      repositories: resolvedWorkingDirectoryPath.map { [RepositoryContext(path: $0)] } ?? []
+      repositories: resolvedWorkingDirectoryPath.map { [RepositoryContext(path: $0)] } ?? [],
+      // The rendered text is what the session keeps; the template is only where it came from.
+      template: templateFill?.reference
     )
   }
 

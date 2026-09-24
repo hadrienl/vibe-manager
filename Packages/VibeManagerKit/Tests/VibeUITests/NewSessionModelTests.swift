@@ -500,3 +500,95 @@ private actor GatedFolders: WorkingDirectoryProbe {
     return .usable
   }
 }
+
+private let templateReview = PromptTemplate(
+  name: "Review", sessionNamePattern: "Review {{url}}", body: "Review {{url}}.\n\n{{focus?}}")
+private let templateFeedback = PromptTemplate(
+  name: "Feedback", sessionNamePattern: "Feedback {{url}}", body: "Address comments on {{url}}.")
+
+@MainActor
+@Suite("Filling a template in the new session sheet")
+struct NewSessionTemplateTests {
+  private func makeModel(templates: [PromptTemplate] = [templateReview, templateFeedback])
+    -> NewSessionModel
+  {
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let model = NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(), agents: registry, folders: StubFolders(status: .usable)),
+      registry: registry,
+      templates: templates
+    )
+    model.draft.workingDirectoryPath = "/workspace"
+    return model
+  }
+
+  @Test("Create stays out of reach while a required field is empty")
+  func requiredFieldBlocksSubmission() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    #expect(model.draft.name == "Review")
+    #expect(!model.canSubmit)
+
+    model.setValue("https://x/1", for: "url")
+    #expect(model.canSubmit)
+    #expect(model.draft.name == "Review https://x/1")
+  }
+
+  @Test("The name follows the template until the user types their own")
+  func nameStopsFollowingOnceTyped() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.draft.name = "My own name"
+    model.setValue("https://x/1", for: "url")
+    #expect(model.draft.name == "My own name")
+  }
+
+  @Test("Changing template keeps the values of fields sharing a name")
+  func switchingKeepsSharedValues() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.setValue("https://x/1", for: "url")
+    model.setValue("the migration", for: "focus")
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.value(for: "url") == "https://x/1")
+    #expect(model.draft.templateFill?.values["focus"] == nil)
+    #expect(model.draft.name == "Feedback https://x/1")
+  }
+
+  @Test("Edit as Text turns the rendering into the free prompt, and drops the template")
+  func editAsText() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.editAsText()
+    #expect(model.draft.templateFill == nil)
+    #expect(model.draft.initialPrompt == "Review {{url}}.")
+    #expect(model.draft.session().template == nil)
+  }
+
+  @Test("A template saved elsewhere is said, and only swapped in on Reload")
+  func staleTemplateReloads() {
+    let model = makeModel()
+    model.selectTemplate(templateReview.id)
+    model.setValue("https://x/1", for: "url")
+    var changed = templateReview
+    changed.body = "Look at {{url}} closely."
+    changed.revision = 2
+
+    model.templatesChanged([changed, templateFeedback])
+    #expect(model.isTemplateStale)
+    #expect(model.renderedPrompt?.prompt == "Review https://x/1.")
+
+    model.reloadTemplate()
+    #expect(!model.isTemplateStale)
+    #expect(model.renderedPrompt?.prompt == "Look at https://x/1 closely.")
+  }
+
+  @Test("Archived templates are not offered")
+  func archivedAreNotOffered() {
+    var archived = templateFeedback
+    archived.archivedAt = Date()
+    let model = makeModel(templates: [templateReview, archived])
+    #expect(model.templates.map(\.id) == [templateReview.id])
+  }
+}

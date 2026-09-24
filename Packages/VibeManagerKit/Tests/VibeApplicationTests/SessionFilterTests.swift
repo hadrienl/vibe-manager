@@ -246,3 +246,17 @@ struct SessionFilterCodingTests {
     #expect(restored.sort == .lastActivity)
   }
 }
+
+@Suite("Searching by template")
+struct SessionFilterTemplateTests {
+  @Test("The name of the template a session came from is searched")
+  func templateNameIsSearched() {
+    var reviewed = session(name: "MR 1315")
+    reviewed.template = PromptTemplateReference(id: "t", name: "Révision", revision: "1")
+    let other = session(name: "Other")
+
+    var filter = SessionFilter(scope: .active)
+    filter.searchText = "revision"
+    #expect(filter.apply(to: [reviewed, other]).map(\.name) == ["MR 1315"])
+  }
+}

@@ -79,6 +79,9 @@ public enum AgentLaunchError: Error, Equatable, Sendable, LocalizedError {
   case missingResumeIdentifier
   case invalidWorkingDirectory
   case promptTooLarge(byteCount: Int, limit: Int)
+  /// A NUL ends a C string: the process would receive the prompt cut at that point, and nothing
+  /// would say so.
+  case promptContainsNullCharacter
 
   public var errorDescription: String? {
     switch self {
@@ -98,6 +101,8 @@ public enum AgentLaunchError: Error, Equatable, Sendable, LocalizedError {
       return "The working directory is not a usable absolute path."
     case .promptTooLarge(_, let limit):
       return "The initial prompt exceeds the \(limit) byte limit accepted by the agent."
+    case .promptContainsNullCharacter:
+      return "The initial prompt contains a null character, which would cut it short."
     }
   }
 }

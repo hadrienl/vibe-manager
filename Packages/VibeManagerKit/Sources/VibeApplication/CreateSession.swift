@@ -139,7 +139,7 @@ public struct CreateSession: Sendable {
     let request = AgentLaunchRequest(
       workingDirectoryPath: path,
       modelID: draft.modelID,
-      initialPrompt: prompt.isEmpty ? nil : draft.initialPrompt,
+      initialPrompt: prompt.isEmpty ? nil : draft.effectivePrompt,
       resume: .none
     )
 
@@ -167,6 +167,9 @@ public struct CreateSession: Sendable {
         message: "The initial prompt is \(byteCount) bytes, and \(agentName) accepts \(limit).",
         remedy: "Shorten it, or create the session without a prompt and paste it in the terminal."
       )
+    case .promptContainsNullCharacter:
+      // The draft already says so, and one character is worth one problem, not two.
+      return .promptControlCharacters
     case .initialPromptUnsupported:
       return .promptRejected(
         message: "\(agentName) does not accept an initial prompt.",

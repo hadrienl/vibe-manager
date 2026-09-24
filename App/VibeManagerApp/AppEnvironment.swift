@@ -98,7 +98,9 @@ final class AppEnvironment {
       fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite),
       notesStore: notes,
       notesFileLocation: { notes.fileURL(for: $0) },
-      quitPreferences: UserDefaultsQuitPreferences(suiteName: data.defaultsSuite)
+      quitPreferences: UserDefaultsQuitPreferences(suiteName: data.defaultsSuite),
+      templateRepository: FilePromptTemplateRepository(storeURL: data.templates),
+      templateExchange: PromptTemplateExchangeCodec()
     )
   }
 
@@ -159,11 +161,12 @@ final class AppEnvironment {
   /// either taking the other for a second instance, or migrating the other's sessions.
   private static func dataLocation(
     environment: [String: String] = ProcessInfo.processInfo.environment
-  ) -> (store: URL, runtime: URL, notes: URL, defaultsSuite: String?) {
+  ) -> (store: URL, runtime: URL, notes: URL, templates: URL, defaultsSuite: String?) {
     guard let directory = environment["VIBE_DATA_DIRECTORY"], directory.hasPrefix("/") else {
       return (
         FileSessionRepository.defaultStoreURL(), FileSessionRuntimeStateStore.defaultURL(),
-        FileSessionNotesStore.defaultDirectory(), nil
+        FileSessionNotesStore.defaultDirectory(), FilePromptTemplateRepository.defaultStoreURL(),
+        nil
       )
     }
     let folder = URL(fileURLWithPath: directory, isDirectory: true)
@@ -171,6 +174,7 @@ final class AppEnvironment {
       folder.appendingPathComponent("sessions.json"),
       folder.appendingPathComponent("runtime.json"),
       folder.appendingPathComponent("Notes", isDirectory: true),
+      folder.appendingPathComponent("templates.json"),
       "com.hadrienl.VibeManager.isolated"
     )
   }

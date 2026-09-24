@@ -37,6 +37,8 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("n", modifiers: .command)
         .disabled(!environment.appModel.canCreateSession)
+
+        TemplateCommands(model: environment.appModel)
       }
 
       // SwiftUI's own Close sits here on ⌘W, which now belongs to the session. The window keeps
@@ -94,8 +96,46 @@ struct VibeManagerApp: App {
       SessionHistoryCommands(model: environment.appModel, focus: windowFocus)
     }
 
+    // A window of its own: an editor, a list and a preview do not fit in the settings.
+    Window("Prompt Templates", id: PromptTemplatesView.windowID) {
+      PromptTemplatesView(model: environment.appModel.templates)
+    }
+    .defaultSize(width: 900, height: 640)
+
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
+    }
+  }
+}
+
+/// Starting a session from a template, and managing them.
+///
+/// ⇧⌘N opens the sheet on the first template, its fields ready to type in; the picker at the top
+/// of the sheet changes it. The submenu goes straight to any of them.
+private struct TemplateCommands: View {
+  let model: AppModel
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    Button("New Session from Template") {
+      model.beginNewSession(template: model.templates.active.first?.id)
+    }
+    .keyboardShortcut("n", modifiers: [.command, .shift])
+    .disabled(!model.canCreateSession || model.templates.active.isEmpty)
+
+    Menu("New Session from") {
+      ForEach(model.templates.active) { template in
+        Button(template.trimmedName) {
+          model.beginNewSession(template: template.id)
+        }
+      }
+    }
+    .disabled(!model.canCreateSession || model.templates.active.isEmpty)
+
+    Divider()
+
+    Button("Manage Prompt Templates…") {
+      openWindow(id: PromptTemplatesView.windowID)
     }
   }
 }
