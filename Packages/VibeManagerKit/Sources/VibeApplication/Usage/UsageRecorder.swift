@@ -82,6 +82,17 @@ public actor UsageRecorder {
     heartbeatTask = nil
   }
 
+  /// Takes writing back up, when the launch is tried again and this copy turns out to hold the
+  /// data after all. What was left open is settled then, by `settleLaunch`.
+  public func unseal() {
+    isSealed = false
+  }
+
+  /// Whether this copy has given up writing.
+  public func isReadOnly() -> Bool {
+    isSealed
+  }
+
   /// Settles what the previous launch left open, once the terminal host has said what it kept.
   ///
   /// A run it never saw end is closed at the last heartbeat that names it, or at its own start. A
@@ -94,6 +105,10 @@ public actor UsageRecorder {
     isSettled = true
     let now = clock.now().storageRounded
     for (id, run) in open {
+      // A session started while this loop waited on a write has a run of its own by now: that
+      // one is not the previous launch's to settle. Each change to `open` is made before the
+      // write, for the same reason.
+      guard open[id]?.id == run.id else { continue }
       if leftovers.contains(run.id) {
         await closeLeftover(run)
       } else if let detachedAt = run.detachedAt {
@@ -102,8 +117,8 @@ public actor UsageRecorder {
           await write(.attach(runID: run.id, at: now))
         } else {
           let end = min(max(closedAt[id] ?? detachedAt, detachedAt), now)
-          await write(.end(runID: run.id, at: end, exit: .endedWhileAway))
           open[id] = nil
+          await write(.end(runID: run.id, at: end, exit: .endedWhileAway))
         }
       }
     }

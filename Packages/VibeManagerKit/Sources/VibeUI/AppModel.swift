@@ -1290,8 +1290,20 @@ public final class AppModel {
     hostUnavailableReason = nil
     await reload()
     await reattach(shutdown)
+    // The first attempt sealed the usage too: settled now, before anything is resumed, or the
+    // runs of this whole launch would go unrecorded.
+    await settleUsage()
     announce(shutdown)
     await resume(shutdown)
+  }
+
+  /// Once the host has said which agents it kept: those runs go on, the others ended while away.
+  private func settleUsage() async {
+    guard let usage else { return }
+    let running = Set(sessions.map(\.id).filter { launcher?.isRunning($0) == true })
+    // A copy of the application that found another one working here only reads.
+    let readOnly = await runtimeRecorder?.isReadOnly() ?? false
+    await usage.settleLaunch(running: running, sessions: sessions, readOnly: readOnly)
   }
 
   /// Empties the queue. What is already running keeps running: stopping an agent that has just
@@ -1497,13 +1509,7 @@ public final class AppModel {
     // Before anything is said or probed: these agents are running now, and their panes are how
     // the list shows it.
     await reattach(shutdown)
-    // Once the host has said which agents it kept: those runs go on, the others ended while away.
-    if let usage {
-      let running = Set(sessions.map(\.id).filter { launcher?.isRunning($0) == true })
-      // A copy of the application that found another one working here only reads.
-      let readOnly = await runtimeRecorder?.isReadOnly() ?? false
-      await usage.settleLaunch(running: running, sessions: sessions, readOnly: readOnly)
-    }
+    await settleUsage()
     // Said as soon as the list is on screen. An offer asks no provider anything, and waiting for
     // the detections to announce it meant a minute of silence after a crash — on a cold cache,
     // with a CLI that answers none of its probes, the banner arrived long after the user had

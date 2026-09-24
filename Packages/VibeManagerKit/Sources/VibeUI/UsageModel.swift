@@ -61,6 +61,8 @@ public final class UsageModel {
     if readOnly {
       await service.recorder.seal()
     } else {
+      // Sealed by an earlier launch attempt that found the host unavailable, and tried again.
+      await service.recorder.unseal()
       var closedAt: [SessionID: Date] = [:]
       for session in sessions {
         if let date = session.closedAt { closedAt[session.id] = date }

@@ -16,6 +16,9 @@ public actor UsageService {
   /// Bumped by a clear and by the tracking switch: a reading started before either is dropped,
   /// or it would put back what was just erased, or count what was just switched off.
   private var generation = 0
+  /// Clears and switches under way: no reading starts while one is, or it would read what they
+  /// are about to erase and save it once they are done.
+  private var changesUnderWay = 0
 
   public init(
     recorder: UsageRecorder,
@@ -37,7 +40,10 @@ public actor UsageService {
   /// tracking is off: an agent's usage during that time is not the application's to read.
   @discardableResult
   public func refreshTokens(for sessions: [WorkSession]) async -> Bool {
-    guard let reader, !isRefreshing, await recorder.isTracking() else { return false }
+    // A copy that only reads leaves the tokens to the one that holds the data.
+    guard let reader, !isRefreshing, changesUnderWay == 0, await !recorder.isReadOnly(),
+      await recorder.isTracking()
+    else { return false }
     isRefreshing = true
     defer { isRefreshing = false }
     let started = generation
@@ -137,13 +143,19 @@ public actor UsageService {
 
   public func setTracking(_ enabled: Bool) async {
     generation += 1
+    changesUnderWay += 1
+    defer { changesUnderWay -= 1 }
     await recorder.setTracking(enabled)
   }
 
   /// Deletes what was recorded and read. The agents' transcripts are left alone, and what they
   /// say about the time before this instant is never read again.
   public func clear() async {
+    // The data is another copy's: erasing its tokens and not its runs would leave them apart.
+    guard await !recorder.isReadOnly() else { return }
     generation += 1
+    changesUnderWay += 1
+    defer { changesUnderWay -= 1 }
     await recorder.clear()
     try? await tokenStore.clear()
     snapshot = .empty

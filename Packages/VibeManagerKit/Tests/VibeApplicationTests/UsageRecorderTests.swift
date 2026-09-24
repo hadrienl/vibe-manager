@@ -195,6 +195,56 @@ struct UsageRecorderEdgeTests {
     #expect(await ledger.heartbeat() != nil)
   }
 
+  @Test("A recorder sealed by a launch that is tried again records once it is settled")
+  func unsealedAfterRetry() async {
+    let ledger = InMemoryUsageLedger()
+    let recorder = UsageRecorder(
+      ledger: ledger, tracking: InMemoryUsageTrackingStore(), clock: MovingClock())
+    await recorder.seal()
+    await recorder.settleLaunch(running: [], closedAt: [:])
+
+    await recorder.unseal()
+    await recorder.settleLaunch(running: [], closedAt: [:])
+    await recorder.started(
+      SessionID(), providerID: "codex", modelID: nil, context: UsageRunContext(kind: .start))
+
+    #expect(UsageLedgerFold.runs(from: await ledger.events()).count == 1)
+  }
+
+  @Test("A session started while the launch is settled keeps its new run")
+  func startDuringSettlement() async {
+    let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    let first = UsageRun(
+      sessionID: SessionID(), providerID: "codex", modelID: nil, kind: .start, startedAt: start)
+    let second = UsageRun(
+      sessionID: SessionID(), providerID: "codex", modelID: nil, kind: .start, startedAt: start)
+    let ledger = HookedUsageLedger(events: [
+      .start(first), .detach(runID: first.id, at: start),
+      .start(second), .detach(runID: second.id, at: start),
+    ])
+    let recorder = UsageRecorder(
+      ledger: ledger, tracking: InMemoryUsageTrackingStore(),
+      clock: MovingClock(start.addingTimeInterval(3_600)))
+    // Whichever run is settled first, the other session is started again during that write.
+    await ledger.onFirstEnd { runID in
+      let other = runID == first.id ? second.sessionID : first.sessionID
+      await recorder.started(
+        other, providerID: "codex", modelID: nil, context: UsageRunContext(kind: .resume))
+    }
+
+    await recorder.settleLaunch(running: [], closedAt: [:])
+
+    let open = await recorder.openRuns()
+    #expect(open.count == 1)
+    #expect(open.first?.kind == .resume)
+    let ends = await ledger.events().filter {
+      guard case .end = $0 else { return false }
+      return true
+    }
+    // Each detached run ended once: the restarted one by its restart, the other by the settlement.
+    #expect(ends.count == 2)
+  }
+
   @Test("A sleep whose wake was lost takes nothing from the runs after it")
   func lostWake() {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
@@ -238,12 +288,16 @@ struct UsageServiceTests {
   private struct StubReader: TokenUsageReading {
     let sessionID: SessionID
     let when: Date
+    /// Adds to what the snapshot already holds, as a transcript that keeps growing does.
+    var growing = false
 
     func refresh(
       _ sessions: [WorkSession], from snapshot: TokenUsageSnapshot,
       isTracked: @escaping @Sendable (Date) -> Bool
     ) async -> TokenUsageSnapshot {
-      var file = TokenUsageFile(sessionID: sessionID, providerID: "codex")
+      var file =
+        (growing ? snapshot.files["/rollout.jsonl"] : nil)
+        ?? TokenUsageFile(sessionID: sessionID, providerID: "codex")
       if isTracked(when) {
         file.add(
           TokenCounts(input: 5, output: 1), model: "gpt",
@@ -274,6 +328,53 @@ struct UsageServiceTests {
     #expect(report.total.hasReportedTokens == false)
   }
 
+  @Test("A copy that only reads saves no tokens and clears nothing")
+  func readOnlyCopy() async {
+    let clock = MovingClock()
+    let session = SessionID()
+    let tracking = InMemoryUsageTrackingStore()
+    let ledger = InMemoryUsageLedger()
+    let store = InMemoryTokenUsageStore()
+    let owner = UsageService(
+      recorder: UsageRecorder(ledger: ledger, tracking: tracking, clock: clock), ledger: ledger,
+      tracking: tracking, tokenStore: store,
+      reader: StubReader(sessionID: session, when: clock.now().addingTimeInterval(-3_600)),
+      clock: clock)
+    await owner.refreshTokens(for: [])
+    let saved = await store.load()
+
+    let recorder = UsageRecorder(ledger: ledger, tracking: tracking, clock: clock)
+    await recorder.seal()
+    let copy = UsageService(
+      recorder: recorder, ledger: ledger, tracking: tracking, tokenStore: store,
+      reader: StubReader(sessionID: SessionID(), when: clock.now().addingTimeInterval(-60)),
+      clock: clock)
+    #expect(await copy.refreshTokens(for: []) == false)
+    await copy.clear()
+
+    #expect(await store.load() == saved)
+  }
+
+  @Test("A reading asked for during a clear does not put the tokens back")
+  func readingDuringClear() async {
+    let clock = MovingClock()
+    let session = SessionID()
+    let tracking = InMemoryUsageTrackingStore()
+    let ledger = InMemoryUsageLedger()
+    let store = HookedTokenUsageStore()
+    let service = UsageService(
+      recorder: UsageRecorder(ledger: ledger, tracking: tracking, clock: clock), ledger: ledger,
+      tracking: tracking, tokenStore: store,
+      reader: StubReader(sessionID: session, when: clock.now(), growing: true), clock: clock)
+    await service.refreshTokens(for: [])
+    await store.onClear { await service.refreshTokens(for: []) }
+
+    await service.clear()
+
+    #expect(await service.sessionReport(session).hasReportedTokens == false)
+    #expect(await store.load().buckets.isEmpty)
+  }
+
   @Test("Clearing empties the token totals")
   func clearing() async {
     let clock = MovingClock()
@@ -295,5 +396,53 @@ struct UsageServiceTests {
     // Read again after the clear, but from before it: it does not come back.
     #expect(await service.sessionReport(session).hasReportedTokens == false)
     #expect(await store.load().buckets.isEmpty)
+  }
+}
+
+/// A journal that runs something of the test's in the middle of the first `end` it is given.
+private actor HookedUsageLedger: UsageLedger {
+  private let inner: InMemoryUsageLedger
+  private var hook: (@Sendable (UUID) async -> Void)?
+
+  init(events: [UsageLedgerEvent]) {
+    inner = InMemoryUsageLedger(events: events)
+  }
+
+  func onFirstEnd(_ hook: @escaping @Sendable (UUID) async -> Void) {
+    self.hook = hook
+  }
+
+  func append(_ event: UsageLedgerEvent) async {
+    await inner.append(event)
+    if case .end(let runID, _, _) = event, let hook {
+      self.hook = nil
+      await hook(runID)
+    }
+  }
+
+  func events() async -> [UsageLedgerEvent] { await inner.events() }
+  func writeHeartbeat(_ heartbeat: UsageHeartbeat?) async { await inner.writeHeartbeat(heartbeat) }
+  func heartbeat() async -> UsageHeartbeat? { await inner.heartbeat() }
+  func clear() async { await inner.clear() }
+}
+
+/// A token store that runs something of the test's in the middle of being cleared.
+private actor HookedTokenUsageStore: TokenUsageStore {
+  private let inner = InMemoryTokenUsageStore()
+  private var hook: (@Sendable () async -> Void)?
+
+  func onClear(_ hook: @escaping @Sendable () async -> Void) {
+    self.hook = hook
+  }
+
+  func load() async -> TokenUsageSnapshot { await inner.load() }
+  func save(_ snapshot: TokenUsageSnapshot) async { await inner.save(snapshot) }
+
+  func clear() async {
+    await inner.clear()
+    if let hook {
+      self.hook = nil
+      await hook()
+    }
   }
 }
