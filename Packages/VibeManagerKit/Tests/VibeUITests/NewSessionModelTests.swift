@@ -123,7 +123,7 @@ struct NewSessionModelTests {
     #expect(model.issues.isEmpty)
   }
 
-  @Test("A burst of keystrokes is checked once, when the typing stops")
+  @Test("A burst of keystrokes is checked once, when the typing stops", .timeLimit(.minutes(1)))
   func revalidationIsDebounced() async throws {
     let plans = PlanCounter()
     let model = makeModel(
@@ -138,7 +138,9 @@ struct NewSessionModelTests {
       model.draft.name.append(character)
       model.draftChanged()
     }
-    try await Task.sleep(for: .milliseconds(300))
+    await waitUntil { model.issues.isEmpty }
+    // Long enough for any other check the burst might have started to land as well.
+    try await Task.sleep(for: .milliseconds(100))
 
     #expect(await plans.count == beforeTyping + 1)
     #expect(model.issues.isEmpty)
@@ -234,7 +236,10 @@ struct NewSessionModelTests {
     #expect(model.protectedLocationNotice == nil)
   }
 
-  @Test("A folder that disappeared stays reported while the next field is fixed")
+  @Test(
+    "A folder that disappeared stays reported while the next field is fixed",
+    .timeLimit(.minutes(1))
+  )
   func folderVerdictSurvivesTheNextEdit() async throws {
     // The folder was opened by Create, so re-checking it raises nothing new. Skipping the check
     // instead made the problem vanish as soon as the name was edited, and come back at the next
@@ -246,13 +251,16 @@ struct NewSessionModelTests {
 
     model.draft.name = "Refactor the webhook"
     model.draftChanged()
-    try await Task.sleep(for: .milliseconds(200))
+    await waitUntil { model.issues(for: .name).isEmpty }
 
     #expect(model.issues.contains(.workingDirectoryNotFound))
     #expect(model.issues(for: .name).isEmpty)
   }
 
-  @Test("A folder chosen while the form is already red does not republish a stale verdict")
+  @Test(
+    "A folder chosen while the form is already red does not republish a stale verdict",
+    .timeLimit(.minutes(1))
+  )
   func chosenFolderDoesNotRestoreAStaleVerdict() async throws {
     // A folder on a network volume takes long enough to check for a name to be typed under it.
     // The answer that comes back describes the older draft, so only the part of it that was
@@ -269,7 +277,7 @@ struct NewSessionModelTests {
     model.draftChanged()
     await folders.open()
     await choosing.value
-    try await Task.sleep(for: .milliseconds(200))
+    await waitUntil { model.issues.isEmpty }
 
     #expect(model.issues.isEmpty)
   }
@@ -367,6 +375,17 @@ private actor SpyRepository: SessionRepository {
 
 /// Counts the checks that reach the agent, which is what a revalidation costs now that the
 /// working folder is left alone until the user designates one.
+/// Waits for the debounced check to land, however long a busy runner takes to get there.
+///
+/// No deadline of its own: a fixed wait of 200 ms ran out on a CI runner where these tests took
+/// seven seconds. The time limit of each test stops a check that never comes.
+@MainActor
+private func waitUntil(_ condition: @MainActor () -> Bool) async {
+  while !condition() {
+    try? await Task.sleep(for: .milliseconds(10))
+  }
+}
+
 private actor PlanCounter {
   private(set) var count = 0
 
