@@ -277,7 +277,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   public var appearance: SessionAppearance
   public private(set) var lifecycle: SessionLifecycle
   public var repositories: [RepositoryContext]
-  public var notes: String?
+  /// The notes a store written before #16 held inside the session. Nothing writes it any more:
+  /// notes live in their own store, and this is only read once, to import them there.
+  public var legacyNotes: String?
   public var template: PromptTemplateReference?
   /// Every switch of agent or model, oldest first. Appended to and never rewritten, except for the
   /// outcome of the last one when it is undone.
@@ -326,7 +328,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     archivedAt: Date? = nil,
     startedAt: Date? = nil,
     repositories: [RepositoryContext] = [],
-    notes: String? = nil,
+    legacyNotes: String? = nil,
     template: PromptTemplateReference? = nil,
     agentHistory: [AgentChange] = []
   ) {
@@ -344,7 +346,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       startedAt: startedAt
     )
     self.repositories = repositories
-    self.notes = notes
+    self.legacyNotes = legacyNotes
     self.template = template
     self.agentHistory = agentHistory
   }

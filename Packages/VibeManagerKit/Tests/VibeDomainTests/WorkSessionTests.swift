@@ -110,7 +110,7 @@ func completeSessionValidation() throws {
         )
       )
     ],
-    notes: "Keep the store local",
+    legacyNotes: "Keep the store local",
     template: PromptTemplateReference(id: "implementation", name: "Implementation", revision: "2")
   )
 

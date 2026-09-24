@@ -83,6 +83,8 @@ public final class AppModel {
   }
   /// The screen state of the inspector's Git pane, kept per session for the length of the run.
   let gitInspector: GitInspectorModel
+  /// Every session's notes: the editor's documents, the writes, the search index.
+  public let notes: NotesModel
   /// A process the system would not let go of. Reported rather than swallowed: the promise that
   /// nothing stays attached to an archived session is only worth making if its failure is said.
   public private(set) var detachWarning: DetachWarning?
@@ -164,6 +166,8 @@ public final class AppModel {
     /// `false` when this agent takes no initial prompt at all: there is then nothing to edit,
     /// and saying so is more honest than showing an empty box.
     public let carriesContext: Bool
+    /// Said when the session's notes did not fit in the summary.
+    public let leftOutNotes: String?
   }
 
   public struct RestartFailure: Equatable {
@@ -323,6 +327,7 @@ public final class AppModel {
   private let clock: any SessionClock
   private let readBranchReport: ReadSessionBranchReport?
   private let repositoryStatus: RepositoryStatusMonitor?
+  private let importLegacyNotes: ImportLegacyNotes
 
   public init(
     repository: any SessionRepository,
@@ -346,8 +351,15 @@ public final class AppModel {
     /// Absent in a workspace assembled without Git: the report is then read on demand only.
     repositoryStatus: RepositoryStatusMonitor? = nil,
     closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences(),
-    fileOpeningPreferences: any FileOpeningPreferences = InMemoryFileOpeningPreferences()
+    fileOpeningPreferences: any FileOpeningPreferences = InMemoryFileOpeningPreferences(),
+    /// Where the notes are kept. A workspace assembled without one keeps none.
+    notesStore: any SessionNotesStore = NoSessionNotes(),
+    /// Where a session's notes file is, for Reveal in Finder when it cannot be read.
+    notesFileLocation: (@Sendable (SessionID) -> URL)? = nil
   ) {
+    notes = NotesModel(
+      store: notesStore, fileLocation: notesFileLocation, opener: WorkspaceFileOpener())
+    importLegacyNotes = ImportLegacyNotes(repository: repository, notes: notesStore)
     self.closePreferences = closePreferences
     self.fileOpeningPreferences = fileOpeningPreferences
     fileEditor = fileOpeningPreferences.editor
@@ -383,7 +395,9 @@ public final class AppModel {
     restoreSession = RestoreSession(repository: repository)
     // A workspace without agents cannot build a launch plan, so it cannot restart anything —
     // and saying that with an optional is clearer than a use case that would refuse every call.
-    let restart = agents.map { RestartSession(repository: repository, agents: $0) }
+    let restart = agents.map {
+      RestartSession(repository: repository, agents: $0, notes: notesStore)
+    }
     restartSession = restart
     planAgentSwitch = agents.map { PlanAgentSwitch(repository: repository, agents: $0) }
     recordAgentSwitch = RecordAgentSwitch(repository: repository, clock: clock)
@@ -449,11 +463,16 @@ public final class AppModel {
   /// What the sidebar lists. Every session is still held — and every terminal still mounted —
   /// so narrowing the list never stops an agent or throws away what one has already said.
   public var visibleSessions: [WorkSession] {
+    let filter = filter
     // A session being closed still reads as active until the stop is done. It is already gone
     // as far as the user is concerned.
-    filter.apply(to: sessions.filter {
+    let sessions = self.sessions.filter {
       !($0.status == .active && dismissedSessionIDs.contains($0.id))
-    })
+    }
+    // The notes are only read when there is something to look for in them: read every time, each
+    // keystroke typed in the notes would redraw the sidebar.
+    guard !filter.trimmedSearchText.isEmpty else { return filter.apply(to: sessions) }
+    return filter.apply(to: sessions, notes: notes.searchIndex)
   }
 
   public var archivedSessionCount: Int {
@@ -795,6 +814,8 @@ public final class AppModel {
     defer { restartingSessionIDs.remove(id) }
 
     restartFailure = nil
+    // The summary is written from the notes on disk: what was just typed has to be there first.
+    await notes.flush(id)
     // Restarting is an answer to the offer too: the session goes back to work on the agent it has.
     switchBackOffers[id] = nil
     do {
@@ -813,7 +834,9 @@ public final class AppModel {
           explanation: restart.explanation?.sentence ?? "",
           briefText: restart.mode.brief?.text ?? "",
           isTruncated: restart.mode.brief?.isTruncated ?? false,
-          carriesContext: restart.mode.brief != nil
+          carriesContext: restart.mode.brief != nil,
+          leftOutNotes: NotesInSummary.leftOut(
+            notes: notes.text(for: id), brief: restart.mode.brief)
         )
         return
       }
@@ -1129,7 +1152,8 @@ public final class AppModel {
       session: session,
       branches: branchReports[session.id],
       statuses: repositoryStatuses.values.filter { $0.key.sessionID == session.id },
-      agentNames: names
+      agentNames: names,
+      notes: notes.text(for: session.id)
     )
   }
 
@@ -1328,6 +1352,9 @@ public final class AppModel {
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
+    // Beside the load rather than before it: the notes only serve the search, and the list must
+    // not wait on reading them.
+    notes.startPreparing(importing: importLegacyNotes)
     // Before the sessions, and never from the creation flow: the point of the whole step is that
     // pressing Create leaves nothing left to ask. Reading the store first left a window in which
     // ⌘N opened a sheet that did not yet know whether the access was there, and warned anyway.
@@ -1399,6 +1426,10 @@ public final class AppModel {
   }
 
   private func apply(selection id: SessionID?) {
+    // Leaving a session is when the user considers its notes done: they are written now.
+    if let previous = selectedSessionID, previous != id {
+      Task { [notes] in await notes.flush(previous) }
+    }
     selectedSessionID = id
     layout.select(id)
     watchBranches()
@@ -1696,6 +1727,27 @@ extension AppModel {
   public func applicationDidBecomeActive() {
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
+  }
+
+  /// Called when another application comes to the front: whatever was typed in the notes is
+  /// written, as it would be on leaving the session.
+  public func applicationWillResignActive() {
+    Task { [notes] in _ = await notes.flushAll() }
+  }
+
+  /// Edit Notes: the inspector is shown if it was hidden, and its editor takes the keyboard.
+  public func focusNotes() {
+    guard selectedSessionID != nil else { return }
+    if !layout.columns.isInspectorVisible {
+      layout.setInspectorVisible(true)
+    }
+    notes.requestFocus()
+  }
+
+  /// Escape in the notes: the keyboard goes back to the session's terminal.
+  public func focusTerminal() {
+    guard let id = selectedSessionID else { return }
+    launcher?.pane(for: id)?.requestFocus()
   }
 
   /// Stops every watch, for good. Called on the way out.

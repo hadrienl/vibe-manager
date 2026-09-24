@@ -55,8 +55,9 @@ public struct SessionContextBrief: Hashable, Sendable {
 
 /// Builds the brief of a session, and nothing else.
 ///
-/// Pure by construction — a session and a byte limit in, a string out — so every wording, every
-/// omission and every truncation is covered by a test that needs no CLI, no disk and no clock.
+/// Pure by construction — a session, its notes and a byte limit in, a string out — so every
+/// wording, every omission and every truncation is covered by a test that needs no CLI, no disk
+/// and no clock.
 public struct SessionContextBriefBuilder: Sendable {
   /// The ceiling the text is kept under. It defaults to what the providers accept as an
   /// argument: both CLIs refuse to take a prompt on the standard input, because in a pseudo
@@ -68,8 +69,9 @@ public struct SessionContextBriefBuilder: Sendable {
     self.byteLimit = byteLimit
   }
 
-  public func callAsFunction(for session: WorkSession) -> SessionContextBrief {
-    var sections = allSections(of: session)
+  /// - Parameter notes: the session's notes, kept apart from it and read by the caller.
+  public func callAsFunction(for session: WorkSession, notes: String?) -> SessionContextBrief {
+    var sections = allSections(of: session, notes: notes)
     var isTruncated = false
 
     // Dropped whole rather than cut in half: half a note reads like a complete one, and the
@@ -110,7 +112,7 @@ public struct SessionContextBriefBuilder: Sendable {
     let text: String
   }
 
-  private func allSections(of session: WorkSession) -> [Part] {
+  private func allSections(of session: WorkSession, notes: String?) -> [Part] {
     var parts: [Part] = [Part(section: .heading, text: heading(of: session))]
 
     if let agent = session.agent {
@@ -119,7 +121,7 @@ public struct SessionContextBriefBuilder: Sendable {
     if let folders = folders(of: session) {
       parts.append(Part(section: .folders, text: folders))
     }
-    if let notes = session.notes?.trimmingCharacters(in: .whitespacesAndNewlines),
+    if let notes = notes?.trimmingCharacters(in: .whitespacesAndNewlines),
       !notes.isEmpty
     {
       parts.append(Part(section: .notes, text: "Notes kept on this session:\n\(notes)"))

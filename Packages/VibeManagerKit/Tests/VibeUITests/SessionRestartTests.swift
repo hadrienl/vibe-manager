@@ -357,7 +357,7 @@ struct SessionRestartTests {
     #expect(stored.initialPrompt == subject.initialPrompt)
     #expect(stored.agent == subject.agent)
     #expect(stored.repositories == subject.repositories)
-    #expect(stored.notes == subject.notes)
+    #expect(stored.legacyNotes == subject.legacyNotes)
     #expect(stored.createdAt == subject.createdAt)
   }
 

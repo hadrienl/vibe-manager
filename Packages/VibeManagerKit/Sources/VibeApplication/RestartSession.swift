@@ -194,14 +194,17 @@ public struct RestartSession: Sendable {
   private let agents: any AgentProviderResolving
   private let folders: any WorkingDirectoryProbe
   private let brief: SessionContextBriefBuilder
+  private let notes: any SessionNotesStore
 
   public init(
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     folders: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
-    brief: SessionContextBriefBuilder = SessionContextBriefBuilder()
+    brief: SessionContextBriefBuilder = SessionContextBriefBuilder(),
+    notes: any SessionNotesStore = NoSessionNotes()
   ) {
     self.repository = repository
+    self.notes = notes
     self.agents = agents
     self.folders = folders
     self.brief = brief
@@ -389,7 +392,7 @@ public struct RestartSession: Sendable {
         includedSections: []
       )
     } else {
-      summary = brief(for: session)
+      summary = brief(for: session, notes: await notes.briefNotes(for: session.id))
     }
 
     let plan = try await launchPlan(

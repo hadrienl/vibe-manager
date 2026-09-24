@@ -8,7 +8,6 @@ struct SessionContextBriefTests {
   private func session(
     name: String = "Refactor the webhook",
     prompt: String = "Split the signature check out.",
-    notes: String? = "The retry path is still untested.",
     repositories: [RepositoryContext] = [
       RepositoryContext(
         path: "/work/app",
@@ -30,14 +29,15 @@ struct SessionContextBriefTests {
       createdAt: Date(timeIntervalSince1970: 1_699_000_000),
       updatedAt: Date(timeIntervalSince1970: 1_700_000_100),
       closedAt: Date(timeIntervalSince1970: 1_700_000_100),
-      repositories: repositories,
-      notes: notes
+      repositories: repositories
     )
   }
 
+  private let notes = "The retry path is still untested."
+
   @Test("Everything the session carries is in the summary, and nothing else")
   func carriesWhatTheSessionHas() {
-    let brief = SessionContextBriefBuilder()(for: session())
+    let brief = SessionContextBriefBuilder()(for: session(), notes: notes)
 
     #expect(brief.text.contains("Refactor the webhook"))
     #expect(brief.text.contains("claude-code · opus"))
@@ -52,7 +52,7 @@ struct SessionContextBriefTests {
 
   @Test("A recorded Git snapshot is dated, never stated in the present")
   func gitSnapshotIsDated() {
-    let brief = SessionContextBriefBuilder()(for: session())
+    let brief = SessionContextBriefBuilder()(for: session(), notes: notes)
 
     #expect(brief.text.contains("recorded "))
     #expect(brief.text.contains("as they were when this was recorded"))
@@ -60,7 +60,7 @@ struct SessionContextBriefTests {
 
   @Test("The initial instruction is quoted as history, not handed back as the task")
   func promptIsQuotedAsHistory() {
-    let brief = SessionContextBriefBuilder()(for: session())
+    let brief = SessionContextBriefBuilder()(for: session(), notes: notes)
 
     #expect(brief.text.contains("The instruction this session was created with, for context:"))
     #expect(brief.text.contains("Pick this work up from the current state of these files."))
@@ -69,7 +69,7 @@ struct SessionContextBriefTests {
   @Test("An empty section is left out rather than rendered as none")
   func emptySectionsAreOmitted() {
     let brief = SessionContextBriefBuilder()(
-      for: session(prompt: "   ", notes: nil, repositories: [])
+      for: session(prompt: "   ", repositories: []), notes: nil
     )
 
     #expect(!brief.includedSections.contains(.notes))
@@ -86,8 +86,8 @@ struct SessionContextBriefTests {
 
     // Two separate builds of the same session, named so that what is being compared is two
     // *runs* and not one expression written twice.
-    let first = builder(for: subject).text
-    let second = builder(for: subject).text
+    let first = builder(for: subject, notes: notes).text
+    let second = builder(for: subject, notes: notes).text
 
     #expect(first == second)
   }
@@ -97,7 +97,7 @@ struct SessionContextBriefTests {
     let builder = SessionContextBriefBuilder(byteLimit: 700)
     let long = String(repeating: "a", count: 2_000)
 
-    let brief = builder(for: session(prompt: long, notes: long))
+    let brief = builder(for: session(prompt: long), notes: long)
 
     #expect(brief.isTruncated)
     #expect(!brief.includedSections.contains(.task))
@@ -111,7 +111,7 @@ struct SessionContextBriefTests {
   @Test("A megabyte of notes still yields a summary an agent can be started with")
   func staysUnderTheAgentLimit() {
     let brief = SessionContextBriefBuilder()(
-      for: session(notes: String(repeating: "note. ", count: 200_000))
+      for: session(), notes: String(repeating: "note. ", count: 200_000)
     )
 
     #expect(brief.text.utf8.count <= AgentPromptLimits.argumentByteLimit)

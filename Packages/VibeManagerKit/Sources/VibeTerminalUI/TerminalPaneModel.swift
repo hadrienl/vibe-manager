@@ -35,6 +35,9 @@ public final class TerminalPaneModel {
   /// An agent that refused the conversation it was handed exits before a key is pressed. One the
   /// user actually worked in did not refuse anything, whatever it exits with afterwards.
   public private(set) var hasReceivedInput = false
+  /// Bumped to hand the keyboard back to this terminal — from the notes, on Escape. A counter
+  /// rather than a flag: the same request twice in a row must still move the focus twice.
+  public private(set) var focusRequest = 0
 
   private let sessionID: SessionID
   private let supervisor: any TerminalSupervisor
@@ -55,6 +58,11 @@ public final class TerminalPaneModel {
     self.supervisor = supervisor
     self.spec = spec
     self.viewportTimeout = viewportTimeout
+  }
+
+  /// Asks the surface to take the keyboard, if it is the terminal on screen.
+  public func requestFocus() {
+    focusRequest += 1
   }
 
   /// Starts the process, once the pane knows how big it is.

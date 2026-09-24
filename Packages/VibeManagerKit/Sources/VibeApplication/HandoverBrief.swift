@@ -13,14 +13,18 @@ public struct SessionBriefInput: Sendable {
   /// Display names of the agents, by provider identifier. An agent missing here is named by its
   /// identifier.
   public let agentNames: [String: String]
+  /// The session's notes, which live apart from it.
+  public let notes: String?
 
   public init(
     session: WorkSession,
     branches: SessionBranchReport? = nil,
     statuses: [RepositoryStatusState] = [],
-    agentNames: [String: String] = [:]
+    agentNames: [String: String] = [:],
+    notes: String? = nil
   ) {
     self.session = session
+    self.notes = notes
     self.branches = branches
     self.statuses = statuses
     self.agentNames = agentNames
@@ -43,7 +47,7 @@ extension SessionContextBriefBuilder {
 
     let periods = agentPeriods(of: session)
     var agents = periods.isEmpty ? nil : agentLines(periods, names: input.agentNames)
-    var notes = session.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+    var notes = input.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
     if notes?.isEmpty == true { notes = nil }
     var visited = input.branches.flatMap { $0.visitedOnly.isEmpty ? nil : $0.visitedOnly }
     var compactRepositories = false

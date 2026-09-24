@@ -70,6 +70,16 @@ struct WorkspaceLayoutTests {
     #expect(WorkspaceLayout(inspectorSplit: 0).inspectorSplit == 0.25)
     #expect(WorkspaceLayout(inspectorSplit: .nan).inspectorSplit == 0.6)
   }
+
+  @Test("A layout saved before the notes editor unfolds the agent and prompt under it")
+  func layoutWithoutDetailsState() throws {
+    let json = Data(#"{"sidebarWidth": 300, "inspectorWidth": 320}"#.utf8)
+    #expect(try JSONDecoder().decode(WorkspaceLayout.self, from: json).isSessionDetailsExpanded)
+
+    let folded = WorkspaceLayout(isSessionDetailsExpanded: false)
+    let data = try JSONEncoder().encode(folded)
+    #expect(!(try JSONDecoder().decode(WorkspaceLayout.self, from: data).isSessionDetailsExpanded))
+  }
 }
 
 @Suite("Which columns fit")

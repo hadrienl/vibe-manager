@@ -43,7 +43,7 @@ private func makeCompleteSession(name: String = "Persistent session") -> WorkSes
         )
       )
     ],
-    notes: "A user-authored note",
+    legacyNotes: "A user-authored note",
     template: PromptTemplateReference(id: "implement", name: "Implement", revision: "2")
   )
 }
@@ -266,14 +266,14 @@ func concurrentMutationsAreSerialized() async throws {
     for _ in 0..<10 {
       group.addTask {
         _ = try? await repository.mutate(id: session.id) { stored in
-          stored.notes = (stored.notes ?? "") + "x"
+          stored.legacyNotes = (stored.legacyNotes ?? "") + "x"
         }
       }
     }
   }
 
   let reloaded = try await repository.session(id: session.id)
-  #expect(reloaded?.notes == "A user-authored note" + String(repeating: "x", count: 10))
+  #expect(reloaded?.legacyNotes == "A user-authored note" + String(repeating: "x", count: 10))
 }
 
 @Test("A store from a newer version is never rewound to an older backup")

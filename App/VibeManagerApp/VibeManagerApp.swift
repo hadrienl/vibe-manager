@@ -1,5 +1,7 @@
 import AppKit
 import SwiftUI
+import VibeApplication
+import VibeDomain
 import VibeUI
 
 @main
@@ -47,6 +49,14 @@ struct VibeManagerApp: App {
           environment.appModel.layout.toggleInspector()
         }
         .keyboardShortcut("i", modifiers: [.command, .option])
+
+        // Without it the terminal keeps the keyboard, and the notes can only be reached with the
+        // pointer. Escape in the notes hands the keyboard back.
+        Button("Edit Notes") {
+          environment.appModel.focusNotes()
+        }
+        .keyboardShortcut("n", modifiers: [.command, .option])
+        .disabled(environment.appModel.selectedSessionID == nil)
 
         Divider()
 
@@ -203,17 +213,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // would wait for an answer nothing is left to send, and the application would never quit.
     guard !hasRepliedToTermination else { return .terminateNow }
 
+    // A quit already on its way — flushing the notes, or asking about them — answers for this one.
+    guard !isFlushingNotes else { return .terminateCancel }
+    isFlushingNotes = true
+
     // Terminating immediately would orphan the process tree of every open terminal, and leave
     // the next launch without the intention to resume them.
     Task {
+      // The notes first, and before the deadline starts: the one thing that can be lost here is
+      // what the user typed, and they are asked before it is.
+      // Bounded: a write stuck on a stalled volume must not keep the application from quitting.
+      let unsaved = await environment.appModel.notes.flushAll(deadline: Self.notesDeadline)
+      if !unsaved.isEmpty {
+        let proceed = confirmQuit(losing: unsaved, names: environment.appModel.sessions)
+        guard proceed else {
+          isFlushingNotes = false
+          NSApplication.shared.reply(toApplicationShouldTerminate: false)
+          return
+        }
+      }
+      Task {
+        try? await Task.sleep(for: Self.shutdownDeadline)
+        replyToTermination()
+      }
       await environment.shutdown()
       replyToTermination()
     }
-    Task {
-      try? await Task.sleep(for: Self.shutdownDeadline)
-      replyToTermination()
-    }
     return .terminateLater
+  }
+
+  private var isFlushingNotes = false
+  /// How long quitting waits for the notes before asking about those still not on disk.
+  private static let notesDeadline: Duration = .seconds(2)
+
+  /// Notes that could not be written are only ever lost on purpose.
+  private func confirmQuit(losing unsaved: [NotesDocument], names sessions: [WorkSession]) -> Bool {
+    let names = unsaved.map { document in
+      sessions.first { $0.id == document.sessionID }?.name ?? "a session"
+    }
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText =
+      names.count == 1
+      ? "The notes of “\(names[0])” couldn't be saved."
+      : "The notes of \(names.count) sessions couldn't be saved."
+    var reason = ""
+    if case .failed(let error, _) = unsaved.first?.state {
+      reason = (error.errorDescription ?? "") + " "
+    }
+    alert.informativeText =
+      reason + "Copy them before quitting, or what was typed since the last save is lost."
+    // Cancel is the default: Return must not be the key that loses what was typed.
+    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: "Copy Notes and Quit")
+    alert.addButton(withTitle: "Quit Anyway").hasDestructiveAction = true
+    switch alert.runModal() {
+    case .alertSecondButtonReturn:
+      let text = zip(names, unsaved).map { name, document in
+        unsaved.count == 1 ? document.text : "\(name)\n\n\(document.text)"
+      }.joined(separator: "\n\n———\n\n")
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(text, forType: .string)
+      return true
+    case .alertThirdButtonReturn:
+      return true
+    default:
+      return false
+    }
   }
 
   /// Answered once, whichever of the two tasks gets here first.

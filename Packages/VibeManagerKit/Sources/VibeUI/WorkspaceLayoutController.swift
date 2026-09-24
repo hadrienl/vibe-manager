@@ -158,6 +158,13 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  /// Whether the agent and the initial prompt are unfolded under the notes.
+  public func setSessionDetailsExpanded(_ isExpanded: Bool) {
+    guard intent.isSessionDetailsExpanded != isExpanded else { return }
+    intent.isSessionDetailsExpanded = isExpanded
+    scheduleSave()
+  }
+
   /// Writes whatever is pending right away. Called when the application is about to quit, where
   /// waiting out the delay would mean losing the last arrangement.
   public func flush() async {

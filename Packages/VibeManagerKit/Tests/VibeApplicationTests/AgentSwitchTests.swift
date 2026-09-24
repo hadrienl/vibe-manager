@@ -25,7 +25,6 @@ struct AgentSwitchTests {
     status: SessionStatus = .closed,
     resumeIdentifier: String? = "8c1d0b7e-1111-4222-8333-444455556666",
     prompt: String = "Audit the dependencies.",
-    notes: String? = "Keep lodash.",
     startedAt: Date? = Date(timeIntervalSince1970: 1_699_000_000)
   ) -> WorkSession {
     WorkSession(
@@ -39,8 +38,7 @@ struct AgentSwitchTests {
       closedAt: status == .active ? nil : Date(timeIntervalSince1970: 1_700_000_100),
       archivedAt: status == .archived ? Date(timeIntervalSince1970: 1_700_000_100) : nil,
       startedAt: startedAt,
-      repositories: [RepositoryContext(path: "/work/app")],
-      notes: notes
+      repositories: [RepositoryContext(path: "/work/app")]
     )
   }
 
@@ -116,7 +114,7 @@ struct AgentSwitchTests {
     let planned = try await plan(
       id: stored.id,
       to: AgentTarget(providerID: "codex", modelID: "gpt-5.5"),
-      context: SessionBriefInput(session: stored, agentNames: Self.names)
+      context: SessionBriefInput(session: stored, agentNames: Self.names, notes: "Keep lodash.")
     )
 
     let brief = try #require(planned.mode.brief)
@@ -134,9 +132,10 @@ struct AgentSwitchTests {
 
   @Test("The summary sent as the sheet showed it stays known as shortened; an edited one does not")
   func unchangedSummaryKeepsItsTruncation() async throws {
-    let stored = session(notes: String(repeating: "note. ", count: 200_000))
+    let stored = session()
     let (plan, _) = subject(stored)
-    let context = SessionBriefInput(session: stored, agentNames: Self.names)
+    let context = SessionBriefInput(
+      session: stored, agentNames: Self.names, notes: String(repeating: "note. ", count: 200_000))
     let target = AgentTarget(providerID: "codex")
     let shown = plan.summary(for: context, to: target)
     #expect(shown.isTruncated)
@@ -318,7 +317,7 @@ struct AgentSwitchTests {
     } else {
       Issue.record("A handover records its summary")
     }
-    #expect(switched.notes == stored.notes)
+    #expect(switched.legacyNotes == stored.legacyNotes)
     #expect(switched.lifecycle == stored.lifecycle)
 
     try await RevertAgentSwitch(repository: repository)(
@@ -359,8 +358,7 @@ struct HandoverBriefTests {
       updatedAt: Date(timeIntervalSince1970: 1_700_000_100),
       closedAt: Date(timeIntervalSince1970: 1_700_000_100),
       startedAt: Date(timeIntervalSince1970: 1_699_000_000),
-      repositories: [RepositoryContext(path: "/work/app")],
-      notes: "Keep lodash."
+      repositories: [RepositoryContext(path: "/work/app")]
     )
     try session.switchAgent(
       to: SessionAgentConfiguration(providerID: "codex"),
@@ -407,7 +405,8 @@ struct HandoverBriefTests {
     SessionBriefInput(
       session: session,
       branches: branches,
-      agentNames: ["claude-code": "Claude Code", "codex": "Codex"]
+      agentNames: ["claude-code": "Claude Code", "codex": "Codex"],
+      notes: "Keep lodash."
     )
   }
 
@@ -476,7 +475,7 @@ struct HandoverBriefTests {
 
   @Test("The restart summary of a switched session says another agent worked here")
   func restartSummaryNamesThePreviousAgents() throws {
-    let brief = SessionContextBriefBuilder()(for: try session())
+    let brief = SessionContextBriefBuilder()(for: try session(), notes: nil)
 
     #expect(
       brief.text.contains("Agent: claude-code · sonnet (previously claude-code · sonnet, codex)"))
@@ -501,7 +500,7 @@ struct HandoverBriefTests {
 
     let brief = SessionContextBriefBuilder().handover(
       input(session), to: SessionAgentConfiguration(providerID: "claude-code"))
-    let restart = SessionContextBriefBuilder()(for: session)
+    let restart = SessionContextBriefBuilder()(for: session, notes: nil)
 
     let lines = brief.text.components(separatedBy: "\n").filter { $0.hasPrefix("- ") }
     #expect(lines.first?.hasPrefix("- Codex, from ") == true)
