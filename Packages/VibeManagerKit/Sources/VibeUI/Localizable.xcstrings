@@ -468,6 +468,17 @@
         }
       }
     },
+    "%@ will stop, then resume their conversation with Full Disk Access. What an agent is doing right now is interrupted." : {
+      "comment" : "The names of the sessions whose agent is restarted, as a list.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vont s’arrêter, puis reprendre leur conversation avec l’accès complet au disque. Ce qu’un agent est en train de faire est interrompu."
+          }
+        }
+      }
+    },
     "%@ — Folder not found" : {
       "comment" : "The help tag of a group whose working folder was moved or deleted.",
       "localizations" : {
@@ -802,6 +813,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld agents ont continué de tourner pendant que Vibe Manager était fermé ; 1 s’est terminé depuis."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld agents running" : {
+      "comment" : "The number of agents running in the background process.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agent running"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agents running"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agents en cours"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agent en cours"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agents en cours"
                 }
               }
             }
@@ -2322,6 +2380,16 @@
         }
       }
     },
+    "Agents run inside Vibe Manager for now. Quit and reopen Vibe Manager to give them the access." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour l’instant, les agents tournent dans Vibe Manager lui-même. Quittez puis rouvrez Vibe Manager pour leur donner l’accès."
+          }
+        }
+      }
+    },
     "All time" : {
       "comment" : "A period of the Usage window.",
       "localizations" : {
@@ -2572,6 +2640,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Précédent"
+          }
+        }
+      }
+    },
+    "Background process that runs agents" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus d’arrière-plan qui lance les agents"
           }
         }
       }
@@ -2916,6 +2994,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replié"
+          }
+        }
+      }
+    },
+    "Come back to Vibe Manager. Agents get the access as soon as the background process that runs them restarts, which Vibe Manager does when none of them is running." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenez dans Vibe Manager. Les agents ont l’accès dès que le processus d’arrière-plan qui les lance redémarre, ce que Vibe Manager fait quand aucun d’eux ne tourne."
           }
         }
       }
@@ -3370,6 +3458,16 @@
         }
       }
     },
+    "Don't Restart" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne pas redémarrer"
+          }
+        }
+      }
+    },
     "Don't Save" : {
       "localizations" : {
         "fr" : {
@@ -3738,6 +3836,16 @@
         }
       }
     },
+    "Full Disk Access is granted, but not yet to your agents." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’accès complet au disque est accordé, mais pas encore à vos agents."
+          }
+        }
+      }
+    },
     "Gathering diagnostics…" : {
       "localizations" : {
         "fr" : {
@@ -3807,6 +3915,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accordé"
+          }
+        }
+      }
+    },
+    "Granted, not yet in effect" : {
+      "comment" : "The state of Full Disk Access: granted, but the agents do not have it yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accordé, pas encore effectif"
           }
         }
       }
@@ -5463,6 +5582,17 @@
         }
       }
     },
+    "Process by Process" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus par processus"
+          }
+        }
+      }
+    },
     "Project icon" : {
       "comment" : "The icon found in the working folder.",
       "localizations" : {
@@ -5777,16 +5907,6 @@
         }
       }
     },
-    "Reopen Vibe Manager — the change takes effect then." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rouvrez Vibe Manager — le changement prend effet à ce moment-là."
-          }
-        }
-      }
-    },
     "Replace" : {
       "comment" : "Replace the template of the library.",
       "localizations" : {
@@ -5863,6 +5983,26 @@
         }
       }
     },
+    "Restart Now" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrer maintenant"
+          }
+        }
+      }
+    },
+    "Restart Now…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrer maintenant…"
+          }
+        }
+      }
+    },
     "Restart Session" : {
       "comment" : "A command of the Session menu, for a session that has run before.",
       "localizations" : {
@@ -5896,12 +6036,42 @@
         }
       }
     },
+    "Restart When Idle" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrer à la fin des agents"
+          }
+        }
+      }
+    },
+    "Restart the running agents?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrer les agents en cours ?"
+          }
+        }
+      }
+    },
     "Restart “%@” in a new process?" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relancer « %@ » dans un nouveau processus ?"
+          }
+        }
+      }
+    },
+    "Restarts when the last running agent ends." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrera à la fin du dernier agent en cours."
           }
         }
       }
@@ -6411,6 +6581,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Définir comme ticket"
+          }
+        }
+      }
+    },
+    "Several “Vibe Manager” in the list? Drag this copy into it to add the right one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs « Vibe Manager » dans la liste ? Glissez-y cette copie pour ajouter la bonne."
+          }
+        }
+      }
+    },
+    "Several “Vibe Manager” in the list? Each build signed differently is a separate entry. Drag this copy into the list to add the right one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs « Vibe Manager » dans la liste ? Chaque build signé différemment est une entrée distincte. Glissez cette copie dans la liste pour ajouter la bonne."
           }
         }
       }
@@ -7132,6 +7322,17 @@
         }
       }
     },
+    "System Settings" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages Système"
+          }
+        }
+      }
+    },
     "Template" : {
       "comment" : "The prompt template the session starts from.",
       "localizations" : {
@@ -7188,6 +7389,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Interrompue par le signal %@"
+          }
+        }
+      }
+    },
+    "The %lld agents running now were started before the access was granted. They get it once the background process that runs them restarts." : {
+      "comment" : "The number of agents running without Full Disk Access.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The agent running now was started before the access was granted. It gets it once the background process that runs it restarts."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The %lld agents running now were started before the access was granted. They get it once the background process that runs them restarts."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les %lld agents en cours ont été lancés avant que l’accès soit accordé. Ils l’auront quand le processus d’arrière-plan qui les lance redémarrera."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’agent en cours a été lancé avant que l’accès soit accordé. Il l’aura quand le processus d’arrière-plan qui le lance redémarrera."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les %lld agents en cours ont été lancés avant que l’accès soit accordé. Ils l’auront quand le processus d’arrière-plan qui les lance redémarrera."
+                }
+              }
+            }
           }
         }
       }
@@ -7330,6 +7578,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’action de l’agent ouvre %@ dans une autre application."
+          }
+        }
+      }
+    },
+    "The background process that runs agents is restarting to take the access." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le processus d’arrière-plan qui lance les agents redémarre pour prendre l’accès."
           }
         }
       }
@@ -7800,6 +8058,16 @@
         }
       }
     },
+    "This window" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette fenêtre"
+          }
+        }
+      }
+    },
     "This would make the notes %@; they are limited to %@." : {
       "comment" : "Two sizes, formatted: “70 KB”, “64 KB”.",
       "localizations" : {
@@ -8152,6 +8420,17 @@
         }
       }
     },
+    "Unknown" : {
+      "comment" : "The state of Full Disk Access of a process that cannot say.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inconnu"
+          }
+        }
+      }
+    },
     "Unreadable" : {
       "comment" : "The state of a session's notes.",
       "localizations" : {
@@ -8170,6 +8449,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non indexés"
+          }
+        }
+      }
+    },
+    "Until Vibe Manager is next opened." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jusqu’à la prochaine ouverture de Vibe Manager."
           }
         }
       }
@@ -8331,6 +8620,16 @@
         }
       }
     },
+    "Vibe Manager" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        }
+      }
+    },
     "Vibe Manager runs coding agents on your behalf. macOS asks for permission every time one of them reads your Desktop, Documents, Downloads, an external disk or iCloud Drive — and it asks in the name of this application, once per folder." : {
       "localizations" : {
         "fr" : {
@@ -8449,6 +8748,16 @@
         }
       }
     },
+    "What a process of this copy gets when it starts now." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu’obtient un processus de cette copie qui démarre maintenant."
+          }
+        }
+      }
+    },
     "What are you working on?" : {
       "localizations" : {
         "fr" : {
@@ -8489,12 +8798,12 @@
         }
       }
     },
-    "Without it, macOS asks for permission each time an agent reads your Desktop, Documents, Downloads, an external disk or iCloud Drive. Turning it on takes effect the next time Vibe Manager is opened." : {
+    "Without it, macOS asks for permission each time an agent reads your Desktop, Documents, Downloads, an external disk or iCloud Drive." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sans lui, macOS demande l’autorisation chaque fois qu’un agent lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive. Son activation prend effet à la prochaine ouverture de Vibe Manager."
+            "value" : "Sans lui, macOS demande l’autorisation chaque fois qu’un agent lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive."
           }
         }
       }
@@ -8631,6 +8940,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vos modifications seront perdues si vous ne les enregistrez pas."
+          }
+        }
+      }
+    },
+    "a session" : {
+      "comment" : "Stands for a session whose name is unknown.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "une session"
           }
         }
       }
@@ -9141,6 +9461,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "en direct"
+          }
+        }
+      }
+    },
+    "macOS gives each process the access it had when it started. Agents run in a background process of Vibe Manager, which keeps running while they work." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS donne à chaque processus l’accès qu’il avait à son démarrage. Les agents tournent dans un processus d’arrière-plan de Vibe Manager, qui reste lancé tant qu’ils travaillent."
           }
         }
       }

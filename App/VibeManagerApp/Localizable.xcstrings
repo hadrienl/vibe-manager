@@ -740,6 +740,16 @@
         }
       }
     },
+    "They still won't have Full Disk Access when you reopen Vibe Manager: stop them to restart them with it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils n’auront toujours pas l’accès complet au disque à la réouverture de Vibe Manager : arrêtez-les pour qu’ils redémarrent avec."
+          }
+        }
+      }
+    },
     "Troubleshooting" : {
       "localizations" : {
         "fr" : {

@@ -4,12 +4,15 @@ import UniformTypeIdentifiers
 import VibeApplication
 import VibeBrowser
 import VibeConversationUI
+import VibeDomain
 
-/// The application's settings, in tabs: General, the prompt templates, and the conversation view.
+/// The application's settings, in tabs: General, Privacy, the prompt templates, the web view, the
+/// activity and the conversation view.
 ///
-/// Both lines are ways back to a question asked once. The Full Disk Access step at launch is never
-/// asked again, and neither is the close confirmation once "Don't ask again" was ticked: refusing
-/// either must not be a door that closes, so this is where the user finds the question again.
+/// Several lines are ways back to a question asked once. The Full Disk Access step at launch is
+/// not asked again by the same identity, and neither is the close confirmation once "Don't ask
+/// again" was ticked: refusing either must not be a door that closes, so this is where the user
+/// finds the question again.
 public struct SettingsView: View {
   private let permissions: PermissionsModel?
   private let model: AppModel?
@@ -31,6 +34,17 @@ public struct SettingsView: View {
             }
           }
           .tag(SettingsTab.general)
+        if let permissions {
+          PrivacySettingsView(permissions: permissions, sessionName: model.sessionName(for:))
+            .tabItem {
+              Label {
+                Text("Privacy", bundle: .module, comment: "A tab of the Settings window.")
+              } icon: {
+                Image(systemName: "hand.raised")
+              }
+            }
+            .tag(SettingsTab.privacy)
+        }
         PromptTemplatesView(model: model.templates)
           .tabItem {
             Label {
@@ -108,15 +122,19 @@ public struct SettingsView: View {
           }
         }
       }
-      Section {
-        if let permissions {
-          FullDiskAccessRow(permissions: permissions)
-        } else {
-          Text("File access cannot be read in this window.", bundle: .module)
-            .foregroundStyle(.secondary)
+      // In a tab of its own when the window has tabs (#76): it grew past what a line of General
+      // can hold. Without the workspace, the window is this one form, and keeps it here.
+      if model == nil {
+        Section {
+          if let permissions {
+            FullDiskAccessRow(permissions: permissions)
+          } else {
+            Text("File access cannot be read in this window.", bundle: .module)
+              .foregroundStyle(.secondary)
+          }
+        } header: {
+          Text("Privacy", bundle: .module, comment: "A section of the Settings window.")
         }
-      } header: {
-        Text("Privacy", bundle: .module, comment: "A section of the Settings window.")
       }
       if let model, model.canExportDiagnostics {
         Section {
@@ -147,13 +165,18 @@ public struct SettingsView: View {
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
     .frame(width: 500)
-    .task { await permissions?.recheck() }
+    .task {
+      guard model == nil else { return }
+      await permissions?.recheck()
+    }
   }
 }
 
 /// The tabs of the settings window.
 public enum SettingsTab: String, Hashable, Sendable {
   case general
+  /// Full Disk Access, and the processes it has to reach (#76).
+  case privacy
   /// The prompt templates: a list, an editor and a preview, which need the room of a tab of their
   /// own rather than a section of a form.
   case templates
@@ -165,6 +188,55 @@ public enum SettingsTab: String, Hashable, Sendable {
   case conversation
 }
 
+/// Full Disk Access, and whether it has reached the agents yet.
+///
+/// Asks a process born now each time the tab is opened: whoever opens it has usually just been to
+/// System Settings, and this window — launched before — could only repeat what it got then.
+struct PrivacySettingsView: View {
+  let permissions: PermissionsModel
+  let sessionName: (SessionID) -> String
+
+  var body: some View {
+    Form {
+      Section {
+        FullDiskAccessRow(permissions: permissions)
+      } header: {
+        Text("Full Disk Access", bundle: .module, comment: "A section of the Settings window.")
+      }
+      if let report = permissions.report, !report.isConsistent {
+        Section {
+          ProcessAccessRows(report: report)
+        } header: {
+          Text("Process by Process", bundle: .module, comment: "A section of the Settings window.")
+        } footer: {
+          Text(
+            """
+            macOS gives each process the access it had when it started. Agents run in a \
+            background process of Vibe Manager, which keeps running while they work.
+            """,
+            bundle: .module
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      Section {
+        SystemSettingsRow(permissions: permissions)
+      } header: {
+        Text("System Settings", bundle: .module, comment: "A section of the Settings window.")
+      }
+    }
+    .formStyle(.grouped)
+    .scrollDisabled(true)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(width: 500)
+    .restartNowConfirmation(permissions: permissions, origin: .settings, sessionName: sessionName)
+    .task { await permissions.recheck() }
+  }
+}
+
+/// The access as the agents get it, and what to do about it.
 private struct FullDiskAccessRow: View {
   let permissions: PermissionsModel
 
@@ -176,17 +248,17 @@ private struct FullDiskAccessRow: View {
         } icon: {
           Image(systemName: symbolName)
         }
-        .foregroundStyle(permissions.isGranted ? .secondary : .primary)
+        .foregroundStyle(permissions.situation == .granted ? .secondary : .primary)
       } label: {
         Text("Full Disk Access", bundle: .module)
       }
 
-      if permissions.status == .notGranted {
+      switch permissions.situation {
+      case .notGranted:
         Text(
           """
           Without it, macOS asks for permission each time an agent reads your Desktop, Documents, \
-          Downloads, an external disk or iCloud Drive. Turning it on takes effect the next time \
-          Vibe Manager is opened.
+          Downloads, an external disk or iCloud Drive.
           """,
           bundle: .module
         )
@@ -199,12 +271,145 @@ private struct FullDiskAccessRow: View {
         } label: {
           Text("Open System Settings", bundle: .module)
         }
+      case .pendingRestart(let runner, let running):
+        PendingRestartExplanation(runner: runner, runningAgents: running)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        if runner == .host, running > 0 {
+          RestartHostButtons(permissions: permissions, origin: .settings)
+        }
+      case .granted, .checking:
+        EmptyView()
       }
     }
   }
 
   private var label: LocalizedStringResource {
-    switch permissions.status {
+    switch permissions.situation {
+    case .granted:
+      return LocalizedStringResource(
+        "Granted", bundle: .module, comment: "The state of Full Disk Access.")
+    case .notGranted:
+      return LocalizedStringResource(
+        "Not granted", bundle: .module, comment: "The state of Full Disk Access.")
+    case .pendingRestart:
+      return LocalizedStringResource(
+        "Granted, not yet in effect", bundle: .module,
+        comment: "The state of Full Disk Access: granted, but the agents do not have it yet.")
+    case .checking:
+      return LocalizedStringResource(
+        "Checking…", bundle: .module, comment: "The state of Full Disk Access.")
+    }
+  }
+
+  private var symbolName: String {
+    switch permissions.situation {
+    case .granted: return "checkmark.circle"
+    case .notGranted: return "exclamationmark.circle"
+    case .pendingRestart: return "arrow.clockwise.circle"
+    case .checking: return "clock"
+    }
+  }
+}
+
+/// Why the access granted has not reached the agents, in one or two sentences.
+struct PendingRestartExplanation: View {
+  let runner: FullDiskAccessSituation.PendingRunner
+  let runningAgents: Int
+
+  var body: some View {
+    switch runner {
+    case .application:
+      Text(
+        "Agents run inside Vibe Manager for now. Quit and reopen Vibe Manager to give them the access.",
+        bundle: .module)
+    case .host:
+      if runningAgents == 0 {
+        Text(
+          "The background process that runs agents is restarting to take the access.",
+          bundle: .module)
+      } else {
+        Text(
+          """
+          The \(runningAgents) agents running now were started before the access was granted. \
+          They get it once the background process that runs them restarts.
+          """,
+          bundle: .module,
+          comment: "The number of agents running without Full Disk Access.")
+      }
+    }
+  }
+}
+
+/// Restart the host when the last agent ends, or now — the one road that stops agents, and only
+/// once they have been named.
+struct RestartHostButtons: View {
+  let permissions: PermissionsModel
+  let origin: RestartNowRequest.Origin
+
+  var body: some View {
+    HStack {
+      if permissions.isRestartArmed {
+        Label {
+          Text("Restarts when the last running agent ends.", bundle: .module)
+        } icon: {
+          Image(systemName: "clock.arrow.circlepath")
+        }
+        .font(.callout)
+        Button {
+          Task { await permissions.cancelRestartWhenIdle() }
+        } label: {
+          Text("Don't Restart", bundle: .module)
+        }
+      } else {
+        Button {
+          Task { await permissions.restartWhenIdle() }
+        } label: {
+          Text("Restart When Idle", bundle: .module)
+        }
+      }
+      Button {
+        Task { await permissions.beginRestartNow(from: origin) }
+      } label: {
+        Text("Restart Now…", bundle: .module)
+      }
+      .disabled(permissions.isRestartingNow)
+    }
+  }
+}
+
+/// What each process got, when they disagree.
+private struct ProcessAccessRows: View {
+  let report: FullDiskAccessReport
+
+  var body: some View {
+    LabeledContent {
+      Text(state(report.identity))
+    } label: {
+      Text("Vibe Manager", bundle: .module)
+      Text("What a process of this copy gets when it starts now.", bundle: .module)
+    }
+    if report.runner.runner == .host {
+      LabeledContent {
+        Text(state(report.runner.hostStatus))
+      } label: {
+        Text("Background process that runs agents", bundle: .module)
+        Text(
+          "\(report.runner.runningAgents) agents running", bundle: .module,
+          comment: "The number of agents running in the background process.")
+      }
+    }
+    LabeledContent {
+      Text(state(report.interface))
+    } label: {
+      Text("This window", bundle: .module)
+      Text("Until Vibe Manager is next opened.", bundle: .module)
+    }
+  }
+
+  private func state(_ status: FullDiskAccessStatus?) -> LocalizedStringResource {
+    switch status {
     case .granted:
       return LocalizedStringResource(
         "Granted", bundle: .module, comment: "The state of Full Disk Access.")
@@ -213,15 +418,105 @@ private struct FullDiskAccessRow: View {
         "Not granted", bundle: .module, comment: "The state of Full Disk Access.")
     case nil:
       return LocalizedStringResource(
-        "Checking…", bundle: .module, comment: "The state of Full Disk Access.")
+        "Unknown", bundle: .module,
+        comment: "The state of Full Disk Access of a process that cannot say.")
     }
   }
+}
 
-  private var symbolName: String {
-    switch permissions.status {
-    case .granted: return "checkmark.circle"
-    case .notGranted: return "exclamationmark.circle"
-    case nil: return "clock"
+/// Where the switch is, and which of several identical entries is this copy.
+private struct SystemSettingsRow: View {
+  let permissions: PermissionsModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(
+        """
+        Several “Vibe Manager” in the list? Each build signed differently is a separate entry. \
+        Drag this copy into the list to add the right one.
+        """,
+        bundle: .module
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      HStack {
+        Button {
+          permissions.revealInFinder()
+        } label: {
+          Text("Show in Finder", bundle: .module)
+        }
+        Button {
+          permissions.openSystemSettings()
+        } label: {
+          Text("Open System Settings", bundle: .module)
+        }
+      }
+    }
+  }
+}
+
+extension View {
+  /// Asks before "Restart Now" stops the agents it names.
+  func restartNowConfirmation(
+    permissions: PermissionsModel, origin: RestartNowRequest.Origin,
+    sessionName: @escaping (SessionID) -> String
+  ) -> some View {
+    modifier(
+      RestartNowConfirmation(permissions: permissions, origin: origin, sessionName: sessionName))
+  }
+
+  /// The same, for a workspace that may have no permissions to speak of.
+  @ViewBuilder
+  func restartNowConfirmation(
+    permissions: PermissionsModel?, origin: RestartNowRequest.Origin,
+    sessionName: @escaping (SessionID) -> String
+  ) -> some View {
+    if let permissions {
+      restartNowConfirmation(permissions: permissions, origin: origin, sessionName: sessionName)
+    } else {
+      self
+    }
+  }
+}
+
+/// Put only in the window that asked, with the sessions it named: the button carries them, so the
+/// alert closing — which clears the request — cannot lose them on the way.
+private struct RestartNowConfirmation: ViewModifier {
+  let permissions: PermissionsModel
+  let origin: RestartNowRequest.Origin
+  let sessionName: (SessionID) -> String
+
+  private var request: RestartNowRequest? {
+    permissions.pendingRestartNow.flatMap { $0.origin == origin ? $0 : nil }
+  }
+
+  func body(content: Content) -> some View {
+    content.alert(
+      Text("Restart the running agents?", bundle: .module),
+      isPresented: Binding(
+        get: { request != nil },
+        set: { if !$0, request != nil { permissions.cancelRestartNow() } }),
+      presenting: request
+    ) { request in
+      Button(role: .destructive) {
+        Task { await permissions.confirmRestartNow(request) }
+      } label: {
+        Text("Restart Now", bundle: .module)
+      }
+      Button(role: .cancel) {
+        permissions.cancelRestartNow()
+      } label: {
+        Text("Cancel", bundle: .module)
+      }
+    } message: { request in
+      Text(
+        """
+        \(request.sessions.map(sessionName).formatted(.list(type: .and))) will stop, then resume their \
+        conversation with Full Disk Access. What an agent is doing right now is interrupted.
+        """,
+        bundle: .module,
+        comment: "The names of the sessions whose agent is restarted, as a list.")
     }
   }
 }

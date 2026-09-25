@@ -41,6 +41,16 @@
         }
       }
     },
+    "This terminal host is leaving." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet hôte des terminaux est en train de s’arrêter."
+          }
+        }
+      }
+    },
     "This terminal host speaks protocol %@." : {
       "comment" : "The version number of the protocol.",
       "localizations" : {

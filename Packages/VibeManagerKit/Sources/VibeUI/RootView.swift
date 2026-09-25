@@ -103,6 +103,7 @@ public struct RootView: View {
             openSystemSettings: {
               Task { await permissions.answerStepByOpeningSystemSettings() }
             },
+            revealInFinder: { permissions.revealInFinder() },
             skip: { Task { await permissions.skipStep() } }
           )
         }
@@ -332,8 +333,18 @@ public struct RootView: View {
           DetachedNoticeBanner(notice: notice, dismiss: { model.dismissDetachedNotice() })
           Divider()
         }
+        if let permissions = model.permissions, permissions.showsRestartNotice,
+          case .pendingRestart(let runner, let running) = permissions.situation
+        {
+          FullDiskAccessRestartBanner(
+            permissions: permissions, runner: runner, runningAgents: running)
+          Divider()
+        }
         detail
       }
+      .restartNowConfirmation(
+        permissions: model.permissions, origin: .workspace, sessionName: model.sessionName(for:)
+      )
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
       // whole application. Repeating it bound the same key twice, under two conditions.
       .toolbar {
@@ -1231,6 +1242,46 @@ private struct HostUnavailableBanner: View {
           "Your agents are still running in the background, but Vibe Manager could not reattach. \(reason)",
         bundle: .module,
         comment: "Why the application could not reattach to its agents, in one sentence."))
+  }
+}
+
+/// Full Disk Access granted, and not yet to the agents: the process that runs them started before
+/// (#76). It offers the two ways through, and neither stops an agent unnamed.
+private struct FullDiskAccessRestartBanner: View {
+  let permissions: PermissionsModel
+  let runner: FullDiskAccessSituation.PendingRunner
+  let runningAgents: Int
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "lock.open.rotation")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Full Disk Access is granted, but not yet to your agents.", bundle: .module)
+          .font(.callout)
+        PendingRestartExplanation(runner: runner, runningAgents: runningAgents)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      if runner == .host, runningAgents > 0 {
+        RestartHostButtons(permissions: permissions, origin: .workspace)
+      }
+      Button {
+        permissions.dismissRestartNotice()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(
+      String(
+        localized: "Full Disk Access is granted, but not yet to your agents.", bundle: .module))
   }
 }
 

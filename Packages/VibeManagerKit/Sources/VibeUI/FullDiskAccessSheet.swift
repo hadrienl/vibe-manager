@@ -4,13 +4,14 @@ import SwiftUI
 ///
 /// macOS has no way to grant "the folders my agents will read": the only permission that covers
 /// them is Full Disk Access, the one Terminal, iTerm2 and Ghostty ask for. It cannot be requested
-/// programmatically, so the step explains it, opens the right pane, and says plainly that the
-/// change lands at the next launch.
+/// programmatically, so the step explains it, opens the right pane, and says plainly what has to
+/// restart before the agents have it (#76).
 ///
 /// Skipping is offered on equal footing, because refusing is a working answer: repositories are
 /// almost never in a protected folder, and the user who says no will simply never see an alert.
 struct FullDiskAccessSheet: View {
   let openSystemSettings: () -> Void
+  let revealInFinder: () -> Void
   let skip: () -> Void
 
   var body: some View {
@@ -43,9 +44,32 @@ struct FullDiskAccessSheet: View {
             "Open Privacy & Security → Full Disk Access.", bundle: .module,
             comment: "The names of the pane and the setting in System Settings."))
         step(2, Text("Turn Vibe Manager on.", bundle: .module))
-        step(3, Text("Reopen Vibe Manager — the change takes effect then.", bundle: .module))
+        step(
+          3,
+          Text(
+            """
+            Come back to Vibe Manager. Agents get the access as soon as the background process \
+            that runs them restarts, which Vibe Manager does when none of them is running.
+            """,
+            bundle: .module))
       }
       .padding(.vertical, 2)
+
+      HStack(alignment: .firstTextBaseline) {
+        Text(
+          """
+          Several “Vibe Manager” in the list? Drag this copy into it to add the right one.
+          """,
+          bundle: .module
+        )
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 8)
+        Button(action: revealInFinder) {
+          Text("Show in Finder", bundle: .module)
+        }
+      }
 
       Text(
         """

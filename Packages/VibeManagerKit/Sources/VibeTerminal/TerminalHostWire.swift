@@ -154,6 +154,13 @@ struct TerminalHostRequest: Codable, Equatable, Sendable {
     case goodbye(keepRunning: Bool)
     /// What the host costs. Only sent to a host whose `welcome` listed `stats`.
     case stats
+    /// Whether the host has Full Disk Access — what every agent it runs inherits (#76). Only sent
+    /// to a host whose `welcome` listed `fullDiskAccess`.
+    case fullDiskAccess
+    /// Asks a host running no agent to leave as soon as its client does, rather than after its
+    /// idle grace period, so the next terminal starts a host of its own. Only sent to a host whose
+    /// `welcome` listed `retire`.
+    case retire
   }
 }
 
@@ -196,6 +203,10 @@ struct TerminalHostMessage: Codable, Equatable, Sendable {
     case truncated(session: SessionID, droppedByteCount: Int)
     /// The host's physical footprint, and the sessions it holds.
     case stats(footprintBytes: Int, sessions: Int)
+    /// Whether the host has Full Disk Access.
+    case fullDiskAccess(granted: Bool)
+    /// `false` when an agent still runs there: nothing was changed.
+    case retiring(accepted: Bool)
   }
 }
 
@@ -204,5 +215,7 @@ struct TerminalHostMessage: Codable, Equatable, Sendable {
 /// never asked what it cannot answer.
 enum TerminalHostCapability {
   static let stats = "stats"
-  static let all = [stats]
+  static let fullDiskAccess = "fullDiskAccess"
+  static let retire = "retire"
+  static let all = [stats, fullDiskAccess, retire]
 }

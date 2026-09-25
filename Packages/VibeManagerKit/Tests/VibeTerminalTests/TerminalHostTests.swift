@@ -23,7 +23,8 @@ final class InProcessTerminalHost: @unchecked Sendable {
 
   init(
     idleGracePeriod: Duration = .seconds(60),
-    maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions
+    maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions,
+    fullDiskAccess: (any FullDiskAccessProbe)? = nil
   ) throws {
     location = TerminalHostLocation(
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -31,11 +32,16 @@ final class InProcessTerminalHost: @unchecked Sendable {
     try location.prepare()
     let listener = try UnixSocket.listen(at: location.socketPath)
     let idle = idle
+    let socketPath = location.socketPath
     server = TerminalHostServer(
       configuration: TerminalHostServer.Configuration(
         verifier: SameUserPeerVerifier(), idleGracePeriod: idleGracePeriod,
-        maximumRunningSessions: maximumRunningSessions),
-      onIdle: { idle.set() }
+        maximumRunningSessions: maximumRunningSessions, fullDiskAccess: fullDiskAccess),
+      // Gone from the socket, as the real host is when it leaves.
+      onIdle: {
+        unlink(socketPath)
+        idle.set()
+      }
     )
     source = TerminalHost.accept(on: listener, into: server)
   }
@@ -585,12 +591,12 @@ struct TerminalHostProcessTests {
   /// The first launch of a freshly linked binary that answers for itself to the system waits for
   /// the system to assess it, which after a rebuild takes seconds. The application's host is the
   /// binary already running, assessed before it ever started a terminal.
-  private static let launchTimeout: Duration = .seconds(30)
+  static let launchTimeout: Duration = .seconds(30)
 
   /// The fixture sits next to the test bundle, where the build put every product. The bundle is
   /// found from the image this code was loaded from: how the tests are run decides whether it is
   /// among `Bundle.allBundles` at all.
-  private static func fixtureURL() throws -> URL {
+  static func fixtureURL() throws -> URL {
     var info = Dl_info()
     let found = withUnsafeMutablePointer(to: &fixtureAnchor) { dladdr($0, &info) }
     try #require(found != 0 && info.dli_fname != nil)

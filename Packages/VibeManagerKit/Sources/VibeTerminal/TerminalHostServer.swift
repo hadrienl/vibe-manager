@@ -30,6 +30,9 @@ public actor TerminalHostServer {
     public var maximumRunningSessions: Int
     /// The host's own log, `host.jsonl`, keyed by the same salt as the application's.
     public var diagnostics: Diagnostics
+    /// How the host reads its own Full Disk Access, which every agent it runs inherits. `nil`
+    /// leaves `fullDiskAccess` out of the capabilities: the host cannot say.
+    public var fullDiskAccess: (any FullDiskAccessProbe)?
 
     public init(
       verifier: any TerminalHostPeerVerifier,
@@ -37,9 +40,11 @@ public actor TerminalHostServer {
       endedRetention: Duration = .seconds(24 * 60 * 60),
       build: String = TerminalHostServer.currentBuild,
       maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions,
-      diagnostics: Diagnostics = .disabled
+      diagnostics: Diagnostics = .disabled,
+      fullDiskAccess: (any FullDiskAccessProbe)? = nil
     ) {
       self.diagnostics = diagnostics
+      self.fullDiskAccess = fullDiskAccess
       self.verifier = verifier
       self.idleGracePeriod = idleGracePeriod
       self.endedRetention = endedRetention
@@ -78,6 +83,8 @@ public actor TerminalHostServer {
   private var keepsRunning = false
   private var forwards: [SessionID: Task<Void, Never>] = [:]
   private var idleTask: Task<Void, Never>?
+  /// Set by `retire`: the host leaves as soon as it is idle, without its grace period.
+  private var isRetiring = false
   /// Held while a session runs: App Nap and timer coalescing must not slow the reading of a
   /// terminal an agent is writing to. The Mac may still go to sleep, as it could before.
   private var activity: (any NSObjectProtocol)?
@@ -160,6 +167,14 @@ public actor TerminalHostServer {
       await reply(request.request, .refused(reason: reason, refusal: .otherClient), to: client)
       return false
     }
+    // On its way out: whoever connects now wants the host that comes after it.
+    if isRetiring {
+      configuration.diagnostics.record(
+        .host, .notice, "host.clientRefused", ["reason": .token(DiagnosticToken("retiring"))])
+      let reason = String(localized: "This terminal host is leaving.", bundle: .module)
+      await reply(request.request, .refused(reason: reason, refusal: .otherClient), to: client)
+      return false
+    }
 
     owner = client
     keepsRunning = false
@@ -171,13 +186,21 @@ public actor TerminalHostServer {
       .welcome(
         protocolVersion: TerminalHostWire.protocolVersion,
         build: configuration.build,
-        capabilities: TerminalHostCapability.all,
+        capabilities: capabilities,
         processIdentifier: getpid(),
         startedAt: startedAt
       ),
       to: client
     )
     return true
+  }
+
+  /// What this host speaks beyond the core. It cannot say whether it has Full Disk Access
+  /// without a probe to ask.
+  private var capabilities: [String] {
+    TerminalHostCapability.all.filter {
+      $0 != TerminalHostCapability.fullDiskAccess || configuration.fullDiskAccess != nil
+    }
   }
 
   private func handle(_ frame: TerminalHostFrame, from client: Client) async {
@@ -234,6 +257,12 @@ public actor TerminalHostServer {
         number,
         .stats(footprintBytes: ProcessMetrics.physicalFootprint() ?? 0, sessions: sessions.count),
         to: client)
+    case .fullDiskAccess:
+      // Asked each time, though the answer cannot change while the host runs: one file open.
+      let status = await configuration.fullDiskAccess?.status()
+      await reply(number, .fullDiskAccess(granted: status == .granted), to: client)
+    case .retire:
+      await reply(number, .retiring(accepted: await retire()), to: client)
     case .goodbye(let keepRunning):
       keepsRunning = keepRunning
       await reply(number, .done, to: client)
@@ -241,6 +270,20 @@ public actor TerminalHostServer {
       // application relaunched at once must not find its own previous run still attached.
       await disconnected(client)
     }
+  }
+
+  /// Agrees to leave once idle when no agent runs, and forgets the sessions that ended: the
+  /// client asking has read them. Refuses, having changed nothing, when an agent still runs.
+  private func retire() async -> Bool {
+    for hosted in sessions.values where await !hosted.session.state().isFinished {
+      return false
+    }
+    for id in Array(sessions.keys) {
+      await release(id)
+    }
+    isRetiring = true
+    configuration.diagnostics.record(.host, .info, "host.retiring")
+    return true
   }
 
   /// `stopped` leaves after the last of the session's own output and its final state, never
@@ -266,6 +309,9 @@ public actor TerminalHostServer {
   }
 
   private func start(_ spec: TerminalSpec, for id: SessionID) async -> TerminalHostMessage.Body {
+    // On its way out, with the goodbye that follows stopping everything: an agent started now
+    // would be stopped with it. The client waits for the next host instead of asking this one.
+    guard !isRetiring else { return .startFailed(.spawnFailed(code: EAGAIN)) }
     if let existing = sessions[id] {
       guard await existing.session.state().isFinished else {
         return .startFailed(.sessionAlreadyRunning(id))
@@ -454,7 +500,7 @@ public actor TerminalHostServer {
       return
     }
     guard idleTask == nil else { return }
-    let grace = configuration.idleGracePeriod
+    let grace = isRetiring ? .zero : configuration.idleGracePeriod
     idleTask = Task { [weak self] in
       try? await Task.sleep(for: grace)
       guard !Task.isCancelled else { return }

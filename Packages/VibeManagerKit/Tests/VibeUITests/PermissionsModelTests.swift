@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VibeApplication
+import VibeDomain
 
 @testable import VibeUI
 
@@ -83,8 +84,6 @@ struct PermissionsModelTests {
 
   @Test("Asking the question again never closes a step the user is reading")
   func refreshDoesNotCloseAnOpenStep() async {
-    // The settings window asks on its own, and the answer is recorded asynchronously: neither
-    // must be able to take the step off the screen while it is being read.
     let model = makeModel(status: .notGranted, preferences: SpyPreferences())
     await model.refresh()
     #expect(model.isPresentingStep)
@@ -94,32 +93,87 @@ struct PermissionsModelTests {
     #expect(model.isPresentingStep)
   }
 
-  @Test("The settings window asks the system again, and never reopens the step")
-  func recheckReadsTheSystemAgain() async {
-    let probe = MutableProbe(status: .notGranted)
+  @Test("Back from System Settings, a process born now is asked, and sees the grant")
+  func comingBackAsksAProcessBornNow() async {
+    // This window cannot see it: TCC settled its access when it started (#76).
+    let current = MutableCurrentProbe()
     let model = PermissionsModel(
-      gate: FullDiskAccessGate(probe: probe, preferences: SpyPreferences()),
-      openURL: { _ in }
-    )
+      gate: FullDiskAccessGate(
+        probe: StubProbe(status: .notGranted), preferences: SpyPreferences(), current: current),
+      openURL: { _ in })
     await model.refresh()
     await model.skipStep()
-    #expect(model.status == .notGranted)
 
-    // Granted elsewhere, in System Settings, while the application is running.
-    await probe.grant()
-    await model.recheck()
+    await model.applicationDidBecomeActive()
+    #expect(await current.probes == 0)
+
+    model.openSystemSettings()
+    await current.grant()
+    await model.applicationDidBecomeActive()
 
     #expect(model.isGranted)
+    #expect(model.situation == .granted)
     #expect(!model.isPresentingStep)
+  }
+
+  @Test("An idle host born before the grant is restarted without a word")
+  func idleHostIsRestartedSilently() async {
+    let runner = SpyRunner(hostStatus: .notGranted, running: [])
+    let model = makeModel(status: .granted, preferences: SpyPreferences(), runner: runner)
+
+    await model.reevaluate(refreshingIdentity: false)
+
+    #expect(await runner.restartRequests == 1)
+    #expect(model.situation == .granted)
+    #expect(!model.showsRestartNotice)
+  }
+
+  @Test("A busy host born before the grant is only talked about, never stopped")
+  func busyHostIsOnlyTalkedAbout() async {
+    let runner = SpyRunner(hostStatus: .notGranted, running: [SessionID(), SessionID()])
+    let model = makeModel(status: .granted, preferences: SpyPreferences(), runner: runner)
+
+    await model.reevaluate(refreshingIdentity: false)
+
+    #expect(model.situation == .pendingRestart(runner: .host, runningAgents: 2))
+    #expect(model.showsRestartNotice)
+    #expect(model.agentAccess == .notGranted)
+    #expect(await runner.restartRequests == 0)
+
+    await model.restartWhenIdle()
+
+    #expect(model.isRestartArmed)
+    #expect(await runner.restartRequests == 1)
+    #expect(await runner.stoppedAnything == false)
+  }
+
+  @Test("A closed notice stays closed for the same lag")
+  func dismissedNoticeStaysClosed() async {
+    let runner = SpyRunner(hostStatus: .notGranted, running: [SessionID(), SessionID()])
+    let model = makeModel(status: .granted, preferences: SpyPreferences(), runner: runner)
+    await model.reevaluate(refreshingIdentity: false)
+
+    model.dismissRestartNotice()
+    await model.reevaluate(refreshingIdentity: false)
+    #expect(!model.showsRestartNotice)
+
+    // One agent fewer is still the same lag.
+    await runner.finishOne()
+    await model.reevaluate(refreshingIdentity: false)
+    #expect(model.situation == .pendingRestart(runner: .host, runningAgents: 1))
+    #expect(!model.showsRestartNotice)
   }
 
   private func makeModel(
     status: FullDiskAccessStatus,
     preferences: SpyPreferences,
-    opened: OpenedURLs = OpenedURLs()
+    opened: OpenedURLs = OpenedURLs(),
+    runner: SpyRunner? = nil
   ) -> PermissionsModel {
     PermissionsModel(
-      gate: FullDiskAccessGate(probe: StubProbe(status: status), preferences: preferences),
+      gate: FullDiskAccessGate(
+        probe: StubProbe(status: status), preferences: preferences, runner: runner),
+      control: runner,
       openURL: { opened.urls.append($0) }
     )
   }
@@ -140,26 +194,67 @@ private struct StubProbe: FullDiskAccessProbe {
   func status() async -> FullDiskAccessStatus { value }
 }
 
-private actor MutableProbe: FullDiskAccessProbe {
-  private var value: FullDiskAccessStatus
-
-  init(status: FullDiskAccessStatus) {
-    value = status
-  }
+private actor MutableCurrentProbe: CurrentFullDiskAccessProbe {
+  private var value: FullDiskAccessStatus = .notGranted
+  private(set) var probes = 0
 
   func grant() { value = .granted }
 
-  func status() async -> FullDiskAccessStatus { value }
+  func status() async -> FullDiskAccessStatus? {
+    probes += 1
+    return value
+  }
 }
 
 private actor SpyPreferences: PermissionPreferences {
-  private var dismissed = false
+  func isFullDiskAccessStepSuppressed() -> Bool { false }
+
+  private var answer: CodeIdentityFingerprint?
   private(set) var dismissals = 0
 
-  func isFullDiskAccessStepDismissed() -> Bool { dismissed }
+  func fullDiskAccessStepAnswer() -> CodeIdentityFingerprint? { answer }
 
-  func dismissFullDiskAccessStep() {
+  func recordFullDiskAccessStepAnswer(by identity: CodeIdentityFingerprint) {
     dismissals += 1
-    dismissed = true
+    answer = identity
   }
+}
+
+/// A host that lags behind the grant, and that restarts — goes away — only when idle.
+private actor SpyRunner: AgentRunnerControl {
+  private var hostStatus: FullDiskAccessStatus?
+  private var running: [SessionID]
+  private var isGone = false
+  private var armed = false
+  private(set) var restartRequests = 0
+  private(set) var stoppedAnything = false
+
+  init(hostStatus: FullDiskAccessStatus?, running: [SessionID]) {
+    self.hostStatus = hostStatus
+    self.running = running
+  }
+
+  func agentRunnerAccess() -> AgentRunnerAccess {
+    isGone
+      ? .none
+      : AgentRunnerAccess(runner: .host, hostStatus: hostStatus, runningAgents: running.count)
+  }
+
+  func runningHostedSessions() -> [SessionID] { running }
+
+  func restartHostWhenIdle() -> HostRestart {
+    restartRequests += 1
+    guard running.isEmpty else {
+      armed = true
+      return .armed
+    }
+    isGone = true
+    return .restarted
+  }
+
+  func cancelHostRestart() { armed = false }
+
+  func finishOne() { running.removeLast() }
+
+  func isHostRestartArmed() -> Bool { armed }
 }

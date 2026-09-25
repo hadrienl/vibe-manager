@@ -1945,6 +1945,9 @@ public final class AppModel {
     // pressing Create leaves nothing left to ask. Reading the store first left a window in which
     // ⌘N opened a sheet that did not yet know whether the access was there, and warned anyway.
     await permissions?.refresh()
+    // "Restart Now" stops agents to resume them in a host born with the access: resumed the way
+    // this launch resumes a clean quit, with the same banner.
+    permissions?.resumeSessions = { [weak self] intent in await self?.beginRestore(intent) }
     // Before the first list, because it is what makes that list true: a session the previous run
     // left `active` has nothing running behind it, and drawing it as running once — even for one
     // frame — is the lie this whole ticket is about.
@@ -1976,6 +1979,9 @@ public final class AppModel {
     // the list shows it.
     await reattach(shutdown)
     await settleUsage()
+    // Now that the host is known: one kept from before the access was granted is restarted here
+    // if no agent runs in it, before anything is resumed into it (#76).
+    await permissions?.reevaluate(refreshingIdentity: false)
     // Said as soon as the list is on screen. An offer asks no provider anything, and waiting for
     // the detections to announce it meant a minute of silence after a crash — on a cold cache,
     // with a CLI that answers none of its probes, the banner arrived long after the user had
@@ -2178,7 +2184,7 @@ public final class AppModel {
         repository: repository, agents: agents, ticketContext: readTicketContext,
         icons: iconStore, diagnostics: diagnostics),
       registry: agents,
-      fullDiskAccess: permissions?.status,
+      fullDiskAccess: permissions?.agentAccess,
       templates: templates.all,
       projectIcons: projectIcons,
       icons: icons,
@@ -2445,6 +2451,8 @@ extension AppModel {
     if let journal {
       Task { await journal.refresh() }
     }
+    // Back from System Settings, perhaps: the access may have been granted since.
+    if let permissions { Task { await permissions.applicationDidBecomeActive() } }
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
   }
@@ -2455,6 +2463,14 @@ extension AppModel {
     isApplicationActive = false
     updateVisibleSession()
     Task { [notes] in _ = await notes.flushAll() }
+  }
+
+  /// A session's name, for a sentence that names it.
+  public func sessionName(for id: SessionID) -> String {
+    sessions.first { $0.id == id }?.name
+      ?? String(
+        localized: "a session", bundle: .module,
+        comment: "Stands for a session whose name is unknown.")
   }
 
   /// Edit Notes: the inspector is shown if it was hidden, and its editor takes the keyboard.

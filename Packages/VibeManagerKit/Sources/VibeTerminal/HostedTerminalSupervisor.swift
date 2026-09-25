@@ -10,7 +10,7 @@ import VibeDomain
 /// cannot be started or will not prove it is ours, a terminal is started here instead, exactly as
 /// before the host existed: it will stop with the application, and quitting says so, but a broken
 /// host never keeps anybody from working.
-public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
+public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, AgentRunnerControl {
   public struct Configuration: Sendable {
     public var location: TerminalHostLocation
     /// `nil` never starts a host: only one already running is used.
@@ -60,6 +60,16 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private var identity: TerminalHostIdentity?
   /// What the connected host said it speaks beyond the core.
   private var hostCapabilities: Set<String> = []
+  /// What the connected host said of its Full Disk Access. It cannot change while the host runs,
+  /// so it is asked once per connection.
+  private var hostFullDiskAccess: FullDiskAccessStatus?
+  /// Set when the host is to be let go as soon as no agent runs there (#76).
+  private var restartArmed = false
+  /// The host being let go. A terminal started meanwhile waits for it: it must reach the next
+  /// host, born with the access, not the one on its way out.
+  private var retirement: Task<Void, Never>?
+  /// Starts sent to the host and not answered yet.
+  private var startsInFlight = 0
   /// Set once starting a host has failed, so every later terminal falls back at once rather than
   /// paying the launch timeout again.
   private var isUnavailable = false
@@ -92,11 +102,16 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     if let existing = await session(for: id), await !existing.state().isFinished {
       throw TerminalError.sessionAlreadyRunning(id)
     }
-    guard await ensureConnected(launching: true) else {
+    guard await connectedOutsideRetirement() else {
       return try await startLocally(spec, for: id)
     }
 
-    switch await request(.start(session: id, spec: spec)) {
+    // Counted until its mirror exists: before that, nothing else says an agent is on its way, and
+    // a host let go meanwhile would take it with it.
+    startsInFlight += 1
+    let reply = await request(.start(session: id, spec: spec))
+    defer { startsInFlight -= 1 }
+    switch reply {
     case .started(let processIdentifier):
       remember(processIdentifier, for: id)
       let mirror = HostedTerminalSession(
@@ -289,6 +304,118 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     dropped?.close()
   }
 
+  /// Connected to a host that is not on its way out. Checked again after every suspension, so the
+  /// `start` that follows leaves in the same turn of the actor: either before a `retire` — which the
+  /// host then refuses, an agent running — or once the next host is there. Reaching a host that is
+  /// leaving would read as one that will not serve, and send every later terminal into the
+  /// application.
+  private func connectedOutsideRetirement() async -> Bool {
+    while true {
+      while let retirement { await retirement.value }
+      let connected = await ensureConnected(launching: true)
+      if retirement == nil { return connected }
+    }
+  }
+
+  // MARK: - AgentRunnerControl
+
+  public func agentRunnerAccess() async -> AgentRunnerAccess {
+    if connection != nil {
+      return AgentRunnerAccess(
+        runner: .host, hostStatus: await hostAccess(),
+        runningAgents: await runningHostedSessions().count)
+    }
+    // Every terminal of this run starts here: the application answers for them.
+    if isUnavailable || configuration.launcher == nil {
+      return AgentRunnerAccess(runner: .application, runningAgents: await local.runningCount())
+    }
+    return .none
+  }
+
+  public func runningHostedSessions() async -> [SessionID] {
+    var running: [SessionID] = []
+    for (id, mirror) in mirrors where await !mirror.state().isFinished {
+      running.append(id)
+    }
+    return running
+  }
+
+  public func restartHostWhenIdle() async -> HostRestart {
+    guard connection != nil else {
+      restartArmed = false
+      return .restarted
+    }
+    restartArmed = true
+    await restartIfIdle()
+    return restartArmed ? .armed : .restarted
+  }
+
+  public func cancelHostRestart() {
+    restartArmed = false
+  }
+
+  public func isHostRestartArmed() -> Bool {
+    restartArmed
+  }
+
+  /// Whether the host has Full Disk Access, `nil` when it cannot say.
+  private func hostAccess() async -> FullDiskAccessStatus? {
+    if let hostFullDiskAccess { return hostFullDiskAccess }
+    guard hostCapabilities.contains(TerminalHostCapability.fullDiskAccess),
+      case .fullDiskAccess(let granted) = await request(.fullDiskAccess)
+    else { return nil }
+    let status: FullDiskAccessStatus = granted ? .granted : .notGranted
+    hostFullDiskAccess = status
+    return status
+  }
+
+  /// Lets the host go when it is armed to and no agent runs there any more.
+  ///
+  /// The retirement is claimed before anything is awaited: two sessions ending together each ask,
+  /// and a start arriving meanwhile must find it claimed rather than race it.
+  private func restartIfIdle() async {
+    guard restartArmed, connection != nil else { return }
+    if let retirement { return await retirement.value }
+    let task = Task { await self.retireIfIdle() }
+    retirement = task
+    await task.value
+    retirement = nil
+  }
+
+  private func retireIfIdle() async {
+    guard startsInFlight == 0, await runningHostedSessions().isEmpty else { return }
+    await retire()
+  }
+
+  /// Says goodbye to an idle host and waits for it to be gone, so the next terminal starts a host
+  /// of its own. The mirrors stay: they are what the panes show of the sessions that ended.
+  private func retire() async {
+    guard let old = connection else { return }
+    if hostCapabilities.contains(TerminalHostCapability.retire) {
+      // Refused when an agent was started in the host meanwhile: it restarts after that one.
+      guard case .retiring(accepted: true) = await request(.retire) else { return }
+    }
+    restartArmed = false
+    let hostProcess = identity?.processIdentifier
+    diagnostics.record(.host, .notice, "host.retired", ["sessions": .count(mirrors.count)])
+    _ = await request(.goodbye(keepRunning: false), timeout: .seconds(1))
+    connection = nil
+    identity = nil
+    hostCapabilities = []
+    hostFullDiskAccess = nil
+    groups.removeAll()
+    await old.closeAfterPendingWrites()
+    // A host that can retire leaves at once; an older one after its idle grace period. Either way
+    // its socket goes with it, and until then a new terminal would reach it again.
+    let deadline = ContinuousClock.now + .seconds(8)
+    while FileManager.default.fileExists(atPath: configuration.location.socketPath),
+      hostProcess.map({ kill($0, 0) == 0 }) ?? true,
+      ContinuousClock.now < deadline
+    {
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+  }
+
   // MARK: - Used by the mirrors
 
   func send(_ body: TerminalHostRequest.Body) {
@@ -452,6 +579,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private func adopt(_ connection: TerminalHostConnection, _ identity: TerminalHostIdentity) {
     self.connection = connection
     self.identity = identity
+    hostFullDiskAccess = nil
     Task { [weak self] in
       for await frame in connection.frames {
         await self?.receive(frame)
@@ -490,7 +618,12 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     case .state(let id, let state, _):
       noteGroup(of: state, for: id)
       await mirrors[id]?.receive(state: state)
-      if state.isFinished { release(id) }
+      if state.isFinished {
+        release(id)
+        // Not awaited: this runs on the loop that reads the host's replies, and letting the host
+        // go asks it something first.
+        if restartArmed { Task { await self.restartIfIdle() } }
+      }
     case .truncated(let id, let count):
       diagnostics.record(
         .host, .notice, "host.outputTruncated",

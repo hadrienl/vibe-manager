@@ -8,18 +8,23 @@ import VibePersistence
 import VibeTerminal
 import VibeUI
 
-/// The one binary is four programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
+/// The one binary is five programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
 /// given `--browser-bridge` or `--browser-cli`, the web view's bridge an agent starts or the `vibe`
-/// command (ADR 0023). Those never return: no `NSApplication` is created, so they have no Dock icon,
-/// no menu bar and no window. Being the same signed binary is the point: TCC and the peer checks
-/// all see Vibe Manager.
+/// command (ADR 0023); given `--probe-full-disk-access`, it says whether a process born now has Full
+/// Disk Access, and exits (#76). Those never return: no `NSApplication` is created, so they have no
+/// Dock icon, no menu bar and no window. Being the same signed binary is the point: TCC and the peer
+/// checks all see Vibe Manager.
 @main
 enum Entry {
   static func main() {
+    FullDiskAccessProbeCommand.runIfRequested(probe: TCCFullDiskAccessProbe())
     BrowserBridge.runIfRequested()
-    TerminalHost.runIfRequested(diagnostics: { directory in
-      Diagnostics.standard(location: DiagnosticsLocation(directory: directory), origin: .host).0
-    })
+    TerminalHost.runIfRequested(
+      diagnostics: { directory in
+        Diagnostics.standard(location: DiagnosticsLocation(directory: directory), origin: .host).0
+      },
+      // What every agent it runs inherits, and what the application asks it.
+      fullDiskAccess: TCCFullDiskAccessProbe())
     VibeManagerApp.main()
   }
 }
@@ -692,6 +697,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         You can leave them working in the background and find them as they are the next time you \
         open Vibe Manager. A restart of the Mac stops them.
         """)
+    // Left running, they keep the access they started with: a host from before the grant carries
+    // on without it, and "Quit & Reopen" in System Settings would not change that (#76).
+    if case .pendingRestart(.host, _) = environment.permissions.situation {
+      information +=
+        "\n\n"
+        + String(
+          localized: """
+            They still won't have Full Disk Access when you reopen Vibe Manager: stop them to \
+            restart them with it.
+            """)
+    }
     let inProcess = environment.inProcessRunningCount
     if inProcess > 0 {
       information +=
