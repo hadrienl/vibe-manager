@@ -8,7 +8,7 @@
 #   4. its terminal host refuses a binary signed ad hoc under the application's identifier
 #      (security review A6).
 #
-#   Scripts/clean-install-check.sh "build/release/1.0.0/Vibe Manager 1.0.0.dmg"
+#   Scripts/clean-install-check.sh build/release/1.0.0/VibeManager-1.0.0.dmg
 #
 # It needs a logged-in graphical session, and the Mac it runs on is never quite clean — PATH,
 # signed-in CLIs. The release checklist adds a pass on a fresh macOS 14 virtual machine.

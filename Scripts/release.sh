@@ -64,7 +64,9 @@ readonly work="$repository_root/build/release/$version"
 readonly archive="$work/Vibe Manager.xcarchive"
 readonly exported="$work/export"
 readonly app="$exported/Vibe Manager.app"
-readonly dmg="$work/Vibe Manager $version.dmg"
+# No space in the name: GitHub turns spaces of a release asset into dots, and the checksum file
+# would name a file nobody downloads.
+readonly dmg="$work/VibeManager-$version.dmg"
 
 # The workflow's signing material: a keychain of its own, and the notarization key in a file, both
 # removed on the way out. On the maintainer's Mac, the login keychain and the stored profile.
