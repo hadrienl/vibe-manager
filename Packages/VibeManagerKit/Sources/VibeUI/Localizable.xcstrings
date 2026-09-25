@@ -249,6 +249,23 @@
         }
       }
     },
+    "%@ moved to %@." : {
+      "comment" : "A session's name, then a task status.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ moved to %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ déplacée vers « %2$@ »."
+          }
+        }
+      }
+    },
     "%@ no longer exists; its closest folder was revealed." : {
       "comment" : "A folder's name.",
       "localizations" : {
@@ -458,6 +475,100 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ — en cours d’exécution"
+          }
+        }
+      }
+    },
+    "%@, %lld sessions" : {
+      "comment" : "A column tab: its name, how many sessions it holds.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld sessions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld sessions"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@, %lld sessions, one waits for you" : {
+      "comment" : "A column tab: its name, how many sessions it holds.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld session, one waits for you"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld sessions, one waits for you"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld sessions, dont une vous attend"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld session, dont une vous attend"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@, %2$lld sessions, dont une vous attend"
+                }
+              }
+            }
           }
         }
       }
@@ -1802,6 +1913,17 @@
         }
       }
     },
+    "Add to To Do" : {
+      "comment" : "Creates a session without launching it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter à À faire"
+          }
+        }
+      }
+    },
     "Address" : {
       "localizations" : {
         "fr" : {
@@ -2053,6 +2175,7 @@
       }
     },
     "Archive" : {
+      "comment" : "A swipe button that archives a session.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2084,7 +2207,7 @@
       }
     },
     "Archived" : {
-      "comment" : "A session's state in the sidebar; also labels the date it took that state.",
+      "comment" : "A session's state in the sidebar; also labels the date it took that state.\nA task status: the session is archived.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2094,7 +2217,19 @@
         }
       }
     },
+    "Archived (%lld)" : {
+      "comment" : "The line at the foot of the sidebar that opens the archived sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivées (%lld)"
+          }
+        }
+      }
+    },
     "Archive…" : {
+      "comment" : "Changes a session's task status.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2929,6 +3064,7 @@
       }
     },
     "Done" : {
+      "comment" : "A task status: the session's work is finished.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3502,6 +3638,17 @@
         }
       }
     },
+    "In Progress" : {
+      "comment" : "A task status: the session is being worked on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours"
+          }
+        }
+      }
+    },
     "In the default browser" : {
       "localizations" : {
         "fr" : {
@@ -3814,6 +3961,50 @@
         }
       }
     },
+    "Move to Done" : {
+      "comment" : "Changes a session's task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers Terminé"
+          }
+        }
+      }
+    },
+    "Move to In Progress" : {
+      "comment" : "Changes a session's task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers En cours"
+          }
+        }
+      }
+    },
+    "Move to To Do" : {
+      "comment" : "Changes a session's task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers À faire"
+          }
+        }
+      }
+    },
+    "Move to Waiting" : {
+      "comment" : "Changes a session's task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer vers En attente"
+          }
+        }
+      }
+    },
     "Multiline" : {
       "localizations" : {
         "fr" : {
@@ -3920,16 +4111,6 @@
         }
       }
     },
-    "No active session" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune session active"
-          }
-        }
-      }
-    },
     "No agent has acted in this web view yet." : {
       "localizations" : {
         "fr" : {
@@ -3946,6 +4127,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun agent enregistré"
+          }
+        }
+      }
+    },
+    "No archived session" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune session archivée"
           }
         }
       }
@@ -3967,16 +4158,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune modification"
-          }
-        }
-      }
-    },
-    "No closed session" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune session fermée"
           }
         }
       }
@@ -4061,22 +4242,13 @@
         }
       }
     },
-    "No session in active matches this filter." : {
+    "No session in %@ matches this filter." : {
+      "comment" : "A task status, the name of a column of the sidebar.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune session active ne correspond à ce filtre."
-          }
-        }
-      }
-    },
-    "No session in closed matches this filter." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune session fermée ne correspond à ce filtre."
+            "value" : "Aucune session de « %@ » ne correspond à ce filtre."
           }
         }
       }
@@ -4429,13 +4601,33 @@
         }
       }
     },
-    "Nothing is deleted: notes, repositories and Git metadata are kept, and the session stays readable under Closed. It can no longer be reopened until it is unarchived." : {
-      "comment" : "Closed is the tab of the sidebar that lists closed sessions.",
+    "Nothing done yet. Swipe a session to move it here." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et la session reste consultable dans « Fermées ». Elle ne pourra plus être rouverte avant d’être désarchivée."
+            "value" : "Rien de terminé pour l’instant. Balayez une session pour la déplacer ici."
+          }
+        }
+      }
+    },
+    "Nothing in progress. Press ⌘N to start a session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien en cours. Appuyez sur ⌘N pour démarrer une session."
+          }
+        }
+      }
+    },
+    "Nothing is deleted: notes, repositories and Git metadata are kept, and the session stays readable under Archived. It can no longer be reopened until it is unarchived." : {
+      "comment" : "Archived is the line at the foot of the sidebar that lists archived sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et la session reste consultable dans Archivées. Elle ne pourra plus être rouverte tant qu’elle n’aura pas été désarchivée."
           }
         }
       }
@@ -4466,6 +4658,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien n’est remplacé sans votre accord."
+          }
+        }
+      }
+    },
+    "Nothing is waiting on a review, a build or someone else." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’attend une revue, une compilation ou quelqu’un d’autre."
+          }
+        }
+      }
+    },
+    "Nothing planned. A session added to To Do waits here until you start it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de prévu. Une session ajoutée à À faire attend ici que vous la démarriez."
           }
         }
       }
@@ -4727,17 +4939,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Période"
-          }
-        }
-      }
-    },
-    "Press ⌘N to start one, or look under Closed for earlier work." : {
-      "comment" : "Closed is the tab of the sidebar that lists closed sessions.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appuyez sur ⌘N pour en lancer une, ou consultez « Fermées » pour retrouver un travail antérieur."
           }
         }
       }
@@ -5508,17 +5709,6 @@
         }
       }
     },
-    "Scope" : {
-      "comment" : "Which sessions the sidebar lists.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessions affichées"
-          }
-        }
-      }
-    },
     "Search sessions" : {
       "localizations" : {
         "fr" : {
@@ -5602,6 +5792,16 @@
         }
       }
     },
+    "Sessions archived from Done land here. Nothing is ever deleted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions archivées depuis Terminé arrivent ici. Rien n’est jamais supprimé."
+          }
+        }
+      }
+    },
     "Sessions created from it keep their prompt." : {
       "localizations" : {
         "fr" : {
@@ -5612,32 +5812,12 @@
         }
       }
     },
-    "Sessions land here when their agent stops. Nothing is ever deleted." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les sessions arrivent ici quand leur agent s’arrête. Rien n’est jamais supprimé."
-          }
-        }
-      }
-    },
     "Sessions made from it keep their own symbol and colour." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les sessions créées à partir de lui gardent leurs propres symbole et couleur."
-          }
-        }
-      }
-    },
-    "Sessions shown" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessions affichées"
           }
         }
       }
@@ -5969,6 +6149,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Démarrage…"
+          }
+        }
+      }
+    },
+    "Status" : {
+      "comment" : "The submenu that moves a session between columns.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statut"
+          }
+        }
+      }
+    },
+    "Status: %@" : {
+      "comment" : "The toolbar menu of a session's task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statut : %@"
           }
         }
       }
@@ -6925,6 +7127,17 @@
         }
       }
     },
+    "To Do" : {
+      "comment" : "A task status: the session is planned, not started.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À faire"
+          }
+        }
+      }
+    },
     "To show in the sidebar when %@ is working, asks a question or has finished an answer, Vibe Manager adds hooks to its sessions. They only note these moments in a file of Vibe Manager's; they never answer in your place." : {
       "comment" : "Why the hooks are added; the argument is the agent's name.",
       "localizations" : {
@@ -7406,6 +7619,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Waiting" : {
+      "comment" : "A task status: the session waits on something else, a review or a build.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente"
           }
         }
       }

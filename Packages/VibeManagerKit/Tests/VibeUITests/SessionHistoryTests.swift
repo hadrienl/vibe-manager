@@ -204,29 +204,27 @@ struct SessionHistoryTests {
     #expect(await repository.session(id: stored.id)?.status == .archived)
   }
 
-  @Test("A confirmed archive moves the session out of the current scope, and back on request")
+  @Test("A confirmed archive takes the session out of the columns, and back to Done on request")
   func archiveAndUnarchiveFromTheWorkspace() async {
     let kept = session(name: "Still working")
     let archived = session(name: "Done with this")
     let repository = MutableRepository(sessions: [kept, archived])
     let model = AppModel(repository: repository, agents: EmptyRegistry())
     await model.load()
+    model.setColumn(.done)
+    #expect(model.visibleSessions.count == 2)
 
     model.requestArchive(archived.id)
     await model.archive(archived.id)
 
     #expect(model.archivedSessionCount == 1)
-
-    // Both are finished, so both are under Closed; only their status tells them apart.
-    model.setScope(.closed)
-    #expect(model.visibleSessions.count == 2)
-    #expect(
-      model.visibleSessions.filter { $0.status == .archived }.map(\.name)
-        == ["Done with this"])
+    #expect(model.visibleSessions.map(\.name) == ["Still working"])
+    #expect(model.archivedSessions.map(\.name) == ["Done with this"])
 
     await model.restore(archived.id)
+    #expect(model.visibleSessions.count == 2)
     #expect(model.visibleSessions.allSatisfy { $0.status == .closed })
-    #expect(await repository.session(id: archived.id)?.status == .closed)
+    #expect(await repository.session(id: archived.id)?.taskStatus == .done)
   }
 
   @Test("Archiving keeps the notes and the Git metadata")
@@ -321,13 +319,13 @@ struct SessionHistoryTests {
       layout: WorkspaceLayoutController(store: MemoryLayoutStore(), saveDelay: .zero)
     )
     await model.load()
-    model.setScope(.closed)
+    model.setColumn(.waiting)
     model.setSearchText("webhook")
 
     #expect(model.filter.searchText == "webhook")
-    #expect(model.filter.scope == .closed)
+    #expect(model.filter.column == .waiting)
     #expect(model.layout.filter.searchText.isEmpty)
-    #expect(model.layout.filter.scope == .closed)
+    #expect(model.layout.filter.column == .waiting)
   }
 
   @Test("Narrowing the list never unmounts a terminal")
@@ -387,7 +385,7 @@ struct SessionHistoryTests {
     #expect((model.selectedSession.map(model.canClose) ?? false) == false)
   }
 
-  @Test("A session whose agent has stopped closes without asking, and the next one is selected")
+  @Test("A session whose agent has stopped closes without asking, and stays in its column")
   func closingAStoppedAgentDoesNotAsk() async {
     let stored = session(name: "Idle", status: .active)
     let other = session(name: "Next", status: .active)
@@ -400,13 +398,14 @@ struct SessionHistoryTests {
 
     #expect(model.pendingClose == nil)
     #expect(model.sessions.first { $0.id == stored.id }?.status == .closed)
-    // The user closed it to get on with the next one.
-    #expect(model.selectedSessionID == other.id)
-    #expect(model.filter.scope == .active)
+    // Stopping the agent says nothing about where the work stands (#80).
+    #expect(model.selectedSessionID == stored.id)
+    #expect(model.filter.column == .doing)
+    #expect(model.visibleSessions.map(\.id).contains(stored.id))
   }
 
-  @Test("Two ⌘W in a row close the selected session, then the next one")
-  func twoCloseCommandsCloseTwoSessions() async {
+  @Test("A second ⌘W on the session just closed does nothing")
+  func twoCloseCommandsCloseOneSession() async {
     let first = session(name: "First", status: .active)
     let second = session(name: "Second", status: .active)
     let repository = MutableRepository(sessions: [first, second])
@@ -420,11 +419,11 @@ struct SessionHistoryTests {
     }
 
     #expect(model.sessions.first { $0.id == first.id }?.status == .closed)
-    #expect(model.sessions.first { $0.id == second.id }?.status == .closed)
+    #expect(model.sessions.first { $0.id == second.id }?.status == .active)
   }
 
-  @Test("A closed session leaves the list and the selection before its agent has stopped")
-  func closingMovesOnBeforeTheStop() async {
+  @Test("A session being closed keeps its row and the selection while its agent stops")
+  func closingKeepsTheRowDuringTheStop() async {
     let first = session(name: "First", status: .active)
     let second = session(name: "Second", status: .active)
     let third = session(name: "Third", status: .active)
@@ -443,14 +442,14 @@ struct SessionHistoryTests {
       await Task.yield()
     }
 
-    #expect(!model.visibleSessions.contains { $0.id == second.id })
-    let index = order.firstIndex(of: second.id)!
-    #expect(model.selectedSessionID == order[index + 1 < order.count ? index + 1 : index - 1])
+    #expect(model.visibleSessions.map(\.id) == order)
+    #expect(model.selectedSessionID == second.id)
 
     await supervisor.releaseStop()
     await closing.value
     #expect(model.sessions.first { $0.id == second.id }?.status == .closed)
-    #expect(!model.visibleSessions.contains { $0.id == second.id })
+    #expect(model.visibleSessions.map(\.id).contains(second.id))
+    #expect(model.selectedSessionID == second.id)
   }
 
   @Test("Closing a session that stays listed leaves the selection on it")
@@ -467,7 +466,6 @@ struct SessionHistoryTests {
     try closed.close(at: Date())
     await repository.save(closed)
     await model.reload()
-    model.setScope(.closed)
     model.select(stopped.id)
     #expect(model.canClose(closed))
 
@@ -490,9 +488,9 @@ struct SessionHistoryTests {
     await model.requestClose(hidden.id)
 
     #expect(model.sessions.first { $0.id == hidden.id }?.status == .closed)
-    // It was never taken from under the user: the sidebar follows it to Closed, as it did.
+    // It was never taken from under the user, and it is still In Progress.
     #expect(model.selectedSessionID == hidden.id)
-    #expect(model.filter.scope == .closed)
+    #expect(model.filter.column == .doing)
   }
 
   @Test("A session picked while an agent is stopping keeps the selection")
@@ -583,7 +581,7 @@ struct SessionHistoryTests {
     #expect(preferences.confirmsStoppingRunningAgent)
   }
 
-  @Test("Scope and sort survive a relaunch; the search text does not")
+  @Test("Column and sort survive a relaunch; the search text does not")
   func filterSurvivesARelaunch() async {
     let store = MemoryLayoutStore()
     let repository = MutableRepository(sessions: [session()])
@@ -593,7 +591,7 @@ struct SessionHistoryTests {
       layout: WorkspaceLayoutController(store: store, saveDelay: .zero)
     )
     await first.load()
-    first.setScope(.closed)
+    first.setColumn(.waiting)
     first.setSort(.name)
     first.setSearchText("webhook")
     await first.layout.flush()
@@ -605,7 +603,7 @@ struct SessionHistoryTests {
     )
     await second.load()
 
-    #expect(second.filter.scope == .closed)
+    #expect(second.filter.column == .waiting)
     #expect(second.filter.sort == .name)
     #expect(second.filter.searchText.isEmpty)
   }
@@ -621,11 +619,11 @@ struct SessionHistoryTests {
     model.select(position: 1)
     #expect(model.selectedSessionID == running.id)
 
-    // There is only one row in the active scope, so there is nowhere to step to.
+    // There is only one row In Progress, so there is nowhere to step to.
     model.selectNext()
     #expect(model.selectedSessionID == running.id)
 
-    model.setScope(.closed)
+    model.setColumn(.done)
     model.select(position: 1)
     #expect(model.selectedSessionID == finished.id)
   }

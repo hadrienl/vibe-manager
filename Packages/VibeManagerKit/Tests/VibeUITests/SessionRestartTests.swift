@@ -620,20 +620,21 @@ struct SessionRestartTests {
 
   // MARK: - Where the session is after it starts
 
-  @Test("A session restarted from Closed is followed into Active, and stays selected")
-  func restartMovesTheSidebarToActive() async {
+  @Test("A session restarted from another column is followed In Progress, and stays selected")
+  func restartMovesTheSidebarToInProgress() async {
     let path = folder()
     let subject = session(path: path)
     let (model, _, _, _) = makeWorkspace(session: subject)
     await model.reload()
-    model.setScope(.closed)
+    #expect(subject.taskStatus != .doing)
+    model.setColumn(subject.taskStatus)
     model.select(subject.id)
 
     await model.restart(subject.id)
 
-    // The sidebar splits on whether an agent is running, so the session left Closed the moment
-    // it started. Left alone, it would have vanished from the list under the user's pointer.
-    #expect(model.filter.scope == .active)
+    // Starting a session puts it back to work (#80), so it left its column the moment it
+    // started. Left alone, it would have vanished from the list under the user's pointer.
+    #expect(model.filter.column == .doing)
     #expect(model.selectedSessionID == subject.id)
     #expect(model.visibleSessions.map(\.id) == [subject.id])
   }
@@ -647,11 +648,11 @@ struct SessionRestartTests {
       supervisor: WorkspaceSupervisor(failure: .resourceLimitReached(code: 35))
     )
     await model.reload()
-    model.setScope(.closed)
+    model.setColumn(subject.taskStatus)
 
     await model.restart(subject.id)
 
-    #expect(model.filter.scope == .closed)
+    #expect(model.filter.column == subject.taskStatus)
     #expect(model.selectedSessionID == subject.id)
   }
 

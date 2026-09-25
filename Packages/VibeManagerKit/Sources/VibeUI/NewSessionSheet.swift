@@ -19,7 +19,8 @@ public struct NewSessionSheet: View {
   }
 
   private let defaultWorkingDirectoryPath: String?
-  private let created: (SessionCreation) -> Void
+  /// The session, and whether to launch it now or leave it in To Do (#80).
+  private let created: (SessionCreation, Bool) -> Void
   private let cancelled: () -> Void
   /// Opens the templates in the settings. `nil`: the sheet offers no way there.
   private let manageTemplates: (() -> Void)?
@@ -27,7 +28,7 @@ public struct NewSessionSheet: View {
   public init(
     model: NewSessionModel,
     defaultWorkingDirectoryPath: String? = nil,
-    created: @escaping (SessionCreation) -> Void,
+    created: @escaping (SessionCreation, Bool) -> Void,
     cancelled: @escaping () -> Void,
     manageTemplates: (() -> Void)? = nil
   ) {
@@ -465,6 +466,14 @@ public struct NewSessionSheet: View {
         Text("Cancel", bundle: .module)
       }
       .keyboardShortcut(.cancelAction)
+      // Prepared now, started later with a swipe to In Progress: the prompt waits in To Do.
+      Button {
+        submit(launching: false)
+      } label: {
+        Text("Add to To Do", bundle: .module, comment: "Creates a session without launching it.")
+      }
+      .disabled(!model.canSubmit)
+      .accessibilityIdentifier("new-session-add-to-do")
       Button(action: submit) {
         Text("Create & Launch", bundle: .module)
       }
@@ -493,6 +502,10 @@ public struct NewSessionSheet: View {
   ]
 
   private func submit() {
+    submit(launching: true)
+  }
+
+  private func submit(launching: Bool) {
     Task {
       guard let creation = await model.submit() else {
         let target =
@@ -505,7 +518,7 @@ public struct NewSessionSheet: View {
         moveFocus(to: target)
         return
       }
-      created(creation)
+      created(creation, launching)
     }
   }
 

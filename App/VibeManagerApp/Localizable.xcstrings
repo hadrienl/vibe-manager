@@ -326,6 +326,26 @@
         }
       }
     },
+    "Move to Next Status" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer au statut suivant"
+          }
+        }
+      }
+    },
+    "Move to Previous Status" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir au statut précédent"
+          }
+        }
+      }
+    },
     "New Session" : {
       "localizations" : {
         "fr" : {
@@ -356,12 +376,12 @@
         }
       }
     },
-    "Next Scope" : {
+    "Next Column" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onglet suivant"
+            "value" : "Colonne suivante"
           }
         }
       }
@@ -392,6 +412,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir la page dans le navigateur"
+          }
+        }
+      }
+    },
+    "Previous Column" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colonne précédente"
           }
         }
       }
@@ -526,6 +556,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la vue web"
+          }
+        }
+      }
+    },
+    "Status" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statut"
           }
         }
       }

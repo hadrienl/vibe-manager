@@ -86,10 +86,6 @@ public final class AppModel {
   /// Closes under way, from the command to the reload that shows the session closed. Until then
   /// the session still reads as running, and a second ⌘W would stop it a second time.
   public private(set) var closingSessionIDs: Set<SessionID> = []
-  /// Sessions the user closed, taken off the Active list the moment they asked. Stopping the
-  /// agent happens behind it, and nothing of it is theirs to watch. Kept apart from
-  /// `closingSessionIDs`, which an agent switch also sets while the session stays on screen.
-  private var dismissedSessionIDs: Set<SessionID> = []
   /// Whether closing a session whose agent runs asks first. Mirrored here so that the settings
   /// window and the dialog's "Don't ask again" read and change the same answer.
   public var confirmsStoppingRunningAgent: Bool {
@@ -392,6 +388,10 @@ public final class AppModel {
 
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
   private var preferredSelection: SessionID?
+  /// An archived session opened from the list at the foot of the sidebar. It is in no column, and
+  /// stays on screen until the user picks something else rather than being replaced at the next
+  /// reload by the first row of the column.
+  private var shownArchivedSessionID: SessionID?
   private var resolutionTask: Task<Void, Never>?
   private var reloadTask: Task<Void, Never>?
 
@@ -434,6 +434,7 @@ public final class AppModel {
   /// How the previous run ended, as this launch found it: for the export.
   public private(set) var previousShutdownVerdict: DiagnosticToken?
   private let restoreSession: RestoreSession
+  private let changeTaskStatus: ChangeTaskStatus
   private let restartSession: RestartSession?
   private let planAgentSwitch: PlanAgentSwitch?
   private let recordAgentSwitch: RecordAgentSwitch
@@ -551,6 +552,7 @@ public final class AppModel {
     closeSession = CloseSession(repository: repository, runtime: runtime)
     archiveSession = ArchiveSession(repository: repository, runtime: runtime)
     restoreSession = RestoreSession(repository: repository)
+    changeTaskStatus = ChangeTaskStatus(repository: repository)
     // A workspace without agents cannot build a launch plan, so it cannot restart anything —
     // and saying that with an optional is clearer than a use case that would refuse every call.
     let restart = agents.map {
@@ -640,11 +642,6 @@ public final class AppModel {
   /// so narrowing the list never stops an agent or throws away what one has already said.
   public var visibleSessions: [WorkSession] {
     let filter = filter
-    // A session being closed still reads as active until the stop is done. It is already gone
-    // as far as the user is concerned.
-    let sessions = self.sessions.filter {
-      !($0.status == .active && dismissedSessionIDs.contains($0.id))
-    }
     // The notes are only read when there is something to look for in them: read every time, each
     // keystroke typed in the notes would redraw the sidebar.
     guard !filter.trimmedSearchText.isEmpty else { return filter.apply(to: sessions) }
@@ -653,6 +650,49 @@ public final class AppModel {
 
   public var archivedSessionCount: Int {
     sessions.filter { $0.status == .archived }.count
+  }
+
+  /// The archived sessions, last archived first, for the list at the foot of the sidebar. The
+  /// search and the facets narrow it like a column.
+  public var archivedSessions: [WorkSession] {
+    let filter = filter
+    let notes = filter.trimmedSearchText.isEmpty ? [:] : notes.searchIndex
+    return
+      sessions
+      .filter { $0.taskStatus == .archived && filter.matchesNarrowing($0, notes: notes[$0.id]) }
+      .sorted { ($0.archivedAt ?? $0.updatedAt) > ($1.archivedAt ?? $1.updatedAt) }
+  }
+
+  /// What a column's tab says: how many sessions clicking it will show, and whether one of them
+  /// waits for the user. The search and the facets count, so the number never promises a row
+  /// the column will not draw.
+  public struct ColumnSummary: Equatable {
+    public let count: Int
+    public let needsAttention: Bool
+  }
+
+  public func summary(of column: SessionTaskStatus) -> ColumnSummary {
+    let filter = filter
+    let notes = filter.trimmedSearchText.isEmpty ? [:] : notes.searchIndex
+    let listed = sessions.filter {
+      $0.taskStatus == column && filter.matchesNarrowing($0, notes: notes[$0.id])
+    }
+    return ColumnSummary(
+      count: listed.count,
+      needsAttention: listed.contains { statusPresentation(for: $0).needsAttention })
+  }
+
+  /// How the sidebar draws a session's state: the stored status corrected by its terminal and
+  /// its agent. One place, so that a row and a tab never disagree on who waits for the user.
+  public func statusPresentation(for session: WorkSession) -> SessionStatusPresentation {
+    let pane = pane(for: session.id)
+    return SessionStatusPresentation.make(
+      session: session,
+      paneStatus: pane?.status,
+      resolution: resolution(forID: session.id),
+      wasStoppedOnPurpose: pane?.wasStoppedOnPurpose == true,
+      activity: activity(for: session.id)
+    )
   }
 
   public var availableProviderIDs: [String] {
@@ -673,16 +713,23 @@ public final class AppModel {
     layout.setFilter(updated)
   }
 
-  /// Changing scope moves the user somewhere else, so the selection follows.
-  public func setScope(_ scope: SessionScope) {
-    update { $0.scope = scope }
+  /// Changing column moves the user somewhere else, so the selection follows.
+  public func setColumn(_ column: SessionTaskStatus) {
+    guard column != .archived else { return }
+    shownArchivedSessionID = nil
+    update { $0.column = column }
     reconcileSelection()
   }
 
-  public func cycleScope() {
-    let scopes = SessionScope.allCases
-    guard let index = scopes.firstIndex(of: filter.scope) else { return }
-    setScope(scopes[(index + 1) % scopes.count])
+  /// ⌃⌘→ and ⌃⌘←. Stops at both ends, like the selection shortcuts.
+  public func showNextColumn() {
+    guard let next = filter.column.next.first, next != .archived else { return }
+    setColumn(next)
+  }
+
+  public func showPreviousColumn() {
+    guard let previous = filter.column.previous.first else { return }
+    setColumn(previous)
   }
 
   public func setSort(_ sort: SessionSort) {
@@ -724,21 +771,20 @@ public final class AppModel {
   ///
   /// With nothing visible the selection is left alone rather than cleared: a load caught
   /// mid-write comes back short, and persisting a fallback there would lose their place for good.
-  /// Keeps the user with a session whose new status has moved it to the other tab.
+  /// Keeps the user with a session that a start or a restart has moved to another column.
   ///
-  /// The sidebar is split on whether an agent is running, so a session put back to work leaves
-  /// Closed the moment it starts. Left alone, the session the user just restarted would vanish
-  /// from the list under their pointer and the selection would fall to whatever row took its
-  /// place. The scope follows the session instead, and the session stays selected.
+  /// Starting a planned session, or restarting a finished one, puts it In Progress (#80). Left
+  /// alone, the session the user just started would vanish from the list under their pointer and
+  /// the selection would fall to whatever row took its place. The column follows the session
+  /// instead, and the session stays selected. A status changed by hand does not follow: see
+  /// `setTaskStatus(_:for:)`.
   ///
-  /// Only the scope is moved. A search or a facet that also hides it is a narrowing the user
+  /// Only the column is moved. A search or a facet that also hides it is a narrowing the user
   /// typed themselves, and clearing it would undo work they can see.
   private func follow(_ id: SessionID) {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
-    if !filter.scope.includes(session.status),
-      let scope = SessionScope.allCases.first(where: { $0.includes(session.status) })
-    {
-      update { $0.scope = scope }
+    if session.taskStatus != filter.column, session.taskStatus != .archived {
+      update { $0.column = session.taskStatus }
     }
     select(id)
   }
@@ -747,6 +793,11 @@ public final class AppModel {
     let visible = visibleSessions
     guard let first = visible.first else { return }
     if let selectedSessionID, visible.contains(where: { $0.id == selectedSessionID }) { return }
+    if let shownArchivedSessionID, shownArchivedSessionID == selectedSessionID,
+      selectedSession?.taskStatus == .archived
+    {
+      return
+    }
     apply(selection: first.id)
   }
 
@@ -798,15 +849,13 @@ public final class AppModel {
 
   /// Stops the agent and keeps everything else, the terminal included.
   ///
-  /// The session leaves the list at once and the selection moves to the row that takes its
-  /// place — the one below, or the one above at the end of the list. Stopping the agent can take
-  /// a while, and the user closed the session to get on with the next one, not to watch a shell
-  /// being killed. It is reported only if it goes wrong.
+  /// The session stays in its column, and selected: stopping an agent says nothing about where
+  /// the work stands (#80). A task paused for the night is still In Progress, and moving it is a
+  /// decision of its own. Stopping can take a while; it is reported only if it goes wrong.
   public func close(_ id: SessionID) async {
     guard !closingSessionIDs.contains(id) else { return }
     closingSessionIDs.insert(id)
     defer { closingSessionIDs.remove(id) }
-    dismiss(id)
     diagnostics.record(
       .lifecycle, .info, "session.closeRequested", ["session": diagnostics.pseudonym(id)])
     do {
@@ -817,35 +866,10 @@ public final class AppModel {
     } catch {
       await report(error)
     }
-    // Still on it only if the user was not looking at its row: listed whatever its state, or
-    // hidden by a search. The sidebar then follows it rather than dropping it.
     let isStillSelected = selectedSessionID == id
     await reload()
-    // Only once the reload has the session closed: dropped earlier, it would flash back in.
-    dismissedSessionIDs.remove(id)
-    if isStillSelected {
-      follow(id)
-    } else {
-      // A close that failed leaves the session active, and back in the list: the selection is
-      // left where the user is now rather than pulled back to it.
-      reconcileSelection()
-    }
-  }
-
-  /// Takes a session off the list, and moves the selection off it if its row was there and has
-  /// gone. A session that is not active stays listed, and one hidden by a search was not where the
-  /// user was looking: either way the selection stays on it.
-  private func dismiss(_ id: SessionID) {
-    let visible = visibleSessions
-    let index = visible.firstIndex { $0.id == id }
-    dismissedSessionIDs.insert(id)
-    guard selectedSessionID == id, let index,
-      !visibleSessions.contains(where: { $0.id == id })
-    else { return }
-    let neighbour =
-      visible.indices.contains(index + 1)
-      ? visible[index + 1] : (index > 0 ? visible[index - 1] : nil)
-    select(neighbour?.id)
+    // A search can hide the row; the session the user was on stays in front of them.
+    if isStillSelected, selectedSessionID != id { select(id) }
   }
 
   /// Opens the confirmation rather than archiving. The command is reversible, but it takes a
@@ -866,6 +890,8 @@ public final class AppModel {
   /// clears `pendingArchive`. Reading it here made Archive do nothing at all.
   public func archive(_ id: SessionID) async {
     pendingArchive = nil
+    let visible = visibleSessions
+    let wasSelected = selectedSessionID == id
     do {
       let archival = try await archiveSession(id: id)
       await activityTracker?.forget(id)
@@ -873,12 +899,14 @@ public final class AppModel {
       diagnostics.record(
         .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)
+      prepareHandOff(from: id, listedBefore: visible)
     } catch {
       // An archive that failed is not a silent no-op. The dialog is already gone, so the banner
       // is the only thing left that can say the session is still where it was.
       await report(error)
     }
     await reload()
+    handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
     reconcileSelection()
   }
 
@@ -898,6 +926,108 @@ public final class AppModel {
 
   public func dismissDetachWarning() {
     detachWarning = nil
+  }
+
+  // MARK: - Task status
+
+  /// The statuses a session can be moved to from where it is, nearest first on each side: what
+  /// its swipe reveals, and what the menus offer. Archived sessions have only one way out.
+  public func previousTaskStatuses(of session: WorkSession) -> [SessionTaskStatus] {
+    session.taskStatus.previous
+  }
+
+  public func nextTaskStatuses(of session: WorkSession) -> [SessionTaskStatus] {
+    session.taskStatus == .archived ? [] : session.taskStatus.next
+  }
+
+  /// Moves a session to another status (#80): a swipe button, the Status menu, ⌥⌘← and ⌥⌘→.
+  ///
+  /// Archiving keeps its confirmation and goes through `ArchiveSession`, and unarchiving through
+  /// `RestoreSession`: they stop or release a process. Moving a session that never ran In
+  /// Progress starts its agent with its prompt — To Do is where a task waits to be launched.
+  /// Every other move writes the status and nothing else.
+  ///
+  /// The column on screen stays where it is: the user sorting a column keeps their place in it.
+  /// A session that leaves the column hands the selection to the row that takes its place, as
+  /// closing one does.
+  public func setTaskStatus(_ status: SessionTaskStatus, for id: SessionID) async {
+    guard let session = sessions.first(where: { $0.id == id }), session.taskStatus != status
+    else { return }
+    if status == .archived {
+      requestArchive(id)
+      return
+    }
+    if session.taskStatus == .archived {
+      await restore(id)
+      return
+    }
+
+    let visible = visibleSessions
+    let wasSelected = selectedSessionID == id
+    do {
+      try await changeTaskStatus(id: id, to: status)
+      diagnostics.record(
+        .session, .info, "session.taskStatusChanged",
+        ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
+      Announcer.announce(
+        String(
+          localized: "\(session.name) moved to \(String(localized: status.label)).",
+          bundle: .module, comment: "A session's name, then a task status."))
+    } catch {
+      await report(error)
+      return
+    }
+    prepareHandOff(from: id, listedBefore: visible)
+    await reload()
+    handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
+
+    if status == .doing, !session.hasEverStarted, session.status == .closed,
+      canRestart(session)
+    {
+      // Started from the store rather than from the value above: the status was just written.
+      await performRestart(id: id, follows: false)
+    }
+  }
+
+  /// A selected session that has just left the column hands the selection to the row that took
+  /// its place: the one below, or the one above at the end of the column. Sorting a column is
+  /// going down it, and the next session to look at is the one that moved up.
+  ///
+  /// `wasSelected` is read before the change: the reload that follows it already moved the
+  /// selection off a row it could no longer see, to the top of the column.
+  private func handOffSelection(
+    from id: SessionID, listedBefore visible: [WorkSession], wasSelected: Bool
+  ) {
+    guard wasSelected, let index = visible.firstIndex(where: { $0.id == id }),
+      !visibleSessions.contains(where: { $0.id == id })
+    else { return }
+    let remaining = visible.filter { $0.id != id }
+    let neighbour = remaining.indices.contains(index) ? remaining[index] : remaining.last
+    guard let neighbour, visibleSessions.contains(where: { $0.id == neighbour.id }) else {
+      select(visibleSessions.first?.id)
+      return
+    }
+    guard selectedSessionID != neighbour.id else { return }
+    select(neighbour.id)
+  }
+
+  /// The row that will take a session's place, handed to the reload so that it lands on it
+  /// directly: going through the top of the column first would show another terminal for a frame.
+  private func prepareHandOff(from id: SessionID, listedBefore visible: [WorkSession]) {
+    guard selectedSessionID == id, let index = visible.firstIndex(where: { $0.id == id }) else {
+      return
+    }
+    let remaining = visible.filter { $0.id != id }
+    preferredSelection = (remaining.indices.contains(index) ? remaining[index] : remaining.last)?.id
+  }
+
+  /// ⌥⌘→ and ⌥⌘←: the next or the previous status, without a confirmation — the shortcut is
+  /// the decision. Archiving is not on this path: it keeps its own command and its question.
+  public func moveTaskStatus(of id: SessionID, forward: Bool) async {
+    guard let session = sessions.first(where: { $0.id == id }) else { return }
+    let candidates = forward ? nextTaskStatuses(of: session) : previousTaskStatuses(of: session)
+    guard let target = candidates.first, target != .archived else { return }
+    await setTaskStatus(target, for: id)
   }
 
   // MARK: - Restart
@@ -1012,7 +1142,10 @@ public final class AppModel {
     id: SessionID,
     contextOverride: String? = nil,
     skippingResume: SessionResumeSkip? = nil,
-    confirmed: Bool = false
+    confirmed: Bool = false,
+    /// `false` when the start comes from a status the user set by hand, and the column they are
+    /// sorting stays on screen (#80).
+    follows: Bool = true
   ) async {
     guard let launcher, let restartSession else { return }
     // A question already asked about this session is not asked twice; answering it is what moves
@@ -1109,9 +1242,13 @@ public final class AppModel {
       await report(error)
     }
     await reload()
-    // Whether it started or not: a restart that succeeded moved the session to Active, and one
+    // Whether it started or not: a restart that succeeded moved the session In Progress, and one
     // that failed left it where it was, which this simply confirms.
-    follow(id)
+    if follows {
+      follow(id)
+    } else {
+      reconcileSelection()
+    }
   }
 
   /// Tells a resumed conversation the agent refused from an ordinary end of work.
@@ -1771,7 +1908,16 @@ public final class AppModel {
   /// now, and a session that reappears later must not take them away from it.
   public func select(_ id: SessionID?) {
     preferredSelection = nil
+    if id != shownArchivedSessionID { shownArchivedSessionID = nil }
     apply(selection: id)
+  }
+
+  /// Opens an archived session from the list at the foot of the sidebar: its terminal is gone,
+  /// its record is shown in the main area.
+  public func showArchived(_ id: SessionID) {
+    guard sessions.contains(where: { $0.id == id && $0.taskStatus == .archived }) else { return }
+    shownArchivedSessionID = id
+    select(id)
   }
 
   private func apply(selection id: SessionID?) {
@@ -1897,7 +2043,10 @@ public final class AppModel {
   /// It is published by inserting it rather than by reloading the store: the session is already
   /// written, so showing it is a fact and not a guess, and the workspace never has to go blank
   /// to display something the application already holds.
-  public func complete(_ creation: SessionCreation) async {
+  ///
+  /// `launching: false` leaves the session in To Do, stored and never started (#80): moving it In
+  /// Progress is what will start it, with its prompt.
+  public func complete(_ creation: SessionCreation, launching: Bool = true) async {
     isPresentingNewSession = false
     newSessionModel = nil
     insert(creation.session)
@@ -1908,11 +2057,15 @@ public final class AppModel {
         "session": diagnostics.pseudonym(creation.session.id),
         "provider": .token(AgentProviderID(creation.plan.providerID.rawValue).diagnosticToken),
       ])
-    guard let launcher else { return }
+    guard launching, let launcher else {
+      // Shown in To Do, where it was put: the column follows what the user just made.
+      follow(creation.session.id)
+      return
+    }
     await launcher.launch(session: creation.session, plan: creation.plan)
     await reload()
-    // A session created while the sidebar was on Closed is running by now, and it is the one the
-    // user is looking at: the tab follows it rather than hiding what they just made.
+    // A session created while the sidebar was on another column is In Progress by now, and it is
+    // the one the user is looking at: the column follows it rather than hiding what they made.
     follow(creation.session.id)
   }
 
