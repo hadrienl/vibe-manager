@@ -58,6 +58,15 @@ public struct SettingsView: View {
         } header: {
           Text("Git", bundle: .module, comment: "A section of the Settings window.")
         }
+        if !model.hookTrustingAgents.isEmpty {
+          Section {
+            ForEach(model.hookTrustingAgents, id: \.id) { agent in
+              AgentActivityRow(model: model, agent: agent)
+            }
+          } header: {
+            Text("Agent Activity", bundle: .module, comment: "A section of the Settings window.")
+          }
+        }
         if let usage = model.usage {
           Section {
             UsageSettingsRow(usage: usage)
@@ -174,6 +183,30 @@ private struct FullDiskAccessRow: View {
     case .granted: return "checkmark.circle"
     case .notGranted: return "exclamationmark.circle"
     case nil: return "clock"
+    }
+  }
+}
+
+/// Whether an agent whose CLI approves its hooks reports its activity (#45). Turned back on, the
+/// next launch of that agent asks again.
+private struct AgentActivityRow: View {
+  let model: AppModel
+  let agent: AgentDescriptor
+
+  var body: some View {
+    Toggle(
+      isOn: Binding(
+        get: { model.reportsActivity[agent.id] ?? true },
+        set: { model.setReportsActivity($0, for: agent.id) })
+    ) {
+      Text(
+        "Track \(agent.displayName) activity", bundle: .module,
+        comment: "A setting; the argument is the agent's name.")
+      Text(
+        "Shows in the sidebar when it works, asks a question or has finished. Needs hooks \(agent.displayName) asks you to approve once.",
+        bundle: .module,
+        comment:
+          "Under the setting that tracks an agent's activity; the argument is the agent's name.")
     }
   }
 }

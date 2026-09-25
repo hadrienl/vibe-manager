@@ -78,6 +78,17 @@
         }
       }
     },
+    "%@ asks for new hooks to be approved once. Vibe Manager approves these ones, and no other." : {
+      "comment" : "What approving does; the argument is the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ demande d’approuver une fois chaque nouveau hook. Vibe Manager approuve ceux-ci, et aucun autre."
+          }
+        }
+      }
+    },
     "%@ cache read" : {
       "comment" : "Tokens read from the cache, abbreviated: “1.2 M cache read”.",
       "localizations" : {
@@ -1518,6 +1529,17 @@
         }
       }
     },
+    "Agent Activity" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité des agents"
+          }
+        }
+      }
+    },
     "Agent and initial prompt" : {
       "localizations" : {
         "fr" : {
@@ -1963,6 +1985,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replié"
+          }
+        }
+      }
+    },
+    "Commands the hooks run" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commandes exécutées par les hooks"
           }
         }
       }
@@ -2648,6 +2680,17 @@
         }
       }
     },
+    "Has a question" : {
+      "comment" : "A session's state: its agent asked the user something and waits for the answer.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question posée"
+          }
+        }
+      }
+    },
     "Hidden" : {
       "comment" : "The inspector is hidden.",
       "localizations" : {
@@ -2749,6 +2792,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identique — ignoré"
+          }
+        }
+      }
+    },
+    "Idle" : {
+      "comment" : "A session's state: its agent waits for an instruction, with nothing to read.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente"
           }
         }
       }
@@ -3042,6 +3096,28 @@
         }
       }
     },
+    "Needs approval" : {
+      "comment" : "A session's state: its agent waits for the user to allow a tool or a plan.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisation requise"
+          }
+        }
+      }
+    },
+    "Needs attention: %@" : {
+      "comment" : "Read out by VoiceOver before what the agent waits for: a question, an approval, an unread answer.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Action requise : %@"
+          }
+        }
+      }
+    },
     "Neither CLI reports a cost that holds together: Claude Code's running totals go down as well as up, and Codex reports none. A price list shipped with the application would be wrong within weeks, and means nothing on a subscription." : {
       "localizations" : {
         "fr" : {
@@ -3080,6 +3156,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau modèle"
+          }
+        }
+      }
+    },
+    "New reply" : {
+      "comment" : "A session's state: its agent finished an answer the user has not seen yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle réponse"
           }
         }
       }
@@ -3361,6 +3448,7 @@
       }
     },
     "Not Now" : {
+      "comment" : "Declines to approve an agent's hooks.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4327,17 +4415,6 @@
         }
       }
     },
-    "Running" : {
-      "comment" : "A session's state, in the sidebar.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En cours"
-          }
-        }
-      }
-    },
     "Running (configured model)" : {
       "comment" : "A column of the Usage window: running time, counted for the configured model.",
       "localizations" : {
@@ -4720,6 +4797,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Affiché"
+          }
+        }
+      }
+    },
+    "Shows in the sidebar when it works, asks a question or has finished. Needs hooks %@ asks you to approve once." : {
+      "comment" : "Under the setting that tracks an agent's activity; the argument is the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indique dans la barre latérale quand il travaille, pose une question ou a terminé. Nécessite des hooks que %@ vous demande d’approuver une fois."
           }
         }
       }
@@ -5478,6 +5566,17 @@
         }
       }
     },
+    "To show in the sidebar when %@ is working, asks a question or has finished an answer, Vibe Manager adds hooks to its sessions. They only note these moments in a file of Vibe Manager's; they never answer in your place." : {
+      "comment" : "Why the hooks are added; the argument is the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour indiquer dans la barre latérale quand %@ travaille, pose une question ou a terminé une réponse, Vibe Manager ajoute des hooks à ses sessions. Ils se contentent de noter ces moments dans un fichier de Vibe Manager ; ils ne répondent jamais à votre place."
+          }
+        }
+      }
+    },
     "Today" : {
       "comment" : "A period of the Usage window.",
       "localizations" : {
@@ -5590,6 +5689,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Total"
+          }
+        }
+      }
+    },
+    "Track %@ activity" : {
+      "comment" : "A setting; the argument is the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivre l’activité de %@"
+          }
+        }
+      }
+    },
+    "Track %@ activity?" : {
+      "comment" : "Title of the sheet asking to approve an agent's hooks; the argument is the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivre l’activité de %@ ?"
+          }
+        }
+      }
+    },
+    "Track Activity" : {
+      "comment" : "Approves an agent's hooks.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivre l’activité"
           }
         }
       }
@@ -5939,6 +6071,17 @@
         }
       }
     },
+    "Working" : {
+      "comment" : "A session's state: its agent is generating, or running a tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours"
+          }
+        }
+      }
+    },
     "Working folder" : {
       "localizations" : {
         "fr" : {
@@ -5966,6 +6109,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utile quand l’agent a refusé le modèle précédent, plutôt que la conversation elle-même."
+          }
+        }
+      }
+    },
+    "You can change this later in Settings." : {
+      "comment" : "Under the question about an agent's hooks.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pourrez changer d’avis plus tard dans les Réglages."
           }
         }
       }

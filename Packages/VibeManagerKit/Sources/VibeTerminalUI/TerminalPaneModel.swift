@@ -178,10 +178,15 @@ public final class TerminalPaneModel {
     await session?.resize(to: size)
   }
 
+  /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
+  /// agent's question is how its state is known to have moved before the agent says so (#45).
+  @ObservationIgnored public var onUserInput: (([UInt8]) -> Void)?
+
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
     guard !bytes.isEmpty else { return }
     hasReceivedInput = true
+    onUserInput?(bytes)
     await session?.write(bytes)
   }
 

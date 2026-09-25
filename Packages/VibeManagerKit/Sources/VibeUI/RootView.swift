@@ -132,7 +132,22 @@ public struct RootView: View {
           DiagnosticsExportSheet(model: export, close: { model.endDiagnosticsExport() })
             .id(export.id)
         }
+      case .hookConsent:
+        if let request = model.hookConsentRequest {
+          HookConsentSheet(request: request, answer: { model.answerHookConsent($0) })
+            .id(request.id)
+        }
       }
+    }
+    // An answer finished while the window is out of sight is unread: minimised, hidden or
+    // covered, it is not in front of the user.
+    .onReceive(
+      NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)
+    ) { notification in
+      guard let window = notification.object as? NSWindow, window.isMainWindowCandidate else {
+        return
+      }
+      model.mainWindowVisibilityChanged(window.occlusionState.contains(.visible))
     }
   }
 
@@ -162,6 +177,7 @@ public struct RootView: View {
     if model.pendingRestart != nil { return .restartContext }
     if model.pendingSwitch != nil { return .agentSwitch }
     if model.diagnosticsExport != nil { return .diagnosticsExport }
+    if model.hookConsentRequest != nil { return .hookConsent }
     return nil
   }
 
@@ -181,6 +197,8 @@ public struct RootView: View {
       model.cancelAgentSwitch()
     case .diagnosticsExport:
       model.endDiagnosticsExport()
+    case .hookConsent:
+      model.answerHookConsent(false)
     case nil:
       break
     }
@@ -200,6 +218,8 @@ public struct RootView: View {
     /// From the Help menu, Settings, or a store that could not be read: the last case has no
     /// workspace to attach a sheet to.
     case diagnosticsExport
+    /// A launch waits on it: asked before a CLI's hooks are approved.
+    case hookConsent
 
     var id: Self { self }
   }
@@ -529,7 +549,8 @@ public struct RootView: View {
       session: session,
       paneStatus: pane.status,
       resolution: model.resolution(forID: session.id),
-      wasStoppedOnPurpose: pane.wasStoppedOnPurpose
+      wasStoppedOnPurpose: pane.wasStoppedOnPurpose,
+      activity: model.activity(for: session.id)
     )
     return String(
       localized: "Terminal — \(session.name) — \(String(localized: status.label))",
@@ -1302,7 +1323,8 @@ private struct SessionSidebar: View {
             session: session,
             paneStatus: model.pane(for: session.id)?.status,
             resolution: model.resolution(forID: session.id),
-            wasStoppedOnPurpose: model.pane(for: session.id)?.wasStoppedOnPurpose == true
+            wasStoppedOnPurpose: model.pane(for: session.id)?.wasStoppedOnPurpose == true,
+            activity: model.activity(for: session.id)
           ),
           isRestoring: model.isRestoring(session.id),
           // Only the rows a shortcut can reach claim one.
@@ -1524,6 +1546,7 @@ private struct SessionRow: View {
   let isRestoring: Bool
   let shortcutPosition: Int?
   let commands: SessionCommands
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     HStack(spacing: 10) {
@@ -1547,7 +1570,11 @@ private struct SessionRow: View {
           systemImage: isRestoring ? "arrow.clockwise" : status.symbolName
         )
         .font(.caption)
+        // What waits for the user is the one state set apart from the others by more than its
+        // colour and its symbol.
+        .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
         .foregroundStyle(isRestoring ? Color.secondary : tint)
+        .modifier(WorkingSymbolEffect(isActive: isWorkingAnimated))
         .lineLimit(1)
       }
       Spacer(minLength: 4)
@@ -1589,12 +1616,40 @@ private struct SessionRow: View {
     }
   }
 
+  /// A working agent's symbol moves; with Reduce Motion it stays still, and its shape and its
+  /// colour still set it apart.
+  private var isWorkingAnimated: Bool {
+    !isRestoring && status.isAnimated && !reduceMotion
+  }
+
   private var tint: Color {
     switch status.severity {
     case .normal: return .secondary
+    case .active: return .accentColor
     case .attention: return .orange
     case .error: return .red
     }
+  }
+}
+
+/// The symbol of a working agent turns; before macOS 15, which cannot turn a symbol, it pulses.
+private struct WorkingSymbolEffect: ViewModifier {
+  let isActive: Bool
+
+  func body(content: Content) -> some View {
+    if #available(macOS 15, *) {
+      content.symbolEffect(.rotate, options: .repeating, isActive: isActive)
+    } else {
+      content.symbolEffect(.pulse, options: .repeating, isActive: isActive)
+    }
+  }
+}
+
+extension NSWindow {
+  /// The workspace window, rather than Settings, a panel or a sheet.
+  fileprivate var isMainWindowCandidate: Bool {
+    canBecomeMain && !(self is NSPanel) && sheetParent == nil
+      && identifier?.rawValue.contains("Settings") != true
   }
 }
 

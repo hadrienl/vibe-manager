@@ -76,6 +76,7 @@ public final class AppEnvironment {
   /// second is not free, and a release build has Instruments for that.
   private let hangDetector: MainThreadHangDetector?
   private let memorySampler: MemorySampler
+  private let activityTracker: TrackAgentActivity
 
   public init(configuration: Configuration = Configuration()) {
     let data = Self.dataLocation(
@@ -147,12 +148,26 @@ public final class AppEnvironment {
       tokenStore: FileTokenUsageStore(directory: data.usage),
       reader: AgentUsageReader()
     )
+    // What each agent is doing (#45): its hooks append to a log per session, beside the store.
+    let dataFolder = data.store.deletingLastPathComponent()
+    let activityTracker = TrackAgentActivity(
+      logs: FileAgentActivityLog(
+        directory: dataFolder.appendingPathComponent("AgentActivity", isDirectory: true)),
+      store: FileAgentActivityStateStore(
+        url: dataFolder.appendingPathComponent("agent-activity.json", isDirectory: false))
+    )
+    self.activityTracker = activityTracker
+    let hookConsents = UserDefaultsAgentHookConsentStore(suiteName: data.defaultsSuite)
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
       agents: registry,
       recorder: recorder,
       usage: usageRecorder,
+      activity: activityTracker,
+      reportActivity: ReportAgentActivity(
+        agents: registry, tracker: activityTracker, consents: hookConsents,
+        diagnostics: diagnostics),
       diagnostics: diagnostics
     )
     self.launcher = launcher
@@ -218,6 +233,8 @@ public final class AppEnvironment {
       templateRepository: FilePromptTemplateRepository(storeURL: data.templates),
       templateExchange: PromptTemplateExchangeCodec(),
       usage: UsageModel(service: usage),
+      activityTracker: activityTracker,
+      hookConsents: hookConsents,
       diagnostics: diagnostics,
       collectDiagnostics: { model in
         await Self.snapshot(
@@ -328,6 +345,8 @@ public final class AppEnvironment {
     // already in flight would otherwise write `reopen` after this shutdown had decided what to
     // close.
     await appModel.stopRestoring()
+    // What is unread, and how far each log was read, for the next launch.
+    await activityTracker.flush()
     if keepingAgentsRunning {
       await detachForQuit()
       // The lines of this very path are the ones worth reading if the agents are not found again.

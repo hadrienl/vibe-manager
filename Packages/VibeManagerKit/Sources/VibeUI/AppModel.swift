@@ -39,6 +39,20 @@ public final class AppModel {
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
+  /// What each session's agent is doing, as the tracker last said (#45).
+  public internal(set) var activities: [SessionID: AgentActivityState] = [:]
+  /// A CLI's hooks waiting for the user's consent before its agent starts.
+  public internal(set) var hookConsentRequest: HookConsentRequest?
+  /// The agents whose CLI makes the user approve hooks, for the setting that turns them off.
+  public internal(set) var hookTrustingAgents: [AgentDescriptor] = []
+  /// Whether each of those agents reports its activity, as the setting shows it.
+  public internal(set) var reportsActivity: [AgentProviderID: Bool] = [:]
+  let activityTracker: TrackAgentActivity?
+  let hookConsents: any AgentHookConsentStore
+  var hookConsentContinuation: CheckedContinuation<Bool, Never>?
+  var activityUpdates: Task<Void, Never>?
+  var isApplicationActive = true
+  var isMainWindowVisible = true
   /// What the agent did to the branches of each session, as last read. Only the session on
   /// screen is read, so the others keep what was true when they were last looked at.
   public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
@@ -377,7 +391,7 @@ public final class AppModel {
   private let repository: any SessionRepository
   private let loadSessions: LoadSessions
   private let recovery: (any SessionStoreRecovery)?
-  private let agents: (any AgentProviderResolving)?
+  let agents: (any AgentProviderResolving)?
   private let launcher: SessionLauncher?
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
@@ -445,6 +459,11 @@ public final class AppModel {
     templateExchange: (any PromptTemplateExchangeFormat)? = nil,
     /// Where runs are recorded and tokens read. A workspace assembled without it shows no usage.
     usage: UsageModel? = nil,
+    /// Follows what each session's agent is doing. Absent in a workspace assembled without it:
+    /// running sessions then show as idle.
+    activityTracker: TrackAgentActivity? = nil,
+    /// What the user decided about the hooks of the CLIs that ask before running them.
+    hookConsents: any AgentHookConsentStore = InMemoryAgentHookConsentStore(),
     /// The diagnostics log. Nothing the user typed ever reaches it: see `DiagnosticEvent`.
     diagnostics: Diagnostics = .disabled,
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
@@ -452,6 +471,8 @@ public final class AppModel {
     /// Writes the archive of an export.
     archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() }
   ) {
+    self.activityTracker = activityTracker
+    self.hookConsents = hookConsents
     self.diagnostics = diagnostics
     self.collectDiagnostics = collectDiagnostics
     self.archiveDiagnostics = archiveDiagnostics
@@ -526,6 +547,11 @@ public final class AppModel {
     }
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
+
+    launcher?.askHookConsent = { [weak self] name, commands in
+      guard let self else { return false }
+      return await self.requestHookConsent(agentName: name, commands: commands)
+    }
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
@@ -748,6 +774,8 @@ public final class AppModel {
     do {
       let closure = try await closeSession(id: id)
       report(closure.detachment, for: closure.session, action: .closed)
+      // Closing a session is reading it.
+      await activityTracker?.forget(id)
     } catch {
       await report(error)
     }
@@ -802,6 +830,7 @@ public final class AppModel {
     pendingArchive = nil
     do {
       let archival = try await archiveSession(id: id)
+      await activityTracker?.forget(id)
       diagnostics.record(
         .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)
@@ -1628,6 +1657,9 @@ public final class AppModel {
     // frame — is the lie this whole ticket is about.
     let shutdown = await detectPreviousShutdown?()
     note(shutdown)
+    // Before any process is started or adopted: what the last launch left unread comes back with
+    // the first list.
+    await startFollowingActivity()
     await reload()
     Signposts.end("launch.firstList", firstList)
     // Which agents write a usage is part of their description, known without probing any of them.
@@ -1710,6 +1742,7 @@ public final class AppModel {
     selectedSessionID = id
     layout.select(id)
     watchBranches()
+    updateVisibleSession()
   }
 
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
@@ -2039,6 +2072,8 @@ extension AppModel {
   /// Called when the application comes back to the front: an event may have been missed while
   /// the Mac slept or a volume was away.
   public func applicationDidBecomeActive() {
+    isApplicationActive = true
+    updateVisibleSession()
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
   }
@@ -2046,6 +2081,8 @@ extension AppModel {
   /// Called when another application comes to the front: whatever was typed in the notes is
   /// written, as it would be on leaving the session.
   public func applicationWillResignActive() {
+    isApplicationActive = false
+    updateVisibleSession()
     Task { [notes] in _ = await notes.flushAll() }
   }
 

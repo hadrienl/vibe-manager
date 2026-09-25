@@ -52,6 +52,11 @@ public struct ReportedLaunch: Sendable {
   public let plan: AgentLaunchPlan
   /// `nil` when the agent reports nothing: its activity is then read from its output.
   public let decoder: (any AgentSignalDecoding)?
+
+  public init(plan: AgentLaunchPlan, decoder: (any AgentSignalDecoding)?) {
+    self.plan = plan
+    self.decoder = decoder
+  }
 }
 
 /// Sets a launch up to report what its agent does, and settles the approval of its hooks when its

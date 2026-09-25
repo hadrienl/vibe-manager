@@ -41,6 +41,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// Where each run of an agent is written down for the usage figures (#18). Absent in a workspace
   /// assembled without it, and no run is then recorded.
   private let usage: UsageRecorder?
+  /// What each session's agent is doing (#45). Absent in a workspace assembled without it, and no
+  /// activity is then followed.
+  private let activity: TrackAgentActivity?
+  /// Sets each launch up to report its agent's activity.
+  private let reportActivity: ReportAgentActivity?
+  /// Asked when a CLI needs its hooks approved before the first launch that carries them. Until
+  /// the workspace sets it, the answer is no: the agent then simply runs without hooks.
+  public var askHookConsent: AgentHookConsentRequest = { _, _ in false }
 
   private let diagnostics: Diagnostics
   /// When each running process was seen starting, for the duration its exit is logged with.
@@ -49,6 +57,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
   private var exitTasks: [SessionID: Task<Void, Never>] = [:]
+  /// Tells the activity tracker that a terminal wrote something: the only signal an agent without
+  /// hooks gives.
+  private var activityTasks: [SessionID: Task<Void, Never>] = [:]
   /// Which exit watch is the current one for a session.
   ///
   /// Cancelling a task only asks. A watch that has already seen its process end, and is waiting
@@ -75,6 +86,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     agents: any AgentProviderResolving,
     recorder: SessionRuntimeRecorder? = nil,
     usage: UsageRecorder? = nil,
+    activity: TrackAgentActivity? = nil,
+    reportActivity: ReportAgentActivity? = nil,
     clock: any SessionClock = SystemSessionClock(),
     viewportTimeout: Duration = .milliseconds(500),
     diagnostics: Diagnostics = .disabled
@@ -85,6 +98,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     self.agents = agents
     self.recorder = recorder
     self.usage = usage
+    self.activity = activity
+    self.reportActivity = reportActivity
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
@@ -133,6 +148,12 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       return .failed(reason: Self.archivedReason)
     }
     let launchedAt = ContinuousClock.now
+    // The hooks are part of the plan the process is started with. Asking whether a CLI may run
+    // them can wait on the user, and the launch waits with it.
+    let reported =
+      await reportActivity?(plan, for: session.id, askConsent: askHookConsent)
+      ?? ReportedLaunch(plan: plan, decoder: nil)
+    let plan = reported.plan
 
     // The pane a session already has is reused rather than replaced. The view that renders it
     // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
@@ -194,6 +215,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       context: run)
     watchForExit(id: session.id, terminal: terminal)
     signpostFirstOutput(of: terminal)
+    await activity?.processStarted(session.id, decoder: reported.decoder)
+    followOutput(of: session.id, terminal: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     // Recorded once there is something to record, and from the terminal rather than from the
     // plan: the process group is the child's own pid, which only exists after the spawn. A
@@ -409,6 +432,17 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     guard case .running(let processIdentifier) = state else { return true }
     startedAt[session.id] = .now
     watchForExit(id: session.id, terminal: terminal)
+    // The hooks it was started with still write to its log: what it did meanwhile is read from
+    // where the last launch stopped.
+    var decoder: (any AgentSignalDecoding)?
+    if let providerID = session.agent?.providerID,
+      let reporting = await agents.provider(id: AgentProviderID(providerID))
+        as? any AgentActivityReporting
+    {
+      decoder = reporting.activityDecoder()
+    }
+    await activity?.processAdopted(session.id, decoder: decoder)
+    followOutput(of: session.id, terminal: terminal)
     await recorder?.started(session.id, processGroup: processIdentifier)
     return true
   }
@@ -447,6 +481,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     exitTasks.removeValue(forKey: id)?.cancel()
     _ = nextExitGeneration(for: id)
     outputTasks.removeValue(forKey: id)?.cancel()
+    activityTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
       await observer.finished()
     }
@@ -468,6 +503,11 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       spec: spec,
       viewportTimeout: viewportTimeout
     )
+    if let activity {
+      pane.onUserInput = { bytes in
+        Task { await activity.userInput(id, bytes) }
+      }
+    }
     panes[id] = pane
     return pane
   }
@@ -488,6 +528,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       task.cancel()
     }
     outputTasks.removeAll()
+    for task in activityTasks.values {
+      task.cancel()
+    }
+    activityTasks.removeAll()
     for observer in observers.values {
       await observer.finished()
     }
@@ -509,9 +553,11 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // past the point where cancellation can stop it.
     _ = nextExitGeneration(for: id)
     outputTasks.removeValue(forKey: id)?.cancel()
+    activityTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
       await observer.finished()
     }
+    await activity?.processEnded(id)
 
     let pane = panes[id]
     var terminal = pane?.session
@@ -620,15 +666,36 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     guard exitGenerations[id] == generation else { return }
     exitTasks[id] = nil
     outputTasks.removeValue(forKey: id)?.cancel()
+    activityTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
       await observer.finished()
     }
+    await activity?.processEnded(id)
     guard exitGenerations[id] == generation else { return }
     // A session that was never marked active — a launch that failed — has nothing to close, and
     // `close` says so by refusing the transition rather than by inventing a second rule here.
     _ = try? await changeStatus(id: id, action: .close)
     guard exitGenerations[id] == generation else { return }
     sessionDidClose?(id, state)
+  }
+
+  /// Tells the tracker the terminal wrote something, at most every quarter of a second: the
+  /// fallback it feeds counts silences in seconds, and a flood of output must not become a flood
+  /// of messages.
+  private func followOutput(of id: SessionID, terminal: any TerminalSession) {
+    guard let activity else { return }
+    activityTasks[id]?.cancel()
+    activityTasks[id] = Task {
+      let attachment = await terminal.attach()
+      var last: ContinuousClock.Instant?
+      for await event in attachment.events {
+        guard case .output = event else { continue }
+        let now = ContinuousClock.now
+        if let last, now - last < .milliseconds(250) { continue }
+        last = now
+        await activity.output(id)
+      }
+    }
   }
 
   private func startObserver(

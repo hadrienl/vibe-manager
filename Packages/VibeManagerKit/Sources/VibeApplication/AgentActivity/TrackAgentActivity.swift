@@ -102,8 +102,10 @@ public actor TrackAgentActivity {
     try await logs.prepareLog(for: id)
   }
 
-  /// A process started for the session. `decoder` is `nil` for an agent launched without hooks.
-  public func processStarted(_ id: SessionID, decoder: (any AgentSignalDecoding)?) {
+  /// A process started for the session. `decoder` is `nil` for an agent launched without hooks,
+  /// whose session then has no log: one left by an earlier process would be read as this one's.
+  public func processStarted(_ id: SessionID, decoder: (any AgentSignalDecoding)?) async {
+    if decoder == nil { await logs.removeLog(for: id) }
     var tracked = sessions[id] ?? Tracked()
     cancelTasks(of: &tracked)
     tracked.decoder = decoder
@@ -119,17 +121,17 @@ public actor TrackAgentActivity {
   /// the meantime is read from where the last launch stopped, as having happened unseen.
   public func processAdopted(_ id: SessionID, decoder: (any AgentSignalDecoding)?) async {
     await load()
+    // A process launched without hooks has no log, and one launched with them always has one.
+    let hasLog = decoder != nil ? await logs.existingLog(for: id) != nil : false
     var tracked = sessions[id] ?? Tracked()
     cancelTasks(of: &tracked)
-    tracked.decoder = decoder
+    tracked.decoder = hasLog ? decoder : nil
     // What the hooks left pending is still pending: the process never stopped.
-    tracked.state.activity = tracked.restoredActivity ?? .idle
+    tracked.state.activity = hasLog ? tracked.restoredActivity ?? .idle : .idle
     tracked.restoredActivity = nil
-    tracked.state.source = decoder == nil ? .inferred : .structured
+    tracked.state.source = hasLog ? .structured : .inferred
     sessions[id] = tracked
-    if decoder != nil, await logs.existingLog(for: id) != nil {
-      follow(id, from: tracked.logPosition)
-    }
+    if hasLog { follow(id, from: tracked.logPosition) }
     changed(id)
   }
 
