@@ -39,6 +39,21 @@ public final class AppModel {
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
+  /// What each session's agent is doing, as the tracker last said (#45).
+  public internal(set) var activities: [SessionID: AgentActivityState] = [:]
+  /// A CLI's hooks waiting for the user's consent before its agent starts.
+  public internal(set) var hookConsentRequest: HookConsentRequest?
+  /// The agents whose CLI makes the user approve hooks, for the setting that turns them off.
+  public internal(set) var hookTrustingAgents: [AgentDescriptor] = []
+  /// Whether each of those agents reports its activity, as the setting shows it.
+  public internal(set) var reportsActivity: [AgentProviderID: Bool] = [:]
+  let activityTracker: TrackAgentActivity?
+  let hookConsents: any AgentHookConsentStore
+  /// Every launch waiting on the consent sheet. One answer settles them all.
+  var hookConsentWaiters: [UUID: CheckedContinuation<AgentHookConsent, Never>] = [:]
+  var activityUpdates: Task<Void, Never>?
+  var isApplicationActive = true
+  var isMainWindowVisible = true
   /// What the agent did to the branches of each session, as last read. Only the session on
   /// screen is read, so the others keep what was true when they were last looked at.
   public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
@@ -108,13 +123,6 @@ public final class AppModel {
     public enum Action: Equatable {
       case closed
       case archived
-
-      var verb: String {
-        switch self {
-        case .closed: return "closed"
-        case .archived: return "archived"
-        }
-      }
     }
 
     public let action: Action
@@ -122,14 +130,27 @@ public final class AppModel {
     public let processIdentifier: Int32
 
     public var message: String {
-      """
-      \(sessionName) was \(action.verb), but its process (pid \(processIdentifier)) did not \
-      answer the stop and may still be running.
-      """
+      let pid = String(processIdentifier)
+      switch action {
+      case .closed:
+        return String(
+          localized: """
+            \(sessionName) was closed, but its process (pid \(pid)) did not answer the stop and \
+            may still be running.
+            """,
+          bundle: .module, comment: "A session's name, then a process identifier.")
+      case .archived:
+        return String(
+          localized: """
+            \(sessionName) was archived, but its process (pid \(pid)) did not answer the stop and \
+            may still be running.
+            """,
+          bundle: .module, comment: "A session's name, then a process identifier.")
+      }
     }
 
     public var suggestion: String {
-      "Check Activity Monitor for a leftover process."
+      String(localized: "Check Activity Monitor for a leftover process.", bundle: .module)
     }
   }
 
@@ -241,9 +262,16 @@ public final class AppModel {
 
     public var message: String {
       guard let currentName else {
-        return "Restoring sessions — \(completed) of \(total)"
+        return String(
+          localized: "Restoring sessions — \(completed) of \(total)", bundle: .module,
+          comment: "Progress of the restoration: sessions done, then sessions in all.")
       }
-      return "Restoring sessions — \(min(completed + 1, total)) of \(total) · \(currentName)"
+      return String(
+        localized:
+          "Restoring sessions — \(min(completed + 1, total)) of \(total) · \(currentName)",
+        bundle: .module,
+        comment:
+          "Progress of the restoration: the session being restored, of how many, and its name.")
     }
   }
 
@@ -260,18 +288,20 @@ public final class AppModel {
     public let interruptedAt: Date?
 
     public var message: String {
-      let subject =
-        sessionCount == 1 ? "1 session was running" : "\(sessionCount) sessions were running"
-      return "Vibe Manager stopped unexpectedly. \(subject)."
+      String(
+        localized: "Vibe Manager stopped unexpectedly. \(sessionCount) sessions were running.",
+        bundle: .module)
     }
 
     public var suggestion: String? {
       guard !leftoverProcessIdentifiers.isEmpty else { return nil }
       let pids = leftoverProcessIdentifiers.map(String.init).joined(separator: ", ")
-      return """
-        A process from that run may still be running (pid \(pids)) and was left alone; check \
-        Activity Monitor.
-        """
+      return String(
+        localized: """
+          A process from that run may still be running (pid \(pids)) and was left alone; check \
+          Activity Monitor.
+          """,
+        bundle: .module, comment: "Process identifiers, separated by commas.")
     }
   }
 
@@ -285,13 +315,27 @@ public final class AppModel {
 
     public var message: String {
       let total = runningCount + endedCount
-      let subject =
-        total == 1
-        ? "1 agent kept running while Vibe Manager was closed"
-        : "\(total) agents kept running while Vibe Manager was closed"
-      guard endedCount > 0 else { return "\(subject)." }
-      let ended = endedCount == 1 ? "1 has finished since" : "\(endedCount) have finished since"
-      return "\(subject); \(ended)."
+      // One count per sentence can agree with its noun: past one ended agent, both counts are
+      // plural, and only the total is left to agree.
+      switch endedCount {
+      case 0:
+        return String(
+          localized: "\(total) agents kept running while Vibe Manager was closed.",
+          bundle: .module)
+      case 1:
+        return String(
+          localized:
+            "\(total) agents kept running while Vibe Manager was closed; 1 has finished since.",
+          bundle: .module)
+      default:
+        return String(
+          localized:
+            "\(total) agents kept running while Vibe Manager was closed; \(endedCount) have finished since.",
+          bundle: .module,
+          comment:
+            "Agents left running when the application quit, then how many of them ended since; both above one."
+        )
+      }
     }
   }
 
@@ -318,19 +362,18 @@ public final class AppModel {
       var sentences: [String] = []
       if !lines.isEmpty {
         sentences.append(
-          lines.count == 1
-            ? "1 session did not come back." : "\(lines.count) sessions did not come back.")
+          String(localized: "\(lines.count) sessions did not come back.", bundle: .module))
       }
       if cancelledCount > 0 {
         sentences.append(
-          cancelledCount == 1
-            ? "1 more was left closed when you cancelled."
-            : "\(cancelledCount) more were left closed when you cancelled."
-        )
+          String(
+            localized: "\(cancelledCount) more were left closed when you cancelled.",
+            bundle: .module,
+            comment: "Sessions the restoration did not reach, because the user cancelled it."))
       }
       if restartedCount > 0 {
         sentences.append(
-          restartedCount == 1 ? "1 session came back." : "\(restartedCount) sessions came back.")
+          String(localized: "\(restartedCount) sessions came back.", bundle: .module))
       }
       return sentences.joined(separator: " ")
     }
@@ -349,7 +392,7 @@ public final class AppModel {
   private let repository: any SessionRepository
   private let loadSessions: LoadSessions
   private let recovery: (any SessionStoreRecovery)?
-  private let agents: (any AgentProviderResolving)?
+  let agents: (any AgentProviderResolving)?
   private let launcher: SessionLauncher?
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
@@ -417,6 +460,11 @@ public final class AppModel {
     templateExchange: (any PromptTemplateExchangeFormat)? = nil,
     /// Where runs are recorded and tokens read. A workspace assembled without it shows no usage.
     usage: UsageModel? = nil,
+    /// Follows what each session's agent is doing. Absent in a workspace assembled without it:
+    /// running sessions then show as idle.
+    activityTracker: TrackAgentActivity? = nil,
+    /// What the user decided about the hooks of the CLIs that ask before running them.
+    hookConsents: any AgentHookConsentStore = InMemoryAgentHookConsentStore(),
     /// The diagnostics log. Nothing the user typed ever reaches it: see `DiagnosticEvent`.
     diagnostics: Diagnostics = .disabled,
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
@@ -424,6 +472,8 @@ public final class AppModel {
     /// Writes the archive of an export.
     archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() }
   ) {
+    self.activityTracker = activityTracker
+    self.hookConsents = hookConsents
     self.diagnostics = diagnostics
     self.collectDiagnostics = collectDiagnostics
     self.archiveDiagnostics = archiveDiagnostics
@@ -498,6 +548,11 @@ public final class AppModel {
     }
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
+
+    launcher?.askHookConsent = { [weak self] name, commands in
+      guard let self else { return .undecided }
+      return await self.requestHookConsent(agentName: name, commands: commands)
+    }
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
@@ -720,6 +775,8 @@ public final class AppModel {
     do {
       let closure = try await closeSession(id: id)
       report(closure.detachment, for: closure.session, action: .closed)
+      // Closing a session is reading it.
+      await activityTracker?.forget(id)
     } catch {
       await report(error)
     }
@@ -774,6 +831,7 @@ public final class AppModel {
     pendingArchive = nil
     do {
       let archival = try await archiveSession(id: id)
+      await activityTracker?.forget(id)
       diagnostics.record(
         .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)
@@ -848,15 +906,40 @@ public final class AppModel {
     if identifier?.isEmpty == false, descriptor.capabilities.supportsResume,
       !resumeRefusals.contains(session.id)
     {
-      return "\(restartTitle(for: session)), resuming its \(descriptor.displayName) conversation"
+      return session.hasEverStarted
+        ? String(
+          localized: "Restart Session, resuming its \(descriptor.displayName) conversation",
+          bundle: .module, comment: "Said by VoiceOver for the Restart action: an agent's name.")
+        : String(
+          localized: "Start Session, resuming its \(descriptor.displayName) conversation",
+          bundle: .module, comment: "Said by VoiceOver for the Start action: an agent's name.")
     }
-    return "\(restartTitle(for: session)) in a new process, with a summary"
+    return session.hasEverStarted
+      ? String(
+        localized: "Restart Session in a new process, with a summary", bundle: .module,
+        comment: "Said by VoiceOver for the Restart action.")
+      : String(
+        localized: "Start Session in a new process, with a summary", bundle: .module,
+        comment: "Said by VoiceOver for the Start action.")
+  }
+
+  /// Stands for the name of a session that is no longer listed.
+  private static var unnamedSession: String {
+    String(
+      localized: "This session", bundle: .module,
+      comment: "Stands for the name of a session that is no longer listed.")
   }
 
   /// A session that was created and never ran is started, not restarted. Promising a restart
   /// there would be a false sentence on the very first use.
   public func restartTitle(for session: WorkSession) -> String {
-    session.hasEverStarted ? "Restart Session" : "Start Session"
+    session.hasEverStarted
+      ? String(
+        localized: "Restart Session", bundle: .module,
+        comment: "A command of the Session menu, for a session that has run before.")
+      : String(
+        localized: "Start Session", bundle: .module,
+        comment: "A command of the Session menu, for a session that has never run.")
   }
 
   /// Restarts a closed session: resumes its conversation when the agent can, and otherwise asks
@@ -970,15 +1053,17 @@ public final class AppModel {
         let failure = launcher.failure(for: id)
         restartFailure = RestartFailure(
           sessionName: restart.session.name,
-          message: reason ?? failure?.message ?? "This session could not be restarted.",
+          message: reason ?? failure?.message
+            ?? String(localized: "This session could not be restarted.", bundle: .module),
           suggestion: reason == nil ? failure?.suggestion : nil,
           sessionID: id
         )
       }
     } catch let refusal as SessionRestartRefusal {
       restartFailure = RestartFailure(
-        sessionName: sessions.first { $0.id == id }?.name ?? "This session",
-        message: refusal.errorDescription ?? "This session could not be restarted.",
+        sessionName: sessions.first { $0.id == id }?.name ?? Self.unnamedSession,
+        message: refusal.errorDescription
+          ?? String(localized: "This session could not be restarted.", bundle: .module),
         suggestion: refusal.recoverySuggestion,
         sessionID: id
       )
@@ -1129,7 +1214,7 @@ public final class AppModel {
     defer { restartingSessionIDs.remove(id) }
     switchFailure = nil
     switchBackOffers[id] = nil
-    let name = sessions.first { $0.id == id }?.name ?? "This session"
+    let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
 
     do {
       // 1. Everything that can refuse, while the agent still runs.
@@ -1195,9 +1280,14 @@ public final class AppModel {
         case .failed(let reason?):
           why = reason
         case .alreadyRunning:
-          why = "Another launch started this session in the meantime."
+          why = String(
+            localized: "Another launch started this session in the meantime.", bundle: .module)
         default:
-          why = launcher.failure(for: id)?.message ?? "\(plan.targetName) could not be started."
+          why =
+            launcher.failure(for: id)?.message
+            ?? String(
+              localized: "\(plan.targetName) could not be started.", bundle: .module,
+              comment: "An agent's name.")
         }
         await undoSwitch(
           id: id, change: change, reason: why, target: plan.targetName, previous: previous,
@@ -1206,7 +1296,8 @@ public final class AppModel {
     } catch let refusal as AgentSwitchRefusal {
       switchFailure = RestartFailure(
         sessionName: name,
-        message: refusal.errorDescription ?? "The agent could not be switched.",
+        message: refusal.errorDescription
+          ?? String(localized: "The agent could not be switched.", bundle: .module),
         suggestion: refusal.recoverySuggestion,
         sessionID: id
       )
@@ -1231,15 +1322,23 @@ public final class AppModel {
     let suggestion: String
     do {
       try await revertAgentSwitch(id: id, change: change.id, reason: reason)
-      suggestion = "The session is back on \(previous)."
+      suggestion = String(
+        localized: "The session is back on \(previous).", bundle: .module,
+        comment: "An agent's name.")
     } catch {
-      suggestion =
-        "The session could not be put back on \(previous): it stays on \(target), and Restart "
-        + "will start it with a summary."
+      suggestion = String(
+        localized: """
+          The session could not be put back on \(previous): it stays on \(target), and Restart \
+          will start it with a summary.
+          """,
+        bundle: .module,
+        comment: "The agent the switch left, then the one it switched to. Restart is a command.")
     }
     switchFailure = RestartFailure(
       sessionName: name,
-      message: "Could not switch to \(target): \(reason)",
+      message: String(
+        localized: "Could not switch to \(target): \(reason)", bundle: .module,
+        comment: "An agent's name, then why it could not be started."),
       suggestion: suggestion,
       sessionID: id
     )
@@ -1559,6 +1658,9 @@ public final class AppModel {
     // frame — is the lie this whole ticket is about.
     let shutdown = await detectPreviousShutdown?()
     note(shutdown)
+    // Before any process is started or adopted: what the last launch left unread comes back with
+    // the first list.
+    await startFollowingActivity()
     await reload()
     Signposts.end("launch.firstList", firstList)
     // Which agents write a usage is part of their description, known without probing any of them.
@@ -1641,6 +1743,7 @@ public final class AppModel {
     selectedSessionID = id
     layout.select(id)
     watchBranches()
+    updateVisibleSession()
   }
 
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
@@ -1892,7 +1995,9 @@ public final class AppModel {
   /// a banner over them: a transient read error must not dismantle the terminals or lose the
   /// user's place.
   private func report(_ error: Error) async {
-    let message = (error as? LocalizedError)?.errorDescription ?? "Unable to load work sessions."
+    let message =
+      (error as? LocalizedError)?.errorDescription
+      ?? String(localized: "Unable to load work sessions.", bundle: .module)
     let canRestoreBackup = await recovery?.recoveryStatus() == .backupAvailable
 
     if sessions.isEmpty {
@@ -1968,6 +2073,8 @@ extension AppModel {
   /// Called when the application comes back to the front: an event may have been missed while
   /// the Mac slept or a volume was away.
   public func applicationDidBecomeActive() {
+    isApplicationActive = true
+    updateVisibleSession()
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
   }
@@ -1975,6 +2082,8 @@ extension AppModel {
   /// Called when another application comes to the front: whatever was typed in the notes is
   /// written, as it would be on leaving the session.
   public func applicationWillResignActive() {
+    isApplicationActive = false
+    updateVisibleSession()
     Task { [notes] in _ = await notes.flushAll() }
   }
 
@@ -2014,12 +2123,16 @@ extension AppModel {
   /// showed. On demand only — never as output arrives.
   public func readLastOutput() async {
     guard let id = selectedSessionID, let session = pane(for: id)?.session else {
-      Announcer.announce("No terminal is selected.")
+      Announcer.announce(LocalizedStringResource("No terminal is selected.", bundle: .module))
       return
     }
     let lines = TerminalText.lastLines(of: await session.history().bytes, count: 5)
-    Announcer.announce(
-      lines.isEmpty ? "The terminal has shown nothing yet." : lines.joined(separator: "\n"))
+    if lines.isEmpty {
+      Announcer.announce(
+        LocalizedStringResource("The terminal has shown nothing yet.", bundle: .module))
+    } else {
+      Announcer.announce(lines.joined(separator: "\n"))
+    }
   }
 
   /// Stops every watch, for good. Called on the way out.

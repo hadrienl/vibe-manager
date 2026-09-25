@@ -16,6 +16,11 @@ SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 GCC_TREAT_WARNINGS_AS_ERRORS = YES
 CODE_SIGN_STYLE = Automatic
 
+// English is the development language; French is translated in full (docs/localization.md). The
+// compiler lists the strings it sees, so that building in Xcode keeps the catalogs up to date.
+LOCALIZATION_PREFERS_STRING_CATALOGS = YES
+SWIFT_EMIT_LOC_STRINGS = YES
+
 // Why the application asks, in each alert macOS can raise on its behalf. The agents it launches
 // run as its children, so every protected folder they read is requested in its name.
 INFOPLIST_KEY_NSDesktopFolderUsageDescription = Vibe Manager lets the coding agent you launched read the folder you chose.

@@ -64,7 +64,8 @@ struct VibeManagerApp: App {
       CommandGroup(after: .sidebar) {
         Button(
           environment.appModel.layout.columns.isInspectorVisible
-            ? "Hide Context" : "Show Context"
+            ? String(localized: "Hide Context", comment: "Hides the inspector of the window.")
+            : String(localized: "Show Context", comment: "Shows the inspector of the window.")
         ) {
           environment.appModel.layout.toggleInspector()
         }
@@ -210,7 +211,11 @@ private struct SessionPositionCommands: View {
 
   private func label(for position: Int) -> String {
     let index = position - 1
-    guard model.sessions.indices.contains(index) else { return "Session \(position)" }
+    guard model.sessions.indices.contains(index) else {
+      return String(
+        localized: "Session \(position)",
+        comment: "A menu item for the session at this position in the list, when there is none.")
+    }
     return model.sessions[index].name
   }
 }
@@ -235,7 +240,9 @@ private struct SessionHistoryCommands: Commands {
     CommandMenu("Session") {
       // The label follows the session: one that was created and never ran is started, not
       // restarted, and the menu is where a keyboard-only user reads which of the two this is.
-      Button(model.selectedSession.map(model.restartTitle) ?? "Restart Session") {
+      Button(
+        model.selectedSession.map(model.restartTitle) ?? String(localized: "Restart Session")
+      ) {
         guard let session = model.selectedSession else { return }
         Task { await model.restart(session.id) }
       }
@@ -377,15 +384,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// back to it or to quit without it.
   private func confirmTemplateChanges(_ templates: PromptTemplateLibraryModel) async -> Bool {
     guard templates.isEdited, let editing = templates.editing else { return true }
-    let name = editing.trimmedName.isEmpty ? "Untitled Template" : editing.trimmedName
+    let name =
+      editing.trimmedName.isEmpty
+      ? String(localized: "Untitled Template", comment: "The name of a template that has none yet.")
+      : editing.trimmedName
     let alert = NSAlert()
     alert.alertStyle = .warning
     if templates.canSave {
-      alert.messageText = "Save the changes to the template “\(name)” before quitting?"
-      alert.informativeText = "Your changes are lost if you don't save them."
-      alert.addButton(withTitle: "Save")
-      alert.addButton(withTitle: "Cancel")
-      alert.addButton(withTitle: "Don't Save").hasDestructiveAction = true
+      alert.messageText = String(
+        localized: "Save the changes to the template “\(name)” before quitting?",
+        comment: "The name of a prompt template.")
+      alert.informativeText = String(localized: "Your changes are lost if you don't save them.")
+      alert.addButton(withTitle: String(localized: "Save"))
+      alert.addButton(withTitle: String(localized: "Cancel"))
+      alert.addButton(withTitle: String(localized: "Don't Save")).hasDestructiveAction = true
       switch alert.runModal() {
       case .alertFirstButtonReturn:
         // A save that fails keeps the application open, with the reason in the templates window.
@@ -397,36 +409,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
     let issue = templates.issues.first.map { "\($0.message) \($0.remedy)" }
-    alert.messageText = "The template “\(name)” has changes that can't be saved."
+    alert.messageText = String(
+      localized: "The template “\(name)” has changes that can't be saved.",
+      comment: "The name of a prompt template.")
     alert.informativeText =
-      (issue.map { $0 + " " } ?? "") + "Go back to it to finish them, or quit without them."
+      (issue.map { $0 + " " } ?? "")
+      + String(localized: "Go back to it to finish them, or quit without them.")
     // Cancel is the default: Return must not be the key that loses what was typed.
-    alert.addButton(withTitle: "Cancel")
-    alert.addButton(withTitle: "Quit Anyway").hasDestructiveAction = true
+    alert.addButton(withTitle: String(localized: "Cancel"))
+    alert.addButton(withTitle: String(localized: "Quit Anyway")).hasDestructiveAction = true
     return alert.runModal() == .alertSecondButtonReturn
   }
 
   /// Notes that could not be written are only ever lost on purpose.
   private func confirmQuit(losing unsaved: [NotesDocument], names sessions: [WorkSession]) -> Bool {
     let names = unsaved.map { document in
-      sessions.first { $0.id == document.sessionID }?.name ?? "a session"
+      sessions.first { $0.id == document.sessionID }?.name
+        ?? String(localized: "a session", comment: "Stands for a session whose name is unknown.")
     }
     let alert = NSAlert()
     alert.alertStyle = .warning
     alert.messageText =
       names.count == 1
-      ? "The notes of “\(names[0])” couldn't be saved."
-      : "The notes of \(names.count) sessions couldn't be saved."
+      ? String(
+        localized: "The notes of “\(names[0])” couldn't be saved.", comment: "A session's name.")
+      : String(localized: "The notes of \(names.count) sessions couldn't be saved.")
     var reason = ""
     if case .failed(let error, _) = unsaved.first?.state {
       reason = (error.errorDescription ?? "") + " "
     }
     alert.informativeText =
-      reason + "Copy them before quitting, or what was typed since the last save is lost."
+      reason
+      + String(
+        localized: "Copy them before quitting, or what was typed since the last save is lost.")
     // Cancel is the default: Return must not be the key that loses what was typed.
-    alert.addButton(withTitle: "Cancel")
-    alert.addButton(withTitle: "Copy Notes and Quit")
-    alert.addButton(withTitle: "Quit Anyway").hasDestructiveAction = true
+    alert.addButton(withTitle: String(localized: "Cancel"))
+    alert.addButton(withTitle: String(localized: "Copy Notes and Quit"))
+    alert.addButton(withTitle: String(localized: "Quit Anyway")).hasDestructiveAction = true
     switch alert.runModal() {
     case .alertSecondButtonReturn:
       let text = zip(names, unsaved).map { name, document in
@@ -457,24 +476,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let alert = NSAlert()
     alert.messageText =
-      count == 1 ? "An agent is still running." : "Agents are running in \(count) sessions."
-    var information = """
-      You can leave them working in the background and find them as they are the next time you \
-      open Vibe Manager. A restart of the Mac stops them.
-      """
+      count == 1
+      ? String(localized: "An agent is still running.")
+      : String(localized: "Agents are running in \(count) sessions.")
+    var information = String(
+      localized: """
+        You can leave them working in the background and find them as they are the next time you \
+        open Vibe Manager. A restart of the Mac stops them.
+        """)
     let inProcess = environment.inProcessRunningCount
     if inProcess > 0 {
       information +=
-        inProcess == 1
-        ? "\n\n1 other agent runs inside Vibe Manager and will stop either way."
-        : "\n\n\(inProcess) other agents run inside Vibe Manager and will stop either way."
+        "\n\n"
+        + String(
+          localized: "\(inProcess) other agents run inside Vibe Manager and will stop either way.")
     }
     alert.informativeText = information
-    alert.addButton(withTitle: "Keep Running")
-    alert.addButton(withTitle: "Stop All")
-    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: String(localized: "Keep Running"))
+    alert.addButton(withTitle: String(localized: "Stop All"))
+    alert.addButton(withTitle: String(localized: "Cancel"))
     alert.showsSuppressionButton = true
-    alert.suppressionButton?.title = "Don't ask again"
+    alert.suppressionButton?.title = String(localized: "Don't ask again")
 
     let keep: Bool
     switch alert.runModal() {

@@ -1,0 +1,1387 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ KiB" : {
+      "comment" : "A size in kibibytes: “1.5 KiB”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Kio"
+          }
+        }
+      }
+    },
+    "%@ cannot resume a previous conversation." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne peut pas reprendre une conversation précédente."
+          }
+        }
+      }
+    },
+    "%@ cannot run right now: %@" : {
+      "comment" : "An agent's name, then why it cannot run.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ cannot run right now: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ne peut pas s’exécuter pour le moment : %2$@"
+          }
+        }
+      }
+    },
+    "%@ does not accept an initial prompt." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’accepte pas de prompt initial."
+          }
+        }
+      }
+    },
+    "%@ does not let Vibe Manager choose a model." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne permet pas à Vibe Manager de choisir un modèle."
+          }
+        }
+      }
+    },
+    "%@ does not offer the model %@." : {
+      "comment" : "An agent's name, then a model's identifier.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ does not offer the model %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ne propose pas le modèle %2$@."
+          }
+        }
+      }
+    },
+    "%@ is not a runnable executable." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’est pas un exécutable lançable."
+          }
+        }
+      }
+    },
+    "%@ kept no identifier for this session, so its conversation cannot be found." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a conservé aucun identifiant pour cette session : sa conversation est donc introuvable."
+          }
+        }
+      }
+    },
+    "%@ stopped as soon as this conversation was resumed last time, so it is not being resumed again." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ s’est arrêté dès la reprise de cette conversation la dernière fois : elle n’est donc pas reprise à nouveau."
+          }
+        }
+      }
+    },
+    "%lld bytes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld byte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bytes"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld octets"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld octet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld octets"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "A terminal is already running for this work session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un terminal est déjà en cours d’exécution pour cette session."
+          }
+        }
+      }
+    },
+    "Active" : {
+      "comment" : "The sessions whose agent is running.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actives"
+          }
+        }
+      }
+    },
+    "Another Git process has been working in this repository for %lld min." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un autre processus Git travaille dans ce dépôt depuis %lld min."
+          }
+        }
+      }
+    },
+    "Check Activity Monitor for a leftover process, then start a new terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cherchez un processus restant dans le Moniteur d’activité, puis ouvrez un nouveau terminal."
+          }
+        }
+      }
+    },
+    "Check the command, or install the tool and try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez la commande, ou installez l’outil et réessayez."
+          }
+        }
+      }
+    },
+    "Choose another agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un autre agent."
+          }
+        }
+      }
+    },
+    "Choose one of the models it lists, or its default model." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez l’un des modèles qu’il propose, ou son modèle par défaut."
+          }
+        }
+      }
+    },
+    "Close a session you no longer need, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermez une session dont vous n’avez plus besoin, puis réessayez."
+          }
+        }
+      }
+    },
+    "Close it first if you want to start it again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermez-la d’abord si vous voulez la relancer."
+          }
+        }
+      }
+    },
+    "Close some terminals or applications, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermez quelques terminaux ou applications, puis réessayez."
+          }
+        }
+      }
+    },
+    "Closed" : {
+      "comment" : "The sessions that are finished, archived or not.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermées"
+          }
+        }
+      }
+    },
+    "Create a new session in the folder you want to work in." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créez une nouvelle session dans le dossier où vous voulez travailler."
+          }
+        }
+      }
+    },
+    "Create a new session to choose an agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créez une nouvelle session pour choisir un agent."
+          }
+        }
+      }
+    },
+    "Create the session without one and type it in the terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créez la session sans prompt et saisissez-le dans le terminal."
+          }
+        }
+      }
+    },
+    "Date Created" : {
+      "comment" : "A way to sort the sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date de création"
+          }
+        }
+      }
+    },
+    "Detect again, or pick another agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancez la détection, ou choisissez un autre agent."
+          }
+        }
+      }
+    },
+    "Detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancez la détection."
+          }
+        }
+      }
+    },
+    "Git could not be run." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git n’a pas pu être exécuté."
+          }
+        }
+      }
+    },
+    "Git could not be started: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git n’a pas pu être lancé : %@"
+          }
+        }
+      }
+    },
+    "Git could not read this repository." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git n’a pas pu lire ce dépôt."
+          }
+        }
+      }
+    },
+    "Git is not installed on this Mac." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git n’est pas installé sur ce Mac."
+          }
+        }
+      }
+    },
+    "Git needs the Command Line Tools, which are not installed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git a besoin des Command Line Tools, qui ne sont pas installés."
+          }
+        }
+      }
+    },
+    "Git refuses to read this repository: it belongs to another user." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git refuse de lire ce dépôt : il appartient à un autre utilisateur."
+          }
+        }
+      }
+    },
+    "Give Vibe Manager Full Disk Access in System Settings." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accordez l’accès complet au disque à Vibe Manager dans Réglages Système."
+          }
+        }
+      }
+    },
+    "Go back to the default model of the agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenez au modèle par défaut de l’agent."
+          }
+        }
+      }
+    },
+    "Grant execute permission to the file, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accordez au fichier l’autorisation d’exécution, puis réessayez."
+          }
+        }
+      }
+    },
+    "If no Git command is running any more, the lock was left behind and can be removed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si plus aucune commande Git n’est en cours, le verrou est resté en place et peut être supprimé."
+          }
+        }
+      }
+    },
+    "Install Git, then read the repositories again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez Git, puis relisez les dépôts."
+          }
+        }
+      }
+    },
+    "Install that agent, or create a new session with one that is available." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez cet agent, ou créez une nouvelle session avec un agent disponible."
+          }
+        }
+      }
+    },
+    "Install the Command Line Tools." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez les Command Line Tools."
+          }
+        }
+      }
+    },
+    "Install the agent, then detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez l’agent, puis relancez la détection."
+          }
+        }
+      }
+    },
+    "It cannot be launched." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne peut pas être lancé."
+          }
+        }
+      }
+    },
+    "Last Activity" : {
+      "comment" : "A way to sort the sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière activité"
+          }
+        }
+      }
+    },
+    "Mark it as safe if you trust it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marquez-le comme sûr si vous lui faites confiance."
+          }
+        }
+      }
+    },
+    "Name" : {
+      "comment" : "A way to sort the sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
+          }
+        }
+      }
+    },
+    "No executable was found at %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun exécutable n’a été trouvé à l’emplacement %@."
+          }
+        }
+      }
+    },
+    "No pseudo terminal could be allocated." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun pseudo-terminal n’a pu être alloué."
+          }
+        }
+      }
+    },
+    "Nothing is repaired automatically: reveal the folder, and restart the session where the repository now is." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’est réparé automatiquement : affichez le dossier, et relancez la session là où se trouve désormais le dépôt."
+          }
+        }
+      }
+    },
+    "Open Switch Agent again to review what will be handed over." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rouvrez « Changer d’agent » pour revoir ce qui sera transmis."
+          }
+        }
+      }
+    },
+    "Pick a folder that still exists and is readable." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un dossier qui existe toujours et qui peut être lu."
+          }
+        }
+      }
+    },
+    "Pick another agent, or detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un autre agent, ou relancez la détection."
+          }
+        }
+      }
+    },
+    "Put the folder back where it was, or create a new session in its new place." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remettez le dossier à son emplacement, ou créez une nouvelle session à son nouvel emplacement."
+          }
+        }
+      }
+    },
+    "Read the repositories again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relisez les dépôts."
+          }
+        }
+      }
+    },
+    "Reload the workspace." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechargez l’espace de travail."
+          }
+        }
+      }
+    },
+    "Restart it to start a new process with a summary of the session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancez-la pour démarrer un nouveau processus avec un résumé de la session."
+          }
+        }
+      }
+    },
+    "Restart the session: its conversation is resumed where the agent supports it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancez la session : sa conversation est reprise si l’agent le permet."
+          }
+        }
+      }
+    },
+    "Restarting without resuming the %@ conversation, as you asked." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relance sans reprendre la conversation %@, comme vous l’avez demandé."
+          }
+        }
+      }
+    },
+    "Run %@ in a terminal, then detect again." : {
+      "comment" : "A command line to type: claude auth login.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exécutez %@ dans un terminal, puis relancez la détection."
+          }
+        }
+      }
+    },
+    "Select a runnable binary or a script with an interpreter line." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un binaire exécutable ou un script avec une ligne d’interpréteur."
+          }
+        }
+      }
+    },
+    "Set the path to its executable, then detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indiquez le chemin de son exécutable, puis relancez la détection."
+          }
+        }
+      }
+    },
+    "Shorten it, or create the session without a prompt and paste it in the terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcissez-le, ou créez la session sans prompt et collez-le dans le terminal."
+          }
+        }
+      }
+    },
+    "Shorten the summary." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcissez le résumé."
+          }
+        }
+      }
+    },
+    "Sign in to the agent, then detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à l’agent, puis relancez la détection."
+          }
+        }
+      }
+    },
+    "Starting this session again would send a prompt to its agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer cette session enverrait un prompt à son agent."
+          }
+        }
+      }
+    },
+    "Stop the running terminal before starting a new one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêtez le terminal en cours avant d’en ouvrir un nouveau."
+          }
+        }
+      }
+    },
+    "Templates couldn't be read: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les modèles n’ont pas pu être lus : %@"
+          }
+        }
+      }
+    },
+    "Templates couldn't be saved: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les modèles n’ont pas pu être enregistrés : %@"
+          }
+        }
+      }
+    },
+    "The agent %@ is not installed in this build." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent %@ n’est pas inclus dans cette version."
+          }
+        }
+      }
+    },
+    "The agent that ran this session, %@, is not installed in this build." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent qui exécutait cette session, %@, n’est pas inclus dans cette version."
+          }
+        }
+      }
+    },
+    "The coding agent is not available on this Mac." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent de code n’est pas disponible sur ce Mac."
+          }
+        }
+      }
+    },
+    "The command line could not be prepared." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La ligne de commande n’a pas pu être préparée."
+          }
+        }
+      }
+    },
+    "The folder of this session, %@, cannot be entered." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier de cette session, %@, n’est pas accessible."
+          }
+        }
+      }
+    },
+    "The folder of this session, %@, no longer exists." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier de cette session, %@, n’existe plus."
+          }
+        }
+      }
+    },
+    "The identifier stored for this session is not one %@ would accept." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’identifiant enregistré pour cette session n’est pas accepté par %@."
+          }
+        }
+      }
+    },
+    "The initial prompt contains a null character, which would cut it short." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt initial contient un caractère nul, qui le tronquerait."
+          }
+        }
+      }
+    },
+    "The initial prompt exceeds the %@ byte limit accepted by the agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt initial dépasse la limite de %@ octets acceptée par l’agent."
+          }
+        }
+      }
+    },
+    "The initial prompt is %@ bytes, and %@ accepts %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The initial prompt is %1$@ bytes, and %2$@ accepts %3$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt initial fait %1$@ octets, et %2$@ en accepte %3$@."
+          }
+        }
+      }
+    },
+    "The model %@ is not offered by this agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet agent ne propose pas le modèle %@."
+          }
+        }
+      }
+    },
+    "The notes could not be read: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notes n’ont pas pu être lues : %@"
+          }
+        }
+      }
+    },
+    "The notes could not be saved: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notes n’ont pas pu être enregistrées : %@"
+          }
+        }
+      }
+    },
+    "The notes would weigh %@; they are limited to %@." : {
+      "comment" : "Two sizes, formatted: “70 KB”, “64 KB”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The notes would weigh %1$@; they are limited to %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notes pèseraient %1$@ ; elles sont limitées à %2$@."
+          }
+        }
+      }
+    },
+    "The path of this session, %@, is not a folder any more." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chemin de cette session, %@, ne désigne plus un dossier."
+          }
+        }
+      }
+    },
+    "The running agent (process %@) could not be confirmed stopped." : {
+      "comment" : "A process identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’arrêt de l’agent en cours (processus %@) n’a pas pu être confirmé."
+          }
+        }
+      }
+    },
+    "The session has no resume identifier to hand to the agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session n’a aucun identifiant de reprise à transmettre à l’agent."
+          }
+        }
+      }
+    },
+    "The session store could not be read." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier des sessions n’a pas pu être lu."
+          }
+        }
+      }
+    },
+    "The session was left on its agent. Check that the process is gone, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session a gardé son agent. Vérifiez que le processus s’est bien arrêté, puis réessayez."
+          }
+        }
+      }
+    },
+    "The sessions could not be read: %@" : {
+      "comment" : "The system's description of the error.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions n’ont pas pu être lues : %@"
+          }
+        }
+      }
+    },
+    "The summary is %@ over what an agent can be started with." : {
+      "comment" : "A size, formatted: “120 bytes”, “1.5 KiB”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le résumé dépasse de %@ la taille qu’un agent accepte au lancement."
+          }
+        }
+      }
+    },
+    "The system refused to start another process." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le système a refusé de lancer un autre processus."
+          }
+        }
+      }
+    },
+    "The terminal host stopped, and this agent was stopped with it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’hôte des terminaux s’est arrêté, et cet agent avec lui."
+          }
+        }
+      }
+    },
+    "The terminal process could not be started." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le processus du terminal n’a pas pu être lancé."
+          }
+        }
+      }
+    },
+    "The terminal process stopped responding and its outcome is unknown." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le processus du terminal ne répond plus et on ignore comment il s’est terminé."
+          }
+        }
+      }
+    },
+    "The working directory %@ is unavailable." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier de travail %@ n’est pas disponible."
+          }
+        }
+      }
+    },
+    "The working directory is not a usable absolute path." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier de travail n’est pas un chemin absolu utilisable."
+          }
+        }
+      }
+    },
+    "This agent cannot resume a previous session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet agent ne peut pas reprendre une session précédente."
+          }
+        }
+      }
+    },
+    "This agent does not accept an initial prompt." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet agent n’accepte pas de prompt initial."
+          }
+        }
+      }
+    },
+    "This agent does not let Vibe Manager choose a model." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet agent ne permet pas à Vibe Manager de choisir un modèle."
+          }
+        }
+      }
+    },
+    "This folder is no longer a Git repository." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dossier n’est plus un dépôt Git."
+          }
+        }
+      }
+    },
+    "This repository is no longer where it was." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dépôt n’est plus à son emplacement."
+          }
+        }
+      }
+    },
+    "This repository took more than %lld s to answer." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dépôt a mis plus de %lld s à répondre."
+          }
+        }
+      }
+    },
+    "This session" : {
+      "comment" : "Stands for the name of a session that could not be read, in a report.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session"
+          }
+        }
+      }
+    },
+    "This session already runs that agent and model." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session utilise déjà cet agent et ce modèle."
+          }
+        }
+      }
+    },
+    "This session cannot be restarted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session ne peut pas être relancée."
+          }
+        }
+      }
+    },
+    "This session cannot be switched right now." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent de cette session ne peut pas être changé pour le moment."
+          }
+        }
+      }
+    },
+    "This session changed while the switch was being prepared, so nothing was switched." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session a changé pendant la préparation du changement d’agent : rien n’a été changé."
+          }
+        }
+      }
+    },
+    "This session could not be restarted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session n’a pas pu être relancée."
+          }
+        }
+      }
+    },
+    "This session has no folder to start in." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session n’a aucun dossier dans lequel démarrer."
+          }
+        }
+      }
+    },
+    "This session is already running." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session est déjà en cours d’exécution."
+          }
+        }
+      }
+    },
+    "This session is archived." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session est archivée."
+          }
+        }
+      }
+    },
+    "This session is no longer in the store." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session n’est plus enregistrée."
+          }
+        }
+      }
+    },
+    "This session was archived while its agent was being stopped." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session a été archivée pendant l’arrêt de son agent."
+          }
+        }
+      }
+    },
+    "This session was never given a coding agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun agent de code n’a jamais été attribué à cette session."
+          }
+        }
+      }
+    },
+    "Try again, and report the failure if it persists." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayez, et signalez l’échec s’il persiste."
+          }
+        }
+      }
+    },
+    "Try again, and restore a backup if it persists." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayez, et restaurez une sauvegarde si le problème persiste."
+          }
+        }
+      }
+    },
+    "Unarchive it first, then restart it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désarchivez-la d’abord, puis relancez-la."
+          }
+        }
+      }
+    },
+    "Unarchive it first, then switch its agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désarchivez-la d’abord, puis changez son agent."
+          }
+        }
+      }
+    },
+    "Update it to %@ or newer, then detect again." : {
+      "comment" : "A version number: 1.0.3.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettez-le à jour vers la version %@ ou ultérieure, puis relancez la détection."
+          }
+        }
+      }
+    },
+    "Vibe Manager already runs %lld terminals, the most it runs at once." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Vibe Manager already runs %lld terminal, the most it runs at once."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Vibe Manager already runs %lld terminals, the most it runs at once."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Vibe Manager exécute déjà %lld terminaux, le maximum simultané."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Vibe Manager exécute déjà %lld terminal, le maximum simultané."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Vibe Manager exécute déjà %lld terminaux, le maximum simultané."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Vibe Manager is not allowed to run %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager n’est pas autorisé à exécuter %@."
+          }
+        }
+      }
+    },
+    "external volumes" : {
+      "comment" : "Completes the sentence “macOS protects …”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les volumes externes"
+          }
+        }
+      }
+    },
+    "iCloud Drive" : {
+      "comment" : "Completes the sentence “macOS protects …”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Drive"
+          }
+        }
+      }
+    },
+    "macOS does not let Vibe Manager read this repository." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS ne permet pas à Vibe Manager de lire ce dépôt."
+          }
+        }
+      }
+    },
+    "there is nowhere to keep notes." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il n’y a nulle part où conserver les notes."
+          }
+        }
+      }
+    },
+    "your Desktop" : {
+      "comment" : "Completes the sentence “macOS protects …”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "votre Bureau"
+          }
+        }
+      }
+    },
+    "your Documents folder" : {
+      "comment" : "Completes the sentence “macOS protects …”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "votre dossier Documents"
+          }
+        }
+      }
+    },
+    "your Downloads folder" : {
+      "comment" : "Completes the sentence “macOS protects …”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "votre dossier Téléchargements"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

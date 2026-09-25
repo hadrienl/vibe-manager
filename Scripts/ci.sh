@@ -21,13 +21,23 @@ xcrun swift-format lint --recursive \
   Packages/VibeManagerKit/Tests \
   Packages/VibeManagerKit/Package.swift
 
+echo "Checking the French translations"
+Scripts/test-check-localizations.sh
+Scripts/check-localizations.sh
+
 echo "Running package tests"
 # Validate package sources with warnings promoted to errors here. Do not pass the equivalent
 # build setting globally to xcodebuild: Xcode 16.4 suppresses warnings for package dependencies,
 # and combining that inherited flag with warnings-as-errors makes the compiler reject both.
+swift build \
+  --package-path "$package_path" \
+  --build-tests \
+  -Xswiftc -warnings-as-errors
+# The SwiftPM of Xcode 16.4 does not compile string catalogs: see the script.
+"$repository_root/Scripts/compile-package-catalogs.sh"
 swift test \
   --package-path "$package_path" \
-  -Xswiftc -warnings-as-errors
+  --skip-build
 
 echo "Building the macOS application, and its interface smoke test"
 # The smoke test is compiled here so that a pull request cannot break it; it is run by the

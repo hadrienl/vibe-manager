@@ -159,7 +159,9 @@ struct RepositoryGroupPresentationTests {
         committed: [(CommittedFile(path: "b.swift", change: .added), true)],
         commitCount: 1, committedTotal: 6_000))
 
-    #expect(group.summary == "1 unstaged · 6000 files committed since origin/main")
+    // A count is formatted in the user's locale: 6,000 in English.
+    #expect(
+      group.summary == "1 unstaged · \(6_000.formatted()) files committed since origin/main")
     #expect(group.sections.map(\.column) == [.unstaged, .committed])
     #expect(group.sections[1].totalCount == 6_000)
     #expect(group.sections[1].help == "1 commit since origin/main (merge base 1a2b3c4)")

@@ -10,8 +10,18 @@
 #   --ignore-sighup      survive the hang-up of its terminal
 #   --spawn-child        start a child that ignores SIGTERM and SIGHUP, and print its pid
 #   --session-id <id>    the resume identifier to print, instead of one made from the clock
+#
+# With VIBE_AGENT_ACTIVITY_LOG set, it reports its activity the way the hooks of a real CLI do
+# (#45): `SessionStart` when it starts, and, while holding, `UserPromptSubmit` then `Stop` for
+# every line typed — or exactly the event a line names, as `event:PermissionRequest`.
 
 set -eu
+
+report() {
+  if [ -n "${VIBE_AGENT_ACTIVITY_LOG:-}" ]; then
+    printf '%s\t%s\t\n' "$1" "$(date +%s)" >>"$VIBE_AGENT_ACTIVITY_LOG"
+  fi
+}
 
 model="mock-fast"
 prompt=""
@@ -89,6 +99,7 @@ else
   echo "Starting mock session."
 fi
 
+report SessionStart
 echo "model: $model"
 echo "cwd: $(pwd)"
 
@@ -116,9 +127,19 @@ fi
 if [ "$hold" -eq 1 ]; then
   echo "Holding."
   while IFS= read -r line; do
-    printf 'echo: %s\n' "$line"
+    case "$line" in
+      event:*)
+        report "${line#event:}"
+        ;;
+      *)
+        report UserPromptSubmit
+        printf 'echo: %s\n' "$line"
+        report Stop
+        ;;
+    esac
   done
 fi
 
+report SessionEnd
 echo "Mock agent finished."
 exit "$exit_code"

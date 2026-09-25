@@ -116,52 +116,70 @@ public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
   public var errorDescription: String? {
     switch self {
     case .executableNotFound(let path):
-      return "No executable was found at \(path)."
+      return String(localized: "No executable was found at \(path).", bundle: .module)
     case .executableNotPermitted(let path):
-      return "Vibe Manager is not allowed to run \(path)."
+      return String(localized: "Vibe Manager is not allowed to run \(path).", bundle: .module)
     case .notExecutable(let path):
-      return "\(path) is not a runnable executable."
+      return String(localized: "\(path) is not a runnable executable.", bundle: .module)
     case .workingDirectoryUnavailable(let path):
-      return "The working directory \(path) is unavailable."
+      return String(localized: "The working directory \(path) is unavailable.", bundle: .module)
     case .pseudoTerminalUnavailable:
-      return "No pseudo terminal could be allocated."
+      return String(localized: "No pseudo terminal could be allocated.", bundle: .module)
     case .resourceLimitReached:
-      return "The system refused to start another process."
+      return String(localized: "The system refused to start another process.", bundle: .module)
     case .spawnFailed:
-      return "The terminal process could not be started."
+      return String(localized: "The terminal process could not be started.", bundle: .module)
     case .sessionAlreadyRunning:
-      return "A terminal is already running for this work session."
+      return String(
+        localized: "A terminal is already running for this work session.", bundle: .module)
     case .processOutcomeUnknown:
-      return "The terminal process stopped responding and its outcome is unknown."
+      return String(
+        localized: "The terminal process stopped responding and its outcome is unknown.",
+        bundle: .module)
     case .tooManySessions(let limit):
-      return "Vibe Manager already runs \(limit) terminals, the most it runs at once."
+      return String(
+        localized: "Vibe Manager already runs \(limit) terminals, the most it runs at once.",
+        bundle: .module)
     case .hostStopped:
-      return "The terminal host stopped, and this agent was stopped with it."
+      return String(
+        localized: "The terminal host stopped, and this agent was stopped with it.", bundle: .module
+      )
     }
   }
 
   public var recoverySuggestion: String? {
     switch self {
     case .executableNotFound:
-      return "Check the command, or install the tool and try again."
+      return String(
+        localized: "Check the command, or install the tool and try again.", bundle: .module)
     case .executableNotPermitted:
-      return "Grant execute permission to the file, then try again."
+      return String(
+        localized: "Grant execute permission to the file, then try again.", bundle: .module)
     case .notExecutable:
-      return "Select a runnable binary or a script with an interpreter line."
+      return String(
+        localized: "Select a runnable binary or a script with an interpreter line.", bundle: .module
+      )
     case .workingDirectoryUnavailable:
-      return "Pick a folder that still exists and is readable."
+      return String(localized: "Pick a folder that still exists and is readable.", bundle: .module)
     case .pseudoTerminalUnavailable, .resourceLimitReached:
-      return "Close some terminals or applications, then try again."
+      return String(
+        localized: "Close some terminals or applications, then try again.", bundle: .module)
     case .spawnFailed:
-      return "Try again, and report the failure if it persists."
+      return String(localized: "Try again, and report the failure if it persists.", bundle: .module)
     case .sessionAlreadyRunning:
-      return "Stop the running terminal before starting a new one."
+      return String(
+        localized: "Stop the running terminal before starting a new one.", bundle: .module)
     case .processOutcomeUnknown:
-      return "Check Activity Monitor for a leftover process, then start a new terminal."
+      return String(
+        localized: "Check Activity Monitor for a leftover process, then start a new terminal.",
+        bundle: .module)
     case .tooManySessions:
-      return "Close a session you no longer need, then try again."
+      return String(
+        localized: "Close a session you no longer need, then try again.", bundle: .module)
     case .hostStopped:
-      return "Restart the session: its conversation is resumed where the agent supports it."
+      return String(
+        localized: "Restart the session: its conversation is resumed where the agent supports it.",
+        bundle: .module)
     }
   }
 

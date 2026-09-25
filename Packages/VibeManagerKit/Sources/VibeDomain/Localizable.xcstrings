@@ -1,0 +1,569 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ cannot be launched. %@" : {
+      "comment" : "An agent's name, then the sentence that says why it cannot be launched.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ cannot be launched. %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de lancer %1$@. %2$@"
+          }
+        }
+      }
+    },
+    "%@ is required." : {
+      "comment" : "The label of a field the chosen prompt template adds to the form.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le champ « %@ » est obligatoire."
+          }
+        }
+      }
+    },
+    "/%@/ is not a valid regular expression: %@" : {
+      "comment" : "A regular expression the user wrote, then why the system rejects it.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "/%1$@/ is not a valid regular expression: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "/%1$@/ n’est pas une expression régulière valide : %2$@"
+          }
+        }
+      }
+    },
+    "A name is required." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un nom est obligatoire."
+          }
+        }
+      }
+    },
+    "Address review feedback" : {
+      "comment" : "An example prompt template.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traiter les retours de revue"
+          }
+        }
+      }
+    },
+    "Address the unresolved review comments on the merge request at {{url}}. For each one, change the code or explain why not, run the tests, and summarise what you did per comment." : {
+      "comment" : "The prompt of an example template. Keep {{url}} as it is.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traitez les commentaires de revue non résolus de la merge request {{url}}. Pour chacun, modifiez le code ou expliquez pourquoi vous ne le faites pas, lancez les tests, puis résumez ce que vous avez fait pour chaque commentaire."
+          }
+        }
+      }
+    },
+    "Another template is already called “%@”." : {
+      "comment" : "The name of the other prompt template.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un autre modèle s’appelle déjà « %@ »."
+          }
+        }
+      }
+    },
+    "Choose it again, or type a path starting with / or ~." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez-le à nouveau, ou saisissez un chemin commençant par / ou ~."
+          }
+        }
+      }
+    },
+    "Choose one that is still there and readable." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez-en un qui existe toujours et qui peut être lu."
+          }
+        }
+      }
+    },
+    "Choose the folder again, or type a path starting with / or ~." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez à nouveau le dossier, ou saisissez un chemin commençant par / ou ~."
+          }
+        }
+      }
+    },
+    "Choose the folder that contains it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez le dossier qui le contient."
+          }
+        }
+      }
+    },
+    "Choose the folder the agent should work in." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez le dossier dans lequel l’agent doit travailler."
+          }
+        }
+      }
+    },
+    "Describe the task in a few words — it labels the session in the sidebar." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez la tâche en quelques mots : c’est ainsi que la session apparaît dans la barre latérale."
+          }
+        }
+      }
+    },
+    "Feedback" : {
+      "comment" : "The start of the name of the sessions the example template for review feedback starts.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retours"
+          }
+        }
+      }
+    },
+    "Fill it in, or pick another template." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplissez-le, ou choisissez un autre modèle."
+          }
+        }
+      }
+    },
+    "Fix it, or remove the |/…/ to use the whole value." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrigez-la, ou retirez le |/…/ pour utiliser la valeur entière."
+          }
+        }
+      }
+    },
+    "Go back to the default model of the agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenez au modèle par défaut de l’agent."
+          }
+        }
+      }
+    },
+    "Grant access to the folder, or choose another one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisez l’accès au dossier, ou choisissez-en un autre."
+          }
+        }
+      }
+    },
+    "It appears twice in the file." : {
+      "comment" : "Why a prompt template of an imported file is skipped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il figure deux fois dans le fichier."
+          }
+        }
+      }
+    },
+    "It is not a valid regular expression." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce n’est pas une expression régulière valide."
+          }
+        }
+      }
+    },
+    "Merge request URL" : {
+      "comment" : "A field of the example templates: the link to a merge or pull request.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL de la merge request"
+          }
+        }
+      }
+    },
+    "Merge some of them, or write the parts that never change as text." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regroupez-en certains, ou écrivez en texte les parties qui ne changent jamais."
+          }
+        }
+      }
+    },
+    "Name the task this template is for — it is how you pick it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nommez la tâche à laquelle sert ce modèle : c’est ainsi que vous le choisirez."
+          }
+        }
+      }
+    },
+    "No coding agent is selected." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun agent de code n’est sélectionné."
+          }
+        }
+      }
+    },
+    "No working folder was chosen." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun dossier de travail n’a été choisi."
+          }
+        }
+      }
+    },
+    "Optional — a part to look at closely" : {
+      "comment" : "The help of a field of the example review template.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Facultatif — une partie à examiner de près"
+          }
+        }
+      }
+    },
+    "Pick a name that tells them apart." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un nom qui permet de les distinguer."
+          }
+        }
+      }
+    },
+    "Pick a symbol and a colour from the ones offered." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un symbole et une couleur parmi ceux proposés."
+          }
+        }
+      }
+    },
+    "Pick one of the agents detected on this Mac." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez l’un des agents détectés sur ce Mac."
+          }
+        }
+      }
+    },
+    "Pick one of the agents listed above." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez l’un des agents ci-dessus."
+          }
+        }
+      }
+    },
+    "Pick one of those shown, or none." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez-en un parmi ceux affichés, ou aucun."
+          }
+        }
+      }
+    },
+    "Prompt" : {
+      "comment" : "Where in a prompt template a pattern is used: its prompt.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt"
+          }
+        }
+      }
+    },
+    "Remove them — they usually come with text pasted from a coloured terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimez-les : ils accompagnent souvent du texte collé depuis un terminal en couleur."
+          }
+        }
+      }
+    },
+    "Review" : {
+      "comment" : "An example prompt template, and the start of the name of the sessions it starts.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revue"
+          }
+        }
+      }
+    },
+    "Review the merge request at {{url}}. Read the description and the diff, check out the branch if needed, and report correctness issues first, then missing tests, then style. Do not push anything.\n\n{{focus?}}" : {
+      "comment" : "The prompt of an example template. Keep {{url}} and {{focus?}} as they are.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faites la revue de la merge request {{url}}. Lisez la description et le diff, basculez sur la branche si besoin, et signalez d’abord les erreurs de fonctionnement, puis les tests manquants, puis le style. Ne poussez rien.\n\n{{focus?}}"
+          }
+        }
+      }
+    },
+    "Session name" : {
+      "comment" : "Where in a prompt template a pattern is used: its session name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom de la session"
+          }
+        }
+      }
+    },
+    "Shorten it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcissez-le."
+          }
+        }
+      }
+    },
+    "The agent %@ is not registered any more." : {
+      "comment" : "An agent's identifier, as stored with the session: claude-code, codex.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent %@ n’est plus enregistré."
+          }
+        }
+      }
+    },
+    "The folder must be an absolute path." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier doit être un chemin absolu."
+          }
+        }
+      }
+    },
+    "The model %@ is not offered by this agent." : {
+      "comment" : "A model's identifier, as the agent's command line takes it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet agent ne propose pas le modèle %@."
+          }
+        }
+      }
+    },
+    "The prompt contains invisible control characters the agent would not read as text." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt contient des caractères de contrôle invisibles que l’agent ne lirait pas comme du texte."
+          }
+        }
+      }
+    },
+    "The prompt is empty." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt est vide."
+          }
+        }
+      }
+    },
+    "The prompt weighs %@; agents accept %@." : {
+      "comment" : "Two sizes, formatted: “12 KB”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The prompt weighs %1$@; agents accept %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt pèse %1$@ ; les agents acceptent %2$@."
+          }
+        }
+      }
+    },
+    "The working folder must be an absolute path." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier de travail doit être un chemin absolu."
+          }
+        }
+      }
+    },
+    "This folder cannot be read." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dossier ne peut pas être lu."
+          }
+        }
+      }
+    },
+    "This folder no longer exists." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dossier n’existe plus."
+          }
+        }
+      }
+    },
+    "This path is a file, not a folder." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce chemin désigne un fichier, pas un dossier."
+          }
+        }
+      }
+    },
+    "This session identity cannot be stored." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette identité de session ne peut pas être enregistrée."
+          }
+        }
+      }
+    },
+    "This symbol or colour is not one Vibe Manager offers." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager ne propose pas ce symbole ou cette couleur."
+          }
+        }
+      }
+    },
+    "This template has %lld fields; a template may have %lld." : {
+      "comment" : "The number of fields, always above the limit, then the limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This template has %1$lld fields; a template may have %2$lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce modèle compte %1$lld champs ; un modèle peut en avoir %2$lld au plus."
+          }
+        }
+      }
+    },
+    "What to look at" : {
+      "comment" : "A field of the example review template.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points à examiner"
+          }
+        }
+      }
+    },
+    "Write what the agent should be asked, with {{fields}} where the text changes." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrivez ce qu’il faut demander à l’agent, avec des {{champs}} là où le texte change."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

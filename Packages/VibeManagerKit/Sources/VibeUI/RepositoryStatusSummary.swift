@@ -8,6 +8,8 @@ import VibeDomain
 struct RepositoryStatusPresentation: Equatable {
   let summary: String
   let details: [String]
+  /// "Shared with Fix login", also in `details`.
+  let sharedWith: String?
   let issue: String?
   let suggestion: String?
   let command: String?
@@ -26,13 +28,20 @@ struct RepositoryStatusPresentation: Equatable {
         details.append(Self.sentence(for: operation))
       }
     } else if case .refreshing = state.phase {
-      summary = "Reading…"
+      summary = String(
+        localized: "Reading…", bundle: .module, comment: "A repository whose state is being read.")
     } else {
-      summary = "Not read yet"
+      summary = Self.notReadYet
     }
     let others = state.sharedWith.compactMap { sessionNames[$0] }
     if !others.isEmpty {
-      details.append("Shared with \(others.joined(separator: ", "))")
+      let shared = String(
+        localized: "Shared with \(others.joined(separator: ", "))", bundle: .module,
+        comment: "The names of the other sessions working in the same repository.")
+      details.append(shared)
+      sharedWith = shared
+    } else {
+      sharedWith = nil
     }
     self.details = details
 
@@ -57,37 +66,82 @@ struct RepositoryStatusPresentation: Equatable {
 
   static func summary(of status: WorkingTreeStatus, unattributed: Int) -> String {
     let counts = status.counts
-    guard !counts.isEmpty else { return "No changes" }
+    guard !counts.isEmpty else {
+      return String(
+        localized: "No changes", bundle: .module, comment: "A repository's working tree is clean.")
+    }
     var parts: [String] = []
-    if counts.conflicted > 0 { parts.append("\(counts.conflicted) conflicted") }
-    if counts.staged > 0 { parts.append("\(counts.staged) staged") }
-    if counts.unstaged > 0 { parts.append("\(counts.unstaged) unstaged") }
-    if counts.untracked > 0 { parts.append("\(counts.untracked) untracked") }
+    if counts.conflicted > 0 {
+      parts.append(
+        String(
+          localized: "\(counts.conflicted) conflicted", bundle: .module,
+          comment: "A number of conflicted files."))
+    }
+    if counts.staged > 0 {
+      parts.append(
+        String(
+          localized: "\(counts.staged) staged", bundle: .module,
+          comment: "A number of staged files."))
+    }
+    if counts.unstaged > 0 {
+      parts.append(
+        String(
+          localized: "\(counts.unstaged) unstaged", bundle: .module,
+          comment: "A number of files changed and not staged."))
+    }
+    if counts.untracked > 0 {
+      parts.append(
+        String(
+          localized: "\(counts.untracked) untracked", bundle: .module,
+          comment: "A number of untracked files."))
+    }
     var text = parts.joined(separator: " · ")
     // Only what the list actually holds is attributed: past the limit, nothing is claimed.
     if unattributed > 0, !status.isTruncated {
       text +=
-        unattributed == status.entries.count
-        ? " — none in this session's transcript"
-        : " — \(unattributed) not in this session's transcript"
+        " — "
+        + (unattributed == status.entries.count
+          ? String(localized: "none in this session's transcript", bundle: .module)
+          : String(
+            localized: "\(unattributed) not in this session's transcript", bundle: .module))
     }
     return text
   }
 
   static func distance(ahead: Int, behind: Int) -> String {
     var parts: [String] = []
-    if ahead > 0 { parts.append("\(ahead) ahead") }
-    if behind > 0 { parts.append("\(behind) behind") }
-    return parts.joined(separator: ", ") + " of upstream"
+    if ahead > 0 { parts.append(Self.ahead(ahead)) }
+    if behind > 0 { parts.append(Self.behind(behind)) }
+    return String(
+      localized: "\(parts.joined(separator: ", ")) of upstream", bundle: .module,
+      comment: "How far a branch is from its upstream: “2 ahead, 1 behind”.")
+  }
+
+  static func ahead(_ count: Int) -> String {
+    String(
+      localized: "\(count) ahead", bundle: .module,
+      comment: "A number of commits the branch has and its upstream has not.")
+  }
+
+  static func behind(_ count: Int) -> String {
+    String(
+      localized: "\(count) behind", bundle: .module,
+      comment: "A number of commits the upstream has and the branch has not.")
+  }
+
+  static var notReadYet: String {
+    String(
+      localized: "Not read yet", bundle: .module,
+      comment: "A repository whose state has not been read.")
   }
 
   static func sentence(for operation: RepositoryOperation) -> String {
     switch operation {
-    case .merging: return "Merge in progress"
-    case .rebasing: return "Rebase in progress"
-    case .cherryPicking: return "Cherry-pick in progress"
-    case .reverting: return "Revert in progress"
-    case .bisecting: return "Bisect in progress"
+    case .merging: return String(localized: "Merge in progress", bundle: .module)
+    case .rebasing: return String(localized: "Rebase in progress", bundle: .module)
+    case .cherryPicking: return String(localized: "Cherry-pick in progress", bundle: .module)
+    case .reverting: return String(localized: "Revert in progress", bundle: .module)
+    case .bisecting: return String(localized: "Bisect in progress", bundle: .module)
     }
   }
 }

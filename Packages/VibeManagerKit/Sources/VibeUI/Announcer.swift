@@ -6,6 +6,10 @@ public enum Announcer {
   /// What was last announced. For tests: an announcement leaves no other trace.
   public private(set) static var lastAnnouncement: String?
 
+  public static func announce(_ text: LocalizedStringResource) {
+    announce(String(localized: text))
+  }
+
   public static func announce(_ text: String) {
     lastAnnouncement = text
     let element: Any = NSApp?.keyWindow ?? NSApp?.mainWindow ?? NSApp as Any

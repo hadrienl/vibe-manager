@@ -43,51 +43,56 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
 
   public static let nameMissing = SessionDraftIssue(
     field: .name,
-    message: "A name is required.",
-    remedy: "Describe the task in a few words — it labels the session in the sidebar."
+    message: String(localized: "A name is required.", bundle: .module),
+    remedy: String(
+      localized: "Describe the task in a few words — it labels the session in the sidebar.",
+      bundle: .module)
   )
 
   public static let workingDirectoryMissing = SessionDraftIssue(
     field: .workingDirectory,
-    message: "No working folder was chosen.",
-    remedy: "Choose the folder the agent should work in."
+    message: String(localized: "No working folder was chosen.", bundle: .module),
+    remedy: String(localized: "Choose the folder the agent should work in.", bundle: .module)
   )
 
   public static let workingDirectoryNotAbsolute = SessionDraftIssue(
     field: .workingDirectory,
-    message: "The working folder must be an absolute path.",
-    remedy: "Choose the folder again, or type a path starting with / or ~."
+    message: String(localized: "The working folder must be an absolute path.", bundle: .module),
+    remedy: String(
+      localized: "Choose the folder again, or type a path starting with / or ~.", bundle: .module)
   )
 
   public static let workingDirectoryNotFound = SessionDraftIssue(
     field: .workingDirectory,
-    message: "This folder no longer exists.",
-    remedy: "Choose one that is still there and readable."
+    message: String(localized: "This folder no longer exists.", bundle: .module),
+    remedy: String(localized: "Choose one that is still there and readable.", bundle: .module)
   )
 
   public static let workingDirectoryNotADirectory = SessionDraftIssue(
     field: .workingDirectory,
-    message: "This path is a file, not a folder.",
-    remedy: "Choose the folder that contains it."
+    message: String(localized: "This path is a file, not a folder.", bundle: .module),
+    remedy: String(localized: "Choose the folder that contains it.", bundle: .module)
   )
 
   public static let workingDirectoryUnreadable = SessionDraftIssue(
     field: .workingDirectory,
-    message: "This folder cannot be read.",
-    remedy: "Grant access to the folder, or choose another one."
+    message: String(localized: "This folder cannot be read.", bundle: .module),
+    remedy: String(localized: "Grant access to the folder, or choose another one.", bundle: .module)
   )
 
   public static let agentMissing = SessionDraftIssue(
     field: .agent,
-    message: "No coding agent is selected.",
-    remedy: "Pick one of the agents detected on this Mac."
+    message: String(localized: "No coding agent is selected.", bundle: .module),
+    remedy: String(localized: "Pick one of the agents detected on this Mac.", bundle: .module)
   )
 
   public static func agentUnknown(_ id: String) -> SessionDraftIssue {
     SessionDraftIssue(
       field: .agent,
-      message: "The agent \(id) is not registered any more.",
-      remedy: "Pick one of the agents listed above."
+      message: String(
+        localized: "The agent \(id) is not registered any more.", bundle: .module,
+        comment: "An agent's identifier, as stored with the session: claude-code, codex."),
+      remedy: String(localized: "Pick one of the agents listed above.", bundle: .module)
     )
   }
 
@@ -96,7 +101,9 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   {
     SessionDraftIssue(
       field: .agent,
-      message: "\(name) cannot be launched. \(summary)",
+      message: String(
+        localized: "\(name) cannot be launched. \(summary)", bundle: .module,
+        comment: "An agent's name, then the sentence that says why it cannot be launched."),
       remedy: remedy
     )
   }
@@ -104,8 +111,10 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   public static func modelUnknown(_ id: String) -> SessionDraftIssue {
     SessionDraftIssue(
       field: .model,
-      message: "The model \(id) is not offered by this agent.",
-      remedy: "Go back to the default model of the agent."
+      message: String(
+        localized: "The model \(id) is not offered by this agent.", bundle: .module,
+        comment: "A model's identifier, as the agent's command line takes it."),
+      remedy: String(localized: "Go back to the default model of the agent.", bundle: .module)
     )
   }
 
@@ -116,21 +125,28 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
   public static func templateFieldMissing(_ field: PromptTemplateField) -> SessionDraftIssue {
     SessionDraftIssue(
       field: .templateField,
-      message: "\(field.label) is required.",
-      remedy: "Fill it in, or pick another template.",
+      message: String(
+        localized: "\(field.label) is required.", bundle: .module,
+        comment: "The label of a field the chosen prompt template adds to the form."),
+      remedy: String(localized: "Fill it in, or pick another template.", bundle: .module),
       fieldKey: field.name
     )
   }
 
   public static let promptControlCharacters = SessionDraftIssue(
     field: .initialPrompt,
-    message: "The prompt contains invisible control characters the agent would not read as text.",
-    remedy: "Remove them — they usually come with text pasted from a coloured terminal."
+    message: String(
+      localized:
+        "The prompt contains invisible control characters the agent would not read as text.",
+      bundle: .module),
+    remedy: String(
+      localized: "Remove them — they usually come with text pasted from a coloured terminal.",
+      bundle: .module)
   )
 
   public static let appearanceInvalid = SessionDraftIssue(
     field: .appearance,
-    message: "This session identity cannot be stored.",
-    remedy: "Pick a symbol and a colour from the ones offered."
+    message: String(localized: "This session identity cannot be stored.", bundle: .module),
+    remedy: String(localized: "Pick a symbol and a colour from the ones offered.", bundle: .module)
   )
 }

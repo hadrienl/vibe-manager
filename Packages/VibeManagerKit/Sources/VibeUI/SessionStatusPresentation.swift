@@ -7,6 +7,8 @@ import VibeTerminalUI
 /// the only thing that carries it, because the sidebar also shows the symbol and the words.
 public enum SessionStatusSeverity: Equatable, Sendable {
   case normal
+  /// The agent is working: the accent colour, which draws the eye less than a warning.
+  case active
   case attention
   case error
 }
@@ -17,27 +19,54 @@ public enum SessionStatusSeverity: Equatable, Sendable {
 /// from the machine since. The stored status is the weakest of the three: it says what the user
 /// intended, while the pane says what actually happened.
 public struct SessionStatusPresentation: Equatable, Sendable {
-  public let label: String
+  public let label: LocalizedStringResource
   public let symbolName: String
   public let severity: SessionStatusSeverity
+  /// What the agent is doing, when the headline is about it rather than about its process.
+  public let agentActivity: AgentActivity?
+  /// The agent waits for the user — a question, a permission, an answer not read yet (#45).
+  public let needsAttention: Bool
 
-  public init(label: String, symbolName: String, severity: SessionStatusSeverity) {
+  public init(
+    label: LocalizedStringResource,
+    symbolName: String,
+    severity: SessionStatusSeverity,
+    agentActivity: AgentActivity? = nil,
+    needsAttention: Bool = false
+  ) {
     self.label = label
     self.symbolName = symbolName
     self.severity = severity
+    self.agentActivity = agentActivity
+    self.needsAttention = needsAttention
+  }
+
+  /// Whether the symbol moves: only a working agent's does, and never with Reduce Motion on.
+  public var isAnimated: Bool {
+    agentActivity == .working
   }
 
   /// - Parameter wasStoppedOnPurpose: the application asked this process to end — Close or
   ///   Archive. An agent killed that way reports the signal it was killed with (143 for
   ///   `SIGTERM`), which is not a crash and must not be shown as one: the session says "Closed",
   ///   which is what the user just did to it.
+  /// - Parameter activity: what the agent of a running process is doing (#45). It takes the place
+  ///   of "Running" only: starting, restoring, an exit that went wrong and a missing agent say
+  ///   more, and keep their place above it.
   public static func make(
     session: WorkSession,
     paneStatus: TerminalPaneModel.Status?,
     resolution: SessionAgentResolution? = nil,
-    wasStoppedOnPurpose: Bool = false
+    wasStoppedOnPurpose: Bool = false,
+    activity: AgentActivityState? = nil
   ) -> SessionStatusPresentation {
-    let process = wasStoppedOnPurpose ? nil : paneStatus.flatMap(process)
+    // The closure's type is written out: Xcode 16.4 cannot infer it on its own.
+    let process: SessionStatusPresentation? =
+      wasStoppedOnPurpose
+      ? nil
+      : paneStatus.flatMap { status -> SessionStatusPresentation? in
+        Self.process(status, activity: activity)
+      }
     if wasStoppedOnPurpose, let paneStatus, hasEnded(paneStatus) {
       return stored(session)
     }
@@ -66,16 +95,22 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     case .active:
       // Stored as active with nothing running here: the session is real, its terminal is not.
       return SessionStatusPresentation(
-        label: "Not running",
+        label: LocalizedStringResource(
+          "Not running", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "pause.circle",
         severity: .normal
       )
     case .closed:
       return SessionStatusPresentation(
-        label: "Closed", symbolName: "stop.circle", severity: .normal)
+        label: LocalizedStringResource(
+          "Closed", bundle: .module,
+          comment: "A session's state in the sidebar; also labels the date it took that state."),
+        symbolName: "stop.circle", severity: .normal)
     case .archived:
       return SessionStatusPresentation(
-        label: "Archived",
+        label: LocalizedStringResource(
+          "Archived", bundle: .module,
+          comment: "A session's state in the sidebar; also labels the date it took that state."),
         symbolName: "archivebox",
         severity: .normal
       )
@@ -93,7 +128,15 @@ public struct SessionStatusPresentation: Equatable, Sendable {
       // with, and naming a model here would be inventing one.
       parts.append([agent.providerID, agent.modelID].compactMap { $0 }.joined(separator: " "))
     }
-    parts.append(status.label)
+    let state = String(localized: status.label)
+    parts.append(
+      status.needsAttention
+        ? String(
+          localized: "Needs attention: \(state)", bundle: .module,
+          comment:
+            "Read out by VoiceOver before what the agent waits for: a question, an approval, an unread answer."
+        )
+        : state)
     return parts.joined(separator: ", ")
   }
 
@@ -120,42 +163,89 @@ public struct SessionStatusPresentation: Equatable, Sendable {
   }
 
   private static func process(
-    _ status: TerminalPaneModel.Status
+    _ status: TerminalPaneModel.Status,
+    activity: AgentActivityState?
   ) -> SessionStatusPresentation? {
     switch status {
     case .starting:
       return SessionStatusPresentation(
-        label: "Starting", symbolName: "hourglass", severity: .normal)
+        label: LocalizedStringResource(
+          "Starting", bundle: .module, comment: "A session's state, in the sidebar."),
+        symbolName: "hourglass", severity: .normal)
     case .running:
-      return SessionStatusPresentation(
-        label: "Running",
-        symbolName: "play.circle.fill",
-        severity: .normal
-      )
+      return agent(activity ?? AgentActivityState())
     case .exited(let code) where code == 0:
       return SessionStatusPresentation(
-        label: "Finished",
+        label: LocalizedStringResource(
+          "Finished", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "checkmark.circle",
         severity: .normal
       )
     case .exited(let code):
       return SessionStatusPresentation(
-        label: "Exited with code \(code)",
+        label: LocalizedStringResource(
+          "Exited with code \(String(code))", bundle: .module,
+          comment: "A session's state: its agent ended with this exit status."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error
       )
     case .terminated(let signal):
       return SessionStatusPresentation(
-        label: "Terminated by signal \(signal)",
+        label: LocalizedStringResource(
+          "Terminated by signal \(String(signal))", bundle: .module,
+          comment: "A session's state: its agent was killed by this signal number."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error
       )
     case .failed:
       return SessionStatusPresentation(
-        label: "Failed",
+        label: LocalizedStringResource(
+          "Failed", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error
       )
+    }
+  }
+
+  /// What the agent of a running process is doing. A question comes first, then an answer not
+  /// read yet — unless the agent went back to work since, which it then says instead.
+  private static func agent(_ state: AgentActivityState) -> SessionStatusPresentation {
+    switch state.activity {
+    case .awaitingUser(.approval):
+      return SessionStatusPresentation(
+        label: LocalizedStringResource(
+          "Needs approval", bundle: .module,
+          comment: "A session's state: its agent waits for the user to allow a tool or a plan."),
+        symbolName: "hand.raised.fill", severity: .attention,
+        agentActivity: state.activity, needsAttention: true)
+    case .awaitingUser(.question):
+      return SessionStatusPresentation(
+        label: LocalizedStringResource(
+          "Has a question", bundle: .module,
+          comment: "A session's state: its agent asked the user something and waits for the answer."
+        ),
+        symbolName: "questionmark.bubble.fill", severity: .attention,
+        agentActivity: state.activity, needsAttention: true)
+    case .working:
+      return SessionStatusPresentation(
+        label: LocalizedStringResource(
+          "Working", bundle: .module,
+          comment: "A session's state: its agent is generating, or running a tool."),
+        symbolName: "arrow.triangle.2.circlepath", severity: .active,
+        agentActivity: state.activity)
+    case .idle where state.unreadSince != nil:
+      return SessionStatusPresentation(
+        label: LocalizedStringResource(
+          "New reply", bundle: .module,
+          comment: "A session's state: its agent finished an answer the user has not seen yet."),
+        symbolName: "text.bubble.fill", severity: .attention,
+        agentActivity: state.activity, needsAttention: true)
+    case .idle:
+      return SessionStatusPresentation(
+        label: LocalizedStringResource(
+          "Idle", bundle: .module,
+          comment: "A session's state: its agent waits for an instruction, with nothing to read."),
+        symbolName: "moon.zzz", severity: .normal, agentActivity: state.activity)
     }
   }
 
@@ -165,7 +255,8 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     switch resolution {
     case .unavailable, .unknownProvider:
       return SessionStatusPresentation(
-        label: "Agent unavailable",
+        label: LocalizedStringResource(
+          "Agent unavailable", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "bolt.horizontal.circle",
         severity: .attention
       )

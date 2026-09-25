@@ -19,7 +19,7 @@ launchers listed below.
 Every `BoundedProcess` command runs with `POSIX_SPAWN_SETPGROUP` (a group of its own, no new
 session: these commands have no terminal and must not acquire one), `POSIX_SPAWN_CLOEXEC_DEFAULT`
 (no descriptor but the three it is given), default signal dispositions and an empty signal mask,
-standard input on `/dev/null`, and at most 1 MiB kept from each output stream unless the caller
+standard input on `/dev/null` unless the caller hands it one, and at most 1 MiB kept from each output stream unless the caller
 asks for another bound. It is registered with `ChildProcessGroupGuard` while it may run.
 
 | Caller of `BoundedProcess` | Command | Environment | Timeout | Output kept |
@@ -29,6 +29,7 @@ asks for another bound. It is registered with `ChildProcessGroupGuard` while it 
 | `FileSystemExecutableLocator`, through `SystemProcessProbe` | `$SHELL -l -c "command -v -- '<binary>'"`, the binary name single quoted, and the only command ever interpolated into shell text | `AgentEnvironmentPolicy` | 3 s, retried once at 10 s | 64 KiB |
 | `ProcessGitCommandRunner` | `git -c core.fsmonitor=false -c core.hooksPath=/dev/null <verb> …`, verbs: `status`, `rev-parse`, `symbolic-ref`, `reflog`, `for-each-ref`, `merge-base`, `rev-list`, `diff --no-ext-diff --no-textconv` | `HOME PATH USER LOGNAME TMPDIR SSH_AUTH_SOCK`, English locale, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `GIT_PAGER=cat` | 30 s for the inspector, 120 s otherwise | 64 MiB; beyond that the command is reported as failed, never parsed cut |
 | `GitExecutable` | `/usr/bin/xcode-select -p` | As `git` | 5 s | 4 KiB |
+| `CodexAppServerProcess` (#45) | `codex app-server -c hooks.<Event>=[…]…`, fed `initialize` and one call — `hooks/list`, or `config/batchWrite` of the approval of our hooks alone — on its standard input, kept open until the answer comes | The agent's launch plan: `AgentEnvironmentPolicy`, `CODEX_HOME` included | 5 s | 1 MiB |
 
 `Process` is not used anywhere in production code. It gives no control over the process group,
 passes every descriptor the application has not marked close-on-exec, and only ever signals the one

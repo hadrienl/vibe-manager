@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import VibeApplication
 import VibeDomain
+import VibeLocalizationTesting
 
 @testable import VibeUI
 
@@ -465,22 +466,24 @@ struct NotesEditorTests {
 struct NotesStatePresentationTests {
   @Test("Each state is said in words, never by a colour alone")
   func wording() {
-    #expect(NotesStatePresentation(state: .saved(at: nil), showsSaving: false).title.isEmpty)
-    #expect(NotesStatePresentation(state: .saved(at: Date()), showsSaving: false).title == "Saved")
-    #expect(NotesStatePresentation(state: .edited, showsSaving: false).title == "Edited")
-    #expect(NotesStatePresentation(state: .saving, showsSaving: false).title == "Edited")
-    #expect(NotesStatePresentation(state: .saving, showsSaving: true).title == "Saving…")
+    #expect(NotesStatePresentation(state: .saved(at: nil), showsSaving: false).title == nil)
+    #expect(
+      english(NotesStatePresentation(state: .saved(at: Date()), showsSaving: false).title)
+        == "Saved")
+    #expect(english(NotesStatePresentation(state: .edited, showsSaving: false).title) == "Edited")
+    #expect(english(NotesStatePresentation(state: .saving, showsSaving: false).title) == "Edited")
+    #expect(english(NotesStatePresentation(state: .saving, showsSaving: true).title) == "Saving…")
 
     let failed = NotesStatePresentation(
       state: .failed(.cannotWrite(reason: "the disk is full."), retryAt: Date()),
       showsSaving: false)
-    #expect(failed.title == "Not saved")
+    #expect(english(failed.title) == "Not saved")
     #expect(failed.isFailure)
     #expect(failed.accessibilityLabel == "Notes not saved: the disk is full.")
 
     let unreadable = NotesStatePresentation(
       state: .unreadable(reason: "the file is not UTF-8 text."), showsSaving: false)
-    #expect(unreadable.title == "Unreadable")
+    #expect(english(unreadable.title) == "Unreadable")
     #expect(unreadable.isUnreadable)
   }
 
@@ -527,4 +530,8 @@ struct NotesInSummaryTests {
     #expect(NotesInSummary.leftOut(notes: nil, brief: brief) == nil)
     #expect(NotesInSummary.leftOut(notes: "Keep lodash.", brief: nil) == nil)
   }
+}
+
+private func english(_ title: LocalizedStringResource?) -> String? {
+  title.map { Localization.string($0, in: "en") }
 }

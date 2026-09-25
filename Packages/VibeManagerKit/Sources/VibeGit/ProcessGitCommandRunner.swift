@@ -71,11 +71,15 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
       return GitCommandResult(
         exitCode: -1,
         output: result.standardOutput,
-        errorOutput: "git did not answer within \(Int(timeout.components.seconds)) seconds."
+        errorOutput: String(
+          localized: "git did not answer within \(Int(timeout.components.seconds)) seconds.",
+          bundle: .module)
       )
     }
     if result.outputTruncated {
-      return GitCommandResult(exitCode: -1, errorOutput: "git wrote more than can be read.")
+      return GitCommandResult(
+        exitCode: -1,
+        errorOutput: String(localized: "git wrote more than can be read.", bundle: .module))
     }
     return GitCommandResult(
       exitCode: result.exitCode,
@@ -126,8 +130,8 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
     if environment["PATH"]?.isEmpty ?? true {
       environment["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     }
-    // English, whatever the user's region: Git's sentences are shown as they are, and the rest of
-    // the interface is in English.
+    // English, whatever the user's language: `RepositoryStatusIssue.classify` recognises a problem
+    // by Git's own words, which it would not find translated.
     environment["LANG"] = "en_US.UTF-8"
     environment["LC_ALL"] = "en_US.UTF-8"
     environment["GIT_TERMINAL_PROMPT"] = "0"

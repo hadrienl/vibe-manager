@@ -103,7 +103,10 @@ public struct GitStatusReader: RepositoryStatusReading {
     }
     let lines = result.text.split(separator: "\n").map(String.init)
     guard lines.count == 2 else {
-      return .failure(.failed(summary: "Git did not say where this repository keeps its state."))
+      return .failure(
+        .failed(
+          summary: String(
+            localized: "Git did not say where this repository keeps its state.", bundle: .module)))
     }
     let found = GitDirectories(gitDirectory: lines[0], commonDirectory: lines[1])
     await directories.remember(found, for: path)

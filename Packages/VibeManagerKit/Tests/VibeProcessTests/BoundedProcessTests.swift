@@ -180,4 +180,48 @@ struct BoundedProcessTests {
 
     #expect(text(result.standardOutput) == "/usr/bin")
   }
+
+  @Test("Without input, a command reads the end of it at once")
+  func noInput() async throws {
+    let result = try await BoundedProcess.run(shell("cat; echo done"))
+    #expect(text(result.standardOutput) == "done")
+  }
+
+  @Test("An input is written, then closed: a command reading to the end gets all of it")
+  func input() async throws {
+    var request = shell("wc -c | tr -d ' '")
+    let data = Data(repeating: 0x61, count: 200_000)
+    request.standardInput = BoundedProcessInput(data: data)
+    let result = try await BoundedProcess.run(request)
+    #expect(text(result.standardOutput) == "200000")
+  }
+
+  @Test("An input can stay open until the output holds an answer, and not a moment longer")
+  func inputKeptOpenUntilAnswered() async throws {
+    // Answers each line it reads, and stops at the end of its input: the second answer only
+    // comes because the input was still open after the first line.
+    var request = shell(#"while IFS= read -r line; do echo "got $line"; done; echo end"#)
+    request.standardInput = BoundedProcessInput(
+      data: Data("one\ntwo\n".utf8), closeOnceOutputContains: Data("got two".utf8))
+    let result = try await BoundedProcess.run(request)
+    #expect(text(result.standardOutput) == "got one\ngot two\nend")
+    #expect(!result.didTimeOut)
+  }
+
+  @Test("A command that never answers is still bounded by its timeout")
+  func inputKeptOpenTimesOut() async throws {
+    var request = shell("cat >/dev/null", timeout: .milliseconds(500))
+    request.standardInput = BoundedProcessInput(
+      data: Data("x\n".utf8), closeOnceOutputContains: Data("never".utf8))
+    let result = try await BoundedProcess.run(request)
+    #expect(result.didTimeOut)
+  }
+
+  @Test("A command that leaves without reading its input costs nothing")
+  func unreadInput() async throws {
+    var request = shell("exit 3")
+    request.standardInput = BoundedProcessInput(data: Data(repeating: 0x61, count: 1_000_000))
+    let result = try await BoundedProcess.run(request)
+    #expect(result.termination == .exited(3))
+  }
 }

@@ -52,7 +52,10 @@ final class WorkspaceFileOpener: FileOpening {
   func name(of editor: EditorChoice) -> String? {
     switch editor {
     case .defaultApplication:
-      return "the default application"
+      return String(
+        localized: "the default application", bundle: .module,
+        comment:
+          "The application a file opens with, named inside a sentence: “could not be opened in …”.")
     case .application(let identifier):
       guard let url = workspace.urlForApplication(withBundleIdentifier: identifier) else {
         return nil

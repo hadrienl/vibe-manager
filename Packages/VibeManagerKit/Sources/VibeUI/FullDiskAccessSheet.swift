@@ -15,7 +15,7 @@ struct FullDiskAccessSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Let agents read your folders")
+      Text("Let agents read your folders", bundle: .module)
         .font(.title2.weight(.semibold))
 
       Text(
@@ -23,21 +23,27 @@ struct FullDiskAccessSheet: View {
         Vibe Manager runs coding agents on your behalf. macOS asks for permission every time one \
         of them reads your Desktop, Documents, Downloads, an external disk or iCloud Drive — and \
         it asks in the name of this application, once per folder.
-        """
+        """,
+        bundle: .module
       )
       .fixedSize(horizontal: false, vertical: true)
 
       Text(
         """
         Granting Full Disk Access once, as you would for Terminal, replaces all of those alerts.
-        """
+        """,
+        bundle: .module
       )
       .fixedSize(horizontal: false, vertical: true)
 
       VStack(alignment: .leading, spacing: 6) {
-        step(1, "Open Privacy & Security → Full Disk Access.")
-        step(2, "Turn Vibe Manager on.")
-        step(3, "Reopen Vibe Manager — the change takes effect then.")
+        step(
+          1,
+          Text(
+            "Open Privacy & Security → Full Disk Access.", bundle: .module,
+            comment: "The names of the pane and the setting in System Settings."))
+        step(2, Text("Turn Vibe Manager on.", bundle: .module))
+        step(3, Text("Reopen Vibe Manager — the change takes effect then.", bundle: .module))
       }
       .padding(.vertical, 2)
 
@@ -45,7 +51,8 @@ struct FullDiskAccessSheet: View {
         """
         You can skip this. Agents still run, and macOS only asks when one of them reaches a \
         protected folder. You can come back to it in Settings at any time.
-        """
+        """,
+        bundle: .module
       )
       .font(.callout)
       .foregroundStyle(.secondary)
@@ -53,22 +60,26 @@ struct FullDiskAccessSheet: View {
 
       HStack {
         Spacer()
-        Button("Not Now", action: skip)
-          .keyboardShortcut(.cancelAction)
-        Button("Open System Settings", action: openSystemSettings)
-          .keyboardShortcut(.defaultAction)
+        Button(action: skip) {
+          Text("Not Now", bundle: .module)
+        }
+        .keyboardShortcut(.cancelAction)
+        Button(action: openSystemSettings) {
+          Text("Open System Settings", bundle: .module)
+        }
+        .keyboardShortcut(.defaultAction)
       }
     }
     .padding(24)
     .frame(width: 460)
   }
 
-  private func step(_ number: Int, _ text: String) -> some View {
+  private func step(_ number: Int, _ text: Text) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Text("\(number).")
+      Text(verbatim: "\(number).")
         .monospacedDigit()
         .foregroundStyle(.secondary)
-      Text(text)
+      text
         .fixedSize(horizontal: false, vertical: true)
     }
     .accessibilityElement(children: .combine)

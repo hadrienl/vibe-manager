@@ -77,10 +77,13 @@ public final class NewSessionModel {
     else {
       return nil
     }
-    return """
-      macOS protects \(location.label): it may ask for permission the first time the agent reads \
-      this folder.
-      """
+    return String(
+      localized: """
+        macOS protects \(location.label): it may ask for permission the first time the agent \
+        reads this folder.
+        """,
+      bundle: .module,
+      comment: "A protected place: “your Desktop”, “your Documents folder”, “iCloud Drive”.")
   }
 
   public var selectedAgent: AgentOption? {
@@ -378,8 +381,9 @@ public final class NewSessionModel {
         SessionDraftIssue(
           field: .name,
           message: (error as? LocalizedError)?.errorDescription
-            ?? "The session could not be saved.",
-          remedy: "Try again, and report the failure if it persists."
+            ?? String(localized: "The session could not be saved.", bundle: .module),
+          remedy: String(
+            localized: "Try again, and report the failure if it persists.", bundle: .module)
         )
       ]
       return nil

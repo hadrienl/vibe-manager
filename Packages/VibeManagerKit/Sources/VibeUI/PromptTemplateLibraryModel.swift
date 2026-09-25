@@ -181,7 +181,11 @@ public final class PromptTemplateLibraryModel {
 
   private func startNewTemplate() {
     let template = PromptTemplate(
-      name: library.uniqueName(startingWith: "Untitled Template"), body: "",
+      name: library.uniqueName(
+        startingWith: String(
+          localized: "Untitled Template", bundle: .module,
+          comment: "The name of a new prompt template, until the user names it.")),
+      body: "",
       createdAt: clock.now())
     selectedID = template.id
     editing = template
@@ -308,8 +312,11 @@ public final class PromptTemplateLibraryModel {
     if let count = await change({ $0.apply(pending.plan, replacing: pending.replacing, at: now) }) {
       importSummary =
         count == 0
-        ? "Nothing to import: every template is already here."
-        : count == 1 ? "1 template imported." : "\(count) templates imported."
+        ? String(
+          localized: "Nothing to import: every template is already here.", bundle: .module)
+        : String(
+          localized: "\(count) templates imported.", bundle: .module,
+          comment: "The number of prompt templates an import added or replaced.")
     }
   }
 

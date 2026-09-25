@@ -1,0 +1,57 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Another copy of Vibe Manager is attached to this terminal host." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une autre copie de Vibe Manager est déjà reliée à cet hôte des terminaux."
+          }
+        }
+      }
+    },
+    "The terminal host could not prove it belongs to this application." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’hôte des terminaux n’a pas pu prouver qu’il appartient à cette application."
+          }
+        }
+      }
+    },
+    "The terminal host did not answer." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’hôte des terminaux n’a pas répondu."
+          }
+        }
+      }
+    },
+    "The terminal host did not list its sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’hôte des terminaux n’a pas listé ses sessions."
+          }
+        }
+      }
+    },
+    "This terminal host speaks protocol %@." : {
+      "comment" : "The version number of the protocol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet hôte des terminaux utilise le protocole %@."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

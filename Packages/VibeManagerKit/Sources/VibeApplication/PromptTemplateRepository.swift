@@ -10,9 +10,9 @@ public enum PromptTemplateStoreError: Error, Equatable, Sendable, LocalizedError
   public var errorDescription: String? {
     switch self {
     case .unreadable(let reason):
-      return "Templates couldn't be read: \(reason)"
+      return String(localized: "Templates couldn't be read: \(reason)", bundle: .module)
     case .cannotWrite(let reason):
-      return "Templates couldn't be saved: \(reason)"
+      return String(localized: "Templates couldn't be saved: \(reason)", bundle: .module)
     }
   }
 }

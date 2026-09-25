@@ -89,81 +89,107 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .sessionMissing:
-      return "This session is no longer in the store."
+      return String(localized: "This session is no longer in the store.", bundle: .module)
     case .storeUnreadable:
-      return "The session store could not be read."
+      return String(localized: "The session store could not be read.", bundle: .module)
     case .notSwitchable(.archived):
-      return "This session is archived."
+      return String(localized: "This session is archived.", bundle: .module)
     case .notSwitchable:
-      return "This session cannot be switched right now."
+      return String(localized: "This session cannot be switched right now.", bundle: .module)
     case .agentUnassigned:
-      return "This session was never given a coding agent."
+      return String(localized: "This session was never given a coding agent.", bundle: .module)
     case .nothingToChange:
-      return "This session already runs that agent and model."
+      return String(localized: "This session already runs that agent and model.", bundle: .module)
     case .noRepository:
-      return "This session has no folder to start in."
+      return String(localized: "This session has no folder to start in.", bundle: .module)
     case .targetUnknown(let providerID):
-      return "The agent \(providerID) is not installed in this build."
+      return String(
+        localized: "The agent \(providerID) is not installed in this build.", bundle: .module)
     case .targetUnavailable(let name, let summary, _):
-      return "\(name) cannot run right now: \(summary)"
+      return String(
+        localized: "\(name) cannot run right now: \(summary)", bundle: .module,
+        comment: "An agent's name, then why it cannot run.")
     case .modelUnknown(let model, let agentName):
-      return "\(agentName) does not offer the model \(model)."
+      return String(
+        localized: "\(agentName) does not offer the model \(model).", bundle: .module,
+        comment: "An agent's name, then a model's identifier.")
     case .summaryTooLong(let overBy):
-      return """
-        The summary is \(Self.size(overBy)) over what an agent can be started with.
-        """
+      return String(
+        localized: "The summary is \(Self.size(overBy)) over what an agent can be started with.",
+        bundle: .module, comment: "A size, formatted: “120 bytes”, “1.5 KiB”.")
     case .workingDirectoryUnusable(let path, .missing):
-      return "The folder of this session, \(path), no longer exists."
+      return String(
+        localized: "The folder of this session, \(path), no longer exists.", bundle: .module)
     case .workingDirectoryUnusable(let path, .notADirectory):
-      return "The path of this session, \(path), is not a folder any more."
+      return String(
+        localized: "The path of this session, \(path), is not a folder any more.", bundle: .module)
     case .workingDirectoryUnusable(let path, _):
-      return "The folder of this session, \(path), cannot be entered."
+      return String(
+        localized: "The folder of this session, \(path), cannot be entered.", bundle: .module)
     case .launchRejected(let error):
       return error.errorDescription
     case .stopUnconfirmed(let pid):
-      return "The running agent (process \(pid)) could not be confirmed stopped."
+      return String(
+        localized: "The running agent (process \(String(pid))) could not be confirmed stopped.",
+        bundle: .module, comment: "A process identifier.")
     case .sessionMoved:
-      return "This session was archived while its agent was being stopped."
+      return String(
+        localized: "This session was archived while its agent was being stopped.", bundle: .module)
     case .planChanged:
-      return "This session changed while the switch was being prepared, so nothing was switched."
+      return String(
+        localized:
+          "This session changed while the switch was being prepared, so nothing was switched.",
+        bundle: .module)
     }
   }
 
   public var recoverySuggestion: String? {
     switch self {
     case .sessionMissing, .sessionMoved:
-      return "Reload the workspace."
+      return String(localized: "Reload the workspace.", bundle: .module)
     case .planChanged:
-      return "Open Switch Agent again to review what will be handed over."
+      return String(
+        localized: "Open Switch Agent again to review what will be handed over.", bundle: .module)
     case .storeUnreadable:
-      return "Try again, and restore a backup if it persists."
+      return String(localized: "Try again, and restore a backup if it persists.", bundle: .module)
     case .notSwitchable(.archived):
-      return "Unarchive it first, then switch its agent."
+      return String(localized: "Unarchive it first, then switch its agent.", bundle: .module)
     case .notSwitchable, .nothingToChange:
       return nil
     case .agentUnassigned:
-      return "Create a new session to choose an agent."
+      return String(localized: "Create a new session to choose an agent.", bundle: .module)
     case .noRepository:
-      return "Create a new session in the folder you want to work in."
+      return String(
+        localized: "Create a new session in the folder you want to work in.", bundle: .module)
     case .targetUnknown:
-      return "Choose another agent."
+      return String(localized: "Choose another agent.", bundle: .module)
     case .targetUnavailable(_, _, let remedy):
       return remedy
     case .modelUnknown:
-      return "Choose one of the models it lists, or its default model."
+      return String(
+        localized: "Choose one of the models it lists, or its default model.", bundle: .module)
     case .summaryTooLong:
-      return "Shorten the summary."
+      return String(localized: "Shorten the summary.", bundle: .module)
     case .workingDirectoryUnusable:
-      return "Put the folder back where it was, or create a new session in its new place."
+      return String(
+        localized: "Put the folder back where it was, or create a new session in its new place.",
+        bundle: .module)
     case .launchRejected:
-      return "Try again, and report the failure if it persists."
+      return String(localized: "Try again, and report the failure if it persists.", bundle: .module)
     case .stopUnconfirmed:
-      return "The session was left on its agent. Check that the process is gone, then try again."
+      return String(
+        localized:
+          "The session was left on its agent. Check that the process is gone, then try again.",
+        bundle: .module)
     }
   }
 
   static func size(_ bytes: Int) -> String {
-    bytes < 1_024 ? "\(bytes) bytes" : String(format: "%.1f KiB", Double(bytes) / 1_024)
+    guard bytes >= 1_024 else { return String(localized: "\(bytes) bytes", bundle: .module) }
+    let kibibytes = (Double(bytes) / 1_024).formatted(
+      .number.precision(.fractionLength(1)).grouping(.never))
+    return String(
+      localized: "\(kibibytes) KiB", bundle: .module, comment: "A size in kibibytes: “1.5 KiB”.")
   }
 }
 

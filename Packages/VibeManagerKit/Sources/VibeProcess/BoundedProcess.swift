@@ -16,6 +16,8 @@ public struct BoundedProcessRequest: Sendable {
   public var outputByteLimit: Int
   /// How long the group is given to leave after `SIGTERM`, before `SIGKILL`.
   public var terminationGrace: Duration
+  /// What the command reads. `nil` gives it `/dev/null`, as every command had before.
+  public var standardInput: BoundedProcessInput?
 
   public init(
     executablePath: String,
@@ -24,8 +26,10 @@ public struct BoundedProcessRequest: Sendable {
     workingDirectoryPath: String? = nil,
     timeout: Duration,
     outputByteLimit: Int = BoundedProcess.defaultOutputByteLimit,
-    terminationGrace: Duration = .seconds(2)
+    terminationGrace: Duration = .seconds(2),
+    standardInput: BoundedProcessInput? = nil
   ) {
+    self.standardInput = standardInput
     self.executablePath = executablePath
     self.arguments = arguments
     self.environment = environment
@@ -33,6 +37,20 @@ public struct BoundedProcessRequest: Sendable {
     self.timeout = timeout
     self.outputByteLimit = outputByteLimit
     self.terminationGrace = terminationGrace
+  }
+}
+
+/// The standard input of a bounded command, written as soon as it starts.
+public struct BoundedProcessInput: Sendable {
+  public var data: Data
+  /// When set, the input is kept open until the standard output holds these bytes, then closed.
+  /// A server that stops at the end of its input — `codex app-server` — would otherwise stop
+  /// before it answered. The timeout still bounds the whole exchange.
+  public var closeOnceOutputContains: Data?
+
+  public init(data: Data, closeOnceOutputContains: Data? = nil) {
+    self.data = data
+    self.closeOnceOutputContains = closeOnceOutputContains
   }
 }
 
@@ -134,19 +152,28 @@ public enum BoundedProcess {
       close(output[1])
       throw BoundedProcessError.launchFailed(code: code)
     }
-    for descriptor in output + errors {
+    var input: [Int32] = [-1, -1]
+    if request.standardInput != nil, pipe(&input) != 0 {
+      let code = errno
+      for descriptor in output + errors { close(descriptor) }
+      throw BoundedProcessError.launchFailed(code: code)
+    }
+    for descriptor in output + errors + input where descriptor >= 0 {
       _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC)
     }
 
     let processIdentifier: pid_t
     do {
-      processIdentifier = try spawn(request, output: output[1], error: errors[1])
+      processIdentifier = try spawn(
+        request, input: input[0] >= 0 ? input[0] : nil, output: output[1], error: errors[1])
     } catch {
-      for descriptor in output + errors { close(descriptor) }
+      for descriptor in output + errors + input where descriptor >= 0 { close(descriptor) }
       throw error
     }
     close(output[1])
     close(errors[1])
+    let writer = request.standardInput.map { InputWriter(descriptor: input[1], input: $0) }
+    if input[0] >= 0 { close(input[0]) }
 
     // The child leads its group: the group identifier is its process identifier.
     let group = processIdentifier
@@ -158,7 +185,11 @@ public enum BoundedProcess {
 
     let reader = OutputReader(
       descriptors: [output[0], errors[0]], limit: max(0, request.outputByteLimit))
+    reader.watchStandardOutput = writer.map { writer in { writer.outputGrew(to: $0) } }
     reader.start()
+    writer?.start()
+    // However it ends, the input is closed with it.
+    defer { writer?.close() }
 
     // The group stays registered until the child is reaped, whenever that is.
     let exit = ExitWaiter(processIdentifier: processIdentifier) {
@@ -202,6 +233,7 @@ public enum BoundedProcess {
 
   private static func spawn(
     _ request: BoundedProcessRequest,
+    input: Int32?,
     output: Int32,
     error: Int32
   ) throws -> pid_t {
@@ -211,7 +243,11 @@ public enum BoundedProcess {
     guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
     defer { posix_spawn_file_actions_destroy(&fileActions) }
 
-    result = posix_spawn_file_actions_addopen(&fileActions, 0, "/dev/null", O_RDONLY, 0)
+    if let input {
+      result = posix_spawn_file_actions_adddup2(&fileActions, input, 0)
+    } else {
+      result = posix_spawn_file_actions_addopen(&fileActions, 0, "/dev/null", O_RDONLY, 0)
+    }
     guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
     result = posix_spawn_file_actions_adddup2(&fileActions, output, 1)
     guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
@@ -357,6 +393,8 @@ private final class OutputReader: @unchecked Sendable {
   private let limit: Int
   private let lock = NSLock()
   private var streams: Streams
+  /// Told what the standard output holds each time it grows. Set before `start`.
+  var watchStandardOutput: ((Data) -> Void)?
   private var abandoned = false
   private let finished = DispatchSemaphore(value: 0)
 
@@ -405,7 +443,7 @@ private final class OutputReader: @unchecked Sendable {
   }
 
   private func append(_ bytes: ArraySlice<UInt8>, to index: Int) {
-    lock.withLock {
+    let grown = lock.withLock { () -> Data? in
       let room = limit - streams.data[index].count
       if bytes.count > room {
         streams.truncated = true
@@ -413,7 +451,82 @@ private final class OutputReader: @unchecked Sendable {
       if room > 0 {
         streams.data[index].append(contentsOf: bytes.prefix(room))
       }
+      return index == 0 ? streams.data[0] : nil
     }
+    if let grown { watchStandardOutput?(grown) }
+  }
+}
+
+/// Writes a command's input on a thread of its own — a pipe holds 64 KiB, and a command that reads
+/// only once it has written would otherwise block the writer — and closes it when it is done, or
+/// once the output holds what it waits for.
+private final class InputWriter: @unchecked Sendable {
+  private let descriptor: Int32
+  private let input: BoundedProcessInput
+  private let lock = NSLock()
+  /// Someone asked for the input to be closed: the command ended, or has what it waits for.
+  private var isCloseRequested = false
+  /// The writing thread still uses the descriptor, which must stay open — closed under it, its
+  /// number could go to a file the application opens next, and the input be written there.
+  private var isWriting = false
+  private var isClosed = false
+  private var isWritten = false
+  private var outputHasMarker = false
+
+  init(descriptor: Int32, input: BoundedProcessInput) {
+    self.descriptor = descriptor
+    self.input = input
+    // A command that exits without reading its input must cost an `EPIPE`, not a `SIGPIPE` that
+    // would end the application.
+    _ = fcntl(descriptor, F_SETNOSIGPIPE, 1)
+  }
+
+  func start() {
+    // Taken before the thread runs: a command that ends before it does must not see its input
+    // closed under the write.
+    lock.withLock { isWriting = true }
+    DispatchQueue.global(qos: .userInitiated).async {
+      self.input.data.withUnsafeBytes { bytes in
+        var offset = 0
+        while offset < bytes.count, !self.lock.withLock({ self.isCloseRequested }) {
+          let written = write(self.descriptor, bytes.baseAddress! + offset, bytes.count - offset)
+          if written < 0 {
+            if errno == EINTR { continue }
+            break
+          }
+          offset += written
+        }
+      }
+      let close = self.lock.withLock { () -> Bool in
+        self.isWriting = false
+        self.isWritten = true
+        return self.isCloseRequested || self.input.closeOnceOutputContains == nil
+          || self.outputHasMarker
+      }
+      if close { self.close() }
+    }
+  }
+
+  func outputGrew(to output: Data) {
+    guard let marker = input.closeOnceOutputContains, output.range(of: marker) != nil else {
+      return
+    }
+    let close = lock.withLock { () -> Bool in
+      outputHasMarker = true
+      return isWritten
+    }
+    if close { self.close() }
+  }
+
+  /// Closes the input now, or once the writing thread lets go of it.
+  func close() {
+    let shouldClose = lock.withLock { () -> Bool in
+      isCloseRequested = true
+      guard !isWriting, !isClosed else { return false }
+      isClosed = true
+      return true
+    }
+    if shouldClose { Darwin.close(descriptor) }
   }
 }
 

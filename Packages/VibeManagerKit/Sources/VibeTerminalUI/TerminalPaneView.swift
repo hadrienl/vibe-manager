@@ -13,11 +13,11 @@ public struct TerminalPaneView: View {
   private let autoStart: Bool
   /// False for a pane that stays mounted behind the one being shown.
   private let isActive: Bool
-  private let accessibilityTitle: String
+  private let accessibilityTitle: String?
 
   public init(
     model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
-    accessibilityTitle: String = "Terminal"
+    accessibilityTitle: String? = nil
   ) {
     self.model = model
     self.autoStart = autoStart
@@ -37,17 +37,25 @@ public struct TerminalPaneView: View {
       .overlay {
         if let failure = model.failure {
           ContentUnavailableView {
-            Label("Terminal unavailable", systemImage: "exclamationmark.triangle")
+            Label {
+              Text("Terminal unavailable", bundle: .module)
+            } icon: {
+              Image(systemName: "exclamationmark.triangle")
+            }
           } description: {
             Text(failure.message)
           } actions: {
-            Button("Try Again") {
+            Button {
               Task { await model.start() }
+            } label: {
+              Text("Try Again", bundle: .module)
             }
           }
           .background(.background)
         } else if model.session == nil {
-          ProgressView("Starting terminal…")
+          ProgressView {
+            Text("Starting terminal…", bundle: .module)
+          }
         }
       }
 
@@ -79,11 +87,15 @@ private struct TerminalStatusBar: View {
         .foregroundStyle(.secondary)
       Spacer()
       if status.isRunning {
-        Button("Stop", action: stop)
-          .controlSize(.small)
+        Button(action: stop) {
+          Text("Stop", bundle: .module, comment: "Stops the terminal's process.")
+        }
+        .controlSize(.small)
       } else {
-        Button("Restart", action: restart)
-          .controlSize(.small)
+        Button(action: restart) {
+          Text("Restart", bundle: .module, comment: "Starts the terminal's process again.")
+        }
+        .controlSize(.small)
       }
     }
     .padding(.horizontal, 12)
@@ -95,13 +107,19 @@ extension TerminalPaneModel.Status {
   var label: String {
     switch self {
     case .starting:
-      return "Starting…"
+      return String(localized: "Starting…", bundle: .module, comment: "A terminal's state.")
     case .running:
-      return "Running"
+      return String(localized: "Running", bundle: .module, comment: "A terminal's state.")
     case .exited(let code):
-      return code == 0 ? "Finished" : "Exited with code \(code)"
+      return code == 0
+        ? String(localized: "Finished", bundle: .module, comment: "A terminal's state.")
+        : String(
+          localized: "Exited with code \(String(code))", bundle: .module,
+          comment: "A terminal's state: its process ended with this exit status.")
     case .terminated(let signal):
-      return "Terminated by signal \(signal)"
+      return String(
+        localized: "Terminated by signal \(String(signal))", bundle: .module,
+        comment: "A terminal's state: its process was killed by this signal number.")
     case .failed(let message):
       return message
     }

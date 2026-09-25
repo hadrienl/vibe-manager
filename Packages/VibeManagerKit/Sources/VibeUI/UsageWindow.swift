@@ -18,7 +18,13 @@ public struct UsageWindow: View {
         .onAppear { usage.startWatching(nil) }
         .onDisappear { usage.stopWatching(nil) }
     } else {
-      ContentUnavailableView("Usage is not available", systemImage: "chart.bar")
+      ContentUnavailableView {
+        Label {
+          Text("Usage is not available", bundle: .module)
+        } icon: {
+          Image(systemName: "chart.bar")
+        }
+      }
     }
   }
 
@@ -41,27 +47,33 @@ public struct UsageWindow: View {
 
   private func toolbar(_ usage: UsageModel) -> some View {
     HStack {
-      Picker("Period", selection: Bindable(usage).period) {
+      Picker(selection: Bindable(usage).period) {
         ForEach(UsagePeriod.allCases, id: \.self) {
           Text(UsagePresentation.periodName($0)).tag($0)
         }
+      } label: {
+        Text("Period", bundle: .module)
       }
       .fixedSize()
-      Picker("Group by", selection: Bindable(usage).grouping) {
+      Picker(selection: Bindable(usage).grouping) {
         ForEach(UsageGrouping.allCases, id: \.self) {
           Text(UsagePresentation.groupingName($0)).tag($0)
         }
+      } label: {
+        Text("Group by", bundle: .module)
       }
       .pickerStyle(.segmented)
       .fixedSize()
       Spacer()
       if usage.isReading {
         ProgressView().controlSize(.small)
-        Text("Reading transcripts…").font(.callout).foregroundStyle(.secondary)
+        Text("Reading transcripts…", bundle: .module).font(.callout).foregroundStyle(.secondary)
       }
-      Picker("Chart", selection: $chartShowsTokens) {
-        Text("Tokens").tag(true)
-        Text("Running time").tag(false)
+      Picker(selection: $chartShowsTokens) {
+        Text("Tokens", bundle: .module).tag(true)
+        Text("Running time", bundle: .module).tag(false)
+      } label: {
+        Text("Chart", bundle: .module, comment: "What the chart of the Usage window shows.")
       }
       .labelsHidden()
       .fixedSize()
@@ -71,16 +83,22 @@ public struct UsageWindow: View {
   private func chart(_ usage: UsageModel) -> some View {
     Chart(usage.report.days, id: \.self) { day in
       BarMark(
-        x: .value("Day", day.day.start(in: .current), unit: .day),
+        x: .value(Text("Day", bundle: .module), day.day.start(in: .current), unit: .day),
         y: .value(
-          chartShowsTokens ? "Tokens" : "Hours",
+          chartShowsTokens ? Text("Tokens", bundle: .module) : Text("Hours", bundle: .module),
           chartShowsTokens
             ? Double(day.tokens.input + day.tokens.output)
             : day.runningTime / 3_600)
       )
-      .foregroundStyle(by: .value("Agent", name(ofProvider: day.providerID)))
+      .foregroundStyle(by: .value(Text("Agent", bundle: .module), name(ofProvider: day.providerID)))
     }
-    .chartYAxisLabel(chartShowsTokens ? "Tokens in + out (≈)" : "Hours")
+    .chartYAxisLabel {
+      if chartShowsTokens {
+        Text("Tokens in + out (≈)", bundle: .module)
+      } else {
+        Text("Hours", bundle: .module)
+      }
+    }
     .accessibilityChartDescriptor(
       UsageChartDescriptor(
         days: usage.report.days, showsTokens: chartShowsTokens, providerName: name(ofProvider:)))
@@ -90,30 +108,76 @@ public struct UsageWindow: View {
     let rows = usage.report.rows + [usage.report.total]
     let grouping = usage.grouping
     return Table(rows, selection: $selection) {
-      TableColumn(UsagePresentation.groupingName(grouping)) { row in
+      TableColumn(Text(UsagePresentation.groupingName(grouping))) { row in
         Text(title(of: row))
           .fontWeight(row.key == .total ? .semibold : .regular)
           .lineLimit(1)
       }
       .width(min: 160, ideal: 240)
-      TableColumn(grouping == .model ? "Running (configured model)" : "Running") { row in
+      TableColumn(
+        Text(
+          grouping == .model
+            ? LocalizedStringResource(
+              "Running (configured model)", bundle: .module,
+              comment:
+                "A column of the Usage window: running time, counted for the configured model."
+            )
+            : LocalizedStringResource(
+              "usage.column.running", defaultValue: "Running", bundle: .module,
+              comment: "A column of the Usage window: running time. Not the state of a session."))
+      ) { row in
         Text(UsagePresentation.duration(row.runningTime)).monospacedDigit()
       }
-      TableColumn("Runs") { row in
-        Text("\(row.runs.total)").monospacedDigit()
+      TableColumn(
+        Text(
+          LocalizedStringResource(
+            "Runs", bundle: .module, comment: "A column of the Usage window: how many runs."))
+      ) { row in
+        Text(row.runs.total, format: .number).monospacedDigit()
       }
       .width(50)
-      TableColumn("Responses") { row in
-        Text(row.hasReportedTokens ? "\(row.responses)" : "—").monospacedDigit()
+      TableColumn(
+        Text(
+          LocalizedStringResource(
+            "Responses", bundle: .module,
+            comment: "A column of the Usage window: how many answers the agents gave."))
+      ) { row in
+        Group {
+          if row.hasReportedTokens {
+            Text(row.responses, format: .number)
+          } else {
+            Text(verbatim: "—")
+          }
+        }
+        .monospacedDigit()
       }
       .width(70)
-      TableColumn(grouping == .model ? "Tokens in (declared model)" : "Tokens in") { row in
+      TableColumn(
+        Text(
+          grouping == .model
+            ? LocalizedStringResource(
+              "Tokens in (declared model)", bundle: .module,
+              comment:
+                "A column of the Usage window: input tokens, counted for the model the agent declared."
+            )
+            : LocalizedStringResource(
+              "Tokens in", bundle: .module, comment: "A column of the Usage window: input tokens."))
+      ) { row in
         tokenCell(row) { $0.input }
       }
-      TableColumn("Tokens out") { row in
+      TableColumn(
+        Text(
+          LocalizedStringResource(
+            "Tokens out", bundle: .module, comment: "A column of the Usage window: output tokens."))
+      ) { row in
         tokenCell(row) { $0.output }
       }
-      TableColumn("Cache read") { row in
+      TableColumn(
+        Text(
+          LocalizedStringResource(
+            "Cache read", bundle: .module,
+            comment: "A column of the Usage window: tokens read from the cache."))
+      ) { row in
         tokenCell(row) { $0.cacheRead }
       }
     }
@@ -130,7 +194,8 @@ public struct UsageWindow: View {
       if row.hasReportedTokens {
         Text("≈ " + UsagePresentation.tokens(value(row.tokens)))
       } else {
-        Text("—").help("No token usage was reported for this row.")
+        Text(verbatim: "—")
+          .help(Text("No token usage was reported for this row.", bundle: .module))
       }
     }
     .monospacedDigit()
@@ -138,36 +203,54 @@ public struct UsageWindow: View {
 
   private var footer: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Label(
-        "Cost: not available — neither CLI reports a reliable cost.", systemImage: "info.circle"
-      )
+      Label {
+        Text("Cost: not available — neither CLI reports a reliable cost.", bundle: .module)
+      } icon: {
+        Image(systemName: "info.circle")
+      }
       .help(UsagePresentation.costExplanation)
-      Text("Tokens (≈) are read from the agents' own transcripts. " + UsagePresentation.privacyNote)
-        .help(UsagePresentation.tokensExplanation)
+      Text(
+        String(localized: "Tokens (≈) are read from the agents' own transcripts.", bundle: .module)
+          + " " + UsagePresentation.privacyNote
+      )
+      .help(UsagePresentation.tokensExplanation)
     }
     .font(.caption)
     .foregroundStyle(.secondary)
   }
 
   private func trackingOffSentence(_ usage: UsageModel) -> String {
-    guard let since = usage.trackingOffSince else { return "Usage tracking is off." }
-    return
-      "Usage tracking is off since \(since.formatted(date: .abbreviated, time: .shortened)). Turn it on in Settings."
+    guard let since = usage.trackingOffSince else {
+      return String(localized: "Usage tracking is off.", bundle: .module)
+    }
+    return String(
+      localized:
+        "Usage tracking is off since \(since.formatted(date: .abbreviated, time: .shortened)). Turn it on in Settings.",
+      bundle: .module, comment: "A date and time.")
   }
 
   private func title(of row: UsageRow) -> String {
     switch row.key {
     case .total:
-      return "Total"
+      return String(
+        localized: "Total", bundle: .module, comment: "The last row of the Usage window's table.")
     case .session(let id):
       guard let session = model.sessions.first(where: { $0.id == id }) else {
-        return "Deleted session"
+        return String(localized: "Deleted session", bundle: .module)
       }
-      return session.status == .archived ? "\(session.name) (archived)" : session.name
+      return session.status == .archived
+        ? String(
+          localized: "\(session.name) (archived)", bundle: .module, comment: "A session's name.")
+        : session.name
     case .provider(let id):
       return name(ofProvider: id)
     case .model(let providerID, let model):
-      return "\(name(ofProvider: providerID)) · \(model ?? "Default")"
+      let modelName =
+        model
+        ?? String(
+          localized: "Default", bundle: .module,
+          comment: "The model an agent uses when none was chosen.")
+      return "\(name(ofProvider: providerID)) · \(modelName)"
     }
   }
 
@@ -186,9 +269,12 @@ private struct UsageChartDescriptor: AXChartDescriptorRepresentable {
     let dates = days.map { $0.day.description }
     let orderedDates = Array(Set(dates)).sorted()
     let values = days.map(value)
-    let x = AXCategoricalDataAxisDescriptor(title: "Day", categoryOrder: orderedDates)
+    let x = AXCategoricalDataAxisDescriptor(
+      title: String(localized: "Day", bundle: .module), categoryOrder: orderedDates)
     let y = AXNumericDataAxisDescriptor(
-      title: showsTokens ? "Tokens in and out, approximate" : "Hours",
+      title: showsTokens
+        ? String(localized: "Tokens in and out, approximate", bundle: .module)
+        : String(localized: "Hours", bundle: .module),
       range: 0...max(values.max() ?? 1, 1), gridlinePositions: []
     ) { value in
       showsTokens ? UsagePresentation.tokens(Int(value)) : String(format: "%.1f h", value)
@@ -200,7 +286,10 @@ private struct UsageChartDescriptor: AXChartDescriptorRepresentable {
         dataPoints: entries.map { AXDataPoint(x: $0.day.description, y: value($0)) })
     }
     return AXChartDescriptor(
-      title: showsTokens ? "Tokens per day" : "Running time per day", summary: nil, xAxis: x,
+      title: showsTokens
+        ? String(localized: "Tokens per day", bundle: .module)
+        : String(localized: "Running time per day", bundle: .module),
+      summary: nil, xAxis: x,
       yAxis: y, additionalAxes: [], series: series)
   }
 

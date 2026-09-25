@@ -14,24 +14,32 @@ public enum SessionStoreError: Error, Equatable, LocalizedError, Sendable {
   public var errorDescription: String? {
     switch self {
     case .cannotAccessStore:
-      return "The session store could not be accessed."
+      return String(localized: "The session store could not be accessed.", bundle: .module)
     case .corruptedStore(let backupAvailable):
       return backupAvailable
-        ? "The session store is damaged, but a backup can be restored."
-        : "The session store is damaged and no valid backup is available."
+        ? String(
+          localized: "The session store is damaged, but a backup can be restored.", bundle: .module)
+        : String(
+          localized: "The session store is damaged and no valid backup is available.",
+          bundle: .module)
     case .invalidSession:
-      return "The work session contains invalid data."
+      return String(localized: "The work session contains invalid data.", bundle: .module)
     case .unsupportedSchemaVersion:
-      return "The session store was created by a newer version of Vibe Manager."
+      return String(
+        localized: "The session store was created by a newer version of Vibe Manager.",
+        bundle: .module)
     case .recoveryUnavailable:
-      return "No valid session backup is available."
+      return String(localized: "No valid session backup is available.", bundle: .module)
     case .recoveryNotNeeded:
-      return "The session store is healthy, so there is nothing to restore."
+      return String(
+        localized: "The session store is healthy, so there is nothing to restore.", bundle: .module)
     case .recoveryRefusedForNewerStore:
-      return """
-        The session store was created by a newer version of Vibe Manager and must not be replaced \
-        by an older backup. Update Vibe Manager to open it.
-        """
+      return String(
+        localized: """
+          The session store was created by a newer version of Vibe Manager and must not be \
+          replaced by an older backup. Update Vibe Manager to open it.
+          """,
+        bundle: .module)
     }
   }
 }

@@ -34,35 +34,41 @@ public struct PromptTemplatesView: View {
     .frame(minWidth: 1000, idealWidth: 1180, minHeight: 600, idealHeight: 700)
     .task { await model.load() }
     .confirmationDialog(
-      "Save the changes to “\(model.editing?.trimmedName ?? "")”?",
+      Text(
+        "Save the changes to “\(model.editing?.trimmedName ?? "")”?", bundle: .module,
+        comment: "The name of the prompt template being edited."),
       isPresented: Binding(
         get: { model.pendingNavigation != nil },
         set: { if !$0 { model.dismissPendingNavigation() } }
       ),
       presenting: model.pendingNavigation
     ) { navigation in
-      Button("Save") { Task { await model.resolve(navigation, saving: true) } }
-        .disabled(!model.canSave)
-      Button("Don't Save", role: .destructive) {
+      Button(LocalizedStringResource("Save", bundle: .module)) {
+        Task { await model.resolve(navigation, saving: true) }
+      }
+      .disabled(!model.canSave)
+      Button(LocalizedStringResource("Don't Save", bundle: .module), role: .destructive) {
         Task { await model.resolve(navigation, saving: false) }
       }
-      Button("Cancel", role: .cancel) {}
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {}
     } message: { _ in
-      Text("Your changes are lost if you don't save them.")
+      Text("Your changes are lost if you don't save them.", bundle: .module)
     }
     .alert(
-      "Delete “\(pendingDelete?.trimmedName ?? "")”?",
+      Text(
+        "Delete “\(pendingDelete?.trimmedName ?? "")”?", bundle: .module,
+        comment: "The name of the prompt template to delete."),
       isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
       presenting: pendingDelete
     ) { template in
       // The template comes from the alert, not from `pendingDelete`: SwiftUI clears that when it
       // dismisses the alert, before it runs this button.
-      Button("Delete", role: .destructive) {
+      Button(LocalizedStringResource("Delete", bundle: .module), role: .destructive) {
         Task { await model.delete(template.id) }
       }
-      Button("Cancel", role: .cancel) {}
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {}
     } message: { _ in
-      Text("Sessions created from it keep their prompt.")
+      Text("Sessions created from it keep their prompt.", bundle: .module)
     }
     .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json]) { result in
       guard case .success(let url) = result else { return }
@@ -72,7 +78,7 @@ public struct PromptTemplatesView: View {
       isPresented: Binding(get: { export != nil }, set: { if !$0 { export = nil } }),
       document: export.map { TemplateFile(data: $0.data) },
       contentType: .json,
-      defaultFilename: export?.filename ?? "Prompt Templates"
+      defaultFilename: export?.filename ?? Self.exportName
     ) { _ in
       export = nil
     }
@@ -101,7 +107,7 @@ public struct PromptTemplatesView: View {
       ) {
         if model.isNew, let editing = model.editing {
           Label(
-            editing.trimmedName.isEmpty ? "Untitled Template" : editing.trimmedName,
+            editing.trimmedName.isEmpty ? Self.untitledName : editing.trimmedName,
             systemImage: "square.and.pencil"
           )
           .italic()
@@ -129,15 +135,15 @@ public struct PromptTemplatesView: View {
         } label: {
           Image(systemName: "plus")
         }
-        .help("New Template")
-        .accessibilityLabel("New Template")
+        .help(Text("New Template", bundle: .module))
+        .accessibilityLabel(Text("New Template", bundle: .module))
         .disabled(model.isReadOnly)
 
         Button(action: requestDeleteSelection) {
           Image(systemName: "minus")
         }
-        .help(model.isNew ? "Discard This Template" : "Delete Template")
-        .accessibilityLabel(model.isNew ? "Discard This Template" : "Delete Template")
+        .help(Text(deleteTitle))
+        .accessibilityLabel(Text(deleteTitle))
         .disabled(model.isReadOnly || model.editing == nil)
 
         Menu {
@@ -147,8 +153,8 @@ public struct PromptTemplatesView: View {
         }
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("More")
-        .accessibilityLabel("More actions")
+        .help(Text("More", bundle: .module))
+        .accessibilityLabel(Text("More actions", bundle: .module))
         Spacer()
       }
       .buttonStyle(.borderless)
@@ -178,28 +184,38 @@ public struct PromptTemplatesView: View {
       templateActions(for: selected)
       Divider()
     }
-    Button("Add Examples") { Task { await model.addExamples() } }
-      .disabled(!model.canAddExamples)
+    Button(LocalizedStringResource("Add Examples", bundle: .module)) {
+      Task { await model.addExamples() }
+    }
+    .disabled(!model.canAddExamples)
     Divider()
-    Button("Import…") { isImporting = true }
+    Button(LocalizedStringResource("Import…", bundle: .module)) { isImporting = true }
       .disabled(model.isReadOnly || !model.canExchange)
-    Button("Export All…") { requestExport(ids: nil) }
+    Button(LocalizedStringResource("Export All…", bundle: .module)) { requestExport(ids: nil) }
       .disabled(model.all.isEmpty || !model.canExchange)
   }
 
   @ViewBuilder
   private func templateActions(for template: PromptTemplate) -> some View {
-    Button("Duplicate") { Task { await model.duplicate(template.id) } }
-      .disabled(model.isReadOnly)
-    Button("Move Up") { Task { await model.move(template.id, by: -1) } }
-      .keyboardShortcut(.upArrow, modifiers: [.command, .control])
-      .disabled(!model.canMove(template.id, by: -1))
-    Button("Move Down") { Task { await model.move(template.id, by: 1) } }
-      .keyboardShortcut(.downArrow, modifiers: [.command, .control])
-      .disabled(!model.canMove(template.id, by: 1))
-    Button("Delete…", role: .destructive) { pendingDelete = template }
-      .disabled(model.isReadOnly)
-    Button("Export “\(template.trimmedName)”…") {
+    Button(LocalizedStringResource("Duplicate", bundle: .module)) {
+      Task { await model.duplicate(template.id) }
+    }
+    .disabled(model.isReadOnly)
+    Button(LocalizedStringResource("Move Up", bundle: .module)) {
+      Task { await model.move(template.id, by: -1) }
+    }
+    .keyboardShortcut(.upArrow, modifiers: [.command, .control])
+    .disabled(!model.canMove(template.id, by: -1))
+    Button(LocalizedStringResource("Move Down", bundle: .module)) {
+      Task { await model.move(template.id, by: 1) }
+    }
+    .keyboardShortcut(.downArrow, modifiers: [.command, .control])
+    .disabled(!model.canMove(template.id, by: 1))
+    Button(LocalizedStringResource("Delete…", bundle: .module), role: .destructive) {
+      pendingDelete = template
+    }
+    .disabled(model.isReadOnly)
+    Button(LocalizedStringResource("Export “\(template.trimmedName)”…", bundle: .module)) {
       requestExport(ids: [template.id])
     }
     .disabled(!model.canExchange)
@@ -215,9 +231,13 @@ public struct PromptTemplatesView: View {
       } else if model.all.isEmpty && model.state == .ready {
         emptyLibrary
       } else {
-        Text(model.state == .loading ? "Loading templates…" : "Select a template.")
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Text(
+          model.state == .loading
+            ? LocalizedStringResource("Loading templates…", bundle: .module)
+            : LocalizedStringResource("Select a template.", bundle: .module)
+        )
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
   }
@@ -227,35 +247,40 @@ public struct PromptTemplatesView: View {
     if case .unreadable(let reason) = model.state {
       Banner(symbol: "exclamationmark.triangle", text: reason) {
         if let url = model.fileURL {
-          Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+          Button(LocalizedStringResource("Reveal in Finder", bundle: .module)) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+          }
         }
       }
     }
     if let failure = model.failure {
       Banner(symbol: "exclamationmark.triangle", text: failure) {
-        Button("Dismiss") { model.dismissFailure() }
+        Button(LocalizedStringResource("Dismiss", bundle: .module)) { model.dismissFailure() }
       }
     }
     if let summary = model.importSummary {
       Banner(symbol: "checkmark.circle", text: summary) {
-        Button("Dismiss") { model.dismissImportSummary() }
+        Button(LocalizedStringResource("Dismiss", bundle: .module)) { model.dismissImportSummary() }
       }
     }
   }
 
   private var emptyLibrary: some View {
     VStack(spacing: 12) {
-      Text("No templates yet.")
+      Text("No templates yet.", bundle: .module)
         .font(.title3)
       Text(
-        "A template is a prompt with fields to fill in — “Review {{url}}” — ready to start a session from."
+        "A template is a prompt with fields to fill in — “Review {{url}}” — ready to start a session from.",
+        bundle: .module
       )
       .foregroundStyle(.secondary)
       .multilineTextAlignment(.center)
       .frame(maxWidth: 360)
       HStack {
-        Button("Add Examples") { Task { await model.addExamples() } }
-        Button("New Template") {
+        Button(LocalizedStringResource("Add Examples", bundle: .module)) {
+          Task { await model.addExamples() }
+        }
+        Button(LocalizedStringResource("New Template", bundle: .module)) {
           model.newTemplate()
           isNameFocused = true
         }
@@ -273,35 +298,53 @@ public struct PromptTemplatesView: View {
       HStack(alignment: .top, spacing: 16) {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
-            EditorRow("Name", issues: issues(for: .name)) {
-              TextField("What is it for?", text: binding(\.name))
-                .textFieldStyle(.roundedBorder)
-                .focused($isNameFocused)
+            EditorRow(
+              LocalizedStringResource(
+                "Name", bundle: .module, comment: "The name of a prompt template."),
+              issues: issues(for: .name)
+            ) {
+              TextField(text: binding(\.name)) {
+                Text("What is it for?", bundle: .module)
+              }
+              .textFieldStyle(.roundedBorder)
+              .focused($isNameFocused)
             }
             EditorRow(
-              "Session name",
-              help: "Optional — names the sessions made from it, with the same {{fields}}.",
+              LocalizedStringResource("Session name", bundle: .module),
+              help: LocalizedStringResource(
+                "Optional — names the sessions made from it, with the same {{fields}}.",
+                bundle: .module),
               issues: issues(for: .sessionName)
             ) {
-              TextField("Review {{url}}", text: binding(\.sessionNamePattern))
-                .textFieldStyle(.roundedBorder)
-                .font(.body.monospaced())
+              TextField(text: binding(\.sessionNamePattern)) {
+                Text(
+                  "Review {{url}}", bundle: .module,
+                  comment: "An example of a session name pattern. Keep {{url}} as it is.")
+              }
+              .textFieldStyle(.roundedBorder)
+              .font(.body.monospaced())
             }
             EditorRow(
-              "Folder",
-              help: "Optional — proposed as the working folder when this template is picked.",
+              LocalizedStringResource("Folder", bundle: .module),
+              help: LocalizedStringResource(
+                "Optional — proposed as the working folder when this template is picked.",
+                bundle: .module),
               issues: issues(for: .folder)
             ) {
               HStack(spacing: 8) {
                 TextField(
-                  "None — the sheet keeps its folder",
                   text: Binding(
                     get: { model.editing?.workingDirectoryPath ?? "" },
                     set: { model.editing?.workingDirectoryPath = $0.isEmpty ? nil : $0 }
                   )
-                )
+                ) {
+                  Text(
+                    "None — the sheet keeps its folder", bundle: .module,
+                    comment:
+                      "Placeholder of a template's folder: the New Session sheet keeps its own.")
+                }
                 .textFieldStyle(.roundedBorder)
-                Button("Choose…", action: chooseFolder)
+                Button(LocalizedStringResource("Choose…", bundle: .module), action: chooseFolder)
                 if model.editing?.folder != nil {
                   Button {
                     model.editing?.workingDirectoryPath = nil
@@ -310,30 +353,33 @@ public struct PromptTemplatesView: View {
                   }
                   .buttonStyle(.borderless)
                   .foregroundStyle(.secondary)
-                  .help("No folder")
-                  .accessibilityLabel("Remove the folder")
+                  .help(Text("No folder", bundle: .module))
+                  .accessibilityLabel(Text("Remove the folder", bundle: .module))
                 }
               }
             }
             EditorRow(
-              "Appearance",
+              LocalizedStringResource("Appearance", bundle: .module),
               help: editing.appearance == nil
-                ? "Optional — the symbol and colour of the sessions made from it."
+                ? LocalizedStringResource(
+                  "Optional — the symbol and colour of the sessions made from it.", bundle: .module)
                 : nil,
               issues: issues(for: .appearance)
             ) {
               appearancePicker(editing)
             }
             EditorRow(
-              "Prompt",
-              help:
+              LocalizedStringResource("Prompt", bundle: .module),
+              help: LocalizedStringResource(
                 "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text.",
+                bundle: .module,
+                comment: "Keep {{name}}, {{name?}}, {{name|/regex/}} and \\{{ as they are."),
               issues: issues(for: .body)
             ) {
               VStack(alignment: .leading, spacing: 5) {
                 PromptTextEditor(
                   text: binding(\.body),
-                  accessibilityLabel: "Prompt",
+                  accessibilityLabel: String(localized: "Prompt", bundle: .module),
                   highlightsPlaceholders: true,
                   isEditable: !model.isReadOnly
                 )
@@ -363,10 +409,13 @@ public struct PromptTemplatesView: View {
     if let first = parsed.malformed.first {
       let text = String(
         decoding: Array(editing.body.utf16)[first], as: UTF16.self)
-      Text("\(text) is not a field — names use letters, digits, - and _ — so it stays as text.")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+      Text(
+        "\(text) is not a field — names use letters, digits, - and _ — so it stays as text.",
+        bundle: .module, comment: "What the user wrote between double braces."
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
     }
   }
 
@@ -376,18 +425,21 @@ public struct PromptTemplatesView: View {
   private func fieldsTable(_ editing: PromptTemplate) -> some View {
     let fields = editing.fields
     EditorRow(
-      "Fields",
-      help: fields.isEmpty ? "Fields appear here as you write {{name}} in the text." : nil,
+      LocalizedStringResource("Fields", bundle: .module),
+      help: fields.isEmpty
+        ? LocalizedStringResource(
+          "Fields appear here as you write {{name}} in the text.", bundle: .module)
+        : nil,
       issues: []
     ) {
       if !fields.isEmpty {
         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
           GridRow {
-            Text("Field")
-            Text("Label")
-            Text("Hint")
-            Text("Required").gridColumnAlignment(.center)
-            Text("Multiline").gridColumnAlignment(.center)
+            Text("Field", bundle: .module)
+            Text("Label", bundle: .module)
+            Text("Hint", bundle: .module)
+            Text("Required", bundle: .module).gridColumnAlignment(.center)
+            Text("Multiline", bundle: .module).gridColumnAlignment(.center)
           }
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -403,28 +455,34 @@ public struct PromptTemplatesView: View {
                 text: settingsBinding(field.name, \.label)
               )
               .textFieldStyle(.roundedBorder)
-              .accessibilityLabel("Label of \(field.name)")
-              TextField("Hint", text: settingsBinding(field.name, \.help))
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Hint of \(field.name)")
+              .accessibilityLabel(
+                Text("Label of \(field.name)", bundle: .module, comment: "A field's name."))
+              TextField(text: settingsBinding(field.name, \.help)) {
+                Text("Hint", bundle: .module)
+              }
+              .textFieldStyle(.roundedBorder)
+              .accessibilityLabel(
+                Text("Hint of \(field.name)", bundle: .module, comment: "A field's name."))
               Toggle(
-                "Required",
+                LocalizedStringResource("Required", bundle: .module),
                 isOn: Binding(
                   get: { field.isRequired },
                   set: { model.setRequired($0, for: field.name) }
                 )
               )
               .labelsHidden()
-              .accessibilityLabel("\(field.name) is required")
+              .accessibilityLabel(
+                Text("\(field.name) is required", bundle: .module, comment: "A field's name."))
               Toggle(
-                "Multiline",
+                LocalizedStringResource("Multiline", bundle: .module),
                 isOn: Binding(
                   get: { field.isMultiline },
                   set: { value in model.updateSettings(for: field.name) { $0.isMultiline = value } }
                 )
               )
               .labelsHidden()
-              .accessibilityLabel("\(field.name) is multiline")
+              .accessibilityLabel(
+                Text("\(field.name) is multiline", bundle: .module, comment: "A field's name."))
             }
           }
         }
@@ -442,10 +500,10 @@ public struct PromptTemplatesView: View {
     let fill = PromptTemplateFill(template: editing, values: model.sampleValues)
     return ScrollView {
       VStack(alignment: .leading, spacing: 14) {
-        Text("Try it")
+        Text("Try it", bundle: .module)
           .font(.headline)
         if editing.fields.isEmpty {
-          Text("Values to try appear here for each field of the template.")
+          Text("Values to try appear here for each field of the template.", bundle: .module)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -461,24 +519,34 @@ public struct PromptTemplatesView: View {
             if field.isMultiline {
               PromptTextEditor(
                 text: value, minimumLines: 2, placeholder: field.help,
-                accessibilityLabel: "Value to try for \(field.label)")
+                accessibilityLabel: String(
+                  localized: "Value to try for \(field.label)", bundle: .module,
+                  comment: "A field's label."))
             } else {
-              TextField(field.help ?? "A value to try", text: value)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Value to try for \(field.label)")
+              TextField(
+                field.help ?? String(localized: "A value to try", bundle: .module), text: value
+              )
+              .textFieldStyle(.roundedBorder)
+              .accessibilityLabel(
+                Text(
+                  "Value to try for \(field.label)", bundle: .module,
+                  comment: "A field's label."))
             }
             ExtractionResultsView(results: fill.extractions(for: field.name), showsPlaces: true)
           }
         }
         if let preview = model.preview {
           Divider()
-          Text("Preview")
+          Text("Preview", bundle: .module)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
           if let name = preview.sessionName, !name.isEmpty {
-            (Text("Session ") + Text(name).bold())
-              .font(.callout)
-              .textSelection(.enabled)
+            Text(
+              "Session \(Text(name).bold())", bundle: .module,
+              comment: "The name of the session the template would give, in bold."
+            )
+            .font(.callout)
+            .textSelection(.enabled)
           }
           PromptPreviewText(rendered: preview)
             .padding(8)
@@ -490,7 +558,9 @@ public struct PromptTemplatesView: View {
               RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor))
             }
           Text(
-            "\(PromptSize.label(preview.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit))"
+            "\(PromptSize.label(preview.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit))",
+            bundle: .module,
+            comment: "The size of the prompt, then the most an agent accepts: “1.2 KB of 128 KB”."
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -509,26 +579,36 @@ public struct PromptTemplatesView: View {
   private func footer(_ editing: PromptTemplate) -> some View {
     HStack {
       if model.isEdited {
-        Text(model.isNew ? "Not saved yet" : "Edited")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          model.isNew
+            ? LocalizedStringResource("Not saved yet", bundle: .module)
+            : LocalizedStringResource(
+              "Edited", bundle: .module, comment: "The prompt template has unsaved changes.")
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       } else if let saved = model.savedEditing {
-        Text("Revision \(saved.revision)")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "Revision \(String(saved.revision))", bundle: .module,
+          comment: "The number of times the prompt template was saved."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
       Spacer()
-      Button("Revert") { model.revert() }
+      Button(LocalizedStringResource("Revert", bundle: .module)) { model.revert() }
         .disabled(!model.isEdited)
-      Button("Save") { Task { await model.save() } }
+      Button(LocalizedStringResource("Save", bundle: .module)) { Task { await model.save() } }
         .keyboardShortcut("s", modifiers: .command)
         .buttonStyle(.borderedProminent)
         .disabled(!model.canSave)
         .background {
-          Button("Save") { Task { await model.save() } }
-            .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!model.canSave)
-            .hidden()
+          Button(LocalizedStringResource("Save", bundle: .module)) {
+            Task { await model.save() }
+          }
+          .keyboardShortcut(.return, modifiers: .command)
+          .disabled(!model.canSave)
+          .hidden()
         }
     }
     .padding(.top, 12)
@@ -591,13 +671,33 @@ public struct PromptTemplatesView: View {
             )
           }
           if current != nil {
-            Button("None") { model.editing?.appearance = nil }
-              .controlSize(.small)
-              .help("Sessions made from it keep their own symbol and colour.")
+            Button(LocalizedStringResource("None", bundle: .module)) {
+              model.editing?.appearance = nil
+            }
+            .controlSize(.small)
+            .help(Text("Sessions made from it keep their own symbol and colour.", bundle: .module))
           }
         }
       }
     }
+  }
+
+  private var deleteTitle: LocalizedStringResource {
+    model.isNew
+      ? LocalizedStringResource("Discard This Template", bundle: .module)
+      : LocalizedStringResource("Delete Template", bundle: .module)
+  }
+
+  private static var untitledName: String {
+    String(
+      localized: "Untitled Template", bundle: .module,
+      comment: "The name of a new prompt template, until the user names it.")
+  }
+
+  private static var exportName: String {
+    String(
+      localized: "Prompt Templates", bundle: .module,
+      comment: "The name of the file prompt templates are exported to.")
   }
 
   /// Written with a `~` when it is in the home folder, so an exported template means the same
@@ -608,7 +708,8 @@ public struct PromptTemplatesView: View {
     panel.canChooseFiles = false
     panel.allowsMultipleSelection = false
     panel.canCreateDirectories = true
-    panel.prompt = "Choose"
+    panel.prompt = String(
+      localized: "Choose", bundle: .module, comment: "The button of the folder panel.")
     let current = model.editing?.folder.map { ($0 as NSString).expandingTildeInPath }
     panel.directoryURL = URL(fileURLWithPath: current ?? NSHomeDirectory(), isDirectory: true)
     guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -636,9 +737,13 @@ public struct PromptTemplatesView: View {
     guard let data = model.exportData(ids: ids) else {
       return
     }
-    var name = "Prompt Templates"
+    var name = Self.exportName
     if let ids, ids.count == 1, let id = ids.first {
-      name = model.library.template(id: id)?.trimmedName ?? "Prompt Template"
+      name =
+        model.library.template(id: id)?.trimmedName
+        ?? String(
+          localized: "Prompt Template", bundle: .module,
+          comment: "The name of the file one prompt template is exported to.")
     }
     export = ExportRequest(data: data, filename: name)
   }
@@ -674,7 +779,7 @@ private struct ImportReviewSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("Import Templates")
+      Text("Import Templates", bundle: .module)
         .font(.title2.weight(.semibold))
         .padding([.horizontal, .top], 20)
         .padding(.bottom, 10)
@@ -682,8 +787,14 @@ private struct ImportReviewSheet: View {
       if let plan = model.pendingImport?.plan {
         List(plan.entries) { entry in
           HStack(alignment: .firstTextBaseline) {
-            Text(entry.template.trimmedName.isEmpty ? "Untitled" : entry.template.trimmedName)
-              .lineLimit(1)
+            Text(
+              entry.template.trimmedName.isEmpty
+                ? String(
+                  localized: "Untitled", bundle: .module,
+                  comment: "An imported prompt template that has no name.")
+                : entry.template.trimmedName
+            )
+            .lineLimit(1)
             Spacer()
             outcome(entry)
           }
@@ -692,16 +803,20 @@ private struct ImportReviewSheet: View {
       }
       Divider()
       HStack {
-        Text("Nothing is replaced unless you choose it.")
+        Text("Nothing is replaced unless you choose it.", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
         Spacer()
-        Button("Cancel", role: .cancel) { model.cancelImport() }
-          .keyboardShortcut(.cancelAction)
-        Button("Import") { Task { await model.applyImport() } }
-          .keyboardShortcut(.defaultAction)
-          .buttonStyle(.borderedProminent)
-          .disabled(!(model.pendingImport?.plan.hasWork ?? false))
+        Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+          model.cancelImport()
+        }
+        .keyboardShortcut(.cancelAction)
+        Button(LocalizedStringResource("Import", bundle: .module)) {
+          Task { await model.applyImport() }
+        }
+        .keyboardShortcut(.defaultAction)
+        .buttonStyle(.borderedProminent)
+        .disabled(!(model.pendingImport?.plan.hasWork ?? false))
       }
       .padding(16)
     }
@@ -712,17 +827,27 @@ private struct ImportReviewSheet: View {
   private func outcome(_ entry: PromptTemplateImportPlan.Entry) -> some View {
     switch entry.outcome {
     case .new:
-      Text("New").foregroundStyle(.secondary)
+      Text(
+        "New", bundle: .module, comment: "An imported template the library does not have yet."
+      ).foregroundStyle(.secondary)
     case .identical:
-      Text("Identical — skipped").foregroundStyle(.secondary)
+      Text(
+        "Identical — skipped", bundle: .module,
+        comment: "An imported template the library already has as it is."
+      ).foregroundStyle(.secondary)
     case .skipped(let reason):
-      Text("Skipped: \(reason)")
-        .foregroundStyle(.orange)
-        .font(.caption)
-        .lineLimit(2)
+      Text(
+        "Skipped: \(reason)", bundle: .module,
+        comment: "Why an imported template is left out."
+      )
+      .foregroundStyle(.orange)
+      .font(.caption)
+      .lineLimit(2)
     case .changed:
       Picker(
-        "Changed",
+        LocalizedStringResource(
+          "Changed", bundle: .module,
+          comment: "An imported template that differs from the one of the library."),
         selection: Binding(
           get: { model.pendingImport?.replacing.contains(entry.id) ?? false },
           set: { replace in
@@ -734,12 +859,15 @@ private struct ImportReviewSheet: View {
           }
         )
       ) {
-        Text("Keep Both").tag(false)
-        Text("Replace").tag(true)
+        Text("Keep Both", bundle: .module).tag(false)
+        Text("Replace", bundle: .module, comment: "Replace the template of the library.").tag(true)
       }
       .pickerStyle(.segmented)
       .fixedSize()
-      .accessibilityLabel("\(entry.template.trimmedName) changed")
+      .accessibilityLabel(
+        Text(
+          "\(entry.template.trimmedName) changed", bundle: .module,
+          comment: "The name of an imported template that differs from the library's."))
     }
   }
 }
@@ -768,13 +896,14 @@ private struct Banner<Actions: View>: View {
 }
 
 private struct EditorRow<Content: View>: View {
-  private let title: String
-  private let help: String?
+  private let title: LocalizedStringResource
+  private let help: LocalizedStringResource?
   private let issues: [PromptTemplateIssue]
   private let content: Content
 
   init(
-    _ title: String, help: String? = nil, issues: [PromptTemplateIssue],
+    _ title: LocalizedStringResource, help: LocalizedStringResource? = nil,
+    issues: [PromptTemplateIssue],
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
@@ -790,10 +919,14 @@ private struct EditorRow<Content: View>: View {
         .foregroundStyle(.secondary)
       content
       ForEach(issues) { issue in
-        Label("\(issue.message) \(issue.remedy)", systemImage: "exclamationmark.circle.fill")
-          .font(.caption)
-          .foregroundStyle(.red)
-          .fixedSize(horizontal: false, vertical: true)
+        Label {
+          Text(verbatim: "\(issue.message) \(issue.remedy)")
+        } icon: {
+          Image(systemName: "exclamationmark.circle.fill")
+        }
+        .font(.caption)
+        .foregroundStyle(.red)
+        .fixedSize(horizontal: false, vertical: true)
       }
       if let help, issues.isEmpty {
         Text(help)

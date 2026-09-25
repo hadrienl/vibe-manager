@@ -282,6 +282,19 @@ public struct PromptTemplateExtractionUse: Hashable, Sendable, Identifiable {
     case sessionName = "Session name"
     case prompt = "Prompt"
 
+    public var label: LocalizedStringResource {
+      switch self {
+      case .sessionName:
+        LocalizedStringResource(
+          "Session name", bundle: .module,
+          comment: "Where in a prompt template a pattern is used: its session name.")
+      case .prompt:
+        LocalizedStringResource(
+          "Prompt", bundle: .module,
+          comment: "Where in a prompt template a pattern is used: its prompt.")
+      }
+    }
+
     public static func < (lhs: Place, rhs: Place) -> Bool {
       lhs == .sessionName && rhs == .prompt
     }
@@ -294,7 +307,7 @@ public struct PromptTemplateExtractionUse: Hashable, Sendable, Identifiable {
 
   /// "Session name, Prompt".
   public var placesLabel: String {
-    places.sorted().map(\.rawValue).joined(separator: ", ")
+    places.sorted().map { String(localized: $0.label) }.joined(separator: ", ")
   }
 }
 
@@ -323,30 +336,38 @@ public struct PromptTemplateIssue: Hashable, Sendable, Identifiable {
 
   public static let nameMissing = PromptTemplateIssue(
     field: .name,
-    message: "A name is required.",
-    remedy: "Name the task this template is for — it is how you pick it."
+    message: String(localized: "A name is required.", bundle: .module),
+    remedy: String(
+      localized: "Name the task this template is for — it is how you pick it.", bundle: .module)
   )
 
   public static func nameTaken(_ name: String) -> PromptTemplateIssue {
     PromptTemplateIssue(
       field: .name,
-      message: "Another template is already called “\(name)”.",
-      remedy: "Pick a name that tells them apart."
+      message: String(
+        localized: "Another template is already called “\(name)”.", bundle: .module,
+        comment: "The name of the other prompt template."),
+      remedy: String(localized: "Pick a name that tells them apart.", bundle: .module)
     )
   }
 
   public static let bodyMissing = PromptTemplateIssue(
     field: .body,
-    message: "The prompt is empty.",
-    remedy: "Write what the agent should be asked, with {{fields}} where the text changes."
+    message: String(localized: "The prompt is empty.", bundle: .module),
+    remedy: String(
+      localized: "Write what the agent should be asked, with {{fields}} where the text changes.",
+      bundle: .module)
   )
 
   public static func bodyTooLarge(byteCount: Int) -> PromptTemplateIssue {
     PromptTemplateIssue(
       field: .body,
       message:
-        "The prompt weighs \(PromptSize.label(byteCount)); agents accept \(PromptSize.label(PromptTemplateLimits.bodyByteLimit)).",
-      remedy: "Shorten it."
+        String(
+          localized:
+            "The prompt weighs \(PromptSize.label(byteCount)); agents accept \(PromptSize.label(PromptTemplateLimits.bodyByteLimit)).",
+          bundle: .module, comment: "Two sizes, formatted: “12 KB”."),
+      remedy: String(localized: "Shorten it.", bundle: .module)
     )
   }
 
@@ -355,29 +376,39 @@ public struct PromptTemplateIssue: Hashable, Sendable, Identifiable {
   ) -> PromptTemplateIssue {
     PromptTemplateIssue(
       field: field,
-      message: "/\(pattern)/ is not a valid regular expression: \(reason)",
-      remedy: "Fix it, or remove the |/…/ to use the whole value."
+      message: String(
+        localized: "/\(pattern)/ is not a valid regular expression: \(reason)", bundle: .module,
+        comment: "A regular expression the user wrote, then why the system rejects it."),
+      remedy: String(
+        localized: "Fix it, or remove the |/…/ to use the whole value.", bundle: .module)
     )
   }
 
   public static let appearanceNotOffered = PromptTemplateIssue(
     field: .appearance,
-    message: "This symbol or colour is not one Vibe Manager offers.",
-    remedy: "Pick one of those shown, or none."
+    message: String(
+      localized: "This symbol or colour is not one Vibe Manager offers.", bundle: .module),
+    remedy: String(localized: "Pick one of those shown, or none.", bundle: .module)
   )
 
   public static let folderNotAbsolute = PromptTemplateIssue(
     field: .folder,
-    message: "The folder must be an absolute path.",
-    remedy: "Choose it again, or type a path starting with / or ~."
+    message: String(localized: "The folder must be an absolute path.", bundle: .module),
+    remedy: String(
+      localized: "Choose it again, or type a path starting with / or ~.", bundle: .module)
   )
 
   public static func tooManyFields(_ count: Int) -> PromptTemplateIssue {
     PromptTemplateIssue(
       field: .body,
       message:
-        "This template has \(count) fields; a template may have \(PromptTemplateLimits.fieldLimit).",
-      remedy: "Merge some of them, or write the parts that never change as text."
+        String(
+          localized:
+            "This template has \(count) fields; a template may have \(PromptTemplateLimits.fieldLimit).",
+          bundle: .module, comment: "The number of fields, always above the limit, then the limit."),
+      remedy: String(
+        localized: "Merge some of them, or write the parts that never change as text.",
+        bundle: .module)
     )
   }
 }

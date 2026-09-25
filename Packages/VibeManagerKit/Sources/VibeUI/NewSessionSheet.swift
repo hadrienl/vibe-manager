@@ -55,9 +55,9 @@ public struct NewSessionSheet: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: 3) {
-      Text("New Session")
+      Text("New Session", bundle: .module, comment: "Title of the New Session sheet.")
         .font(.title2.weight(.semibold))
-      Text("The terminal and the agent start as soon as the session is created.")
+      Text("The terminal and the agent start as soon as the session is created.", bundle: .module)
         .font(.caption)
         .foregroundStyle(.secondary)
     }
@@ -94,25 +94,32 @@ public struct NewSessionSheet: View {
   }
 
   private var nameField: some View {
-    LabeledField("Name", issues: model.issues(for: .name)) {
-      TextField("What are you working on?", text: $model.draft.name)
-        .textFieldStyle(.roundedBorder)
-        .focused($focus, equals: .draft(.name))
-        .accessibilityIdentifier("new-session-name")
+    LabeledField(
+      Text("Name", bundle: .module, comment: "The name of the new session."),
+      issues: model.issues(for: .name)
+    ) {
+      TextField(
+        String(localized: "What are you working on?", bundle: .module),
+        text: $model.draft.name
+      )
+      .textFieldStyle(.roundedBorder)
+      .focused($focus, equals: .draft(.name))
+      .accessibilityIdentifier("new-session-name")
     }
   }
 
   @ViewBuilder
   private var templateField: some View {
     LabeledField(
-      "Template",
+      Text("Template", bundle: .module, comment: "The prompt template the session starts from."),
       help: model.templates.isEmpty
-        ? "No templates yet — Manage… to write one, or add the examples." : nil,
+        ? Text(
+          "No templates yet — Manage… to write one, or add the examples.", bundle: .module,
+          comment: "Manage… is the button next to the template picker.") : nil,
       issues: []
     ) {
       HStack(spacing: 8) {
         Picker(
-          "Template",
           selection: Binding(
             get: { model.selectedTemplateID },
             set: { id in
@@ -123,24 +130,30 @@ public struct NewSessionSheet: View {
             }
           )
         ) {
-          Text("None — free prompt").tag(PromptTemplateID?.none)
+          Text("None — free prompt", bundle: .module, comment: "No prompt template.")
+            .tag(PromptTemplateID?.none)
           if !model.templates.isEmpty {
             Divider()
           }
           ForEach(model.templates) { template in
-            Label(
-              template.trimmedName,
-              systemImage: template.appearance?.symbolName ?? "text.badge.plus"
-            )
+            Label {
+              Text(template.trimmedName)
+            } icon: {
+              Image(systemName: template.appearance?.symbolName ?? "text.badge.plus")
+            }
             .tag(PromptTemplateID?.some(template.id))
           }
+        } label: {
+          Text("Template", bundle: .module, comment: "The prompt template the session starts from.")
         }
         .labelsHidden()
         .frame(maxWidth: 280, alignment: .leading)
 
         if let manageTemplates {
-          Button("Manage…", action: manageTemplates)
-            .controlSize(.small)
+          Button(action: manageTemplates) {
+            Text("Manage…", bundle: .module, comment: "Opens the prompt templates window.")
+          }
+          .controlSize(.small)
         }
       }
     }
@@ -148,10 +161,14 @@ public struct NewSessionSheet: View {
       HStack(spacing: 8) {
         Image(systemName: "arrow.triangle.2.circlepath")
           .foregroundStyle(.secondary)
-        Text("This template changed since you picked it.")
+        Text("This template changed since you picked it.", bundle: .module)
           .font(.caption)
-        Button("Reload") { model.reloadTemplate() }
-          .controlSize(.small)
+        Button {
+          model.reloadTemplate()
+        } label: {
+          Text("Reload", bundle: .module, comment: "Reloads the changed template into the form.")
+        }
+        .controlSize(.small)
       }
       .padding(.leading, 130)
       .accessibilityElement(children: .combine)
@@ -164,7 +181,7 @@ public struct NewSessionSheet: View {
     if let fill = model.draft.templateFill {
       ForEach(fill.template.fields) { field in
         LabeledField(
-          field.isRequired ? "\(field.label) *" : field.label,
+          Text(verbatim: field.isRequired ? "\(field.label) *" : field.label),
           issues: model.issues(forTemplateField: field.name)
         ) {
           let text = Binding(
@@ -187,7 +204,11 @@ public struct NewSessionSheet: View {
             }
           }
           .focused($focus, equals: .templateField(field.name))
-          .accessibilityValue(field.isRequired ? "Required" : "")
+          .accessibilityValue(
+            field.isRequired
+              ? Text(
+                "Required", bundle: .module, comment: "VoiceOver: a field that must be filled.")
+              : Text(verbatim: ""))
           // What the patterns of the template keep of the value, once there is one.
           if !model.value(for: field.name).isEmpty {
             ExtractionResultsView(results: fill.extractions(for: field.name))
@@ -202,7 +223,10 @@ public struct NewSessionSheet: View {
   @ViewBuilder
   private var previewField: some View {
     if let rendered = model.renderedPrompt, let fill = model.draft.templateFill {
-      LabeledField("Prompt", issues: model.issues(for: .initialPrompt)) {
+      LabeledField(
+        Text("Prompt", bundle: .module, comment: "The prompt the agent is started with."),
+        issues: model.issues(for: .initialPrompt)
+      ) {
         VStack(alignment: .leading, spacing: 6) {
           ScrollView {
             PromptPreviewText(rendered: rendered)
@@ -220,18 +244,26 @@ public struct NewSessionSheet: View {
 
           HStack(spacing: 6) {
             Text(
-              "\(PromptSize.label(rendered.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit)) · From “\(fill.template.trimmedName)”, revision \(fill.template.revision)"
+              "\(PromptSize.label(rendered.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit)) · From “\(fill.template.trimmedName)”, revision \(String(fill.template.revision))",
+              bundle: .module,
+              comment:
+                "The prompt's size, the most an agent accepts, the template's name and revision."
             )
             .font(.caption)
             .foregroundStyle(
               rendered.byteCount > AgentPromptLimits.argumentByteLimit ? Color.red : .secondary)
             Spacer()
-            Button("Edit as Text") {
+            Button {
               model.editAsText()
               moveFocus(to: .draft(.initialPrompt))
+            } label: {
+              Text("Edit as Text", bundle: .module)
             }
             .controlSize(.small)
-            .help("Turn the prompt into free text. The session will not refer to the template.")
+            .help(
+              Text(
+                "Turn the prompt into free text. The session will not refer to the template.",
+                bundle: .module))
           }
         }
       }
@@ -240,13 +272,13 @@ public struct NewSessionSheet: View {
 
   private var promptField: some View {
     LabeledField(
-      "Initial prompt",
-      help: "Optional — handed to the agent as its first message.",
+      Text("Initial prompt", bundle: .module),
+      help: Text("Optional — handed to the agent as its first message.", bundle: .module),
       issues: model.issues(for: .initialPrompt)
     ) {
       PromptTextEditor(
         text: $model.draft.initialPrompt,
-        accessibilityLabel: "Initial prompt",
+        accessibilityLabel: String(localized: "Initial prompt", bundle: .module),
         focusRequested: editorRequest == .draft(.initialPrompt)
       )
       .focused($focus, equals: .draft(.initialPrompt))
@@ -266,14 +298,19 @@ public struct NewSessionSheet: View {
   }
 
   private var agentField: some View {
-    LabeledField("Agent", issues: model.issues(for: .agent)) {
+    LabeledField(
+      Text("Agent", bundle: .module, comment: "The coding agent the session runs."),
+      issues: model.issues(for: .agent)
+    ) {
       VStack(alignment: .leading, spacing: 8) {
         if model.agents.isEmpty {
-          Text(
-            model.isLoadingAgents
-              ? "Looking for coding agents…"
-              : "No coding agent was detected on this Mac."
-          )
+          Group {
+            if model.isLoadingAgents {
+              Text("Looking for coding agents…", bundle: .module)
+            } else {
+              Text("No coding agent was detected on this Mac.", bundle: .module)
+            }
+          }
           .font(.callout)
           .foregroundStyle(.secondary)
         }
@@ -284,8 +321,10 @@ public struct NewSessionSheet: View {
             select: { Task { await model.select(agent: agent.id.rawValue) } }
           )
         }
-        Button("Detect again") {
+        Button {
           Task { await model.refreshAgents(forceRefresh: true) }
+        } label: {
+          Text("Detect again", bundle: .module)
         }
         .controlSize(.small)
         .disabled(model.isLoadingAgents)
@@ -296,17 +335,19 @@ public struct NewSessionSheet: View {
   @ViewBuilder
   private var modelField: some View {
     LabeledField(
-      "Model",
+      Text("Model", bundle: .module, comment: "The model of a coding agent."),
       help: model.models.isEmpty
-        ? "This agent published no model list, so it keeps its own default."
-        : "Read from the list the CLI caches for itself.",
+        ? Text("This agent published no model list, so it keeps its own default.", bundle: .module)
+        : Text("Read from the list the CLI caches for itself.", bundle: .module),
       issues: model.issues(for: .model)
     ) {
-      Picker("Model", selection: $model.draft.modelID) {
-        Text("Default model of the agent").tag(String?.none)
+      Picker(selection: $model.draft.modelID) {
+        Text("Default model of the agent", bundle: .module).tag(String?.none)
         ForEach(model.models) { available in
           Text(available.displayName).tag(String?.some(available.id))
         }
+      } label: {
+        Text("Model", bundle: .module, comment: "The model of a coding agent.")
       }
       .labelsHidden()
       .frame(maxWidth: 280, alignment: .leading)
@@ -316,11 +357,11 @@ public struct NewSessionSheet: View {
 
   private var appearanceField: some View {
     LabeledField(
-      "Appearance",
+      Text("Appearance", bundle: .module, comment: "The symbol and colour of the session."),
       help: model.draft.appearance == nil
-        ? "Derived from the name until you pick one."
+        ? Text("Derived from the name until you pick one.", bundle: .module)
         : model.appearanceComesFromTemplate
-          ? "Given by the template — pick another if needed." : nil,
+          ? Text("Given by the template — pick another if needed.", bundle: .module) : nil,
       issues: model.issues(for: .appearance)
     ) {
       HStack(alignment: .top, spacing: 14) {
@@ -352,15 +393,15 @@ public struct NewSessionSheet: View {
 
   private var folderField: some View {
     LabeledField(
-      "Working folder",
-      help: model.protectedLocationNotice
+      Text("Working folder", bundle: .module),
+      help: model.protectedLocationNotice.map { Text($0) }
         ?? (model.folderComesFromTemplate
-          ? "Proposed by the template — change it if needed." : nil),
+          ? Text("Proposed by the template — change it if needed.", bundle: .module) : nil),
       issues: model.issues(for: .workingDirectory)
     ) {
       HStack(spacing: 8) {
         TextField(
-          "Choose a folder",
+          String(localized: "Choose a folder", bundle: .module),
           text: Binding(
             get: { model.draft.workingDirectoryPath ?? "" },
             set: { model.draft.workingDirectoryPath = $0.isEmpty ? nil : $0 }
@@ -370,7 +411,9 @@ public struct NewSessionSheet: View {
         .focused($focus, equals: .draft(.workingDirectory))
         .accessibilityIdentifier("new-session-folder")
 
-        Button("Choose…", action: chooseFolder)
+        Button(action: chooseFolder) {
+          Text("Choose…", bundle: .module, comment: "Opens a panel to choose the working folder.")
+        }
       }
     }
   }
@@ -378,34 +421,44 @@ public struct NewSessionSheet: View {
   private var footer: some View {
     HStack {
       if model.hasSubmitted, !model.issues.isEmpty {
-        Label(
-          model.issues.count == 1 ? "1 problem to fix" : "\(model.issues.count) problems to fix",
-          systemImage: "exclamationmark.circle"
-        )
+        Label {
+          Text("\(model.issues.count) problems to fix", bundle: .module)
+        } icon: {
+          Image(systemName: "exclamationmark.circle")
+        }
         .font(.caption)
         .foregroundStyle(.red)
       } else {
-        Text("Cancel creates nothing — no session, no process.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "Cancel creates nothing — no session, no process.", bundle: .module,
+          comment: "Cancel is the button of the sheet."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
 
       Spacer()
 
-      Button("Cancel", role: .cancel, action: cancelled)
-        .keyboardShortcut(.cancelAction)
-      Button("Create & Launch", action: submit)
-        .keyboardShortcut(.defaultAction)
-        .buttonStyle(.borderedProminent)
-        .disabled(!model.canSubmit)
-        .accessibilityIdentifier("new-session-create")
-        // Return goes to the line in a prompt; ⌘↩ creates from anywhere in the form.
-        .background {
-          Button("Create & Launch", action: submit)
-            .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!model.canSubmit)
-            .hidden()
+      Button(role: .cancel, action: cancelled) {
+        Text("Cancel", bundle: .module)
+      }
+      .keyboardShortcut(.cancelAction)
+      Button(action: submit) {
+        Text("Create & Launch", bundle: .module)
+      }
+      .keyboardShortcut(.defaultAction)
+      .buttonStyle(.borderedProminent)
+      .disabled(!model.canSubmit)
+      .accessibilityIdentifier("new-session-create")
+      // Return goes to the line in a prompt; ⌘↩ creates from anywhere in the form.
+      .background {
+        Button(action: submit) {
+          Text("Create & Launch", bundle: .module)
         }
+        .keyboardShortcut(.return, modifiers: .command)
+        .disabled(!model.canSubmit)
+        .hidden()
+      }
     }
     .padding(.horizontal, 24)
     .padding(.vertical, 13)
@@ -454,7 +507,8 @@ public struct NewSessionSheet: View {
     panel.canChooseFiles = false
     panel.allowsMultipleSelection = false
     panel.canCreateDirectories = true
-    panel.prompt = "Choose"
+    panel.prompt = String(
+      localized: "Choose", bundle: .module, comment: "The button of the folder panel.")
     // The panel opens on the home directory when nothing is chosen yet. The sheet itself
     // proposes no folder — accepting one that contains Desktop, Documents and Downloads would
     // send an agent into them with nothing said — but the panel has to start somewhere.
@@ -468,14 +522,14 @@ public struct NewSessionSheet: View {
 }
 
 private struct LabeledField<Content: View>: View {
-  private let title: String
-  private let help: String?
+  private let title: Text
+  private let help: Text?
   private let issues: [SessionDraftIssue]
   private let content: Content
 
   init(
-    _ title: String,
-    help: String? = nil,
+    _ title: Text,
+    help: Text? = nil,
     issues: [SessionDraftIssue],
     @ViewBuilder content: () -> Content
   ) {
@@ -487,7 +541,7 @@ private struct LabeledField<Content: View>: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 12) {
-      Text(title)
+      title
         .foregroundStyle(.secondary)
         .frame(width: 118, alignment: .trailing)
 
@@ -497,7 +551,7 @@ private struct LabeledField<Content: View>: View {
           IssueLabel(issue: issue)
         }
         if let help, issues.isEmpty {
-          Text(help)
+          help
             .font(.caption)
             .foregroundStyle(.tertiary)
         }
@@ -516,12 +570,12 @@ private struct IssueLabel: View {
         .foregroundStyle(.red)
       // The remedy sits next to the problem: an error that does not say what to do next is a
       // dead end the user has to guess their way out of.
-      Text("\(issue.message) \(issue.remedy)")
+      Text(verbatim: "\(issue.message) \(issue.remedy)")
         .fixedSize(horizontal: false, vertical: true)
     }
     .font(.caption)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(issue.message) \(issue.remedy)")
+    .accessibilityLabel(Text(verbatim: "\(issue.message) \(issue.remedy)"))
   }
 }
 
@@ -555,7 +609,7 @@ struct AgentChoiceRow: View {
         if agent.warnsBeforeLaunch {
           Image(systemName: "lock")
             .foregroundStyle(.orange)
-            .help("The agent will ask you to sign in inside the terminal.")
+            .help(Text("The agent will ask you to sign in inside the terminal.", bundle: .module))
         }
         if isSelected {
           Image(systemName: "checkmark")
@@ -581,9 +635,10 @@ struct AgentChoiceRow: View {
     .opacity(agent.isUsable ? 1 : 0.6)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     .accessibilityLabel(
-      agent.isUsable
-        ? "\(agent.name). \(agent.status)"
-        : "\(agent.name). \(agent.status) \(agent.remedy)"
+      Text(
+        verbatim: agent.isUsable
+          ? "\(agent.name). \(agent.status)"
+          : "\(agent.name). \(agent.status) \(agent.remedy)")
     )
   }
 }
@@ -629,7 +684,9 @@ struct ColorChoice: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(Text("Accent \(hex)"))
+    .accessibilityLabel(
+      Text("Accent \(hex)", bundle: .module, comment: "VoiceOver: a colour, by its hex code.")
+    )
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
   }
 }
@@ -657,7 +714,10 @@ struct PromptPreviewText: View {
         value.inlinePresentationIntent = .stronglyEmphasized
         result += value
       case .unmatched(_, let label, _):
-        var unmatched = AttributedString("‹\(label): no match›")
+        var unmatched = AttributedString(
+          String(
+            localized: "‹\(label): no match›", bundle: .module,
+            comment: "In a prompt preview: a field whose pattern found nothing in its value."))
         unmatched.foregroundColor = .orange
         result += unmatched
       case .missing(_, let label, _, let isRequired):
@@ -668,7 +728,7 @@ struct PromptPreviewText: View {
       }
     }
     if result.characters.isEmpty {
-      var empty = AttributedString("The prompt is empty.")
+      var empty = AttributedString(String(localized: "The prompt is empty.", bundle: .module))
       empty.foregroundColor = .secondary
       return empty
     }

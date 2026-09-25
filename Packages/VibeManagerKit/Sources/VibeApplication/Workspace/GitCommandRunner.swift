@@ -36,11 +36,12 @@ public enum GitUnavailable: Error, Hashable, Sendable, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .notInstalled:
-      return "Git is not installed on this Mac."
+      return String(localized: "Git is not installed on this Mac.", bundle: .module)
     case .commandLineToolsMissing:
-      return "Git needs the Command Line Tools, which are not installed."
+      return String(
+        localized: "Git needs the Command Line Tools, which are not installed.", bundle: .module)
     case .failedToStart(let reason):
-      return "Git could not be started: \(reason)"
+      return String(localized: "Git could not be started: \(reason)", bundle: .module)
     }
   }
 }

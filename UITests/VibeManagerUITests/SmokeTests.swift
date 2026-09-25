@@ -30,7 +30,9 @@ final class SmokeTests: XCTestCase {
     }
   }
 
-  private func launch() -> XCUIApplication {
+  /// In English unless told otherwise, whatever the language of the Mac that runs the test: the
+  /// test finds its buttons and menus by their English titles.
+  private func launch(language: String = "en", locale: String = "en_US") -> XCUIApplication {
     // `Scripts/clean-install-check.sh` points it at the notarized application it installed:
     // `TEST_RUNNER_VIBE_SMOKE_APP` reaches this process as `VIBE_SMOKE_APP`.
     let app =
@@ -46,6 +48,8 @@ final class SmokeTests: XCTestCase {
     app.launchArguments += [
       "-permissions.fullDiskAccess.stepDismissed.v1", "YES",
       "-ApplePersistenceIgnoreState", "YES",
+      "-AppleLanguages", "(\(language))",
+      "-AppleLocale", locale,
     ]
     app.launch()
     XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 20))
@@ -148,6 +152,27 @@ final class SmokeTests: XCTestCase {
 
     app = launch()
     expectSessionRows(3, in: app, timeout: 20)
+    app.terminate()
+  }
+
+  /// The application in French: a button of the window, a tab of the sidebar, a command of the
+  /// Help menu — whose own title comes from macOS — and the New Session sheet.
+  func testTheInterfaceSpeaksFrench() throws {
+    let app = launch(language: "fr", locale: "fr_FR")
+    XCTAssertTrue(app.buttons["Nouvelle session"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.radioButtons["Actives"].exists)
+    XCTAssertTrue(app.radioButtons["Fermées"].exists)
+
+    app.menuBars.menuBarItems["Aide"].click()
+    XCTAssertTrue(app.menuBars.menuItems["Exporter les diagnostics…"].waitForExistence(timeout: 5))
+    app.typeKey(.escape, modifierFlags: [])
+
+    app.typeKey("n", modifierFlags: .command)
+    let create = app.buttons["new-session-create"]
+    XCTAssertTrue(create.waitForExistence(timeout: 10))
+    XCTAssertEqual(create.label, "Créer et lancer")
+    XCTAssertTrue(app.staticTexts["Dossier de travail"].exists)
+    app.typeKey(.escape, modifierFlags: [])
     app.terminate()
   }
 

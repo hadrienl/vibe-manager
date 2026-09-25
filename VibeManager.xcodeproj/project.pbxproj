@@ -20,6 +20,8 @@
 		A0000000000000000000000B /* VibeGit in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000008 /* VibeGit */; };
 		A0000000000000000000000D /* VibeComposition in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000009 /* VibeComposition */; };
 		A0000000000000000000000E /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* SmokeTests.swift */; };
+		A0000000000000000000000F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* Localizable.xcstrings */; };
+		A00000000000000000000010 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* InfoPlist.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,8 @@
 		B00000000000000000000009 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
 		B0000000000000000000000A /* VibeManagerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VibeManagerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0000000000000000000000B /* UITests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = UITests.xcconfig; sourceTree = "<group>"; };
+		B0000000000000000000000C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		B0000000000000000000000D /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -96,6 +100,8 @@
 				B00000000000000000000001 /* VibeManagerApp.swift */,
 				B00000000000000000000008 /* WindowFocus.swift */,
 				B00000000000000000000003 /* Assets.xcassets */,
+				B0000000000000000000000C /* Localizable.xcstrings */,
+				B0000000000000000000000D /* InfoPlist.xcstrings */,
 			);
 			path = VibeManagerApp;
 			sourceTree = "<group>";
@@ -210,6 +216,7 @@
 			knownRegions = (
 				en,
 				Base,
+				fr,
 			);
 			mainGroup = C00000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
@@ -233,6 +240,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000003 /* Assets.xcassets in Resources */,
+				A0000000000000000000000F /* Localizable.xcstrings in Resources */,
+				A00000000000000000000010 /* InfoPlist.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,11 +14,26 @@ public enum ProtectedFileLocation: Hashable, Sendable, CaseIterable {
 
   public var label: String {
     switch self {
-    case .desktop: return "your Desktop"
-    case .documents: return "your Documents folder"
-    case .downloads: return "your Downloads folder"
-    case .iCloudDrive: return "iCloud Drive"
-    case .externalVolume: return "external volumes"
+    case .desktop:
+      return String(
+        localized: "your Desktop", bundle: .module,
+        comment: "Completes the sentence “macOS protects …”.")
+    case .documents:
+      return String(
+        localized: "your Documents folder", bundle: .module,
+        comment: "Completes the sentence “macOS protects …”.")
+    case .downloads:
+      return String(
+        localized: "your Downloads folder", bundle: .module,
+        comment: "Completes the sentence “macOS protects …”.")
+    case .iCloudDrive:
+      return String(
+        localized: "iCloud Drive", bundle: .module,
+        comment: "Completes the sentence “macOS protects …”.")
+    case .externalVolume:
+      return String(
+        localized: "external volumes", bundle: .module,
+        comment: "Completes the sentence “macOS protects …”.")
     }
   }
 

@@ -508,27 +508,46 @@ enum AgentDiagnosticFactory {
     for state: AgentAvailabilityState,
     descriptor: AgentDescriptor
   ) -> String {
+    let name = descriptor.displayName
     switch state {
     case .available:
-      return "\(descriptor.displayName) is ready."
+      return String(
+        localized: "\(name) is ready.", bundle: .module,
+        comment: "An agent's name.")
     case .outdated(let found, let required):
-      return "\(descriptor.displayName) \(found) is older than the required \(required)."
+      return String(
+        localized:
+          "\(name) \(found.description) is older than the required \(required.description).",
+        bundle: .module,
+        comment: "An agent's name, then two version numbers.")
     case .notFound:
-      return "\(descriptor.displayName) was not found on this Mac."
+      return String(
+        localized: "\(name) was not found on this Mac.", bundle: .module,
+        comment: "An agent's name.")
     case .notExecutable:
-      return "The \(descriptor.displayName) command exists but cannot be run."
+      return String(
+        localized: "The \(name) command exists but cannot be run.", bundle: .module,
+        comment: "An agent's name.")
     case .unauthenticated:
-      return "\(descriptor.displayName) is installed but not signed in."
+      return String(
+        localized: "\(name) is installed but not signed in.", bundle: .module,
+        comment: "An agent's name.")
     case .probeFailed(let reason):
       // Saying "could not be inspected" about a command that simply stayed silent describes a
       // broken installation the user does not have.
       switch reason {
       case .timedOut:
-        return "\(descriptor.displayName) did not answer in time."
+        return String(
+          localized: "\(name) did not answer in time.", bundle: .module,
+          comment: "An agent's name.")
       case .cancelled:
-        return "The \(descriptor.displayName) check was interrupted."
+        return String(
+          localized: "The \(name) check was interrupted.", bundle: .module,
+          comment: "An agent's name.")
       case .failed:
-        return "\(descriptor.displayName) could not be inspected."
+        return String(
+          localized: "\(name) could not be inspected.", bundle: .module,
+          comment: "An agent's name.")
       }
     }
   }

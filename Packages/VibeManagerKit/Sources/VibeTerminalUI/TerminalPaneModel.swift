@@ -120,14 +120,18 @@ public final class TerminalPaneModel {
     } catch let error as TerminalError {
       launchError = error
       failure = Failure(
-        message: error.errorDescription ?? "The terminal could not be started.",
+        message: error.errorDescription ?? Self.notStarted,
         suggestion: error.recoverySuggestion
       )
-      status = .failed(message: error.errorDescription ?? "The terminal could not be started.")
+      status = .failed(message: error.errorDescription ?? Self.notStarted)
     } catch {
-      failure = Failure(message: "The terminal could not be started.", suggestion: nil)
-      status = .failed(message: "The terminal could not be started.")
+      failure = Failure(message: Self.notStarted, suggestion: nil)
+      status = .failed(message: Self.notStarted)
     }
+  }
+
+  private static var notStarted: String {
+    String(localized: "The terminal could not be started.", bundle: .module)
   }
 
   /// Shows a process this pane did not start: one the terminal host kept running while the
@@ -174,10 +178,15 @@ public final class TerminalPaneModel {
     await session?.resize(to: size)
   }
 
+  /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
+  /// agent's question is how its state is known to have moved before the agent says so (#45).
+  @ObservationIgnored public var onUserInput: (([UInt8]) -> Void)?
+
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
     guard !bytes.isEmpty else { return }
     hasReceivedInput = true
+    onUserInput?(bytes)
     await session?.write(bytes)
   }
 
@@ -225,7 +234,9 @@ public final class TerminalPaneModel {
     case .terminated(let signal):
       status = .terminated(signal: signal)
     case .failed(let error):
-      status = .failed(message: error.errorDescription ?? "The terminal failed.")
+      status = .failed(
+        message: error.errorDescription
+          ?? String(localized: "The terminal failed.", bundle: .module))
     }
   }
 }

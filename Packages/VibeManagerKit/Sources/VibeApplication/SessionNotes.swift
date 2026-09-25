@@ -46,12 +46,14 @@ public enum SessionNotesError: Error, Equatable, Sendable, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .tooLarge(let byteCount, let limit):
-      return
-        "The notes would weigh \(Self.size(byteCount)); they are limited to \(Self.size(limit))."
+      return String(
+        localized:
+          "The notes would weigh \(Self.size(byteCount)); they are limited to \(Self.size(limit)).",
+        bundle: .module, comment: "Two sizes, formatted: “70 KB”, “64 KB”.")
     case .unreadable(let reason):
-      return "The notes could not be read: \(reason)"
+      return String(localized: "The notes could not be read: \(reason)", bundle: .module)
     case .cannotWrite(let reason):
-      return "The notes could not be saved: \(reason)"
+      return String(localized: "The notes could not be saved: \(reason)", bundle: .module)
     }
   }
 
@@ -144,7 +146,8 @@ public struct NoSessionNotes: SessionNotesStore {
   public func allNotes() async -> [SessionID: String] { [:] }
   /// Refused, so that the notes stay in the session rather than being cleared into nowhere.
   public func importNotes(_ text: String, for id: SessionID) async throws {
-    throw SessionNotesError.cannotWrite(reason: "there is nowhere to keep notes.")
+    throw SessionNotesError.cannotWrite(
+      reason: String(localized: "there is nowhere to keep notes.", bundle: .module))
   }
 }
 
