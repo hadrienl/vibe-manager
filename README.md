@@ -102,11 +102,16 @@ folding thresholds of the columns and what is restored at launch are documented 
 
 Nothing leaves that list on its own. Closing a session stops its agent and keeps everything else,
 terminal output included; archiving asks once, detaches the process and marks the session as no
-longer reopenable until it is unarchived. The sidebar has two tabs — Active and Closed — split on
-whether an agent is running, not on whether a session was archived, so all past work is found in
-one place. No session is ever deleted, and the list is searchable, filterable and sorted in an
-order that survives a relaunch. The rules are documented in
+longer reopenable until it is unarchived. No session is ever deleted, and the list is searchable,
+filterable and sorted in an order that survives a relaunch. The rules are documented in
 [`docs/architecture/0009-session-history-and-archive.md`](docs/architecture/0009-session-history-and-archive.md).
+
+The sidebar is a task list. Each session is To Do, In Progress, Waiting or Done, one column per
+status behind four coloured tabs, and archived sessions are listed from the foot of the sidebar.
+Swiping a row sideways reveals the statuses before and after its own; a click on one moves it.
+The status is where the work stands, not what the agent does: closing a session leaves it in its
+column, and only starting or restarting one moves it back In Progress. See
+[`docs/architecture/0024-sessions-as-tasks.md`](docs/architecture/0024-sessions-as-tasks.md).
 
 A closed session goes back to work with one command. When the agent can resume its own
 conversation, it does, and it is handed no prompt; when it cannot — no identifier was ever kept,
