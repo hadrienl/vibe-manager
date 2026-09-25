@@ -33,9 +33,11 @@ public enum Localization {
   /// The resource bundle SwiftPM builds for `module`, copied next to the tests.
   public static func moduleBundle(_ module: String) -> Bundle {
     let name = "VibeManagerKit_\(module).bundle"
+    // Inside the test bundle's resources for the SwiftPM of recent Xcodes; next to the test bundle,
+    // in the build folder, for the one of Xcode 16.4, which CI uses.
+    let bundles = [Bundle(for: BundleMarker.self), Bundle.main] + Bundle.allBundles
     let candidates =
-      [Bundle(for: BundleMarker.self).resourceURL, Bundle.main.resourceURL]
-      + Bundle.allBundles.map(\.resourceURL)
+      bundles.map(\.resourceURL) + bundles.map { $0.bundleURL.deletingLastPathComponent() }
     for candidate in candidates.compactMap({ $0 }) {
       if let bundle = Bundle(url: candidate.appendingPathComponent(name)) {
         return bundle
