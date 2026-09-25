@@ -164,3 +164,19 @@ struct FileAgentActivityStateStoreTests {
     #expect(!FileManager.default.fileExists(atPath: url.path))
   }
 }
+
+@Test("The consent to a CLI's hooks is kept per CLI, and a key never written reads as no decision")
+func hookConsentStore() {
+  let suite = "vibe-tests-\(UUID().uuidString)"
+  defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+  let store = UserDefaultsAgentHookConsentStore(suiteName: suite)
+  let codex = AgentProviderID("codex")
+  #expect(store.approvedFingerprint(for: codex) == nil)
+  #expect(!store.isDeclined(codex))
+  store.setApprovedFingerprint("abc", for: codex)
+  store.setDeclined(true, for: codex)
+  let reread = UserDefaultsAgentHookConsentStore(suiteName: suite)
+  #expect(reread.approvedFingerprint(for: codex) == "abc")
+  #expect(reread.isDeclined(codex))
+  #expect(!reread.isDeclined(AgentProviderID("claude-code")))
+}
