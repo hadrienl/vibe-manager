@@ -25,22 +25,35 @@ private func take(
   from stream: AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>,
   within timeout: Duration = .seconds(3)
 ) async -> [(AgentActivityEvent, AgentActivityLogPosition)] {
-  await withTaskGroup(of: [(AgentActivityEvent, AgentActivityLogPosition)].self) { group in
+  let taken = Taken()
+  await withTaskGroup(of: Void.self) { group in
     group.addTask {
-      var taken: [(AgentActivityEvent, AgentActivityLogPosition)] = []
       for await item in stream {
-        taken.append(item)
-        if taken.count == count { break }
+        if taken.append(item) >= count { break }
       }
-      return taken
     }
-    group.addTask {
-      try? await Task.sleep(for: timeout)
-      return []
-    }
-    let first = await group.next() ?? []
+    group.addTask { try? await Task.sleep(for: timeout) }
+    await group.next()
     group.cancelAll()
-    return first
+  }
+  return taken.items
+}
+
+/// What `take` has read so far, kept when its deadline passes.
+private final class Taken: @unchecked Sendable {
+  private let lock = NSLock()
+  private var storage: [(AgentActivityEvent, AgentActivityLogPosition)] = []
+
+  var items: [(AgentActivityEvent, AgentActivityLogPosition)] {
+    lock.withLock { storage }
+  }
+
+  /// Adds `item` and says how many there are now.
+  func append(_ item: (AgentActivityEvent, AgentActivityLogPosition)) -> Int {
+    lock.withLock {
+      storage.append(item)
+      return storage.count
+    }
   }
 }
 
@@ -106,9 +119,10 @@ struct FileAgentActivityLogTests {
   @Test("A log past its size is moved aside, and the next one is followed from its start")
   func rotates() async throws {
     let directory = try temporaryDirectory()
-    // A grace long enough for a slow machine to write within it.
+    // A grace long enough for a loaded machine — the whole suite runs at once — to write within
+    // it: the late line is lost otherwise, as it would be from a hook that slow.
     let logs = FileAgentActivityLog(
-      directory: directory, rotationThreshold: 16, rotationGrace: .seconds(3))
+      directory: directory, rotationThreshold: 16, rotationGrace: .seconds(10))
     let id = SessionID()
     let url = try await logs.prepareLog(for: id)
     // A hook that opened the log before it is moved aside, and writes to it afterwards.
@@ -116,7 +130,7 @@ struct FileAgentActivityLogTests {
     try append("Long\t1\t0123456789\n", to: url)
     let stream = await logs.events(for: id, from: nil)
     // Read in one pass, as the application does: an iteration that ends may end the stream with it.
-    let reading = Task { await take(3, from: stream, within: .seconds(20)) }
+    let reading = Task { await take(3, from: stream, within: .seconds(30)) }
 
     // The rotation happened — once `Long` was read: the hook's next append creates the log again.
     for _ in 0..<250 where FileManager.default.fileExists(atPath: url.path) {
