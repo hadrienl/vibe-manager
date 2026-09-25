@@ -21,6 +21,10 @@ xcrun swift-format lint --recursive \
   Packages/VibeManagerKit/Tests \
   Packages/VibeManagerKit/Package.swift
 
+echo "Checking the French translations"
+Scripts/test-check-localizations.sh
+Scripts/check-localizations.sh
+
 echo "Running package tests"
 # Validate package sources with warnings promoted to errors here. Do not pass the equivalent
 # build setting globally to xcodebuild: Xcode 16.4 suppresses warnings for package dependencies,
