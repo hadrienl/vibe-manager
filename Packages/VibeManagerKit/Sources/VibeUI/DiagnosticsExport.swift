@@ -91,10 +91,14 @@ struct DiagnosticsExportSheet: View {
         bundle: .module
       )
       .fixedSize(horizontal: false, vertical: true)
-      Text(DiagnosticArchive.exclusions)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+      // `DiagnosticArchive.exclusions`, which the archive itself carries in English.
+      Text(
+        "Not included: what the terminals showed, prompts, notes, and the names of sessions and folders.",
+        bundle: .module
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
 
       Group {
         switch model.state {
