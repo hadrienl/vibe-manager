@@ -105,6 +105,17 @@ same sessions, a store that could not be read, an agent that will stop with the 
 restart that failed. The restoration banner is also marked as updating frequently, and is read once
 per session, never once per line.
 
+### The conversation view
+
+Each folded tool call is one button whose label is its title and its state — "Read Session.swift,
+succeeded" — and whose value says whether it is expanded; Space unfolds it. The state is also a
+symbol of its own, never a colour alone. The Messages rotor goes from one prompt of the user to the
+next, the Failures rotor from one failed call to the next, and a prompt is announced as a heading.
+A request the agent waits on takes VoiceOver's focus when it appears. The composer is labelled with
+the agent it writes to: Return sends, Shift-Return starts a line, Escape stops a turn under way.
+⌥⌘T switches between the conversation and the terminal. Text follows the size chosen in
+Settings › Conversation, and unfolding does not animate with Reduce Motion on.
+
 ### Colour
 
 A status is never said by colour alone: each has its own symbol, and its label says it in words.
