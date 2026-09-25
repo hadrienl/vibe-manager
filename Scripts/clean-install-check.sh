@@ -16,7 +16,7 @@
 set -euo pipefail
 
 readonly repository_root="${0:A:h:h}"
-readonly bundle_identifier="com.hadrienl.VibeManager"
+readonly bundle_identifier="eu.hadrien.VibeManager"
 readonly image="${1:-}"
 
 fail() {

@@ -21,7 +21,7 @@
 #   NOTARY_API_KEY_ID, NOTARY_API_ISSUER_ID
 #   GH_TOKEN                            to read the CI runs and create the draft
 #
-# The team is `VIBE_TEAM_ID`, or `DEVELOPMENT_TEAM` in Configuration/Local.xcconfig.
+# The team is `VIBE_TEAM_ID`, or `DEVELOPMENT_TEAM` in Configuration/Local.xcconfig, then Shared.xcconfig.
 #
 # Every step checks what it produced, and the script stops at the first that fails.
 
@@ -29,7 +29,7 @@ set -euo pipefail
 
 readonly repository_root="${0:A:h:h}"
 readonly notary_profile="vibe-manager-notary"
-readonly bundle_identifier="com.hadrienl.VibeManager"
+readonly bundle_identifier="eu.hadrien.VibeManager"
 
 version="${1:-}"
 dry_run=0
@@ -53,10 +53,11 @@ in_ci=0
 if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then in_ci=1; fi
 
 team="${VIBE_TEAM_ID:-}"
-if [[ -z "$team" && -f Configuration/Local.xcconfig ]]; then
+for configuration in Configuration/Local.xcconfig Configuration/Shared.xcconfig; do
+  [[ -z "$team" && -f "$configuration" ]] || continue
   team="$(sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]*\).*/\1/p' \
-    Configuration/Local.xcconfig | head -1)"
-fi
+    "$configuration" | head -1)"
+done
 [[ "$team" =~ '^[A-Z0-9]{10}$' ]] || fail "no team: set VIBE_TEAM_ID or DEVELOPMENT_TEAM"
 
 readonly work="$repository_root/build/release/$version"

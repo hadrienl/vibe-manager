@@ -164,7 +164,7 @@ application quits, while the agents go on reading the user's folders. What `tccd
 responsible process that has exited is documented nowhere. That behaviour is **avoided rather than
 relied on**: the host is spawned with `responsibility_spawnattrs_setdisclaim(attributes, 1)`, so it
 answers for itself, and the agents it spawns without a disclaimer answer to it. Because the host is
-the application's binary, its code identity is Vibe Manager's (`com.hadrienl.VibeManager` and the
+the application's binary, its code identity is Vibe Manager's (`eu.hadrien.VibeManager` and the
 same designated requirement). The answer to "who does TCC hold responsible" is therefore **Vibe
 Manager**, before and after the application quits, and the Full Disk Access granted to it keeps
 applying.

@@ -1,10 +1,10 @@
 import os
 
-/// Intervals for Instruments, under `com.hadrienl.VibeManager`, category `perf`. They cost nothing
+/// Intervals for Instruments, under `eu.hadrien.VibeManager`, category `perf`. They cost nothing
 /// while nothing records them, so they stay in every build.
 public enum Signposts {
   public static let signposter = OSSignposter(
-    subsystem: "com.hadrienl.VibeManager", category: "perf")
+    subsystem: "eu.hadrien.VibeManager", category: "perf")
 
   /// Runs `body` inside an interval named `name`.
   public static func interval<Result>(

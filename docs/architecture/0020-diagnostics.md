@@ -34,7 +34,7 @@ The ticket makes it an acceptance criterion: no prompt, token or secret in the l
   paths and sometimes command output.
 
 A prompt cannot be logged by accident: it does not compile. Debug events, enabled by
-`defaults write com.hadrienl.VibeManager DiagnosticsVerbose -bool YES`, are made of the same types:
+`defaults write eu.hadrien.VibeManager DiagnosticsVerbose -bool YES`, are made of the same types:
 verbose is not indiscreet.
 
 ### Sessions by pseudonym, paths by hash
@@ -64,7 +64,7 @@ weeks. A line that cannot be written — a full disk — is counted, and the cou
 `diagnostics.linesDropped` once writing works again. Logging never fails or slows the action it
 describes.
 
-Every event also goes to the unified log, subsystem `com.hadrienl.VibeManager`, one category per
+Every event also goes to the unified log, subsystem `eu.hadrien.VibeManager`, one category per
 module, for Console.app and Instruments. It is marked `.public`: its content is safe by
 construction.
 

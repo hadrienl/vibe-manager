@@ -16,8 +16,11 @@ saved, and it holds no prompt, note, session name, folder name or terminal conte
 | Prompt templates | `…/com.hadrienl.VibeManager/templates.json` |
 | Usage figures | `…/com.hadrienl.VibeManager/Usage/` |
 | Diagnostics log | `~/Library/Logs/Vibe Manager/app.jsonl`, `host.jsonl`, and the salt of the session pseudonyms, `.salt` |
-| Preferences | `~/Library/Preferences/com.hadrienl.VibeManager.plist` |
+| Preferences | `~/Library/Preferences/eu.hadrien.VibeManager.plist` |
 | The terminal host's socket and lock | `$TMPDIR/vibe-manager/<hash of the data folder>/` |
+
+The data folder keeps the application's first identifier, `com.hadrienl.VibeManager`, so that the
+sessions stored before it became `eu.hadrien.VibeManager` are still found.
 
 Every file is readable only by you (`0600`), every folder `0700`; the application brings its folders
 back to that at launch if a backup restored them otherwise.
@@ -57,7 +60,7 @@ keeps them across updates. A development build signed ad hoc gets a new identity
 put a team in `Configuration/Local.xcconfig` (see the README). To start over from nothing:
 
 ```sh
-tccutil reset SystemPolicyAllFiles com.hadrienl.VibeManager
+tccutil reset SystemPolicyAllFiles eu.hadrien.VibeManager
 ```
 
 ### An agent is not found
@@ -79,7 +82,7 @@ alone.
 ### Something else
 
 Help → Export Diagnostics…, then open an issue with the file. `defaults write
-com.hadrienl.VibeManager DiagnosticsVerbose -bool YES` adds debug events to the log — made of the
+eu.hadrien.VibeManager DiagnosticsVerbose -bool YES` adds debug events to the log — made of the
 same types as the others: verbose is not indiscreet — and turns on the main-thread hang detector.
 
 ## Uninstalling completely
@@ -90,11 +93,11 @@ Quit the application, choosing Stop All if it asks, then:
 rm -rf "/Applications/Vibe Manager.app" \
   ~/Library/Application\ Support/com.hadrienl.VibeManager \
   ~/Library/Logs/Vibe\ Manager \
-  ~/Library/Saved\ Application\ State/com.hadrienl.VibeManager.savedState \
+  ~/Library/Saved\ Application\ State/eu.hadrien.VibeManager.savedState \
   "$TMPDIR/vibe-manager"
-defaults delete com.hadrienl.VibeManager
+defaults delete eu.hadrien.VibeManager
 defaults delete com.hadrienl.VibeManager.isolated 2>/dev/null
-tccutil reset All com.hadrienl.VibeManager
+tccutil reset All eu.hadrien.VibeManager
 ```
 
 The agents' own files — `~/.claude`, `~/.codex` — belong to them and are left alone.

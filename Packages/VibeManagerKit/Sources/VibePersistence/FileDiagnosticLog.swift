@@ -56,7 +56,7 @@ public struct DiagnosticsLocation: Hashable, Sendable {
   }
 }
 
-/// Whether debug events are kept: `defaults write com.hadrienl.VibeManager DiagnosticsVerbose -bool
+/// Whether debug events are kept: `defaults write eu.hadrien.VibeManager DiagnosticsVerbose -bool
 /// YES`. Verbose is not indiscreet: debug events are made of the same types as the others.
 public enum DiagnosticsVerbosity {
   public static let defaultsKey = "DiagnosticsVerbose"
@@ -202,10 +202,10 @@ public final class FileDiagnosticLog: DiagnosticLog, @unchecked Sendable {
   }
 }
 
-/// Every event in the unified log as well, under `com.hadrienl.VibeManager`, one category per
+/// Every event in the unified log as well, under `eu.hadrien.VibeManager`, one category per
 /// module, for Console.app and Instruments. Marked public: its content is safe by construction.
 public struct OSLogDiagnosticLog: DiagnosticLog {
-  public static let subsystem = "com.hadrienl.VibeManager"
+  public static let subsystem = "eu.hadrien.VibeManager"
 
   private let minimumLevel: DiagnosticLevel
 

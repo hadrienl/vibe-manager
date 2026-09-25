@@ -68,6 +68,8 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       .appendingPathComponent("Library/Application Support", isDirectory: true)
     return
       applicationSupport
+      // The folder keeps the application's first identifier: renaming it would lose every
+      // session stored before the identifier changed.
       .appendingPathComponent("com.hadrienl.VibeManager", isDirectory: true)
       .appendingPathComponent("sessions.json", isDirectory: false)
   }

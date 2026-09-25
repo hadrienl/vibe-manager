@@ -1,8 +1,8 @@
 MACOSX_DEPLOYMENT_TARGET = 14.0
 SWIFT_VERSION = 6.0
-PRODUCT_BUNDLE_IDENTIFIER = com.hadrienl.VibeManager
+PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager
 PRODUCT_NAME = Vibe Manager
-MARKETING_VERSION = 0.1.0
+MARKETING_VERSION = 1.0.0
 CURRENT_PROJECT_VERSION = 1
 GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_KEY_CFBundleDisplayName = Vibe Manager
@@ -25,8 +25,12 @@ INFOPLIST_KEY_NSRemovableVolumesUsageDescription = Vibe Manager opens the workin
 INFOPLIST_KEY_NSNetworkVolumesUsageDescription = Vibe Manager opens the working folder you chose on this volume.
 INFOPLIST_KEY_NSFileProviderDomainUsageDescription = Vibe Manager opens the working folder you chose in iCloud Drive.
 
-// Signing is per-machine, and it is not cosmetic: macOS keys a privacy grant to the code identity
-// of the application, so an ad-hoc signature — the fallback when no team is set — gets a new
-// identity at every build, and every permission granted the day before is asked for again. Copy
-// Configuration/Local.xcconfig.example to Configuration/Local.xcconfig and put your own team in it.
+// Signing is not cosmetic: macOS keys a privacy grant to the code identity of the application, so
+// an ad-hoc signature gets a new identity at every build, and every permission granted the day
+// before is asked for again. The maintainer's team is the default — a Team ID is public, it is in
+// every binary signed with it — and a release is signed with its Developer ID by
+// Scripts/release.sh. A contributor puts their own team in Configuration/Local.xcconfig (copied from
+// Local.xcconfig.example), which overrides these two lines.
+DEVELOPMENT_TEAM = QMJKZ67Z3H
+CODE_SIGN_IDENTITY = Apple Development
 #include? "Local.xcconfig"

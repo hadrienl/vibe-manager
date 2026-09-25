@@ -84,7 +84,7 @@ public struct TerminalHostLocation: Hashable, Sendable {
 public enum TerminalHost {
   public static let argument = "--terminal-host"
   private static let logger = Logger(
-    subsystem: "com.hadrienl.VibeManager.terminal-host", category: "host")
+    subsystem: "eu.hadrien.VibeManager.terminal-host", category: "host")
 
   /// Runs the host and never returns, when the arguments ask for it; returns at once otherwise.
   ///
