@@ -156,6 +156,14 @@ struct BrowserWorkspaceToolsTests {
       arguments: ["script": "await new Promise(r => setTimeout(r, 10)); return {n: 2}"],
       session: session)
     #expect(text(asynchronous) == #"{"n":2}"#)
+    // A count of one is a number, not `true`; `return` in a string leaves an expression one.
+    let one = await workspace.run(
+      tool: "page_evaluate", arguments: ["script": "[document.querySelectorAll('h1').length, 0, true]"],
+      session: session)
+    #expect(text(one) == "[1,0,true]")
+    let quoted = await workspace.run(
+      tool: "page_evaluate", arguments: ["script": "'return policy'.length"], session: session)
+    #expect(text(quoted) == "13")
 
     let console = text(await workspace.run(tool: "page_console", arguments: [:], session: session))
     #expect(console.contains("log: ready"))
@@ -226,7 +234,11 @@ struct BrowserWorkspaceToolsTests {
     } else {
       Issue.record("\(String(describing: tab.failure))")
     }
+    #expect(tab.isRetrying)
+    // Stopped, the tab tries a later address from the first attempt again.
+    while tab.retryAttempt == 0 { try await Task.sleep(for: .milliseconds(100)) }
     tab.stopRetrying()
+    #expect(tab.retryAttempt == 0)
   }
 
   @Test("A session sees its own tabs only, and an id from another is unknown")
@@ -379,6 +391,21 @@ struct BrowserCommittedPageTests {
       .joined()
     #expect(evaluated.isError || text == "\"B\"", "\(text)")
     #expect(text != "\"A\"")
+  }
+
+  @Test("A blank page a site opened is decided on that site")
+  func blankPageOrigin() {
+    let blank = URL(string: "about:blank")!
+    let policy = { BrowserWorkspace.policyURL(committed: blank, reportedOrigin: $0) }
+    #expect(policy("https://github.com").absoluteString == "https://github.com")
+    #expect(
+      BrowserActionPolicy.decide(.act, url: policy("https://github.com"), grants: []) == .ask)
+    #expect(policy("null") == blank)
+    #expect(policy(nil) == blank)
+    #expect(BrowserActionPolicy.decide(.act, url: policy("null"), grants: []) == .allow)
+    let page = URL(string: "http://localhost:5173/")!
+    #expect(
+      BrowserWorkspace.policyURL(committed: page, reportedOrigin: "https://github.com") == page)
   }
 
   @Test("The origin a page reports is the one the check compares with")

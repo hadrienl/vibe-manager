@@ -74,9 +74,9 @@ public enum JSONValue: Hashable, Sendable, Codable {
   public init(any value: Any?) {
     switch value {
     case nil, is NSNull: self = .null
-    case let value as Bool where type(of: value) == Bool.self: self = .bool(value)
     case let value as NSNumber:
-      // A boolean crosses Objective-C as an NSNumber of its own class.
+      // A boolean crosses Objective-C as an NSNumber of its own class. Asked first: a number that
+      // is 0 or 1 also casts to `Bool`.
       if CFGetTypeID(value) == CFBooleanGetTypeID() {
         self = .bool(value.boolValue)
       } else {

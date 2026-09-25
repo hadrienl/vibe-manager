@@ -34,16 +34,7 @@ public final class BrowserWebConfiguration {
     // taking it for an application's embedded view.
     configuration.applicationNameForUserAgent = Self.safariApplicationName
     configuration.preferences.isElementFullscreenEnabled = true
-    let controller = WKUserContentController()
-    controller.addUserScript(
-      WKUserScript(
-        source: PageScripts.console, injectionTime: .atDocumentStart, forMainFrameOnly: true,
-        in: .page))
-    controller.addUserScript(
-      WKUserScript(
-        source: PageScripts.agent, injectionTime: .atDocumentStart, forMainFrameOnly: true,
-        in: agentWorld))
-    configuration.userContentController = controller
+    configuration.userContentController = makeContentController()
     // A web view the user browses with: it goes wherever they, or their agent, send it. What an
     // agent may do there is bounded by `BrowserActionPolicy` (ADR 0023), not by where it can go.
     let webView = WKWebView(
@@ -56,6 +47,20 @@ public final class BrowserWebConfiguration {
       webView.isInspectable = true
     #endif
     return webView
+  }
+
+  /// The page's scripts, without the console handler: each tab attaches its own.
+  func makeContentController() -> WKUserContentController {
+    let controller = WKUserContentController()
+    controller.addUserScript(
+      WKUserScript(
+        source: PageScripts.console, injectionTime: .atDocumentStart, forMainFrameOnly: true,
+        in: .page))
+    controller.addUserScript(
+      WKUserScript(
+        source: PageScripts.agent, injectionTime: .atDocumentStart, forMainFrameOnly: true,
+        in: agentWorld))
+    return controller
   }
 
   func attachConsole(to webView: WKWebView, handler: any WKScriptMessageHandler) {

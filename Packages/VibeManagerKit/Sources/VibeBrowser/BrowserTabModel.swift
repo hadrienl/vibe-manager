@@ -165,6 +165,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
   func adopt(_ webView: WKWebView) {
     webView.navigationDelegate = self
     webView.uiDelegate = self
+    configuration.attachConsole(to: webView, handler: ConsoleMessageHandler(tab: self))
     self.webView = webView
     observe(webView)
     configuration.park(webView)
@@ -214,6 +215,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
   }
 
   public func stopRetrying() {
+    retryAttempt = 0
     retryTask?.cancel()
     retryTask = nil
     isRetrying = false
@@ -365,7 +367,6 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
     committedURL = webView.url
     console.reset()
-    retryAttempt = 0
     stopRetrying()
   }
 
@@ -465,7 +466,8 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       return nil
     }
     // WebKit must be handed a view made with the configuration it gives: that is what ties the
-    // pop-up to its opener.
+    // pop-up to its opener. Its scripts are its own, so that its console reaches its own tab.
+    configuration.userContentController = self.configuration.makeContentController()
     let popup = WKWebView(frame: webView.bounds, configuration: configuration)
     popup.allowsBackForwardNavigationGestures = true
     popup.allowsMagnification = true

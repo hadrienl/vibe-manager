@@ -132,7 +132,16 @@ extension BrowserWorkspace: BrowserToolRunning {
       throw BrowserToolFailure(
         "The page is still loading: nothing was done. Wait for it with page_read, then try again.")
     }
-    let site = BrowserOrigin(url: committed)
+    // A blank page a site opened holds that site's origin, and reaches its opener: acting there is
+    // acting as the user on that site. The page is asked which origin it has.
+    var reported: String?
+    if BrowserOrigin(url: committed) == nil {
+      reported =
+        try await configuration.callAgent(
+          "return location.origin;", arguments: [:], in: webView) as? String
+    }
+    let policyURL = Self.policyURL(committed: committed, reportedOrigin: reported)
+    let site = BrowserOrigin(url: policyURL)
     let target = Self.elementTarget(arguments)
     var description = ""
     var value: String?
@@ -160,7 +169,7 @@ extension BrowserWorkspace: BrowserToolRunning {
     }
 
     let decision: BrowserActionRecord.Decision
-    switch BrowserActionPolicy.decide(.act, url: committed, grants: permissions.grants) {
+    switch BrowserActionPolicy.decide(.act, url: policyURL, grants: permissions.grants) {
     case .allow:
       let isLocal = site?.isLocal ?? true
       decision = isLocal ? .automatic : .always
@@ -192,7 +201,9 @@ extension BrowserWorkspace: BrowserToolRunning {
 
     // What was allowed was this site. A page that moved meanwhile — while the question was on
     // screen, or since the element was looked up — is not acted on.
-    guard !tab.isLoading, tab.committedURL.flatMap(BrowserOrigin.init(url:)) == site else {
+    guard !tab.isLoading,
+      tab.committedURL.flatMap(BrowserOrigin.init(url:)) == BrowserOrigin(url: committed)
+    else {
       record(
         tool, in: browser, tab: tab, target: Self.trace(description, value), decision: decision,
         succeeded: false)
@@ -250,6 +261,16 @@ extension BrowserWorkspace: BrowserToolRunning {
     }
   }
 
+  /// The address an action is decided on: the document's own, or — for a page without an origin
+  /// of its own, as a blank page a site opened — the web origin the page says it has.
+  static func policyURL(committed: URL, reportedOrigin: String?) -> URL {
+    guard BrowserOrigin(url: committed) == nil, let reportedOrigin,
+      let url = URL(string: reportedOrigin), let origin = BrowserOrigin(url: url),
+      scriptOrigin(origin) != nil
+    else { return committed }
+    return url
+  }
+
   /// `location.origin` as a page reports it for an origin: no default port, IPv6 in brackets. `nil`
   /// for local files, whose origin a page reports as opaque.
   static func scriptOrigin(_ origin: BrowserOrigin) -> String? {
@@ -260,13 +281,21 @@ extension BrowserWorkspace: BrowserToolRunning {
     return "\(origin.scheme)://\(host):\(port)"
   }
 
-  /// An expression is evaluated as it is; a body with `return` runs as an async function.
+  /// An expression is evaluated as it is; what does not parse as one — a body with `return` or
+  /// `await` — runs as an async function. A syntax error is raised before anything runs, so the
+  /// script never runs twice.
   static func evaluate(_ script: String, in webView: WKWebView) async throws -> Any? {
-    if script.range(of: #"\breturn\b"#, options: .regularExpression) != nil {
+    do {
+      return try await webView.evaluateJavaScript(script, in: nil, contentWorld: .page)
+    } catch let error as NSError where isSyntaxError(error) {
       return try await webView.callAsyncJavaScript(
         script, arguments: [:], in: nil, contentWorld: .page)
     }
-    return try await webView.evaluateJavaScript(script, in: nil, contentWorld: .page)
+  }
+
+  private static func isSyntaxError(_ error: NSError) -> Bool {
+    let message = error.userInfo["WKJavaScriptExceptionMessage"] as? String ?? ""
+    return message.hasPrefix("SyntaxError")
   }
 
   // MARK: - Opening
