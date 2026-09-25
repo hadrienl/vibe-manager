@@ -21,6 +21,8 @@ public struct AgentActivityState: Hashable, Sendable {
   var lastOutputAt: Date?
   /// When the user last typed into this session's terminal.
   var lastUserInputAt: Date?
+  /// The tool the pending question holds up, when the hooks named it.
+  var pendingTool: String?
 
   public init(
     activity: AgentActivity = .idle,
@@ -153,14 +155,24 @@ public enum AgentActivityMachine {
     next.lastOutputAt = nil
     switch signal {
     case .channelConfirmed:
-      break
+      // What the output suggested before the hooks spoke — a startup screen drawn, a history
+      // replayed — was a guess, and nothing structured would ever take it back: an agent that has
+      // just started waits for its prompt.
+      if !state.isStructured { next.activity = .idle }
     case .promptSubmitted(let byUser):
       next.activity = .working
       // Writing to the agent is reading what it said last.
       if byUser { next.unreadSince = nil }
-    case .questionAsked(let kind):
+    case .questionAsked(let kind, let tool):
       next.activity = .awaitingUser(kind)
+      next.pendingTool = tool
     case .questionResolved:
+      next.activity = .working
+    case .toolFinished(let tool):
+      // Sub-agents run tools side by side: one finishing answers nothing another is waiting on.
+      if case .awaitingUser = next.activity, let pending = next.pendingTool, pending != tool {
+        break
+      }
       next.activity = .working
     case .turnEnded:
       next.activity = .idle

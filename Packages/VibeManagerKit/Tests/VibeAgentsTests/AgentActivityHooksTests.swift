@@ -87,6 +87,20 @@ struct AgentActivityHookCommandTests {
     #expect(written.map(\.last) == [marker, ""])
   }
 
+  @Test("A field writes back only that field, as JSON, and nothing when it is missing")
+  func field() throws {
+    let log = try temporaryLog()
+    let command = AgentActivityHookCommand.command(
+      event: "PostToolUse", payload: .field("tool_name"))
+    _ = try runHook(
+      command,
+      input:
+        #"{"session_id":"s","tool_name":"Bash","tool_input":{"command":"echo \"tool_name\":\"x\""},"tool_response":{"stdout":"secret"}}"#,
+      log: log)
+    _ = try runHook(command, input: #"{"session_id":"s"}"#, log: log)
+    #expect(lines(of: log).map(\.last) == [#"{"tool_name":"Bash"}"#, ""])
+  }
+
   @Test("Without a log to write to, or with one it cannot write, it still succeeds silently")
   func neverFails() throws {
     let command = AgentActivityHookCommand.command(event: "Stop", payload: .keep)
@@ -184,16 +198,23 @@ struct ClaudeCodeSignalDecoderTests {
         == .promptSubmitted(byUser: false))
     #expect(
       decoder.signal(for: event("PermissionRequest", ClaudePayloads.bashPermission))
-        == .questionAsked(.approval))
+        == .questionAsked(.approval, tool: "Bash"))
     #expect(
       decoder.signal(for: event("PermissionRequest", ClaudePayloads.askUserQuestion))
-        == .questionAsked(.question))
+        == .questionAsked(.question, tool: "AskUserQuestion"))
     #expect(
       decoder.signal(for: event("PreToolUse", ClaudePayloads.exitPlanMode))
+        == .questionAsked(.approval, tool: "ExitPlanMode"))
+    // A permission for a large `Write` is cut short past the byte limit: still a permission.
+    #expect(
+      decoder.signal(for: event("PermissionRequest", #"{"tool_name":"Ba"#))
         == .questionAsked(.approval))
     #expect(decoder.signal(for: event("Elicitation")) == .questionAsked(.question))
     for name in ["PostToolUse", "PostToolUseFailure", "PermissionDenied", "ElicitationResult"] {
       #expect(decoder.signal(for: event(name)) == .questionResolved)
+    }
+    for name in ["PostToolUse", "PostToolUseFailure", "PermissionDenied"] {
+      #expect(decoder.signal(for: event(name, #"{"tool_name":"Bash"}"#)) == .toolFinished("Bash"))
     }
     #expect(decoder.signal(for: event("Stop")) == .turnEnded)
     #expect(decoder.signal(for: event("StopFailure")) == .turnEnded)
@@ -205,7 +226,6 @@ struct ClaudeCodeSignalDecoderTests {
   func silence() {
     #expect(
       decoder.signal(for: event("Notification", ClaudePayloads.permissionNotification)) == nil)
-    #expect(decoder.signal(for: event("PermissionRequest", #"{"tool_name":"Ba"#)) == nil)
     #expect(decoder.signal(for: event("PreToolUse", #"{"tool_name":"Bash"}"#)) == nil)
     #expect(decoder.signal(for: event("SubagentStop")) == nil)
   }

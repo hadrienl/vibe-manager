@@ -27,9 +27,9 @@ public enum ClaudeCodeActivityHooks {
     Hook(event: "Notification", matcher: nil, payload: .keep),
     Hook(event: "Elicitation", matcher: nil, payload: .drop),
     Hook(event: "ElicitationResult", matcher: nil, payload: .drop),
-    Hook(event: "PostToolUse", matcher: nil, payload: .drop),
-    Hook(event: "PostToolUseFailure", matcher: nil, payload: .drop),
-    Hook(event: "PermissionDenied", matcher: nil, payload: .drop),
+    Hook(event: "PostToolUse", matcher: nil, payload: .field("tool_name")),
+    Hook(event: "PostToolUseFailure", matcher: nil, payload: .field("tool_name")),
+    Hook(event: "PermissionDenied", matcher: nil, payload: .field("tool_name")),
     Hook(event: "Stop", matcher: nil, payload: .drop),
     Hook(event: "StopFailure", matcher: nil, payload: .drop),
     Hook(event: "SessionEnd", matcher: nil, payload: .drop),
@@ -82,12 +82,15 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       // The hook writes the marker back only when the prompt carries it.
       return .promptSubmitted(byUser: event.payload == nil)
     case "PreToolUse", "PermissionRequest":
-      // `AskUserQuestion` also asks for permission to run: it is still a question.
-      switch event.string("tool_name") {
-      case "AskUserQuestion": return .questionAsked(.question)
-      case "ExitPlanMode": return .questionAsked(.approval)
-      case .some where event.name == "PermissionRequest": return .questionAsked(.approval)
-      default: return nil
+      // `AskUserQuestion` also asks for permission to run: it is still a question. Any other
+      // permission is an approval, even one whose tool cannot be read — the payload is cut short
+      // past its byte limit, and a large `Write` leaves no JSON to read it from.
+      let tool = event.string("tool_name")
+      switch tool {
+      case "AskUserQuestion": return .questionAsked(.question, tool: tool)
+      case "ExitPlanMode": return .questionAsked(.approval, tool: tool)
+      default:
+        return event.name == "PermissionRequest" ? .questionAsked(.approval, tool: tool) : nil
       }
     case "Notification":
       // Only the idle reminder is read. `permission_prompt` and `elicitation_dialog` repeat what
@@ -96,8 +99,10 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       return event.string("notification_type") == "idle_prompt" ? .waitingForInput : nil
     case "Elicitation":
       return .questionAsked(.question)
-    case "ElicitationResult", "PostToolUse", "PostToolUseFailure", "PermissionDenied":
+    case "ElicitationResult":
       return .questionResolved
+    case "PostToolUse", "PostToolUseFailure", "PermissionDenied":
+      return event.string("tool_name").map(AgentSignal.toolFinished) ?? .questionResolved
     case "Stop", "StopFailure":
       return .turnEnded
     case "SessionEnd":

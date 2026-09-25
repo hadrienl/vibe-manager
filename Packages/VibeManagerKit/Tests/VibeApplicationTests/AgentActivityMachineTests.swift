@@ -82,6 +82,29 @@ struct AgentActivityStructuredTests {
     #expect(resolved.activity == .working)
   }
 
+  @Test("A tool that finishes answers its own permission, not another tool's")
+  func toolFinished() {
+    let asked = reduce(structured(.working), .signal(.questionAsked(.approval, tool: "Bash")))
+    let other = reduce(asked, .signal(.toolFinished("Read")))
+    #expect(other.activity == .awaitingUser(.approval))
+    #expect(reduce(other, .signal(.toolFinished("Bash"))).activity == .working)
+    // A question whose tool is unknown is answered by whichever finishes.
+    let unnamed = reduce(structured(.working), .signal(.questionAsked(.approval)))
+    #expect(reduce(unnamed, .signal(.toolFinished("Read"))).activity == .working)
+  }
+
+  @Test("Hooks that speak late replace what the output suggested")
+  func lateConfirmationForgetsTheGuess() {
+    let guessed = reduce(
+      AgentActivityState(source: .unconfirmed(since: start)), .output, context: context(1))
+    #expect(guessed.activity == .working)
+    let confirmed = reduce(guessed, .signal(.channelConfirmed), context: context(2))
+    #expect(confirmed.activity == .idle)
+    #expect(confirmed.source == .structured)
+    // Once structured, a session started again — `/clear` — keeps what it was doing.
+    #expect(reduce(structured(.working), .signal(.channelConfirmed)).activity == .working)
+  }
+
   @Test("A permission key answers a permission, an arrow key does not")
   func approvalKeys() {
     let asked = structured(.awaitingUser(.approval))

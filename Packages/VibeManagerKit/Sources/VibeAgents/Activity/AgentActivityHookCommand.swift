@@ -22,6 +22,10 @@ public enum AgentActivityHookCommand {
     case keep
     /// Only whether the input contains this text, written back when it does.
     case match(String)
+    /// Only this top-level string field, written back as a JSON object of its own. Read from
+    /// the first `payloadByteLimit` bytes, which hold the fields that come before a tool's input
+    /// and output.
+    case field(String)
   }
 
   /// The script, identical for every hook. Its input is read to the end in every case, so the CLI
@@ -36,12 +40,25 @@ public enum AgentActivityHookCommand {
     + #"[ -n "$f" ] && printf "%s\t%s\t%s\n" "$1" "$(date +%s)" "$p" >>"$f"; "#
     + #"exit 0"#
 
+  /// The script of `Payload.field`. A script of its own rather than a branch of `script`, whose
+  /// words Codex approved and must not see change.
+  static let fieldScript =
+    #"f="$VIBE_AGENT_ACTIVITY_LOG"; "#
+    + #"p=$({ head -c \#(payloadByteLimit); cat >/dev/null; } | tr -d "\r\n" | grep -o -E -- "\"$2\": ?\"[^\"]*\"" | head -n 1); "#
+    + #"[ -n "$p" ] && p="{$p}"; "#
+    + #"[ -n "$f" ] && printf "%s\t%s\t%s\n" "$1" "$(date +%s)" "$p" >>"$f"; "#
+    + #"exit 0"#
+
   public static func command(event: String, payload: Payload) -> String {
+    var script = self.script
     var arguments = [event]
     switch payload {
     case .drop: arguments.append("drop")
     case .keep: arguments.append("keep")
     case .match(let text): arguments += ["match", text]
+    case .field(let key):
+      script = fieldScript
+      arguments.append(key)
     }
     return (["/bin/sh", "-c", script, "vibe-activity"] + arguments).map(shellQuoted)
       .joined(separator: " ") + " 2>/dev/null"
