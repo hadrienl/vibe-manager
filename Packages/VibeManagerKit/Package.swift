@@ -17,6 +17,7 @@ let package = Package(
     .library(name: "VibeTerminal", targets: ["VibeTerminal"]),
     .library(name: "VibeGit", targets: ["VibeGit"]),
     .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
+    .library(name: "VibeBrowser", targets: ["VibeBrowser"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
     .library(name: "VibeComposition", targets: ["VibeComposition"]),
   ],
@@ -63,17 +64,24 @@ let package = Package(
       ],
       resources: [.process("Localizable.xcstrings")]
     ),
+    // The session's web view (#69): its tabs and their pages, and the channel through which an
+    // agent drives them. WebKit and sockets; no view: the panel is drawn by VibeUI. It names no
+    // user-facing sentence either — what it says is said to the agent, in English.
+    .target(
+      name: "VibeBrowser",
+      dependencies: ["VibeApplication", "VibeDomain", "VibeProcess", "VibeTerminal"]
+    ),
     .target(
       name: "VibeUI",
-      dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"],
+      dependencies: ["VibeApplication", "VibeBrowser", "VibeDomain", "VibeTerminalUI"],
       resources: [.process("Localizable.xcstrings")]
     ),
     // The application, composed. Out of the application target so that a test can compose it.
     .target(
       name: "VibeComposition",
       dependencies: [
-        "VibeAgents", "VibeApplication", "VibeDomain", "VibeGit", "VibePersistence",
-        "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeUI",
+        "VibeAgents", "VibeApplication", "VibeBrowser", "VibeDomain", "VibeGit",
+        "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeUI",
       ]
     ),
     // The terminal host in a process of its own, for the tests that need one to outlive their
@@ -82,6 +90,13 @@ let package = Package(
       name: "VibeTerminalHostFixture",
       dependencies: ["VibeTerminal", "VibeApplication", "VibePersistence"],
       path: "Tests/VibeTerminalHostFixture"
+    ),
+    // The web view's bridge in a process of its own (#69): the channel accepts a process by where
+    // it descends from, which only a real child process can show.
+    .executableTarget(
+      name: "VibeBrowserBridgeFixture",
+      dependencies: ["VibeBrowser", "VibeTerminal"],
+      path: "Tests/VibeBrowserBridgeFixture"
     ),
     // Resolves a string in a given language, from the catalog of the module it belongs to.
     .target(name: "VibeLocalizationTesting", path: "Tests/VibeLocalizationTesting"),
@@ -131,6 +146,13 @@ let package = Package(
         "VibeComposition", "VibeUI", "VibeApplication", "VibeDomain", "VibeAgents",
         "VibeTerminal", "VibeTerminalUI", "VibePersistence", "VibeGit", "VibeProcess",
         "VibeTerminalHostFixture",
+      ]
+    ),
+    .testTarget(
+      name: "VibeBrowserTests",
+      dependencies: [
+        "VibeBrowser", "VibeApplication", "VibeDomain", "VibeProcess", "VibeTerminal",
+        "VibeBrowserBridgeFixture",
       ]
     ),
     .testTarget(
