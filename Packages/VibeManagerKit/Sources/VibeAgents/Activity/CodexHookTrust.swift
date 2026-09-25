@@ -1,5 +1,6 @@
 import Foundation
 import VibeApplication
+import VibeProcess
 
 /// Asks Codex whether the activity hooks will run, and approves them — only them — when the user
 /// agreed to it in Vibe Manager (#45).
@@ -118,7 +119,8 @@ public protocol CodexAppServerConnecting: Sendable {
 
 /// `codex app-server`, over its standard input and output, with the plan's own executable,
 /// environment — `CODEX_HOME` above all — and folder, so it reads the configuration the agent
-/// will read.
+/// will read. Started through `BoundedProcess`, like every command that is not a terminal: a group
+/// of its own, a timeout, and nothing left behind.
 public struct CodexAppServerProcess: CodexAppServerConnecting {
   private let timeout: Duration
 
@@ -129,138 +131,46 @@ public struct CodexAppServerProcess: CodexAppServerConnecting {
   public func call(
     plan: AgentLaunchPlan, options: [String], method: String, params: Data
   ) async throws -> Data {
-    let request = try JSONSerialization.data(withJSONObject: [
-      "jsonrpc": "2.0", "id": 1, "method": method,
-      "params": try JSONSerialization.jsonObject(with: params),
-    ])
-    let session = CodexAppServerSession(
-      executablePath: plan.executablePath, arguments: ["app-server"] + options,
-      environment: plan.environment, workingDirectory: plan.workingDirectoryPath)
-    return try await session.run(request: request, timeout: timeout)
-  }
-}
-
-/// A server process for one call: `initialize`, the call, and the process is stopped.
-final class CodexAppServerSession: @unchecked Sendable {
-  private let process = Process()
-  private let input = Pipe()
-  private let output = Pipe()
-  private let lock = NSLock()
-  private var buffer = Data()
-  private var continuation: CheckedContinuation<Data, any Error>?
-  private var sentCall = false
-  private var callData = Data()
-
-  init(
-    executablePath: String, arguments: [String], environment: [String: String],
-    workingDirectory: String
-  ) {
-    process.executableURL = URL(fileURLWithPath: executablePath)
-    process.arguments = arguments
-    process.environment = environment
-    process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
-    process.standardInput = input
-    process.standardOutput = output
-    process.standardError = FileHandle.nullDevice
-  }
-
-  func run(request: Data, timeout: Duration) async throws -> Data {
-    callData = request
-    defer { stop() }
-    return try await withThrowingTaskGroup(of: Data.self) { group in
-      group.addTask {
-        try await withCheckedThrowingContinuation { continuation in
-          self.start(continuation)
-        }
-      }
-      group.addTask {
-        try await Task.sleep(for: timeout)
-        throw CodexHookTrustError.timedOut
-      }
-      defer { group.cancelAll() }
-      guard let result = try await group.next() else { throw CodexHookTrustError.timedOut }
-      return result
-    }
-  }
-
-  private func start(_ continuation: CheckedContinuation<Data, any Error>) {
-    lock.withLock { self.continuation = continuation }
-    output.fileHandleForReading.readabilityHandler = { [weak self] handle in
-      let data = handle.availableData
-      guard let self else { return }
-      if data.isEmpty {
-        self.finish(.failure(CodexHookTrustError.serverFailed("closed")))
-      } else {
-        self.received(data)
-      }
-    }
-    do {
-      try process.run()
-      let initialize = try JSONSerialization.data(withJSONObject: [
+    // The server stops at the end of its input, before answering what is still in flight: the
+    // input stays open until the answer to the call — the only request numbered 1 — has come.
+    let messages: [[String: Any]] = [
+      [
         "jsonrpc": "2.0", "id": 0, "method": "initialize",
         "params": ["clientInfo": ["name": "vibe-manager", "version": "1"]],
-      ])
-      write(initialize)
-    } catch {
-      finish(.failure(error))
+      ],
+      ["jsonrpc": "2.0", "method": "initialized"],
+      [
+        "jsonrpc": "2.0", "id": 1, "method": method,
+        "params": try JSONSerialization.jsonObject(with: params),
+      ],
+    ]
+    var input = Data()
+    for message in messages {
+      input += try JSONSerialization.data(withJSONObject: message) + Data([0x0A])
     }
+    let result = try await BoundedProcess.run(
+      BoundedProcessRequest(
+        executablePath: plan.executablePath, arguments: ["app-server"] + options,
+        environment: plan.environment, workingDirectoryPath: plan.workingDirectoryPath,
+        timeout: timeout,
+        standardInput: BoundedProcessInput(
+          data: input, closeOnceOutputContains: Data(#"{"id":1,"#.utf8))))
+    guard !result.didTimeOut else { throw CodexHookTrustError.timedOut }
+    return try Self.answer(in: result.standardOutput)
   }
 
-  private func received(_ data: Data) {
-    let lines: [Data] = lock.withLock {
-      buffer.append(data)
-      var lines: [Data] = []
-      while let newline = buffer.firstIndex(of: 0x0A) {
-        lines.append(Data(buffer[buffer.startIndex..<newline]))
-        buffer = Data(buffer[(newline + 1)...])
-      }
-      return lines
-    }
-    for line in lines {
-      guard let message = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
-        let id = message["id"] as? Int
+  /// The `result` of the call, out of everything the server wrote.
+  static func answer(in output: Data) throws -> Data {
+    for line in output.split(separator: 0x0A) {
+      guard let message = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any],
+        message["id"] as? Int == 1
       else { continue }
-      if id == 0 {
-        let shouldSend = lock.withLock { () -> Bool in
-          defer { sentCall = true }
-          return !sentCall
-        }
-        guard shouldSend else { continue }
-        if let initialized = try? JSONSerialization.data(withJSONObject: [
-          "jsonrpc": "2.0", "method": "initialized",
-        ]) {
-          write(initialized)
-        }
-        write(callData)
-      } else if id == 1 {
-        if let result = message["result"],
-          let data = try? JSONSerialization.data(withJSONObject: result)
-        {
-          finish(.success(data))
-        } else {
-          let error = (message["error"] as? [String: Any])?["message"] as? String ?? "error"
-          finish(.failure(CodexHookTrustError.serverFailed(error)))
-        }
+      if let result = message["result"] {
+        return try JSONSerialization.data(withJSONObject: result)
       }
+      let error = (message["error"] as? [String: Any])?["message"] as? String ?? "error"
+      throw CodexHookTrustError.serverFailed(error)
     }
-  }
-
-  private func write(_ data: Data) {
-    try? input.fileHandleForWriting.write(contentsOf: data + Data([0x0A]))
-  }
-
-  private func finish(_ result: Result<Data, any Error>) {
-    let continuation = lock.withLock { () -> CheckedContinuation<Data, any Error>? in
-      defer { self.continuation = nil }
-      return self.continuation
-    }
-    continuation?.resume(with: result)
-  }
-
-  private func stop() {
-    output.fileHandleForReading.readabilityHandler = nil
-    try? input.fileHandleForWriting.close()
-    if process.isRunning { process.terminate() }
-    finish(.failure(CancellationError()))
+    throw CodexHookTrustError.unreadableAnswer
   }
 }
