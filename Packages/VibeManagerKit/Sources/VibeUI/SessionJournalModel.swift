@@ -44,6 +44,8 @@ public final class SessionJournalModel {
   /// The last list of sessions handed to the monitor. Each waits for the one before it: an older
   /// list arriving after a newer one would follow a session just closed again.
   @ObservationIgnored private var tracking: Task<Void, Never>?
+  /// Turns the settings window to the journal's tab, before it is opened.
+  @ObservationIgnored var showSettingsTab: (() -> Void)?
   /// The editor chosen in the settings, for Open in Editor.
   @ObservationIgnored var editor: EditorChoice?
 

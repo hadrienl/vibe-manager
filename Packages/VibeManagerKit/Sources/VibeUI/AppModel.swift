@@ -582,6 +582,8 @@ public final class AppModel {
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
 
+    journal?.showSettingsTab = { [weak self] in self?.settingsTab = .activity }
+
     launcher?.askHookConsent = { [weak self] name, commands in
       guard let self else { return .undecided }
       return await self.requestHookConsent(agentName: name, commands: commands)

@@ -978,16 +978,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld ressource de plus n’a pas été gardée."
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld ressources de plus n’ont pas été gardées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ressource de plus n’a pas été gardée."
                 }
               },
               "other" : {
@@ -1194,16 +1194,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld action plus ancienne"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld actions plus anciennes"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld action plus ancienne"
                 }
               },
               "other" : {
@@ -1782,7 +1782,7 @@
       }
     },
     "Activity" : {
-      "comment" : "A tab of the inspector.",
+      "comment" : "A tab of the Settings window.\nA tab of the inspector.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -5738,13 +5738,13 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
+              "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Afficher %lld de plus"
                 }
               },
-              "many" : {
+              "one" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Afficher %lld de plus"
@@ -7955,7 +7955,6 @@
       }
     },
     "involvement.branch.changed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7972,7 +7971,6 @@
       }
     },
     "involvement.branch.created" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7989,7 +7987,6 @@
       }
     },
     "involvement.branch.viewed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8006,7 +8003,6 @@
       }
     },
     "involvement.issue.changed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8023,7 +8019,6 @@
       }
     },
     "involvement.issue.created" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8040,7 +8035,6 @@
       }
     },
     "involvement.issue.viewed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8057,7 +8051,6 @@
       }
     },
     "involvement.request.changed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8074,7 +8067,6 @@
       }
     },
     "involvement.request.created" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8091,7 +8083,6 @@
       }
     },
     "involvement.request.viewed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8108,7 +8099,6 @@
       }
     },
     "involvement.worktree.changed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8125,7 +8115,6 @@
       }
     },
     "involvement.worktree.created" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8142,7 +8131,6 @@
       }
     },
     "involvement.worktree.viewed" : {
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {

@@ -119,6 +119,7 @@ struct ActivityPane: View {
           .controlSize(.small)
         case .disabled:
           Button {
+            journal.showSettingsTab?()
             openSettings()
           } label: {
             Text("Open Settings…", bundle: .module)

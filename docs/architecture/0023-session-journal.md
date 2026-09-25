@@ -91,7 +91,7 @@ only files that grew are read, from their cursor.
 - Quitting cancels passes (their process group is killed); the turns they covered wait for the next
   launch. After a relaunch or a reattachment (ADR 0017), what the agent did meanwhile is read at
   once and summarized in one pass.
-- The summary can be turned off in Settings › General › Sessions; the resources are read anyway.
+- The summary can be turned off in a Settings tab of its own, Activity; the resources are read anyway.
 
 ### A file per session, only appended to
 
