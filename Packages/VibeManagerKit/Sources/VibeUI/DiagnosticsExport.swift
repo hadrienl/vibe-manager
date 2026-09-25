@@ -68,7 +68,8 @@ public final class DiagnosticsExportModel: Identifiable {
       diagnostics.log.record(
         DiagnosticEvent(.lifecycle, .error, "diagnostics.exportFailed", fields: fields))
       state = .failed(
-        (error as? LocalizedError)?.errorDescription ?? "The file could not be saved.")
+        (error as? LocalizedError)?.errorDescription
+          ?? String(localized: "The file could not be saved.", bundle: .module))
     }
   }
 }
@@ -80,11 +81,14 @@ struct DiagnosticsExportSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Export Diagnostics")
+      Text("Export Diagnostics", bundle: .module)
         .font(.title2.weight(.semibold))
       Text(
-        "This is everything the file will contain. Read it, search it with ⌘F, then save it and "
-          + "attach it to a report yourself: nothing is sent."
+        """
+        This is everything the file will contain. Read it, search it with ⌘F, then save it and \
+        attach it to a report yourself: nothing is sent.
+        """,
+        bundle: .module
       )
       .fixedSize(horizontal: false, vertical: true)
       Text(DiagnosticArchive.exclusions)
@@ -95,11 +99,13 @@ struct DiagnosticsExportSheet: View {
       Group {
         switch model.state {
         case .collecting:
-          ProgressView("Gathering diagnostics…")
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+          ProgressView {
+            Text("Gathering diagnostics…", bundle: .module)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .ready, .saved, .failed:
           ReadOnlyTextView(text: model.preview)
-            .accessibilityLabel("Diagnostics preview")
+            .accessibilityLabel(Text("Diagnostics preview", bundle: .module))
             .accessibilityIdentifier("diagnostics-preview")
         }
       }
@@ -109,14 +115,21 @@ struct DiagnosticsExportSheet: View {
       HStack {
         switch model.state {
         case .saved(let fileName):
-          Label("Saved as \(fileName).", systemImage: "checkmark.circle.fill")
-            .foregroundStyle(.green)
+          Label {
+            Text("Saved as \(fileName).", bundle: .module, comment: "The name of the saved file.")
+          } icon: {
+            Image(systemName: "checkmark.circle.fill")
+          }
+          .foregroundStyle(.green)
         case .failed(let message):
           Label(message, systemImage: "exclamationmark.triangle.fill")
             .foregroundStyle(.orange)
         case .ready:
           Text(
-            "\(model.files.count) files, "
+            String(
+              localized: "\(model.files.count) files", bundle: .module,
+              comment: "How many files the diagnostics archive holds.")
+              + ", "
               + ByteCountFormatter.string(
                 fromByteCount: Int64(model.totalBytes), countStyle: .file)
           )
@@ -125,12 +138,20 @@ struct DiagnosticsExportSheet: View {
           EmptyView()
         }
         Spacer()
-        Button(isSaved ? "Done" : "Cancel", action: close)
-          .keyboardShortcut(.cancelAction)
-        Button("Save…", action: save)
-          .keyboardShortcut(.defaultAction)
-          .disabled(model.state == .collecting)
-          .accessibilityIdentifier("diagnostics-save")
+        Button(action: close) {
+          if isSaved {
+            Text("Done", bundle: .module)
+          } else {
+            Text("Cancel", bundle: .module)
+          }
+        }
+        .keyboardShortcut(.cancelAction)
+        Button(action: save) {
+          Text("Save…", bundle: .module)
+        }
+        .keyboardShortcut(.defaultAction)
+        .disabled(model.state == .collecting)
+        .accessibilityIdentifier("diagnostics-save")
       }
     }
     .padding(20)

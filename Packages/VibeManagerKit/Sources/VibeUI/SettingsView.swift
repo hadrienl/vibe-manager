@@ -21,10 +21,22 @@ public struct SettingsView: View {
     if let model {
       TabView(selection: Bindable(model).settingsTab) {
         general
-          .tabItem { Label("General", systemImage: "gearshape") }
+          .tabItem {
+            Label {
+              Text("General", bundle: .module, comment: "A tab of the Settings window.")
+            } icon: {
+              Image(systemName: "gearshape")
+            }
+          }
           .tag(SettingsTab.general)
         PromptTemplatesView(model: model.templates)
-          .tabItem { Label("Templates", systemImage: "text.badge.plus") }
+          .tabItem {
+            Label {
+              Text("Templates", bundle: .module, comment: "A tab of the Settings window.")
+            } icon: {
+              Image(systemName: "text.badge.plus")
+            }
+          }
           .tag(SettingsTab.templates)
       }
     } else {
@@ -35,38 +47,55 @@ public struct SettingsView: View {
   private var general: some View {
     Form {
       if let model {
-        Section("Sessions") {
+        Section {
           SessionCloseRow(model: model)
           QuitBehaviorRow(model: model)
+        } header: {
+          Text("Sessions", bundle: .module, comment: "A section of the Settings window.")
         }
-        Section("Git") {
+        Section {
           EditorRow(model: model)
+        } header: {
+          Text("Git", bundle: .module, comment: "A section of the Settings window.")
         }
         if let usage = model.usage {
-          Section("Usage") {
+          Section {
             UsageSettingsRow(usage: usage)
+          } header: {
+            Text("Usage", bundle: .module, comment: "A section of the Settings window.")
           }
         }
       }
-      Section("Privacy") {
+      Section {
         if let permissions {
           FullDiskAccessRow(permissions: permissions)
         } else {
-          Text("File access cannot be read in this window.")
+          Text("File access cannot be read in this window.", bundle: .module)
             .foregroundStyle(.secondary)
         }
+      } header: {
+        Text("Privacy", bundle: .module, comment: "A section of the Settings window.")
       }
       if let model, model.canExportDiagnostics {
-        Section("Diagnostics") {
+        Section {
           LabeledContent {
-            Button("Export Diagnostics…") { model.beginDiagnosticsExport() }
+            Button {
+              model.beginDiagnosticsExport()
+            } label: {
+              Text("Export Diagnostics…", bundle: .module)
+            }
           } label: {
-            Text("Diagnostics")
+            Text("Diagnostics", bundle: .module)
             Text(
-              "A local log of what the application did, never of what you typed, kept for two "
-                + "weeks. Exported only when you save it yourself."
+              """
+              A local log of what the application did, never of what you typed, kept for two \
+              weeks. Exported only when you save it yourself.
+              """,
+              bundle: .module
             )
           }
+        } header: {
+          Text("Diagnostics", bundle: .module)
         }
       }
     }
@@ -93,9 +122,15 @@ private struct FullDiskAccessRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      LabeledContent("Full Disk Access") {
-        Label(label, systemImage: symbolName)
-          .foregroundStyle(permissions.isGranted ? .secondary : .primary)
+      LabeledContent {
+        Label {
+          Text(label)
+        } icon: {
+          Image(systemName: symbolName)
+        }
+        .foregroundStyle(permissions.isGranted ? .secondary : .primary)
+      } label: {
+        Text("Full Disk Access", bundle: .module)
       }
 
       if permissions.status == .notGranted {
@@ -104,24 +139,33 @@ private struct FullDiskAccessRow: View {
           Without it, macOS asks for permission each time an agent reads your Desktop, Documents, \
           Downloads, an external disk or iCloud Drive. Turning it on takes effect the next time \
           Vibe Manager is opened.
-          """
+          """,
+          bundle: .module
         )
         .font(.callout)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
 
-        Button("Open System Settings") {
+        Button {
           permissions.openSystemSettings()
+        } label: {
+          Text("Open System Settings", bundle: .module)
         }
       }
     }
   }
 
-  private var label: String {
+  private var label: LocalizedStringResource {
     switch permissions.status {
-    case .granted: return "Granted"
-    case .notGranted: return "Not granted"
-    case nil: return "Checking…"
+    case .granted:
+      return LocalizedStringResource(
+        "Granted", bundle: .module, comment: "The state of Full Disk Access.")
+    case .notGranted:
+      return LocalizedStringResource(
+        "Not granted", bundle: .module, comment: "The state of Full Disk Access.")
+    case nil:
+      return LocalizedStringResource(
+        "Checking…", bundle: .module, comment: "The state of Full Disk Access.")
     }
   }
 
@@ -138,10 +182,9 @@ private struct SessionCloseRow: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    Toggle(
-      "Ask before closing a session whose agent is running",
-      isOn: $model.confirmsStoppingRunningAgent
-    )
+    Toggle(isOn: $model.confirmsStoppingRunningAgent) {
+      Text("Ask before closing a session whose agent is running", bundle: .module)
+    }
   }
 }
 
@@ -152,16 +195,25 @@ private struct QuitBehaviorRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Picker("When quitting with agents running", selection: $model.quitBehavior) {
-        Text("Ask").tag(QuitBehavior.ask)
-        Text("Keep them running").tag(QuitBehavior.keepRunning)
-        Text("Stop them").tag(QuitBehavior.stopAll)
+      Picker(selection: $model.quitBehavior) {
+        Text("Ask", bundle: .module, comment: "What to do when quitting with agents running.")
+          .tag(QuitBehavior.ask)
+        Text(
+          "Keep them running", bundle: .module,
+          comment: "What to do when quitting with agents running."
+        )
+        .tag(QuitBehavior.keepRunning)
+        Text("Stop them", bundle: .module, comment: "What to do when quitting with agents running.")
+          .tag(QuitBehavior.stopAll)
+      } label: {
+        Text("When quitting with agents running", bundle: .module)
       }
       Text(
         """
         Agents kept running go on working in the background, and are back on screen as they are \
         the next time Vibe Manager is opened. A restart of the Mac stops them.
-        """
+        """,
+        bundle: .module
       )
       .font(.callout)
       .foregroundStyle(.secondary)
@@ -187,9 +239,9 @@ private struct EditorRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Picker("Open changed files with", selection: selection) {
-        Text("Finder (reveal only)").tag(Choice.revealOnly)
-        Text("Default Application").tag(Choice.defaultApplication)
+      Picker(selection: selection) {
+        Text("Finder (reveal only)", bundle: .module).tag(Choice.revealOnly)
+        Text("Default Application", bundle: .module).tag(Choice.defaultApplication)
         let editors = model.gitInspector.installedEditors()
         if !editors.isEmpty || chosenElsewhere != nil {
           Divider()
@@ -201,18 +253,24 @@ private struct EditorRow: View {
           Text(chosenElsewhere.name).tag(Choice.application(chosenElsewhere.identifier))
         }
         Divider()
-        Text("Other…").tag(Choice.other)
+        Text("Other…", bundle: .module, comment: "Picks another application to open files with.")
+          .tag(Choice.other)
+      } label: {
+        Text("Open changed files with", bundle: .module)
       }
       .id(pickerIdentity)
       if case .application = model.fileEditor, let editor = model.fileEditor,
         model.gitInspector.name(of: editor) == nil
       {
-        Text("This editor is no longer installed: files are revealed in the Finder instead.")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
+        Text(
+          "This editor is no longer installed: files are revealed in the Finder instead.",
+          bundle: .module
+        )
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
       }
-      Text("Double-click a file in the Git list, or press Return, to open it.")
+      Text("Double-click a file in the Git list, or press Return, to open it.", bundle: .module)
         .font(.callout)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -258,7 +316,9 @@ private struct EditorRow: View {
     panel.allowedContentTypes = [.application]
     panel.canChooseDirectories = false
     panel.allowsMultipleSelection = false
-    panel.prompt = "Choose"
+    panel.prompt = String(
+      localized: "Choose", bundle: .module,
+      comment: "The button of the panel that picks an application to open files with.")
     guard panel.runModal() == .OK, let url = panel.url,
       let identifier = Bundle(url: url)?.bundleIdentifier
     else {
@@ -280,35 +340,45 @@ private struct UsageSettingsRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       Toggle(
-        "Track agent usage",
         isOn: Binding(
           get: { usage.isTrackingEnabled },
           set: { enabled in Task { await usage.setTracking(enabled) } }
-        ))
+        )
+      ) {
+        Text("Track agent usage", bundle: .module)
+      }
       Text(
         """
         Running time, runs and the tokens your agents' transcripts report, kept on this Mac only. \
         Nothing is sent anywhere, and what the agents were asked or answered is never read.
-        """
+        """,
+        bundle: .module
       )
       .font(.callout)
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
-      Button("Clear Usage Data…") { isConfirmingClear = true }
-        .confirmationDialog(
-          "Clear usage data?", isPresented: $isConfirmingClear
-        ) {
-          Button("Clear Usage Data", role: .destructive) {
-            Task { await usage.clear() }
-          }
-        } message: {
-          Text(
-            """
-            Running times, runs and token totals recorded on this Mac will be deleted. Your \
-            agents' own transcripts are not touched.
-            """
-          )
+      Button {
+        isConfirmingClear = true
+      } label: {
+        Text("Clear Usage Data…", bundle: .module)
+      }
+      .confirmationDialog(
+        Text("Clear usage data?", bundle: .module), isPresented: $isConfirmingClear
+      ) {
+        Button(role: .destructive) {
+          Task { await usage.clear() }
+        } label: {
+          Text("Clear Usage Data", bundle: .module)
         }
+      } message: {
+        Text(
+          """
+          Running times, runs and token totals recorded on this Mac will be deleted. Your \
+          agents' own transcripts are not touched.
+          """,
+          bundle: .module
+        )
+      }
     }
   }
 }
