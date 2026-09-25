@@ -1194,16 +1194,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld action requise"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld actions requises"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld action requise"
                 }
               },
               "other" : {
@@ -1561,16 +1561,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld session"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sessions"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session"
                 }
               },
               "other" : {
@@ -1928,13 +1928,13 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
+              "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld en erreur"
                 }
               },
-              "many" : {
+              "one" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld en erreur"
@@ -1975,13 +1975,13 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
+              "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld en cours"
                 }
               },
-              "many" : {
+              "one" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld en cours"
@@ -3756,17 +3756,6 @@
         }
       }
     },
-    "Group by Folder" : {
-      "comment" : "Groups the sidebar by working folder.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grouper par dossier"
-          }
-        }
-      }
-    },
     "Group name" : {
       "comment" : "The field that renames a group.",
       "localizations" : {
@@ -3774,6 +3763,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nom du groupe"
+          }
+        }
+      }
+    },
+    "Group the sessions by working folder (⌃⌘G)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grouper les sessions par dossier de travail (⌃⌘G)"
           }
         }
       }
@@ -6401,6 +6400,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher les fichiers de ce dossier"
+          }
+        }
+      }
+    },
+    "Show the sessions as one list (⌃⌘G)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les sessions en une seule liste (⌃⌘G)"
           }
         }
       }

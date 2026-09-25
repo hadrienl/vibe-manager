@@ -1491,22 +1491,19 @@ struct SidebarFooter: View {
 
       Spacer(minLength: 0)
 
-      // One list, or one section per working folder. The View menu has it too, on ⌃⌘G.
-      Toggle(
-        isOn: Binding(
-          get: { model.sidebarMode == .byFolder },
-          set: { model.setSidebarMode($0 ? .byFolder : .flat) })
-      ) {
-        Label {
-          Text("Group by Folder", bundle: .module, comment: "Groups the sidebar by working folder.")
-        } icon: {
-          Image(systemName: "folder")
-        }
-        .labelStyle(.iconOnly)
+      // One list, or one section per working folder. The View menu has it too, on ⌃⌘G. A plain
+      // button rather than a toggle styled as one: the help tag of the latter never showed.
+      Button {
+        model.toggleGrouping()
+      } label: {
+        Image(systemName: isGrouped ? "folder.fill" : "folder")
+          .foregroundStyle(isGrouped ? Color.accentColor : Color.secondary)
+          .contentShape(Rectangle())
       }
-      .toggleStyle(.button)
       .buttonStyle(.borderless)
-      .help(Text("Group Sessions by Folder", bundle: .module))
+      .help(groupingHelp)
+      .accessibilityLabel(Text("Group Sessions by Folder", bundle: .module))
+      .accessibilityAddTraits(isGrouped ? [.isSelected] : [])
       .accessibilityIdentifier("sidebar-group-toggle")
 
       if model.filter.isNarrowing {
@@ -1527,6 +1524,17 @@ struct SidebarFooter: View {
 
   private func displayPath(_ path: String) -> String {
     (path as NSString).abbreviatingWithTildeInPath
+  }
+
+  private var isGrouped: Bool {
+    model.sidebarMode == .byFolder
+  }
+
+  /// Says what a click does, and the shortcut that does the same.
+  private var groupingHelp: Text {
+    isGrouped
+      ? Text("Show the sessions as one list (⌃⌘G)", bundle: .module)
+      : Text("Group the sessions by working folder (⌃⌘G)", bundle: .module)
   }
 }
 
