@@ -464,6 +464,11 @@ private final class InputWriter: @unchecked Sendable {
   private let descriptor: Int32
   private let input: BoundedProcessInput
   private let lock = NSLock()
+  /// Someone asked for the input to be closed: the command ended, or has what it waits for.
+  private var isCloseRequested = false
+  /// The writing thread still uses the descriptor, which must stay open — closed under it, its
+  /// number could go to a file the application opens next, and the input be written there.
+  private var isWriting = false
   private var isClosed = false
   private var isWritten = false
   private var outputHasMarker = false
@@ -477,10 +482,13 @@ private final class InputWriter: @unchecked Sendable {
   }
 
   func start() {
+    // Taken before the thread runs: a command that ends before it does must not see its input
+    // closed under the write.
+    lock.withLock { isWriting = true }
     DispatchQueue.global(qos: .userInitiated).async {
       self.input.data.withUnsafeBytes { bytes in
         var offset = 0
-        while offset < bytes.count {
+        while offset < bytes.count, !self.lock.withLock({ self.isCloseRequested }) {
           let written = write(self.descriptor, bytes.baseAddress! + offset, bytes.count - offset)
           if written < 0 {
             if errno == EINTR { continue }
@@ -490,8 +498,10 @@ private final class InputWriter: @unchecked Sendable {
         }
       }
       let close = self.lock.withLock { () -> Bool in
+        self.isWriting = false
         self.isWritten = true
-        return self.input.closeOnceOutputContains == nil || self.outputHasMarker
+        return self.isCloseRequested || self.input.closeOnceOutputContains == nil
+          || self.outputHasMarker
       }
       if close { self.close() }
     }
@@ -508,10 +518,13 @@ private final class InputWriter: @unchecked Sendable {
     if close { self.close() }
   }
 
+  /// Closes the input now, or once the writing thread lets go of it.
   func close() {
     let shouldClose = lock.withLock { () -> Bool in
-      defer { isClosed = true }
-      return !isClosed
+      isCloseRequested = true
+      guard !isWriting, !isClosed else { return false }
+      isClosed = true
+      return true
     }
     if shouldClose { Darwin.close(descriptor) }
   }
