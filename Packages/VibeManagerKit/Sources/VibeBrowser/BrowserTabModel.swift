@@ -340,7 +340,7 @@ public enum BrowserAgentEffect: Hashable, Sendable {
 
 // Every navigation is allowed on purpose: the tab is a browser (ADR 0023). Top-level schemes are
 // filtered below and by `BrowserActionPolicy`; what an agent does on a page is decided there.
-extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {  // NOSONAR (swift:S7485)
+extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
   public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!)
   {
     failure = nil

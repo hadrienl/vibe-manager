@@ -43,7 +43,7 @@ public final class BrowserWebConfiguration {
     configuration.userContentController = controller
     // A web view the user browses with: it goes wherever they, or their agent, send it. What an
     // agent may do there is bounded by `BrowserActionPolicy` (ADR 0023), not by where it can go.
-    let webView = WKWebView(  // NOSONAR (swift:S7485) navigation is the feature; ADR 0023
+    let webView = WKWebView(
       frame: NSRect(x: 0, y: 0, width: 1_024, height: 768), configuration: configuration)
     webView.allowsBackForwardNavigationGestures = true
     webView.allowsMagnification = true
