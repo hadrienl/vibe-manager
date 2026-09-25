@@ -58,14 +58,15 @@ final class SmokeTests: XCTestCase {
 
   /// Waits for the rows of both tabs together: the mock agent says its piece and exits, so a
   /// session may be in Closed as soon as it is created. On a failure, keeps what the interface
-  /// showed and what it exposed to accessibility. Leaves the Active tab selected.
+  /// showed and what it exposed to accessibility. Leaves the Closed tab selected, where the
+  /// sessions are: the shortcuts that follow select among the rows shown.
   private func expectSessionRows(
     _ expected: Int, in app: XCUIApplication, timeout: TimeInterval = 10
   ) {
     let deadline = Date().addingTimeInterval(timeout)
     var found = 0
     repeat {
-      found = ["Closed", "Active"].reduce(0) { total, scope in
+      found = ["Active", "Closed"].reduce(0) { total, scope in
         app.radioButtons[scope].click()
         return total + sessionRows(in: app).count
       }
