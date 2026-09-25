@@ -766,4 +766,58 @@ struct TerminalHostProcessTests {
     #expect(await eventually { await session.state() == .failed(.hostStopped) })
     #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(1))
   }
+
+  @Test("An agent the application cannot show to be its own is not said to be stopped")
+  func hostDeathLeavesAnUnprovenAgentUnknown() async throws {
+    let location = TerminalHostLocation(
+      directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
+    defer { try? FileManager.default.removeItem(at: location.directory) }
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
+    let log = RecordingDiagnosticLog()
+    let application = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30),
+        diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()),
+        processes: StartTimeBlindProbe()))
+    let session = try await application.start(
+      TerminalTestSupport.spec(script: "trap '' HUP\nwhile :; do sleep 0.1; done"),
+      for: SessionID())
+    guard case .running(let agent) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
+    defer { kill(-agent, SIGKILL) }
+    let identity = try #require(await application.hostIdentity())
+
+    kill(identity.processIdentifier, SIGKILL)
+
+    #expect(
+      await eventually {
+        if case .failed(.processOutcomeUnknown) = await session.state() { return true }
+        return false
+      })
+    #expect(isProcessAlive(agent))
+    #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(0))
+  }
+}
+
+/// The system's answers, but no start time: no group can be shown to be the one recorded.
+private struct StartTimeBlindProbe: ProcessLivenessProbe {
+  private let system = SystemProcessLivenessProbe()
+
+  func isAlive(processIdentifier: Int32) -> Bool {
+    system.isAlive(processIdentifier: processIdentifier)
+  }
+
+  func startTime(of processIdentifier: Int32) -> Date? { nil }
+
+  func terminate(processGroup: Int32) -> Bool {
+    system.terminate(processGroup: processGroup)
+  }
+
+  func bootTime() -> Date? { system.bootTime() }
 }

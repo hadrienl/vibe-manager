@@ -536,7 +536,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   /// closed with it and sent their groups a hang-up, but an agent that ignores it would run on,
   /// with no terminal and nobody to see it, until the next launch found it. Every group the host
   /// ran for this copy is stopped now, once it is shown to still be ours (ADR 0011's rule: the
-  /// group and the instant it started), and its session ends saying why.
+  /// group and the instant it started), and its session ends saying why. A session whose group
+  /// was not recorded, or could not be shown to be ours, is not said to be stopped: whatever it
+  /// ran may still be running, and it ends as one whose outcome is unknown.
   private func connectionEnded(_ ended: TerminalHostConnection) async {
     guard connection === ended else { return }
     connection = nil
@@ -547,10 +549,16 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     var stopped = 0
     for (id, mirror) in mirrors {
       guard await !mirror.state().isFinished else { continue }
-      if let known = groups[id], stopGroup(known.group, startedAt: known.startedAt, for: id) {
+      let outcome = groups[id].map { stopGroup($0.group, startedAt: $0.startedAt, for: id) }
+      switch outcome {
+      case .stopped:
         stopped += 1
+        await mirror.hostStopped()
+      case .alreadyGone:
+        await mirror.hostStopped()
+      case .unreachable, nil:
+        await mirror.connectionLost()
       }
-      await mirror.hostStopped()
     }
     groups.removeAll()
     diagnostics.record(
@@ -558,19 +566,31 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       ["sessions": .count(mirrors.count), "stopped": .count(stopped)])
   }
 
+  private enum GroupOutcome {
+    /// Killed now.
+    case stopped
+    /// Its leader and every member had already exited: the hang-up of the terminal was enough.
+    case alreadyGone
+    /// Not shown to be ours, or the kill failed: it may still be running.
+    case unreachable
+  }
+
   /// `SIGKILL` to a group, when it is the one this copy recorded. A group whose leader has exited
   /// is still ours while it has members: the kernel gives no process a pid that names a live group.
-  private func stopGroup(_ group: Int32, startedAt: Date?, for id: SessionID) -> Bool {
+  private func stopGroup(_ group: Int32, startedAt: Date?, for id: SessionID) -> GroupOutcome {
     let identity = configuration.processes.identify(processGroup: group, startedAt: startedAt)
-    let stopped: Bool
+    let outcome: GroupOutcome
     switch identity {
     case .matches:
-      stopped = configuration.processes.terminate(processGroup: group)
+      outcome = configuration.processes.terminate(processGroup: group) ? .stopped : .unreachable
+    case .gone where kill(-group, 0) != 0 && errno == ESRCH:
+      outcome = .alreadyGone
     case .gone:
-      stopped = kill(-group, 0) == 0 && configuration.processes.terminate(processGroup: group)
+      outcome = configuration.processes.terminate(processGroup: group) ? .stopped : .unreachable
     case .differs, .unknown:
-      stopped = false
+      outcome = .unreachable
     }
+    let stopped = outcome == .stopped
     let token: DiagnosticToken
     switch identity {
     case .matches: token = "matches"
@@ -584,6 +604,6 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
         "session": diagnostics.pseudonym(id), "identity": .token(token),
         "stopped": .flag(stopped), "errno": .code(stopped ? 0 : errno),
       ])
-    return stopped
+    return outcome
   }
 }
