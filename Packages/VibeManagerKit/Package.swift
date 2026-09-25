@@ -4,6 +4,9 @@ import PackageDescription
 
 let package = Package(
   name: "VibeManagerKit",
+  // English is the development language, and the one a string falls back to when the catalog has
+  // no translation for the user's language (docs/localization.md).
+  defaultLocalization: "en",
   platforms: [.macOS(.v14)],
   products: [
     .library(name: "VibeDomain", targets: ["VibeDomain"]),
@@ -23,9 +26,18 @@ let package = Package(
     .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.20.0")
   ],
   targets: [
-    .target(name: "VibeDomain"),
-    .target(name: "VibeApplication", dependencies: ["VibeDomain"]),
-    .target(name: "VibePersistence", dependencies: ["VibeApplication", "VibeDomain"]),
+    // Every target whose text reaches the user carries its own string catalog.
+    .target(name: "VibeDomain", resources: [.process("Localizable.xcstrings")]),
+    .target(
+      name: "VibeApplication",
+      dependencies: ["VibeDomain"],
+      resources: [.process("Localizable.xcstrings")]
+    ),
+    .target(
+      name: "VibePersistence",
+      dependencies: ["VibeApplication", "VibeDomain"],
+      resources: [.process("Localizable.xcstrings")]
+    ),
     // The one way to run a child that is not a terminal, and the guard that stops every child
     // group the application started when it exits. Depends on nothing: it is infrastructure.
     .target(name: "VibeProcess"),
@@ -40,11 +52,13 @@ let package = Package(
       name: "VibeTerminalUI",
       dependencies: [
         "VibeApplication", "VibeDomain", .product(name: "SwiftTerm", package: "SwiftTerm"),
-      ]
+      ],
+      resources: [.process("Localizable.xcstrings")]
     ),
     .target(
       name: "VibeUI",
-      dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"]
+      dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"],
+      resources: [.process("Localizable.xcstrings")]
     ),
     // The application, composed. Out of the application target so that a test can compose it.
     .target(
@@ -61,16 +75,22 @@ let package = Package(
       dependencies: ["VibeTerminal", "VibeApplication", "VibePersistence"],
       path: "Tests/VibeTerminalHostFixture"
     ),
-    .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
+    // Resolves a string in a given language, from the catalog of the module it belongs to.
+    .target(name: "VibeLocalizationTesting", path: "Tests/VibeLocalizationTesting"),
+    .testTarget(
+      name: "VibeDomainTests", dependencies: ["VibeDomain", "VibeLocalizationTesting"]),
     .testTarget(name: "VibeProcessTests", dependencies: ["VibeProcess"]),
     .testTarget(
       name: "VibeApplicationTests",
-      dependencies: ["VibeApplication", "VibeDomain"]
+      dependencies: ["VibeApplication", "VibeDomain", "VibeLocalizationTesting"]
     ),
     .testTarget(
       name: "VibePersistenceTests",
       // VibeProcess reads the diagnostics archive back with the system's `unzip`.
-      dependencies: ["VibePersistence", "VibeApplication", "VibeDomain", "VibeProcess"]
+      dependencies: [
+        "VibePersistence", "VibeApplication", "VibeDomain", "VibeProcess",
+        "VibeLocalizationTesting",
+      ]
     ),
     .testTarget(
       name: "VibeAgentsTests",
@@ -91,7 +111,7 @@ let package = Package(
     .testTarget(
       name: "VibeTerminalUITests",
       dependencies: [
-        "VibeTerminalUI", "VibeApplication", "VibeDomain",
+        "VibeTerminalUI", "VibeApplication", "VibeDomain", "VibeLocalizationTesting",
         .product(name: "SwiftTerm", package: "SwiftTerm"),
       ]
     ),
@@ -107,7 +127,9 @@ let package = Package(
     ),
     .testTarget(
       name: "VibeUITests",
-      dependencies: ["VibeUI", "VibeApplication", "VibeDomain", "VibeTerminalUI"]
+      dependencies: [
+        "VibeUI", "VibeApplication", "VibeDomain", "VibeTerminalUI", "VibeLocalizationTesting",
+      ]
     ),
   ]
 )
