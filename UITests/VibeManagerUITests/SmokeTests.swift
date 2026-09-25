@@ -56,15 +56,22 @@ final class SmokeTests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: "session-row")
   }
 
-  /// Waits for the rows, and on a failure keeps what the interface showed and what it exposed to
-  /// accessibility: a count of 0 alone does not tell a session not created from a row not found.
+  /// Waits for the rows of both tabs together: the mock agent says its piece and exits, so a
+  /// session may be in Closed as soon as it is created. On a failure, keeps what the interface
+  /// showed and what it exposed to accessibility. Leaves the Active tab selected.
   private func expectSessionRows(
     _ expected: Int, in app: XCUIApplication, timeout: TimeInterval = 10
   ) {
-    let rows = sessionRows(in: app)
-    let found = XCTNSPredicateExpectation(
-      predicate: NSPredicate { _, _ in rows.count == expected }, object: nil)
-    guard XCTWaiter.wait(for: [found], timeout: timeout) != .completed else { return }
+    let deadline = Date().addingTimeInterval(timeout)
+    var found = 0
+    repeat {
+      found = ["Closed", "Active"].reduce(0) { total, scope in
+        app.radioButtons[scope].click()
+        return total + sessionRows(in: app).count
+      }
+      if found == expected { return }
+      Thread.sleep(forTimeInterval: 0.5)
+    } while Date() < deadline
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.lifetime = .keepAlways
     add(screenshot)
@@ -72,7 +79,7 @@ final class SmokeTests: XCTestCase {
     tree.name = "Accessibility tree"
     tree.lifetime = .keepAlways
     add(tree)
-    XCTAssertEqual(rows.count, expected)
+    XCTAssertEqual(found, expected, "Sessions in Active and Closed together")
   }
 
   private func createSession(named name: String, in app: XCUIApplication) {
