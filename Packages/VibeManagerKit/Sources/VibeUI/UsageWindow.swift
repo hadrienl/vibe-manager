@@ -108,35 +108,39 @@ public struct UsageWindow: View {
     let rows = usage.report.rows + [usage.report.total]
     let grouping = usage.grouping
     return Table(rows, selection: $selection) {
-      TableColumn(UsagePresentation.groupingName(grouping)) { row in
+      TableColumn(Text(UsagePresentation.groupingName(grouping))) { row in
         Text(title(of: row))
           .fontWeight(row.key == .total ? .semibold : .regular)
           .lineLimit(1)
       }
       .width(min: 160, ideal: 240)
       TableColumn(
-        grouping == .model
-          ? LocalizedStringResource(
-            "Running (configured model)", bundle: .module,
-            comment: "A column of the Usage window: running time, counted for the configured model."
-          )
-          : LocalizedStringResource(
-            "usage.column.running", defaultValue: "Running", bundle: .module,
-            comment: "A column of the Usage window: running time. Not the state of a session.")
+        Text(
+          grouping == .model
+            ? LocalizedStringResource(
+              "Running (configured model)", bundle: .module,
+              comment:
+                "A column of the Usage window: running time, counted for the configured model."
+            )
+            : LocalizedStringResource(
+              "usage.column.running", defaultValue: "Running", bundle: .module,
+              comment: "A column of the Usage window: running time. Not the state of a session."))
       ) { row in
         Text(UsagePresentation.duration(row.runningTime)).monospacedDigit()
       }
       TableColumn(
-        LocalizedStringResource(
-          "Runs", bundle: .module, comment: "A column of the Usage window: how many runs.")
+        Text(
+          LocalizedStringResource(
+            "Runs", bundle: .module, comment: "A column of the Usage window: how many runs."))
       ) { row in
         Text(row.runs.total, format: .number).monospacedDigit()
       }
       .width(50)
       TableColumn(
-        LocalizedStringResource(
-          "Responses", bundle: .module,
-          comment: "A column of the Usage window: how many answers the agents gave.")
+        Text(
+          LocalizedStringResource(
+            "Responses", bundle: .module,
+            comment: "A column of the Usage window: how many answers the agents gave."))
       ) { row in
         Group {
           if row.hasReportedTokens {
@@ -149,27 +153,30 @@ public struct UsageWindow: View {
       }
       .width(70)
       TableColumn(
-        grouping == .model
-          ? LocalizedStringResource(
-            "Tokens in (declared model)", bundle: .module,
-            comment:
-              "A column of the Usage window: input tokens, counted for the model the agent declared."
-          )
-          : LocalizedStringResource(
-            "Tokens in", bundle: .module, comment: "A column of the Usage window: input tokens.")
+        Text(
+          grouping == .model
+            ? LocalizedStringResource(
+              "Tokens in (declared model)", bundle: .module,
+              comment:
+                "A column of the Usage window: input tokens, counted for the model the agent declared."
+            )
+            : LocalizedStringResource(
+              "Tokens in", bundle: .module, comment: "A column of the Usage window: input tokens."))
       ) { row in
         tokenCell(row) { $0.input }
       }
       TableColumn(
-        LocalizedStringResource(
-          "Tokens out", bundle: .module, comment: "A column of the Usage window: output tokens.")
+        Text(
+          LocalizedStringResource(
+            "Tokens out", bundle: .module, comment: "A column of the Usage window: output tokens."))
       ) { row in
         tokenCell(row) { $0.output }
       }
       TableColumn(
-        LocalizedStringResource(
-          "Cache read", bundle: .module,
-          comment: "A column of the Usage window: tokens read from the cache.")
+        Text(
+          LocalizedStringResource(
+            "Cache read", bundle: .module,
+            comment: "A column of the Usage window: tokens read from the cache."))
       ) { row in
         tokenCell(row) { $0.cacheRead }
       }

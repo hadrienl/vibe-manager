@@ -60,7 +60,13 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     wasStoppedOnPurpose: Bool = false,
     activity: AgentActivityState? = nil
   ) -> SessionStatusPresentation {
-    let process = wasStoppedOnPurpose ? nil : paneStatus.flatMap { process($0, activity: activity) }
+    // The closure's type is written out: Xcode 16.4 cannot infer it on its own.
+    let process: SessionStatusPresentation? =
+      wasStoppedOnPurpose
+      ? nil
+      : paneStatus.flatMap { status -> SessionStatusPresentation? in
+        Self.process(status, activity: activity)
+      }
     if wasStoppedOnPurpose, let paneStatus, hasEnded(paneStatus) {
       return stored(session)
     }
