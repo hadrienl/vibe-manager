@@ -190,8 +190,10 @@ if [[ -n "$entitlements" ]]; then
   [[ "$(print -rn -- "$entitlements" | plutil -convert json -o - -)" == "{}" ]] \
     || fail "the application has entitlements, and needs none (ADR 0001)"
 fi
-codesign -d --verbose=4 "$app" 2>&1 | grep -q 'flags=.*runtime' \
-  || fail "the hardened runtime is off"
+# Read whole, then matched: `grep -q` stops at the first match, the writer gets SIGPIPE, and
+# `pipefail` turns a pass into a failure.
+signature="$(codesign -d --verbose=4 "$app" 2>&1)"
+[[ "$signature" == *"flags="*"(runtime)"* ]] || fail "the hardened runtime is off"
 requirement="$(codesign -d -r- "$app" 2>&1)"
 [[ "$requirement" == *"certificate leaf[subject.OU] = \"$team\""* \
   || "$requirement" == *"certificate leaf[subject.OU] = $team"* ]] \
@@ -200,9 +202,9 @@ requirement="$(codesign -d -r- "$app" 2>&1)"
   || fail "unexpected bundle identifier"
 [[ "$(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString)" == "$version" ]] \
   || fail "the bundle does not carry version $version"
-find "$app" -name mock-agent.sh | grep -q . \
+[[ -n "$(find "$app" -name mock-agent.sh)" ]] \
   || fail "mock-agent.sh is missing: the smoke test runs against it (security review A8)"
-if find "$app" -name 'Local.xcconfig' | grep -q .; then
+if [[ -n "$(find "$app" -name 'Local.xcconfig')" ]]; then
   fail "a Local.xcconfig was bundled"
 fi
 
