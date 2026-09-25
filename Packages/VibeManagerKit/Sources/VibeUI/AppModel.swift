@@ -48,6 +48,8 @@ public final class AppModel {
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
   /// What each session's agent is doing, as the tracker last said (#45).
   public internal(set) var activities: [SessionID: AgentActivityState] = [:]
+  /// The conversation views of the sessions (#38), and the settings they share.
+  public let conversations: ConversationWorkspace
   /// A CLI's hooks waiting for the user's consent before its agent starts.
   public internal(set) var hookConsentRequest: HookConsentRequest?
   /// The agents whose CLI makes the user approve hooks, for the setting that turns them off.
@@ -513,6 +515,8 @@ public final class AppModel {
     diagnostics: Diagnostics = .disabled,
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
     collectDiagnostics: (@MainActor (AppModel) async -> DiagnosticSnapshot)? = nil,
+    /// The conversation views (#38). A workspace assembled without transcripts shows terminals.
+    conversations: ConversationWorkspace = ConversationWorkspace(),
     /// Writes the archive of an export.
     archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() },
     /// Keeps each session's journal. Absent, the inspector shows Git alone.
@@ -532,6 +536,7 @@ public final class AppModel {
     self.iconStore = iconStore
     icons = SessionIconLibrary(store: iconStore)
     self.activityTracker = activityTracker
+    self.conversations = conversations
     self.hookConsents = hookConsents
     self.browser = browser
     readTicketContext = ticketContext
@@ -1889,7 +1894,12 @@ public final class AppModel {
     // the first list.
     await startFollowingActivity()
     await journal?.start()
+    await conversations.prepare()
+    connectConversations()
     await reload()
+    // The choices of sessions that are gone are forgotten — never on an empty list, which may be
+    // a store that could not be read rather than one without sessions.
+    if !sessions.isEmpty { layout.keepPresentations(of: Set(sessions.map(\.id))) }
     Signposts.end("launch.firstList", firstList)
     // Which agents write a usage is part of their description, known without probing any of them.
     if let usage, let agents {

@@ -579,6 +579,17 @@
         }
       }
     },
+    "Show Conversation" : {
+      "comment" : "Shows the session as a conversation.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la conversation"
+          }
+        }
+      }
+    },
     "Show Next Tab" : {
       "localizations" : {
         "fr" : {
@@ -595,6 +606,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher l’onglet précédent"
+          }
+        }
+      }
+    },
+    "Show Terminal" : {
+      "comment" : "Shows the raw terminal of the session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le terminal"
           }
         }
       }

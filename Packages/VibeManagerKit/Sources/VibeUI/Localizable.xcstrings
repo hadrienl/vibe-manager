@@ -2909,6 +2909,16 @@
         }
       }
     },
+    "Conversation" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation"
+          }
+        }
+      }
+    },
     "Copy" : {
       "comment" : "Copies a command line.",
       "localizations" : {
@@ -6393,6 +6403,16 @@
         }
       }
     },
+    "Show the session as" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la session en"
+          }
+        }
+      }
+    },
     "Show the sessions as one list (⌃⌘G)" : {
       "localizations" : {
         "fr" : {
@@ -6729,6 +6749,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Revenir à %@…"
+          }
+        }
+      }
+    },
+    "Switch between the conversation and the terminal (⌥⌘T)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basculer entre la conversation et le terminal (⌥⌘T)"
           }
         }
       }

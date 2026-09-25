@@ -23,6 +23,7 @@ extension AppModel {
       for await update in updates {
         guard let self else { return }
         self.activities[update.sessionID] = update.state
+        self.conversations.activityChanged(update.sessionID, to: update.state?.activity)
       }
     }
     await activityTracker.load()

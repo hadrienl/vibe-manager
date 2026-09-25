@@ -102,6 +102,19 @@ struct VibeManagerApp: App {
         .keyboardShortcut("n", modifiers: [.command, .option])
         .disabled(environment.appModel.selectedSessionID == nil)
 
+        // The same session, as a conversation or as its raw terminal (#38).
+        Button(
+          environment.appModel.selectedSession.map { environment.appModel.presentation(of: $0) }
+            == .conversation
+            ? String(localized: "Show Terminal", comment: "Shows the raw terminal of the session.")
+            : String(
+              localized: "Show Conversation", comment: "Shows the session as a conversation.")
+        ) {
+          environment.appModel.togglePresentation()
+        }
+        .keyboardShortcut("t", modifiers: [.command, .option])
+        .disabled(!environment.appModel.canTogglePresentation)
+
         Divider()
 
         Button("Next Session") {

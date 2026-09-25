@@ -273,6 +273,13 @@ public final class AppEnvironment {
         repository: repository,
         summariesEnabled: journalPreferences.summariesEnabled),
       preferences: journalPreferences)
+    // The conversation view (#38): the same transcripts, read to be shown and never kept.
+    let conversations = ConversationWorkspace(
+      follow: FollowConversation(
+        agents: registry, tail: FileTranscriptTail(),
+        hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }),
+      store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),
+      agents: registry)
     appModel = AppModel(
       repository: repository,
       recovery: repository,
@@ -326,6 +333,7 @@ public final class AppEnvironment {
               environment: configuration.environment) != nil,
             crashReports: configuration.crashReports))
       },
+      conversations: conversations,
       archiveDiagnostics: { files, date in ZipArchiveWriter.archive(files, at: date) },
       journal: journal,
       folderLabels: FileFolderLabelStore(url: data.folders),

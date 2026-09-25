@@ -267,6 +267,28 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  /// How a session is shown, the Conversation settings giving the default (#38).
+  public func presentation(of id: SessionID, default fallback: SessionPresentation)
+    -> SessionPresentation
+  {
+    settings.presentation(of: id, default: fallback)
+  }
+
+  /// Records the user's choice for one session. Only a choice that differs from the default is
+  /// kept: changing the default then moves every session that was never switched.
+  public func setPresentation(
+    _ presentation: SessionPresentation, of id: SessionID, default fallback: SessionPresentation
+  ) {
+    updateIntent {
+      $0.sessionPresentations[id.description] = presentation == fallback ? nil : presentation
+    }
+  }
+
+  /// Drops the choices of sessions that no longer exist.
+  public func keepPresentations(of ids: Set<SessionID>) {
+    updateIntent { $0.keepPresentations(of: ids) }
+  }
+
   /// Writes whatever is pending right away. Called when the application is about to quit, where
   /// waiting out the delay would mean losing the last arrangement.
   public func flush() async {
