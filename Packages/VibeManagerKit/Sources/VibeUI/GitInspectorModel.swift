@@ -198,7 +198,8 @@ final class GitInspectorModel {
   /// answer could land last.
   private func read(_ key: ListingKey) {
     guard let listUntracked else {
-      listings[key] = .failed("Untracked folders cannot be read here.")
+      listings[key] = .failed(
+        String(localized: "Untracked folders cannot be read here.", bundle: .module))
       return
     }
     guard !listingsInFlight.contains(key) else {
@@ -384,13 +385,18 @@ final class GitInspectorModel {
   private func open(_ url: URL, with editor: EditorChoice) async {
     guard let name = opener.name(of: editor) else {
       opener.reveal(url)
-      notice =
-        "The editor chosen in Settings is no longer installed. The file was revealed instead."
+      notice = String(
+        localized:
+          "The editor chosen in Settings is no longer installed. The file was revealed instead.",
+        bundle: .module)
       return
     }
     if await !opener.open(url, with: editor) {
       opener.reveal(url)
-      notice = "\(url.lastPathComponent) could not be opened in \(name). It was revealed instead."
+      notice = String(
+        localized:
+          "\(url.lastPathComponent) could not be opened in \(name). It was revealed instead.",
+        bundle: .module, comment: "A file's name, then an editor's name.")
     }
   }
 

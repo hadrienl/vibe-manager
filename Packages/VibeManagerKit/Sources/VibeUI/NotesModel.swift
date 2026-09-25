@@ -133,10 +133,12 @@ public final class NotesDocument {
     let removed = current.substring(with: clamped).utf8.count
     let next = byteCount - removed + replacement.utf8.count
     guard next <= SessionNotesLimits.byteLimit || next <= byteCount else {
-      refusal = """
-        This would make the notes \(SessionNotesError.size(next)); they are limited to \
-        \(SessionNotesError.size(SessionNotesLimits.byteLimit)).
-        """
+      refusal = String(
+        localized: """
+          This would make the notes \(SessionNotesError.size(next)); they are limited to \
+          \(SessionNotesError.size(SessionNotesLimits.byteLimit)).
+          """,
+        bundle: .module, comment: "Two sizes, formatted: “70 KB”, “64 KB”.")
       return false
     }
     refusal = nil
@@ -421,10 +423,12 @@ enum NotesInSummary {
     guard let brief, let notes else { return nil }
     let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !brief.includedSections.contains(.notes) else { return nil }
-    return """
-      Notes left out: too long for the summary (\(SessionNotesError.size(trimmed.utf8.count))). \
-      Paste what matters into the summary above.
-      """
+    return String(
+      localized: """
+        Notes left out: too long for the summary (\(SessionNotesError.size(trimmed.utf8.count))). \
+        Paste what matters into the summary above.
+        """,
+      bundle: .module, comment: "A size, formatted: “18 KB”.")
   }
 }
 

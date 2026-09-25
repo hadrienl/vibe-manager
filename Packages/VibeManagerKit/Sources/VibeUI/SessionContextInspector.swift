@@ -150,8 +150,12 @@ private struct InspectorSplit<Top: View, Bottom: View>: View {
         }
     )
     .accessibilityElement()
-    .accessibilityLabel("Divider between Git and the session")
-    .accessibilityValue("\(Int((dragged ?? fraction) * 100)) percent for Git")
+    .accessibilityLabel(Text("Divider between Git and the session", bundle: .module))
+    .accessibilityValue(
+      Text(
+        "\(Int((dragged ?? fraction) * 100)) percent for Git", bundle: .module,
+        comment: "The share of the inspector's height given to the Git list.")
+    )
     .accessibilityAdjustableAction { direction in
       let step = direction == .increment ? 0.05 : -0.05
       onChange(Self.bounded(fraction + step))
@@ -224,8 +228,14 @@ private struct SessionPane: View {
         Image(systemName: "chevron.right")
           .rotationEffect(.degrees(isDetailsExpanded ? 90 : 0))
           .font(.caption2.weight(.semibold))
-        Text(usage == nil ? "Agent & initial prompt" : "Agent, usage & initial prompt")
-          .font(.subheadline.weight(.semibold))
+        Group {
+          if usage == nil {
+            Text("Agent & initial prompt", bundle: .module)
+          } else {
+            Text("Agent, usage & initial prompt", bundle: .module)
+          }
+        }
+        .font(.subheadline.weight(.semibold))
         Spacer()
       }
       .foregroundStyle(.secondary)
@@ -235,9 +245,13 @@ private struct SessionPane: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .accessibilityLabel(
-      usage == nil ? "Agent and initial prompt" : "Agent, usage and initial prompt"
+      usage == nil
+        ? Text("Agent and initial prompt", bundle: .module)
+        : Text("Agent, usage and initial prompt", bundle: .module)
     )
-    .accessibilityValue(isDetailsExpanded ? "Expanded" : "Collapsed")
+    .accessibilityValue(
+      isDetailsExpanded
+        ? Text("Expanded", bundle: .module) : Text("Collapsed", bundle: .module))
   }
 
   private var details: some View {
@@ -249,13 +263,18 @@ private struct SessionPane: View {
         }
       } header: {
         HStack {
-          Text("Agent")
+          Text("Agent", bundle: .module, comment: "The heading of the session's agent.")
           Spacer()
           if let switchAgent {
-            Button("Switch…", action: switchAgent)
-              .buttonStyle(.borderless)
-              .controlSize(.small)
-              .accessibilityLabel("Switch the agent of \(session.name)")
+            Button(action: switchAgent) {
+              Text("Switch…", bundle: .module, comment: "Opens the sheet that switches the agent.")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .accessibilityLabel(
+              Text(
+                "Switch the agent of \(session.name)", bundle: .module,
+                comment: "The session's name."))
           }
         }
       }
@@ -264,29 +283,42 @@ private struct SessionPane: View {
         SessionUsageSection(session: session, usage: usage, agentNames: agentNames)
       }
 
-      Section("Initial prompt") {
+      Section {
         // The name and revision the session was created with: the template may since have been
         // renamed, changed or deleted, and none of that changes what this session was sent.
         if let template = session.template {
-          Text(
-            template.revision.map { "From template “\(template.name)”, revision \($0)" }
-              ?? "From template “\(template.name)”"
-          )
+          Group {
+            if let revision = template.revision {
+              Text(
+                "From template “\(template.name)”, revision \(String(revision))",
+                bundle: .module, comment: "A prompt template's name, then its revision number.")
+            } else {
+              Text(
+                "From template “\(template.name)”", bundle: .module,
+                comment: "A prompt template's name.")
+            }
+          }
           .font(.callout)
           .foregroundStyle(.secondary)
         }
         if session.initialPrompt.isEmpty {
-          InspectorPlaceholder("This session was started without a prompt.")
+          InspectorPlaceholder(
+            LocalizedStringResource(
+              "This session was started without a prompt.", bundle: .module))
         } else {
           // Folded by default: a prompt can be long, and the context of the session is what the
           // column is for. Unfolding it is one click, scrolling past it every time is not.
-          DisclosureGroup("Show prompt") {
+          DisclosureGroup {
             Text(session.initialPrompt)
               .font(.callout)
               .textSelection(.enabled)
               .padding(.top, 4)
+          } label: {
+            Text("Show prompt", bundle: .module)
           }
         }
+      } header: {
+        Text("Initial prompt", bundle: .module)
       }
     }
     .listStyle(.sidebar)
@@ -347,11 +379,14 @@ private struct GitPane: View {
           PlainFolderRow(path: folder) { git.revealRepository(folder) }
         }
         if let visited = branchReport?.visitedOnly, !visited.isEmpty {
-          Text("Also looked in: \(visited.joined(separator: ", "))")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
+          Text(
+            "Also looked in: \(visited.joined(separator: ", "))", bundle: .module,
+            comment: "A list of folders the agent visited that are not repositories."
+          )
+          .font(.caption)
+          .foregroundStyle(.tertiary)
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
         }
       } header: {
         header(groups)
@@ -373,11 +408,15 @@ private struct GitPane: View {
       // ⌘⇧R reveals the selected file. Present only with a selection, so the shortcut belongs to
       // no one the rest of the time.
       if isListFocused, let selected = git.selection(in: session.id) {
-        Button("Reveal in Finder") { git.reveal(selected) }
-          .keyboardShortcut("r", modifiers: [.command, .shift])
-          .opacity(0)
-          .frame(width: 0, height: 0)
-          .accessibilityHidden(true)
+        Button {
+          git.reveal(selected)
+        } label: {
+          Text("Reveal in Finder", bundle: .module)
+        }
+        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
       }
     }
   }
@@ -411,12 +450,17 @@ private struct GitPane: View {
   private func emptyOrLoading(_ pane: GitPanePresentation) -> some View {
     if let branchReport {
       if pane.groups.isEmpty {
-        Text(
-          !branchReport.hasTranscript
-            ? "No transcript of this session was found, so only what is attached can be shown."
-            : session.repositories.isEmpty
-              ? "No repository in this session yet." : "No repository worked in yet."
-        )
+        Group {
+          if !branchReport.hasTranscript {
+            Text(
+              "No transcript of this session was found, so only what is attached can be shown.",
+              bundle: .module)
+          } else if session.repositories.isEmpty {
+            Text("No repository in this session yet.", bundle: .module)
+          } else {
+            Text("No repository worked in yet.", bundle: .module)
+          }
+        }
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(nil)
@@ -425,27 +469,30 @@ private struct GitPane: View {
     } else if refresh != nil {
       HStack(spacing: 6) {
         ProgressView().controlSize(.small)
-        Text("Reading the repositories…")
+        Text("Reading the repositories…", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
       }
     } else {
       InspectorPlaceholder(
         session.repositories.isEmpty
-          ? "No repository in this session yet."
-          : "Git is not read in this window.")
+          ? LocalizedStringResource("No repository in this session yet.", bundle: .module)
+          : LocalizedStringResource("Git is not read in this window.", bundle: .module))
     }
   }
 
   private func header(_ groups: [RepositoryGroupPresentation]) -> some View {
     HStack(spacing: 6) {
-      Text("Git")
+      Text(verbatim: "Git")
       Spacer()
       if isLive(groups) {
         // Said only when it is true: every repository is watched and its last reading held.
-        Text("live")
-          .font(.caption2)
-          .foregroundStyle(.tertiary)
+        Text(
+          "live", bundle: .module,
+          comment: "Said of a Git list that follows the disk as it changes."
+        )
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
       } else if let branchReport {
         // The age is said, never implied: this is what was read, not a live view.
         TimelineView(.periodic(from: .now, by: 10)) { context in
@@ -457,8 +504,8 @@ private struct GitPane: View {
       if let refresh {
         Button(action: refresh) { Image(systemName: "arrow.clockwise") }
           .buttonStyle(.borderless)
-          .help("Read the repositories again")
-          .accessibilityLabel("Read the repositories again")
+          .help(Text("Read the repositories again", bundle: .module))
+          .accessibilityLabel(Text("Read the repositories again", bundle: .module))
       }
     }
   }
@@ -472,9 +519,18 @@ private struct GitPane: View {
 
 private func age(of date: Date, at now: Date) -> String {
   let seconds = max(0, Int(now.timeIntervalSince(date)))
-  if seconds < 10 { return "read just now" }
-  if seconds < 60 { return "read \(seconds / 10 * 10) s ago" }
-  return "read at \(date.formatted(date: .omitted, time: .shortened))"
+  if seconds < 10 {
+    return String(
+      localized: "read just now", bundle: .module, comment: "When the Git list was read.")
+  }
+  if seconds < 60 {
+    return String(
+      localized: "read \(seconds / 10 * 10) s ago", bundle: .module,
+      comment: "When the Git list was read: a number of seconds.")
+  }
+  return String(
+    localized: "read at \(date.formatted(date: .omitted, time: .shortened))", bundle: .module,
+    comment: "When the Git list was read: a time of day.")
 }
 
 /// One repository: its header, then its lists. Equatable on what it draws, so that a selection
@@ -521,14 +577,21 @@ private struct RepositoryGroupView: View, Equatable {
         IssueBannerView(banner: banner, actions: bannerActions)
       }
       if let asOf = group.asOf, group.hasChanges || group.committedCount > 0 {
-        Text("As of \(asOf.formatted(date: .omitted, time: .shortened))")
-          .font(.caption2)
-          .foregroundStyle(.tertiary)
+        Text(
+          "As of \(asOf.formatted(date: .omitted, time: .shortened))", bundle: .module,
+          comment: "The time of day the list shown was true."
+        )
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
       }
       if group.isUnreadable {
-        Button("Reveal in Finder") { git.revealRepository(group.repositoryPath) }
-          .buttonStyle(.link)
-          .font(.caption)
+        Button {
+          git.revealRepository(group.repositoryPath)
+        } label: {
+          Text("Reveal in Finder", bundle: .module)
+        }
+        .buttonStyle(.link)
+        .font(.caption)
       }
       ForEach(group.sections) { section in
         FileSectionView(
@@ -536,27 +599,44 @@ private struct RepositoryGroupView: View, Equatable {
       }
       if group.isTruncated {
         VStack(alignment: .leading, spacing: 2) {
-          Text("Only the first \(group.changeCount) changes are listed; the counts are exact.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
-          Button("Reveal in Finder") { git.revealRepository(group.repositoryPath) }
-            .buttonStyle(.link)
-            .font(.caption)
+          Text(
+            "Only the first \(group.changeCount) changes are listed; the counts are exact.",
+            bundle: .module
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
+          Button {
+            git.revealRepository(group.repositoryPath)
+          } label: {
+            Text("Reveal in Finder", bundle: .module)
+          }
+          .buttonStyle(.link)
+          .font(.caption)
         }
       }
     } label: {
       RepositoryHeader(group: group)
         .contextMenu {
-          Button("Reveal in Finder") { git.revealRepository(group.repositoryPath) }
+          Button {
+            git.revealRepository(group.repositoryPath)
+          } label: {
+            Text("Reveal in Finder", bundle: .module)
+          }
           if let editor = git.editorName {
-            Button("Open in \(editor)") {
+            Button {
               Task { await git.openRepository(group.repositoryPath) }
+            } label: {
+              Text("Open in \(editor)", bundle: .module, comment: "An editor's name: Xcode.")
             }
           }
           Divider()
-          Button("Copy Path") { git.copy(group.repositoryPath) }
+          Button {
+            git.copy(group.repositoryPath)
+          } label: {
+            Text("Copy Path", bundle: .module)
+          }
         }
     }
   }
@@ -640,14 +720,14 @@ private struct RepositoryHeader: View {
     if group.isLoading {
       ProgressView()
         .controlSize(.mini)
-        .accessibilityLabel("Reading")
+        .accessibilityLabel(Text("Reading", bundle: .module))
     } else if group.hasChanges {
-      Text(group.isTruncated ? "\(group.changeCount)+" : "\(group.changeCount)")
+      Text(verbatim: group.isTruncated ? "\(group.changeCount)+" : "\(group.changeCount)")
         .font(.caption.monospacedDigit().weight(.semibold))
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .background(Capsule().fill(Color.secondary.opacity(0.18)))
-        .help("\(group.changeCount) changed entries")
+        .help(Text("\(group.changeCount) changed entries", bundle: .module))
     }
   }
 }
@@ -674,17 +754,25 @@ private struct FileSectionView: View {
         }
       }
       if let total = section.totalCount, total > section.rows.count, section.rows.count <= limit {
-        Text("and \(total - section.rows.count) more, not listed")
+        Text("and \(total - section.rows.count) more, not listed", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
       }
       if section.rows.count > limit {
         HStack(spacing: 10) {
-          Button("Show \(min(GitInspectorModel.pageSize, section.rows.count - limit)) More") {
+          Button {
             git.showMore(section.id, in: session)
+          } label: {
+            Text(
+              "Show \(min(GitInspectorModel.pageSize, section.rows.count - limit)) More",
+              bundle: .module)
           }
-          Button("Show All (\(section.rows.count))") {
+          Button {
             git.showAll(section.id, in: session)
+          } label: {
+            Text(
+              "Show All (\(section.rows.count))", bundle: .module,
+              comment: "Shows every file of a list: their number.")
           }
         }
         .buttonStyle(.link)
@@ -695,15 +783,18 @@ private struct FileSectionView: View {
         Text(section.column.title)
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
-        Text("\(section.totalCount ?? section.rows.count)")
+        Text(verbatim: "\(section.totalCount ?? section.rows.count)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(.tertiary)
       }
       .help(section.help ?? "")
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(
-        ["\(section.column.title), \(section.totalCount ?? section.rows.count)", section.help]
-          .compactMap { $0 }.joined(separator: ", "))
+        [
+          "\(String(localized: section.column.title)), \(section.totalCount ?? section.rows.count)",
+          section.help,
+        ]
+        .compactMap { $0 }.joined(separator: ", "))
     }
   }
 
@@ -741,7 +832,7 @@ private struct DirectoryContents: View {
             child: child))
       }
       if listing.isTruncated {
-        Text("and \(listing.totalCount - listing.paths.count) more")
+        Text("and \(listing.totalCount - listing.paths.count) more", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
           .padding(.leading, 14)
@@ -754,7 +845,7 @@ private struct DirectoryContents: View {
     case .loading, nil:
       HStack(spacing: 6) {
         ProgressView().controlSize(.mini)
-        Text("Reading…")
+        Text("Reading…", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
       }
@@ -787,7 +878,7 @@ private struct FileRowView: View {
             .lineLimit(1)
             .truncationMode(.middle)
           if let renamedFrom = row.renamedFrom {
-            Text("← \(renamedFrom)")
+            Text(verbatim: "← \(renamedFrom)")
               .font(.caption)
               .foregroundStyle(.secondary)
               .lineLimit(1)
@@ -816,9 +907,13 @@ private struct FileRowView: View {
         }
         .buttonStyle(.borderless)
         .help(
-          directory.isExpanded ? "Hide the files of this folder" : "Show the files of this folder"
+          directory.isExpanded
+            ? Text("Hide the files of this folder", bundle: .module)
+            : Text("Show the files of this folder", bundle: .module)
         )
-        .accessibilityLabel(directory.isExpanded ? "Hide files" : "Show files")
+        .accessibilityLabel(
+          directory.isExpanded
+            ? Text("Hide files", bundle: .module) : Text("Show files", bundle: .module))
       }
     }
     .opacity(isStale ? 0.6 : 1)
@@ -835,18 +930,40 @@ private struct FileRowMenu: View {
 
   var body: some View {
     let isOnDisk = row?.isOnDisk ?? true
-    Button(isOnDisk ? "Reveal in Finder" : "Reveal Folder in Finder") { git.reveal(id) }
-    if let editor = git.editorName {
-      Button("Open in \(editor)") { Task { await git.activate(id) } }
-        .disabled(!isOnDisk || row?.isDirectory == true)
+    Button {
+      git.reveal(id)
+    } label: {
+      if isOnDisk {
+        Text("Reveal in Finder", bundle: .module)
+      } else {
+        Text("Reveal Folder in Finder", bundle: .module)
+      }
     }
-    Button("Open with Default Application") {
+    if let editor = git.editorName {
+      Button {
+        Task { await git.activate(id) }
+      } label: {
+        Text("Open in \(editor)", bundle: .module, comment: "An editor's name: Xcode.")
+      }
+      .disabled(!isOnDisk || row?.isDirectory == true)
+    }
+    Button {
       Task { await git.openWithDefaultApplication(id) }
+    } label: {
+      Text("Open with Default Application", bundle: .module)
     }
     .disabled(!isOnDisk || row?.isDirectory == true)
     Divider()
-    Button("Copy Path") { git.copyPath(id, relative: false) }
-    Button("Copy Relative Path") { git.copyPath(id, relative: true) }
+    Button {
+      git.copyPath(id, relative: false)
+    } label: {
+      Text("Copy Path", bundle: .module)
+    }
+    Button {
+      git.copyPath(id, relative: true)
+    } label: {
+      Text("Copy Relative Path", bundle: .module)
+    }
   }
 }
 
@@ -858,14 +975,19 @@ private struct PlainFolderRow: View {
     VStack(alignment: .leading, spacing: 2) {
       Label((path as NSString).lastPathComponent, systemImage: "folder")
         .lineLimit(1)
-      Text("Not a Git repository. The repositories the agent works in inside it appear above.")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(nil)
-        .fixedSize(horizontal: false, vertical: true)
+      Text(
+        "Not a Git repository. The repositories the agent works in inside it appear above.",
+        bundle: .module
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .lineLimit(nil)
+      .fixedSize(horizontal: false, vertical: true)
     }
     .help(path)
-    .contextMenu { Button("Reveal in Finder", action: reveal) }
+    .contextMenu {
+      Button(action: reveal) { Text("Reveal in Finder", bundle: .module) }
+    }
     .accessibilityElement(children: .combine)
   }
 }
@@ -906,9 +1028,13 @@ private struct IssueBannerView: View {
               .textSelection(.enabled)
               .lineLimit(nil)
               .fixedSize(horizontal: false, vertical: true)
-            Button("Copy") { actions.copy(command) }
-              .buttonStyle(.link)
-              .font(.caption2)
+            Button {
+              actions.copy(command)
+            } label: {
+              Text("Copy", bundle: .module, comment: "Copies a command line.")
+            }
+            .buttonStyle(.link)
+            .font(.caption2)
           }
         }
         action
@@ -922,19 +1048,27 @@ private struct IssueBannerView: View {
     switch banner.action {
     case .refresh:
       if let refresh = actions.refresh {
-        Button("Refresh", action: refresh)
-          .buttonStyle(.link)
-          .font(.caption)
-      }
-    case .revealParent(let folder):
-      Button("Reveal Parent Folder") { actions.reveal(folder) }
+        Button(action: refresh) {
+          Text("Refresh", bundle: .module, comment: "Reads the repository again.")
+        }
         .buttonStyle(.link)
         .font(.caption)
+      }
+    case .revealParent(let folder):
+      Button {
+        actions.reveal(folder)
+      } label: {
+        Text("Reveal Parent Folder", bundle: .module)
+      }
+      .buttonStyle(.link)
+      .font(.caption)
     case .openPrivacySettings:
       if let open = actions.openPrivacySettings {
-        Button("Open Privacy Settings", action: open)
-          .buttonStyle(.link)
-          .font(.caption)
+        Button(action: open) {
+          Text("Open Privacy Settings", bundle: .module)
+        }
+        .buttonStyle(.link)
+        .font(.caption)
       }
     }
   }
@@ -997,8 +1131,12 @@ private struct AgentRow: View {
         Label(AgentHistoryList.label(agent, names: names), systemImage: "cpu")
           .lineLimit(1)
       } else {
-        Label("No agent recorded", systemImage: "cpu")
-          .lineLimit(1)
+        Label {
+          Text("No agent recorded", bundle: .module)
+        } icon: {
+          Image(systemName: "cpu")
+        }
+        .lineLimit(1)
       }
 
       Text(statusSentence)
@@ -1012,15 +1150,17 @@ private struct AgentRow: View {
   private var statusSentence: String {
     switch resolution {
     case .ready:
-      return "Ready to resume."
+      return String(localized: "Ready to resume.", bundle: .module)
     case .unavailable(let diagnostic):
       return diagnostic.summary
     case .unknownProvider(let providerID):
-      return "The provider \(providerID) is not installed in this build."
+      return String(
+        localized: "The provider \(providerID) is not installed in this build.", bundle: .module,
+        comment: "An agent's identifier: claude-code, codex.")
     case .unassigned:
-      return "This session was stored without an agent."
+      return String(localized: "This session was stored without an agent.", bundle: .module)
     case .none:
-      return "Detection has not answered yet."
+      return String(localized: "Detection has not answered yet.", bundle: .module)
     }
   }
 }
@@ -1033,7 +1173,7 @@ private struct AgentHistoryList: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text("History")
+      Text("History", bundle: .module, comment: "The agents a session had, heading.")
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
       ForEach(session.agentHistory.reversed()) { change in
@@ -1042,10 +1182,16 @@ private struct AgentHistoryList: View {
       if let first = firstAgent, let start = session.startedAt {
         row(
           date: start,
-          text: "Started with \(Self.label(first, names: names))",
+          text: String(
+            localized: "Started with \(Self.label(first, names: names))", bundle: .module,
+            comment: "The agent a session first ran: its name, and its model."),
           detail: nil,
           failed: false,
-          spoken: "\(Self.spoken(start)), started with \(Self.label(first, names: names))"
+          spoken: String(
+            localized:
+              "\(Self.spoken(start)), started with \(Self.label(first, names: names))",
+            bundle: .module,
+            comment: "What VoiceOver says of a session's start: a date, then its first agent.")
         )
       }
     }
@@ -1064,7 +1210,11 @@ private struct AgentHistoryList: View {
     // Another model of the same agent names the model alone: the agent is already on the line.
     let to =
       change.changesProvider
-      ? Self.label(change.next, names: names) : (change.next.modelID ?? "default model")
+      ? Self.label(change.next, names: names)
+      : (change.next.modelID
+        ?? String(
+          localized: "default model", bundle: .module,
+          comment: "Stands for the model an agent uses when none is chosen."))
     switch change.outcome {
     case .completed:
       row(
@@ -1072,16 +1222,26 @@ private struct AgentHistoryList: View {
         text: "\(from) → \(to)",
         detail: Self.handover(change.handover),
         failed: false,
-        spoken: "\(Self.spoken(change.date)), switched from \(from) to \(to), "
-          + Self.handover(change.handover)
+        spoken: String(
+          localized:
+            "\(Self.spoken(change.date)), switched from \(from) to \(to), \(Self.handover(change.handover))",
+          bundle: .module,
+          comment:
+            "What VoiceOver says of an agent switch: a date, the agent left, the agent taken, and what was handed over."
+        )
       )
     case .failed(let reason):
       row(
         date: change.date,
-        text: "→ \(to) failed",
+        text: String(
+          localized: "→ \(to) failed", bundle: .module,
+          comment: "A switch to this agent that failed."),
         detail: reason.isEmpty ? nil : reason,
         failed: true,
-        spoken: "\(Self.spoken(change.date)), switch to \(to) failed. \(reason)"
+        spoken: String(
+          localized: "\(Self.spoken(change.date)), switch to \(to) failed. \(reason)",
+          bundle: .module,
+          comment: "What VoiceOver says of a failed agent switch: a date, the agent, and why.")
       )
     }
   }
@@ -1121,14 +1281,26 @@ private struct AgentHistoryList: View {
   static func handover(_ handover: AgentChange.Handover) -> String {
     switch handover {
     case .resumedConversation:
-      return "same conversation"
+      return String(
+        localized: "same conversation", bundle: .module,
+        comment: "What an agent switch handed over: the conversation was resumed.")
     case .summary(let bytes, _, let wasEdited):
       let size = AgentSwitchSheet.size(bytes)
-      return wasEdited ? "edited summary, \(size)" : "summary, \(size)"
+      return wasEdited
+        ? String(
+          localized: "edited summary, \(size)", bundle: .module,
+          comment: "What an agent switch handed over: a size, “1.2 KiB”.")
+        : String(
+          localized: "summary, \(size)", bundle: .module,
+          comment: "What an agent switch handed over: a size, “1.2 KiB”.")
     case .initialPrompt:
-      return "initial prompt"
+      return String(
+        localized: "initial prompt", bundle: .module,
+        comment: "What an agent switch handed over.")
     case .nothing:
-      return "nothing handed over"
+      return String(
+        localized: "nothing handed over", bundle: .module,
+        comment: "What an agent switch handed over.")
     }
   }
 
@@ -1138,9 +1310,9 @@ private struct AgentHistoryList: View {
 }
 
 private struct InspectorPlaceholder: View {
-  private let text: String
+  private let text: LocalizedStringResource
 
-  init(_ text: String) {
+  init(_ text: LocalizedStringResource) {
     self.text = text
   }
 

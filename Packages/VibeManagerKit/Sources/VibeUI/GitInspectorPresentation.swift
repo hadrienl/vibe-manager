@@ -11,13 +11,44 @@ enum ChangeColumn: Int, CaseIterable, Hashable, Sendable, Comparable {
   case untracked
   case committed
 
-  var title: String {
+  var title: LocalizedStringResource {
     switch self {
-    case .conflicts: return "Conflicts"
-    case .staged: return "Staged"
-    case .unstaged: return "Unstaged"
-    case .untracked: return "Untracked"
-    case .committed: return "Committed"
+    case .conflicts:
+      return LocalizedStringResource(
+        "Conflicts", bundle: .module, comment: "A list of the Git inspector: conflicted files.")
+    case .staged:
+      return LocalizedStringResource(
+        "Staged", bundle: .module, comment: "A list of the Git inspector: staged files.")
+    case .unstaged:
+      return LocalizedStringResource(
+        "Unstaged", bundle: .module, comment: "A list of the Git inspector: unstaged files.")
+    case .untracked:
+      return LocalizedStringResource(
+        "Untracked", bundle: .module, comment: "A list of the Git inspector: untracked files.")
+    case .committed:
+      return LocalizedStringResource(
+        "Committed", bundle: .module,
+        comment: "A list of the Git inspector: files the branch committed.")
+    }
+  }
+
+  /// "staged: modified", what VoiceOver says of a file's change in this list.
+  func spoken(_ change: String) -> String {
+    switch self {
+    case .conflicts, .untracked:
+      return change
+    case .staged:
+      return String(
+        localized: "staged: \(change)", bundle: .module,
+        comment: "A file's change in the staged list: “modified”.")
+    case .unstaged:
+      return String(
+        localized: "unstaged: \(change)", bundle: .module,
+        comment: "A file's change in the unstaged list: “modified”.")
+    case .committed:
+      return String(
+        localized: "committed: \(change)", bundle: .module,
+        comment: "A file's change in the list of what the branch committed: “modified”.")
     }
   }
 
@@ -97,7 +128,14 @@ struct FileRow: Equatable, Identifiable, Sendable {
   let isOnDisk: Bool
   let isDirectory: Bool
   let isSubmodule: Bool
-  let accessibilityLabel: String
+
+  /// What VoiceOver says of the row. Computed when asked, not with the list: thousands of rows
+  /// are built for the few on screen.
+  var accessibilityLabel: String {
+    Self.label(
+      name: name, directory: directory, column: id.column, change: change,
+      renamedFrom: renamedFrom, isAttributed: isAttributed)
+  }
 
   /// The row's full path, relative to the root, for its tooltip.
   var help: String {
@@ -108,8 +146,12 @@ struct FileRow: Equatable, Identifiable, Sendable {
     return text
   }
 
-  static let unattributedHelp =
-    "Not in this session's transcript: changed by a shell command, another session, or you."
+  static var unattributedHelp: String {
+    String(
+      localized:
+        "Not in this session's transcript: changed by a shell command, another session, or you.",
+      bundle: .module)
+  }
 }
 
 struct FileSection: Equatable, Identifiable, Sendable {
@@ -134,11 +176,20 @@ enum BranchLine: Equatable, Sendable {
   var text: String {
     switch self {
     case .named(let name): return name
-    case .detached(let revision?): return "detached at \(revision.prefix(7))"
-    case .detached(nil): return "detached HEAD"
-    case .unborn(let name?): return "\(name), no commits yet"
-    case .unborn(nil): return "no commits yet"
-    case .unknown: return "No branch"
+    case .detached(let revision?):
+      return String(
+        localized: "detached at \(String(revision.prefix(7)))", bundle: .module,
+        comment: "A detached HEAD: the abbreviated commit it points at.")
+    case .detached(nil):
+      return String(localized: "detached HEAD", bundle: .module)
+    case .unborn(let name?):
+      return String(
+        localized: "\(name), no commits yet", bundle: .module,
+        comment: "A branch's name, before its first commit.")
+    case .unborn(nil):
+      return String(localized: "no commits yet", bundle: .module)
+    case .unknown:
+      return String(localized: "No branch", bundle: .module)
     }
   }
 }
@@ -222,9 +273,16 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
   }
 
   var accessibilityLabel: String {
-    var parts = ["Repository \(title)"]
+    var parts = [
+      String(
+        localized: "Repository \(title)", bundle: .module,
+        comment: "What VoiceOver says first of a repository: its name.")
+    ]
     if let worktree { parts.append(worktree) }
-    parts.append("branch \(branch.text)")
+    parts.append(
+      String(
+        localized: "branch \(branch.text)", bundle: .module,
+        comment: "What VoiceOver says of a repository's branch: its name."))
     if let distance { parts.append(distance) }
     if let operation { parts.append(operation) }
     parts.append(summary)
@@ -261,32 +319,57 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
       let ahead = branch.ahead ?? 0
       let behind = branch.behind ?? 0
       var parts: [String] = []
-      if ahead > 0 { parts.append("\(ahead) ahead") }
-      if behind > 0 { parts.append("\(behind) behind") }
-      distance = parts.isEmpty ? nil : parts.joined(separator: ", ") + " " + upstream
+      if ahead > 0 { parts.append(RepositoryStatusPresentation.ahead(ahead)) }
+      if behind > 0 { parts.append(RepositoryStatusPresentation.behind(behind)) }
+      distance =
+        parts.isEmpty
+        ? nil
+        : String(
+          localized: "inspector.distance",
+          defaultValue: "\(parts.joined(separator: ", ")) \(upstream)", bundle: .module,
+          comment: "How far a branch is from its upstream: “2 ahead, 1 behind”, then the upstream.")
       var arrows: [String] = []
       if ahead > 0 { arrows.append("↑\(ahead)") }
       if behind > 0 { arrows.append("↓\(behind)") }
       self.arrows = arrows.isEmpty ? nil : arrows.joined(separator: " ")
-      distanceHelp = "Compared with \(upstream), as last fetched: nothing is fetched here."
+      distanceHelp = String(
+        localized: "Compared with \(upstream), as last fetched: nothing is fetched here.",
+        bundle: .module, comment: "The upstream branch: origin/main.")
     } else {
       distance = nil
       arrows = nil
-      distanceHelp = "No upstream branch."
+      distanceHelp = String(localized: "No upstream branch.", bundle: .module)
     }
 
     var pills: [Pill] = []
     if report.isUnreadable {
-      pills.append(Pill(label: "unreadable", tone: .unreadable))
+      pills.append(
+        Pill(
+          label: String(
+            localized: "unreadable", bundle: .module,
+            comment: "A repository whose state could not be read."),
+          tone: .unreadable))
     } else if let change = report.change {
-      if change.kind == .created { pills.append(Pill(label: "new", tone: .new)) }
+      if change.kind == .created {
+        pills.append(
+          Pill(
+            label: String(
+              localized: "new", bundle: .module,
+              comment: "A branch the session created."),
+            tone: .new))
+      }
       switch change.kind {
       case .created, .advanced:
         if let count = change.commitCount, count > 0 {
           pills.append(Pill(label: "+\(count)", tone: .advanced))
         }
       case .rewritten:
-        pills.append(Pill(label: "rewritten", tone: .rewritten))
+        pills.append(
+          Pill(
+            label: String(
+              localized: "rewritten", bundle: .module,
+              comment: "A branch whose history the session rewrote."),
+            tone: .rewritten))
       }
     }
     self.pills = pills
@@ -304,16 +387,21 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
         if unattributed > 0, !status.isTruncated {
           details.append(
             unattributed == state.entries.count
-              ? "None in this session's transcript"
-              : "\(unattributed) not in this session's transcript")
+              ? String(localized: "None in this session's transcript", bundle: .module)
+              : String(
+                localized: "\(unattributed) not in this session's transcript", bundle: .module
+              ))
         }
       } else {
         summary = presentation.summary
       }
       // The distance and the operation have their own place in the header.
-      self.details = details + presentation.details.filter { $0.hasPrefix("Shared with") }
+      self.details = details + [presentation.sharedWith].compactMap { $0 }
     } else {
-      summary = report.isUnreadable ? "This repository could not be read." : "Not read yet"
+      summary =
+        report.isUnreadable
+        ? String(localized: "This repository could not be read.", bundle: .module)
+        : RepositoryStatusPresentation.notReadYet
       details = []
     }
 
@@ -350,10 +438,19 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
   static func summary(of status: WorkingTreeStatus) -> String {
     let summary = RepositoryStatusPresentation.summary(of: status, unattributed: 0)
     guard let committed = status.committed, committed.totalCount > 0 else { return summary }
-    let files = committed.totalCount == 1 ? "1 file" : "\(committed.totalCount) files"
-    let sentence = "\(files) committed since \(committed.base)"
-    return status.isClean ? "Working tree clean — \(sentence)" : "\(summary) · \(sentence)"
+    let sentence = String(
+      localized: "\(committed.totalCount) files committed since \(committed.base)",
+      bundle: .module, comment: "A number of files, then the branch they are compared with.")
+    return status.isClean
+      ? String(
+        localized: "Working tree clean — \(sentence)", bundle: .module,
+        comment: "Followed by “3 files committed since origin/main”.")
+      : "\(summary) · \(sentence)"
   }
+
+  static var untracked: String { Words.untracked }
+
+  static var untrackedFolder: String { Words.untrackedFolder }
 
   /// The files the branch committed, as one list: attributed like the others, since a branch may
   /// carry commits from before the session.
@@ -362,11 +459,15 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
   ) -> FileSection? {
     guard !files.isEmpty else { return nil }
     let rows = files.map { FileRow(repositoryPath: repositoryPath, committed: $0) }
-    let commits = committed.commitCount == 1 ? "1 commit" : "\(committed.commitCount) commits"
     return FileSection(
       id: GitSectionID(repositoryPath: repositoryPath, column: .committed),
       rows: rows,
-      help: "\(commits) since \(committed.base) (merge base \(committed.mergeBase.prefix(7)))",
+      help: String(
+        localized:
+          "\(committed.commitCount) commits since \(committed.base) (merge base \(String(committed.mergeBase.prefix(7))))",
+        bundle: .module,
+        comment:
+          "A number of commits, the branch they are compared with, and an abbreviated commit."),
       totalCount: committed.totalCount)
   }
 
@@ -388,7 +489,7 @@ struct RepositoryGroupPresentation: Equatable, Identifiable, Sendable {
           FileRow(
             repositoryPath: repositoryPath, column: .untracked, entry: attributed, letter: "?",
             tone: .untracked,
-            change: entry.kind == .untrackedDirectory ? "untracked folder" : "untracked",
+            change: entry.kind == .untrackedDirectory ? Self.untrackedFolder : Self.untracked,
             isOnDisk: true))
       case .tracked(let staged, let unstaged):
         if let staged {
@@ -436,10 +537,27 @@ extension FileRow {
     var sentence = change.sentence
     if let submodule {
       var parts: [String] = []
-      if submodule.contains(.commitChanged) { parts.append("commit changed") }
-      if submodule.contains(.trackedChanges) { parts.append("modified content") }
-      if submodule.contains(.untrackedChanges) { parts.append("untracked content") }
-      sentence = (["submodule"] + (parts.isEmpty ? [sentence] : parts)).joined(separator: ", ")
+      if submodule.contains(.commitChanged) {
+        parts.append(
+          String(
+            localized: "commit changed", bundle: .module,
+            comment: "A submodule's change: it points at another commit."))
+      }
+      if submodule.contains(.trackedChanges) {
+        parts.append(
+          String(
+            localized: "modified content", bundle: .module,
+            comment: "A submodule's change: its files were modified."))
+      }
+      if submodule.contains(.untrackedChanges) {
+        parts.append(
+          String(
+            localized: "untracked content", bundle: .module,
+            comment: "A submodule's change: it holds untracked files."))
+      }
+      let submoduleWord = String(
+        localized: "submodule", bundle: .module, comment: "A Git submodule, before its changes.")
+      sentence = ([submoduleWord] + (parts.isEmpty ? [sentence] : parts)).joined(separator: ", ")
     }
     self.init(
       repositoryPath: repositoryPath, column: column, entry: entry, letter: letter, tone: tone,
@@ -466,10 +584,7 @@ extension FileRow {
       isAttributed: entry.touchedByAgent,
       isOnDisk: isOnDisk,
       isDirectory: isDirectory,
-      isSubmodule: isSubmodule,
-      accessibilityLabel: Self.label(
-        name: name, directory: directory, column: column, change: change,
-        renamedFrom: renamedFrom, isAttributed: entry.touchedByAgent)
+      isSubmodule: isSubmodule
     )
   }
 
@@ -489,10 +604,7 @@ extension FileRow {
       isAttributed: committed.touchedByAgent,
       isOnDisk: file.change != .deleted,
       isDirectory: false,
-      isSubmodule: false,
-      accessibilityLabel: Self.label(
-        name: name, directory: directory, column: .committed, change: sentence,
-        renamedFrom: renamedFrom, isAttributed: committed.touchedByAgent)
+      isSubmodule: false
     )
   }
 
@@ -507,15 +619,12 @@ extension FileRow {
       name: name,
       directory: directory,
       renamedFrom: nil,
-      change: "untracked",
+      change: RepositoryGroupPresentation.untracked,
       // Attribution is the folder's: the transcript is not asked file by file.
       isAttributed: true,
       isOnDisk: true,
       isDirectory: child.hasSuffix("/"),
-      isSubmodule: false,
-      accessibilityLabel: Self.label(
-        name: name, directory: directory, column: .untracked, change: "untracked",
-        renamedFrom: nil, isAttributed: true)
+      isSubmodule: false
     )
   }
 
@@ -537,12 +646,22 @@ extension FileRow {
     renamedFrom: String?, isAttributed: Bool
   ) -> String {
     var parts = [name]
-    if let directory { parts.append("in \(directory)") }
-    if let renamedFrom { parts.append("from \(renamedFrom)") }
-    parts.append(
-      column == .untracked || column == .conflicts
-        ? change : "\(column.title.lowercased()): \(change)")
-    if !isAttributed { parts.append("not in this session's transcript") }
+    if let directory {
+      parts.append(
+        String(
+          localized: "in \(directory)", bundle: .module,
+          comment: "What VoiceOver says of a file's folder: its path."))
+    }
+    if let renamedFrom {
+      parts.append(
+        String(
+          localized: "from \(renamedFrom)", bundle: .module,
+          comment: "What VoiceOver says of a renamed file: the path it had."))
+    }
+    parts.append(column.spoken(change))
+    if !isAttributed {
+      parts.append(String(localized: "not in this session's transcript", bundle: .module))
+    }
     return parts.joined(separator: ", ")
   }
 }
@@ -571,12 +690,18 @@ extension FileChange {
 
   fileprivate var sentence: String {
     switch self {
-    case .added: return "added"
-    case .modified: return "modified"
-    case .deleted: return "deleted"
-    case .typeChanged: return "type changed"
-    case .renamed(_, let similarity): return "renamed, \(similarity) % similar"
-    case .copied(_, let similarity): return "copied, \(similarity) % similar"
+    case .added: return Words.added
+    case .modified: return Words.modified
+    case .deleted: return Words.deleted
+    case .typeChanged: return Words.typeChanged
+    case .renamed(_, let similarity):
+      return String(
+        localized: "renamed, \(similarity) % similar", bundle: .module,
+        comment: "A file's change: how much of it is unchanged, in percent.")
+    case .copied(_, let similarity):
+      return String(
+        localized: "copied, \(similarity) % similar", bundle: .module,
+        comment: "A file's change: how much of it is unchanged, in percent.")
     }
   }
 
@@ -607,13 +732,20 @@ extension ConflictKind {
 
   var sentence: String {
     switch self {
-    case .bothModified: return "conflict: both modified"
-    case .bothAdded: return "conflict: both added"
-    case .bothDeleted: return "conflict: both deleted"
-    case .addedByUs: return "conflict: added by us"
-    case .addedByThem: return "conflict: added by them"
-    case .deletedByUs: return "conflict: deleted by us"
-    case .deletedByThem: return "conflict: deleted by them"
+    case .bothModified:
+      return String(localized: "conflict: both modified", bundle: .module)
+    case .bothAdded:
+      return String(localized: "conflict: both added", bundle: .module)
+    case .bothDeleted:
+      return String(localized: "conflict: both deleted", bundle: .module)
+    case .addedByUs:
+      return String(localized: "conflict: added by us", bundle: .module)
+    case .addedByThem:
+      return String(localized: "conflict: added by them", bundle: .module)
+    case .deletedByUs:
+      return String(localized: "conflict: deleted by us", bundle: .module)
+    case .deletedByThem:
+      return String(localized: "conflict: deleted by them", bundle: .module)
     }
   }
 
@@ -636,7 +768,8 @@ struct GitPanePresentation: Equatable, Sendable {
     let read = groups.filter { !$0.isLoading && $0.banner == nil && !$0.isUnreadable }
     allClean =
       groups.count > 1 && read.count == groups.count && groups.allSatisfy { !$0.hasChanges }
-      ? "Nothing to commit in \(groups.count) repositories" : nil
+      ? String(localized: "Nothing to commit in \(groups.count) repositories", bundle: .module)
+      : nil
 
     let issues = groups.compactMap(\.issue)
     if groups.count > 1, issues.count == groups.count,
@@ -658,4 +791,20 @@ struct GitPanePresentation: Equatable, Sendable {
       return !roots.contains { canonical == $0 || canonical.hasPrefix($0 + "/") }
     }
   }
+}
+
+/// The words every row repeats, looked up once: a list of thousands of files would otherwise look
+/// each of them up thousands of times. The language does not change while the application runs.
+private enum Words {
+  static let added = String(localized: "added", bundle: .module, comment: "A file's change.")
+  static let modified = String(localized: "modified", bundle: .module, comment: "A file's change.")
+  static let deleted = String(localized: "deleted", bundle: .module, comment: "A file's change.")
+  static let typeChanged = String(
+    localized: "type changed", bundle: .module,
+    comment: "A file's change: a file became a link, or the reverse.")
+  static let untracked = String(
+    localized: "untracked", bundle: .module, comment: "A file's change: Git does not track it.")
+  static let untrackedFolder = String(
+    localized: "untracked folder", bundle: .module,
+    comment: "A folder's change: Git tracks nothing in it.")
 }

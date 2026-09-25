@@ -223,7 +223,7 @@ struct SessionNotesSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(alignment: .firstTextBaseline) {
-        Text("Notes")
+        Text("Notes", bundle: .module, comment: "The heading of a session's notes.")
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(.secondary)
           .accessibilityAddTraits(.isHeader)
@@ -237,20 +237,25 @@ struct SessionNotesSection: View {
         SessionNotesEditor(
           document: document,
           isEditable: document.isLoaded,
-          label: "Notes for \(session.name)",
+          label: String(
+            localized: "Notes for \(session.name)", bundle: .module,
+            comment: "What VoiceOver calls the notes editor: the session's name."),
           wantsFocus: notes.wantsFocus,
           focusTaken: { notes.focusTaken() },
           openLink: { notes.openLink($0) },
           leave: leave
         )
         if document.isLoaded, document.byteCount == 0 {
-          Text("Decisions, links, what to check next — saved automatically.")
-            .font(.callout)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+          Text(
+            "Decisions, links, what to check next — saved automatically.", bundle: .module,
+            comment: "The placeholder of empty notes."
+          )
+          .font(.callout)
+          .foregroundStyle(.tertiary)
+          .padding(.horizontal, 9)
+          .padding(.vertical, 6)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
         }
         if case .unreadable(let reason) = document.state {
           NotesUnreadable(
@@ -278,8 +283,11 @@ enum NotesFooter {
   static func text(refusal: String?, byteCount: Int) -> String? {
     if let refusal { return refusal }
     guard byteCount >= SessionNotesLimits.warningByteCount else { return nil }
-    return
-      "\(SessionNotesError.size(byteCount)) of \(SessionNotesError.size(SessionNotesLimits.byteLimit))"
+    return String(
+      localized: "notes.footer.size",
+      defaultValue:
+        "\(SessionNotesError.size(byteCount)) of \(SessionNotesError.size(SessionNotesLimits.byteLimit))",
+      bundle: .module, comment: "How much the notes weigh, of their limit: “58 KB of 64 KB”.")
   }
 }
 
@@ -297,22 +305,32 @@ struct NotesStateLabel: View {
         Button {
           isShowingFailure = true
         } label: {
-          Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
-            .foregroundStyle(.orange)
+          Label {
+            if let title = presentation.title { Text(title) }
+          } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+          }
+          .foregroundStyle(.orange)
         }
         .buttonStyle(.borderless)
         .popover(isPresented: $isShowingFailure) {
           NotesFailureDetail(document: document)
         }
       } else if presentation.isUnreadable {
-        Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
-          .foregroundStyle(.orange)
+        Label {
+          if let title = presentation.title { Text(title) }
+        } icon: {
+          Image(systemName: "exclamationmark.triangle.fill")
+        }
+        .foregroundStyle(.orange)
       } else if case .loading = document.state {
         if showsLoading { ProgressView().controlSize(.mini) }
       } else {
-        Text(presentation.title)
-          .foregroundStyle(.secondary)
-          .help(presentation.help ?? "")
+        if let title = presentation.title {
+          Text(title)
+            .foregroundStyle(.secondary)
+            .help(presentation.help ?? "")
+        }
       }
     }
     .font(.caption)
@@ -345,7 +363,8 @@ struct NotesStateLabel: View {
 
 /// What the header says of a state. Pure, so every wording is tested without a view.
 struct NotesStatePresentation: Equatable {
-  let title: String
+  /// `nil` when there is nothing to say: loading, or never written.
+  let title: LocalizedStringResource?
   let help: String?
   let accessibilityLabel: String
   let isFailure: Bool
@@ -357,30 +376,40 @@ struct NotesStatePresentation: Equatable {
     var isUnreadable = false
     switch state {
     case .loading:
-      title = ""
-      accessibilityLabel = "Loading notes"
+      title = nil
+      accessibilityLabel = String(localized: "Loading notes", bundle: .module)
     case .saved(nil):
       // Never written: there is nothing to report as saved.
-      title = ""
-      accessibilityLabel = "No notes yet"
+      title = nil
+      accessibilityLabel = String(localized: "No notes yet", bundle: .module)
     case .saved(let date?):
-      title = "Saved"
-      help = "Saved at \(Self.time(date))"
-      accessibilityLabel = "Notes saved"
+      title = Self.saved
+      help = String(
+        localized: "Saved at \(Self.time(date))", bundle: .module,
+        comment: "When the notes were last saved: a time of day.")
+      accessibilityLabel = String(localized: "Notes saved", bundle: .module)
     case .edited:
-      title = "Edited"
-      help = "Saved a moment after you stop typing"
-      accessibilityLabel = "Notes edited, not yet saved"
+      title = Self.edited
+      help = String(localized: "Saved a moment after you stop typing", bundle: .module)
+      accessibilityLabel = String(localized: "Notes edited, not yet saved", bundle: .module)
     case .saving:
-      title = showsSaving ? "Saving…" : "Edited"
-      accessibilityLabel = "Saving notes"
+      title =
+        showsSaving
+        ? LocalizedStringResource(
+          "Saving…", bundle: .module, comment: "The state of a session's notes.")
+        : Self.edited
+      accessibilityLabel = String(localized: "Saving notes", bundle: .module)
     case .failed(let error, _):
-      title = "Not saved"
-      accessibilityLabel = "Notes not saved: \(Self.sentence(error))"
+      title = LocalizedStringResource(
+        "Not saved", bundle: .module, comment: "The state of a session's notes.")
+      accessibilityLabel = Self.notSaved(error)
       isFailure = true
     case .unreadable(let reason):
-      title = "Unreadable"
-      accessibilityLabel = "Notes unreadable: \(reason)"
+      title = LocalizedStringResource(
+        "Unreadable", bundle: .module, comment: "The state of a session's notes.")
+      accessibilityLabel = String(
+        localized: "Notes unreadable: \(reason)", bundle: .module,
+        comment: "Why the notes could not be read.")
       isUnreadable = true
     }
     self.help = help
@@ -394,9 +423,9 @@ struct NotesStatePresentation: Equatable {
     case (.failed, .failed):
       return nil
     case (_, .failed(let error, _)):
-      return "Notes not saved: \(sentence(error))"
+      return notSaved(error)
     case (.failed, .saved):
-      return "Notes saved"
+      return String(localized: "Notes saved", bundle: .module)
     default:
       return nil
     }
@@ -411,6 +440,21 @@ struct NotesStatePresentation: Equatable {
     }
   }
 
+  private static var saved: LocalizedStringResource {
+    LocalizedStringResource("Saved", bundle: .module, comment: "The state of a session's notes.")
+  }
+
+  private static var edited: LocalizedStringResource {
+    LocalizedStringResource(
+      "Edited", bundle: .module, comment: "The state of a session's notes: changed, not saved yet.")
+  }
+
+  private static func notSaved(_ error: SessionNotesError) -> String {
+    String(
+      localized: "Notes not saved: \(sentence(error))", bundle: .module,
+      comment: "Why the notes could not be saved.")
+  }
+
   static func time(_ date: Date) -> String {
     date.formatted(date: .omitted, time: .shortened)
   }
@@ -422,25 +466,38 @@ private struct NotesFailureDetail: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       if case .failed(let error, let retryAt) = document.state {
-        Text("The notes could not be saved: \(NotesStatePresentation.sentence(error))")
-          .fixedSize(horizontal: false, vertical: true)
+        Text(
+          "The notes could not be saved: \(NotesStatePresentation.sentence(error))",
+          bundle: .module, comment: "Why the notes could not be saved."
+        )
+        .fixedSize(horizontal: false, vertical: true)
         TimelineView(.periodic(from: .now, by: 1)) { context in
           let seconds = max(0, Int(retryAt.timeIntervalSince(context.date).rounded(.up)))
-          Text(seconds > 0 ? "Retrying in \(seconds) s." : "Retrying…")
-            .foregroundStyle(.secondary)
+          Group {
+            if seconds > 0 {
+              Text("Retrying in \(seconds) s.", bundle: .module)
+            } else {
+              Text("Retrying…", bundle: .module)
+            }
+          }
+          .foregroundStyle(.secondary)
         }
-        Text("What you typed is kept until it is saved.")
+        Text("What you typed is kept until it is saved.", bundle: .module)
           .foregroundStyle(.secondary)
       } else {
-        Text("The notes are saved.")
+        Text("The notes are saved.", bundle: .module)
       }
       HStack {
-        Button("Copy Notes") {
+        Button {
           NSPasteboard.general.clearContents()
           NSPasteboard.general.setString(document.text, forType: .string)
+        } label: {
+          Text("Copy Notes", bundle: .module)
         }
-        Button("Retry Now") {
+        Button {
           Task { await document.save() }
+        } label: {
+          Text("Retry Now", bundle: .module)
         }
         .keyboardShortcut(.defaultAction)
       }
@@ -459,21 +516,34 @@ private struct NotesUnreadable: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label("These notes could not be read", systemImage: "exclamationmark.triangle")
-        .font(.callout.weight(.semibold))
-      Text("\(reason) The file is left untouched, so nothing in it is lost.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+      Label {
+        Text("These notes could not be read", bundle: .module)
+      } icon: {
+        Image(systemName: "exclamationmark.triangle")
+      }
+      .font(.callout.weight(.semibold))
+      Text(
+        "\(reason) The file is left untouched, so nothing in it is lost.", bundle: .module,
+        comment: "Why the notes could not be read, a sentence."
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
       HStack {
         if let url = notes.fileURL(for: sessionID) {
-          Button("Reveal in Finder") { notes.reveal(url) }
+          Button {
+            notes.reveal(url)
+          } label: {
+            Text("Reveal in Finder", bundle: .module)
+          }
         }
         // Read before it failed, typed since: the text is still in the editor, only not on disk.
         if !text.isEmpty {
-          Button("Copy Notes") {
+          Button {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
+          } label: {
+            Text("Copy Notes", bundle: .module)
           }
         }
       }
