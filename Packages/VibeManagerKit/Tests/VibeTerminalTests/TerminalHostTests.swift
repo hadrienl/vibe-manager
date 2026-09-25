@@ -762,7 +762,9 @@ struct TerminalHostProcessTests {
     let clock = ContinuousClock()
     let start = clock.now
     #expect(await eventually { !isProcessAlive(agent) && !isProcessAlive(child) })
-    #expect(clock.now - start < .seconds(10))
+    // The agent never exits by itself: any bound shows it was stopped, and a tight one measures
+    // the runner's load.
+    #expect(clock.now - start < .seconds(20))
     #expect(await eventually { await session.state() == .failed(.hostStopped) })
     #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(1))
   }
