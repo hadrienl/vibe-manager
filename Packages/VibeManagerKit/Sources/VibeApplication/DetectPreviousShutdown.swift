@@ -303,7 +303,9 @@ public struct DetectPreviousShutdown: Sendable {
       await host?.stepAway()
       await recorder.seal()
       return .hostUnavailable(
-        reason: "The sessions could not be read: \(error.localizedDescription)")
+        reason: String(
+          localized: "The sessions could not be read: \(error.localizedDescription)",
+          bundle: .module, comment: "The system's description of the error."))
     }
 
     let byID = Dictionary(hosted.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })

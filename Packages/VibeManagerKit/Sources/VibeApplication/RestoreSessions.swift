@@ -72,9 +72,12 @@ public struct SessionRestoreOutcome: Equatable, Sendable {
       return nil
     case .skipped(.needsConfirmation(let explanation)):
       return explanation?.sentence
-        ?? "Starting this session again would send a prompt to its agent."
+        ?? String(
+          localized: "Starting this session again would send a prompt to its agent.",
+          bundle: .module)
     case .skipped(.refused(let refusal)):
-      return refusal.errorDescription ?? "This session could not be restarted."
+      return refusal.errorDescription
+        ?? String(localized: "This session could not be restarted.", bundle: .module)
     case .failed(let message, _):
       return message
     }
@@ -85,7 +88,9 @@ public struct SessionRestoreOutcome: Equatable, Sendable {
     case .restarted, .skipped(.alreadyRunning), .skipped(.cancelled):
       return nil
     case .skipped(.needsConfirmation):
-      return "Restart it to start a new process with a summary of the session."
+      return String(
+        localized: "Restart it to start a new process with a summary of the session.",
+        bundle: .module)
     case .skipped(.refused(let refusal)):
       return refusal.recoverySuggestion
     case .failed(_, let suggestion):
@@ -196,7 +201,8 @@ public struct RestoreSessions: Sendable {
     guard attempt.started else {
       return outcome(
         .failed(
-          message: attempt.message ?? "This session could not be restarted.",
+          message: attempt.message
+            ?? String(localized: "This session could not be restarted.", bundle: .module),
           suggestion: attempt.suggestion
         )
       )
@@ -207,7 +213,11 @@ public struct RestoreSessions: Sendable {
   /// The name is read for the report, and a session that has gone missing still gets a line:
   /// a report that silently drops what it could not do is a report nobody can act on.
   private func name(of id: SessionID) async -> String {
-    guard let session = try? await repository.session(id: id) else { return "This session" }
+    guard let session = try? await repository.session(id: id) else {
+      return String(
+        localized: "This session", bundle: .module,
+        comment: "Stands for the name of a session that could not be read, in a report.")
+    }
     return session.name
   }
 }

@@ -84,43 +84,58 @@ public enum RepositoryStatusIssue: Error, Hashable, Sendable {
   public var message: String {
     switch self {
     case .missing:
-      return "This repository is no longer where it was."
+      return String(localized: "This repository is no longer where it was.", bundle: .module)
     case .notARepository:
-      return "This folder is no longer a Git repository."
+      return String(localized: "This folder is no longer a Git repository.", bundle: .module)
     case .locked(_, let since):
       let minutes = max(1, Int(Date().timeIntervalSince(since) / 60))
-      return
-        "Another Git process has been working in this repository for \(minutes) min."
+      return String(
+        localized: "Another Git process has been working in this repository for \(minutes) min.",
+        bundle: .module)
     case .permissionDenied:
-      return "macOS does not let Vibe Manager read this repository."
+      return String(
+        localized: "macOS does not let Vibe Manager read this repository.", bundle: .module)
     case .unsafeRepository:
-      return "Git refuses to read this repository: it belongs to another user."
+      return String(
+        localized: "Git refuses to read this repository: it belongs to another user.",
+        bundle: .module)
     case .gitUnavailable(let reason):
-      return reason.errorDescription ?? "Git could not be run."
+      return reason.errorDescription ?? String(localized: "Git could not be run.", bundle: .module)
     case .timedOut(let after):
-      return "This repository took more than \(after.components.seconds) s to answer."
+      return String(
+        localized: "This repository took more than \(after.components.seconds) s to answer.",
+        bundle: .module)
     case .failed(let summary):
-      return summary.isEmpty ? "Git could not read this repository." : summary
+      return summary.isEmpty
+        ? String(localized: "Git could not read this repository.", bundle: .module) : summary
     }
   }
 
   public var suggestion: String? {
     switch self {
     case .missing, .notARepository:
-      return "Nothing is repaired automatically: reveal the folder, and restart the session "
-        + "where the repository now is."
+      return String(
+        localized: """
+          Nothing is repaired automatically: reveal the folder, and restart the session where the \
+          repository now is.
+          """,
+        bundle: .module)
     case .locked:
-      return "If no Git command is running any more, the lock was left behind and can be removed."
+      return String(
+        localized:
+          "If no Git command is running any more, the lock was left behind and can be removed.",
+        bundle: .module)
     case .permissionDenied:
-      return "Give Vibe Manager Full Disk Access in System Settings."
+      return String(
+        localized: "Give Vibe Manager Full Disk Access in System Settings.", bundle: .module)
     case .unsafeRepository:
-      return "Mark it as safe if you trust it."
+      return String(localized: "Mark it as safe if you trust it.", bundle: .module)
     case .gitUnavailable(.commandLineToolsMissing):
-      return "Install the Command Line Tools."
+      return String(localized: "Install the Command Line Tools.", bundle: .module)
     case .gitUnavailable:
-      return "Install Git, then read the repositories again."
+      return String(localized: "Install Git, then read the repositories again.", bundle: .module)
     case .timedOut, .failed:
-      return "Read the repositories again."
+      return String(localized: "Read the repositories again.", bundle: .module)
     }
   }
 

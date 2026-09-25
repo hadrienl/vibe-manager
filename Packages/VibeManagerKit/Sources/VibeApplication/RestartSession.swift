@@ -50,18 +50,32 @@ public enum SessionRestartExplanation: Equatable, Sendable {
   public var sentence: String {
     switch self {
     case .agentCannotResume(let name):
-      return "\(name) cannot resume a previous conversation."
+      return String(
+        localized: "\(name) cannot resume a previous conversation.", bundle: .module,
+        comment: "An agent's name.")
     case .noResumeIdentifier(let name):
-      return "\(name) kept no identifier for this session, so its conversation cannot be found."
+      return String(
+        localized:
+          "\(name) kept no identifier for this session, so its conversation cannot be found.",
+        bundle: .module,
+        comment: "An agent's name.")
     case .identifierRejected(let name):
-      return "The identifier stored for this session is not one \(name) would accept."
+      return String(
+        localized: "The identifier stored for this session is not one \(name) would accept.",
+        bundle: .module,
+        comment: "An agent's name.")
     case .resumeDeclined(let name):
-      return "Restarting without resuming the \(name) conversation, as you asked."
+      return String(
+        localized: "Restarting without resuming the \(name) conversation, as you asked.",
+        bundle: .module,
+        comment: "An agent's name.")
     case .resumeFailedBefore(let name):
-      return """
-        \(name) stopped as soon as this conversation was resumed last time, so it is not being \
-        resumed again.
-        """
+      return String(
+        localized: """
+          \(name) stopped as soon as this conversation was resumed last time, so it is not being \
+          resumed again.
+          """,
+        bundle: .module, comment: "An agent's name.")
     }
   }
 }
@@ -100,29 +114,37 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .sessionMissing:
-      return "This session is no longer in the store."
+      return String(localized: "This session is no longer in the store.", bundle: .module)
     case .storeUnreadable:
-      return "The session store could not be read."
+      return String(localized: "The session store could not be read.", bundle: .module)
     case .notRestartable(.active):
-      return "This session is already running."
+      return String(localized: "This session is already running.", bundle: .module)
     case .notRestartable(.archived):
-      return "This session is archived."
+      return String(localized: "This session is archived.", bundle: .module)
     case .notRestartable:
-      return "This session cannot be restarted."
+      return String(localized: "This session cannot be restarted.", bundle: .module)
     case .agentUnassigned:
-      return "This session was never given a coding agent."
+      return String(localized: "This session was never given a coding agent.", bundle: .module)
     case .agentUnknown(let providerID):
-      return "The agent that ran this session, \(providerID), is not installed in this build."
+      return String(
+        localized:
+          "The agent that ran this session, \(providerID), is not installed in this build.",
+        bundle: .module)
     case .agentUnavailable(let name, let summary, _):
-      return "\(name) cannot run right now: \(summary)"
+      return String(
+        localized: "\(name) cannot run right now: \(summary)", bundle: .module,
+        comment: "An agent's name, then why it cannot run.")
     case .noRepository:
-      return "This session has no folder to start in."
+      return String(localized: "This session has no folder to start in.", bundle: .module)
     case .workingDirectoryUnusable(let path, .missing):
-      return "The folder of this session, \(path), no longer exists."
+      return String(
+        localized: "The folder of this session, \(path), no longer exists.", bundle: .module)
     case .workingDirectoryUnusable(let path, .notADirectory):
-      return "The path of this session, \(path), is not a folder any more."
+      return String(
+        localized: "The path of this session, \(path), is not a folder any more.", bundle: .module)
     case .workingDirectoryUnusable(let path, _):
-      return "The folder of this session, \(path), cannot be entered."
+      return String(
+        localized: "The folder of this session, \(path), cannot be entered.", bundle: .module)
     case .launchRejected(let error):
       return error.errorDescription
     }
@@ -131,27 +153,32 @@ public enum SessionRestartRefusal: Error, Equatable, Sendable, LocalizedError {
   public var recoverySuggestion: String? {
     switch self {
     case .sessionMissing:
-      return "Reload the workspace."
+      return String(localized: "Reload the workspace.", bundle: .module)
     case .storeUnreadable:
-      return "Try again, and restore a backup if it persists."
+      return String(localized: "Try again, and restore a backup if it persists.", bundle: .module)
     case .notRestartable(.archived):
-      return "Unarchive it first, then restart it."
+      return String(localized: "Unarchive it first, then restart it.", bundle: .module)
     case .notRestartable(.active):
-      return "Close it first if you want to start it again."
+      return String(localized: "Close it first if you want to start it again.", bundle: .module)
     case .notRestartable:
       return nil
     case .agentUnassigned:
-      return "Create a new session to choose an agent."
+      return String(localized: "Create a new session to choose an agent.", bundle: .module)
     case .agentUnknown:
-      return "Install that agent, or create a new session with one that is available."
+      return String(
+        localized: "Install that agent, or create a new session with one that is available.",
+        bundle: .module)
     case .agentUnavailable(_, _, let remedy):
       return remedy
     case .noRepository:
-      return "Create a new session in the folder you want to work in."
+      return String(
+        localized: "Create a new session in the folder you want to work in.", bundle: .module)
     case .workingDirectoryUnusable:
-      return "Put the folder back where it was, or create a new session in its new place."
+      return String(
+        localized: "Put the folder back where it was, or create a new session in its new place.",
+        bundle: .module)
     case .launchRejected:
-      return "Try again, and report the failure if it persists."
+      return String(localized: "Try again, and report the failure if it persists.", bundle: .module)
     }
   }
 }

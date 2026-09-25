@@ -14,10 +14,14 @@ public enum SessionScope: String, Codable, CaseIterable, Sendable {
   /// Everything that is finished, archived or not.
   case closed
 
-  public var label: String {
+  public var label: LocalizedStringResource {
     switch self {
-    case .active: return "Active"
-    case .closed: return "Closed"
+    case .active:
+      return LocalizedStringResource(
+        "Active", bundle: .module, comment: "The sessions whose agent is running.")
+    case .closed:
+      return LocalizedStringResource(
+        "Closed", bundle: .module, comment: "The sessions that are finished, archived or not.")
     }
   }
 
@@ -34,11 +38,17 @@ public enum SessionSort: String, Codable, CaseIterable, Sendable {
   case created
   case name
 
-  public var label: String {
+  public var label: LocalizedStringResource {
     switch self {
-    case .lastActivity: return "Last Activity"
-    case .created: return "Date Created"
-    case .name: return "Name"
+    case .lastActivity:
+      return LocalizedStringResource(
+        "Last Activity", bundle: .module, comment: "A way to sort the sessions.")
+    case .created:
+      return LocalizedStringResource(
+        "Date Created", bundle: .module, comment: "A way to sort the sessions.")
+    case .name:
+      return LocalizedStringResource(
+        "Name", bundle: .module, comment: "A way to sort the sessions.")
     }
   }
 }

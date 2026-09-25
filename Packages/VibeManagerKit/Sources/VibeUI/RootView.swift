@@ -1237,7 +1237,12 @@ private struct SessionSidebar: View {
       ContentUnavailableView {
         Label("No matching session", systemImage: "line.3.horizontal.decrease.circle")
       } description: {
-        Text("No session in \(model.filter.scope.label.lowercased()) matches this filter.")
+        switch model.filter.scope {
+        case .active:
+          Text("No session in active matches this filter.", bundle: .module)
+        case .closed:
+          Text("No session in closed matches this filter.", bundle: .module)
+        }
       } actions: {
         Button("Clear Filter") { model.clearNarrowing() }
       }

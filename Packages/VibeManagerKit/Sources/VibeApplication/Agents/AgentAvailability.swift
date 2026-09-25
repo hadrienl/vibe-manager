@@ -100,16 +100,24 @@ extension AgentRemediation {
   public var sentence: String {
     switch self {
     case .install:
-      return "Install the agent, then detect again."
+      return String(localized: "Install the agent, then detect again.", bundle: .module)
     case .update(let minimumVersion, _):
-      return "Update it to \(minimumVersion) or newer, then detect again."
+      return String(
+        localized: "Update it to \(minimumVersion.description) or newer, then detect again.",
+        bundle: .module,
+        comment: "A version number: 1.0.3.")
     case .authenticate(let command):
-      guard let command else { return "Sign in to the agent, then detect again." }
-      return "Run \(command) in a terminal, then detect again."
+      guard let command else {
+        return String(localized: "Sign in to the agent, then detect again.", bundle: .module)
+      }
+      return String(
+        localized: "Run \(command) in a terminal, then detect again.", bundle: .module,
+        comment: "A command line to type: claude auth login.")
     case .defineExecutablePath:
-      return "Set the path to its executable, then detect again."
+      return String(
+        localized: "Set the path to its executable, then detect again.", bundle: .module)
     case .retryDetection:
-      return "Detect again."
+      return String(localized: "Detect again.", bundle: .module)
     }
   }
 
@@ -122,7 +130,8 @@ extension AgentRemediation {
       if case .retryDetection = remediation { return false }
       return true
     }
-    return (specific ?? remediations.first)?.sentence ?? "Detect again, or pick another agent."
+    return (specific ?? remediations.first)?.sentence
+      ?? String(localized: "Detect again, or pick another agent.", bundle: .module)
   }
 }
 

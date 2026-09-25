@@ -152,8 +152,9 @@ public struct CreateSession: Sendable {
       issues.append(
         .agentUnavailable(
           name: provider.descriptor.displayName,
-          summary: "The command line could not be prepared.",
-          remedy: "Try again, and report the failure if it persists."
+          summary: String(localized: "The command line could not be prepared.", bundle: .module),
+          remedy: String(
+            localized: "Try again, and report the failure if it persists.", bundle: .module)
         )
       )
       return (issues, nil)
@@ -164,32 +165,42 @@ public struct CreateSession: Sendable {
     switch error {
     case .promptTooLarge(let byteCount, let limit):
       return .promptRejected(
-        message: "The initial prompt is \(byteCount) bytes, and \(agentName) accepts \(limit).",
-        remedy: "Shorten it, or create the session without a prompt and paste it in the terminal."
+        message: String(
+          localized:
+            "The initial prompt is \(String(byteCount)) bytes, and \(agentName) accepts \(String(limit)).",
+          bundle: .module),
+        remedy: String(
+          localized:
+            "Shorten it, or create the session without a prompt and paste it in the terminal.",
+          bundle: .module)
       )
     case .promptContainsNullCharacter:
       // The draft already says so, and one character is worth one problem, not two.
       return .promptControlCharacters
     case .initialPromptUnsupported:
       return .promptRejected(
-        message: "\(agentName) does not accept an initial prompt.",
-        remedy: "Create the session without one and type it in the terminal."
+        message: String(
+          localized: "\(agentName) does not accept an initial prompt.", bundle: .module),
+        remedy: String(
+          localized: "Create the session without one and type it in the terminal.", bundle: .module)
       )
     case .unsupportedModel(let id):
       return .modelUnknown(id)
     case .modelSelectionUnsupported:
       return SessionDraftIssue(
         field: .model,
-        message: "\(agentName) does not let Vibe Manager choose a model.",
-        remedy: "Go back to the default model of the agent."
+        message: String(
+          localized: "\(agentName) does not let Vibe Manager choose a model.", bundle: .module),
+        remedy: String(localized: "Go back to the default model of the agent.", bundle: .module)
       )
     case .invalidWorkingDirectory:
       return .workingDirectoryNotAbsolute
     case .unavailable, .resumeUnsupported, .missingResumeIdentifier:
       return .agentUnavailable(
         name: agentName,
-        summary: error.errorDescription ?? "It cannot be launched.",
-        remedy: "Pick another agent, or detect again."
+        summary: error.errorDescription
+          ?? String(localized: "It cannot be launched.", bundle: .module),
+        remedy: String(localized: "Pick another agent, or detect again.", bundle: .module)
       )
     }
   }

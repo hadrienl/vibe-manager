@@ -86,23 +86,31 @@ public enum AgentLaunchError: Error, Equatable, Sendable, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .unavailable:
-      return "The coding agent is not available on this Mac."
+      return String(localized: "The coding agent is not available on this Mac.", bundle: .module)
     case .unsupportedModel(let id):
-      return "The model \(id) is not offered by this agent."
+      return String(localized: "The model \(id) is not offered by this agent.", bundle: .module)
     case .modelSelectionUnsupported:
-      return "This agent does not let Vibe Manager choose a model."
+      return String(
+        localized: "This agent does not let Vibe Manager choose a model.", bundle: .module)
     case .initialPromptUnsupported:
-      return "This agent does not accept an initial prompt."
+      return String(localized: "This agent does not accept an initial prompt.", bundle: .module)
     case .resumeUnsupported:
-      return "This agent cannot resume a previous session."
+      return String(localized: "This agent cannot resume a previous session.", bundle: .module)
     case .missingResumeIdentifier:
-      return "The session has no resume identifier to hand to the agent."
+      return String(
+        localized: "The session has no resume identifier to hand to the agent.", bundle: .module)
     case .invalidWorkingDirectory:
-      return "The working directory is not a usable absolute path."
+      return String(
+        localized: "The working directory is not a usable absolute path.", bundle: .module)
     case .promptTooLarge(_, let limit):
-      return "The initial prompt exceeds the \(limit) byte limit accepted by the agent."
+      return String(
+        localized:
+          "The initial prompt exceeds the \(String(limit)) byte limit accepted by the agent.",
+        bundle: .module)
     case .promptContainsNullCharacter:
-      return "The initial prompt contains a null character, which would cut it short."
+      return String(
+        localized: "The initial prompt contains a null character, which would cut it short.",
+        bundle: .module)
     }
   }
 }
