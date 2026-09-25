@@ -65,6 +65,17 @@
         }
       }
     },
+    "%@ could not be started.": {
+      "comment": "An agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ n’a pas pu être lancé."
+          }
+        }
+      }
+    },
     "%@ is multiline": {
       "localizations": {
         "fr": {
@@ -131,6 +142,40 @@
         }
       }
     },
+    "%@ was archived, but its process (pid %@) did not answer the stop and may still be running.": {
+      "comment": "A session's name, then a process identifier.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ was archived, but its process (pid %2$@) did not answer the stop and may still be running."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a été archivée, mais son processus (pid %2$@) n’a pas répondu à l’arrêt et tourne peut-être encore."
+          }
+        }
+      }
+    },
+    "%@ was closed, but its process (pid %@) did not answer the stop and may still be running.": {
+      "comment": "A session's name, then a process identifier.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ was closed, but its process (pid %2$@) did not answer the stop and may still be running."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a été fermée, mais son processus (pid %2$@) n’a pas répondu à l’arrêt et tourne peut-être encore."
+          }
+        }
+      }
+    },
     "%@ · %@": {
       "localizations": {
         "en": {
@@ -179,7 +224,7 @@
       }
     },
     "%lld": {},
-    "%lld changed entries": {
+    "%lld agents kept running while Vibe Manager was closed.": {
       "localizations": {
         "fr": {
           "variations": {
@@ -187,24 +232,109 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld entrée modifiée"
+                  "value": "%lld agent a continué de tourner pendant que Vibe Manager était fermé."
                 }
               },
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld entrées modifiées"
+                  "value": "%lld agents ont continué de tourner pendant que Vibe Manager était fermé."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld entrées modifiées"
+                  "value": "%lld agents ont continué de tourner pendant que Vibe Manager était fermé."
                 }
               }
             }
           }
         },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent kept running while Vibe Manager was closed."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents kept running while Vibe Manager was closed."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld agents kept running while Vibe Manager was closed; %lld have finished since.": {
+      "comment": "Agents left running when the application quit, then how many of them ended since; both above one.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld agents kept running while Vibe Manager was closed; %2$lld have finished since."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld agents ont continué de tourner pendant que Vibe Manager était fermé ; %2$lld se sont terminés depuis."
+          }
+        }
+      }
+    },
+    "%lld agents kept running while Vibe Manager was closed; 1 has finished since.": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent a continué de tourner pendant que Vibe Manager était fermé ; il s’est terminé depuis."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents ont continué de tourner pendant que Vibe Manager était fermé ; 1 s’est terminé depuis."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents ont continué de tourner pendant que Vibe Manager était fermé ; 1 s’est terminé depuis."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent kept running while Vibe Manager was closed; 1 has finished since."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents kept running while Vibe Manager was closed; 1 has finished since."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changed entries": {
+      "localizations": {
         "en": {
           "variations": {
             "plural": {
@@ -218,6 +348,77 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld changed entries"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entrées modifiées"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entrée modifiée"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entrées modifiées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld more were left closed when you cancelled.": {
+      "comment": "Sessions the restoration did not reach, because the user cancelled it.",
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld autre est restée fermée quand vous avez annulé."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld autres sont restées fermées quand vous avez annulé."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld autres sont restées fermées quand vous avez annulé."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more was left closed when you cancelled."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more were left closed when you cancelled."
                 }
               }
             }
@@ -237,6 +438,24 @@
     },
     "%lld problems to fix": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problem to fix"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problems to fix"
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -260,6 +479,34 @@
               }
             }
           }
+        }
+      }
+    },
+    "%lld sessions came back.": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld session a été rétablie."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions ont été rétablies."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions ont été rétablies."
+                }
+              }
+            }
+          }
         },
         "en": {
           "variations": {
@@ -267,13 +514,59 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld problem to fix"
+                  "value": "%lld session came back."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld problems to fix"
+                  "value": "%lld sessions came back."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions did not come back.": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld session n’a pas été rétablie."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions n’ont pas été rétablies."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions n’ont pas été rétablies."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld session did not come back."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions did not come back."
                 }
               }
             }
@@ -291,6 +584,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Une session terminée affiche sa dernière sortie, et peut être relancée."
+          }
+        }
+      }
+    },
+    "A process from that run may still be running (pid %@) and was left alone; check Activity Monitor.": {
+      "comment": "Process identifiers, separated by commas.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un processus de cette exécution tourne peut-être encore (pid %@) et n’a pas été touché ; vérifiez dans le Moniteur d’activité."
           }
         }
       }
@@ -365,6 +669,17 @@
         }
       }
     },
+    "Agent switched": {
+      "comment": "The title of the line a terminal shows above an agent that replaced another.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent changé"
+          }
+        }
+      }
+    },
     "Agent unavailable": {
       "comment": "A session's state, in the sidebar.",
       "localizations": {
@@ -433,6 +748,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Une autre copie de Vibe Manager exécute ces sessions. Rien n’a été restauré ni modifié ici."
+          }
+        }
+      }
+    },
+    "Another launch started this session in the meantime.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un autre lancement a démarré cette session entre-temps."
           }
         }
       }
@@ -575,6 +900,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Graphique"
+          }
+        }
+      }
+    },
+    "Check Activity Monitor for a leftover process.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cherchez un processus restant dans le Moniteur d’activité."
           }
         }
       }
@@ -747,6 +1082,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Coût : non disponible — aucune des deux CLI ne fournit un coût fiable."
+          }
+        }
+      }
+    },
+    "Could not switch to %@: %@": {
+      "comment": "An agent's name, then why it could not be started.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Could not switch to %1$@: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de passer à %1$@ : %2$@"
           }
         }
       }
@@ -1493,6 +1845,17 @@
         }
       }
     },
+    "Model changed": {
+      "comment": "The title of the line a terminal shows above an agent whose model was changed.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle changé"
+          }
+        }
+      }
+    },
     "More": {
       "localizations": {
         "fr": {
@@ -1699,6 +2062,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucun modèle pour l’instant."
+          }
+        }
+      }
+    },
+    "No terminal is selected.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun terminal n’est sélectionné."
           }
         }
       }
@@ -2127,6 +2500,39 @@
         }
       }
     },
+    "Restart Session": {
+      "comment": "A command of the Session menu, for a session that has run before.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer la session"
+          }
+        }
+      }
+    },
+    "Restart Session in a new process, with a summary": {
+      "comment": "Said by VoiceOver for the Restart action.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer la session dans un nouveau processus, avec un résumé"
+          }
+        }
+      }
+    },
+    "Restart Session, resuming its %@ conversation": {
+      "comment": "Said by VoiceOver for the Restart action: an agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer la session, en reprenant sa conversation %@"
+          }
+        }
+      }
+    },
     "Restart “%@” in a new process?": {
       "localizations": {
         "fr": {
@@ -2153,6 +2559,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Restauration en cours"
+          }
+        }
+      }
+    },
+    "Restoring sessions — %lld of %lld": {
+      "comment": "Progress of the restoration: sessions done, then sessions in all.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Restoring sessions — %1$lld of %2$lld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauration des sessions — %1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "Restoring sessions — %lld of %lld · %@": {
+      "comment": "Progress of the restoration: the session being restored, of how many, and its name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Restoring sessions — %1$lld of %2$lld · %3$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauration des sessions — %1$lld sur %2$lld · %3$@"
           }
         }
       }
@@ -2203,7 +2643,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nouvel essai dans %lld s."
+            "value": "Nouvelle tentative dans %lld s."
           }
         }
       }
@@ -2574,6 +3014,39 @@
         }
       }
     },
+    "Start Session": {
+      "comment": "A command of the Session menu, for a session that has never run.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer la session"
+          }
+        }
+      }
+    },
+    "Start Session in a new process, with a summary": {
+      "comment": "Said by VoiceOver for the Start action.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer la session dans un nouveau processus, avec un résumé"
+          }
+        }
+      }
+    },
+    "Start Session, resuming its %@ conversation": {
+      "comment": "Said by VoiceOver for the Start action: an agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer la session, en reprenant sa conversation %@"
+          }
+        }
+      }
+    },
     "Starting": {
       "comment": "A session's state, in the sidebar.",
       "localizations": {
@@ -2753,6 +3226,16 @@
         }
       }
     },
+    "The agent could not be switched.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’agent n’a pas pu être changé."
+          }
+        }
+      }
+    },
     "The agent will ask you to sign in inside the terminal.": {
       "localizations": {
         "fr": {
@@ -2813,12 +3296,60 @@
         }
       }
     },
+    "The session could not be put back on %@: it stays on %@, and Restart will start it with a summary.": {
+      "comment": "The agent the switch left, then the one it switched to. Restart is a command.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "The session could not be put back on %1$@: it stays on %2$@, and Restart will start it with a summary."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session n’a pas pu revenir à %1$@ : elle reste sur %2$@, et « Relancer » la démarrera avec un résumé."
+          }
+        }
+      }
+    },
+    "The session is back on %@.": {
+      "comment": "An agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session est revenue à %@."
+          }
+        }
+      }
+    },
+    "The session store would not put this session back to work.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier des sessions a refusé de remettre cette session en service."
+          }
+        }
+      }
+    },
     "The terminal and the agent start as soon as the session is created.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Le terminal et l’agent démarrent dès la création de la session."
+          }
+        }
+      }
+    },
+    "The terminal has shown nothing yet.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le terminal n’a encore rien affiché."
           }
         }
       }
@@ -2853,12 +3384,43 @@
         }
       }
     },
+    "This session": {
+      "comment": "Stands for the name of a session that is no longer listed.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session"
+          }
+        }
+      }
+    },
+    "This session could not be restarted.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session n’a pas pu être relancée."
+          }
+        }
+      }
+    },
     "This session has no running terminal in this window.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Cette session n’a aucun terminal en cours dans cette fenêtre."
+          }
+        }
+      }
+    },
+    "This session is archived.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session est archivée."
           }
         }
       }
@@ -3003,6 +3565,16 @@
         }
       }
     },
+    "Unable to load work sessions.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de charger les sessions."
+          }
+        }
+      }
+    },
     "Unarchive": {
       "localizations": {
         "fr": {
@@ -3059,6 +3631,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vibe Manager exécute des agents de code en votre nom. macOS demande une autorisation chaque fois que l’un d’eux lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive — et il la demande au nom de cette application, une fois par dossier."
+          }
+        }
+      }
+    },
+    "Vibe Manager stopped unexpectedly. %lld sessions were running.": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager s’est arrêté de façon inattendue. %lld session était en cours."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager s’est arrêté de façon inattendue. %lld sessions étaient en cours."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager s’est arrêté de façon inattendue. %lld sessions étaient en cours."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager stopped unexpectedly. %lld session was running."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager stopped unexpectedly. %lld sessions were running."
+                }
+              }
+            }
           }
         }
       }
@@ -3159,16 +3777,16 @@
         "fr": {
           "variations": {
             "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "et %lld autre"
-                }
-              },
               "many": {
                 "stringUnit": {
                   "state": "translated",
                   "value": "et %lld autres"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autre"
                 }
               },
               "other": {
@@ -3187,16 +3805,16 @@
         "fr": {
           "variations": {
             "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "et %lld autre, non listé"
-                }
-              },
               "many": {
                 "stringUnit": {
                   "state": "translated",
                   "value": "et %lld autres, non listés"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autre, non listé"
                 }
               },
               "other": {
@@ -3210,12 +3828,56 @@
         }
       }
     },
+    "first start": {
+      "comment": "In the line a terminal shows above an agent: how it was started.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "premier démarrage"
+          }
+        }
+      }
+    },
+    "given a summary": {
+      "comment": "In the line a terminal shows above a switched agent: how it was started.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "avec un résumé"
+          }
+        }
+      }
+    },
     "live": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "en direct"
+          }
+        }
+      }
+    },
+    "new process": {
+      "comment": "In the line a terminal shows above an agent: how it was started.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nouveau processus"
+          }
+        }
+      }
+    },
+    "new process, given a summary": {
+      "comment": "In the line a terminal shows above a restarted agent: how it was started.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nouveau processus, avec un résumé"
           }
         }
       }
@@ -3236,6 +3898,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "rien pour l’instant"
+          }
+        }
+      }
+    },
+    "resumed conversation": {
+      "comment": "In the line a terminal shows above a restarted agent: how it was started.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "conversation reprise"
+          }
+        }
+      }
+    },
+    "same conversation": {
+      "comment": "In the line a terminal shows above a switched agent: how it was started.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "même conversation"
+          }
+        }
+      }
+    },
+    "separator.restart": {
+      "comment": "The title of the line a terminal shows above a restarted agent: a noun.",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Restart"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relance"
           }
         }
       }

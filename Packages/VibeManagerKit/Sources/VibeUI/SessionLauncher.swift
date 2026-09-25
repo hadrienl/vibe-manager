@@ -244,14 +244,20 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       let failure = failure(for: restart.session.id)
       return SessionRestartAttempt(
         started: false,
-        message: reason ?? failure?.message ?? "This session could not be restarted.",
+        message: reason ?? failure?.message
+          ?? String(localized: "This session could not be restarted.", bundle: .module),
         suggestion: reason == nil ? failure?.suggestion : nil
       )
     }
   }
 
-  static let archivedReason = "This session is archived."
-  static let storeRefusedReason = "The session store would not put this session back to work."
+  static var archivedReason: String {
+    String(localized: "This session is archived.", bundle: .module)
+  }
+  static var storeRefusedReason: String {
+    String(
+      localized: "The session store would not put this session back to work.", bundle: .module)
+  }
 
   /// Starts a closed session again, in the pane it already has.
   ///
@@ -323,14 +329,32 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     let stamp = date.formatted(date: .abbreviated, time: .shortened)
     let what: String
     switch plan.mode {
-    case .resumeWithModel: what = "same conversation"
-    case .firstLaunch: what = "first start"
-    case .handover: what = "given a summary"
-    case .freshWithoutContext: what = "new process"
+    case .resumeWithModel:
+      what = String(
+        localized: "same conversation", bundle: .module,
+        comment: "In the line a terminal shows above a switched agent: how it was started.")
+    case .firstLaunch:
+      what = String(
+        localized: "first start", bundle: .module,
+        comment: "In the line a terminal shows above an agent: how it was started.")
+    case .handover:
+      what = String(
+        localized: "given a summary", bundle: .module,
+        comment: "In the line a terminal shows above a switched agent: how it was started.")
+    case .freshWithoutContext:
+      what = String(
+        localized: "new process", bundle: .module,
+        comment: "In the line a terminal shows above an agent: how it was started.")
     }
     let next = plan.target.modelID.map { "\(plan.targetName) (\($0))" } ?? plan.targetName
     let title =
-      plan.session.agent?.providerID == plan.target.providerID ? "Model changed" : "Agent switched"
+      plan.session.agent?.providerID == plan.target.providerID
+      ? String(
+        localized: "Model changed", bundle: .module,
+        comment: "The title of the line a terminal shows above an agent whose model was changed.")
+      : String(
+        localized: "Agent switched", bundle: .module,
+        comment: "The title of the line a terminal shows above an agent that replaced another.")
     return "\r\n\u{1B}[2m── \(title) · \(stamp) · \(previous) → \(next) · \(what) ──\u{1B}[0m\r\n"
   }
 
@@ -343,15 +367,27 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     let what: String
     switch mode {
     case .firstLaunch:
-      what = "first start"
+      what = String(
+        localized: "first start", bundle: .module,
+        comment: "In the line a terminal shows above an agent: how it was started.")
     case .native:
-      what = "resumed conversation"
+      what = String(
+        localized: "resumed conversation", bundle: .module,
+        comment: "In the line a terminal shows above a restarted agent: how it was started.")
     case .freshWithContext:
-      what = "new process, given a summary"
+      what = String(
+        localized: "new process, given a summary", bundle: .module,
+        comment: "In the line a terminal shows above a restarted agent: how it was started.")
     case .freshWithoutContext:
-      what = "new process"
+      what = String(
+        localized: "new process", bundle: .module,
+        comment: "In the line a terminal shows above an agent: how it was started.")
     }
-    return "\r\n\u{1B}[2m── Restart · \(stamp) · \(what) ──\u{1B}[0m\r\n"
+    // A key of its own: the noun here, where the menus have the verb.
+    let title = String(
+      localized: "separator.restart", defaultValue: "Restart", bundle: .module,
+      comment: "The title of the line a terminal shows above a restarted agent: a noun.")
+    return "\r\n\u{1B}[2m── \(title) · \(stamp) · \(what) ──\u{1B}[0m\r\n"
   }
 
   /// Takes back a session whose process the terminal host kept while the application was closed,
