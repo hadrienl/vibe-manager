@@ -115,10 +115,10 @@ struct FileAgentActivityLogTests {
     let lateHook = try FileHandle(forWritingTo: url)
     try append("Long\t1\t0123456789\n", to: url)
     let stream = await logs.events(for: id, from: nil)
-    let first = await take(1, from: stream)
-    #expect(first.map(\.0.name) == ["Long"])
+    // Read in one pass, as the application does: an iteration that ends may end the stream with it.
+    let reading = Task { await take(3, from: stream, within: .seconds(20)) }
 
-    // The rotation happened: the hook's next append creates the log again.
+    // The rotation happened — once `Long` was read: the hook's next append creates the log again.
     for _ in 0..<250 where FileManager.default.fileExists(atPath: url.path) {
       try await Task.sleep(for: .milliseconds(20))
     }
@@ -128,8 +128,8 @@ struct FileAgentActivityLogTests {
     try lateHook.close()
     FileManager.default.createFile(
       atPath: url.path, contents: Data("Next\t3\t\n".utf8), attributes: [.posixPermissions: 0o644])
-    let next = await take(2, from: stream, within: .seconds(10))
-    #expect(next.map(\.0.name) == ["Late", "Next"])
+    let read = await reading.value
+    #expect(read.map(\.0.name) == ["Long", "Late", "Next"])
     let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
     #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
   }
