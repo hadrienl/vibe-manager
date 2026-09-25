@@ -95,7 +95,11 @@ struct BrowserChannelTests {
     let path = Self.socketPath()
     let process = try Self.thisProcess(as: session)
     let listener = BrowserChannelListener(
-      socketPath: path, prepare: {}, runner: runner, sessions: { [process] })
+      socketPath: path,
+      prepare: {
+        // Nothing to prepare in a test.
+      }, runner: runner,
+      sessions: { [process] })
     try listener.start()
     defer { listener.stop() }
 
@@ -118,7 +122,11 @@ struct BrowserChannelTests {
       sessionID: SessionID(), processIdentifier: 1,
       startedAt: ProcessStartTime(seconds: 0, microseconds: 0))
     let listener = BrowserChannelListener(
-      socketPath: path, prepare: {}, runner: runner, sessions: { [stranger] })
+      socketPath: path,
+      prepare: {
+        // Nothing to prepare in a test.
+      }, runner: runner,
+      sessions: { [stranger] })
     try listener.start()
     defer { listener.stop() }
 

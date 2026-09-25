@@ -400,6 +400,7 @@ private struct BrowserAddressBar: View {
         Text("Set Ticket", bundle: .module)
       }
       Button(role: .cancel) {
+        // The alert closes itself; cancelling changes nothing.
       } label: {
         Text("Cancel", bundle: .module)
       }
@@ -639,6 +640,7 @@ private struct BrowserEmptyView: View {
         Text("Set Ticket", bundle: .module)
       }
       Button(role: .cancel) {
+        // The alert closes itself; cancelling changes nothing.
       } label: {
         Text("Cancel", bundle: .module)
       }

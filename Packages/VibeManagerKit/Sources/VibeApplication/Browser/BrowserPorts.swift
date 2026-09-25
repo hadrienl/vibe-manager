@@ -80,7 +80,9 @@ public final class InMemoryBrowserPermissionStore: BrowserPermissionStore {
 public actor InMemoryBrowserStateStore: BrowserStateStore {
   private var states: [SessionID: SessionBrowserState] = [:]
 
-  public init() {}
+  public init() {
+    // Starts empty.
+  }
 
   public func load(_ id: SessionID) -> SessionBrowserState {
     states[id] ?? SessionBrowserState()
@@ -98,7 +100,9 @@ public actor InMemoryBrowserStateStore: BrowserStateStore {
 public actor InMemoryBrowserActionLogStore: BrowserActionLogStore {
   private var logs: [SessionID: [BrowserActionRecord]] = [:]
 
-  public init() {}
+  public init() {
+    // Starts empty.
+  }
 
   public func load(_ id: SessionID) -> [BrowserActionRecord] {
     logs[id] ?? []

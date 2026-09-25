@@ -552,7 +552,9 @@ public struct BrowserConsole: Hashable, Sendable {
   public static let capacity = 500
   public private(set) var entries: [BrowserConsoleEntry] = []
 
-  public init() {}
+  public init() {
+    // An empty console.
+  }
 
   mutating func append(_ entry: BrowserConsoleEntry) {
     entries.append(entry)
