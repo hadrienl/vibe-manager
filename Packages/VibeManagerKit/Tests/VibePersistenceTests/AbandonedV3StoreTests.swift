@@ -108,6 +108,6 @@ struct AbandonedV3StoreTests {
     _ = try await FileSessionRepository(storeURL: storeURL).sessions()
 
     let object = try JSONSerialization.jsonObject(with: Data(contentsOf: storeURL))
-    #expect((object as? [String: Any])?["schemaVersion"] as? Int == 6)
+    #expect((object as? [String: Any])?["schemaVersion"] as? Int == 7)
   }
 }

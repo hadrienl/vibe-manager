@@ -55,7 +55,7 @@ struct AgentHistoryStoreTests {
     let rewritten = try #require(
       try JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any]
     )
-    #expect(rewritten["schemaVersion"] as? Int == 6)
+    #expect(rewritten["schemaVersion"] as? Int == 7)
   }
 
   @Test("Every switch comes back as it was written, a failed one included")
@@ -137,9 +137,9 @@ struct AgentHistoryStoreTests {
   @Test("A document from a later schema is refused rather than rewritten without what it holds")
   func laterSchemaIsRefused() throws {
     let document = v2Document.replacingOccurrences(
-      of: "\"schemaVersion\": 2", with: "\"schemaVersion\": 7")
+      of: "\"schemaVersion\": 2", with: "\"schemaVersion\": 8")
 
-    #expect(throws: SessionStoreCodecError.unsupportedSchemaVersion(7)) {
+    #expect(throws: SessionStoreCodecError.unsupportedSchemaVersion(8)) {
       try SessionStoreCodec().decode(Data(document.utf8))
     }
   }

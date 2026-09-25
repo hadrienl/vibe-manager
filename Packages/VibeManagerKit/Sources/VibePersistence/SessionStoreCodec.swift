@@ -17,9 +17,12 @@ struct SessionStoreCodec {
   /// the document is louder, and loses nothing.
   ///
   /// v5 adds the ticket a session works on (#69), and v6 each session's task status (#80), for
-  /// the same reason: an older build would erase them. Each shape is the one before with one more
-  /// optional field, so all three are read by the same structure.
-  static let currentSchemaVersion = 6
+  /// the same reason: an older build would erase them. v7 adds the project icon of a session's
+  /// appearance (#27), again for that reason. Each shape is the one before with one more optional
+  /// field, so all four are read by the same structure.
+  static let currentSchemaVersion = 7
+  /// v6 is v7 without the project icon: the session wears the symbol and the colour it had.
+  static let iconlessSchemaVersion = 6
   /// v5 is v6 without the task status, which is read from the lifecycle instead.
   static let statuslessSchemaVersion = 5
   static let ticketlessSchemaVersion = 4
@@ -30,10 +33,10 @@ struct SessionStoreCodec {
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV6(
+    let envelope = StoreEnvelopeV7(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV6.init)
+      sessions: sessions.map(StoredSessionV7.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -63,11 +66,15 @@ struct SessionStoreCodec {
         sessions = previous.sessions.map(\.workSession)
         requiresRewrite = true
       case Self.ticketlessSchemaVersion, Self.statuslessSchemaVersion:
-        let previous = try Self.makeDecoder().decode(StoreEnvelopeV6.self, from: data)
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV7.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: false) }
         requiresRewrite = true
+      case Self.iconlessSchemaVersion:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV7.self, from: data)
+        sessions = previous.sessions.map { $0.workSession(recordsStart: true) }
+        requiresRewrite = true
       case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV6.self, from: data)
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV7.self, from: data)
         sessions = current.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = false
       case Self.abandonedSchemaVersion:
@@ -137,21 +144,22 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-/// Reads v4 and v5 as well: a v5 session is a v6 one without `taskStatus`, and a v4 one has no
-/// `ticket` either.
-private struct StoreEnvelopeV6: Codable {
+/// Reads v4 to v6 as well: a v6 session is a v7 one without an icon, a v5 one has no `taskStatus`
+/// either, and a v4 one no `ticket`.
+private struct StoreEnvelopeV7: Codable {
   let schemaVersion: Int
   let savedAt: Date
-  let sessions: [StoredSessionV6]
+  let sessions: [StoredSessionV7]
 }
 
-/// A v2 session, the history of its agent switches (v4), its ticket (v5) and its task status (v6).
-private struct StoredSessionV6: Codable {
+/// A v2 session, the history of its agent switches (v4), its ticket (v5), its task status (v6) and
+/// its project icon (v7).
+private struct StoredSessionV7: Codable {
   let id: UUID
   let name: String
   let initialPrompt: String
   let agent: StoredAgentV2?
-  let appearance: StoredAppearanceV2
+  let appearance: StoredAppearanceV7
   let lifecycle: StoredLifecycleV2
   let repositories: [StoredRepositoryV2]
   let notes: String?
@@ -167,7 +175,7 @@ private struct StoredSessionV6: Codable {
     name = session.name
     initialPrompt = session.initialPrompt
     agent = session.agent.map(StoredAgentV2.init)
-    appearance = StoredAppearanceV2(session.appearance)
+    appearance = StoredAppearanceV7(session.appearance)
     lifecycle = StoredLifecycleV2(session.lifecycle)
     repositories = session.repositories.map(StoredRepositoryV2.init)
     notes = session.legacyNotes
@@ -504,6 +512,28 @@ private struct StoredAppearanceV2: Codable {
 
   var domainValue: SessionAppearance {
     SessionAppearance(symbolName: symbolName, colorHex: colorHex)
+  }
+}
+
+/// The v2 appearance and the project icon, which a value that is not a digest cannot name: such a
+/// value is dropped, and the badge falls back on the symbol and the colour.
+private struct StoredAppearanceV7: Codable {
+  let symbolName: String
+  let colorHex: String
+  let iconID: String?
+
+  init(_ appearance: SessionAppearance) {
+    symbolName = appearance.symbolName
+    colorHex = appearance.colorHex
+    iconID = appearance.iconID?.sha256
+  }
+
+  var domainValue: SessionAppearance {
+    SessionAppearance(
+      symbolName: symbolName,
+      colorHex: colorHex,
+      iconID: iconID.flatMap { (value: String) -> SessionIconID? in SessionIconID(sha256: value) }
+    )
   }
 }
 

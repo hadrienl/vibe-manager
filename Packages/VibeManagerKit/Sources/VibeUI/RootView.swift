@@ -1491,6 +1491,24 @@ struct SidebarFooter: View {
 
       Spacer(minLength: 0)
 
+      // One list, or one section per working folder. The View menu has it too, on ⌃⌘G.
+      Toggle(
+        isOn: Binding(
+          get: { model.sidebarMode == .byFolder },
+          set: { model.setSidebarMode($0 ? .byFolder : .flat) })
+      ) {
+        Label {
+          Text("Group by Folder", bundle: .module, comment: "Groups the sidebar by working folder.")
+        } icon: {
+          Image(systemName: "folder")
+        }
+        .labelStyle(.iconOnly)
+      }
+      .toggleStyle(.button)
+      .buttonStyle(.borderless)
+      .help(Text("Group Sessions by Folder", bundle: .module))
+      .accessibilityIdentifier("sidebar-group-toggle")
+
       if model.filter.isNarrowing {
         Button {
           model.clearNarrowing()
@@ -1585,6 +1603,7 @@ struct SessionCommandButtons: View {
 
 struct SessionRow: View {
   let session: WorkSession
+  let icon: NSImage?
   let status: SessionStatusPresentation
   /// The one row the restoration is working on. Said on the row rather than only in the banner,
   /// because the banner names a session the sidebar may have scrolled away from.
@@ -1597,7 +1616,7 @@ struct SessionRow: View {
 
   var body: some View {
     HStack(spacing: 10) {
-      SessionBadge(appearance: session.appearance)
+      SessionBadge(appearance: session.appearance, icon: icon)
       VStack(alignment: .leading, spacing: 2) {
         Text(session.name)
           .fontWeight(.medium)
@@ -1609,20 +1628,14 @@ struct SessionRow: View {
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
-        Label(
-          isRestoring
-            ? LocalizedStringResource(
-              "Restoring…", bundle: .module, comment: "A session's state, in the sidebar.")
-            : status.label,
-          systemImage: isRestoring ? "arrow.clockwise" : status.symbolName
-        )
-        .font(.caption)
-        // What waits for the user is the one state set apart from the others by more than its
-        // colour and its symbol.
-        .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
-        .foregroundStyle(isRestoring ? Color.secondary : tint)
-        .modifier(WorkingSymbolEffect(isActive: isWorkingAnimated))
-        .lineLimit(1)
+        Label(status.label, systemImage: status.symbolName)
+          .font(.caption)
+          // What waits for the user is the one state set apart from the others by more than its
+          // colour and its symbol.
+          .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
+          .foregroundStyle(isRestoring ? Color.secondary : tint)
+          .modifier(WorkingSymbolEffect(isActive: isWorkingAnimated))
+          .lineLimit(1)
       }
       Spacer(minLength: 4)
       switch webView {

@@ -94,6 +94,7 @@ struct SessionSidebar: View {
     let commands = SessionCommands(model: model, session: session)
     return SessionRow(
       session: session,
+      icon: model.icons.image(for: session.appearance.iconID),
       status: model.statusPresentation(for: session),
       isRestoring: model.isRestoring(session.id),
       webView: model.webViewAttention(for: session.id),

@@ -47,6 +47,11 @@ public final class NewSessionModel {
   /// The folder the open panel last handed over, and the only one checked on the disk before the
   /// user asks for the session.
   private var checkedFolderPath: String?
+  private let projectIcons: any ProjectIconFinding
+  let icons: SessionIconLibrary?
+  /// The folder the project icon was last looked for in, and the search under way.
+  private var iconFolderPath: String?
+  private var iconSearch: Task<Void, Never>?
 
   /// `fullDiskAccess` decides whether the sheet remarks on a protected folder, and `nil` — not
   /// probed yet — stays silent. The remark is only worth making when the application positively
@@ -56,8 +61,12 @@ public final class NewSessionModel {
     registry: any AgentProviderResolving,
     revalidationDelay: Duration = .milliseconds(250),
     fullDiskAccess: FullDiskAccessStatus? = nil,
-    templates: [PromptTemplate] = []
+    templates: [PromptTemplate] = [],
+    projectIcons: any ProjectIconFinding = NoProjectIcons(),
+    icons: SessionIconLibrary? = nil
   ) {
+    self.projectIcons = projectIcons
+    self.icons = icons
     self.templates = templates
     self.create = create
     self.registry = registry
@@ -286,6 +295,10 @@ public final class NewSessionModel {
   /// the disk and the agents on every character, and finish out of order — an early verdict
   /// landing last would post "A name is required." over a name that is now there.
   public func draftChanged() {
+    // An icon found in another folder is not this one's.
+    if draft.projectIcon != nil, draft.resolvedWorkingDirectoryPath != iconFolderPath {
+      draft.projectIcon = nil
+    }
     guard hasSubmitted else {
       // Before the first submit the only problems on screen are the ones the open panel came
       // back with, and they judge the folder that was designated then. Once the field says
@@ -316,6 +329,7 @@ public final class NewSessionModel {
     // the new path is the one being looked at and leaves its verdict alone.
     checkedFolderPath = path
     draft.workingDirectoryPath = path
+    lookForIcon()
     let checked = draft
     let found = await create.problems(with: checked, checkingFolder: true)
     guard checkedFolderPath == path else { return }
@@ -332,6 +346,49 @@ public final class NewSessionModel {
     issues =
       issues.filter { $0.field != .workingDirectory }
       + found.filter { $0.field == .workingDirectory }
+  }
+
+  // MARK: - Project icon
+
+  /// Whether the badge shows the icon found in the folder, because nothing else was chosen.
+  public var usesProjectIcon: Bool {
+    draft.usesProjectIcon
+  }
+
+  /// Goes back to the project's icon after picking a symbol or a colour.
+  public func useProjectIcon() {
+    guard draft.projectIcon != nil else { return }
+    draft.appearance = nil
+  }
+
+  /// Looks for the icon of the folder in the field, and drops the one of the previous folder.
+  ///
+  /// Only for a folder the user designated — through the open panel, or at creation — never while
+  /// a path is typed: reading a folder macOS guards raises the system's consent alert, and that
+  /// must follow a gesture. The answer is only kept if the field still names that folder.
+  func lookForIcon() {
+    let path = draft.resolvedWorkingDirectoryPath
+    guard path != iconFolderPath else { return }
+    iconSearch?.cancel()
+    iconFolderPath = path
+    draft.projectIcon = nil
+    guard let path else { return }
+    iconSearch = Task { [projectIcons] in
+      let icon = await projectIcons.icon(inFolder: path)
+      guard !Task.isCancelled, self.iconFolderPath == path,
+        self.draft.resolvedWorkingDirectoryPath == path
+      else { return }
+      if let icon { self.icons?.insert(icon) }
+      self.draft.projectIcon = icon
+    }
+  }
+
+  /// The icon of the folder in the field, looked for now if it has not been: creation opens the
+  /// folder anyway, and the session is owed the same default whether the folder was typed or
+  /// picked.
+  private func settleIcon() async {
+    lookForIcon()
+    await iconSearch?.value
   }
 
   public func revalidateIfSubmitted() async {
@@ -368,6 +425,7 @@ public final class NewSessionModel {
     // Creation opens the folder itself, so from here on it is a folder this session has looked
     // at, and the checks that follow may keep looking at it.
     checkedFolderPath = draft.workingDirectoryPath
+    await settleIcon()
 
     do {
       let creation = try await create(draft)

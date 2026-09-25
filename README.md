@@ -112,6 +112,11 @@ Swiping a row sideways reveals the statuses before and after its own; a click on
 The status is where the work stands, not what the agent does: closing a session leaves it in its
 column, and only starting or restarting one moves it back In Progress. See
 [`docs/architecture/0024-sessions-as-tasks.md`](docs/architecture/0024-sessions-as-tasks.md).
+The sidebar can also be grouped by working folder (⌃⌘G): one foldable section per project, named
+after its folder or renamed, whose header says how many sessions it holds and the most pressing of
+their states. A new session wears its project's icon — an app icon, a favicon or a logo found in the
+folder — until another one is picked. See
+[`docs/architecture/0025-session-groups.md`](docs/architecture/0025-session-groups.md).
 
 A closed session goes back to work with one command. When the agent can resume its own
 conversation, it does, and it is handed no prompt; when it cannot — no identifier was ever kept,

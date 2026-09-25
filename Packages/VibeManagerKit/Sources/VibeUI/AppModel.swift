@@ -447,6 +447,22 @@ public final class AppModel {
   private let repositoryStatus: RepositoryStatusMonitor?
   private let importLegacyNotes: ImportLegacyNotes
 
+  // MARK: Groups (#27)
+
+  /// The project icons the badges draw.
+  public let icons: SessionIconLibrary
+  let folderLabelStore: any FolderLabelStore
+  let projectIcons: any ProjectIconFinding
+  let iconStore: any SessionIconStore
+  /// What the user renamed groups to.
+  public internal(set) var folderLabels: [SessionFolderKey: String] = [:]
+  /// Where the disk says each working folder is, and which are gone. Until it has answered, a
+  /// folder is filed under its path as written.
+  var folderResolution = SessionFolderResolution()
+  var folderResolutionTask: Task<Void, Never>?
+  /// A rename that could not be written, until the user has read why.
+  public internal(set) var folderLabelFailure: String?
+
   public init(
     repository: any SessionRepository,
     recovery: (any SessionStoreRecovery)? = nil,
@@ -500,10 +516,21 @@ public final class AppModel {
     /// Writes the archive of an export.
     archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() },
     /// Keeps each session's journal. Absent, the inspector shows Git alone.
-    journal: SessionJournalModel? = nil
+    journal: SessionJournalModel? = nil,
+    /// Where the names given to groups are kept. A workspace assembled without one keeps them for
+    /// the run.
+    folderLabels: any FolderLabelStore = InMemoryFolderLabelStore(),
+    /// Looks for a project's icon when a session is created. Finds nothing by default.
+    projectIcons: any ProjectIconFinding = NoProjectIcons(),
+    /// Where the project icons of the sessions are copied.
+    iconStore: any SessionIconStore = InMemorySessionIconStore()
   ) {
     self.journal = journal
     journal?.editor = fileOpeningPreferences.editor
+    folderLabelStore = folderLabels
+    self.projectIcons = projectIcons
+    self.iconStore = iconStore
+    icons = SessionIconLibrary(store: iconStore)
     self.activityTracker = activityTracker
     self.hookConsents = hookConsents
     self.browser = browser
@@ -1824,6 +1851,7 @@ public final class AppModel {
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
+    await loadFolderLabels()
     // Beside the load rather than before it: the notes only serve the search, and the list must
     // not wait on reading them.
     notes.startPreparing(importing: importLegacyNotes)
@@ -1910,9 +1938,13 @@ public final class AppModel {
 
   /// An explicit selection replaces whatever the previous run had asked for: the user is here
   /// now, and a session that reappears later must not take them away from it.
+  ///
+  /// A session a folded group hides is shown: its group unfolds. The quick switcher, a new session
+  /// or a banner can all land on one, and a selection nobody can see is a lost one.
   public func select(_ id: SessionID?) {
     preferredSelection = nil
     if id != shownArchivedSessionID { shownArchivedSessionID = nil }
+    if let id { reveal(id) }
     apply(selection: id)
   }
 
@@ -1938,19 +1970,45 @@ public final class AppModel {
 
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
   /// wrapping: a repeated shortcut should not silently loop back to where it started.
+  ///
+  /// It walks the rows on screen, so a folded group is stepped over. From a selection its group
+  /// hides, it goes on from where that session would be.
   public func selectNext() {
-    let visible = visibleSessions
-    guard let index = selectedIndex else {
-      select(visible.first?.id)
+    let displayed = displayedSessions
+    guard let selectedSessionID else {
+      select(displayed.first?.id)
       return
     }
-    guard index + 1 < visible.count else { return }
-    select(visible[index + 1].id)
+    if let index = displayed.firstIndex(where: { $0.id == selectedSessionID }) {
+      guard index + 1 < displayed.count else { return }
+      select(displayed[index + 1].id)
+      return
+    }
+    let ordered = orderedSessions
+    guard let hidden = ordered.firstIndex(where: { $0.id == selectedSessionID }) else {
+      select(displayed.first?.id)
+      return
+    }
+    let shown = Set(displayed.map(\.id))
+    if let next = ordered[(hidden + 1)...].first(where: { shown.contains($0.id) }) {
+      select(next.id)
+    }
   }
 
   public func selectPrevious() {
-    guard let index = selectedIndex, index > 0 else { return }
-    select(visibleSessions[index - 1].id)
+    let displayed = displayedSessions
+    guard let selectedSessionID else { return }
+    if let index = displayed.firstIndex(where: { $0.id == selectedSessionID }) {
+      guard index > 0 else { return }
+      select(displayed[index - 1].id)
+      return
+    }
+    let ordered = orderedSessions
+    guard let hidden = ordered.firstIndex(where: { $0.id == selectedSessionID }) else { return }
+    let shown = Set(displayed.map(\.id))
+    if let previous = ordered[..<hidden].last(where: { shown.contains($0.id) }) {
+      select(previous.id)
+    }
   }
 
   /// How many sessions a shortcut can reach. Past that, the sidebar and its arrow keys are the
@@ -1961,13 +2019,9 @@ public final class AppModel {
   /// row the user is looking at, so it follows the filter rather than the whole store.
   public func select(position: Int) {
     let index = position - 1
-    let visible = visibleSessions
-    guard visible.indices.contains(index) else { return }
-    select(visible[index].id)
-  }
-
-  private var selectedIndex: Int? {
-    visibleSessions.firstIndex { $0.id == selectedSessionID }
+    let displayed = displayedSessions
+    guard displayed.indices.contains(index) else { return }
+    select(displayed[index].id)
   }
 
   public func resolution(forID id: SessionID) -> SessionAgentResolution? {
@@ -2018,17 +2072,26 @@ public final class AppModel {
   /// The sheet's model lives here, not in the sheet: SwiftUI may evaluate the presentation
   /// closure more than once, and a draft must survive that without being typed twice.
   /// Opens the New Session sheet, on a template when one is given.
-  public func beginNewSession(template: PromptTemplateID? = nil) {
+  ///
+  /// With a folder — New Session in This Folder, from a group — the sheet opens on it and looks
+  /// for its icon at once: sessions already run there, so reading it asks the system nothing new.
+  public func beginNewSession(template: PromptTemplateID? = nil, folder: String? = nil) {
     guard let agents, canCreateSession else { return }
     let model = NewSessionModel(
       create: CreateSession(
-        repository: repository, agents: agents, ticketContext: readTicketContext),
+        repository: repository, agents: agents, ticketContext: readTicketContext,
+        icons: iconStore, diagnostics: diagnostics),
       registry: agents,
       fullDiskAccess: permissions?.status,
-      templates: templates.all
+      templates: templates.all,
+      projectIcons: projectIcons,
+      icons: icons
     )
     if let template {
       model.selectTemplate(template)
+    }
+    if let folder {
+      Task { await model.folderChosen(folder) }
     }
     newSessionModel = model
     isPresentingNewSession = true
@@ -2101,6 +2164,7 @@ public final class AppModel {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
       refreshFailure = nil
+      resolveFolders()
       // A selection restored from a previous run may name a session that has been archived out
       // of the list, or that never came back at all. It falls back instead of blocking the
       // launch on a session that no longer exists.

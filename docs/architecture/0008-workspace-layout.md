@@ -109,6 +109,6 @@ the menu is also where a keyboard-only user discovers that the action exists at 
 
 Restarting a closed session (#10), restoring agents at launch (#11), several repositories and
 worktrees (#12), changed files (#13), the live Git context (#14), editable notes (#16), and
-grouping sessions by folder (#27) — the sidebar is a flat list of sections so that grouping can
-be added without rewriting it. Reordering by drag, several windows, and more than one terminal
+grouping sessions by folder (#27, [ADR 0025](0025-session-groups.md)) — the sidebar is a flat
+list of sections so that grouping can be added without rewriting it. Reordering by drag, several windows, and more than one terminal
 per session are not planned for the V1.

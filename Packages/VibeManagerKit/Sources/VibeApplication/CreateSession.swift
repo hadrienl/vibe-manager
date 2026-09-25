@@ -33,19 +33,27 @@ public struct CreateSession: Sendable {
   private let clock: any SessionClock
   /// Turns a ticket typed as `#12` into its address, from the working folder's repository (#69).
   private let ticketContext: ReadTicketContext?
+  private let icons: (any SessionIconStore)?
+  private let diagnostics: Diagnostics
 
+  /// - Parameter icons: where the project icon a draft wears is copied. Without it, a session is
+  ///   created with the identity its name gives.
   public init(
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     folders: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
     clock: any SessionClock = SystemSessionClock(),
-    ticketContext: ReadTicketContext? = nil
+    ticketContext: ReadTicketContext? = nil,
+    icons: (any SessionIconStore)? = nil,
+    diagnostics: Diagnostics = .disabled
   ) {
     self.repository = repository
     self.agents = agents
     self.folders = folders
     self.clock = clock
     self.ticketContext = ticketContext
+    self.icons = icons
+    self.diagnostics = diagnostics
   }
 
   /// Everything wrong with this draft right now, without creating anything.
@@ -74,9 +82,30 @@ public struct CreateSession: Sendable {
     if let ticketContext, let path = draft.resolvedWorkingDirectoryPath {
       forge = await ticketContext(path: path).repository
     }
-    let session = draft.session(createdAt: clock.now(), repository: forge)
+    let session = await keepingIcon(of: draft).session(createdAt: clock.now(), repository: forge)
     try await repository.save(session)
     return SessionCreation(session: session, plan: plan)
+  }
+
+  /// The draft, once the project icon it wears has been copied into the data folder.
+  ///
+  /// Copied before the session is stored, so a stored session never names an icon that is not
+  /// there. An icon that cannot be written never blocks the creation: the session wears what its
+  /// name gives, and the failure goes to the diagnostics log.
+  private func keepingIcon(of draft: SessionDraft) async -> SessionDraft {
+    guard draft.usesProjectIcon, let icon = draft.projectIcon else { return draft }
+    var draft = draft
+    guard let icons else {
+      draft.projectIcon = nil
+      return draft
+    }
+    do {
+      try await icons.save(icon)
+    } catch {
+      diagnostics.record(.session, .error, "session.iconNotKept")
+      draft.projectIcon = nil
+    }
+    return draft
   }
 
   /// The draft's problems, each stated once.
