@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import VibeApplication
 import VibeDomain
+import VibeLocalizationTesting
 import VibeTerminalUI
 
 @testable import VibeUI
@@ -23,7 +24,7 @@ struct SessionStatusPresentationTests {
       paneStatus: .running
     )
 
-    #expect(presentation.label == "Running")
+    #expect(english(presentation.label) == "Running")
     #expect(presentation.severity == .normal)
   }
 
@@ -37,7 +38,7 @@ struct SessionStatusPresentationTests {
       wasStoppedOnPurpose: true
     )
 
-    #expect(closed.label == "Closed")
+    #expect(english(closed.label) == "Closed")
     #expect(closed.severity == .normal)
 
     // The same code, from an agent nobody asked to stop, is still a failure.
@@ -63,9 +64,9 @@ struct SessionStatusPresentationTests {
 
     #expect(failed.severity == .error)
     #expect(exited.severity == .error)
-    #expect(exited.label.contains("127"))
+    #expect(english(exited.label).contains("127"))
     #expect(terminated.severity == .error)
-    #expect(terminated.label.contains("9"))
+    #expect(english(terminated.label).contains("9"))
   }
 
   @Test("A clean exit is not a failure")
@@ -73,7 +74,7 @@ struct SessionStatusPresentationTests {
     let presentation = SessionStatusPresentation.make(
       session: session(), paneStatus: .exited(code: 0))
 
-    #expect(presentation.label == "Finished")
+    #expect(english(presentation.label) == "Finished")
     #expect(presentation.severity == .normal)
   }
 
@@ -87,7 +88,7 @@ struct SessionStatusPresentationTests {
     ]
 
     #expect(Set(states.map(\.symbolName)).count == states.count)
-    #expect(Set(states.map(\.label)).count == states.count)
+    #expect(Set(states.map { english($0.label) }).count == states.count)
   }
 
   @Test("A missing agent is reported only when nothing is running")
@@ -105,9 +106,9 @@ struct SessionStatusPresentationTests {
       resolution: unknown
     )
 
-    #expect(idle.label == "Agent unavailable")
+    #expect(english(idle.label) == "Agent unavailable")
     #expect(idle.severity == .attention)
-    #expect(running.label == "Running")
+    #expect(english(running.label) == "Running")
   }
 
   @Test("A terminal that simply finished does not hide a missing agent")
@@ -126,8 +127,8 @@ struct SessionStatusPresentationTests {
       resolution: unknown
     )
 
-    #expect(finished.label == "Agent unavailable")
-    #expect(failed.label.contains("127"))
+    #expect(english(finished.label) == "Agent unavailable")
+    #expect(english(failed.label).contains("127"))
   }
 
   @Test("VoiceOver hears the name, the agent and the state")
@@ -139,4 +140,39 @@ struct SessionStatusPresentationTests {
 
     #expect(label == "Refactor the supervisor, claude-code sonnet, Running")
   }
+}
+
+@Suite("What the sidebar says about a session, in French")
+struct SessionStatusFrenchTests {
+  @Test("Every state reads in French")
+  func states() {
+    let expected: [(TerminalPaneModel.Status, String)] = [
+      (.starting, "Démarrage"),
+      (.running, "En cours"),
+      (.exited(code: 0), "Terminée"),
+      (.exited(code: 127), "Terminée avec le code 127"),
+      (.terminated(signal: 9), "Interrompue par le signal 9"),
+      (.failed(message: "x"), "Échec"),
+    ]
+    for (pane, french) in expected {
+      let status = SessionStatusPresentation.make(
+        session: WorkSession(name: "S", status: .active), paneStatus: pane)
+      #expect(Localization.string(status.label, in: "fr") == french)
+    }
+  }
+
+  @Test("A session with nothing running reads its stored state in French")
+  func storedStates() {
+    let labels = [SessionStatus.active, .closed, .archived].map {
+      Localization.string(
+        SessionStatusPresentation.make(session: WorkSession(name: "S", status: $0), paneStatus: nil)
+          .label,
+        in: "fr")
+    }
+    #expect(labels == ["Arrêtée", "Fermée", "Archivée"])
+  }
+}
+
+private func english(_ label: LocalizedStringResource) -> String {
+  Localization.string(label, in: "en")
 }

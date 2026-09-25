@@ -1,7 +1,3248 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-
+  "sourceLanguage": "en",
+  "strings": {
+    "": {},
+    "%@ %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ A new process will be started instead, and given this summary of what the session carries. You can edit it before it is sent.": {
+      "comment": "Why the conversation cannot be resumed, in one sentence.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Un nouveau processus sera lancé à la place, avec ce résumé de ce que contient la session. Vous pouvez le modifier avant son envoi."
+          }
+        }
+      }
+    },
+    "%@ Nothing was stopped or closed.": {
+      "comment": "Why the application could not reattach to its agents, in one sentence.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Rien n’a été arrêté ni fermé."
+          }
+        }
+      }
+    },
+    "%@ The file is left untouched, so nothing in it is lost.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Le fichier est laissé intact : rien de ce qu’il contient n’est perdu."
+          }
+        }
+      }
+    },
+    "%@ This agent takes no initial prompt either, so the new process starts without any summary of the session.": {
+      "comment": "Why the conversation cannot be resumed, in one sentence.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Cet agent n’accepte pas non plus de prompt initial : le nouveau processus démarre donc sans résumé de la session."
+          }
+        }
+      }
+    },
+    "%@ changed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modifié"
+          }
+        }
+      }
+    },
+    "%@ is multiline": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sur plusieurs lignes"
+          }
+        }
+      }
+    },
+    "%@ is not a field — names use letters, digits, - and _ — so it stays as text.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ n’est pas un champ — un nom utilise des lettres, des chiffres, - et _ — et reste donc du texte."
+          }
+        }
+      }
+    },
+    "%@ is required": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ obligatoire"
+          }
+        }
+      }
+    },
+    "%@ of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ of %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ sur %2$@"
+          }
+        }
+      }
+    },
+    "%@ of %@ · From “%@”, revision %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ of %2$@ · From “%3$@”, revision %4$lld"
+          }
+        }
+      }
+    },
+    "%@ over what an agent can be started with. Shorten the summary.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ de plus que ce avec quoi un agent peut être lancé. Raccourcissez le résumé."
+          }
+        }
+      }
+    },
+    "%@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@. %2$@"
+          }
+        }
+      }
+    },
+    "%@. %@ %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@. %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%@: %@": {
+      "comment": "A session's name, then a sentence about it.\nA session's name, then what happened to it when the sessions were restored.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : %2$@"
+          }
+        }
+      }
+    },
+    "%lld": {},
+    "%lld changed entries": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entrée modifiée"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entrées modifiées"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entrées modifiées"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changed entry"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changed entries"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld percent for Git": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld pour cent pour Git"
+          }
+        }
+      }
+    },
+    "%lld problems to fix": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problème à corriger"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problèmes à corriger"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problèmes à corriger"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problem to fix"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld problems to fix"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld+": {},
+    "%lld.": {},
+    "/%@/": {},
+    "1 problem to fix": {},
+    "A finished session shows its last output, and can be restarted.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une session terminée affiche sa dernière sortie, et peut être relancée."
+          }
+        }
+      }
+    },
+    "A template is a prompt with fields to fill in — “Review {{url}}” — ready to start a session from.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un modèle est un prompt avec des champs à remplir — « Revue {{url}} » — prêt à lancer une session."
+          }
+        }
+      }
+    },
+    "A transcript is no longer found; what it reported until %@ is kept.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un transcript est introuvable ; ce qu’il indiquait jusqu’au %@ est conservé."
+          }
+        }
+      }
+    },
+    "Accent %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couleur %@"
+          }
+        }
+      }
+    },
+    "Add Examples": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter les exemples"
+          }
+        }
+      }
+    },
+    "Agent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent"
+          }
+        }
+      }
+    },
+    "Agent & initial prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent et prompt initial"
+          }
+        }
+      }
+    },
+    "Agent and initial prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent et prompt initial"
+          }
+        }
+      }
+    },
+    "Agent unavailable": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent indisponible"
+          }
+        }
+      }
+    },
+    "Agent, usage & initial prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent, utilisation et prompt initial"
+          }
+        }
+      }
+    },
+    "Agent, usage and initial prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent, utilisation et prompt initial"
+          }
+        }
+      }
+    },
+    "Agents kept running go on working in the background, and are back on screen as they are the next time Vibe Manager is opened. A restart of the Mac stops them.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les agents laissés en cours d’exécution continuent de travailler en arrière-plan, et réapparaissent tels quels à la prochaine ouverture de Vibe Manager. Un redémarrage du Mac les arrête."
+          }
+        }
+      }
+    },
+    "Also looked in: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Également consulté : %@"
+          }
+        }
+      }
+    },
+    "Another copy of Vibe Manager (pid %@) is running these sessions.": {
+      "comment": "The process identifier of the other copy.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une autre copie de Vibe Manager (pid %@) exécute ces sessions."
+          }
+        }
+      }
+    },
+    "Another copy of Vibe Manager is running these sessions. Nothing was restored or changed here.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une autre copie de Vibe Manager exécute ces sessions. Rien n’a été restauré ni modifié ici."
+          }
+        }
+      }
+    },
+    "Any folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous les dossiers"
+          }
+        }
+      }
+    },
+    "Archive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archiver"
+          }
+        }
+      }
+    },
+    "Archive this session?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archiver cette session ?"
+          }
+        }
+      }
+    },
+    "Archive “%@”?": {
+      "comment": "A session's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archiver « %@ » ?"
+          }
+        }
+      }
+    },
+    "Archived": {
+      "comment": "A session's state in the sidebar; also labels the date it took that state.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivée"
+          }
+        }
+      }
+    },
+    "Archive…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archiver…"
+          }
+        }
+      }
+    },
+    "As of %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "État à %@"
+          }
+        }
+      }
+    },
+    "Ask": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demander"
+          }
+        }
+      }
+    },
+    "Ask before closing a session whose agent is running": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demander avant de fermer une session dont l’agent est en cours d’exécution"
+          }
+        }
+      }
+    },
+    "Cache read": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lus en cache"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        }
+      }
+    },
+    "Cancel creates nothing — no session, no process.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler ne crée rien — ni session, ni processus."
+          }
+        }
+      }
+    },
+    "Changed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifié"
+          }
+        }
+      }
+    },
+    "Chart": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Graphique"
+          }
+        }
+      }
+    },
+    "Choose a folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un dossier"
+          }
+        }
+      }
+    },
+    "Choose…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir…"
+          }
+        }
+      }
+    },
+    "Clear Filter": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer le filtre"
+          }
+        }
+      }
+    },
+    "Clear Usage Data": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer les données d’utilisation"
+          }
+        }
+      }
+    },
+    "Clear Usage Data…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer les données d’utilisation…"
+          }
+        }
+      }
+    },
+    "Clear filter": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer le filtre"
+          }
+        }
+      }
+    },
+    "Clear usage data?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer les données d’utilisation ?"
+          }
+        }
+      }
+    },
+    "Close Session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer la session"
+          }
+        }
+      }
+    },
+    "Close this session?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer cette session ?"
+          }
+        }
+      }
+    },
+    "Close “%@”?": {
+      "comment": "A session's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer « %@ » ?"
+          }
+        }
+      }
+    },
+    "Closed": {
+      "comment": "A session's state in the sidebar; also labels the date it took that state.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermée"
+          }
+        }
+      }
+    },
+    "Collapsed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replié"
+          }
+        }
+      }
+    },
+    "Copy": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier"
+          }
+        }
+      }
+    },
+    "Copy Notes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier les notes"
+          }
+        }
+      }
+    },
+    "Copy Path": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le chemin"
+          }
+        }
+      }
+    },
+    "Copy Relative Path": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le chemin relatif"
+          }
+        }
+      }
+    },
+    "Cost: not available — neither CLI reports a reliable cost.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coût : non disponible — aucune des deux CLI ne fournit un coût fiable."
+          }
+        }
+      }
+    },
+    "Create & Launch": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer et lancer"
+          }
+        }
+      }
+    },
+    "Create one to start a terminal and its coding agent.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créez-en une pour lancer un terminal et son agent de code."
+          }
+        }
+      }
+    },
+    "Created": {
+      "comment": "Labels the date a session was created.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créée"
+          }
+        }
+      }
+    },
+    "Day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jour"
+          }
+        }
+      }
+    },
+    "Decisions, links, what to check next — saved automatically.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Décisions, liens, ce qu’il faut vérifier ensuite — enregistré automatiquement."
+          }
+        }
+      }
+    },
+    "Default Application": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application par défaut"
+          }
+        }
+      }
+    },
+    "Default model of the agent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle par défaut de l’agent"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
+          }
+        }
+      }
+    },
+    "Delete Template": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le modèle"
+          }
+        }
+      }
+    },
+    "Delete “%@”?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer « %@ » ?"
+          }
+        }
+      }
+    },
+    "Delete…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer…"
+          }
+        }
+      }
+    },
+    "Detect Again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer la détection"
+          }
+        }
+      }
+    },
+    "Detect again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer la détection"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        }
+      }
+    },
+    "Diagnostics preview": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aperçu des diagnostics"
+          }
+        }
+      }
+    },
+    "Discard This Template": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner ce modèle"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer"
+          }
+        }
+      }
+    },
+    "Divider between Git and the session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séparateur entre Git et la session"
+          }
+        }
+      }
+    },
+    "Don't Save": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne pas enregistrer"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
+          }
+        }
+      }
+    },
+    "Don’t ask again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne plus demander"
+          }
+        }
+      }
+    },
+    "Double-click a file in the Git list, or press Return, to open it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-cliquez sur un fichier de la liste Git, ou appuyez sur Retour, pour l’ouvrir."
+          }
+        }
+      }
+    },
+    "Duplicate": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dupliquer"
+          }
+        }
+      }
+    },
+    "Edit as Text": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier comme texte"
+          }
+        }
+      }
+    },
+    "Edited": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifié"
+          }
+        }
+      }
+    },
+    "Exited with code %@": {
+      "comment": "A session's state: its agent ended with this exit status.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminée avec le code %@"
+          }
+        }
+      }
+    },
+    "Expanded": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplié"
+          }
+        }
+      }
+    },
+    "Export All…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout exporter…"
+          }
+        }
+      }
+    },
+    "Export Diagnostics": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter les diagnostics"
+          }
+        }
+      }
+    },
+    "Export Diagnostics…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter les diagnostics…"
+          }
+        }
+      }
+    },
+    "Export “%@”…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter « %@ »…"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec"
+          }
+        }
+      }
+    },
+    "Field": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Champ"
+          }
+        }
+      }
+    },
+    "File access cannot be read in this window.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’accès aux fichiers ne peut pas être lu dans cette fenêtre."
+          }
+        }
+      }
+    },
+    "Filtering is on. Click to clear it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un filtre est actif. Cliquez pour l’effacer."
+          }
+        }
+      }
+    },
+    "Finder (reveal only)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder (afficher seulement)"
+          }
+        }
+      }
+    },
+    "Finished": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminée"
+          }
+        }
+      }
+    },
+    "Folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dossier"
+          }
+        }
+      }
+    },
+    "From template “%@”": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D’après le modèle « %@ »"
+          }
+        }
+      }
+    },
+    "From template “%@”, revision %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "From template “%1$@”, revision %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D’après le modèle « %1$@ », révision %2$@"
+          }
+        }
+      }
+    },
+    "Full Disk Access": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accès complet au disque"
+          }
+        }
+      }
+    },
+    "Gathering diagnostics…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collecte des diagnostics…"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Général"
+          }
+        }
+      }
+    },
+    "Git": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Git"
+          }
+        }
+      }
+    },
+    "Granting Full Disk Access once, as you would for Terminal, replaces all of those alerts.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accorder une fois l’accès complet au disque, comme vous le feriez pour Terminal, remplace toutes ces alertes."
+          }
+        }
+      }
+    },
+    "Group by": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grouper par"
+          }
+        }
+      }
+    },
+    "Hidden": {
+      "comment": "The inspector is hidden.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masqué"
+          }
+        }
+      }
+    },
+    "Hide Context": {
+      "comment": "Hides the inspector of the window.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer le contexte"
+          }
+        }
+      }
+    },
+    "Hide Details": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer les détails"
+          }
+        }
+      }
+    },
+    "Hide files": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer les fichiers"
+          }
+        }
+      }
+    },
+    "Hide the files of this folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer les fichiers de ce dossier"
+          }
+        }
+      }
+    },
+    "Hint": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indication"
+          }
+        }
+      }
+    },
+    "Hint of %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indication de %@"
+          }
+        }
+      }
+    },
+    "History": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique"
+          }
+        }
+      }
+    },
+    "Hours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heures"
+          }
+        }
+      }
+    },
+    "Identical — skipped": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identique — ignoré"
+          }
+        }
+      }
+    },
+    "Ignore": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignorer"
+          }
+        }
+      }
+    },
+    "Import": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer"
+          }
+        }
+      }
+    },
+    "Import Templates": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer des modèles"
+          }
+        }
+      }
+    },
+    "Import…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer…"
+          }
+        }
+      }
+    },
+    "Initial prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt initial"
+          }
+        }
+      }
+    },
+    "Invalid pattern: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motif non valide : %@"
+          }
+        }
+      }
+    },
+    "Its running agent will be stopped.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son agent en cours sera arrêté."
+          }
+        }
+      }
+    },
+    "Keep Both": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder les deux"
+          }
+        }
+      }
+    },
+    "Keep them running": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les laisser tourner"
+          }
+        }
+      }
+    },
+    "Label": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libellé"
+          }
+        }
+      }
+    },
+    "Label of %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libellé de %@"
+          }
+        }
+      }
+    },
+    "Let agents read your folders": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laisser les agents lire vos dossiers"
+          }
+        }
+      }
+    },
+    "Loading sessions…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des sessions…"
+          }
+        }
+      }
+    },
+    "Loading templates…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des modèles…"
+          }
+        }
+      }
+    },
+    "Looking for coding agents…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recherche des agents de code…"
+          }
+        }
+      }
+    },
+    "Manage…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gérer…"
+          }
+        }
+      }
+    },
+    "Model": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle"
+          }
+        }
+      }
+    },
+    "More": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus"
+          }
+        }
+      }
+    },
+    "More actions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus d’actions"
+          }
+        }
+      }
+    },
+    "Move Down": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descendre"
+          }
+        }
+      }
+    },
+    "Move Up": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monter"
+          }
+        }
+      }
+    },
+    "Multiline": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plusieurs lignes"
+          }
+        }
+      }
+    },
+    "New": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau"
+          }
+        }
+      }
+    },
+    "New Session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle session"
+          }
+        }
+      }
+    },
+    "New Template": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau modèle"
+          }
+        }
+      }
+    },
+    "No active session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session active"
+          }
+        }
+      }
+    },
+    "No agent recorded": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun agent enregistré"
+          }
+        }
+      }
+    },
+    "No closed session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session fermée"
+          }
+        }
+      }
+    },
+    "No coding agent was detected on this Mac.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun agent de code n’a été détecté sur ce Mac."
+          }
+        }
+      }
+    },
+    "No folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun dossier"
+          }
+        }
+      }
+    },
+    "No matching session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session correspondante"
+          }
+        }
+      }
+    },
+    "No repository in this session yet.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun dépôt dans cette session pour l’instant."
+          }
+        }
+      }
+    },
+    "No repository worked in yet.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun dépôt travaillé pour l’instant."
+          }
+        }
+      }
+    },
+    "No session in active matches this filter.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session active ne correspond à ce filtre."
+          }
+        }
+      }
+    },
+    "No session in closed matches this filter.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session fermée ne correspond à ce filtre."
+          }
+        }
+      }
+    },
+    "No session selected": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session sélectionnée"
+          }
+        }
+      }
+    },
+    "No session yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session pour l’instant"
+          }
+        }
+      }
+    },
+    "No templates yet.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun modèle pour l’instant."
+          }
+        }
+      }
+    },
+    "No token usage was reported for this row.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune consommation de jetons n’a été signalée pour cette ligne."
+          }
+        }
+      }
+    },
+    "No transcript of this session was found, so only what is attached can be shown.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun transcript de cette session n’a été trouvé : seul ce qui y est rattaché peut être affiché."
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun"
+          }
+        }
+      }
+    },
+    "None — free prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun — prompt libre"
+          }
+        }
+      }
+    },
+    "None — the sheet keeps its folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun — la fenêtre garde son dossier"
+          }
+        }
+      }
+    },
+    "Not Now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus tard"
+          }
+        }
+      }
+    },
+    "Not a Git repository. The repositories the agent works in inside it appear above.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce n’est pas un dépôt Git. Les dépôts dans lesquels l’agent travaille à l’intérieur apparaissent ci-dessus."
+          }
+        }
+      }
+    },
+    "Not running": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêtée"
+          }
+        }
+      }
+    },
+    "Not saved yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas encore enregistré"
+          }
+        }
+      }
+    },
+    "Notes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        }
+      }
+    },
+    "Nothing is deleted: notes, repositories and Git metadata are kept, and the session stays readable under Closed. It can no longer be reopened until it is unarchived.": {
+      "comment": "Closed is the tab of the sidebar that lists closed sessions.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et la session reste consultable dans Fermées. Elle ne pourra plus être rouverte avant d’être désarchivée."
+          }
+        }
+      }
+    },
+    "Nothing is replaced unless you choose it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n’est remplacé sans votre accord."
+          }
+        }
+      }
+    },
+    "Nothing was restored or changed here. Quit that copy before working from this one.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n’a été restauré ni modifié ici. Quittez cette copie avant de travailler depuis celle-ci."
+          }
+        }
+      }
+    },
+    "Now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actuellement"
+          }
+        }
+      }
+    },
+    "Only the first %lld changes are listed; the counts are exact.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seules les %lld premières modifications sont listées ; les totaux sont exacts."
+          }
+        }
+      }
+    },
+    "Open Privacy Settings": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les réglages de confidentialité"
+          }
+        }
+      }
+    },
+    "Open System Settings": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir Réglages Système"
+          }
+        }
+      }
+    },
+    "Open changed files with": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les fichiers modifiés avec"
+          }
+        }
+      }
+    },
+    "Open in %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir dans %@"
+          }
+        }
+      }
+    },
+    "Open with Default Application": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir avec l’application par défaut"
+          }
+        }
+      }
+    },
+    "Other…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autre…"
+          }
+        }
+      }
+    },
+    "Period": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Période"
+          }
+        }
+      }
+    },
+    "Press ⌘N to start one, or look under Closed for earlier work.": {
+      "comment": "Closed is the tab of the sidebar that lists closed sessions.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appuyez sur ⌘N pour en lancer une, ou consultez Fermées pour retrouver un travail antérieur."
+          }
+        }
+      }
+    },
+    "Preview": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aperçu"
+          }
+        }
+      }
+    },
+    "Privacy": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidentialité"
+          }
+        }
+      }
+    },
+    "Read the repositories again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relire les dépôts"
+          }
+        }
+      }
+    },
+    "Reading": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture"
+          }
+        }
+      }
+    },
+    "Reading the repositories…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture des dépôts…"
+          }
+        }
+      }
+    },
+    "Reading transcripts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture des transcripts"
+          }
+        }
+      }
+    },
+    "Reading transcripts…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture des transcripts…"
+          }
+        }
+      }
+    },
+    "Reading…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture…"
+          }
+        }
+      }
+    },
+    "Recorded since %@.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistré depuis le %@."
+          }
+        }
+      }
+    },
+    "Refresh": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser"
+          }
+        }
+      }
+    },
+    "Regenerate the summary": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Régénérer le résumé"
+          }
+        }
+      }
+    },
+    "Regenerate the summary, dropping your edits": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Régénérer le résumé, en abandonnant vos modifications"
+          }
+        }
+      }
+    },
+    "Reload": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recharger"
+          }
+        }
+      }
+    },
+    "Remove the folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer le dossier"
+          }
+        }
+      }
+    },
+    "Replace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remplacer"
+          }
+        }
+      }
+    },
+    "Repositories, Git metadata, notes and the initial prompt are kept, and are listed in the context column. An archived session stays in Closed, but cannot be reopened: unarchive it first, then restarting its agent is a separate, deliberate step.": {
+      "comment": "Closed is the tab of the sidebar that lists closed sessions.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les dépôts, les métadonnées Git, les notes et le prompt initial sont conservés, et figurent dans la colonne de contexte. Une session archivée reste dans Fermées, mais ne peut pas être rouverte : désarchivez-la d’abord ; relancer son agent est ensuite une étape distincte et volontaire."
+          }
+        }
+      }
+    },
+    "Required": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obligatoire"
+          }
+        }
+      }
+    },
+    "Responses": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponses"
+          }
+        }
+      }
+    },
+    "Restart": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer"
+          }
+        }
+      }
+    },
+    "Restart “%@” in a new process?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancer « %@ » dans un nouveau processus ?"
+          }
+        }
+      }
+    },
+    "Restore Backup": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer la sauvegarde"
+          }
+        }
+      }
+    },
+    "Restoring": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauration en cours"
+          }
+        }
+      }
+    },
+    "Restoring…": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauration…"
+          }
+        }
+      }
+    },
+    "Resume Sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre les sessions"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        }
+      }
+    },
+    "Retry Now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer maintenant"
+          }
+        }
+      }
+    },
+    "Retrying in %lld s.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvel essai dans %lld s."
+          }
+        }
+      }
+    },
+    "Retrying…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle tentative…"
+          }
+        }
+      }
+    },
+    "Reveal Folder in Finder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le dossier dans le Finder"
+          }
+        }
+      }
+    },
+    "Reveal Parent Folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le dossier parent"
+          }
+        }
+      }
+    },
+    "Reveal in Finder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher dans le Finder"
+          }
+        }
+      }
+    },
+    "Revert": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rétablir"
+          }
+        }
+      }
+    },
+    "Review {{url}}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revue {{url}}"
+          }
+        }
+      }
+    },
+    "Revision %lld": {},
+    "Running": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En cours"
+          }
+        }
+      }
+    },
+    "Running (configured model)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temps d’exécution (modèle configuré)"
+          }
+        }
+      }
+    },
+    "Running time": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temps d’exécution"
+          }
+        }
+      }
+    },
+    "Running time, runs and the tokens your agents' transcripts report, kept on this Mac only. Nothing is sent anywhere, and what the agents were asked or answered is never read.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le temps d’exécution, les exécutions et les jetons indiqués par les transcripts de vos agents, conservés sur ce Mac uniquement. Rien n’est envoyé nulle part, et ce qui a été demandé aux agents ou ce qu’ils ont répondu n’est jamais lu."
+          }
+        }
+      }
+    },
+    "Running times, runs and token totals recorded on this Mac will be deleted. Your agents' own transcripts are not touched.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les temps d’exécution, les exécutions et les totaux de jetons enregistrés sur ce Mac seront supprimés. Les transcripts de vos agents ne sont pas modifiés."
+          }
+        }
+      }
+    },
+    "Runs": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exécutions"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer"
+          }
+        }
+      }
+    },
+    "Save the changes to “%@”?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer les modifications de « %@ » ?"
+          }
+        }
+      }
+    },
+    "Saved as %@.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistré sous %@."
+          }
+        }
+      }
+    },
+    "Save…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer…"
+          }
+        }
+      }
+    },
+    "Scope": {
+      "comment": "Which sessions the sidebar lists.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions affichées"
+          }
+        }
+      }
+    },
+    "Search sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechercher des sessions"
+          }
+        }
+      }
+    },
+    "Select a session to see its repositories and notes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez une session pour voir ses dépôts et ses notes."
+          }
+        }
+      }
+    },
+    "Select a template.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez un modèle."
+          }
+        }
+      }
+    },
+    "Session ": {},
+    "Sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions"
+          }
+        }
+      }
+    },
+    "Sessions created from it keep their prompt.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les sessions créées à partir de lui gardent leur prompt."
+          }
+        }
+      }
+    },
+    "Sessions land here when their agent stops. Nothing is ever deleted.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les sessions arrivent ici quand leur agent s’arrête. Rien n’est jamais supprimé."
+          }
+        }
+      }
+    },
+    "Sessions made from it keep their own symbol and colour.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les sessions créées à partir de lui gardent leurs propres symbole et couleur."
+          }
+        }
+      }
+    },
+    "Sessions shown": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions affichées"
+          }
+        }
+      }
+    },
+    "Sessions unavailable": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions indisponibles"
+          }
+        }
+      }
+    },
+    "Show %lld More": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher %lld de plus"
+          }
+        }
+      }
+    },
+    "Show All (%lld)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout afficher (%lld)"
+          }
+        }
+      }
+    },
+    "Show Context": {
+      "comment": "Shows the inspector of the window.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le contexte"
+          }
+        }
+      }
+    },
+    "Show Details": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les détails"
+          }
+        }
+      }
+    },
+    "Show files": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les fichiers"
+          }
+        }
+      }
+    },
+    "Show prompt": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le prompt"
+          }
+        }
+      }
+    },
+    "Show the files of this folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les fichiers de ce dossier"
+          }
+        }
+      }
+    },
+    "Shown": {
+      "comment": "The inspector is shown.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiché"
+          }
+        }
+      }
+    },
+    "Skipped: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignoré : %@"
+          }
+        }
+      }
+    },
+    "Sort By": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trier par"
+          }
+        }
+      }
+    },
+    "Starting": {
+      "comment": "A session's state, in the sidebar.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrage"
+          }
+        }
+      }
+    },
+    "Starting…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrage…"
+          }
+        }
+      }
+    },
+    "Stop them": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les arrêter"
+          }
+        }
+      }
+    },
+    "Summary handed to %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résumé transmis à %@"
+          }
+        }
+      }
+    },
+    "Summary sent to %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résumé envoyé à %@"
+          }
+        }
+      }
+    },
+    "Summary sent to the agent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résumé envoyé à l’agent"
+          }
+        }
+      }
+    },
+    "Switch Agent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer d’agent"
+          }
+        }
+      }
+    },
+    "Switch Agent — %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer d’agent — %@"
+          }
+        }
+      }
+    },
+    "Switch Agent…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer d’agent…"
+          }
+        }
+      }
+    },
+    "Switch Back to %@…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenir à %@…"
+          }
+        }
+      }
+    },
+    "Switch the agent of %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer l’agent de %@"
+          }
+        }
+      }
+    },
+    "Switch to": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passer à"
+          }
+        }
+      }
+    },
+    "Switch…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer…"
+          }
+        }
+      }
+    },
+    "Template": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle de prompt"
+          }
+        }
+      }
+    },
+    "Templates": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles"
+          }
+        }
+      }
+    },
+    "Terminal — %@ — %@": {
+      "comment": "What VoiceOver calls a terminal: the session's name, then its state.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Terminal — %1$@ — %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal — %1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "Terminated by signal %@": {
+      "comment": "A session's state: its agent was killed by this signal number.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrompue par le signal %@"
+          }
+        }
+      }
+    },
+    "The agent will ask you to sign in inside the terminal.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’agent vous demandera de vous connecter dans le terminal."
+          }
+        }
+      }
+    },
+    "The agent will be stopped. The session can be restarted later.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’agent sera arrêté. La session pourra être relancée plus tard."
+          }
+        }
+      }
+    },
+    "The background terminal host could not be used for it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’hôte des terminaux en arrière-plan n’a pas pu être utilisé pour lui."
+          }
+        }
+      }
+    },
+    "The first match, or its first group when there is one.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La première correspondance, ou son premier groupe s’il y en a un."
+          }
+        }
+      }
+    },
+    "The notes are saved.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les notes sont enregistrées."
+          }
+        }
+      }
+    },
+    "The notes could not be saved: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les notes n’ont pas pu être enregistrées : %@"
+          }
+        }
+      }
+    },
+    "The terminal and the agent start as soon as the session is created.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le terminal et l’agent démarrent dès la création de la session."
+          }
+        }
+      }
+    },
+    "These notes could not be read": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ces notes n’ont pas pu être lues"
+          }
+        }
+      }
+    },
+    "This agent will stop when Vibe Manager quits.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet agent s’arrêtera quand vous quitterez Vibe Manager."
+          }
+        }
+      }
+    },
+    "This editor is no longer installed: files are revealed in the Finder instead.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet éditeur n’est plus installé : les fichiers sont affichés dans le Finder à la place."
+          }
+        }
+      }
+    },
+    "This session has no running terminal in this window.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session n’a aucun terminal en cours dans cette fenêtre."
+          }
+        }
+      }
+    },
+    "This session is archived: nothing was deleted, and it cannot be reopened.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session est archivée : rien n’a été supprimé, et elle ne peut pas être rouverte."
+          }
+        }
+      }
+    },
+    "This session is closed. Everything it carries is kept.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session est fermée. Tout ce qu’elle contient est conservé."
+          }
+        }
+      }
+    },
+    "This summary was shortened to fit what the agent accepts.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce résumé a été raccourci pour tenir dans ce que l’agent accepte."
+          }
+        }
+      }
+    },
+    "This template changed since you picked it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce modèle a changé depuis que vous l’avez choisi."
+          }
+        }
+      }
+    },
+    "Tokens": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons"
+          }
+        }
+      }
+    },
+    "Tokens in": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons en entrée"
+          }
+        }
+      }
+    },
+    "Tokens in (declared model)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons en entrée (modèle déclaré)"
+          }
+        }
+      }
+    },
+    "Tokens in + out (≈)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons en entrée + sortie (≈)"
+          }
+        }
+      }
+    },
+    "Tokens out": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons en sortie"
+          }
+        }
+      }
+    },
+    "Track agent usage": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suivre l’utilisation des agents"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        }
+      }
+    },
+    "Try it": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Essayer"
+          }
+        }
+      }
+    },
+    "Try resuming the conversation anyway": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Essayer quand même de reprendre la conversation"
+          }
+        }
+      }
+    },
+    "Turn the prompt into free text. The session will not refer to the template.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transforme le prompt en texte libre. La session ne fera plus référence au modèle."
+          }
+        }
+      }
+    },
+    "Unarchive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désarchiver"
+          }
+        }
+      }
+    },
+    "Usage": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilisation"
+          }
+        }
+      }
+    },
+    "Usage is not available": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’utilisation n’est pas disponible"
+          }
+        }
+      }
+    },
+    "Value to try for %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valeur à essayer pour %@"
+          }
+        }
+      }
+    },
+    "Values to try appear here for each field of the template.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les valeurs à essayer apparaissent ici pour chaque champ du modèle."
+          }
+        }
+      }
+    },
+    "Vibe Manager runs coding agents on your behalf. macOS asks for permission every time one of them reads your Desktop, Documents, Downloads, an external disk or iCloud Drive — and it asks in the name of this application, once per folder.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vibe Manager exécute des agents de code en votre nom. macOS demande une autorisation chaque fois que l’un d’eux lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive — et il la demande au nom de cette application, une fois par dossier."
+          }
+        }
+      }
+    },
+    "What are you working on?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sur quoi travaillez-vous ?"
+          }
+        }
+      }
+    },
+    "What is it for?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À quoi sert-il ?"
+          }
+        }
+      }
+    },
+    "What you typed is kept until it is saved.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce que vous avez tapé est conservé jusqu’à son enregistrement."
+          }
+        }
+      }
+    },
+    "When quitting with agents running": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En quittant avec des agents en cours d’exécution"
+          }
+        }
+      }
+    },
+    "Without it, macOS asks for permission each time an agent reads your Desktop, Documents, Downloads, an external disk or iCloud Drive. Turning it on takes effect the next time Vibe Manager is opened.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans lui, macOS demande l’autorisation chaque fois qu’un agent lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive. Son activation prend effet à la prochaine ouverture de Vibe Manager."
+          }
+        }
+      }
+    },
+    "You can skip this. Agents still run, and macOS only asks when one of them reaches a protected folder. You can come back to it in Settings at any time.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous pouvez passer cette étape. Les agents fonctionnent quand même, et macOS ne demande que lorsque l’un d’eux accède à un dossier protégé. Vous pourrez y revenir à tout moment dans les Réglages."
+          }
+        }
+      }
+    },
+    "Your agents are still running in the background, but Vibe Manager could not reattach.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos agents s’exécutent toujours en arrière-plan, mais Vibe Manager n’a pas pu s’y reconnecter."
+          }
+        }
+      }
+    },
+    "Your agents are still running in the background, but Vibe Manager could not reattach. %@": {
+      "comment": "Why the application could not reattach to its agents, in one sentence.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos agents s’exécutent toujours en arrière-plan, mais Vibe Manager n’a pas pu s’y reconnecter. %@"
+          }
+        }
+      }
+    },
+    "Your changes are lost if you don't save them.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos modifications seront perdues si vous ne les enregistrez pas."
+          }
+        }
+      }
+    },
+    "and %lld more": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autre"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autres"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autres"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "and %lld more, not listed": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autre, non listé"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autres, non listés"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "et %lld autres, non listés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "live": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en direct"
+          }
+        }
+      }
+    },
+    "no match": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aucune correspondance"
+          }
+        }
+      }
+    },
+    "nothing yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rien pour l’instant"
+          }
+        }
+      }
+    },
+    "—": {},
+    "← %@": {},
+    "→": {}
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

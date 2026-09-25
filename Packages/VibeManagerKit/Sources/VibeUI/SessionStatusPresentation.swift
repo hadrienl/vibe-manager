@@ -17,11 +17,11 @@ public enum SessionStatusSeverity: Equatable, Sendable {
 /// from the machine since. The stored status is the weakest of the three: it says what the user
 /// intended, while the pane says what actually happened.
 public struct SessionStatusPresentation: Equatable, Sendable {
-  public let label: String
+  public let label: LocalizedStringResource
   public let symbolName: String
   public let severity: SessionStatusSeverity
 
-  public init(label: String, symbolName: String, severity: SessionStatusSeverity) {
+  public init(label: LocalizedStringResource, symbolName: String, severity: SessionStatusSeverity) {
     self.label = label
     self.symbolName = symbolName
     self.severity = severity
@@ -66,16 +66,22 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     case .active:
       // Stored as active with nothing running here: the session is real, its terminal is not.
       return SessionStatusPresentation(
-        label: "Not running",
+        label: LocalizedStringResource(
+          "Not running", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "pause.circle",
         severity: .normal
       )
     case .closed:
       return SessionStatusPresentation(
-        label: "Closed", symbolName: "stop.circle", severity: .normal)
+        label: LocalizedStringResource(
+          "Closed", bundle: .module,
+          comment: "A session's state in the sidebar; also labels the date it took that state."),
+        symbolName: "stop.circle", severity: .normal)
     case .archived:
       return SessionStatusPresentation(
-        label: "Archived",
+        label: LocalizedStringResource(
+          "Archived", bundle: .module,
+          comment: "A session's state in the sidebar; also labels the date it took that state."),
         symbolName: "archivebox",
         severity: .normal
       )
@@ -93,7 +99,7 @@ public struct SessionStatusPresentation: Equatable, Sendable {
       // with, and naming a model here would be inventing one.
       parts.append([agent.providerID, agent.modelID].compactMap { $0 }.joined(separator: " "))
     }
-    parts.append(status.label)
+    parts.append(String(localized: status.label))
     return parts.joined(separator: ", ")
   }
 
@@ -125,34 +131,43 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     switch status {
     case .starting:
       return SessionStatusPresentation(
-        label: "Starting", symbolName: "hourglass", severity: .normal)
+        label: LocalizedStringResource(
+          "Starting", bundle: .module, comment: "A session's state, in the sidebar."),
+        symbolName: "hourglass", severity: .normal)
     case .running:
       return SessionStatusPresentation(
-        label: "Running",
+        label: LocalizedStringResource(
+          "Running", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "play.circle.fill",
         severity: .normal
       )
     case .exited(let code) where code == 0:
       return SessionStatusPresentation(
-        label: "Finished",
+        label: LocalizedStringResource(
+          "Finished", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "checkmark.circle",
         severity: .normal
       )
     case .exited(let code):
       return SessionStatusPresentation(
-        label: "Exited with code \(code)",
+        label: LocalizedStringResource(
+          "Exited with code \(String(code))", bundle: .module,
+          comment: "A session's state: its agent ended with this exit status."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error
       )
     case .terminated(let signal):
       return SessionStatusPresentation(
-        label: "Terminated by signal \(signal)",
+        label: LocalizedStringResource(
+          "Terminated by signal \(String(signal))", bundle: .module,
+          comment: "A session's state: its agent was killed by this signal number."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error
       )
     case .failed:
       return SessionStatusPresentation(
-        label: "Failed",
+        label: LocalizedStringResource(
+          "Failed", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error
       )
@@ -165,7 +180,8 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     switch resolution {
     case .unavailable, .unknownProvider:
       return SessionStatusPresentation(
-        label: "Agent unavailable",
+        label: LocalizedStringResource(
+          "Agent unavailable", bundle: .module, comment: "A session's state, in the sidebar."),
         symbolName: "bolt.horizontal.circle",
         severity: .attention
       )

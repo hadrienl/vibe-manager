@@ -23,27 +23,31 @@ public struct RootView: View {
     Group {
       switch model.state {
       case .idle, .loading:
-        ProgressView("Loading sessions…")
-          .controlSize(.large)
+        ProgressView {
+          Text("Loading sessions…", bundle: .module)
+        }
+        .controlSize(.large)
       case .loaded:
         workspace
       case .failed(let message, let canRestoreBackup):
         ContentUnavailableView {
-          Label("Sessions unavailable", systemImage: "exclamationmark.triangle")
+          Label(
+            LocalizedStringResource("Sessions unavailable", bundle: .module),
+            systemImage: "exclamationmark.triangle")
         } description: {
           Text(message)
         } actions: {
           if canRestoreBackup {
-            Button("Restore Backup") {
+            Button(LocalizedStringResource("Restore Backup", bundle: .module)) {
               Task { await model.restoreBackup() }
             }
             .buttonStyle(.borderedProminent)
           }
-          Button("Try Again") {
+          Button(LocalizedStringResource("Try Again", bundle: .module)) {
             Task { await model.reload() }
           }
           if model.canExportDiagnostics {
-            Button("Export Diagnostics…") {
+            Button(LocalizedStringResource("Export Diagnostics…", bundle: .module)) {
               model.beginDiagnosticsExport()
             }
           }
@@ -299,7 +303,7 @@ public struct RootView: View {
           Button {
             model.beginNewSession()
           } label: {
-            Label("New Session", systemImage: "plus")
+            Label(LocalizedStringResource("New Session", bundle: .module), systemImage: "plus")
           }
           .disabled(!model.canCreateSession)
         }
@@ -310,11 +314,18 @@ public struct RootView: View {
             model.layout.toggleInspector()
           } label: {
             Label(
-              model.layout.columns.isInspectorVisible ? "Hide Context" : "Show Context",
+              model.layout.columns.isInspectorVisible
+                ? LocalizedStringResource(
+                  "Hide Context", bundle: .module, comment: "Hides the inspector of the window.")
+                : LocalizedStringResource(
+                  "Show Context", bundle: .module, comment: "Shows the inspector of the window."),
               systemImage: "sidebar.right"
             )
           }
-          .accessibilityValue(model.layout.columns.isInspectorVisible ? "Shown" : "Hidden")
+          .accessibilityValue(
+            model.layout.columns.isInspectorVisible
+              ? Text("Shown", bundle: .module, comment: "The inspector is shown.")
+              : Text("Hidden", bundle: .module, comment: "The inspector is hidden."))
         }
       }
       .inspector(isPresented: inspectorPresented) {
@@ -347,11 +358,15 @@ public struct RootView: View {
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
             // under it: the column stays rather than snapping shut mid-refresh.
-            ContentUnavailableView(
-              "No session selected",
-              systemImage: "sidebar.right",
-              description: Text("Select a session to see its repositories and notes.")
-            )
+            ContentUnavailableView {
+              Label {
+                Text("No session selected", bundle: .module)
+              } icon: {
+                Image(systemName: "sidebar.right")
+              }
+            } description: {
+              Text("Select a session to see its repositories and notes.", bundle: .module)
+            }
           }
         }
         .inspectorColumnWidth(
@@ -368,7 +383,9 @@ public struct RootView: View {
     // Only asked when an agent is running: the one thing closing loses is the work it is doing.
     // `presenting:` for the same reason as the archive dialog below.
     .confirmationDialog(
-      model.pendingClose.map { "Close “\($0.name)”?" } ?? "Close this session?",
+      model.pendingClose.map {
+        Text("Close “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Close this session?", bundle: .module),
       isPresented: Binding(
         get: { model.pendingClose != nil },
         set: { isPresented in
@@ -379,19 +396,21 @@ public struct RootView: View {
       titleVisibility: .visible,
       presenting: model.pendingClose
     ) { session in
-      Button("Close Session") {
+      Button(LocalizedStringResource("Close Session", bundle: .module)) {
         let askAgain = !suppressesCloseConfirmation
         Task { await model.confirmClose(session.id, askAgain: askAgain) }
       }
-      Button("Cancel", role: .cancel) {
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
         model.cancelClose()
       }
     } message: { _ in
-      Text("The agent will be stopped. The session can be restarted later.")
+      Text("The agent will be stopped. The session can be restarted later.", bundle: .module)
     }
     // Before the archive dialog in the chain: the toggle reaches every dialog it wraps, and the
     // archive question has no "Don't ask again".
-    .dialogSuppressionToggle("Don’t ask again", isSuppressed: $suppressesCloseConfirmation)
+    .dialogSuppressionToggle(
+      Text("Don’t ask again", bundle: .module), isSuppressed: $suppressesCloseConfirmation
+    )
     .onChange(of: model.pendingClose?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
     }
@@ -401,7 +420,9 @@ public struct RootView: View {
     // the model. SwiftUI dismisses the dialog before running a button's action, and the dismissal
     // clears the pending session — read there, Archive found nothing and did nothing.
     .confirmationDialog(
-      model.pendingArchive.map { "Archive “\($0.name)”?" } ?? "Archive this session?",
+      model.pendingArchive.map {
+        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Archive this session?", bundle: .module),
       isPresented: Binding(
         get: { model.pendingArchive != nil },
         set: { isPresented in
@@ -412,10 +433,10 @@ public struct RootView: View {
       titleVisibility: .visible,
       presenting: model.pendingArchive
     ) { session in
-      Button("Archive") {
+      Button(LocalizedStringResource("Archive", bundle: .module)) {
         Task { await model.archive(session.id) }
       }
-      Button("Cancel", role: .cancel) {
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
         model.cancelArchive()
       }
     } message: { session in
@@ -425,11 +446,15 @@ public struct RootView: View {
 
   private func archiveConfirmationMessage(for session: WorkSession) -> String {
     let isRunning = model.pane(for: session.id)?.status == .running
-    let agent = isRunning ? "Its running agent will be stopped. " : ""
-    return """
-      \(agent)Nothing is deleted: notes, repositories and Git metadata are kept, and the session \
-      stays readable under Closed. It can no longer be reopened until it is unarchived.
-      """
+    let consequence = String(
+      localized: """
+        Nothing is deleted: notes, repositories and Git metadata are kept, and the session stays \
+        readable under Closed. It can no longer be reopened until it is unarchived.
+        """,
+      bundle: .module, comment: "Closed is the tab of the sidebar that lists closed sessions.")
+    guard isRunning else { return consequence }
+    return String(localized: "Its running agent will be stopped.", bundle: .module) + " "
+      + consequence
   }
 
   /// `.detailOnly` is the only hidden state worth recording; the others all show the sidebar.
@@ -483,11 +508,13 @@ public struct RootView: View {
       }
     } else {
       ContentUnavailableView {
-        Label("No session yet", systemImage: "square.stack.3d.up")
+        Label(
+          LocalizedStringResource("No session yet", bundle: .module),
+          systemImage: "square.stack.3d.up")
       } description: {
-        Text("Create one to start a terminal and its coding agent.")
+        Text("Create one to start a terminal and its coding agent.", bundle: .module)
       } actions: {
-        Button("New Session") {
+        Button(LocalizedStringResource("New Session", bundle: .module)) {
           model.beginNewSession()
         }
         .buttonStyle(.borderedProminent)
@@ -504,7 +531,10 @@ public struct RootView: View {
       resolution: model.resolution(forID: session.id),
       wasStoppedOnPurpose: pane.wasStoppedOnPurpose
     )
-    return "Terminal — \(session.name) — \(status.label)"
+    return String(
+      localized: "Terminal — \(session.name) — \(String(localized: status.label))",
+      bundle: .module,
+      comment: "What VoiceOver calls a terminal: the session's name, then its state.")
   }
 
   @ViewBuilder
@@ -538,7 +568,9 @@ public struct RootView: View {
         } description: {
           Text(
             model.launchFailure(for: session.id)?.message
-              ?? "This session has no running terminal in this window."
+              ?? String(
+                localized: "This session has no running terminal in this window.",
+                bundle: .module)
           )
         } actions: {
           if let suggestion = model.launchFailure(for: session.id)?.suggestion {
@@ -571,19 +603,22 @@ private struct ClosedSessionBar: View {
     HStack(spacing: 10) {
       Image(systemName: "stop.circle")
         .foregroundStyle(.secondary)
-      Text("This session is closed. Everything it carries is kept.")
+      Text("This session is closed. Everything it carries is kept.", bundle: .module)
         .font(.callout)
       Spacer(minLength: 8)
       if isRestarting {
         ProgressView()
           .controlSize(.small)
-        Text("Starting…")
+        Text("Starting…", bundle: .module)
           .font(.callout)
           .foregroundStyle(.secondary)
       }
       if let switchBack, !isRestarting {
-        Button("Switch Back to \(switchBack.label)…", action: switchBack.action)
-          .controlSize(.small)
+        Button(
+          LocalizedStringResource("Switch Back to \(switchBack.label)…", bundle: .module),
+          action: switchBack.action
+        )
+        .controlSize(.small)
       }
       Button(title, action: restart)
         .controlSize(.small)
@@ -612,8 +647,11 @@ private struct RestartFailureBanner: View {
       Image(systemName: "exclamationmark.triangle.fill")
         .foregroundStyle(.orange)
       VStack(alignment: .leading, spacing: 2) {
-        Text("\(failure.sessionName): \(failure.message)")
-          .font(.callout)
+        Text(
+          "\(failure.sessionName): \(failure.message)", bundle: .module,
+          comment: "A session's name, then a sentence about it."
+        )
+        .font(.callout)
         if let suggestion = failure.suggestion {
           Text(suggestion)
             .font(.caption)
@@ -623,15 +661,15 @@ private struct RestartFailureBanner: View {
       Spacer(minLength: 8)
       // Most of these failures are an agent the Mac cannot run right now, and detecting again is
       // what turns that around without leaving the workspace.
-      Button("Detect Again", action: detect)
+      Button(LocalizedStringResource("Detect Again", bundle: .module), action: detect)
         .controlSize(.small)
         .disabled(isDetecting)
       if let restart {
-        Button("Restart", action: restart)
+        Button(LocalizedStringResource("Restart", bundle: .module), action: restart)
           .controlSize(.small)
       }
       if let switchAgent {
-        Button("Switch Agent…", action: switchAgent)
+        Button(LocalizedStringResource("Switch Agent…", bundle: .module), action: switchAgent)
           .controlSize(.small)
       }
       Button {
@@ -640,13 +678,16 @@ private struct RestartFailureBanner: View {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
     // Said as it appears: VoiceOver does not read what shows up away from its cursor.
-    .announcedOnAppear("\(failure.sessionName): \(failure.message)")
+    .announcedOnAppear(
+      String(
+        localized: "\(failure.sessionName): \(failure.message)", bundle: .module,
+        comment: "A session's name, then a sentence about it."))
   }
 }
 
@@ -675,7 +716,7 @@ private struct RestartContextSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Restart “\(pending.sessionName)” in a new process?")
+      Text("Restart “\(pending.sessionName)” in a new process?", bundle: .module)
         .font(.headline)
       Text(explanation)
         .font(.callout)
@@ -689,9 +730,9 @@ private struct RestartContextSheet: View {
           .overlay(
             RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
           )
-          .accessibilityLabel("Summary sent to the agent")
+          .accessibilityLabel(Text("Summary sent to the agent", bundle: .module))
         if pending.isTruncated {
-          Text("This summary was shortened to fit what the agent accepts.")
+          Text("This summary was shortened to fit what the agent accepts.", bundle: .module)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -705,15 +746,15 @@ private struct RestartContextSheet: View {
 
       HStack {
         Spacer()
-        Button("Cancel", role: .cancel, action: cancel)
+        Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel, action: cancel)
           .keyboardShortcut(.cancelAction)
-        Button("Restart") { restart(text) }
+        Button(LocalizedStringResource("Restart", bundle: .module)) { restart(text) }
           .keyboardShortcut(.defaultAction)
           .buttonStyle(.borderedProminent)
           // Return belongs to the summary while it is being edited: ⌘↩ restarts from anywhere in
           // the sheet, as it creates from anywhere in the New Session one.
           .background {
-            Button("Restart") { restart(text) }
+            Button(LocalizedStringResource("Restart", bundle: .module)) { restart(text) }
               .keyboardShortcut(.return, modifiers: .command)
               .hidden()
           }
@@ -725,15 +766,19 @@ private struct RestartContextSheet: View {
 
   private var explanation: String {
     guard pending.carriesContext else {
-      return """
-        \(pending.explanation) This agent takes no initial prompt either, so the new process \
-        starts without any summary of the session.
-        """
+      return String(
+        localized: """
+          \(pending.explanation) This agent takes no initial prompt either, so the new process \
+          starts without any summary of the session.
+          """,
+        bundle: .module, comment: "Why the conversation cannot be resumed, in one sentence.")
     }
-    return """
-      \(pending.explanation) A new process will be started instead, and given this summary of \
-      what the session carries. You can edit it before it is sent.
-      """
+    return String(
+      localized: """
+        \(pending.explanation) A new process will be started instead, and given this summary of \
+        what the session carries. You can edit it before it is sent.
+        """,
+      bundle: .module, comment: "Why the conversation cannot be resumed, in one sentence.")
   }
 }
 
@@ -754,13 +799,13 @@ private struct RefreshFailureBanner: View {
         .lineLimit(2)
       Spacer(minLength: 8)
       if failure.canRestoreBackup {
-        Button("Restore Backup", action: restore)
+        Button(LocalizedStringResource("Restore Backup", bundle: .module), action: restore)
           .controlSize(.small)
       }
-      Button("Try Again", action: retry)
+      Button(LocalizedStringResource("Try Again", bundle: .module), action: retry)
         .controlSize(.small)
       if let export {
-        Button("Export Diagnostics…", action: export)
+        Button(LocalizedStringResource("Export Diagnostics…", bundle: .module), action: export)
           .controlSize(.small)
       }
       Button {
@@ -769,7 +814,7 @@ private struct RefreshFailureBanner: View {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
@@ -796,7 +841,7 @@ private struct RestorationBanner: View {
         .font(.callout)
         .lineLimit(1)
       Spacer(minLength: 8)
-      Button("Cancel", action: cancel)
+      Button(LocalizedStringResource("Cancel", bundle: .module), action: cancel)
         .controlSize(.small)
     }
     .padding(.horizontal, 14)
@@ -832,10 +877,10 @@ private struct RestoreOfferBanner: View {
         }
       }
       Spacer(minLength: 8)
-      Button("Resume Sessions", action: resume)
+      Button(LocalizedStringResource("Resume Sessions", bundle: .module), action: resume)
         .controlSize(.small)
         .buttonStyle(.borderedProminent)
-      Button("Ignore", action: dismiss)
+      Button(LocalizedStringResource("Ignore", bundle: .module), action: dismiss)
         .controlSize(.small)
     }
     .padding(.horizontal, 14)
@@ -856,11 +901,17 @@ private struct OtherInstanceBanner: View {
       Image(systemName: "rectangle.on.rectangle")
         .foregroundStyle(.orange)
       VStack(alignment: .leading, spacing: 2) {
-        Text("Another copy of Vibe Manager (pid \(processIdentifier)) is running these sessions.")
-          .font(.callout)
-        Text("Nothing was restored or changed here. Quit that copy before working from this one.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "Another copy of Vibe Manager (pid \(String(processIdentifier))) is running these sessions.",
+          bundle: .module, comment: "The process identifier of the other copy."
+        )
+        .font(.callout)
+        Text(
+          "Nothing was restored or changed here. Quit that copy before working from this one.",
+          bundle: .module
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
       Spacer(minLength: 8)
       Button {
@@ -869,15 +920,17 @@ private struct OtherInstanceBanner: View {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
     // Said as it appears: VoiceOver does not read what shows up away from its cursor.
     .announcedOnAppear(
-      "Another copy of Vibe Manager is running these sessions. Nothing was restored or changed here."
-    )
+      String(
+        localized:
+          "Another copy of Vibe Manager is running these sessions. Nothing was restored or changed here.",
+        bundle: .module))
   }
 }
 
@@ -887,9 +940,9 @@ private struct InProcessAgentBar: View {
     HStack(spacing: 8) {
       Image(systemName: "exclamationmark.triangle")
         .foregroundStyle(.orange)
-      Text("This agent will stop when Vibe Manager quits.")
+      Text("This agent will stop when Vibe Manager quits.", bundle: .module)
         .font(.callout)
-      Text("The background terminal host could not be used for it.")
+      Text("The background terminal host could not be used for it.", bundle: .module)
         .font(.caption)
         .foregroundStyle(.secondary)
       Spacer(minLength: 0)
@@ -917,31 +970,43 @@ private struct HostUnavailableBanner: View {
         .foregroundStyle(.orange)
       VStack(alignment: .leading, spacing: 2) {
         Text(
-          "Your agents are still running in the background, but Vibe Manager could not reattach."
+          "Your agents are still running in the background, but Vibe Manager could not reattach.",
+          bundle: .module
         )
         .font(.callout)
-        Text("\(reason) Nothing was stopped or closed.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Text(
+          "\(reason) Nothing was stopped or closed.", bundle: .module,
+          comment: "Why the application could not reattach to its agents, in one sentence."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
       }
       Spacer(minLength: 8)
-      Button(isRetrying ? "Retrying…" : "Retry", action: retry)
-        .disabled(isRetrying)
+      Button(
+        isRetrying
+          ? LocalizedStringResource("Retrying…", bundle: .module)
+          : LocalizedStringResource("Retry", bundle: .module),
+        action: retry
+      )
+      .disabled(isRetrying)
       Button {
         dismiss()
       } label: {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
     // Said as it appears: VoiceOver does not read what shows up away from its cursor.
     .announcedOnAppear(
-      "Your agents are still running in the background, but Vibe Manager could not reattach. \(reason)"
-    )
+      String(
+        localized:
+          "Your agents are still running in the background, but Vibe Manager could not reattach. \(reason)",
+        bundle: .module,
+        comment: "Why the application could not reattach to its agents, in one sentence."))
   }
 }
 
@@ -958,7 +1023,7 @@ private struct DetachedNoticeBanner: View {
         Text(notice.message)
           .font(.callout)
         if notice.endedCount > 0 {
-          Text("A finished session shows its last output, and can be restarted.")
+          Text("A finished session shows its last output, and can be restarted.", bundle: .module)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -970,7 +1035,7 @@ private struct DetachedNoticeBanner: View {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
@@ -1006,8 +1071,12 @@ private struct RestoreReportBanner: View {
         if isShowingDetails {
           ForEach(report.lines) { line in
             VStack(alignment: .leading, spacing: 1) {
-              Text("\(line.name): \(line.sentence)")
-                .font(.caption)
+              Text(
+                "\(line.name): \(line.sentence)", bundle: .module,
+                comment:
+                  "A session's name, then what happened to it when the sessions were restored."
+              )
+              .font(.caption)
               if let suggestion = line.suggestion {
                 Text(suggestion)
                   .font(.caption2)
@@ -1019,7 +1088,11 @@ private struct RestoreReportBanner: View {
       }
       Spacer(minLength: 8)
       if !report.lines.isEmpty {
-        Button(isShowingDetails ? "Hide Details" : "Show Details") {
+        Button(
+          isShowingDetails
+            ? LocalizedStringResource("Hide Details", bundle: .module)
+            : LocalizedStringResource("Show Details", bundle: .module)
+        ) {
           isShowingDetails.toggle()
         }
         .controlSize(.small)
@@ -1030,7 +1103,7 @@ private struct RestoreReportBanner: View {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
@@ -1063,7 +1136,7 @@ private struct DetachWarningBanner: View {
         Image(systemName: "xmark")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Dismiss")
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
@@ -1086,10 +1159,13 @@ private struct ArchivedSessionDetail: View {
       HStack(spacing: 10) {
         Image(systemName: "archivebox.fill")
           .foregroundStyle(.secondary)
-        Text("This session is archived: nothing was deleted, and it cannot be reopened.")
-          .font(.callout)
+        Text(
+          "This session is archived: nothing was deleted, and it cannot be reopened.",
+          bundle: .module
+        )
+        .font(.callout)
         Spacer(minLength: 8)
-        Button("Unarchive", action: restore)
+        Button(LocalizedStringResource("Unarchive", bundle: .module), action: restore)
           .controlSize(.small)
       }
       .padding(.horizontal, 14)
@@ -1115,12 +1191,25 @@ private struct ArchivedSessionDetail: View {
           }
 
           Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            dateRow("Created", session.createdAt)
+            dateRow(
+              LocalizedStringResource(
+                "Created", bundle: .module, comment: "Labels the date a session was created."),
+              session.createdAt)
             if let closedAt = session.closedAt {
-              dateRow("Closed", closedAt)
+              dateRow(
+                LocalizedStringResource(
+                  "Closed", bundle: .module,
+                  comment:
+                    "A session's state in the sidebar; also labels the date it took that state."),
+                closedAt)
             }
             if let archivedAt = session.archivedAt {
-              dateRow("Archived", archivedAt)
+              dateRow(
+                LocalizedStringResource(
+                  "Archived", bundle: .module,
+                  comment:
+                    "A session's state in the sidebar; also labels the date it took that state."),
+                archivedAt)
             }
           }
           .font(.callout)
@@ -1130,7 +1219,9 @@ private struct ArchivedSessionDetail: View {
             Repositories, Git metadata, notes and the initial prompt are kept, and are listed in \
             the context column. An archived session stays in Closed, but cannot be reopened: \
             unarchive it first, then restarting its agent is a separate, deliberate step.
-            """
+            """,
+            bundle: .module,
+            comment: "Closed is the tab of the sidebar that lists closed sessions."
           )
           .font(.callout)
           .foregroundStyle(.secondary)
@@ -1144,7 +1235,7 @@ private struct ArchivedSessionDetail: View {
     .background(.background)
   }
 
-  private func dateRow(_ label: String, _ date: Date) -> some View {
+  private func dateRow(_ label: LocalizedStringResource, _ date: Date) -> some View {
     GridRow {
       Text(label)
         .foregroundStyle(.secondary)
@@ -1190,7 +1281,7 @@ private struct SessionSidebar: View {
     .searchable(
       text: Binding(get: { model.filter.searchText }, set: { model.setSearchText($0) }),
       placement: .sidebar,
-      prompt: "Search sessions"
+      prompt: Text("Search sessions", bundle: .module)
     )
   }
 
@@ -1198,7 +1289,7 @@ private struct SessionSidebar: View {
     sessionList
       .focused($isListFocused)
       .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
-      .accessibilityLabel("Sessions")
+      .accessibilityLabel(Text("Sessions", bundle: .module))
       .accessibilityIdentifier("session-list")
   }
 
@@ -1235,7 +1326,9 @@ private struct SessionSidebar: View {
   private var emptyState: some View {
     if model.filter.isNarrowing {
       ContentUnavailableView {
-        Label("No matching session", systemImage: "line.3.horizontal.decrease.circle")
+        Label(
+          LocalizedStringResource("No matching session", bundle: .module),
+          systemImage: "line.3.horizontal.decrease.circle")
       } description: {
         switch model.filter.scope {
         case .active:
@@ -1244,20 +1337,30 @@ private struct SessionSidebar: View {
           Text("No session in closed matches this filter.", bundle: .module)
         }
       } actions: {
-        Button("Clear Filter") { model.clearNarrowing() }
+        Button(LocalizedStringResource("Clear Filter", bundle: .module)) { model.clearNarrowing() }
       }
     } else if model.filter.scope == .closed {
-      ContentUnavailableView(
-        "No closed session",
-        systemImage: "stop.circle",
-        description: Text("Sessions land here when their agent stops. Nothing is ever deleted.")
-      )
+      ContentUnavailableView {
+        Label {
+          Text("No closed session", bundle: .module)
+        } icon: {
+          Image(systemName: "stop.circle")
+        }
+      } description: {
+        Text("Sessions land here when their agent stops. Nothing is ever deleted.", bundle: .module)
+      }
     } else {
-      ContentUnavailableView(
-        "No active session",
-        systemImage: "square.stack.3d.up",
-        description: Text("Press ⌘N to start one, or look under Closed for earlier work.")
-      )
+      ContentUnavailableView {
+        Label {
+          Text("No active session", bundle: .module)
+        } icon: {
+          Image(systemName: "square.stack.3d.up")
+        }
+      } description: {
+        Text(
+          "Press ⌘N to start one, or look under Closed for earlier work.", bundle: .module,
+          comment: "Closed is the tab of the sidebar that lists closed sessions.")
+      }
     }
   }
 }
@@ -1272,7 +1375,8 @@ private struct ScopePicker: View {
 
   var body: some View {
     Picker(
-      "Scope",
+      LocalizedStringResource(
+        "Scope", bundle: .module, comment: "Which sessions the sidebar lists."),
       selection: Binding(get: { model.filter.scope }, set: { model.setScope($0) })
     ) {
       ForEach(SessionScope.allCases, id: \.self) { scope in
@@ -1283,7 +1387,7 @@ private struct ScopePicker: View {
     .labelsHidden()
     .padding(.horizontal, 10)
     .padding(.vertical, 8)
-    .accessibilityLabel("Sessions shown")
+    .accessibilityLabel(Text("Sessions shown", bundle: .module))
   }
 }
 
@@ -1296,7 +1400,7 @@ private struct SidebarFooter: View {
     HStack(spacing: 6) {
       Menu {
         Picker(
-          "Sort By",
+          LocalizedStringResource("Sort By", bundle: .module),
           selection: Binding(get: { model.filter.sort }, set: { model.setSort($0) })
         ) {
           ForEach(SessionSort.allCases, id: \.self) { sort in
@@ -1307,7 +1411,7 @@ private struct SidebarFooter: View {
 
         if !model.availableProviderIDs.isEmpty {
           Divider()
-          Section("Agent") {
+          Section(LocalizedStringResource("Agent", bundle: .module)) {
             ForEach(model.availableProviderIDs, id: \.self) { providerID in
               Toggle(
                 providerID,
@@ -1322,8 +1426,10 @@ private struct SidebarFooter: View {
 
         if !model.availableRepositoryPaths.isEmpty {
           Divider()
-          Section("Folder") {
-            Button("Any folder") { model.setRepositoryFacet(nil) }
+          Section(LocalizedStringResource("Folder", bundle: .module)) {
+            Button(LocalizedStringResource("Any folder", bundle: .module)) {
+              model.setRepositoryFacet(nil)
+            }
             ForEach(model.availableRepositoryPaths, id: \.self) { path in
               Button(displayPath(path)) { model.setRepositoryFacet(path) }
             }
@@ -1332,7 +1438,9 @@ private struct SidebarFooter: View {
 
         if model.filter.isNarrowing {
           Divider()
-          Button("Clear Filter") { model.clearNarrowing() }
+          Button(LocalizedStringResource("Clear Filter", bundle: .module)) {
+            model.clearNarrowing()
+          }
         }
       } label: {
         Label(model.filter.sort.label, systemImage: "arrow.up.arrow.down")
@@ -1349,8 +1457,8 @@ private struct SidebarFooter: View {
           Image(systemName: "line.3.horizontal.decrease.circle.fill")
         }
         .buttonStyle(.borderless)
-        .help("Filtering is on. Click to clear it.")
-        .accessibilityLabel("Clear filter")
+        .help(Text("Filtering is on. Click to clear it.", bundle: .module))
+        .accessibilityLabel(Text("Clear filter", bundle: .module))
       }
     }
     .font(.caption)
@@ -1394,16 +1502,16 @@ private struct SessionCommandButtons: View {
       Button(commands.restartTitle) { commands.restart() }
     }
     if commands.canSwitchAgent {
-      Button("Switch Agent…") { commands.switchAgent() }
+      Button(LocalizedStringResource("Switch Agent…", bundle: .module)) { commands.switchAgent() }
     }
     if commands.canClose {
-      Button("Close Session") { commands.close() }
+      Button(LocalizedStringResource("Close Session", bundle: .module)) { commands.close() }
     }
     if commands.canArchive {
-      Button("Archive…") { commands.requestArchive() }
+      Button(LocalizedStringResource("Archive…", bundle: .module)) { commands.requestArchive() }
     }
     if commands.canRestore {
-      Button("Unarchive") { commands.restore() }
+      Button(LocalizedStringResource("Unarchive", bundle: .module)) { commands.restore() }
     }
   }
 }
@@ -1432,7 +1540,10 @@ private struct SessionRow: View {
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
         Label(
-          isRestoring ? "Restoring…" : status.label,
+          isRestoring
+            ? LocalizedStringResource(
+              "Restoring…", bundle: .module, comment: "A session's state, in the sidebar.")
+            : status.label,
           systemImage: isRestoring ? "arrow.clockwise" : status.symbolName
         )
         .font(.caption)
@@ -1441,7 +1552,7 @@ private struct SessionRow: View {
       }
       Spacer(minLength: 4)
       if let shortcutPosition {
-        Text("⌘\(shortcutPosition)")
+        Text(verbatim: "⌘\(shortcutPosition)")
           .font(.caption2)
           .foregroundStyle(.tertiary)
           .accessibilityHidden(true)
@@ -1454,25 +1565,25 @@ private struct SessionRow: View {
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("session-row")
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
-    .accessibilityValue(isRestoring ? "Restoring" : "")
+    .accessibilityValue(isRestoring ? Text("Restoring", bundle: .module) : Text(verbatim: ""))
     // The same commands, reachable without a pointer and without the menu bar.
     .accessibilityAction(named: Text(commands.restartAnnouncement)) {
       guard commands.canRestart else { return }
       commands.restart()
     }
-    .accessibilityAction(named: "Switch Agent") {
+    .accessibilityAction(named: Text("Switch Agent", bundle: .module)) {
       guard commands.canSwitchAgent else { return }
       commands.switchAgent()
     }
-    .accessibilityAction(named: "Close Session") {
+    .accessibilityAction(named: Text("Close Session", bundle: .module)) {
       guard commands.canClose else { return }
       commands.close()
     }
-    .accessibilityAction(named: "Archive") {
+    .accessibilityAction(named: Text("Archive", bundle: .module)) {
       guard commands.canArchive else { return }
       commands.requestArchive()
     }
-    .accessibilityAction(named: "Unarchive") {
+    .accessibilityAction(named: Text("Unarchive", bundle: .module)) {
       guard commands.canRestore else { return }
       commands.restore()
     }
