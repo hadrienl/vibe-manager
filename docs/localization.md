@@ -39,6 +39,11 @@ the bundle: build a second time before testing a translation.
   code is `String(localized: "…", bundle: .module)`. Each module defines
   `LocalizedStringResource.BundleDescription.module` for the resources (`Localization.swift`).
   `#bundle` would say the same, but Xcode 16.4, which CI uses, does not know it.
+- **Only `Text` takes a `LocalizedStringResource` in the SDK CI builds with** (Xcode 16.4, macOS
+  15). `Button`, `Label`, `Toggle`, `Picker` and `Section` titled with a resource come from
+  `LocalizedStringResourceControls.swift` in `VibeUI`, which says the same through `Text`; any other
+  control is given `Text(resource)` as its label. Later SDKs have these initialisers too, as
+  disfavoured overloads, so the code compiles with both — but only CI tells the old one apart.
 - **A text field takes its title as a view**, `TextField(text:prompt:label:)`, or as a resolved
   `String`: `TextField(_: LocalizedStringResource, text:)` only exists from macOS 26.
 - **`Text(verbatim:)`** for what is shown as it is — a path, a name, `⌘1`, `→` — so that it does
