@@ -123,6 +123,25 @@ struct SessionJournalReaderTests {
     #expect(fourth.events.map(\.event) == [.prompt("new", at: nil)])
   }
 
+  @Test("A line longer than a chunk is skipped, and the lines after it read at once")
+  func longLine() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identifier = "b3d22715-737b-4f7e-b8fe-97bc7bd5faa5"
+    let folder = root.appendingPathComponent("projects/-r", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let file = folder.appendingPathComponent("\(identifier).jsonl")
+    let screenshot =
+      #"{"type":"user","message":{"content":""# + String(repeating: "A", count: 200) + #""}}"#
+    try append(
+      screenshot + "\n" + #"{"type":"user","message":{"content":"after"}}"# + "\n", to: file)
+    let reader = SessionJournalReader(
+      claudeProjects: root.appendingPathComponent("projects"),
+      codexSessions: root.appendingPathComponent("sessions"), chunkSize: 64)
+    let reading = await reader.read(session("claude-code", identifier), from: [:])
+    #expect(reading.events.map(\.event) == [.prompt("after", at: nil)])
+  }
+
   @Test("Codex: user messages but not its instructions, exec commands, outputs and task ends")
   func codex() async throws {
     let root = try scratch()

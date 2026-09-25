@@ -105,9 +105,11 @@ public actor SessionJournalReader: SessionJournalReading {
       else { break }
       // Only whole lines: the CLI may be writing the last one.
       guard let lastNewline = data.lastIndex(of: UInt8(ascii: "\n")) else {
-        // A line longer than a chunk: skipped whole rather than read forever.
-        if data.count == chunkSize { cursor.offset += UInt64(data.count) }
-        break
+        // A line longer than a chunk: skipped whole rather than read forever, and the lines after
+        // it read now.
+        guard data.count == chunkSize else { break }
+        cursor.offset += UInt64(data.count)
+        continue
       }
       let complete = data[data.startIndex...lastNewline]
       cursor.offset += UInt64(complete.count)

@@ -473,9 +473,27 @@ struct Invocation {
   private static let valueOptions: Set<String> = [
     "-R", "--repo", "-b", "--body", "-t", "--title", "-B", "--base", "-H", "--head", "--json",
     "-q", "--jq", "-F", "--body-file", "-l", "--label", "-a", "--assignee", "-m", "--milestone",
-    "--template", "-r", "--reviewer", "-p", "--project", "-d", "--description", "-s", "--state",
-    "--source-branch", "--target-branch", "-c", "--comments", "--message", "-T",
+    "--template", "-r", "--reviewer", "-p", "--project", "--state", "-A", "--author-email",
   ]
+
+  /// Options that take a value for `glab` only: for `gh` they are switches — `pr merge -d -s`.
+  private static let glabValueOptions: Set<String> = [
+    "-d", "--description", "-s", "--source-branch", "--target-branch", "--message", "-T",
+  ]
+
+  /// Switches of `merge` that other actions take a value with: delete the branch, squash, rebase —
+  /// and for `gh`, `-m` merge.
+  private static let mergeSwitches: Set<String> = ["-d", "-s", "-r"]
+
+  private func takesValue(_ option: String, action: String) -> Bool {
+    if action == "merge",
+      Self.mergeSwitches.contains(option) || (program == "gh" && option == "-m")
+    {
+      return false
+    }
+    return Self.valueOptions.contains(option)
+      || (program == "glab" && Self.glabValueOptions.contains(option))
+  }
 
   /// The number the command is about: the first argument after the action that is a number, the
   /// values of options left aside.
@@ -486,7 +504,7 @@ struct Invocation {
         index += 1
         continue
       }
-      if Self.valueOptions.contains(argument) {
+      if takesValue(argument, action: verb.action) {
         index += 2
         continue
       }

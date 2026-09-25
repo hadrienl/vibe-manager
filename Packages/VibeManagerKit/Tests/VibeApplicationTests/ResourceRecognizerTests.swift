@@ -107,6 +107,28 @@ struct ResourceRecognizerTests {
         == [.reference(.gitlab, .pullRequest, number: 3, repository: nil, directory: "/repo", involvement: .changed, at: date)])
   }
 
+  private func numbers(_ found: [ResourceSighting]) -> [Int] {
+    found.compactMap {
+      if case .reference(_, _, let number, _, _, _, _) = $0 { return number }
+      return nil
+    }
+  }
+
+  @Test("Switches are not values: the number after them is still read")
+  func switchesBeforeNumber() {
+    for command in [
+      "gh pr merge -s 42", "gh pr merge -d 42", "gh pr merge -m 42", "gh pr merge -r 42",
+      "gh pr view -c 42", "gh pr view --comments 42",
+    ] {
+      #expect(
+        numbers(sightings(command)) == [42], "\(command)")
+    }
+    #expect(numbers(sightings("glab mr merge -s -d 7")) == [7])
+    #expect(numbers(sightings("glab mr merge -m 'Merge it' 7")) == [7])
+    #expect(sightings("glab mr note -m 3").isEmpty)
+    #expect(numbers(sightings("gh pr edit -m 3 12")) == [12])
+  }
+
   @Test("gh with a URL is read as the URL, with the command's involvement")
   func ghURL() {
     let found = sightings("gh pr review https://github.com/o/r/pull/4 --approve")

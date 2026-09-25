@@ -258,6 +258,49 @@ struct SessionJournalMonitorTests {
     await monitor.stop()
   }
 
+  @Test("A session that stops is let go once finished: no more reads, no more passes")
+  func stoppedIsDropped() async throws {
+    let reader = QueuedJournalReader()
+    let summarizer = ScriptedSummarizer()
+    let monitor = make(reader: reader, summarizer: summarizer)
+    let session = session()
+    await reader.queue(session.id, [.prompt("half done", at: nil)])
+    await monitor.track([session])
+    #expect(await eventually { await reader.readCount >= 1 })
+    let closed = WorkSession(
+      id: session.id, name: "S", agent: session.agent, status: .closed,
+      createdAt: session.createdAt)
+    await monitor.track([closed])
+    #expect(await eventually { await summarizer.requests.count == 1 })
+    try await Task.sleep(for: .milliseconds(200))
+    let reads = await reader.readCount
+    await monitor.track([closed])
+    await monitor.refresh()
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(await reader.readCount == reads)
+    #expect(await summarizer.requests.count == 1)
+    await monitor.stop()
+  }
+
+  @Test("Turns left pending by the last launch are summarized without waiting for a new one")
+  func pendingAfterRelaunch() async throws {
+    let reader = QueuedJournalReader()
+    let summarizer = ScriptedSummarizer()
+    let store = InMemorySessionJournalStore()
+    let session = session()
+    let first = make(reader: reader, summarizer: summarizer, store: store)
+    await first.setSummariesEnabled(false)
+    await reader.queue(session.id, turn("x"))
+    await first.track([session])
+    #expect(await eventually { await first.journal(for: session.id)?.hasEndedTurn == true })
+    await first.stop()
+    #expect(await summarizer.requests.isEmpty)
+    let second = make(reader: reader, summarizer: summarizer, store: store)
+    await second.track([session])
+    #expect(await eventually { await second.journal(for: session.id)?.entries.count == 1 })
+    await second.stop()
+  }
+
   @Test("The journal is found again by a new monitor: nothing read twice, nothing lost")
   func relaunch() async throws {
     let reader = QueuedJournalReader()

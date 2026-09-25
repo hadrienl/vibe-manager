@@ -53,6 +53,8 @@ public actor SessionJournalMonitor {
   private struct Followed {
     var session: WorkSession
     var journal: SessionJournal
+    /// Still in the store's active sessions; false once it stopped, true again if it restarts.
+    var isActive = true
     var isReading = false
     var readAgain = false
     var scheduledPass: Task<Void, Never>?
@@ -160,6 +162,7 @@ public actor SessionJournalMonitor {
     let active = sessions.filter { $0.status == .active }
     let activeIDs = Set(active.map(\.id))
     for id in followed.keys where !activeIDs.contains(id) {
+      followed[id]?.isActive = false
       finish(id)
     }
     for session in active {
@@ -171,6 +174,7 @@ public actor SessionJournalMonitor {
           state.journal.summary = .ready
         }
         state.session = session
+        state.isActive = true
         followed[session.id] = state
         continue
       }
@@ -181,6 +185,8 @@ public actor SessionJournalMonitor {
       followed[session.id] = Followed(session: session, journal: journal)
       publish(session.id)
       requestRead(session.id)
+      // Turns left pending by the last launch — quit during a pass, or after one failed.
+      schedulePass(session.id)
     }
     await refreshWatch()
   }
@@ -559,7 +565,7 @@ public actor SessionJournalMonitor {
     final.scheduledPass?.cancel()
     try? await store.save(final.journal, for: id)
     // Made active again while it was being finished — restarted: it stays followed.
-    if final.session.status == .active {
+    if final.isActive {
       requestRead(id)
       return
     }
