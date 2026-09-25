@@ -103,6 +103,25 @@ struct SessionLauncherTests {
     #expect(typed.initialInput == "Fix the tests\n")
   }
 
+  @Test("An agent's terminal announces colour support whatever the application inherited")
+  func agentTerminalDeclaresItsCapabilities() {
+    let spec = TerminalSpec.agent(
+      plan: AgentLaunchPlan(
+        providerID: AgentProviderID("stub"),
+        executablePath: "/usr/bin/true",
+        arguments: [],
+        environment: ["HOME": "/Users/test", "TERM": "xterm-ghostty"],
+        workingDirectoryPath: "/workspace",
+        promptDelivery: .none
+      )
+    )
+
+    #expect(spec.environment["HOME"] == "/Users/test")
+    #expect(spec.environment["TERM"] == "xterm-256color")
+    #expect(spec.environment["COLORTERM"] == "truecolor")
+    #expect(spec.environment["TERM_PROGRAM"] == "VibeManager")
+  }
+
   @Test("A created session is published and selected even when its launch fails")
   func creationSurvivesAFailedLaunch() async {
     let session = storedSession()
