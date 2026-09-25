@@ -184,8 +184,12 @@ xcodebuild -exportArchive -archivePath "$archive" -exportPath "$exported" \
 # 4. The binary is what a release must be.
 step "Verifying the signature"
 codesign --verify --deep --strict --verbose=2 "$app" || fail "the signature does not verify"
-entitlements="$(codesign -d --entitlements :- "$app" 2>/dev/null || true)"
-[[ -z "$entitlements" ]] || fail "the application has entitlements, and needs none (ADR 0001)"
+# The export signs with an empty dictionary: what matters is that it grants nothing.
+entitlements="$(codesign -d --entitlements - --xml "$app" 2>/dev/null || true)"
+if [[ -n "$entitlements" ]]; then
+  [[ "$(print -rn -- "$entitlements" | plutil -convert json -o - -)" == "{}" ]] \
+    || fail "the application has entitlements, and needs none (ADR 0001)"
+fi
 codesign -d --verbose=4 "$app" 2>&1 | grep -q 'flags=.*runtime' \
   || fail "the hardened runtime is off"
 requirement="$(codesign -d -r- "$app" 2>&1)"
