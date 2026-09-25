@@ -59,11 +59,16 @@ public actor SessionJournalReader: SessionJournalReading {
     return reading
   }
 
+  /// The folders of every agent the session has had, and of its current one even before it has
+  /// named its conversation: the first lines are written before the store knows which file they
+  /// are in, and a folder not watched then would never wake the journal.
   public func transcriptDirectories(for session: WorkSession) async -> [String] {
     var directories: [String] = []
-    for conversation in session.conversations {
+    let providers =
+      session.conversations.map(\.providerID) + [session.agent?.providerID].compactMap { $0 }
+    for providerID in providers {
       let directory: String
-      switch conversation.providerID {
+      switch providerID {
       case ClaudeCodeAgentProvider.id.rawValue: directory = locator.claudeProjects.path
       case CodexAgentProvider.id.rawValue: directory = locator.codexSessions.path
       default: continue

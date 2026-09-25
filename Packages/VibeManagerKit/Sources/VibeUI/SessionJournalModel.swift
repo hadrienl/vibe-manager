@@ -80,14 +80,14 @@ public final class SessionJournalModel {
     await monitor.setSummariesEnabled(summariesEnabled)
   }
 
-  func track(_ sessions: [WorkSession]) async {
+  /// Hands the monitor a list of sessions, after the lists handed before it. Chained here, on the
+  /// main actor, so that the order the lists were made in is the order they arrive in.
+  func track(_ sessions: [WorkSession]) {
     let previous = tracking
-    let task = Task { [monitor] in
+    tracking = Task { [monitor] in
       await previous?.value
       await monitor.track(sessions)
     }
-    tracking = task
-    await task.value
   }
 
   func refresh() async {

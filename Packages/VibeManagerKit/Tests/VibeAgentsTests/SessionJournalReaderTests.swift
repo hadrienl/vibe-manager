@@ -83,6 +83,15 @@ struct SessionJournalReaderTests {
     #expect(events[6] == .turnEnded(at: Date(timeIntervalSince1970: 1_790_330_460)))
   }
 
+  @Test("The agent's folder is watched before it has named its conversation")
+  func directoriesBeforeIdentifier() async {
+    let reader = SessionJournalReader(
+      claudeProjects: URL(fileURLWithPath: "/p"), codexSessions: URL(fileURLWithPath: "/s"))
+    let unnamed = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "codex"), status: .active)
+    #expect(await reader.transcriptDirectories(for: unnamed) == ["/s"])
+  }
+
   @Test("Only whole lines, resumed from the cursor; a replaced file is read from its start")
   func cursors() async throws {
     let root = try scratch()

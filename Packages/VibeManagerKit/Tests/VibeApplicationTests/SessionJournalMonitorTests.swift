@@ -53,6 +53,16 @@ actor ScriptedSummarizer: SessionSummarizing, SessionSummarizerResolving {
   }
 }
 
+/// The store the monitor asks, when a session it follows has not named its conversation yet.
+actor OneSessionRepository: SessionRepository {
+  var stored: WorkSession
+  init(_ session: WorkSession) { stored = session }
+  func set(_ session: WorkSession) { stored = session }
+  func sessions() -> [WorkSession] { [stored] }
+  func session(id: SessionID) -> WorkSession? { stored.id == id ? stored : nil }
+  func save(_ session: WorkSession) { stored = session }
+}
+
 struct NoRepositories: RepositoryIdentityResolving {
   func identity(ofDirectory path: String) async -> RepositoryIdentity? { nil }
 }
@@ -281,6 +291,31 @@ struct SessionJournalMonitorTests {
     #expect(await summarizer.requests.isEmpty)
     await monitor.setSummariesEnabled(true)
     #expect(await eventually { await summarizer.requests.count == 1 })
+    await monitor.stop()
+  }
+
+  @Test("A session started before its agent named its conversation is watched and read anyway")
+  func conversationNamedLater() async throws {
+    let reader = QueuedJournalReader()
+    let summarizer = ScriptedSummarizer()
+    let events = ManualFileChanges()
+    let unnamed = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "claude-code"), status: .active)
+    let repository = OneSessionRepository(unnamed)
+    let monitor = SessionJournalMonitor(
+      store: InMemorySessionJournalStore(), reader: reader, repositories: NoRepositories(),
+      summarizers: summarizer, events: events, repository: repository, timing: fast)
+    await monitor.track([unnamed])
+    #expect(await eventually { events.watchedPaths == ["/t"] })
+    // The CLI names its conversation in the store, then writes.
+    await repository.set(
+      WorkSession(
+        id: unnamed.id, name: "S",
+        agent: SessionAgentConfiguration(providerID: "claude-code", resumeIdentifier: "abc"),
+        status: .active, createdAt: unnamed.createdAt))
+    await reader.queue(unnamed.id, [.prompt("https://github.com/o/r/issues/2", at: nil)])
+    events.send(.changed(["/t/x/abc.jsonl"]))
+    #expect(await eventually { await monitor.journal(for: unnamed.id)?.resources.count == 1 })
     await monitor.stop()
   }
 

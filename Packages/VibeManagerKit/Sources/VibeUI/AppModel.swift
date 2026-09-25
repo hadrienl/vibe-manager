@@ -24,7 +24,13 @@ public final class AppModel {
     public let canRestoreBackup: Bool
   }
 
-  public private(set) var state: State = .idle
+  public private(set) var state: State = .idle {
+    // Every list the workspace holds — a reload, a session just created — is the journal's too:
+    // it follows the active sessions, and gives one that stopped its last pass.
+    didSet {
+      if case .loaded(let sessions) = state { journal?.track(sessions) }
+    }
+  }
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   /// The name of each detected agent, by provider identifier, for the places that name one.
@@ -1935,10 +1941,6 @@ public final class AppModel {
     do {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
-      // The journal follows every active session, and gives one that stopped its last pass.
-      if let journal {
-        Task { await journal.track(sessions) }
-      }
       refreshFailure = nil
       // A selection restored from a previous run may name a session that has been archived out
       // of the list, or that never came back at all. It falls back instead of blocking the

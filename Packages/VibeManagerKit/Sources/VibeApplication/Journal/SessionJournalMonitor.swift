@@ -267,7 +267,7 @@ public actor SessionJournalMonitor {
           !$0.isEmpty
         }
         // A session whose agent has not said its conversation yet may be the one writing.
-        if identifiers.isEmpty
+        if !Self.namesItsConversation(state.session)
           || paths.contains(where: { path in identifiers.contains { path.contains($0) } })
         {
           requestRead(id)
@@ -312,7 +312,7 @@ public actor SessionJournalMonitor {
 
     // A session whose agent has not named its conversation in the store yet, as this monitor was
     // handed it: the store may know by now.
-    if state.session.conversations.isEmpty, let repository,
+    if !Self.namesItsConversation(state.session), let repository,
       let fresh = try? await repository.session(id: id)
     {
       state.session = fresh
@@ -351,6 +351,11 @@ public actor SessionJournalMonitor {
     } while followed[id]?.readAgain == true
 
     if turnEnded { schedulePass(id) }
+  }
+
+  /// Whether the store already says which conversation the session's current agent writes.
+  static func namesItsConversation(_ session: WorkSession) -> Bool {
+    !(session.agent?.resumeIdentifier?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
   }
 
   /// What an event adds to the turns waiting for a summary. Returns whether a turn ended.
