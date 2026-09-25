@@ -239,8 +239,9 @@ the #19 audit. Recovering from each thing that can go wrong, and the known limit
 [`docs/operations.md`](docs/operations.md) (Help ▸ Troubleshooting). What VoiceOver reads and what
 the keyboard reaches is in [`docs/accessibility.md`](docs/accessibility.md).
 
-Releases are signed with a Developer ID, notarized, and published as a disk image on GitHub
-Releases by `Scripts/release.sh <version>`, run on the maintainer's Mac, then checked with
+Releases are signed with a Developer ID, notarized, and drafted as a disk image on GitHub Releases
+when a tag `v<version>` is pushed on `main` (the Release workflow, in a protected environment, runs
+`Scripts/release.sh`), then checked with
 `Scripts/clean-install-check.sh` and [`docs/release-checklist.md`](docs/release-checklist.md). The
 decisions are documented in
 [`docs/architecture/0021-distribution.md`](docs/architecture/0021-distribution.md).

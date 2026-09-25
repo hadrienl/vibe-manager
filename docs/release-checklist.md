@@ -12,13 +12,17 @@ Copy this into the draft, then tick as you go.
 - [ ] The `ui-smoke` workflow is green on that commit (Actions → CI → Run workflow, if it has not
       run since).
 - [ ] The version follows the previous one: `1.2.3`, or `1.2.3-rc.1` for a release candidate.
-- [ ] The notarization credentials are in the keychain (`xcrun notarytool history
-      --keychain-profile vibe-manager-notary` answers).
+- [ ] The `release` environment holds `DEVELOPER_ID_CERTIFICATE_P12`,
+      `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `NOTARY_API_KEY_P8`, `NOTARY_API_KEY_ID`,
+      `NOTARY_API_ISSUER_ID`, and the variable `VIBE_TEAM_ID`; it requires a reviewer and only
+      accepts `v*` tags.
 
 ## Automatic
 
-- [ ] `Scripts/release.sh <version>` ran to the end. It checks, and stops at the first failure:
-  - a clean tree on `main`, equal to `origin/main`, no tag `v<version>` yet, CI green on the commit;
+- [ ] `git tag v<version> && git push origin v<version>`, then the Release workflow approved and run
+      to the end (by hand instead: `Scripts/release.sh <version>` from `main`, before tagging). It
+      checks, and stops at the first failure:
+  - a clean tree, the tag on the commit being built and that commit on `main`, CI green on it;
   - a Developer ID Application certificate of the team;
   - the archive, built with `MARKETING_VERSION=<version>` and
     `CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD)`, nothing written to the repository;
@@ -28,7 +32,8 @@ Copy this into the draft, then tick as you go.
   - the application notarized and stapled, Gatekeeper accepting it;
   - the disk image built by `hdiutil`, signed, notarized, stapled, accepted by Gatekeeper;
   - the SHA-256 of the image, and a **draft** release with both files.
-- [ ] `Scripts/clean-install-check.sh "build/release/<version>/Vibe Manager <version>.dmg"` passed:
+- [ ] `Scripts/clean-install-check.sh "Vibe Manager <version>.dmg"`, on the image downloaded from the
+      draft, passed:
       Gatekeeper and staples, installation in a folder of its own, TCC reset for the bundle, the
       interface smoke test against the installed binary, and its terminal host refusing an ad hoc
       binary that carries the application's identifier.
@@ -92,4 +97,4 @@ Copy this into the draft, then tick as you go.
 ## Publishing
 
 - [ ] The draft's notes: what changed, this list filled in, the SHA-256.
-- [ ] Publish the draft. The tag `v<version>` is created on the commit the script built.
+- [ ] Publish the draft.

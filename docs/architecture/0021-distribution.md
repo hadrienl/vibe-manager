@@ -39,15 +39,29 @@ beside it. It is attached to a **draft** release on GitHub; the draft is publish
 There is no Sparkle in V1: it is a dependency, an EdDSA key to keep and an appcast to host, for a
 release rhythm that does not need it yet. A ticket of its own reopens it after the V1.
 
-### Built on the maintainer's Mac, not in CI
+### Built by a tag, in a protected environment
 
-`Scripts/release.sh <version>` runs where the certificate and the notarization credentials already
-are: the login keychain, the latter stored by `notarytool store-credentials` and never written to a
-file or an environment variable. Importing the certificate into GitHub Actions would expose the key
-to every workflow change, for a gain a monthly release does not need.
+Pushing a tag `v<version>` on a commit of `main` runs `.github/workflows/release.yml`, and nothing
+else does: not a push to `main`, not a pull request. A release is a decision, and two notarizations
+per merge would buy nothing.
 
-The script refuses to go on at the first step that fails: a clean tree on `main` equal to
-`origin/main`, no existing tag, CI green on the commit, the certificate present; then the archive,
+The Developer ID certificate and an App Store Connect API key (role Developer, enough to notarize)
+are secrets of a GitHub environment, `release`, that requires the maintainer's approval before any
+job reads them and is restricted to `v*` tags. The one action the job uses is pinned by commit, not
+by tag. The script imports the certificate into a keychain of its own and writes the key to a file,
+both deleted when it ends, whatever the outcome.
+
+This was a trade. The certificate on the maintainer's Mac alone could not leak through a workflow;
+in CI, anything that runs in the job could read it and sign as the team, and revoking it would
+invalidate every build already distributed. The environment's approval, the pinned action and the
+tag-only trigger narrow that to a job the maintainer has just started and approved, for the
+convenience of releasing without a particular Mac. The same script still runs by hand from `main`
+on that Mac, with the login keychain and a stored notarization profile, should the workflow be
+unavailable.
+
+The script refuses to go on at the first step that fails: a clean tree; in the workflow, a tag
+naming the commit being built, and that commit on `main`; by hand, `main` equal to `origin/main`
+and no tag yet; CI green on the commit, the certificate present; then the archive,
 the export, the checks of the signature (strict verification, no entitlement, hardened runtime, a
 requirement naming the team, the bundle's identifier and version, `mock-agent.sh` sealed, no
 `Local.xcconfig`), notarization, the disk image and its own notarization, the checksum and the
@@ -77,14 +91,18 @@ review A8).
 
 ## Consequences
 
-- A release needs the maintainer's Mac, and takes the time of two notarizations.
+- A release is a tag, an approval, and the time of two notarizations.
 - Users update by downloading the next image. Agents kept running survive it.
-- The first release candidate is drafted by running the script with a `-rc.1` version; it is
+- The first release candidate is drafted by pushing a tag such as `v1.0.0-rc.1`; it is
   marked as a pre-release.
 
 ## Rejected alternatives
 
 - **An unsigned build with instructions to bypass Gatekeeper.** Teaches users to disable a
   protection, and leaves A6 open.
-- **Signing in CI.** See above.
+- **Signing on the maintainer's Mac only.** The safest place for the key, and the first decision of
+  this record; replaced by the protected environment for the convenience of releasing from
+  anywhere.
+- **A release, or a nightly, at every push to `main`.** Two notarizations per merge, and a list of
+  releases nobody decided.
 - **A Homebrew cask.** Worth considering after the V1; it would download the same notarized image.
