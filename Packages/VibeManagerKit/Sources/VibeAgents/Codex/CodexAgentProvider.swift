@@ -71,7 +71,8 @@ public struct CodexAgentProvider: AgentProvider {
   /// `CODEX_HOME`. The only place that touches the machine.
   public static func make(
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
-    diagnostics: any DiagnosticLog = NullDiagnosticLog()
+    diagnostics: any DiagnosticLog = NullDiagnosticLog(),
+    shellEnvironment: (any ShellEnvironmentSource)? = nil
   ) -> CodexAgentProvider {
     // A `CODEX_HOME` this application cannot resolve is dropped rather than forwarded: the
     // CLI would then write its sessions where nothing watches for them.
@@ -96,7 +97,8 @@ public struct CodexAgentProvider: AgentProvider {
         models: [],
         argumentBuilder: CodexArgumentBuilder(),
         availabilityProbe: availabilityProbe,
-        environment: environment
+        environment: environment,
+        shellEnvironment: shellEnvironment
       ),
       catalog: CodexModelCatalog(environment: environment),
       discovery: CodexRolloutSessionDiscovery(environment: environment)

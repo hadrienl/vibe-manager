@@ -249,7 +249,8 @@ enum TestFixtures {
     locator: any ExecutableLocator,
     probe: any ProcessProbe,
     environment: [String: String] = ["PATH": "/usr/bin", "HOME": "/Users/test"],
-    descriptor: AgentDescriptor = TestFixtures.descriptor
+    descriptor: AgentDescriptor = TestFixtures.descriptor,
+    shellEnvironment: (any ShellEnvironmentSource)? = nil
   ) -> CommandLineAgentProvider {
     CommandLineAgentProvider(
       descriptor: descriptor,
@@ -264,7 +265,8 @@ enum TestFixtures {
         environment: environment,
         now: { Date(timeIntervalSince1970: 0) }
       ),
-      environment: environment
+      environment: environment,
+      shellEnvironment: shellEnvironment
     )
   }
 }

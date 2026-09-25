@@ -165,6 +165,63 @@ struct AgentLaunchPlanTests {
     #expect(plan.environment["ANTHROPIC_API_KEY"] == nil)
   }
 
+  @Test("The shell's PATH replaces the inherited one, and the request still has the last word")
+  func shellEnvironmentWins() throws {
+    let plan = try provider.plan(
+      for: AgentLaunchRequest(
+        workingDirectoryPath: "/Users/test/app", additionalEnvironment: ["NVM_DIR": "/request"]),
+      installation: TestFixtures.installation,
+      shellEnvironment: ["PATH": "/Users/test/.local/bin:/usr/bin", "NVM_DIR": "/Users/test/.nvm"]
+    )
+
+    #expect(plan.environment["PATH"] == "/Users/test/.local/bin:/usr/bin")
+    #expect(plan.environment["NVM_DIR"] == "/request")
+    #expect(plan.environment["HOME"] == "/Users/test")
+  }
+
+  @Test("A launch asks the shell for its environment")
+  func launchUsesTheShellEnvironment() async throws {
+    let probe = StubProcessProbe(
+      defaultResponse: .success(ProbeResult(exitCode: 0, standardOutput: "stub-agent 2.4.1")))
+    let shell = LoginShellEnvironment(
+      inherited: [:],
+      probe: StubProcessProbe(
+        defaultResponse: .success(
+          ProbeResult(
+            exitCode: 0,
+            standardOutput: LoginShellEnvironment.marker + "PATH=/Users/test/.local/bin"))))
+    let provider = TestFixtures.provider(
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)),
+      probe: probe,
+      shellEnvironment: shell
+    )
+
+    let plan = try await provider.launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: "/Users/test/app"))
+
+    #expect(plan.environment["PATH"] == "/Users/test/.local/bin")
+  }
+
+  @Test("A shell that does not answer leaves the inherited PATH")
+  func silentShellKeepsTheInheritedPath() async throws {
+    let provider = TestFixtures.provider(
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)),
+      probe: StubProcessProbe(
+        defaultResponse: .success(ProbeResult(exitCode: 0, standardOutput: "stub-agent 2.4.1"))),
+      shellEnvironment: LoginShellEnvironment(
+        inherited: [:],
+        probe: StubProcessProbe(
+          defaultResponse: .success(ProbeResult(exitCode: -1, didTimeOut: true))))
+    )
+
+    let plan = try await provider.launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: "/Users/test/app"))
+
+    #expect(plan.environment["PATH"] == "/usr/bin")
+  }
+
   @Test("Explicit overrides are the only way to add an environment variable")
   func overridesAreExplicit() throws {
     let plan = try plan(additionalEnvironment: ["STUB_AGENT_MODE": "test"])

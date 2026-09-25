@@ -110,7 +110,9 @@ extension ProcessProbe {
 /// injected, including secrets unrelated to the agent.
 public enum AgentEnvironmentPolicy {
   public static let defaultAllowedKeys: Set<String> = [
-    "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LOGNAME", "PATH", "SHELL", "SSH_AUTH_SOCK",
+    // `NVM_DIR` because nvm is often loaded lazily, by shell functions that source it from there:
+    // without it, `npm` and `node` are missing from the shells the agent opens.
+    "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LOGNAME", "NVM_DIR", "PATH", "SHELL", "SSH_AUTH_SOCK",
     "TERM", "TERM_PROGRAM", "TMPDIR", "USER", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
     "XDG_DATA_HOME",
   ]

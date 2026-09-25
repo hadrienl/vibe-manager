@@ -430,9 +430,15 @@ public final class AppEnvironment {
     if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
       return [MockAgentProvider(environment: environment)]
     }
+    // One shell for both agents, asked as soon as the application starts: by the time the first
+    // session is launched, its answer is usually there.
+    let shell = LoginShellEnvironment(inherited: environment, probe: SystemProcessProbe())
+    shell.warmUp()
     var providers: [any AgentProvider] = [
-      ClaudeCodeAgentProvider.make(environment: environment, diagnostics: diagnostics),
-      CodexAgentProvider.make(environment: environment, diagnostics: diagnostics),
+      ClaudeCodeAgentProvider.make(
+        environment: environment, diagnostics: diagnostics, shellEnvironment: shell),
+      CodexAgentProvider.make(
+        environment: environment, diagnostics: diagnostics, shellEnvironment: shell),
     ]
     if MockAgentProvider.isEnabled(environment: environment) {
       providers.append(MockAgentProvider(environment: environment))
