@@ -113,6 +113,16 @@
         }
       }
     },
+    "Back" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Précédent"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "fr" : {
@@ -129,6 +139,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fermer la session"
+          }
+        }
+      }
+    },
+    "Close Tab" : {
+      "comment" : "Closes the web view's tab in front.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer l’onglet"
           }
         }
       }
@@ -233,6 +254,26 @@
         }
       }
     },
+    "Focus Web View" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aller à la vue web"
+          }
+        }
+      }
+    },
+    "Forward" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivant"
+          }
+        }
+      }
+    },
     "Go back to it to finish them, or quit without them." : {
       "localizations" : {
         "fr" : {
@@ -250,6 +291,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer le contexte"
+          }
+        }
+      }
+    },
+    "Hide Web View" : {
+      "comment" : "Hides the session's web view.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer la vue web"
           }
         }
       }
@@ -324,6 +376,26 @@
         }
       }
     },
+    "Open Location…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l’adresse…"
+          }
+        }
+      }
+    },
+    "Open Page in Browser" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la page dans le navigateur"
+          }
+        }
+      }
+    },
     "Previous Session" : {
       "localizations" : {
         "fr" : {
@@ -350,6 +422,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lire la dernière sortie"
+          }
+        }
+      }
+    },
+    "Reload Page" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recharger la page"
           }
         }
       }
@@ -413,6 +495,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher le contexte"
+          }
+        }
+      }
+    },
+    "Show Next Tab" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’onglet suivant"
+          }
+        }
+      }
+    },
+    "Show Previous Tab" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’onglet précédent"
+          }
+        }
+      }
+    },
+    "Show Web View" : {
+      "comment" : "Shows the session's web view.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la vue web"
           }
         }
       }
@@ -542,6 +655,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utilisation"
+          }
+        }
+      }
+    },
+    "Web" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web"
           }
         }
       }

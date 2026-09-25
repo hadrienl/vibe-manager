@@ -81,6 +81,7 @@ public struct NewSessionSheet: View {
           promptField
         }
         folderField
+        ticketField
         agentField
         modelField
         appearanceField
@@ -415,6 +416,27 @@ public struct NewSessionSheet: View {
           Text("Choose…", bundle: .module, comment: "Opens a panel to choose the working folder.")
         }
       }
+    }
+  }
+
+  /// The ticket the session works on (#69), pinned first in its web view. Optional: a branch named
+  /// after a ticket gives one anyway.
+  private var ticketField: some View {
+    LabeledField(
+      Text("Ticket", bundle: .module, comment: "The ticket the new session works on."),
+      help: Text(
+        "Optional. An address, or #12 in the working folder’s repository. Left empty, a branch named after a ticket gives one.",
+        bundle: .module),
+      issues: []
+    ) {
+      TextField(
+        text: $model.draft.ticketText,
+        prompt: Text(verbatim: "https://github.com/owner/repo/issues/12")
+      ) {
+        Text("Ticket", bundle: .module, comment: "The ticket the new session works on.")
+      }
+      .textFieldStyle(.roundedBorder)
+      .accessibilityIdentifier("new-session-ticket")
     }
   }
 

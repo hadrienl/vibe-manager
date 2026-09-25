@@ -70,6 +70,8 @@ pid, so a `git` that started a helper or a login shell whose profile started one
 | A8 | `mock-agent.sh` ships in the Release bundle | None: it is sealed by the signature and only enabled by `VIBE_ENABLE_MOCK_AGENT`, which only the user can set | **Kept**: it is what lets the smoke test run against the notarized build. `release.sh` checks it is there and sealed. |
 | A9 | A session stopped on purpose only had its group signalled while its leader ran: an agent that exited on `SIGTERM` left a child that ignores it in the group | An orphan with no terminal and nobody to see it | **Fixed**: once the leader has exited, whatever is left in its group is killed (`PTYTerminalSession.sweepGroup`). |
 | A10 | A terminal host killed while the application runs closed its terminals with a hang-up, which an agent may ignore | Agents running unseen until the next launch | **Fixed**: the application stops every group the host ran for it at once, after checking each is still the one it recorded (ADR 0011's rule), and the session ends saying the host stopped. |
+| A11 | The web view's channel (#69) lets an agent click, type and run JavaScript in pages the user may be signed in to | An agent acting as the user on a forge, a mailbox, a bank | **Decided in ADR 0023**: acting is free only on this Mac (`localhost`, loopback, `file:`), asked everywhere else, and each "Always Allow" is per site, listed and removable in Settings. A connection is accepted only from a process that descends from a session's agent (pid and start time checked at every link), for that session alone; no secret is put in an agent's environment or command line. `BrowserPolicyTests`, `BrowserChannelAuthorizerTests` and `BrowserChannelTests` (a real child process accepted, a stranger refused) prove it. |
+| A12 | Claude Code is started with `--allowedTools mcp__vibe-browser` | Claude no longer asks before a web view tool | **Accepted**: Vibe Manager asks before anything is done as the user, and a second question on the same call adds nothing. The user's other tools keep their own rules. |
 
 ## Residual risks
 
@@ -82,3 +84,13 @@ pid, so a `git` that started a helper or a login shell whose profile started one
   it cannot already reach. The application does not defend against its own user.
 - **Agents' own permissions.** What Claude Code or Codex are allowed to do inside a session is their
   configuration, not the application's.
+- **What an agent reads in the web view.** Reading is free on every site, including those the user
+  is signed in to: an agent can read a private ticket, and a page can try to steer the agent
+  through its content. The tools say a page is data; the policy bounds what the agent can do about
+  it, not what it reads (ADR 0023).
+- **"Always Allow" is a preference.** It lives in the user defaults, which an agent's shell can
+  write like any file of the user's: the question stops a mistaken or misled agent, not a program
+  bent on acting as the user.
+- **The web view's trace and tabs.** `Browser/*.json` are `0600` in a `0700` folder; a process of
+  the same user can read or rewrite them. A typed value is kept cut short, and never for a password,
+  card or one-time-code field.

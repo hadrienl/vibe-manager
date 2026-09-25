@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import VibeApplication
@@ -46,6 +47,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private let activity: TrackAgentActivity?
   /// Sets each launch up to report its agent's activity.
   private let reportActivity: ReportAgentActivity?
+  /// Sets each launch up with the tools of its session's web view (#69).
+  private let provideTools: ProvideAgentTools?
   /// Asked when a CLI needs its hooks approved before the first launch that carries them. Until
   /// the workspace sets it, the answer is no: the agent then simply runs without hooks.
   public var askHookConsent: AgentHookConsentRequest = { _, _ in .undecided }
@@ -76,6 +79,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// could be told "still running" about a process that had already exited.
   public var sessionDidClose: (@MainActor (SessionID, TerminalProcessState) -> Void)?
 
+  /// Told of an address ⌘-clicked in a session's terminal, and whether ⌥ was held (#69). Unset, it
+  /// opens in the default browser.
+  public var openLink: (@MainActor (SessionID, URL, _ alternate: Bool) -> Void)?
+
+  /// Told of each agent process as soon as it is known — started, or adopted from the terminal
+  /// host — so that what it is can be read before its number could be given to another (#69).
+  public var processDidStart: (@MainActor (SessionID, Int32) -> Void)?
+
   /// How long a launch waits for the pane to measure itself before falling back to the spec's
   /// own size. Long enough for one layout pass, short enough never to feel like a delay.
   private let viewportTimeout: Duration
@@ -88,6 +99,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     usage: UsageRecorder? = nil,
     activity: TrackAgentActivity? = nil,
     reportActivity: ReportAgentActivity? = nil,
+    provideTools: ProvideAgentTools? = nil,
     clock: any SessionClock = SystemSessionClock(),
     viewportTimeout: Duration = .milliseconds(500),
     diagnostics: Diagnostics = .disabled
@@ -100,12 +112,26 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     self.usage = usage
     self.activity = activity
     self.reportActivity = reportActivity
+    self.provideTools = provideTools
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
 
   public func pane(for id: SessionID) -> TerminalPaneModel? {
     panes[id]
+  }
+
+  /// The process each running session's terminal started — its agent — for the web view's channel
+  /// to know whose descendants it is talking to (#69).
+  public func runningProcessIdentifiers() async -> [SessionID: Int32] {
+    var result: [SessionID: Int32] = [:]
+    for (id, pane) in panes {
+      guard let terminal = pane.session,
+        case .running(let processIdentifier) = await terminal.state()
+      else { continue }
+      result[id] = processIdentifier
+    }
+    return result
   }
 
   public func isRunning(_ id: SessionID) -> Bool {
@@ -153,7 +179,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     let reported =
       await reportActivity?(plan, for: session.id, askConsent: askHookConsent)
       ?? ReportedLaunch(plan: plan, decoder: nil)
-    let plan = reported.plan
+    // After the hooks: Codex's approval of them is keyed on the plan they were read from, and the
+    // tool server is not theirs to approve.
+    let plan = await provideTools?(reported.plan) ?? reported.plan
 
     // The pane a session already has is reused rather than replaced. The view that renders it
     // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
@@ -224,6 +252,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // nothing left to look for at the next launch.
     if case .running(let processIdentifier) = await terminal.state() {
       await recorder?.started(session.id, processGroup: processIdentifier)
+      processDidStart?(session.id, processIdentifier)
     }
     startedAt[session.id] = launchedAt
     diagnostics.record(
@@ -444,6 +473,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     await activity?.processAdopted(session.id, decoder: decoder)
     followOutput(of: session.id, terminal: terminal)
     await recorder?.started(session.id, processGroup: processIdentifier)
+    processDidStart?(session.id, processIdentifier)
     return true
   }
 
@@ -507,6 +537,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       pane.onUserInput = { bytes in
         Task { await activity.userInput(id, bytes) }
       }
+    }
+    pane.onOpenLink = { [weak self] url, alternate in
+      self?.openLink?(id, url, alternate)
     }
     panes[id] = pane
     return pane

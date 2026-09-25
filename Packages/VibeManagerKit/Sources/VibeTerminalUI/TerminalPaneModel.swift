@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import VibeApplication
@@ -181,6 +182,20 @@ public final class TerminalPaneModel {
   /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
   /// agent's question is how its state is known to have moved before the agent says so (#45).
   @ObservationIgnored public var onUserInput: (([UInt8]) -> Void)?
+
+  /// Told of an address clicked in the terminal, with whether it was ⌥⌘-clicked (#69). Unset, the
+  /// address opens in the default browser, as it would from any terminal.
+  @ObservationIgnored public var onOpenLink: ((URL, _ alternate: Bool) -> Void)?
+
+  func openLink(_ text: String, alternate: Bool) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let url = URL(string: trimmed), url.scheme != nil else { return }
+    if let onOpenLink {
+      onOpenLink(url, alternate)
+    } else {
+      NSWorkspace.shared.open(url)
+    }
+  }
 
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
