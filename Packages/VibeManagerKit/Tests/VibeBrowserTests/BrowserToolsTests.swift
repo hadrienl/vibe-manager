@@ -393,3 +393,33 @@ struct BrowserCommittedPageTests {
     )
   }
 }
+
+@Suite("Signing in from the web view")
+@MainActor
+struct BrowserSignInTests {
+  @Test("Pages see Safari, so sign-in pages do not refuse the web view")
+  func userAgent() async throws {
+    let server = try TestPageServer(pages: ["/": "<title>UA</title>"])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+      session: session)
+    let agent = await workspace.run(
+      tool: "page_evaluate", arguments: ["script": "navigator.userAgent"], session: session)
+    let text = agent.content.compactMap { if case .text(let t) = $0 { t } else { nil } }.joined()
+    #expect(text.contains("Safari/605.1.15"), "\(text)")
+    #expect(text.contains("Version/"), "\(text)")
+  }
+
+  @Test("A window that closes itself, as a sign-in pop-up does, closes its tab")
+  func popupCloses() async throws {
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    let tab = workspace.open(URL(string: "about:blank")!, in: session, openedBy: .user)
+    #expect(workspace.browser(for: session).tabs.count == 1)
+    tab.didCloseWindow?()
+    #expect(workspace.browser(for: session).tabs.isEmpty)
+  }
+}

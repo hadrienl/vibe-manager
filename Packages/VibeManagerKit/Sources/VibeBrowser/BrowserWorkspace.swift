@@ -191,6 +191,19 @@ public final class BrowserWorkspace {
     return tab
   }
 
+  /// A window a page opened, shown as a tab after its opener's, in front.
+  private func adoptPopup(_ popup: WKWebView, url: URL, byAgent: Bool, in id: SessionID) {
+    let browser = browser(for: id)
+    let tab = makeTab(url, openedBy: byAgent ? .agent : .user, in: id)
+    tab.adopt(popup)
+    browser.append(
+      tab, activate: true,
+      after: browser.activeTab.flatMap {
+        $0.isPinnedTicket ? nil : $0.id
+      })
+    touch(tab)
+  }
+
   /// A link from a terminal: the tab that already shows it comes forward, else a new one opens.
   public func openLink(_ url: URL, in id: SessionID) {
     let browser = browser(for: id)
@@ -247,6 +260,13 @@ public final class BrowserWorkspace {
     }
     tab.openInNewTab = { [weak self] url, byAgent in
       self?.open(url, in: id, openedBy: byAgent ? .agent : .user)
+    }
+    tab.openPopup = { [weak self] popup, url, byAgent in
+      self?.adoptPopup(popup, url: url, byAgent: byAgent, in: id)
+    }
+    tab.didCloseWindow = { [weak self, weak tab] in
+      guard let self, let tab, !tab.isPinnedTicket else { return }
+      self.close(tab.id, in: id)
     }
     tab.confirmAgentEffect = { [weak self] effect, tab in
       guard let self else { return false }

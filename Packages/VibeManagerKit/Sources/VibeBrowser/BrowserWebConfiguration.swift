@@ -30,6 +30,9 @@ public final class BrowserWebConfiguration {
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = dataStore
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+    // Safari's user agent: sign-in pages — Google's first — refuse a browser they cannot name,
+    // taking it for an application's embedded view.
+    configuration.applicationNameForUserAgent = Self.safariApplicationName
     configuration.preferences.isElementFullscreenEnabled = true
     let controller = WKUserContentController()
     controller.addUserScript(
@@ -67,6 +70,8 @@ public final class BrowserWebConfiguration {
     try await webView.callAsyncJavaScript(
       body, arguments: arguments, in: nil, contentWorld: agentWorld)
   }
+
+  static let safariApplicationName = "Version/18.5 Safari/605.1.15"
 
   /// Puts a page nobody shows in the parking window.
   func park(_ webView: WKWebView) {

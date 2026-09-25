@@ -77,6 +77,12 @@ public final class BrowserTabModel: NSObject, Identifiable {
   @ObservationIgnored var didChange: (@MainActor () -> Void)?
   /// Asked when a page wants a new window: it becomes a tab of the same session.
   @ObservationIgnored var openInNewTab: (@MainActor (URL, _ byAgent: Bool) -> Void)?
+  /// Given the web view WebKit made for a window a page opened — a sign-in pop-up — to show as a
+  /// tab of the same session. It stays that page's opener's: the pop-up hands the sign-in back to
+  /// it through `window.opener`, which a tab opened on the same address would not have.
+  @ObservationIgnored var openPopup: (@MainActor (WKWebView, URL, _ byAgent: Bool) -> Void)?
+  /// Told when the page closes its own window, as a pop-up does once it is done.
+  @ObservationIgnored var didCloseWindow: (@MainActor () -> Void)?
   /// Asked before a download or another application's address that an agent caused.
   @ObservationIgnored var confirmAgentEffect:
     (@MainActor (_ kind: BrowserAgentEffect, _ tab: BrowserTabModel) async -> Bool)?
@@ -153,6 +159,15 @@ public final class BrowserTabModel: NSObject, Identifiable {
     configuration.park(webView)
     load(url)
     return webView
+  }
+
+  /// Takes a web view WebKit already made, and is loading, for a pop-up.
+  func adopt(_ webView: WKWebView) {
+    webView.navigationDelegate = self
+    webView.uiDelegate = self
+    self.webView = webView
+    observe(webView)
+    configuration.park(webView)
   }
 
   public func load(_ url: URL) {
@@ -444,10 +459,22 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     _ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures
   ) -> WKWebView? {
-    if let target = navigationAction.request.url {
+    let target = navigationAction.request.url ?? URL(string: "about:blank")!
+    guard let openPopup else {
       openInNewTab?(target, isAgentDriven)
+      return nil
     }
-    return nil
+    // WebKit must be handed a view made with the configuration it gives: that is what ties the
+    // pop-up to its opener.
+    let popup = WKWebView(frame: webView.bounds, configuration: configuration)
+    popup.allowsBackForwardNavigationGestures = true
+    popup.allowsMagnification = true
+    openPopup(popup, target, isAgentDriven)
+    return popup
+  }
+
+  public func webViewDidClose(_ webView: WKWebView) {
+    didCloseWindow?()
   }
 }
 
