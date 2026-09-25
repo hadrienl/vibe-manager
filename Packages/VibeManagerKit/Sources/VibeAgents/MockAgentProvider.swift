@@ -117,6 +117,15 @@ public struct MockAgentProvider: AgentProvider {
     )
   }
 
+  /// Where the mock writes its conversations, as Claude Code does, when
+  /// `VIBE_MOCK_TRANSCRIPT_DIRECTORY` names a folder (#38). Without it, the mock has no
+  /// conversation view, like any agent that writes nothing readable.
+  var transcriptDirectory: URL? {
+    environment["VIBE_MOCK_TRANSCRIPT_DIRECTORY"].flatMap {
+      $0.hasPrefix("/") ? URL(fileURLWithPath: $0, isDirectory: true) : nil
+    }
+  }
+
   public func models() async -> [AgentModel] {
     catalog
   }
@@ -140,6 +149,9 @@ public struct MockAgentProvider: AgentProvider {
     )
 
     var arguments = [installation.executablePath] + behaviour
+    if let transcripts = transcriptDirectory {
+      arguments.append(contentsOf: ["--transcript-dir", transcripts.path])
+    }
     if let modelID = request.modelID {
       arguments.append(contentsOf: ["--model", modelID])
     }
@@ -244,5 +256,26 @@ public struct MockResumeIdentifierExtractor: AgentResumeIdentifierExtractor {
       return identifier
     }
     return nil
+  }
+}
+
+extension MockAgentProvider: AgentConversationReporting {
+  public func conversationFiles(
+    for conversation: SessionAgentConfiguration, in session: WorkSession,
+    hint: AgentActivityEvent?
+  ) -> [URL] {
+    guard let directory = transcriptDirectory, let identifier = conversation.resumeIdentifier
+    else { return [] }
+    let file = directory.appendingPathComponent("\(identifier).jsonl")
+    return FileManager.default.fileExists(atPath: file.path) ? [file] : []
+  }
+
+  public func conversationDecoder(for file: URL) -> any ConversationDecoding {
+    ClaudeCodeConversationDecoder(file: file)
+  }
+
+  /// The mock reads a line at a time: a paste without brackets, then Return.
+  public var promptFormat: AgentPromptFormat {
+    AgentPromptFormat(usesBracketedPaste: transcriptDirectory != nil)
   }
 }
