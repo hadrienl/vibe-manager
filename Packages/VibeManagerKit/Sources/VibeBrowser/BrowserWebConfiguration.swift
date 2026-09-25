@@ -41,13 +41,17 @@ public final class BrowserWebConfiguration {
         source: PageScripts.agent, injectionTime: .atDocumentStart, forMainFrameOnly: true,
         in: agentWorld))
     configuration.userContentController = controller
-    let webView = WKWebView(
+    // A web view the user browses with: it goes wherever they, or their agent, send it. What an
+    // agent may do there is bounded by `BrowserActionPolicy` (ADR 0023), not by where it can go.
+    let webView = WKWebView(  // NOSONAR (swift:S7485) navigation is the feature; ADR 0023
       frame: NSRect(x: 0, y: 0, width: 1_024, height: 768), configuration: configuration)
     webView.allowsBackForwardNavigationGestures = true
     webView.allowsMagnification = true
-    // Safari's Web Inspector, from the page's context menu: the one developer tool the ticket
-    // leaves in, and it costs nothing.
-    webView.isInspectable = true
+    // Safari's Web Inspector, from the page's context menu, in a development build only: a
+    // released application does not open its pages to another program's debugger.
+    #if DEBUG
+      webView.isInspectable = true
+    #endif
     return webView
   }
 

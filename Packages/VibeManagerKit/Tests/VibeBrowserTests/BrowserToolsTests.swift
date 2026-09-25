@@ -335,7 +335,7 @@ struct BrowserWorkspaceToolsTests {
 @Suite("Opening local files")
 @MainActor
 struct BrowserFileTests {
-  @Test("A local file opens and settles without waiting out the load timeout")
+  @Test("A local file opens and settles before the load timeout")
   func localFile() async throws {
     let folder = FileManager.default.temporaryDirectory
       .appendingPathComponent("VibeBrowserFile-\(UUID().uuidString)", isDirectory: true)
@@ -343,12 +343,12 @@ struct BrowserFileTests {
     let page = folder.appendingPathComponent("index.html")
     try Data("<!doctype html><title>File page</title><p>Hi</p>".utf8).write(to: page)
     let workspace = BrowserWorkspace()
-    let started = ContinuousClock.now
     let result = await workspace.run(
       tool: "tab_open", arguments: ["url": .string(page.path)], session: SessionID())
     let text = result.content.compactMap { if case .text(let t) = $0 { t } else { nil } }.joined()
+    // Settled, not given up on: the load timeout would return it still loading.
     #expect(text.contains("File page"), "\(text)")
-    #expect(ContinuousClock.now - started < .seconds(5))
+    #expect(text.contains("\"loaded\":true"), "\(text)")
   }
 }
 

@@ -167,5 +167,5 @@ or GitLab signs in every session's ticket tab. Settings › Web View clears it.
 ## Out of scope
 
 A full browser (bookmarks, global history, extensions, passwords), developer tools beyond what
-`page_read` and `page_console` give (Safari's Web Inspector remains, from a page's context menu),
+`page_read` and `page_console` give (Safari's Web Inspector remains in development builds only),
 and sharing a tab between sessions.
