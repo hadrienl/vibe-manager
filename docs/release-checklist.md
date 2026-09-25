@@ -12,6 +12,10 @@ Copy this into the draft, then tick as you go.
 - [ ] The `ui-smoke` workflow is green on that commit (Actions → CI → Run workflow, if it has not
       run since).
 - [ ] The version follows the previous one: `1.2.3`, or `1.2.3-rc.1` for a release candidate.
+- [ ] A final version comes after a release candidate of the same commit whose Release workflow
+      went to the end: CI builds in Release but signs nothing, so signing, notarization and the
+      disk image are only ever tried by that workflow. A candidate that fails is fixed on `main`
+      and followed by `rc.2`; its draft is deleted.
 - [ ] The `release` environment holds `DEVELOPER_ID_CERTIFICATE_P12`,
       `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `NOTARY_API_KEY_P8`, `NOTARY_API_KEY_ID`,
       `NOTARY_API_ISSUER_ID`, and the variable `VIBE_TEAM_ID`; it requires a reviewer and only
