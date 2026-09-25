@@ -42,9 +42,29 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
     self.timeLimit = timeLimit
   }
 
+  /// Answers within the time limit whatever the disk does: a listing stuck on a slow volume is
+  /// left to finish on its own, and its answer to nobody. Cancelling stops the search too.
   public func icon(inFolder path: String) async -> ProjectIcon? {
+    let search = search(path)
+    let race = FirstAnswer<ProjectIcon?>()
+    return await withTaskCancellationHandler {
+      await race.wait { race in
+        Task.detached { race.answer(await search.value) }
+        Task.detached { [timeLimit] in
+          try? await Task.sleep(for: timeLimit)
+          search.cancel()
+          race.answer(nil)
+        }
+      }
+    } onCancel: {
+      search.cancel()
+      race.answer(nil)
+    }
+  }
+
+  private func search(_ path: String) -> Task<ProjectIcon?, Never> {
     let timeLimit = timeLimit
-    return await Task.detached(priority: .userInitiated) {
+    return Task.detached(priority: .userInitiated) {
       let deadline = ContinuousClock.now.advanced(by: timeLimit)
       let root = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
       let files = Self.walk(root, until: deadline)
@@ -56,7 +76,7 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
         }
       }
       return nil
-    }.value
+    }
   }
 
   /// A file found by the walk, and where it sits relative to the project.
@@ -85,7 +105,9 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
     var files: [Entry] = []
     var listed = 0
     var queue: [(url: URL, relative: String, depth: Int)] = [(root, "", 0)]
-    while !queue.isEmpty, listed < maximumEntries, ContinuousClock.now < deadline {
+    while !queue.isEmpty, listed < maximumEntries, ContinuousClock.now < deadline,
+      !Task.isCancelled
+    {
       let (directory, relative, depth) = queue.removeFirst()
       guard
         let children = try? manager.contentsOfDirectory(
@@ -105,7 +127,10 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
             // An asset catalogue is looked into for its application icon alone, at any depth
             // the walk reached it: that is where an Xcode project keeps its icon.
             let set = child.appendingPathComponent("AppIcon.appiconset", isDirectory: true)
-            queue.insert((set, "\(path)/AppIcon.appiconset", maximumDepth), at: 0)
+            let kind = try? set.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            if kind?.isDirectory == true, kind?.isSymbolicLink != true {
+              queue.insert((set, "\(path)/AppIcon.appiconset", maximumDepth), at: 0)
+            }
           } else if depth + 1 < maximumDepth, !skippedDirectories.contains(name),
             !skippedExtensions.contains(pathExtension)
           {
@@ -238,5 +263,45 @@ enum ProjectIconImporter {
     CGImageDestinationAddImage(destination, rendered, nil)
     guard CGImageDestinationFinalize(destination) else { return nil }
     return output as Data
+  }
+}
+
+/// Hands a waiter the first answer given, and drops the others. An answer given before anyone
+/// waits is kept for the waiter.
+final class FirstAnswer<Value: Sendable>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var continuation: CheckedContinuation<Value, Never>?
+  private var result: Value?
+  private var isAnswered = false
+
+  func wait(starting start: (FirstAnswer) -> Void) async -> Value {
+    await withCheckedContinuation { continuation in
+      lock.lock()
+      if isAnswered, let result {
+        lock.unlock()
+        continuation.resume(returning: result)
+        return
+      }
+      self.continuation = continuation
+      lock.unlock()
+      start(self)
+    }
+  }
+
+  func answer(_ value: Value) {
+    lock.lock()
+    guard !isAnswered else {
+      lock.unlock()
+      return
+    }
+    isAnswered = true
+    if let continuation {
+      self.continuation = nil
+      lock.unlock()
+      continuation.resume(returning: value)
+    } else {
+      result = value
+      lock.unlock()
+    }
   }
 }

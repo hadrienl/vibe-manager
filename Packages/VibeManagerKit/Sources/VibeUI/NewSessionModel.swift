@@ -295,9 +295,11 @@ public final class NewSessionModel {
   /// the disk and the agents on every character, and finish out of order — an early verdict
   /// landing last would post "A name is required." over a name that is now there.
   public func draftChanged() {
-    // An icon found in another folder is not this one's.
-    if draft.projectIcon != nil, draft.resolvedWorkingDirectoryPath != iconFolderPath {
-      draft.projectIcon = nil
+    // An icon found in another folder is not this one's; coming back to that folder looks again.
+    if iconFolderPath != nil, draft.resolvedWorkingDirectoryPath != iconFolderPath {
+      iconSearch?.cancel()
+      iconFolderPath = nil
+      if draft.projectIcon != nil { draft.projectIcon = nil }
     }
     guard hasSubmitted else {
       // Before the first submit the only problems on screen are the ones the open panel came

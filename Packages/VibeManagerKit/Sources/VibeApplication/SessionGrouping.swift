@@ -40,7 +40,9 @@ public struct SessionFolderKey: Hashable, Comparable, Codable, Sendable, CustomS
   /// under until the disk has been asked.
   public static func lexical(_ path: String) -> SessionFolderKey {
     let expanded = (path as NSString).expandingTildeInPath
-    return SessionFolderKey(path: URL(fileURLWithPath: expanded).standardizedFileURL.path)
+    // `isDirectory` is given, so the URL does not ask the disk what the path is.
+    return SessionFolderKey(
+      path: URL(fileURLWithPath: expanded, isDirectory: true).standardizedFileURL.path)
   }
 
   /// The folder as the file system sees it. `/var` and `/private/var`, or a folder opened through

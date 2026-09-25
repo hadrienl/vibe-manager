@@ -25,6 +25,8 @@ struct SessionGroupHeader: View {
         }
         .textFieldStyle(.roundedBorder)
         .focused($isNameFocused)
+        // Once the field exists: asked for in the update that inserts it, the focus is dropped.
+        .task { isNameFocused = true }
         .onSubmit(commitRename)
         .onExitCommand { isRenaming = false }
         .onChange(of: isNameFocused) { _, isFocused in

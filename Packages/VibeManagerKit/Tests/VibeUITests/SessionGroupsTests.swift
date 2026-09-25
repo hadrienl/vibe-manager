@@ -174,6 +174,31 @@ struct SidebarGroupsTests {
     #expect(model.isExpanded(try #require(model.groups.first)))
   }
 
+  @Test("Closing a session a fold hides moves the selection to the nearest row on screen")
+  func closingAHiddenSelection() async throws {
+    let model = await makeModel()
+    model.select(apiNew.id)
+    model.collapseSelectedGroup()
+
+    await model.close(apiNew.id)
+
+    #expect(model.selectedSessionID == webNew.id)
+    #expect(model.filter.scope == .active)
+    let api = try #require(model.groups.first { $0.folderName == "api" })
+    #expect(!model.isExpanded(api))
+  }
+
+  @Test("The list dropping the selection of a row it folds away does not clear it")
+  func foldingDoesNotClearTheSelection() async {
+    let model = await makeModel()
+    model.select(apiOld.id)
+    model.collapseSelectedGroup()
+
+    model.selectFromList(nil)
+
+    #expect(model.selectedSessionID == apiOld.id)
+  }
+
   @Test("Switching between the views keeps the selection")
   func toggleKeepsTheSelection() async {
     let model = await makeModel()

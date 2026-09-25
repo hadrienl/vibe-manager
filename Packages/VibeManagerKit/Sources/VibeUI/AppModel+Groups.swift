@@ -112,6 +112,18 @@ extension AppModel {
     layout.setCollapsed(!isExpanded, folders: Set(groups.map(\.foldKey)))
   }
 
+  /// What the list asks for. The outline view under a sidebar list drops the selection of a row it
+  /// folds away; folding the group of the selection must keep it, so that one is ignored.
+  public func selectFromList(_ id: SessionID?) {
+    if id == nil, let selectedSessionID,
+      !displayedSessions.contains(where: { $0.id == selectedSessionID }),
+      orderedSessions.contains(where: { $0.id == selectedSessionID })
+    {
+      return
+    }
+    select(id)
+  }
+
   /// Unfolds whatever hides a session.
   func reveal(_ id: SessionID) {
     guard sidebarMode == .byFolder,

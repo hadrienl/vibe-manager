@@ -151,6 +151,33 @@ struct ProjectIconFinderTests {
     #expect(await find() == nil)
   }
 
+  @Test("An asset catalogue's icon set that is a link is not followed")
+  func appIconSetLinkIsNotFollowed() async throws {
+    defer { cleanUp() }
+    let outside = root.deletingLastPathComponent().appendingPathComponent("elsewhere")
+    try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+    try png(side: 32).write(to: outside.appendingPathComponent("icon.png"))
+    let catalogue = root.appendingPathComponent("Assets.xcassets")
+    try FileManager.default.createDirectory(at: catalogue, withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(
+      at: catalogue.appendingPathComponent("AppIcon.appiconset"), withDestinationURL: outside)
+
+    #expect(await find() == nil)
+  }
+
+  @Test("A cancelled search answers at once")
+  func cancellationAnswers() async throws {
+    defer { cleanUp() }
+    try write(try png(side: 32), at: "favicon.png")
+    let finder = FileSystemProjectIconFinder(timeLimit: .seconds(60))
+    let search = Task { [root] in await finder.icon(inFolder: root.path) }
+    search.cancel()
+
+    let started = ContinuousClock.now
+    _ = await search.value
+    #expect(ContinuousClock.now - started < .seconds(5))
+  }
+
   @Test("A file too large to be an icon is ignored")
   func sizeIsBounded() async throws {
     defer { cleanUp() }

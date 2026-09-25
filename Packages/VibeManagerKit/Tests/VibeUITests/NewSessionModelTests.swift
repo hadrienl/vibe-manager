@@ -778,6 +778,24 @@ struct NewSessionProjectIconTests {
     #expect(saved == SessionAppearanceCatalog.derived(forName: "Refactor"))
   }
 
+  @Test("Editing the folder and coming back to it finds its icon again")
+  func comingBackToTheFolder() async throws {
+    let repository = SpyRepository()
+    let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+    await model.folderChosen("/work/api")
+    await waitUntil { model.draft.projectIcon != nil }
+
+    model.draft.workingDirectoryPath = "/work/ap"
+    model.draftChanged()
+    model.draft.workingDirectoryPath = "/work/api"
+    model.draftChanged()
+    _ = try #require(await model.submit())
+
+    #expect(await repository.savedSessions.first?.appearance.iconID == projectIcon("a").id)
+  }
+
   @Test("A typed folder gets its icon at creation")
   func typedFolderAtCreation() async throws {
     let repository = SpyRepository()
