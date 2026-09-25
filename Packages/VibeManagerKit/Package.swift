@@ -145,7 +145,7 @@ let package = Package(
       dependencies: [
         "VibeComposition", "VibeUI", "VibeApplication", "VibeDomain", "VibeAgents",
         "VibeTerminal", "VibeTerminalUI", "VibePersistence", "VibeGit", "VibeProcess",
-        "VibeTerminalHostFixture",
+        "VibeTerminalHostFixture", "VibeBrowser", "VibeBrowserBridgeFixture",
       ]
     ),
     .testTarget(

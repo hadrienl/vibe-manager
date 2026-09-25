@@ -124,7 +124,9 @@ final class Scenario {
         },
         defaultsSuite: suite,
         fullDiskAccessProbe: GrantedFullDiskAccess(),
-        crashReports: URL(fileURLWithPath: root).appendingPathComponent("NoCrashReports")
+        crashReports: URL(fileURLWithPath: root).appendingPathComponent("NoCrashReports"),
+        browserBridgeExecutable: try Self.fixtureURL().deletingLastPathComponent()
+          .appendingPathComponent("VibeBrowserBridgeFixture").path
       ))
     environments.append(composed)
     return composed

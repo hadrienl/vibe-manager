@@ -234,11 +234,18 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   nonisolated public func clipboardCopy(source: TerminalView, content: Data) {}
 
+  /// ⌘-click on an address (#69). Whether ⌥ was held too is read now, from the click itself: by the
+  /// time the main actor runs, the keys may have been let go.
   nonisolated public func requestOpenLink(
     source: TerminalView,
     link: String,
     params: [String: String]
-  ) {}
+  ) {
+    let alternate = NSEvent.modifierFlags.contains(.option)
+    Task { @MainActor [weak self] in
+      self?.pane.openLink(link, alternate: alternate)
+    }
+  }
 
   nonisolated public func bell(source: TerminalView) {}
 

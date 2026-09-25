@@ -331,3 +331,23 @@ struct BrowserWorkspaceToolsTests {
     #expect(restored.tabs.allSatisfy { !$0.isLoaded })
   }
 }
+
+@Suite("Opening local files")
+@MainActor
+struct BrowserFileTests {
+  @Test("A local file opens and settles without waiting out the load timeout")
+  func localFile() async throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeBrowserFile-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let page = folder.appendingPathComponent("index.html")
+    try Data("<!doctype html><title>File page</title><p>Hi</p>".utf8).write(to: page)
+    let workspace = BrowserWorkspace()
+    let started = ContinuousClock.now
+    let result = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(page.path)], session: SessionID())
+    let text = result.content.compactMap { if case .text(let t) = $0 { t } else { nil } }.joined()
+    #expect(text.contains("File page"), "\(text)")
+    #expect(ContinuousClock.now - started < .seconds(5))
+  }
+}

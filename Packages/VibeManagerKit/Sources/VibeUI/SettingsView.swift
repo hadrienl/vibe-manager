@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeBrowser
 
 /// The application's settings, in tabs: General, and the prompt templates.
 ///
@@ -65,6 +66,13 @@ public struct SettingsView: View {
             }
           } header: {
             Text("Agent Activity", bundle: .module, comment: "A section of the Settings window.")
+          }
+        }
+        if let browser = model.browser {
+          Section {
+            WebViewSettingsRows(browser: browser)
+          } header: {
+            Text("Web View", bundle: .module, comment: "A section of the Settings window.")
           }
         }
         if let usage = model.usage {
@@ -412,6 +420,96 @@ private struct UsageSettingsRow: View {
           bundle: .module
         )
       }
+    }
+  }
+}
+
+/// Settings › Web View (#69). The preferences are read once and written as they change: they live
+/// in the user defaults, which the view does not observe.
+private struct WebViewSettingsRows: View {
+  let browser: BrowserWorkspace
+  @State private var givesAgents = true
+  @State private var showsOnAgentPage = true
+  @State private var links: TerminalLinkDestination = .webView
+  @State private var isConfirmingClear = false
+
+  var body: some View {
+    Group {
+      Toggle(isOn: $givesAgents) {
+        Text("Give agents the web view", bundle: .module)
+        Text(
+          "Claude Code and Codex are started with tools to open, read and use the pages of their session’s web view. Takes effect at the next start of an agent.",
+          bundle: .module)
+      }
+      .onChange(of: givesAgents) { _, value in browser.preferences.givesAgentsWebView = value }
+      Toggle(isOn: $showsOnAgentPage) {
+        Text("Show the web view when an agent opens a page", bundle: .module)
+      }
+      .onChange(of: showsOnAgentPage) { _, value in
+        browser.preferences.showsWebViewWhenAgentOpensPage = value
+      }
+      Picker(selection: $links) {
+        Text("In the web view", bundle: .module).tag(TerminalLinkDestination.webView)
+        Text("In the default browser", bundle: .module).tag(TerminalLinkDestination.defaultBrowser)
+      } label: {
+        Text("Open links ⌘-clicked in the terminal", bundle: .module)
+        Text("⌥⌘-click opens a link the other way.", bundle: .module)
+      }
+      .onChange(of: links) { _, value in browser.preferences.terminalLinks = value }
+      LabeledContent {
+        EmptyView()
+      } label: {
+        Text("Always allowed sites", bundle: .module)
+        Text(
+          "Agents may click, type and run JavaScript on this Mac’s pages without asking. On these sites too.",
+          bundle: .module)
+      }
+      if browser.grants.isEmpty {
+        Text("None yet: an agent asks before acting on any other site.", bundle: .module)
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(browser.grants.sorted(), id: \.self) { site in
+          LabeledContent {
+            Button {
+              browser.revokeGrant(site)
+            } label: {
+              Text("Remove", bundle: .module)
+            }
+          } label: {
+            Text(verbatim: site)
+          }
+        }
+      }
+      LabeledContent {
+        Button {
+          isConfirmingClear = true
+        } label: {
+          Text("Clear Browsing Data…", bundle: .module)
+        }
+      } label: {
+        Text("Browsing data", bundle: .module)
+        Text(
+          "Cookies and sign-ins are shared by every session’s web view, and kept apart from Safari’s.",
+          bundle: .module)
+      }
+    }
+    .onAppear {
+      givesAgents = browser.preferences.givesAgentsWebView
+      showsOnAgentPage = browser.preferences.showsWebViewWhenAgentOpensPage
+      links = browser.preferences.terminalLinks
+    }
+    .confirmationDialog(
+      Text("Clear the web view’s browsing data?", bundle: .module),
+      isPresented: $isConfirmingClear
+    ) {
+      Button(role: .destructive) {
+        Task { await browser.configuration.clearBrowsingData() }
+      } label: {
+        Text("Clear", bundle: .module)
+      }
+    } message: {
+      Text(
+        "You will be signed out of every site in every session’s web view.", bundle: .module)
     }
   }
 }

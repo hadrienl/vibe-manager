@@ -114,7 +114,7 @@ func legacyStoreMigration() async throws {
   let migratedData = try Data(contentsOf: storeURL)
   let rawObject = try JSONSerialization.jsonObject(with: migratedData)
   let object = try #require(rawObject as? [String: Any])
-  #expect(object["schemaVersion"] as? Int == 4)
+  #expect(object["schemaVersion"] as? Int == 5)
 }
 
 @Test("A future schema is rejected without modifying the store")

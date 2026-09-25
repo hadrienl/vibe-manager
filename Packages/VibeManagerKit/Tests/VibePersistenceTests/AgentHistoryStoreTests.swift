@@ -39,7 +39,7 @@ struct AgentHistoryStoreTests {
     }
     """
 
-  @Test("A v2 session is read with an empty history, and the document is rewritten as v4")
+  @Test("A v2 session is read with an empty history, and the document is rewritten as v5")
   func v2IsMigrated() async throws {
     let storeURL = try makeStoreURL()
     defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
@@ -53,7 +53,7 @@ struct AgentHistoryStoreTests {
     let rewritten = try #require(
       try JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any]
     )
-    #expect(rewritten["schemaVersion"] as? Int == 4)
+    #expect(rewritten["schemaVersion"] as? Int == 5)
   }
 
   @Test("Every switch comes back as it was written, a failed one included")
@@ -135,9 +135,9 @@ struct AgentHistoryStoreTests {
   @Test("A document from a later schema is refused rather than rewritten without what it holds")
   func laterSchemaIsRefused() throws {
     let document = v2Document.replacingOccurrences(
-      of: "\"schemaVersion\": 2", with: "\"schemaVersion\": 5")
+      of: "\"schemaVersion\": 2", with: "\"schemaVersion\": 6")
 
-    #expect(throws: SessionStoreCodecError.unsupportedSchemaVersion(5)) {
+    #expect(throws: SessionStoreCodecError.unsupportedSchemaVersion(6)) {
       try SessionStoreCodec().decode(Data(document.utf8))
     }
   }

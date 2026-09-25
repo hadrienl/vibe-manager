@@ -1,18 +1,22 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeBrowser
 import VibeComposition
 import VibeDomain
 import VibePersistence
 import VibeTerminal
 import VibeUI
 
-/// The one binary is two programs. Given `--terminal-host`, it is the terminal host (ADR 0017) and
-/// never returns: no `NSApplication` is created, so it has no Dock icon, no menu bar and no window.
-/// Being the same signed binary is the point: TCC and the host's peer check both see Vibe Manager.
+/// The one binary is four programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
+/// given `--browser-bridge` or `--browser-cli`, the web view's bridge an agent starts or the `vibe`
+/// command (ADR 0023). Those never return: no `NSApplication` is created, so they have no Dock icon,
+/// no menu bar and no window. Being the same signed binary is the point: TCC and the peer checks
+/// all see Vibe Manager.
 @main
 enum Entry {
   static func main() {
+    BrowserBridge.runIfRequested()
     TerminalHost.runIfRequested(diagnostics: { directory in
       Diagnostics.standard(location: DiagnosticsLocation(directory: directory), origin: .host).0
     })
@@ -71,6 +75,16 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("i", modifiers: [.command, .option])
 
+        Button(
+          environment.appModel.isWebViewOpen
+            ? String(localized: "Hide Web View", comment: "Hides the session's web view.")
+            : String(localized: "Show Web View", comment: "Shows the session's web view.")
+        ) {
+          environment.appModel.toggleWebView()
+        }
+        .keyboardShortcut("b", modifiers: [.command, .option])
+        .disabled(!environment.appModel.isWebViewAvailable)
+
         // Without it the terminal keeps the keyboard, and the notes can only be reached with the
         // pointer. Escape in the notes hands the keyboard back.
         Button("Edit Notes") {
@@ -121,6 +135,12 @@ struct VibeManagerApp: App {
         .keyboardShortcut("3", modifiers: [.command, .option])
         .disabled(environment.appModel.selectedSessionID == nil)
 
+        Button("Focus Web View") {
+          environment.appModel.focusWebView()
+        }
+        .keyboardShortcut("4", modifiers: [.command, .option])
+        .disabled(!environment.appModel.isWebViewAvailable)
+
         // What the terminal said last, read by VoiceOver on demand rather than as it arrives.
         Button("Read Last Output") {
           Task { await environment.appModel.readLastOutput() }
@@ -129,6 +149,8 @@ struct VibeManagerApp: App {
       }
 
       SessionHistoryCommands(model: environment.appModel, focus: windowFocus)
+
+      WebCommands(model: environment.appModel)
 
       // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
       CommandGroup(after: .help) {
@@ -260,10 +282,20 @@ private struct SessionHistoryCommands: Commands {
 
       Divider()
 
-      Button("Close Session") {
+      // With the keyboard in the web view, ⌘W closes its tab, and the item says so: the menu is
+      // where the user reads which of the two it will do (ADR 0023).
+      Button(
+        closesWebTab
+          ? String(localized: "Close Tab", comment: "Closes the web view's tab in front.")
+          : String(localized: "Close Session")
+      ) {
         // Over Settings or any other window, ⌘W keeps closing that window.
         guard focus.front == .workspace else {
           focus.closeKeyWindow()
+          return
+        }
+        if closesWebTab {
+          model.closeWebTab()
           return
         }
         guard let session = model.selectedSession else { return }
@@ -288,12 +320,72 @@ private struct SessionHistoryCommands: Commands {
     }
   }
 
+  private var closesWebTab: Bool {
+    focus.front == .workspace && model.closesWebTab
+  }
+
   /// A sheet over the workspace keeps ⌘W to itself, so the session behind it is never closed.
   private var isCloseEnabled: Bool {
     switch focus.front {
     case .other: return true
-    case .workspace: return model.selectedSession.map(model.canClose) ?? false
+    case .workspace:
+      // On the ticket's pinned tab, ⌘W is enabled and beeps: it never falls back on the session.
+      return closesWebTab || (model.selectedSession.map(model.canClose) ?? false)
     case .sheet, .none: return false
+    }
+  }
+}
+
+/// The web view's own menu (#69): moving through its tabs and pages from the keyboard.
+private struct WebCommands: Commands {
+  let model: AppModel
+
+  var body: some Commands {
+    CommandMenu("Web") {
+      Button("Open Location…") {
+        model.focusAddressBar()
+      }
+      .keyboardShortcut("l", modifiers: .command)
+      .disabled(!model.isWebViewAvailable)
+
+      Button("Reload Page") {
+        model.reloadWebTab()
+      }
+      .keyboardShortcut("r", modifiers: .command)
+      .disabled(model.activeWebTab == nil)
+
+      Button("Back") {
+        model.goBackInWebTab()
+      }
+      .keyboardShortcut("[", modifiers: .command)
+      .disabled(!(model.activeWebTab?.canGoBack ?? false))
+
+      Button("Forward") {
+        model.goForwardInWebTab()
+      }
+      .keyboardShortcut("]", modifiers: .command)
+      .disabled(!(model.activeWebTab?.canGoForward ?? false))
+
+      Divider()
+
+      Button("Show Next Tab") {
+        model.selectNextWebTab()
+      }
+      .keyboardShortcut(.tab, modifiers: .control)
+      .disabled((model.selectedBrowser?.allTabs.count ?? 0) < 2)
+
+      Button("Show Previous Tab") {
+        model.selectPreviousWebTab()
+      }
+      .keyboardShortcut(.tab, modifiers: [.control, .shift])
+      .disabled((model.selectedBrowser?.allTabs.count ?? 0) < 2)
+
+      Divider()
+
+      Button("Open Page in Browser") {
+        if let url = model.activeWebTab?.url { NSWorkspace.shared.open(url) }
+      }
+      .disabled(model.activeWebTab == nil)
     }
   }
 }

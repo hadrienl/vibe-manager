@@ -11,6 +11,9 @@
 #   --spawn-child        start a child that ignores SIGTERM and SIGHUP, and print its pid
 #   --session-id <id>    the resume identifier to print, instead of one made from the clock
 #
+# While holding, a line `run:<command>` runs that command through `sh`, as a CLI's shell tool does,
+# and prints its output then `run-exit: <status>` — how the scenarios of #69 reach `vibe`.
+#
 # With VIBE_AGENT_ACTIVITY_LOG set, it reports its activity the way the hooks of a real CLI do
 # (#45): `SessionStart` when it starts, and, while holding, `UserPromptSubmit` then `Stop` for
 # every line typed — or exactly the event a line names, as `event:PermissionRequest`.
@@ -130,6 +133,11 @@ if [ "$hold" -eq 1 ]; then
     case "$line" in
       event:*)
         report "${line#event:}"
+        ;;
+      run:*)
+        status=0
+        /bin/sh -c "${line#run:}" 2>&1 || status=$?
+        printf 'run-exit: %s\n' "$status"
         ;;
       *)
         report UserPromptSubmit

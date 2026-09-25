@@ -17,6 +17,8 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌥⌘1 | Focus Sidebar: the session list takes the keyboard | View |
 | ⌥⌘2 | Focus Terminal: the selected session's terminal | View |
 | ⌥⌘3 | Focus Inspector: the Git list, the inspector shown if it was hidden | View |
+| ⌥⌘4 | Focus Web View: the page in front, the web view shown if it was hidden | View |
+| ⌥⌘B | Show / Hide Web View; in a window where the two take turns, swaps terminal and web view | View |
 | ⌥⌘N | Edit Notes; Escape gives the keyboard back to the terminal | View |
 | ⌥⌘↓ / ⌥⌘↑ | Next / Previous Session | View |
 | ⌘1…⌘9 | The session at that position in the list | View |
@@ -26,6 +28,21 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 
 An agent running in the terminal loses ⌥⌘1, ⌥⌘2 and ⌥⌘3, which full-screen programs rarely use; the
 menus already took the others before #19.
+
+## The web view
+
+| Action | Shortcut | Menu |
+|---|---|---|
+| Open Location…: the address bar takes the keyboard | ⌘L | Web |
+| Reload Page | ⌘R | Web |
+| Back / Forward | ⌘[ / ⌘] | Web |
+| Show Next / Previous Tab | ⌃⇥ / ⌃⇧⇥ | Web |
+| Close Tab, with the keyboard in the web view | ⌘W | Session ("Close Tab") |
+| Deny an agent's request, in its banner | Escape | — |
+
+⌘W closes a tab only while the keyboard is in the web view — the page or its address bar — and the
+Session menu's item then reads "Close Tab". On the ticket's pinned tab it beeps rather than closing
+the session.
 
 ## Sessions
 
@@ -54,6 +71,13 @@ menus already took the others before #19.
 | Git inspector | the list of repositories and files | — | Open, Reveal in Finder, from the context menu | `inspector-git` |
 | New Session: name, prompt, folder, Create | their labels | — | — | `new-session-name`, `new-session-prompt`, `new-session-folder`, `new-session-create` |
 | Diagnostics preview | "Diagnostics preview" | the whole text of the export | searchable (⌘F) | `diagnostics-preview` |
+| Web view | "Web view", containing "Web tabs" | — | — | — |
+| A web tab, one element | its title; "Ticket tab, #12"; "…, opened by the agent", "…, the agent is acting" | selected | activate, Close Tab | — |
+| Address bar | "Address" | the address | editable | — |
+| Web view divider | "Divider between the terminal and the web view" | "520 points wide" | adjustable (±40 points) | — |
+| Agent's request banner | the question, the value typed, the expiry | — | Deny, Always Allow for ‹site›, Allow Once; announced when it appears | — |
+| A session row whose web view waits | as above | "Waiting for your approval in the web view", "The agent opened a page" | — | `session-row` |
+| New Session: ticket | "Ticket" | — | — | `new-session-ticket` |
 
 ### The terminal
 

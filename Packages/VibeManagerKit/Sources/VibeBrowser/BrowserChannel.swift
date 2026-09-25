@@ -103,8 +103,12 @@ public final class BrowserChannelListener {
   public func start() throws {
     guard listener < 0 else { return }
     try prepare()
-    // A socket left by a previous run of this copy: nothing listens on it, since this copy is the
-    // only one that would (the store's instance lock sees to that).
+    // A socket something still listens on belongs to another copy running on the same data: it
+    // keeps it. One nobody answers on was left by a run that ended, and is replaced.
+    if let other = UnixSocket.connect(to: socketPath) {
+      close(other)
+      throw POSIXError(.EADDRINUSE)
+    }
     unlink(socketPath)
     let descriptor = try UnixSocket.listen(at: socketPath)
     listener = descriptor

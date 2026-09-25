@@ -333,6 +333,50 @@ public struct RootView: View {
           }
           .disabled(!model.canCreateSession)
         }
+        if model.browser != nil {
+          // In a window too narrow for both, the terminal and the web view take turns, and this
+          // is where the user picks which one (#69).
+          if model.layout.columns.browser == .alternating {
+            ToolbarItem(placement: .principal) {
+              Picker(
+                selection: Binding(
+                  get: { model.layout.showsBrowserWhenAlternating },
+                  set: { showsBrowser in
+                    model.layout.setShowsBrowserWhenAlternating(showsBrowser)
+                    if !showsBrowser { model.focusTerminal() }
+                  })
+              ) {
+                Text("Terminal", bundle: .module).tag(false)
+                Text("Web", bundle: .module).tag(true)
+              } label: {
+                Text("Main View", bundle: .module)
+              }
+              .pickerStyle(.segmented)
+              .fixedSize()
+            }
+          }
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              model.toggleWebView()
+            } label: {
+              Label(
+                model.isWebViewOpen
+                  ? LocalizedStringResource(
+                    "Hide Web View", bundle: .module,
+                    comment: "Hides the session's web view beside its terminal.")
+                  : LocalizedStringResource(
+                    "Show Web View", bundle: .module,
+                    comment: "Shows the session's web view beside its terminal."),
+                systemImage: "globe"
+              )
+            }
+            .disabled(!model.isWebViewAvailable)
+            .accessibilityValue(
+              model.isWebViewOpen
+                ? Text("Shown", bundle: .module, comment: "The web view is shown.")
+                : Text("Hidden", bundle: .module, comment: "The web view is hidden."))
+          }
+        }
         ToolbarItem(placement: .primaryAction) {
           // Never disabled: with the column open and the selection gone, a disabled button
           // would be the only way to close it. The column says so itself instead.
@@ -530,7 +574,7 @@ public struct RootView: View {
           InProcessAgentBar()
           Divider()
         }
-        terminalStack(for: session)
+        sessionContent(for: session)
       }
     } else {
       ContentUnavailableView {
@@ -546,6 +590,53 @@ public struct RootView: View {
         .buttonStyle(.borderedProminent)
         .disabled(!model.canCreateSession)
       }
+    }
+  }
+
+  /// About eighty columns at the terminal's default font: the web view never takes more.
+  private static let terminalMinimumWidth: Double = 560
+
+  /// The terminal, and the web view beside it or in turns with it (#69).
+  ///
+  /// The terminal is never taken out of the hierarchy, nor narrowed to nothing: when the web view
+  /// takes its place, it is drawn over it. A terminal resized to zero columns would tell its agent
+  /// so, and every full-screen program in it would redraw for a window it does not have.
+  @ViewBuilder
+  private func sessionContent(for session: WorkSession) -> some View {
+    if let workspace = model.browser, session.status != .archived {
+      let browser = workspace.browser(for: session.id)
+      switch model.layout.columns.browser {
+      case .hidden:
+        terminalStack(for: session)
+      case .beside:
+        GeometryReader { proxy in
+          // The terminal keeps its eighty columns: the web view gives way first.
+          let available =
+            Double(proxy.size.width) - Self.terminalMinimumWidth
+            - Double(SplitHandle.thickness)
+          let upper = max(WorkspaceLayout.browserWidthRange.lowerBound, available)
+          let width = min(model.layout.browserWidth, upper)
+          HStack(spacing: 0) {
+            terminalStack(for: session)
+            SplitHandle(
+              width: width,
+              range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
+              label: Text("Divider between the terminal and the web view", bundle: .module),
+              onChange: { model.layout.browserWidthChanged(to: $0) })
+            BrowserPanel(model: model, workspace: workspace, browser: browser)
+              .frame(width: width)
+          }
+        }
+      case .alternating:
+        ZStack {
+          terminalStack(for: session)
+          if model.layout.showsBrowserWhenAlternating {
+            BrowserPanel(model: model, workspace: workspace, browser: browser)
+          }
+        }
+      }
+    } else {
+      terminalStack(for: session)
     }
   }
 
@@ -1333,6 +1424,7 @@ private struct SessionSidebar: View {
             activity: model.activity(for: session.id)
           ),
           isRestoring: model.isRestoring(session.id),
+          webView: model.webViewAttention(for: session.id),
           // Only the rows a shortcut can reach claim one.
           shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,
           commands: SessionCommands(model: model, session: session)
@@ -1550,6 +1642,8 @@ private struct SessionRow: View {
   /// The one row the restoration is working on. Said on the row rather than only in the banner,
   /// because the banner names a session the sidebar may have scrolled away from.
   let isRestoring: Bool
+  /// Its web view has something unseen: a page its agent opened, or a question (#69).
+  let webView: WebViewAttention?
   let shortcutPosition: Int?
   let commands: SessionCommands
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -1584,6 +1678,19 @@ private struct SessionRow: View {
         .lineLimit(1)
       }
       Spacer(minLength: 4)
+      switch webView {
+      case .waitingForApproval:
+        Image(systemName: "hand.raised.fill")
+          .foregroundStyle(.orange)
+          .help(Text("The agent is waiting for your approval in the web view", bundle: .module))
+      case .agentOpenedPage:
+        Image(systemName: "globe")
+          .font(.caption)
+          .foregroundStyle(Color.accentColor)
+          .help(Text("The agent opened a page in the web view", bundle: .module))
+      case nil:
+        EmptyView()
+      }
       if let shortcutPosition {
         Text(verbatim: "⌘\(shortcutPosition)")
           .font(.caption2)
@@ -1598,7 +1705,7 @@ private struct SessionRow: View {
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("session-row")
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
-    .accessibilityValue(isRestoring ? Text("Restoring", bundle: .module) : Text(verbatim: ""))
+    .accessibilityValue(accessibilityValue)
     // The same commands, reachable without a pointer and without the menu bar.
     .accessibilityAction(named: Text(commands.restartAnnouncement)) {
       guard commands.canRestart else { return }
@@ -1619,6 +1726,18 @@ private struct SessionRow: View {
     .accessibilityAction(named: Text("Unarchive", bundle: .module)) {
       guard commands.canRestore else { return }
       commands.restore()
+    }
+  }
+
+  private var accessibilityValue: Text {
+    if isRestoring { return Text("Restoring", bundle: .module) }
+    switch webView {
+    case .waitingForApproval:
+      return Text("Waiting for your approval in the web view", bundle: .module)
+    case .agentOpenedPage:
+      return Text("The agent opened a page", bundle: .module)
+    case nil:
+      return Text(verbatim: "")
     }
   }
 

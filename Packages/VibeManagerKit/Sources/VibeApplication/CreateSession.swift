@@ -31,17 +31,21 @@ public struct CreateSession: Sendable {
   private let agents: any AgentProviderResolving
   private let folders: any WorkingDirectoryProbe
   private let clock: any SessionClock
+  /// Turns a ticket typed as `#12` into its address, from the working folder's repository (#69).
+  private let ticketContext: ReadTicketContext?
 
   public init(
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     folders: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
-    clock: any SessionClock = SystemSessionClock()
+    clock: any SessionClock = SystemSessionClock(),
+    ticketContext: ReadTicketContext? = nil
   ) {
     self.repository = repository
     self.agents = agents
     self.folders = folders
     self.clock = clock
+    self.ticketContext = ticketContext
   }
 
   /// Everything wrong with this draft right now, without creating anything.
@@ -66,7 +70,11 @@ public struct CreateSession: Sendable {
       throw SessionCreationRejected(issues: issues)
     }
 
-    let session = draft.session(createdAt: clock.now())
+    var forge: RepositoryWebAddress?
+    if let ticketContext, let path = draft.resolvedWorkingDirectoryPath {
+      forge = await ticketContext(path: path).repository
+    }
+    let session = draft.session(createdAt: clock.now(), repository: forge)
     try await repository.save(session)
     return SessionCreation(session: session, plan: plan)
   }

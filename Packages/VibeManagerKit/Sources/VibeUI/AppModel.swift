@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import VibeApplication
+import VibeBrowser
 import VibeDomain
 import VibeTerminalUI
 
@@ -385,15 +386,27 @@ public final class AppModel {
   private var reloadTask: Task<Void, Never>?
 
   public let layout: WorkspaceLayoutController
+  /// Every session's web view (#69). Absent in a workspace assembled without it: no web view is
+  /// offered, and a link clicked in a terminal opens in the default browser.
+  public let browser: BrowserWorkspace?
+  let readTicketContext: ReadTicketContext?
+  /// The branch and forge each session's ticket was last deduced from.
+  var ticketContexts: [SessionID: TicketContext] = [:]
+  /// Asks the web view's panel to take the keyboard, or its address bar.
+  public internal(set) var webViewFocusRequest = 0
+  public internal(set) var addressBarFocusRequest = 0
+  /// Whether the web view's address bar holds the keyboard: ⌘W then closes a tab, not the session.
+  public var isAddressBarFocused = false
+  var webPageFocus = false
   /// Absent in a workspace assembled without the system around it — tests and previews. The
   /// application always has one.
   public let permissions: PermissionsModel?
 
-  private let repository: any SessionRepository
+  let repository: any SessionRepository
   private let loadSessions: LoadSessions
   private let recovery: (any SessionStoreRecovery)?
   let agents: (any AgentProviderResolving)?
-  private let launcher: SessionLauncher?
+  let launcher: SessionLauncher?
   private let defaultWorkingDirectoryPath: String?
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
@@ -465,6 +478,10 @@ public final class AppModel {
     activityTracker: TrackAgentActivity? = nil,
     /// What the user decided about the hooks of the CLIs that ask before running them.
     hookConsents: any AgentHookConsentStore = InMemoryAgentHookConsentStore(),
+    /// Every session's web view (#69). A workspace assembled without one offers none.
+    browser: BrowserWorkspace? = nil,
+    /// Reads a session's branch and forge, for the ticket it deduces. Absent without Git.
+    ticketContext: ReadTicketContext? = nil,
     /// The diagnostics log. Nothing the user typed ever reaches it: see `DiagnosticEvent`.
     diagnostics: Diagnostics = .disabled,
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
@@ -474,6 +491,8 @@ public final class AppModel {
   ) {
     self.activityTracker = activityTracker
     self.hookConsents = hookConsents
+    self.browser = browser
+    readTicketContext = ticketContext
     self.diagnostics = diagnostics
     self.collectDiagnostics = collectDiagnostics
     self.archiveDiagnostics = archiveDiagnostics
@@ -553,6 +572,8 @@ public final class AppModel {
       guard let self else { return .undecided }
       return await self.requestHookConsent(agentName: name, commands: commands)
     }
+
+    connectBrowser()
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }
@@ -832,6 +853,7 @@ public final class AppModel {
     do {
       let archival = try await archiveSession(id: id)
       await activityTracker?.forget(id)
+      browser?.release(id)
       diagnostics.record(
         .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)
@@ -1744,6 +1766,7 @@ public final class AppModel {
     layout.select(id)
     watchBranches()
     updateVisibleSession()
+    selectionDidChange(to: id)
   }
 
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
@@ -1831,7 +1854,8 @@ public final class AppModel {
   public func beginNewSession(template: PromptTemplateID? = nil) {
     guard let agents, canCreateSession else { return }
     let model = NewSessionModel(
-      create: CreateSession(repository: repository, agents: agents),
+      create: CreateSession(
+        repository: repository, agents: agents, ticketContext: readTicketContext),
       registry: agents,
       fullDiskAccess: permissions?.status,
       templates: templates.all
@@ -2075,6 +2099,7 @@ extension AppModel {
   public func applicationDidBecomeActive() {
     isApplicationActive = true
     updateVisibleSession()
+    if let id = selectedSessionID { refreshTicket(of: id) }
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
   }

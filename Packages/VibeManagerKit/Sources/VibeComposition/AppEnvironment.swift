@@ -1,9 +1,11 @@
 import Foundation
 import VibeAgents
 import VibeApplication
+import VibeBrowser
 import VibeDomain
 import VibeGit
 import VibePersistence
+import VibeProcess
 import VibeTerminal
 import VibeTerminalUI
 import VibeUI
@@ -36,6 +38,10 @@ public final class AppEnvironment {
     public var fullDiskAccessProbe: any FullDiskAccessProbe
     /// Where the system writes crash reports, read by an export.
     public var crashReports: URL
+    /// The program the agents start as their web view's bridge (#69): this application's binary,
+    /// given `--browser-bridge`. `nil` gives the agents no web view tools — outside an application
+    /// bundle, the test runner would be started instead.
+    public var browserBridgeExecutable: String?
 
     public init(
       environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -45,7 +51,8 @@ public final class AppEnvironment {
       defaultsSuite: String? = nil,
       fullDiskAccessProbe: any FullDiskAccessProbe = TCCFullDiskAccessProbe(),
       crashReports: URL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
+        .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true),
+      browserBridgeExecutable: String? = AppEnvironment.bundledExecutable()
     ) {
       self.environment = environment
       self.hostLaunch = hostLaunch
@@ -54,6 +61,7 @@ public final class AppEnvironment {
       self.defaultsSuite = defaultsSuite
       self.fullDiskAccessProbe = fullDiskAccessProbe
       self.crashReports = crashReports
+      self.browserBridgeExecutable = browserBridgeExecutable
     }
   }
 
@@ -77,6 +85,9 @@ public final class AppEnvironment {
   private let hangDetector: MainThreadHangDetector?
   private let memorySampler: MemorySampler
   private let activityTracker: TrackAgentActivity
+  /// Every session's web view, and the socket its agents reach it through (#69).
+  public let browser: BrowserWorkspace
+  private let browserChannel: BrowserChannelListener
 
   public init(configuration: Configuration = Configuration()) {
     let data = Self.dataLocation(
@@ -158,6 +169,33 @@ public final class AppEnvironment {
     )
     self.activityTracker = activityTracker
     let hookConsents = UserDefaultsAgentHookConsentStore(suiteName: data.defaultsSuite)
+    // The web view (#69): its tabs and trace beside the store, its choices in the user defaults,
+    // its cookies in a website data store of this copy's own.
+    let hostLocation = TerminalHostLocation(dataDirectory: dataFolder)
+    let browserSettings = UserDefaultsBrowserSettings(suiteName: data.defaultsSuite)
+    let browserStore = FileBrowserStore(
+      directory: dataFolder.appendingPathComponent("Browser", isDirectory: true))
+    let browser = BrowserWorkspace(
+      stateStore: browserStore, logStore: browserStore, permissions: browserSettings,
+      preferences: browserSettings,
+      configuration: BrowserWebConfiguration(
+        storeIdentifierFile: dataFolder.appendingPathComponent("browser-store-identifier")))
+    self.browser = browser
+    let commandDirectory = Self.installCommand(
+      at: hostLocation, executable: configuration.browserBridgeExecutable)
+    let bridge = configuration.browserBridgeExecutable
+    let socketPath = hostLocation.browserSocketPath
+    let provideTools = ProvideAgentTools(agents: registry) { [browserSettings] in
+      guard browserSettings.givesAgentsWebView, let bridge else { return nil }
+      return ProvideAgentTools.Setup(
+        servers: [
+          AgentToolServer(
+            name: BrowserToolCatalog.serverName, executablePath: bridge,
+            arguments: [BrowserBridge.bridgeFlag, socketPath])
+        ],
+        pathPrefix: commandDirectory?.path,
+        environment: [BrowserBridge.socketEnvironmentKey: socketPath])
+    }
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
@@ -168,9 +206,28 @@ public final class AppEnvironment {
       reportActivity: ReportAgentActivity(
         agents: registry, tracker: activityTracker, consents: hookConsents,
         diagnostics: diagnostics),
+      provideTools: provideTools,
       diagnostics: diagnostics
     )
     self.launcher = launcher
+    browserChannel = BrowserChannelListener(
+      socketPath: socketPath, prepare: { try hostLocation.prepare() }, runner: browser,
+      sessions: { [weak launcher] in
+        guard let launcher else { return [] }
+        return await launcher.runningProcessIdentifiers().compactMap { id, pid in
+          ProcessAncestry.entry(of: pid).map {
+            SessionProcess(
+              sessionID: id, processIdentifier: pid,
+              startedAt: ProcessStartTime(
+                seconds: $0.startSeconds, microseconds: $0.startMicroseconds))
+          }
+        }
+      })
+    do {
+      try browserChannel.start()
+    } catch {
+      diagnostics.record(.lifecycle, .error, "browser.channelUnavailable")
+    }
     memorySampler = MemorySampler(
       diagnostics: diagnostics, launcher: launcher, supervisor: supervisor)
     memorySampler.start()
@@ -235,6 +292,9 @@ public final class AppEnvironment {
       usage: UsageModel(service: usage),
       activityTracker: activityTracker,
       hookConsents: hookConsents,
+      browser: browser,
+      ticketContext: ReadTicketContext(
+        git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
       diagnostics: diagnostics,
       collectDiagnostics: { model in
         await Self.snapshot(
@@ -350,6 +410,10 @@ public final class AppEnvironment {
     await appModel.stopRestoring()
     // What is unread, and how far each log was read, for the next launch.
     await activityTracker.flush()
+    // The tabs and the trace of every web view, and no more connections: an agent's bridge that
+    // calls now is told the application is closed.
+    await browser.flush()
+    browserChannel.stop()
     if keepingAgentsRunning {
       await detachForQuit()
       // The lines of this very path are the ones worth reading if the agents are not found again.
@@ -362,6 +426,34 @@ public final class AppEnvironment {
     // Said rather than left to the host to infer: a client that simply vanished reads as a crash.
     await terminalSupervisor.relinquish(keepRunning: false)
     diagnostics.flush()
+  }
+
+  /// This application's binary, when it runs from its bundle: what the agents start as their web
+  /// view's bridge, and what the `vibe` command runs.
+  public nonisolated static func bundledExecutable() -> String? {
+    guard Bundle.main.bundleURL.pathExtension == "app" else { return nil }
+    return Bundle.main.executablePath
+  }
+
+  /// Writes the `vibe` command, pointing at this binary, in the host's private directory: written
+  /// again at each launch, so that it follows the application if it is moved or updated.
+  private static func installCommand(
+    at location: TerminalHostLocation, executable: String?
+  ) -> URL? {
+    guard let executable, (try? location.prepare()) != nil else { return nil }
+    let directory = location.directory.appendingPathComponent("bin", isDirectory: true)
+    let command = directory.appendingPathComponent("vibe", isDirectory: false)
+    let quoted = "'" + executable.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
+    let script = "#!/bin/sh\nexec \(quoted) \(BrowserBridge.commandLineFlag) \"$@\"\n"
+    do {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+      try Data(script.utf8).write(to: command, options: .atomic)
+      chmod(command.path, 0o700)
+      return directory
+    } catch {
+      return nil
+    }
   }
 
   /// The application's own binary, started with `--terminal-host`. `VIBE_TERMINAL_HOST=off` starts
