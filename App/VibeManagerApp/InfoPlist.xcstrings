@@ -1,7 +1,150 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-
+    "CFBundleDisplayName" : {
+      "comment" : "The application's name, shown in the Finder.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "The application's short name, in the menu bar.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        }
+      }
+    },
+    "NSDesktopFolderUsageDescription" : {
+      "comment" : "Why the application asks for access to the Desktop.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager lets the coding agent you launched read the folder you chose."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager permet à l’agent de code que vous avez lancé de lire le dossier que vous avez choisi."
+          }
+        }
+      }
+    },
+    "NSDocumentsFolderUsageDescription" : {
+      "comment" : "Why the application asks for access to the Documents folder.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager lets the coding agent you launched read the folder you chose."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager permet à l’agent de code que vous avez lancé de lire le dossier que vous avez choisi."
+          }
+        }
+      }
+    },
+    "NSDownloadsFolderUsageDescription" : {
+      "comment" : "Why the application asks for access to the Downloads folder.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager lets the coding agent you launched read the folder you chose."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager permet à l’agent de code que vous avez lancé de lire le dossier que vous avez choisi."
+          }
+        }
+      }
+    },
+    "NSFileProviderDomainUsageDescription" : {
+      "comment" : "Why the application asks for access to iCloud Drive.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager opens the working folder you chose in iCloud Drive."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager ouvre le dossier de travail que vous avez choisi dans iCloud Drive."
+          }
+        }
+      }
+    },
+    "NSNetworkVolumesUsageDescription" : {
+      "comment" : "Why the application asks for access to a network volume.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager opens the working folder you chose on this volume."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager ouvre le dossier de travail que vous avez choisi sur ce volume."
+          }
+        }
+      }
+    },
+    "NSRemovableVolumesUsageDescription" : {
+      "comment" : "Why the application asks for access to a removable volume.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager opens the working folder you chose on this volume."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager ouvre le dossier de travail que vous avez choisi sur ce volume."
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
