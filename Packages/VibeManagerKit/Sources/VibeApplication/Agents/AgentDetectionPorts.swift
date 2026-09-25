@@ -43,17 +43,21 @@ public struct ProbeResult: Hashable, Sendable {
   public let standardOutput: String
   public let standardError: String
   public let didTimeOut: Bool
+  /// The command wrote more than the probe keeps: the end of its output is missing.
+  public let outputTruncated: Bool
 
   public init(
     exitCode: Int32,
     standardOutput: String = "",
     standardError: String = "",
-    didTimeOut: Bool = false
+    didTimeOut: Bool = false,
+    outputTruncated: Bool = false
   ) {
     self.exitCode = exitCode
     self.standardOutput = standardOutput
     self.standardError = standardError
     self.didTimeOut = didTimeOut
+    self.outputTruncated = outputTruncated
   }
 
   public var combinedOutput: String {
@@ -110,7 +114,9 @@ extension ProcessProbe {
 /// injected, including secrets unrelated to the agent.
 public enum AgentEnvironmentPolicy {
   public static let defaultAllowedKeys: Set<String> = [
-    "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LOGNAME", "PATH", "SHELL", "SSH_AUTH_SOCK",
+    // `NVM_DIR` because nvm is often loaded lazily, by shell functions that source it from there:
+    // without it, `npm` and `node` are missing from the shells the agent opens.
+    "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LOGNAME", "NVM_DIR", "PATH", "SHELL", "SSH_AUTH_SOCK",
     "TERM", "TERM_PROGRAM", "TMPDIR", "USER", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
     "XDG_DATA_HOME",
   ]

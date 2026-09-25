@@ -113,6 +113,7 @@ public struct CommandLineAgentProvider: AgentProvider {
   private let argumentBuilder: any CommandLineAgentArgumentBuilder
   private let catalog: [AgentModel]
   private let environment: [String: String]
+  private let shellEnvironment: (any ShellEnvironmentSource)?
 
   public init(
     descriptor: AgentDescriptor,
@@ -120,7 +121,8 @@ public struct CommandLineAgentProvider: AgentProvider {
     models: [AgentModel] = [],
     argumentBuilder: any CommandLineAgentArgumentBuilder,
     availabilityProbe: AgentAvailabilityProbe,
-    environment: [String: String] = ProcessInfo.processInfo.environment
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    shellEnvironment: (any ShellEnvironmentSource)? = nil
   ) {
     self.descriptor = descriptor
     self.specification = specification
@@ -128,6 +130,7 @@ public struct CommandLineAgentProvider: AgentProvider {
     self.argumentBuilder = argumentBuilder
     self.availabilityProbe = availabilityProbe
     self.environment = environment
+    self.shellEnvironment = shellEnvironment
   }
 
   public func availability(forceRefresh: Bool) async -> AgentAvailability {
@@ -143,13 +146,20 @@ public struct CommandLineAgentProvider: AgentProvider {
     guard availability.isUsable, let installation = availability.installation else {
       throw AgentLaunchError.unavailable(availability.state)
     }
-    return try plan(for: request, installation: installation)
+    // The agent runs the user's tools, so it needs the `PATH` of their shell, not the bare one an
+    // application launched from the Finder inherits.
+    let shell = await shellEnvironment?.environment() ?? [:]
+    return try plan(for: request, installation: installation, shellEnvironment: shell)
   }
 
-  /// Pure part of the launch: same installation and request always yield the same plan.
+  /// Pure part of the launch: same installation, request and shell always yield the same plan.
+  ///
+  /// `shellEnvironment` wins over the inherited environment, and the request's own additions
+  /// over both.
   public func plan(
     for request: AgentLaunchRequest,
-    installation: AgentInstallation
+    installation: AgentInstallation,
+    shellEnvironment: [String: String] = [:]
   ) throws -> AgentLaunchPlan {
     try AgentLaunchValidation.validateWorkingDirectory(request.workingDirectoryPath)
     try AgentLaunchValidation.validateModel(request.modelID, in: catalog, descriptor: descriptor)
@@ -170,7 +180,7 @@ public struct CommandLineAgentProvider: AgentProvider {
       executablePath: installation.executablePath,
       arguments: arguments,
       environment: AgentEnvironmentPolicy.environment(
-        base: environment,
+        base: environment.merging(shellEnvironment) { _, shell in shell },
         additionalKeys: specification.additionalEnvironmentKeys,
         overrides: request.additionalEnvironment
       ),

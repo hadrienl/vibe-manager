@@ -51,7 +51,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
 
   public static func make(
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
-    diagnostics: any DiagnosticLog = NullDiagnosticLog()
+    diagnostics: any DiagnosticLog = NullDiagnosticLog(),
+    shellEnvironment: (any ShellEnvironmentSource)? = nil
   ) -> ClaudeCodeAgentProvider {
     // The CLI and the catalog reader must agree on where the configuration lives, so a value
     // that cannot be resolved into an absolute path is dropped rather than forwarded.
@@ -74,7 +75,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
         models: [],
         argumentBuilder: ClaudeCodeArgumentBuilder(),
         availabilityProbe: availabilityProbe,
-        environment: environment
+        environment: environment,
+        shellEnvironment: shellEnvironment
       ),
       catalog: ClaudeCodeModelCatalog(environment: environment)
     )
