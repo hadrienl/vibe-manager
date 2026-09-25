@@ -3,6 +3,8 @@
 - Status: accepted
 - Date: 2026-09-22
 - Issue: [#31](https://github.com/hadrienl/vibe-manager/issues/31)
+- Revised: [#76](https://github.com/hadrienl/vibe-manager/issues/76), after the terminal host of
+  [ADR 0017](0017-terminal-host.md) — see "Which process has the access"
 
 ## Context
 
@@ -50,9 +52,9 @@ seeing the alerts, and that should be known rather than rediscovered.
 
 macOS offers exactly one grant that covers folders an agent may freely decide to read: Full Disk
 Access. It cannot be requested programmatically, so the application detects that it is missing,
-explains it, opens the right pane of System Settings, and says that the change takes effect at the
-next launch. That is the path Terminal, iTerm2, Ghostty and Warp take, and the only one that keeps
-the promise of "once and for all".
+explains it, opens the right pane of System Settings, and says what has to restart before the agents
+have it. That is the path Terminal, iTerm2, Ghostty and Warp take, and the only one that keeps the
+promise of "once and for all".
 
 The step is presented at launch and nowhere else. Asking during session creation would reproduce
 exactly the interruption this ticket exists to remove.
@@ -70,35 +72,80 @@ it exists on every Mac, and only Full Disk Access opens it. Crucially, a process
 access is refused *silently* — the path is hidden rather than denied (`errno = 2` observed), with
 no alert. Nothing is read from the file; being allowed to open it is the whole answer.
 
-### Probed once per launch, except where the user is looking
+### Which process has the access
 
-TCC freezes a process's permissions when it starts, so the answer cannot change under a running
-process. `FullDiskAccessGate` caches it, and that same fact is why the step has to talk about
-relaunching rather than waiting for the user to come back.
+Measured for #76, on a build signed Apple Development, with an agent running under a terminal host
+started before the grant:
 
-The settings window is the exception, and asks again through `refreshedStatus()`. Someone who
-opens it has usually just come back from System Settings, and a row that kept saying "Not granted"
-because the question was settled at launch would be a row that lies. One file open is a small
-price for that.
+1. The switch turned on in System Settings, "Later" answered to "Quit & Reopen", nothing
+   relaunched.
+2. A read of the witness from that agent's shell, then from a **new** process spawned there after
+   the grant: both still refused.
+3. A copy of the same bundle, launched after the grant: granted.
+4. The settings window of the application launched before the grant, which probed again when
+   opened: "Not granted".
+5. In `tccd`'s log, none of the reads of step 2 raised a request: the answer was settled without it.
+
+**TCC settles Full Disk Access once, for the process responsible, when it starts, and everything
+that process spawns inherits that answer** — including a process spawned after the grant. Three
+consequences:
+
+- The process that matters is the one responsible for the agents: the terminal host since
+  ADR 0017, which outlives the application. A host started before the grant never gets it: it has to
+  restart, and the step says so instead of "reopen Vibe Manager".
+- A probe run in a process answers for that process's start, never for now. The settings window used
+  to probe again when opened; it could only repeat the launch's answer, and told someone who had just
+  granted the access that they had not. It is gone.
+- To learn whether the switch was turned on since, the application asks a process born now and
+  answering for itself: its own binary, `--probe-full-disk-access`, spawned with the disclaimer the
+  host is spawned with (`SpawnedFullDiskAccessProbe`). It is asked when the Privacy tab of Settings
+  opens, and when the application comes back to the front after a trip to System Settings it
+  started — never on the way to creating a session, and never waited for at launch, where the
+  application's own answer is already the identity's.
+
+The host reports its own answer through the `fullDiskAccess` capability of its protocol. From the
+three answers — the identity now, the host, this process — `FullDiskAccessSituation` says one of
+`granted`, `notGranted`, `pendingRestart` or `checking`:
+
+- **An idle host that lags** is let go at once, and the next terminal starts one born with the
+  access. `retire` is refused by a host where an agent runs, and a retiring host refuses `start`;
+  on the application's side, a start waits for the retirement to finish, and no host is let go
+  while a start is on its way. The goodbye that follows therefore has nothing to stop.
+- **A host with agents** is never stopped on its own: a notice above the workspace, and the Privacy
+  tab, offer **Restart When Idle** — the host goes when its last agent ends — and **Restart Now…**,
+  which names the sessions, stops them as a quit would and resumes them natively (#11).
+- **Quitting with Keep Running** while the host lags adds a line to the question: they will still
+  not have the access at the next launch.
+
+Nothing is ever warned about on a guess. Until an answer has come, the situation is `checking`, and
+the creation sheet says nothing about a protected folder: telling someone who granted the access
+long ago that macOS is about to interrupt them would be worse than staying quiet.
 
 The step itself is offered at most once per launch, in the gate rather than in the interface:
-recording the answer is what makes it final across launches, but that write is asynchronous, and a
-second caller reading the preferences inside that window would otherwise be told to present a step
-the user is already reading.
-
-Nothing is ever warned about on a guess. Until the first probe has answered, the status is `nil`,
-and the creation sheet says nothing about a protected folder: telling someone who granted the
-access long ago that macOS is about to interrupt them would be worse than staying quiet.
+recording the answer is what makes it final, but that write is asynchronous, and a second caller
+reading the preferences inside that window would otherwise be told to present a step the user is
+already reading.
 
 ### The application stores the answer, never the access
 
-`UserDefaultsPermissionPreferences` records only that the step was answered. Whether access is
-granted is probed at every launch, so an access turned off in System Settings cannot leave a stale
-"yes" behind in the preferences.
+`UserDefaultsPermissionPreferences` records only that the step was answered, and **by which code
+identity**. Whether access is granted is probed, so an access turned off in System Settings cannot
+leave a stale "yes" behind in the preferences.
 
-The step does not come back: not once access is granted, because the status alone settles it; not
-after a refusal, because the answer was recorded. The way back is the Settings window, which gets
-its first real row here — a permanent entrance, rather than something that surges up unbidden.
+TCC keeps a grant against the identity that received it: the bundle identifier and, for a signed
+build, the designated requirement — which, for Apple Development, names the leaf certificate. The
+change from `com.hadrienl.VibeManager` to `eu.hadrien.VibeManager` made a new application of it,
+and the step, recorded as a plain boolean, never came back to say so (#76). The answer is now kept
+with a fingerprint of the identity (`CodeIdentityFingerprint`): identifier, team and designated
+requirement, or the identifier alone for an ad-hoc build, whose requirement changes at every
+compilation. A new identity — another identifier, another team, a Developer ID build after an
+Apple Development one — is asked once. The boolean of the first version reads as no answer.
+
+The step does not come back otherwise: not once access is granted, because the status alone settles
+it; not after a refusal by the same identity, because the answer was recorded. The way back is the
+Privacy tab of the Settings window — a permanent entrance, rather than something that surges up
+unbidden. Since System Settings shows every identity under the same name, the step and the tab
+offer **Show in Finder**, to drag this very copy into the list.
 
 ### No folder is proposed any more
 

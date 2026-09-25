@@ -66,6 +66,26 @@ put a team in `Configuration/Local.xcconfig` (see the README). To start over fro
 tccutil reset SystemPolicyAllFiles eu.hadrien.VibeManager
 ```
 
+### Full Disk Access is granted, and agents are still asked
+
+Each process keeps the access it had when it started, and the agents inherit theirs from the
+background process that runs them, which outlives the application (ADR 0010, #76). Settings →
+Privacy shows what each process has: **Restart When Idle** lets that process go once its last
+agent ends, **Restart Now…** stops the agents it names and resumes them. When no agent runs, it
+restarts by itself.
+
+System Settings may list several "Vibe Manager": each signature is a separate entry, and nothing
+tells them apart. **Show in Finder**, in the same tab, reveals this copy to drag into the list.
+
+To see what TCC decides — `/usr/bin/log`, since zsh has a `log` of its own:
+
+```sh
+/usr/bin/log stream --info --predicate 'subsystem == "com.apple.TCC" AND eventMessage CONTAINS "AUTHREQ_RESULT"'
+```
+
+`authValue=2` is allowed, `authValue=0` denied. A process whose access was settled at its start asks
+nothing more, so a read that shows no line at all is answered from that.
+
 ### An agent is not found
 
 Settings, or the New Session sheet, show why: not installed, not executable, too old, not signed
