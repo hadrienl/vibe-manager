@@ -96,7 +96,8 @@ public actor FileSessionNotesStore: SessionNotesStore {
       throw SessionNotesError.unreadable(reason: Self.reason(error))
     }
     guard let text = String(data: data, encoding: .utf8) else {
-      throw SessionNotesError.unreadable(reason: "the file is not UTF-8 text.")
+      throw SessionNotesError.unreadable(
+        reason: String(localized: "the file is not UTF-8 text.", bundle: .module))
     }
     return SessionNotes(text: text, modifiedAt: modificationDate(of: url))
   }
@@ -143,7 +144,8 @@ public actor FileSessionNotesStore: SessionNotesStore {
       manager.createFile(
         atPath: temporaryURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
     else {
-      throw SessionNotesError.cannotWrite(reason: "the notes folder is not writable.")
+      throw SessionNotesError.cannotWrite(
+        reason: String(localized: "the notes folder is not writable.", bundle: .module))
     }
     let handle = try FileHandle(forWritingTo: temporaryURL)
     do {
@@ -182,16 +184,20 @@ public actor FileSessionNotesStore: SessionNotesStore {
     let error = error as NSError
     if error.domain == NSCocoaErrorDomain {
       switch error.code {
-      case NSFileWriteOutOfSpaceError: return "the disk is full."
+      case NSFileWriteOutOfSpaceError:
+        return String(localized: "the disk is full.", bundle: .module)
       case NSFileWriteNoPermissionError, NSFileReadNoPermissionError:
-        return "permission was denied."
-      case NSFileWriteVolumeReadOnlyError: return "the volume is read-only."
+        return String(localized: "permission was denied.", bundle: .module)
+      case NSFileWriteVolumeReadOnlyError:
+        return String(localized: "the volume is read-only.", bundle: .module)
       default: break
       }
     }
-    if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOSPC) { return "the disk is full." }
+    if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOSPC) {
+      return String(localized: "the disk is full.", bundle: .module)
+    }
     if error.domain == NSPOSIXErrorDomain, error.code == Int(EACCES) {
-      return "permission was denied."
+      return String(localized: "permission was denied.", bundle: .module)
     }
     return error.localizedDescription
   }

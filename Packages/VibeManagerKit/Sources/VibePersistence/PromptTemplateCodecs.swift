@@ -128,13 +128,18 @@ public enum PromptTemplateExchangeError: Error, Equatable, Sendable, LocalizedEr
   public var errorDescription: String? {
     switch self {
     case .tooLarge(let byteCount):
-      return
-        "This file weighs \(PromptSize.label(byteCount)); a template file is at most \(PromptSize.label(PromptTemplateExchangeCodec.byteLimit))."
+      return String(
+        localized:
+          "This file weighs \(PromptSize.label(byteCount)); a template file is at most \(PromptSize.label(PromptTemplateExchangeCodec.byteLimit)).",
+        bundle: .module, comment: "Two sizes, formatted: “1.2 MB”, “1 MB”.")
     case .notATemplateFile:
-      return "This file does not hold Vibe Manager prompt templates."
+      return String(
+        localized: "This file does not hold Vibe Manager prompt templates.", bundle: .module)
     case .unsupportedVersion(let version):
-      return
-        "These templates were exported by a newer version of Vibe Manager (format \(version)). Update Vibe Manager to import them."
+      return String(
+        localized:
+          "These templates were exported by a newer version of Vibe Manager (format \(String(version))). Update Vibe Manager to import them.",
+        bundle: .module, comment: "The version number of the file's format.")
     }
   }
 }

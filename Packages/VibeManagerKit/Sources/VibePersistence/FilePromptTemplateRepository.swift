@@ -71,9 +71,11 @@ public actor FilePromptTemplateRepository: PromptTemplateRepository {
       return try codec.decode(data)
     } catch PromptTemplateCodecError.unsupportedVersion {
       throw PromptTemplateStoreError.unreadable(
-        reason: "the file was written by a newer version of Vibe Manager.")
+        reason: String(
+          localized: "the file was written by a newer version of Vibe Manager.", bundle: .module))
     } catch {
-      throw PromptTemplateStoreError.unreadable(reason: "the file is damaged.")
+      throw PromptTemplateStoreError.unreadable(
+        reason: String(localized: "the file is damaged.", bundle: .module))
     }
   }
 
@@ -96,7 +98,8 @@ public actor FilePromptTemplateRepository: PromptTemplateRepository {
       manager.createFile(
         atPath: temporaryURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
     else {
-      throw PromptTemplateStoreError.cannotWrite(reason: "the folder is not writable.")
+      throw PromptTemplateStoreError.cannotWrite(
+        reason: String(localized: "the folder is not writable.", bundle: .module))
     }
     let handle = try FileHandle(forWritingTo: temporaryURL)
     do {
@@ -132,16 +135,20 @@ public actor FilePromptTemplateRepository: PromptTemplateRepository {
     let error = error as NSError
     if error.domain == NSCocoaErrorDomain {
       switch error.code {
-      case NSFileWriteOutOfSpaceError: return "the disk is full."
+      case NSFileWriteOutOfSpaceError:
+        return String(localized: "the disk is full.", bundle: .module)
       case NSFileWriteNoPermissionError, NSFileReadNoPermissionError:
-        return "permission was denied."
-      case NSFileWriteVolumeReadOnlyError: return "the volume is read-only."
+        return String(localized: "permission was denied.", bundle: .module)
+      case NSFileWriteVolumeReadOnlyError:
+        return String(localized: "the volume is read-only.", bundle: .module)
       default: break
       }
     }
-    if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOSPC) { return "the disk is full." }
+    if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOSPC) {
+      return String(localized: "the disk is full.", bundle: .module)
+    }
     if error.domain == NSPOSIXErrorDomain, error.code == Int(EACCES) {
-      return "permission was denied."
+      return String(localized: "permission was denied.", bundle: .module)
     }
     return error.localizedDescription
   }
