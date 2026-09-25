@@ -710,6 +710,13 @@ private struct RestartContextSheet: View {
         Button("Restart") { restart(text) }
           .keyboardShortcut(.defaultAction)
           .buttonStyle(.borderedProminent)
+          // Return belongs to the summary while it is being edited: ⌘↩ restarts from anywhere in
+          // the sheet, as it creates from anywhere in the New Session one.
+          .background {
+            Button("Restart") { restart(text) }
+              .keyboardShortcut(.return, modifiers: .command)
+              .hidden()
+          }
       }
     }
     .padding(20)

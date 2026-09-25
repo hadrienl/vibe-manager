@@ -35,6 +35,7 @@ menus already took the others before #19.
 | New Session from Template | ⇧⌘N | File |
 | Create & Launch, from anywhere in the sheet | ⌘↩ | — |
 | Restart | ⌃⌘R | Session |
+| Restart in a new process, from anywhere in its sheet | ⌘↩ | — |
 | Switch Agent… | ⌃⌘M | Session |
 | Close Session | ⌘W | Session |
 | Archive… / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
