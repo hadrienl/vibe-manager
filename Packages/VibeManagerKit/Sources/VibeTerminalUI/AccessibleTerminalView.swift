@@ -11,13 +11,15 @@ import SwiftTerm
 /// on demand.
 public final class AccessibleTerminalView: TerminalView {
   /// "Terminal — <session> — <agent state>", set by the surface.
-  public var accessibilityTitle = "Terminal"
+  public var accessibilityTitle = String(localized: "Terminal", bundle: .module)
 
   public override func isAccessibilityElement() -> Bool { true }
 
   public override func accessibilityRole() -> NSAccessibility.Role? { .textArea }
 
-  public override func accessibilityRoleDescription() -> String? { "terminal" }
+  public override func accessibilityRoleDescription() -> String? {
+    String(localized: "terminal", bundle: .module, comment: "What VoiceOver calls the element.")
+  }
 
   public override func accessibilityLabel() -> String? { accessibilityTitle }
 
@@ -30,7 +32,10 @@ public final class AccessibleTerminalView: TerminalView {
   }
 
   public override func accessibilityHelp() -> String? {
-    "Read Last Output, Control-Option-Command-O, reads the last lines the agent wrote."
+    String(
+      localized:
+        "Read Last Output, Control-Option-Command-O, reads the last lines the agent wrote.",
+      bundle: .module, comment: "Read Last Output is a command of the View menu.")
   }
 }
 

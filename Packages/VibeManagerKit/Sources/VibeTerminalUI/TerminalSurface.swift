@@ -15,14 +15,14 @@ public struct TerminalSurface: NSViewRepresentable {
   /// See `TerminalPaneModel.focusRequest`.
   private let focusRequest: Int
   /// What VoiceOver calls the terminal: see `AccessibleTerminalView`.
-  private let accessibilityTitle: String
+  private let accessibilityTitle: String?
 
   public init(
     pane: TerminalPaneModel,
     session: (any TerminalSession)?,
     isActive: Bool = true,
     focusRequest: Int = 0,
-    accessibilityTitle: String = "Terminal"
+    accessibilityTitle: String? = nil
   ) {
     self.pane = pane
     self.session = session
@@ -37,7 +37,9 @@ public struct TerminalSurface: NSViewRepresentable {
 
   public func makeNSView(context: Context) -> TerminalView {
     let view = AccessibleTerminalView()
-    view.accessibilityTitle = accessibilityTitle
+    if let accessibilityTitle {
+      view.accessibilityTitle = accessibilityTitle
+    }
     view.setAccessibilityIdentifier("terminal")
     // As long as the history the application keeps: at SwiftTerm's default of 500 lines, a history
     // replayed after a relaunch was cut on screen. Measured at about 17 MB for a full terminal of
@@ -53,7 +55,9 @@ public struct TerminalSurface: NSViewRepresentable {
     // The pane can be replaced under a view SwiftUI keeps identical — a relaunch of the same
     // session builds a new one — so the coordinator is told which pane is the live one.
     context.coordinator.adopt(pane: pane)
-    (nsView as? AccessibleTerminalView)?.accessibilityTitle = accessibilityTitle
+    if let accessibilityTitle {
+      (nsView as? AccessibleTerminalView)?.accessibilityTitle = accessibilityTitle
+    }
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
