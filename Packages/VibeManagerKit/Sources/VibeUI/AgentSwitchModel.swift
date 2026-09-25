@@ -172,16 +172,23 @@ public final class AgentSwitchModel {
 
   /// The button's own words: it says that an agent will be stopped when one will.
   public var confirmTitle: String {
-    stopsRunningAgent ? "Stop and Switch" : "Switch"
+    stopsRunningAgent
+      ? String(
+        localized: "Stop and Switch", bundle: .module,
+        comment: "Button of the Switch Agent sheet: stops the running agent, then switches.")
+      : String(
+        localized: "Switch", bundle: .module, comment: "Button of the Switch Agent sheet.")
   }
 
   /// The warning shown when the switch stops a running agent.
   public var stopWarning: String? {
     guard stopsRunningAgent else { return nil }
-    return """
-      \(currentName) is running and will be stopped. Whatever it is doing right now will be \
-      interrupted.
-      """
+    return String(
+      localized: """
+        \(currentName) is running and will be stopped. Whatever it is doing right now will be \
+        interrupted.
+        """,
+      bundle: .module, comment: "An agent's name.")
   }
 
   /// What the new agent will and will not know: always said, and said for the case at hand.
@@ -189,42 +196,80 @@ public final class AgentSwitchModel {
     switch handover {
     case .resumesConversation:
       let model = modelID.map { id in models.first { $0.id == id }?.displayName ?? id }
-      return "The conversation continues with \(model ?? "the agent's default model")."
+      guard let model else {
+        return String(
+          localized: "The conversation continues with the agent's default model.",
+          bundle: .module)
+      }
+      return String(
+        localized: "The conversation continues with \(model).", bundle: .module,
+        comment: "A model's name.")
     case .firstLaunch:
-      return """
-        This session has never run: \(targetName) starts it with the prompt it was created with.
-        """
+      return String(
+        localized: """
+          This session has never run: \(targetName) starts it with the prompt it was created with.
+          """,
+        bundle: .module, comment: "An agent's name.")
     case .nothing:
-      return """
-        \(targetName) starts a new conversation and takes no prompt: it will not see \
-        \(currentName)'s conversation, and nothing is sent to it.
-        """
+      return String(
+        localized: """
+          \(targetName) starts a new conversation and takes no prompt: it will not see \
+          \(currentName)'s conversation, and nothing is sent to it.
+          """,
+        bundle: .module, comment: "The new agent's name, then the current agent's name.")
     case .summary:
       if skipsResume {
-        return """
-          \(currentName) stopped as soon as this conversation was resumed last time, so \
-          \(targetName) starts a new one with the summary below.
-          """
+        return String(
+          localized: """
+            \(currentName) stopped as soon as this conversation was resumed last time, so \
+            \(targetName) starts a new one with the summary below.
+            """,
+          bundle: .module, comment: "The current agent's name, then the new agent's name.")
       }
-      let whose =
-        providerID == current.providerID
-        ? "the previous conversation" : "\(currentName)'s conversation"
-      if isSummaryEmptied {
-        return """
-          \(targetName) starts a new conversation. It will not see \(whose), and no summary \
-          will be sent.
-          """
+      // Whole sentences for each case, rather than a phrase slotted into one: a translation
+      // cannot agree with a fragment it does not see.
+      switch (providerID == current.providerID, isSummaryEmptied) {
+      case (true, true):
+        return String(
+          localized: """
+            \(targetName) starts a new conversation. It will not see the previous conversation, \
+            and no summary will be sent.
+            """,
+          bundle: .module, comment: "An agent's name.")
+      case (true, false):
+        return String(
+          localized: """
+            \(targetName) starts a new conversation. It will not see the previous conversation \
+            — only the summary below.
+            """,
+          bundle: .module, comment: "An agent's name.")
+      case (false, true):
+        return String(
+          localized: """
+            \(targetName) starts a new conversation. It will not see \(currentName)'s \
+            conversation, and no summary will be sent.
+            """,
+          bundle: .module, comment: "The new agent's name, then the current agent's name.")
+      case (false, false):
+        return String(
+          localized: """
+            \(targetName) starts a new conversation. It will not see \(currentName)'s \
+            conversation — only the summary below.
+            """,
+          bundle: .module, comment: "The new agent's name, then the current agent's name.")
       }
-      return """
-        \(targetName) starts a new conversation. It will not see \(whose) — only the summary \
-        below.
-        """
     }
   }
 
   public var accessibilityDescription: String {
-    "Switch the agent of \(sessionName), currently \(currentLabel)"
-      + (stopsRunningAgent ? ", running" : "")
+    stopsRunningAgent
+      ? String(
+        localized: "Switch the agent of \(sessionName), currently \(currentLabel), running",
+        bundle: .module,
+        comment: "VoiceOver: the session's name, then its agent and model, which is running.")
+      : String(
+        localized: "Switch the agent of \(sessionName), currently \(currentLabel)",
+        bundle: .module, comment: "VoiceOver: the session's name, then its agent and model.")
   }
 
   // MARK: - Loading and picking

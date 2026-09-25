@@ -1,7 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "": {},
     "%@ %@": {
       "localizations": {
         "en": {
@@ -19,6 +18,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ Un nouveau processus sera lancé à la place, avec ce résumé de ce que contient la session. Vous pouvez le modifier avant son envoi."
+          }
+        }
+      }
+    },
+    "%@ KiB": {
+      "comment": "A size in kibibytes: “1.5 KiB”.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Kio"
           }
         }
       }
@@ -106,7 +116,19 @@
         }
       }
     },
+    "%@ is running and will be stopped. Whatever it is doing right now will be interrupted.": {
+      "comment": "An agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ est en cours d’exécution et sera arrêté. Ce qu’il est en train de faire sera interrompu."
+          }
+        }
+      }
+    },
     "%@ of %@": {
+      "comment": "The summary's size, then the most an agent accepts.",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -122,22 +144,120 @@
         }
       }
     },
-    "%@ of %@ · From “%@”, revision %lld": {
+    "%@ of %@ · From “%@”, revision %@": {
+      "comment": "The prompt's size, the most an agent accepts, the template's name and revision.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$@ of %2$@ · From “%3$@”, revision %4$lld"
+            "value": "%1$@ of %2$@ · From “%3$@”, revision %4$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ sur %2$@ · Issu de « %3$@ », révision %4$@"
           }
         }
       }
     },
     "%@ over what an agent can be started with. Shorten the summary.": {
+      "comment": "A size, formatted: “120 bytes”, “1.5 KiB”.",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ de plus que ce avec quoi un agent peut être lancé. Raccourcissez le résumé."
+          }
+        }
+      }
+    },
+    "%@ starts a new conversation and takes no prompt: it will not see %@'s conversation, and nothing is sent to it.": {
+      "comment": "The new agent's name, then the current agent's name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ starts a new conversation and takes no prompt: it will not see %2$@'s conversation, and nothing is sent to it."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ démarre une nouvelle conversation et ne reçoit aucun prompt : il ne verra pas la conversation de %2$@, et rien ne lui est envoyé."
+          }
+        }
+      }
+    },
+    "%@ starts a new conversation. It will not see %@'s conversation — only the summary below.": {
+      "comment": "The new agent's name, then the current agent's name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ starts a new conversation. It will not see %2$@'s conversation — only the summary below."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ démarre une nouvelle conversation. Il ne verra pas la conversation de %2$@ — seulement le résumé ci-dessous."
+          }
+        }
+      }
+    },
+    "%@ starts a new conversation. It will not see %@'s conversation, and no summary will be sent.": {
+      "comment": "The new agent's name, then the current agent's name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ starts a new conversation. It will not see %2$@'s conversation, and no summary will be sent."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ démarre une nouvelle conversation. Il ne verra pas la conversation de %2$@, et aucun résumé ne sera envoyé."
+          }
+        }
+      }
+    },
+    "%@ starts a new conversation. It will not see the previous conversation — only the summary below.": {
+      "comment": "An agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ démarre une nouvelle conversation. Il ne verra pas la conversation précédente — seulement le résumé ci-dessous."
+          }
+        }
+      }
+    },
+    "%@ starts a new conversation. It will not see the previous conversation, and no summary will be sent.": {
+      "comment": "An agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ démarre une nouvelle conversation. Il ne verra pas la conversation précédente, et aucun résumé ne sera envoyé."
+          }
+        }
+      }
+    },
+    "%@ stopped as soon as this conversation was resumed last time, so %@ starts a new one with the summary below.": {
+      "comment": "The current agent's name, then the new agent's name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ stopped as soon as this conversation was resumed last time, so %2$@ starts a new one with the summary below."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ s’est arrêté dès la reprise de cette conversation la dernière fois : %2$@ en démarre donc une nouvelle avec le résumé ci-dessous."
           }
         }
       }
@@ -186,22 +306,13 @@
         }
       }
     },
-    "%@. %@": {
+    "%@ — running": {
+      "comment": "The session's current agent and model, which is running.",
       "localizations": {
-        "en": {
+        "fr": {
           "stringUnit": {
-            "state": "new",
-            "value": "%1$@. %2$@"
-          }
-        }
-      }
-    },
-    "%@. %@ %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@. %2$@ %3$@"
+            "state": "translated",
+            "value": "%@ — en cours d’exécution"
           }
         }
       }
@@ -226,6 +337,24 @@
     "%lld": {},
     "%lld agents kept running while Vibe Manager was closed.": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent kept running while Vibe Manager was closed."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents kept running while Vibe Manager was closed."
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -245,24 +374,6 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld agents ont continué de tourner pendant que Vibe Manager était fermé."
-                }
-              }
-            }
-          }
-        },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld agent kept running while Vibe Manager was closed."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld agents kept running while Vibe Manager was closed."
                 }
               }
             }
@@ -289,6 +400,24 @@
     },
     "%lld agents kept running while Vibe Manager was closed; 1 has finished since.": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent kept running while Vibe Manager was closed; 1 has finished since."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents kept running while Vibe Manager was closed; 1 has finished since."
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -312,6 +441,34 @@
               }
             }
           }
+        }
+      }
+    },
+    "%lld bytes": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld octet"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld octets"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld octets"
+                }
+              }
+            }
+          }
         },
         "en": {
           "variations": {
@@ -319,13 +476,13 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld agent kept running while Vibe Manager was closed; 1 has finished since."
+                  "value": "%lld byte"
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld agents kept running while Vibe Manager was closed; 1 has finished since."
+                  "value": "%lld bytes"
                 }
               }
             }
@@ -382,6 +539,24 @@
     "%lld more were left closed when you cancelled.": {
       "comment": "Sessions the restoration did not reach, because the user cancelled it.",
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more was left closed when you cancelled."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld more were left closed when you cancelled."
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -401,24 +576,6 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld autres sont restées fermées quand vous avez annulé."
-                }
-              }
-            }
-          }
-        },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld more was left closed when you cancelled."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld more were left closed when you cancelled."
                 }
               }
             }
@@ -484,6 +641,24 @@
     },
     "%lld sessions came back.": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld session came back."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions came back."
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -507,29 +682,29 @@
               }
             }
           }
-        },
+        }
+      }
+    },
+    "%lld sessions did not come back.": {
+      "localizations": {
         "en": {
           "variations": {
             "plural": {
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld session came back."
+                  "value": "%lld session did not come back."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "%lld sessions came back."
+                  "value": "%lld sessions did not come back."
                 }
               }
             }
           }
-        }
-      }
-    },
-    "%lld sessions did not come back.": {
-      "localizations": {
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -553,31 +728,11 @@
               }
             }
           }
-        },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld session did not come back."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld sessions did not come back."
-                }
-              }
-            }
-          }
         }
       }
     },
     "%lld+": {},
-    "%lld.": {},
     "/%@/": {},
-    "1 problem to fix": {},
     "A finished session shows its last output, and can be restarted.": {
       "localizations": {
         "fr": {
@@ -620,6 +775,7 @@
       }
     },
     "Accent %@": {
+      "comment": "VoiceOver: a colour, by its hex code.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -640,6 +796,7 @@
       }
     },
     "Agent": {
+      "comment": "The coding agent the session runs.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -772,6 +929,17 @@
         }
       }
     },
+    "Appearance": {
+      "comment": "The symbol and colour of the session.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apparence"
+          }
+        }
+      }
+    },
     "Archive": {
       "localizations": {
         "fr": {
@@ -875,6 +1043,7 @@
       }
     },
     "Cancel creates nothing — no session, no process.": {
+      "comment": "Cancel is the button of the sheet.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -914,6 +1083,17 @@
         }
       }
     },
+    "Choose": {
+      "comment": "The button of the folder panel.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir"
+          }
+        }
+      }
+    },
     "Choose a folder": {
       "localizations": {
         "fr": {
@@ -925,6 +1105,7 @@
       }
     },
     "Choose…": {
+      "comment": "Opens a panel to choose the working folder.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1210,6 +1391,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Supprimer…"
+          }
+        }
+      }
+    },
+    "Derived from the name until you pick one.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déduite du nom tant que vous n’en choisissez pas."
           }
         }
       }
@@ -1553,6 +1744,16 @@
         }
       }
     },
+    "Given by the template — pick another if needed.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définie par le modèle — choisissez-en une autre si besoin."
+          }
+        }
+      }
+    },
     "Granting Full Disk Access once, as you would for Terminal, replaces all of those alerts.": {
       "localizations": {
         "fr": {
@@ -1826,6 +2027,7 @@
       }
     },
     "Manage…": {
+      "comment": "Opens the prompt templates window.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1836,6 +2038,7 @@
       }
     },
     "Model": {
+      "comment": "The model of a coding agent.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1906,6 +2109,17 @@
         }
       }
     },
+    "Name": {
+      "comment": "The name of the new session.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nom"
+          }
+        }
+      }
+    },
     "New": {
       "localizations": {
         "fr": {
@@ -1917,6 +2131,7 @@
       }
     },
     "New Session": {
+      "comment": "Title of the New Session sheet.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2056,6 +2271,17 @@
         }
       }
     },
+    "No templates yet — Manage… to write one, or add the examples.": {
+      "comment": "Manage… is the button next to the template picker.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun modèle pour l’instant — « Gérer… » pour en écrire un, ou ajouter les exemples."
+          }
+        }
+      }
+    },
     "No templates yet.": {
       "localizations": {
         "fr": {
@@ -2107,6 +2333,7 @@
       }
     },
     "None — free prompt": {
+      "comment": "No prompt template.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2209,6 +2436,7 @@
       }
     },
     "Now": {
+      "comment": "The agent the session runs now.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2224,6 +2452,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seules les %lld premières modifications sont listées ; les totaux sont exacts."
+          }
+        }
+      }
+    },
+    "Open Privacy & Security → Full Disk Access.": {
+      "comment": "The names of the pane and the setting in System Settings.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrez Confidentialité et sécurité → Accès complet au disque."
           }
         }
       }
@@ -2278,6 +2517,16 @@
         }
       }
     },
+    "Optional — handed to the agent as its first message.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Facultatif — transmis à l’agent comme premier message."
+          }
+        }
+      }
+    },
     "Other…": {
       "localizations": {
         "fr": {
@@ -2325,6 +2574,37 @@
           "stringUnit": {
             "state": "translated",
             "value": "Confidentialité"
+          }
+        }
+      }
+    },
+    "Prompt": {
+      "comment": "The prompt the agent is started with.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt"
+          }
+        }
+      }
+    },
+    "Proposed by the template — change it if needed.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Proposé par le modèle — modifiez-le si besoin."
+          }
+        }
+      }
+    },
+    "Read from the list the CLI caches for itself.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lu dans la liste que la CLI met en cache pour elle-même."
           }
         }
       }
@@ -2430,6 +2710,7 @@
       }
     },
     "Reload": {
+      "comment": "Reloads the changed template into the form.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2445,6 +2726,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Retirer le dossier"
+          }
+        }
+      }
+    },
+    "Reopen Vibe Manager — the change takes effect then.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rouvrez Vibe Manager — le changement prend effet à ce moment-là."
           }
         }
       }
@@ -2471,6 +2762,7 @@
       }
     },
     "Required": {
+      "comment": "VoiceOver: a field that must be filled.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3068,6 +3360,17 @@
         }
       }
     },
+    "Stop and Switch": {
+      "comment": "Button of the Switch Agent sheet: stops the running agent, then switches.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter et changer"
+          }
+        }
+      }
+    },
     "Stop them": {
       "localizations": {
         "fr": {
@@ -3079,6 +3382,7 @@
       }
     },
     "Summary handed to %@": {
+      "comment": "Heads the summary the new agent is started with: its name.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3089,6 +3393,7 @@
       }
     },
     "Summary sent to %@": {
+      "comment": "VoiceOver: the summary's editor, and the agent it is sent to.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3108,6 +3413,39 @@
         }
       }
     },
+    "Summary too long by %@": {
+      "comment": "VoiceOver: a size, formatted.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résumé trop long de %@"
+          }
+        }
+      }
+    },
+    "Summary uses %@": {
+      "comment": "VoiceOver: “120 bytes of 96.0 KiB”.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le résumé utilise %@"
+          }
+        }
+      }
+    },
+    "Switch": {
+      "comment": "Button of the Switch Agent sheet.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer"
+          }
+        }
+      }
+    },
     "Switch Agent": {
       "localizations": {
         "fr": {
@@ -3119,6 +3457,7 @@
       }
     },
     "Switch Agent — %@": {
+      "comment": "Title of the Switch Agent sheet: the session's name.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3158,7 +3497,42 @@
         }
       }
     },
+    "Switch the agent of %@, currently %@": {
+      "comment": "VoiceOver: the session's name, then its agent and model.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Switch the agent of %1$@, currently %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer l’agent de %1$@, actuellement %2$@"
+          }
+        }
+      }
+    },
+    "Switch the agent of %@, currently %@, running": {
+      "comment": "VoiceOver: the session's name, then its agent and model, which is running.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Switch the agent of %1$@, currently %2$@, running"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer l’agent de %1$@, actuellement %2$@, en cours d’exécution"
+          }
+        }
+      }
+    },
     "Switch to": {
+      "comment": "Heads the list of agents to switch to.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3179,6 +3553,7 @@
       }
     },
     "Template": {
+      "comment": "The prompt template the session starts from.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3266,6 +3641,27 @@
         }
       }
     },
+    "The conversation continues with %@.": {
+      "comment": "A model's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversation continue avec %@."
+          }
+        }
+      }
+    },
+    "The conversation continues with the agent's default model.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversation continue avec le modèle par défaut de l’agent."
+          }
+        }
+      }
+    },
     "The first match, or its first group when there is one.": {
       "localizations": {
         "fr": {
@@ -3296,6 +3692,16 @@
         }
       }
     },
+    "The prompt is empty.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le prompt est vide."
+          }
+        }
+      }
+    },
     "The session could not be put back on %@: it stays on %@, and Restart will start it with a summary.": {
       "comment": "The agent the switch left, then the one it switched to. Restart is a command.",
       "localizations": {
@@ -3309,6 +3715,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "La session n’a pas pu revenir à %1$@ : elle reste sur %2$@, et « Relancer » la démarrera avec un résumé."
+          }
+        }
+      }
+    },
+    "The session could not be saved.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session n’a pas pu être enregistrée."
           }
         }
       }
@@ -3364,6 +3780,16 @@
         }
       }
     },
+    "This agent published no model list, so it keeps its own default.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet agent ne publie aucune liste de modèles : il garde donc son modèle par défaut."
+          }
+        }
+      }
+    },
     "This agent will stop when Vibe Manager quits.": {
       "localizations": {
         "fr": {
@@ -3401,6 +3827,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cette session n’a pas pu être relancée."
+          }
+        }
+      }
+    },
+    "This session has never run: %@ starts it with the prompt it was created with.": {
+      "comment": "An agent's name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette session n’a jamais été lancée : %@ la démarre avec le prompt de sa création."
           }
         }
       }
@@ -3535,6 +3972,16 @@
         }
       }
     },
+    "Try again, and report the failure if it persists.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayez, et signalez l’échec s’il persiste."
+          }
+        }
+      }
+    },
     "Try it": {
       "localizations": {
         "fr": {
@@ -3551,6 +3998,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Essayer quand même de reprendre la conversation"
+          }
+        }
+      }
+    },
+    "Turn Vibe Manager on.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activez Vibe Manager."
           }
         }
       }
@@ -3637,6 +4094,24 @@
     },
     "Vibe Manager stopped unexpectedly. %lld sessions were running.": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager stopped unexpectedly. %lld session was running."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Vibe Manager stopped unexpectedly. %lld sessions were running."
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -3656,24 +4131,6 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "Vibe Manager s’est arrêté de façon inattendue. %lld sessions étaient en cours."
-                }
-              }
-            }
-          }
-        },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Vibe Manager stopped unexpectedly. %lld session was running."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Vibe Manager stopped unexpectedly. %lld sessions were running."
                 }
               }
             }
@@ -3727,6 +4184,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sans lui, macOS demande l’autorisation chaque fois qu’un agent lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive. Son activation prend effet à la prochaine ouverture de Vibe Manager."
+          }
+        }
+      }
+    },
+    "Working folder": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dossier de travail"
+          }
+        }
+      }
+    },
+    "Worth trying when the previous model is what the agent refused, rather than the conversation itself.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utile quand l’agent a refusé le modèle précédent, plutôt que la conversation elle-même."
           }
         }
       }
@@ -3860,6 +4337,17 @@
         }
       }
     },
+    "macOS protects %@: it may ask for permission the first time the agent reads this folder.": {
+      "comment": "A protected place: “your Desktop”, “your Documents folder”, “iCloud Drive”.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS protège %@ : il peut demander une autorisation la première fois que l’agent lit ce dossier."
+          }
+        }
+      }
+    },
     "new process": {
       "comment": "In the line a terminal shows above an agent: how it was started.",
       "localizations": {
@@ -3943,6 +4431,17 @@
       }
     },
     "—": {},
+    "‹%@: no match›": {
+      "comment": "In a prompt preview: a field whose pattern found nothing in its value.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "‹%@ : aucune correspondance›"
+          }
+        }
+      }
+    },
     "← %@": {},
     "→": {}
   },
