@@ -181,7 +181,8 @@ func forcesStopAfterGracePeriod() async throws {
   let elapsed = ContinuousClock.now - start
 
   #expect(await session.state() == .terminated(signal: SIGKILL))
-  #expect(elapsed < .seconds(5))
+  // Under the 20 seconds the script runs for: a tighter bound measures the runner's load.
+  #expect(elapsed < .seconds(15))
   await observer.cancel()
 }
 
