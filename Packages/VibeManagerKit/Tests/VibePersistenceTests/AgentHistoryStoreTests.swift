@@ -39,7 +39,9 @@ struct AgentHistoryStoreTests {
     }
     """
 
-  @Test("A v2 session is read with an empty history, and the document is rewritten as v5")
+  @Test(
+    "A v2 session is read with an empty history, and the document is rewritten in the current schema"
+  )
   func v2IsMigrated() async throws {
     let storeURL = try makeStoreURL()
     defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
@@ -53,7 +55,7 @@ struct AgentHistoryStoreTests {
     let rewritten = try #require(
       try JSONSerialization.jsonObject(with: Data(contentsOf: storeURL)) as? [String: Any]
     )
-    #expect(rewritten["schemaVersion"] as? Int == 5)
+    #expect(rewritten["schemaVersion"] as? Int == 6)
   }
 
   @Test("Every switch comes back as it was written, a failed one included")
@@ -135,9 +137,9 @@ struct AgentHistoryStoreTests {
   @Test("A document from a later schema is refused rather than rewritten without what it holds")
   func laterSchemaIsRefused() throws {
     let document = v2Document.replacingOccurrences(
-      of: "\"schemaVersion\": 2", with: "\"schemaVersion\": 6")
+      of: "\"schemaVersion\": 2", with: "\"schemaVersion\": 7")
 
-    #expect(throws: SessionStoreCodecError.unsupportedSchemaVersion(6)) {
+    #expect(throws: SessionStoreCodecError.unsupportedSchemaVersion(7)) {
       try SessionStoreCodec().decode(Data(document.utf8))
     }
   }
@@ -158,12 +160,12 @@ struct SessionTicketStoreTests {
     ]
     let data = try codec.encode(sessions: sessions)
     let text = String(decoding: data, as: UTF8.self)
-    #expect(text.contains(#""schemaVersion" : 5"#))
+    #expect(text.contains(#""schemaVersion" : 6"#))
     let decoded = try codec.decode(data)
     #expect(decoded.sessions.map(\.ticket) == sessions.map(\.ticket))
     #expect(!decoded.requiresRewrite)
 
-    let v4 = text.replacingOccurrences(of: #""schemaVersion" : 5"#, with: #""schemaVersion" : 4"#)
+    let v4 = text.replacingOccurrences(of: #""schemaVersion" : 6"#, with: #""schemaVersion" : 4"#)
     let old = try codec.decode(Data(v4.utf8))
     #expect(old.requiresRewrite)
     #expect(old.sessions.count == 3)

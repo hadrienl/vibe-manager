@@ -165,17 +165,6 @@
         }
       }
     },
-    "Active" : {
-      "comment" : "The sessions whose agent is running.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actives"
-          }
-        }
-      }
-    },
     "Another Git process has been working in this repository for %lld min." : {
       "localizations" : {
         "fr" : {
@@ -252,17 +241,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fermez quelques terminaux ou applications, puis réessayez."
-          }
-        }
-      }
-    },
-    "Closed" : {
-      "comment" : "The sessions that are finished, archived or not.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fermées"
           }
         }
       }

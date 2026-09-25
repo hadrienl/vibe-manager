@@ -42,7 +42,10 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
     updatedAt: Date = Date(),
     closedAt: Date? = nil,
     archivedAt: Date? = nil,
-    startedAt: Date? = nil
+    startedAt: Date? = nil,
+    /// `false` takes a `nil` start at its word: never started. A store that records the start of
+    /// every session it writes says so (schema v6); an older one leaves it to be inferred.
+    infersStartedAt: Bool = true
   ) {
     self.status = status
     let createdAt = createdAt.storageRounded
@@ -52,6 +55,10 @@ public struct SessionLifecycle: Hashable, Codable, Sendable {
     self.updatedAt = updatedAt
     self.closedAt = closedAt
     self.archivedAt = archivedAt?.storageRounded
+    guard infersStartedAt || startedAt != nil else {
+      self.startedAt = nil
+      return
+    }
     self.startedAt =
       startedAt?.storageRounded
       ?? Self.inferredStartedAt(
@@ -265,6 +272,8 @@ public enum WorkSessionValidationError: Error, Equatable, Sendable {
   case emptyAgentIdentifier
   case invalidAppearance
   case invalidLifecycle
+  /// Archived as a task and not as a process, or the other way round.
+  case invalidTaskStatus
   case duplicateRepositoryIdentifier
   case emptyRepositoryPath
 }
@@ -287,6 +296,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   /// The ticket this session works on, when someone said which (#69). `nil` leaves it to the
   /// branch.
   public var ticket: SessionTicket?
+  /// Where the work stands (#80). Changed by `setTaskStatus`, and by archiving and unarchiving,
+  /// which are the only moves that touch the process as well.
+  public private(set) var taskStatus: SessionTaskStatus
 
   public var status: SessionStatus {
     lifecycle.status
@@ -334,7 +346,11 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     legacyNotes: String? = nil,
     template: PromptTemplateReference? = nil,
     agentHistory: [AgentChange] = [],
-    ticket: SessionTicket? = nil
+    ticket: SessionTicket? = nil,
+    /// `nil` reads it from the lifecycle, as for a session stored before it existed.
+    taskStatus: SessionTaskStatus? = nil,
+    /// See `SessionLifecycle.init`: whether a `nil` start is inferred or means never started.
+    infersStartedAt: Bool = true
   ) {
     self.id = id
     self.name = name
@@ -347,13 +363,17 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       updatedAt: updatedAt,
       closedAt: closedAt,
       archivedAt: archivedAt,
-      startedAt: startedAt
+      startedAt: startedAt,
+      infersStartedAt: infersStartedAt
     )
     self.repositories = repositories
     self.legacyNotes = legacyNotes
     self.template = template
     self.agentHistory = agentHistory
     self.ticket = ticket
+    self.taskStatus =
+      taskStatus
+      ?? SessionTaskStatus.inferred(from: status, hasEverStarted: lifecycle.startedAt != nil)
   }
 
   public mutating func close(at date: Date) throws {
@@ -366,10 +386,26 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
 
   public mutating func archive(at date: Date) throws {
     try lifecycle.archive(at: date)
+    taskStatus = .archived
   }
 
+  /// An unarchived session comes back finished: it was archived from Done, or on its way out.
   public mutating func restore(at date: Date) throws {
     try lifecycle.restore(at: date)
+    taskStatus = .done
+  }
+
+  /// Moves the session between the four columns. The process is left alone: marking a task done
+  /// does not stop an agent that may still be writing its summary.
+  ///
+  /// The session is touched, so that it arrives at the top of a column sorted by last activity.
+  public mutating func setTaskStatus(_ newStatus: SessionTaskStatus, at date: Date) throws {
+    guard newStatus != taskStatus else { return }
+    guard newStatus != .archived, taskStatus != .archived else {
+      throw SessionTaskStatusError.requiresLifecycleChange(from: taskStatus, to: newStatus)
+    }
+    try lifecycle.touch(at: date)
+    taskStatus = newStatus
   }
 
   /// Every conversation this session has had, oldest first — the agents it was switched away from,
@@ -445,6 +481,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     }
     guard Self.isValidLifecycle(lifecycle) else {
       throw WorkSessionValidationError.invalidLifecycle
+    }
+    guard (taskStatus == .archived) == (lifecycle.status == .archived) else {
+      throw WorkSessionValidationError.invalidTaskStatus
     }
     guard Set(repositories.map(\.id)).count == repositories.count else {
       throw WorkSessionValidationError.duplicateRepositoryIdentifier

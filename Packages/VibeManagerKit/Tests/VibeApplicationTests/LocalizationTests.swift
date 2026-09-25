@@ -5,14 +5,8 @@ import VibeLocalizationTesting
 
 @Suite("The application's text, in English and in French")
 struct LocalizationTests {
-  @Test("The tabs and the sort orders of the sidebar read in both languages")
-  func scopesAndSorts() {
-    #expect(
-      SessionScope.allCases.map { Localization.string($0.label, in: "en") } == ["Active", "Closed"])
-    #expect(
-      SessionScope.allCases.map { Localization.string($0.label, in: "fr") } == [
-        "Actives", "Fermées",
-      ])
+  @Test("The sort orders of the sidebar read in both languages")
+  func sorts() {
     #expect(
       SessionSort.allCases.map { Localization.string($0.label, in: "en") }
         == ["Last Activity", "Date Created", "Name"])
