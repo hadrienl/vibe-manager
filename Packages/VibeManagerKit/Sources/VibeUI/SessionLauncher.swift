@@ -83,6 +83,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// opens in the default browser.
   public var openLink: (@MainActor (SessionID, URL, _ alternate: Bool) -> Void)?
 
+  /// Told of each agent process as soon as it is known — started, or adopted from the terminal
+  /// host — so that what it is can be read before its number could be given to another (#69).
+  public var processDidStart: (@MainActor (SessionID, Int32) -> Void)?
+
   /// How long a launch waits for the pane to measure itself before falling back to the spec's
   /// own size. Long enough for one layout pass, short enough never to feel like a delay.
   private let viewportTimeout: Duration
@@ -248,6 +252,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // nothing left to look for at the next launch.
     if case .running(let processIdentifier) = await terminal.state() {
       await recorder?.started(session.id, processGroup: processIdentifier)
+      processDidStart?(session.id, processIdentifier)
     }
     startedAt[session.id] = launchedAt
     diagnostics.record(
@@ -468,6 +473,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     await activity?.processAdopted(session.id, decoder: decoder)
     followOutput(of: session.id, terminal: terminal)
     await recorder?.started(session.id, processGroup: processIdentifier)
+    processDidStart?(session.id, processIdentifier)
     return true
   }
 
@@ -533,11 +539,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       }
     }
     pane.onOpenLink = { [weak self] url, alternate in
-      guard let openLink = self?.openLink else {
-        NSWorkspace.shared.open(url)
-        return
-      }
-      openLink(id, url, alternate)
+      self?.openLink?(id, url, alternate)
     }
     panes[id] = pane
     return pane

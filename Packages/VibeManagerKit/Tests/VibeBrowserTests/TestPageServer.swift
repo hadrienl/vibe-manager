@@ -61,6 +61,8 @@ final class TestPageServer: @unchecked Sendable {
     guard count > 0 else { return }
     let request = String(decoding: buffer[0..<count], as: UTF8.self)
     let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
+    // A page that takes its time: a navigation still under way.
+    if path == "/slow" { Thread.sleep(forTimeInterval: 3) }
     let body = lock.withLock { pages[path] }
     let status = body == nil ? "404 Not Found" : "200 OK"
     let payload = Data((body ?? "<h1>Not found</h1>").utf8)

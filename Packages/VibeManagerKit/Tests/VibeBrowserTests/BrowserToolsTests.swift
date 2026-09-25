@@ -351,3 +351,45 @@ struct BrowserFileTests {
     #expect(ContinuousClock.now - started < .seconds(5))
   }
 }
+
+@Suite("Acting on the page a tab holds, not the one it is heading to", .serialized)
+@MainActor
+struct BrowserCommittedPageTests {
+  @Test("Nothing is done while a navigation is under way")
+  func refusedWhileLoading() async throws {
+    let server = try TestPageServer(pages: [
+      "/": "<title>A</title><button>Go</button>", "/slow": "<title>B</title>",
+    ])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+      session: session)
+    let tab = try #require(workspace.browser(for: session).activeTab)
+    #expect(tab.committedURL?.path == "/")
+    tab.load(server.url("/slow"))
+    try await Task.sleep(for: .milliseconds(300))
+    // The address already names the slow page; the document is still the first one.
+    #expect(tab.url.path == "/slow")
+    #expect(tab.committedURL?.path == "/")
+    let evaluated = await workspace.run(
+      tool: "page_evaluate", arguments: ["script": "document.title"], session: session)
+    let text = evaluated.content.compactMap { if case .text(let t) = $0 { t } else { nil } }
+      .joined()
+    #expect(evaluated.isError || text == "\"B\"", "\(text)")
+    #expect(text != "\"A\"")
+  }
+
+  @Test("The origin a page reports is the one the check compares with")
+  func scriptOrigins() {
+    let origin = { BrowserWorkspace.scriptOrigin(BrowserOrigin(url: URL(string: $0)!)!) }
+    #expect(origin("https://github.com/o/r") == "https://github.com")
+    #expect(origin("http://localhost:5173/x") == "http://localhost:5173")
+    #expect(origin("https://example.com:443/") == "https://example.com")
+    #expect(origin("http://[::1]:3000/") == "http://[::1]:3000")
+    #expect(
+      BrowserWorkspace.scriptOrigin(BrowserOrigin(url: URL(fileURLWithPath: "/tmp/a.html"))!) == nil
+    )
+  }
+}

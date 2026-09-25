@@ -94,7 +94,14 @@ public struct RepositoryWebAddress: Hashable, Sendable {
     guard segments.count >= 2, !segments.contains(where: { $0 == ".." || $0 == "." }) else {
       return nil
     }
-    return RepositoryWebAddress(forge: forge, host: host, path: segments.joined(separator: "/"))
+    let joined = segments.joined(separator: "/")
+    // A remote is anybody's text: one that does not make a web address is not a repository here,
+    // and nothing further down builds an address that cannot exist.
+    guard host.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }),
+      joined.allSatisfy({ !$0.isWhitespace && !"?#%\\\"<>".contains($0) }),
+      URL(string: "https://\(host)/\(joined)/-/merge_requests/1") != nil
+    else { return nil }
+    return RepositoryWebAddress(forge: forge, host: host, path: joined)
   }
 }
 

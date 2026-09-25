@@ -16,7 +16,7 @@ public final class WorkspaceLayoutController {
     var layout = settings
     layout.sidebarWidth = measuredWidths.sidebar
     layout.inspectorWidth = measuredWidths.inspector
-    layout.browserWidth = measuredWidths.browser
+    layout.browserWidth = browserWidth
     return layout
   }
   public private(set) var columns: WorkspaceColumns
@@ -31,8 +31,11 @@ public final class WorkspaceLayoutController {
   /// inspector and toolbar — and they measured again. A window snapped to half the screen
   /// resizes in a single display cycle: AppKit counted past its loop guard and threw, which with
   /// an application built for development is a crash.
-  @ObservationIgnored private var measuredWidths:
-    (sidebar: Double, inspector: Double, browser: Double)
+  @ObservationIgnored private var measuredWidths: (sidebar: Double, inspector: Double)
+
+  /// The web view's width (#69). Observed, unlike the columns' measured widths: it is not
+  /// measured from a layout pass but set by its own handle, and the panel is drawn at it.
+  public private(set) var browserWidth: Double
 
   /// Whether the selected session asks for its web view (#69). It is the session's, not the
   /// layout's: the workspace says it here each time the selection or the session changes it.
@@ -61,13 +64,9 @@ public final class WorkspaceLayoutController {
     self.store = store
     self.saveDelay = saveDelay
     settings = layout
-    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth, layout.browserWidth)
+    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth)
+    browserWidth = layout.browserWidth
     columns = WorkspaceLayoutPolicy.resolve(windowWidth: 0, intent: layout)
-  }
-
-  /// The web view's width, as last measured or restored.
-  public var browserWidth: Double {
-    measuredWidths.browser
   }
 
   public func setBrowserRequested(_ isRequested: Bool) {
@@ -100,12 +99,10 @@ public final class WorkspaceLayoutController {
   }
 
   public func browserWidthChanged(to width: Double) {
-    guard let measured = WorkspaceLayout.measured(width, in: WorkspaceLayout.browserWidthRange),
-      abs(measured - measuredWidths.browser) >= 1
-    else {
-      return
-    }
-    measuredWidths.browser = measured
+    let bounded = WorkspaceLayout.bounded(
+      width, in: WorkspaceLayout.browserWidthRange, fallback: browserWidth)
+    guard abs(bounded - browserWidth) >= 1 else { return }
+    browserWidth = bounded
     scheduleSave()
   }
 
@@ -249,7 +246,8 @@ public final class WorkspaceLayoutController {
 
   private func apply(_ layout: WorkspaceLayout) {
     settings = layout
-    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth, layout.browserWidth)
+    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth)
+    browserWidth = layout.browserWidth
     resolveColumns()
   }
 

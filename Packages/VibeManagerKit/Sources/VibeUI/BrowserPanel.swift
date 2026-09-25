@@ -385,6 +385,7 @@ private struct BrowserAddressBar: View {
     .onChange(of: isFocused) { _, focused in
       model.isAddressBarFocused = focused
     }
+    .onDisappear { model.isAddressBarFocused = false }
     .alert(Text("Ticket", bundle: .module), isPresented: $isEditingTicket) {
       TextField(text: $ticketText) {
         Text("Ticket address or #number", bundle: .module)
@@ -489,7 +490,7 @@ private struct BrowserWebViewHost: NSViewRepresentable {
   let isPageFocused: (Bool) -> Void
 
   func makeCoordinator() -> Coordinator {
-    Coordinator()
+    Coordinator(workspace: workspace)
   }
 
   func makeNSView(context: Context) -> BrowserWebViewContainer {
@@ -517,16 +518,25 @@ private struct BrowserWebViewHost: NSViewRepresentable {
     }
   }
 
+  /// The panel went away — hidden, or the terminal took the room: its page waits in the parking
+  /// window, where it keeps running and can still be captured, and the keyboard is no longer in it.
   static func dismantleNSView(_ container: BrowserWebViewContainer, coordinator: Coordinator) {
     MainActor.assumeIsolated {
       for case let webView as WKWebView in container.subviews {
-        webView.removeFromSuperview()
+        coordinator.workspace.hide(webView)
       }
+      container.focusChanged?(false)
     }
   }
 
+  @MainActor
   final class Coordinator {
+    let workspace: BrowserWorkspace
     var focusRequest: Int?
+
+    init(workspace: BrowserWorkspace) {
+      self.workspace = workspace
+    }
   }
 }
 
@@ -547,6 +557,7 @@ final class BrowserWebViewContainer: NSView {
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    if window == nil { focusChanged?(false) }
     observation = window?.observe(\.firstResponder, options: [.new]) { [weak self] window, _ in
       MainActor.assumeIsolated {
         guard let self else { return }

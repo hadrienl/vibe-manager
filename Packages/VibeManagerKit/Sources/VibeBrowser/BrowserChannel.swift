@@ -168,8 +168,8 @@ public final class BrowserChannelListener {
     let connection = BrowserChannelConnection(descriptor: client)
     guard let session = BrowserChannelAuthorizer.session(of: lineage, among: known) else {
       connection.refuse(
-        "This process does not run in the terminal of a Vibe Manager session, "
-          + "so it cannot drive a session's web view.")
+        "This process cannot drive a session's web view: it does not run in the terminal of a "
+          + "Vibe Manager session, or agents are not given the web view (Settings › Web View).")
       return
     }
     connection.serve { [weak self] line in

@@ -59,6 +59,9 @@ bridge starts either way: with the application closed it answers `initialize` an
 itself, says so when a tool is called, and connects again at the next call — which is how an agent
 left running in the terminal host (ADR 0017) gets its tools back after a relaunch.
 
+Turning off "Give agents the web view" in the settings closes that door too: the channel then lets
+no one in, rather than only leaving the tool server off the command line.
+
 The same channel answers `vibe browser …`, a command put in front of the `PATH` of every session's
 terminal (a script in the host's directory, written at each launch so that it follows the
 application when it moves), for the shell scripts of the agent and of the user.
@@ -93,7 +96,12 @@ allowed:
 | Act — click, type, JavaScript | free | asked, unless "Always Allow" for that site |
 
 `0.0.0.0`, the local network and `.local` are other machines, or can be. The origin is read from
-the parsed address, never from a string. A tab cannot be sent to `javascript:` or `data:`; another
+the parsed address, never from a string — and from the document the page holds, never from where a
+navigation is heading: until a navigation commits, the page is still the previous site's, with its
+cookies, so an agent that sends a signed-in tab to a local port that never answers gains nothing.
+Nothing is done while a page loads. The site is checked again after the user answers, since the
+page may have moved while the question was on screen, and once more inside the page
+(`location.origin`) in the same turn as the action. A tab cannot be sent to `javascript:` or `data:`; another
 application's address, and a download, caused by the agent are asked. A question is a banner in
 the session's web view — the session's row says so when it is not on screen — and the agent waits
 two minutes at most. "Always Allow" covers clicks, typing and JavaScript on that site; the sites are
@@ -121,6 +129,14 @@ outlined for 600 ms. `BrowserActionLog` keeps the last 200 actions of a session,
 password, card or one-time-code field; a script is cut to 200; no page text, capture or console is
 written.
 
+### A link clicked in a terminal
+
+⌘-click opens a web address in the session's web view, or the default browser as the settings
+say, ⌥⌘-click the other way. What a terminal shows is anybody's, and a link's text can differ from
+its address: only `http`, `https`, `mailto` and local files that are pages (`html`, `svg`, `pdf`)
+are opened. Another application's address or any other file — a `.command`, an application — is
+not run on a click.
+
 ### ⌘W follows the keyboard
 
 With the keyboard in the web view — the page or its address bar — ⌘W closes its tab, and the Session
@@ -143,8 +159,10 @@ or GitLab signs in every session's ticket tab. Settings › Web View clears it.
 - A session adopted from the terminal host keeps the command line it was started with: its agent
   gets the tools at its next start.
 - A process of the same user can write false console lines into a page it controls, and false
-  lines into the trace's file. It can neither reach a session's tabs through the channel nor act
-  on a page.
+  lines into the trace's file. It cannot reach a session's tabs through the channel. It can,
+  however, write an "Always Allow" into the user defaults, as it can edit any file of the user's:
+  the question guards against an agent that is mistaken or misled by a page, not against a
+  program of the user's own that sets out to act as them.
 
 ## Out of scope
 

@@ -12,6 +12,9 @@ struct SplitHandle: View {
   let onChange: (Double) -> Void
 
   @State private var dragged: Double?
+  /// The width when the drag began: the drag's translation is counted from it, however often the
+  /// view is redrawn meanwhile.
+  @State private var startWidth: Double?
   @State private var isHovering = false
   @State private var cursorPushed = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -40,12 +43,16 @@ struct SplitHandle: View {
     .gesture(
       DragGesture(minimumDistance: 1, coordinateSpace: .global)
         .onChanged { value in
+          let start = startWidth ?? width
+          startWidth = start
           // The pane after the handle grows as the handle moves left.
-          dragged = bounded(width - Double(value.translation.width))
-          if let dragged { onChange(dragged) }
+          let next = bounded(start - Double(value.translation.width))
+          dragged = next
+          onChange(next)
         }
         .onEnded { _ in
           dragged = nil
+          startWidth = nil
           updateCursor()
         }
     )

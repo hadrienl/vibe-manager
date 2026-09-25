@@ -201,17 +201,24 @@ extension AppModel {
   /// ⌘-click in a terminal: the session's web view, or the default browser as Settings say; ⌥⌘-click
   /// does the other.
   func openTerminalLink(_ url: URL, from id: SessionID, alternate: Bool) {
-    guard let browser else {
+    // A link's text and its address can differ (OSC 8), and output is anybody's: only what shows a
+    // page is opened. Another application's address, or a file that is not a page — a `.command`,
+    // an app — is not run on a click.
+    let scheme = url.scheme?.lowercased() ?? ""
+    let isWeb = scheme == "http" || scheme == "https"
+    let isPage =
+      url.isFileURL && ["html", "htm", "svg", "pdf"].contains(url.pathExtension.lowercased())
+    guard isWeb || isPage || scheme == "mailto" else {
+      NSSound.beep()
+      return
+    }
+    guard let browser, scheme != "mailto" else {
       NSWorkspace.shared.open(url)
       return
     }
     var inWebView = browser.preferences.terminalLinks == .webView
     if alternate { inWebView.toggle() }
-    let scheme = url.scheme?.lowercased() ?? ""
-    let showable =
-      scheme == "http" || scheme == "https"
-      || (url.isFileURL && ["html", "htm", "svg", "pdf"].contains(url.pathExtension.lowercased()))
-    guard inWebView, showable else {
+    guard inWebView else {
       NSWorkspace.shared.open(url)
       return
     }

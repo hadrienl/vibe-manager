@@ -51,6 +51,10 @@ public final class BrowserTabModel: NSObject, Identifiable {
   public let isPinnedTicket: Bool
 
   public private(set) var url: URL
+  /// The address of the document the page actually holds: set when a navigation commits, and only
+  /// then. What an agent may do is decided on it — `url` already names where a navigation is
+  /// heading, while the page, its script and its cookies are still the previous site's.
+  public private(set) var committedURL: URL?
   public private(set) var title: String
   public private(set) var isLoading = false
   public private(set) var progress: Double = 0
@@ -119,6 +123,11 @@ public final class BrowserTabModel: NSObject, Identifiable {
     if !title.isEmpty { return title }
     if url.isFileURL { return url.lastPathComponent }
     return BrowserOrigin(url: url)?.description ?? url.absoluteString
+  }
+
+  /// The site of the document the page holds, or `nil` while none has committed.
+  public var committedOrigin: BrowserOrigin? {
+    committedURL.flatMap(BrowserOrigin.init(url:))
   }
 
   public var origin: BrowserOrigin? {
@@ -211,6 +220,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     webView?.uiDelegate = nil
     webView?.removeFromSuperview()
     webView = nil
+    committedURL = nil
     isLoading = false
   }
 
@@ -336,6 +346,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
   }
 
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+    committedURL = webView.url
     console.reset()
     retryAttempt = 0
     stopRetrying()

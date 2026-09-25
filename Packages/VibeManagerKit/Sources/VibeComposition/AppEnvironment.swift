@@ -210,17 +210,17 @@ public final class AppEnvironment {
       diagnostics: diagnostics
     )
     self.launcher = launcher
+    // Each agent is identified by its number and by when it started, read as soon as the launcher
+    // knows it: a number read again at connection time could already belong to another process.
+    let agentProcesses = AgentProcessRegistry()
+    launcher.processDidStart = { id, pid in agentProcesses.record(id, pid) }
     browserChannel = BrowserChannelListener(
       socketPath: socketPath, prepare: { try hostLocation.prepare() }, runner: browser,
-      sessions: { [weak launcher] in
-        guard let launcher else { return [] }
+      sessions: { [weak launcher, browserSettings] in
+        // Agents not given the web view are not let in by another door either.
+        guard browserSettings.givesAgentsWebView, let launcher else { return [] }
         return await launcher.runningProcessIdentifiers().compactMap { id, pid in
-          ProcessAncestry.entry(of: pid).map {
-            SessionProcess(
-              sessionID: id, processIdentifier: pid,
-              startedAt: ProcessStartTime(
-                seconds: $0.startSeconds, microseconds: $0.startMicroseconds))
-          }
+          agentProcesses.process(id, pid)
         }
       })
     do {
@@ -530,5 +530,26 @@ public final class AppEnvironment {
       providers.append(MockAgentProvider(environment: environment))
     }
     return providers
+  }
+}
+
+/// When each session's agent started, read when it was launched or adopted.
+@MainActor
+private final class AgentProcessRegistry {
+  private var processes: [SessionID: SessionProcess] = [:]
+
+  func record(_ id: SessionID, _ pid: Int32) {
+    guard let entry = ProcessAncestry.entry(of: pid) else { return }
+    processes[id] = SessionProcess(
+      sessionID: id, processIdentifier: pid,
+      startedAt: ProcessStartTime(
+        seconds: entry.startSeconds, microseconds: entry.startMicroseconds))
+  }
+
+  /// The agent the launcher says is running, as it was when it started. A process never recorded
+  /// — which the launcher's callbacks leave no room for — is not trusted.
+  func process(_ id: SessionID, _ pid: Int32) -> SessionProcess? {
+    guard let process = processes[id], process.processIdentifier == pid else { return nil }
+    return process
   }
 }

@@ -47,6 +47,10 @@ extension BrowserWorkspace: BrowserToolRunning {
     switch tool.name {
     case "tab_navigate":
       let url = try Self.address(arguments["url"]?.stringValue)
+      guard !tab.isPinnedTicket else {
+        throw BrowserToolFailure(
+          "The ticket's tab stays on the ticket: open the address in a new tab with tab_open.")
+      }
       willAct(on: tab)
       defer { didAct(on: tab) }
       tab.ensureWebView()
@@ -122,6 +126,13 @@ extension BrowserWorkspace: BrowserToolRunning {
     browser: SessionBrowser
   ) async throws -> BrowserToolResult {
     let webView = try await ready(tab)
+    // What may be done is decided on the document the page holds, never on where a navigation is
+    // heading: until it commits, the page is still the previous site's, with its cookies.
+    guard !tab.isLoading, let committed = tab.committedURL else {
+      throw BrowserToolFailure(
+        "The page is still loading: nothing was done. Wait for it with page_read, then try again.")
+    }
+    let site = BrowserOrigin(url: committed)
     let target = Self.elementTarget(arguments)
     var description = ""
     var value: String?
@@ -149,9 +160,9 @@ extension BrowserWorkspace: BrowserToolRunning {
     }
 
     let decision: BrowserActionRecord.Decision
-    switch BrowserActionPolicy.decide(.act, url: tab.url, grants: permissions.grants) {
+    switch BrowserActionPolicy.decide(.act, url: committed, grants: permissions.grants) {
     case .allow:
-      let isLocal = tab.origin?.isLocal ?? true
+      let isLocal = site?.isLocal ?? true
       decision = isLocal ? .automatic : .always
     case .deny(let reason):
       throw BrowserToolFailure(reason)
@@ -159,7 +170,7 @@ extension BrowserWorkspace: BrowserToolRunning {
       tab.isAgentActing = true
       let outcome = await ask(
         .act(tool: tool.name, target: description, value: value), tab: tab,
-        in: browser.sessionID, grantKey: tab.origin?.grantKey)
+        in: browser.sessionID, grantKey: site?.grantKey)
       tab.isAgentActing = false
       switch outcome {
       case .allowed(let always):
@@ -169,7 +180,7 @@ extension BrowserWorkspace: BrowserToolRunning {
           tool, in: browser, tab: tab, target: Self.trace(description, value), decision: .denied,
           succeeded: false)
         return .error(
-          "The user refused: nothing was done on \(tab.origin?.description ?? "the page").")
+          "The user refused: nothing was done on \(site?.description ?? "the page").")
       case .expired:
         record(
           tool, in: browser, tab: tab, target: Self.trace(description, value), decision: .expired,
@@ -179,10 +190,26 @@ extension BrowserWorkspace: BrowserToolRunning {
       }
     }
 
+    // What was allowed was this site. A page that moved meanwhile — while the question was on
+    // screen, or since the element was looked up — is not acted on.
+    guard !tab.isLoading, tab.committedURL.flatMap(BrowserOrigin.init(url:)) == site else {
+      record(
+        tool, in: browser, tab: tab, target: Self.trace(description, value), decision: decision,
+        succeeded: false)
+      throw BrowserToolFailure(
+        "The page changed before the action could run: nothing was done. Read it again.")
+    }
     willAct(on: tab)
     defer { didAct(on: tab) }
     let before = tab.url
     do {
+      // Checked once more inside the page, in the same turn as the action: the web process may
+      // have committed a navigation the application has not heard of yet.
+      if let expected = site.flatMap(Self.scriptOrigin) {
+        _ = try await configuration.callAgent(
+          "if (location.origin !== expected) { throw new Error('The page changed before the action could run: nothing was done.'); } return true;",
+          arguments: ["expected": expected], in: webView)
+      }
       let result: BrowserToolResult
       switch tool.name {
       case "page_click":
@@ -221,6 +248,16 @@ extension BrowserWorkspace: BrowserToolRunning {
         succeeded: false)
       throw BrowserToolFailure(Self.describe(error))
     }
+  }
+
+  /// `location.origin` as a page reports it for an origin: no default port, IPv6 in brackets. `nil`
+  /// for local files, whose origin a page reports as opaque.
+  static func scriptOrigin(_ origin: BrowserOrigin) -> String? {
+    guard origin.scheme == "http" || origin.scheme == "https" else { return nil }
+    let host = origin.host.contains(":") ? "[\(origin.host)]" : origin.host
+    let defaultPort = origin.scheme == "http" ? 80 : 443
+    guard let port = origin.port, port != defaultPort else { return "\(origin.scheme)://\(host)" }
+    return "\(origin.scheme)://\(host):\(port)"
   }
 
   /// An expression is evaluated as it is; a body with `return` runs as an async function.
