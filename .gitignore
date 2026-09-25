@@ -9,3 +9,4 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 Configuration/Local.xcconfig
+*.profraw
