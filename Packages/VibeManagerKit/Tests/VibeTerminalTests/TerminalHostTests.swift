@@ -777,12 +777,13 @@ struct TerminalHostProcessTests {
       executableURL: try Self.fixtureURL(),
       disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let log = RecordingDiagnosticLog()
+    let probe = UnprovenGroupProbe()
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
         launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30),
         diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()),
-        processes: StartTimeBlindProbe()))
+        processes: probe))
     let session = try await application.start(
       TerminalTestSupport.spec(script: "trap '' HUP\nwhile :; do sleep 0.1; done"),
       for: SessionID())
@@ -800,24 +801,27 @@ struct TerminalHostProcessTests {
         if case .failed(.processOutcomeUnknown) = await session.state() { return true }
         return false
       })
-    #expect(isProcessAlive(agent))
+    #expect(probe.terminated.isEmpty)
     #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(0))
   }
 }
 
-/// The system's answers, but no start time: no group can be shown to be the one recorded.
-private struct StartTimeBlindProbe: ProcessLivenessProbe {
-  private let system = SystemProcessLivenessProbe()
+/// A group that is always alive and never shown to be the one recorded: whether the agent really
+/// survives the host is the runner's business, and not what the supervisor decides from.
+private final class UnprovenGroupProbe: ProcessLivenessProbe, @unchecked Sendable {
+  private let lock = NSLock()
+  private var terminatedGroups: [Int32] = []
 
-  func isAlive(processIdentifier: Int32) -> Bool {
-    system.isAlive(processIdentifier: processIdentifier)
-  }
+  var terminated: [Int32] { lock.withLock { terminatedGroups } }
+
+  func isAlive(processIdentifier: Int32) -> Bool { true }
 
   func startTime(of processIdentifier: Int32) -> Date? { nil }
 
   func terminate(processGroup: Int32) -> Bool {
-    system.terminate(processGroup: processGroup)
+    lock.withLock { terminatedGroups.append(processGroup) }
+    return false
   }
 
-  func bootTime() -> Date? { system.bootTime() }
+  func bootTime() -> Date? { nil }
 }

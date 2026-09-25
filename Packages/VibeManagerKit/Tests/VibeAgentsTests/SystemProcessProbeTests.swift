@@ -69,7 +69,9 @@ struct SystemProcessProbeTests {
     task.cancel()
 
     await #expect(throws: ProbeError.cancelled) { try await task.value }
-    #expect(clock.now - start < .seconds(5))
+    // Well under the 30 seconds of the timeout; 5 seconds measured the runner's load, and failed
+    // at 5.01 on a busy one.
+    #expect(clock.now - start < .seconds(20))
     #expect(!FileManager.default.fileExists(atPath: marker.path))
   }
 

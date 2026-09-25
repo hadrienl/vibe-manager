@@ -44,3 +44,11 @@ jobs:
 
       - name: Run the interface smoke test
         run: Scripts/ui-smoke.sh
+
+      - name: Keep the result of a failed smoke test
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-result
+          path: DerivedData/UISmoke/UISmoke.xcresult
+          retention-days: 7
