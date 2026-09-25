@@ -28,13 +28,16 @@ struct ExtractionResultsView: View {
     HStack(alignment: .firstTextBaseline, spacing: 6) {
       Image(systemName: "arrow.turn.down.right")
         .foregroundStyle(.tertiary)
-      Text("/\(use.pattern)/")
+      Text(verbatim: "/\(use.pattern)/")
         .font(.caption.monospaced())
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
-        .help("The first match, or its first group when there is one.")
-      Text("→")
+        .help(
+          Text(
+            "The first match, or its first group when there is one.", bundle: .module,
+            comment: "What a pattern takes out of a field's value."))
+      Text(verbatim: "→")
         .foregroundStyle(.tertiary)
       outcomeLabel(outcome)
       Spacer(minLength: 8)
@@ -50,20 +53,35 @@ struct ExtractionResultsView: View {
   private func outcomeLabel(_ outcome: PromptTemplateExtraction.Outcome) -> some View {
     switch outcome {
     case .extracted(let part) where part.isEmpty:
-      Text("nothing yet")
-        .foregroundStyle(.tertiary)
+      Text(
+        "nothing yet", bundle: .module,
+        comment: "What a pattern takes out of a field that is still empty."
+      )
+      .foregroundStyle(.tertiary)
     case .extracted(let part):
       Text(part)
         .fontWeight(.semibold)
         .textSelection(.enabled)
         .lineLimit(1)
     case .noMatch:
-      Label("no match", systemImage: "exclamationmark.triangle")
-        .foregroundStyle(.orange)
+      Label {
+        Text(
+          "no match", bundle: .module,
+          comment: "A pattern found nothing in the field's value.")
+      } icon: {
+        Image(systemName: "exclamationmark.triangle")
+      }
+      .foregroundStyle(.orange)
     case .invalid(let reason):
-      Label("Invalid pattern: \(reason)", systemImage: "xmark.octagon")
-        .foregroundStyle(.red)
-        .lineLimit(2)
+      Label {
+        Text(
+          "Invalid pattern: \(reason)", bundle: .module,
+          comment: "Why the system rejects the regular expression.")
+      } icon: {
+        Image(systemName: "xmark.octagon")
+      }
+      .foregroundStyle(.red)
+      .lineLimit(2)
     }
   }
 }

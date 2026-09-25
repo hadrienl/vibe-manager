@@ -1,16 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%@ %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ %2$@"
-          }
-        }
-      }
-    },
     "%@ A new process will be started instead, and given this summary of what the session carries. You can edit it before it is sent.": {
       "comment": "Why the conversation cannot be resumed, in one sentence.",
       "localizations": {
@@ -66,6 +56,7 @@
       }
     },
     "%@ changed": {
+      "comment": "The name of an imported template that differs from the library's.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -87,6 +78,7 @@
       }
     },
     "%@ is multiline": {
+      "comment": "A field's name.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -97,6 +89,7 @@
       }
     },
     "%@ is not a field — names use letters, digits, - and _ — so it stays as text.": {
+      "comment": "What the user wrote between double braces.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -107,6 +100,7 @@
       }
     },
     "%@ is required": {
+      "comment": "A field's name.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -128,7 +122,7 @@
       }
     },
     "%@ of %@": {
-      "comment": "The summary's size, then the most an agent accepts.",
+      "comment": "The size of the prompt, then the most an agent accepts: “1.2 KB of 128 KB”.\nThe summary's size, then the most an agent accepts.",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -446,6 +440,24 @@
     },
     "%lld bytes": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld byte"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld bytes"
+                }
+              }
+            }
+          }
+        },
         "fr": {
           "variations": {
             "plural": {
@@ -465,24 +477,6 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%lld octets"
-                }
-              }
-            }
-          }
-        },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld byte"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld bytes"
                 }
               }
             }
@@ -731,8 +725,54 @@
         }
       }
     },
+    "%lld templates imported.": {
+      "comment": "The number of prompt templates an import added or replaced.",
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld modèle importé."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld modèles importés."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld modèles importés."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld template imported."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld templates imported."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld+": {},
-    "/%@/": {},
     "A finished session shows its last output, and can be restarted.": {
       "localizations": {
         "fr": {
@@ -770,6 +810,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Un transcript est introuvable ; ce qu’il indiquait jusqu’au %@ est conservé."
+          }
+        }
+      }
+    },
+    "A value to try": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une valeur à essayer"
           }
         }
       }
@@ -1054,6 +1104,7 @@
       }
     },
     "Changed": {
+      "comment": "An imported template that differs from the one of the library.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1376,6 +1427,7 @@
       }
     },
     "Delete “%@”?": {
+      "comment": "The name of the prompt template to delete.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1536,6 +1588,7 @@
       }
     },
     "Edited": {
+      "comment": "The prompt template has unsaved changes.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1623,6 +1676,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Champ"
+          }
+        }
+      }
+    },
+    "Fields": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Champs"
+          }
+        }
+      }
+    },
+    "Fields appear here as you write {{name}} in the text.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les champs apparaissent ici à mesure que vous écrivez des {{nom}} dans le texte."
           }
         }
       }
@@ -1837,6 +1910,7 @@
       }
     },
     "Hint of %@": {
+      "comment": "A field's name.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1867,6 +1941,7 @@
       }
     },
     "Identical — skipped": {
+      "comment": "An imported template the library already has as it is.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1927,6 +2002,7 @@
       }
     },
     "Invalid pattern: %@": {
+      "comment": "Why the system rejects the regular expression.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1977,6 +2053,7 @@
       }
     },
     "Label of %@": {
+      "comment": "A field's name.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2110,7 +2187,7 @@
       }
     },
     "Name": {
-      "comment": "The name of the new session.",
+      "comment": "The name of a prompt template.\nThe name of the new session.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2121,6 +2198,7 @@
       }
     },
     "New": {
+      "comment": "An imported template the library does not have yet.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2344,6 +2422,7 @@
       }
     },
     "None — the sheet keeps its folder": {
+      "comment": "Placeholder of a template's folder: the New Session sheet keeps its own.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2421,6 +2500,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rien n’est remplacé sans votre accord."
+          }
+        }
+      }
+    },
+    "Nothing to import: every template is already here.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien à importer : tous les modèles sont déjà là."
           }
         }
       }
@@ -2527,6 +2616,36 @@
         }
       }
     },
+    "Optional — names the sessions made from it, with the same {{fields}}.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Facultatif — nomme les sessions créées à partir de lui, avec les mêmes {{champs}}."
+          }
+        }
+      }
+    },
+    "Optional — proposed as the working folder when this template is picked.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Facultatif — proposé comme dossier de travail quand ce modèle est choisi."
+          }
+        }
+      }
+    },
+    "Optional — the symbol and colour of the sessions made from it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Facultatif — le symbole et la couleur des sessions créées à partir de lui."
+          }
+        }
+      }
+    },
     "Other…": {
       "localizations": {
         "fr": {
@@ -2585,6 +2704,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Prompt"
+          }
+        }
+      }
+    },
+    "Prompt Template": {
+      "comment": "The name of the file one prompt template is exported to.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle de prompt"
+          }
+        }
+      }
+    },
+    "Prompt Templates": {
+      "comment": "The name of the file prompt templates are exported to.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles de prompt"
           }
         }
       }
@@ -2741,6 +2882,7 @@
       }
     },
     "Replace": {
+      "comment": "Replace the template of the library.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2991,6 +3133,7 @@
       }
     },
     "Review {{url}}": {
+      "comment": "An example of a session name pattern. Keep {{url}} as it is.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3000,7 +3143,17 @@
         }
       }
     },
-    "Revision %lld": {},
+    "Revision %@": {
+      "comment": "The number of times the prompt template was saved.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Révision %@"
+          }
+        }
+      }
+    },
     "Running": {
       "comment": "A session's state, in the sidebar.",
       "localizations": {
@@ -3073,6 +3226,7 @@
       }
     },
     "Save the changes to “%@”?": {
+      "comment": "The name of the prompt template being edited.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3143,7 +3297,27 @@
         }
       }
     },
-    "Session ": {},
+    "Session %@": {
+      "comment": "The name of the session the template would give, in bold.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session %@"
+          }
+        }
+      }
+    },
+    "Session name": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nom de la session"
+          }
+        }
+      }
+    },
     "Sessions": {
       "localizations": {
         "fr": {
@@ -3287,6 +3461,7 @@
       }
     },
     "Skipped: %@": {
+      "comment": "Why an imported template is left out.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -3663,6 +3838,7 @@
       }
     },
     "The first match, or its first group when there is one.": {
+      "comment": "What a pattern takes out of a field's value.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -4042,6 +4218,28 @@
         }
       }
     },
+    "Untitled": {
+      "comment": "An imported prompt template that has no name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans titre"
+          }
+        }
+      }
+    },
+    "Untitled Template": {
+      "comment": "The name of a new prompt template, until the user names it.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle sans titre"
+          }
+        }
+      }
+    },
     "Usage": {
       "localizations": {
         "fr": {
@@ -4063,6 +4261,7 @@
       }
     },
     "Value to try for %@": {
+      "comment": "A field's label.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -4371,6 +4570,7 @@
       }
     },
     "no match": {
+      "comment": "A pattern found nothing in the field's value.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -4381,6 +4581,7 @@
       }
     },
     "nothing yet": {
+      "comment": "What a pattern takes out of a field that is still empty.",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -4430,6 +4631,17 @@
         }
       }
     },
+    "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text.": {
+      "comment": "Keep {{name}}, {{name?}}, {{name|/regex/}} and \\{{ as they are.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "{{name}} est un champ, {{name?}} un champ facultatif, {{name|/regex/}} en garde une partie. Écrivez \\{{ pour garder les accolades comme du texte."
+          }
+        }
+      }
+    },
     "—": {},
     "‹%@: no match›": {
       "comment": "In a prompt preview: a field whose pattern found nothing in its value.",
@@ -4442,8 +4654,7 @@
         }
       }
     },
-    "← %@": {},
-    "→": {}
+    "← %@": {}
   },
   "version": "1.0"
 }
