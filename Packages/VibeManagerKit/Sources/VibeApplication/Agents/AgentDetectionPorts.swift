@@ -43,17 +43,21 @@ public struct ProbeResult: Hashable, Sendable {
   public let standardOutput: String
   public let standardError: String
   public let didTimeOut: Bool
+  /// The command wrote more than the probe keeps: the end of its output is missing.
+  public let outputTruncated: Bool
 
   public init(
     exitCode: Int32,
     standardOutput: String = "",
     standardError: String = "",
-    didTimeOut: Bool = false
+    didTimeOut: Bool = false,
+    outputTruncated: Bool = false
   ) {
     self.exitCode = exitCode
     self.standardOutput = standardOutput
     self.standardError = standardError
     self.didTimeOut = didTimeOut
+    self.outputTruncated = outputTruncated
   }
 
   public var combinedOutput: String {

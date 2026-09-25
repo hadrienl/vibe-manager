@@ -46,7 +46,8 @@ public struct SystemProcessProbe: ProcessProbe {
       exitCode: result.exitCode,
       standardOutput: Self.text(result.standardOutput),
       standardError: Self.text(result.standardError),
-      didTimeOut: result.didTimeOut
+      didTimeOut: result.didTimeOut,
+      outputTruncated: result.outputTruncated
     )
   }
 

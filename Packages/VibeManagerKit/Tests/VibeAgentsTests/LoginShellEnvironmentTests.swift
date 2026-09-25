@@ -66,17 +66,37 @@ struct LoginShellEnvironmentTests {
     #expect(probe.invocations.count == 1)
   }
 
-  @Test("A shell that did not answer is asked again next time")
-  func retriesAfterSilence() async {
+  @Test("A shell that did not answer is not waited for again until the retry delay has passed")
+  func retriesAfterSilenceOnceTheDelayHasPassed() async {
     let probe = ScriptedProcessProbe(responses: [
       .success(ProbeResult(exitCode: -1, didTimeOut: true)),
       .success(ProbeResult(exitCode: 0, standardOutput: Self.output(["PATH=/opt/homebrew/bin"]))),
     ])
-    let shell = LoginShellEnvironment(inherited: [:], probe: probe)
+    let clock = TestClock()
+    let shell = LoginShellEnvironment(
+      inherited: [:], probe: probe, retryDelay: .seconds(60), now: { clock.now })
 
     #expect(await shell.environment() == nil)
+    clock.advance(by: 59)
+    #expect(await shell.environment() == nil)
+    #expect(probe.invocations.count == 1)
+
+    clock.advance(by: 1)
     #expect(await shell.environment() == ["PATH": "/opt/homebrew/bin"])
     #expect(probe.invocations.count == 2)
+  }
+
+  @Test("An output cut short is not trusted: its PATH may be missing its end")
+  func refusesTruncatedOutput() async {
+    let shell = LoginShellEnvironment(
+      inherited: [:],
+      probe: StubProcessProbe(
+        defaultResponse: .success(
+          ProbeResult(
+            exitCode: 0, standardOutput: Self.output(["PATH=/Users/test/.local/bin:/opt/ho"]),
+            outputTruncated: true))))
+
+    #expect(await shell.environment() == nil)
   }
 
   @Test("A failing shell or one that cannot start gives nothing")
@@ -102,5 +122,17 @@ struct LoginShellEnvironmentTests {
     let path = await shell.environment()?["PATH"]
 
     #expect(path?.contains("/usr/bin") == true)
+  }
+}
+
+/// A wall clock the test moves by hand.
+private final class TestClock: @unchecked Sendable {
+  private let lock = NSLock()
+  private var current = Date(timeIntervalSince1970: 1_000_000)
+
+  var now: Date { lock.withLock { current } }
+
+  func advance(by seconds: TimeInterval) {
+    lock.withLock { current = current.addingTimeInterval(seconds) }
   }
 }

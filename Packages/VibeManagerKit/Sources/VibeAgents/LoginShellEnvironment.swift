@@ -26,16 +26,23 @@ public actor LoginShellEnvironment: ShellEnvironmentSource {
   private let inherited: [String: String]
   private let probe: any ProcessProbe
   private let timeout: Duration
+  private let retryDelay: Duration
+  private let now: @Sendable () -> Date
   private var resolution: Task<[String: String]?, Never>?
+  private var lastFailure: Date?
 
   public init(
     inherited: [String: String] = ProcessInfo.processInfo.environment,
     probe: any ProcessProbe,
-    timeout: Duration = .seconds(10)
+    timeout: Duration = .seconds(10),
+    retryDelay: Duration = .seconds(300),
+    now: @escaping @Sendable () -> Date = Date.init
   ) {
     self.inherited = inherited
     self.probe = probe
     self.timeout = timeout
+    self.retryDelay = retryDelay
+    self.now = now
   }
 
   /// Starts asking now, so the first launch does not pay for a shell sourcing its configuration.
@@ -45,14 +52,21 @@ public actor LoginShellEnvironment: ShellEnvironmentSource {
 
   public func environment() async -> [String: String]? {
     if let resolution { return await resolution.value }
+    // A shell that did not answer may answer later, but every launch meanwhile would wait for it
+    // until the timeout: the silence is kept too, for a while, and the launch goes on without it.
+    if let lastFailure, now().timeIntervalSince(lastFailure) < retryDelay.seconds { return nil }
 
     let task = Task { [inherited, probe, timeout] in
       await Self.resolve(inherited: inherited, probe: probe, timeout: timeout)
     }
     resolution = task
     let resolved = await task.value
-    // A shell that did not answer this time may answer the next: only an answer is kept.
-    if resolved == nil { resolution = nil }
+    if resolved == nil {
+      resolution = nil
+      lastFailure = now()
+    } else {
+      lastFailure = nil
+    }
     return resolved
   }
 
@@ -70,7 +84,9 @@ public actor LoginShellEnvironment: ShellEnvironmentSource {
         workingDirectoryPath: nil,
         timeout: timeout
       ),
-      !result.didTimeOut, result.exitCode == 0
+      !result.didTimeOut, result.exitCode == 0,
+      // Cut short, the last variable printed may be a `PATH` missing its end.
+      !result.outputTruncated
     else { return nil }
     return parse(result.standardOutput)
   }
