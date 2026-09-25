@@ -36,7 +36,7 @@ Copy this into the draft, then tick as you go.
   - the application notarized and stapled, Gatekeeper accepting it;
   - the disk image built by `hdiutil`, signed, notarized, stapled, accepted by Gatekeeper;
   - the SHA-256 of the image, and a **draft** release with both files.
-- [ ] `Scripts/clean-install-check.sh "Vibe Manager <version>.dmg"`, on the image downloaded from the
+- [ ] `Scripts/clean-install-check.sh VibeManager-<version>.dmg`, on the image downloaded from the
       draft, passed:
       Gatekeeper and staples, installation in a folder of its own, TCC reset for the bundle, the
       interface smoke test against the installed binary, and its terminal host refusing an ad hoc
