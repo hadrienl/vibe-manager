@@ -92,6 +92,8 @@ public final class ConversationModel {
   @ObservationIgnored public var showTerminal: (() -> Void)?
   /// Restarts the session, from the composer of a session whose agent stopped.
   @ObservationIgnored public var restart: (() -> Void)?
+  /// Whether the session can be restarted now: an archived one cannot.
+  @ObservationIgnored public var canRestart: () -> Bool = { true }
   @ObservationIgnored private var toggles: [String: Bool] = [:]
   @ObservationIgnored private var followTask: Task<Void, Never>?
   @ObservationIgnored private var echoTimer: Task<Void, Never>?
@@ -233,7 +235,8 @@ public final class ConversationModel {
   public var isAgentWorking: Bool { activity == .working && isProcessRunning }
 
   public func attach(_ files: [URL]) {
-    for file in files where !attachments.contains(file) {
+    for file in files where !attachments.contains(file) && PromptEncoding.isWritablePath(file.path)
+    {
       attachments.append(file)
     }
     focusComposerRequest += 1

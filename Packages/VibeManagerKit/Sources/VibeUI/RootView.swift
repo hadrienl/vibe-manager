@@ -578,6 +578,12 @@ public struct RootView: View {
       VStack(spacing: 0) {
         // A closed session keeps its terminal on screen, so the way back to work has to be on
         // screen too — next to what the agent said last, not only in a menu.
+        // The archive card is what the terminal side shows; over a conversation, the same way
+        // back sits above it.
+        if session.status == .archived, model.presentation(of: session) == .conversation {
+          ArchivedConversationBar { Task { await model.restore(session.id) } }
+          Divider()
+        }
         if session.status == .closed {
           ClosedSessionBar(
             title: model.restartTitle(for: session),
@@ -718,6 +724,9 @@ public struct RootView: View {
           .opacity(isActive ? 1 : 0)
           .allowsHitTesting(isActive)
           .accessibilityHidden(!isActive)
+          // A hidden composer must lose the keyboard: typed into, it would send to a session
+          // nobody is looking at.
+          .disabled(!isActive)
         }
       }
 
@@ -1814,6 +1823,29 @@ extension View {
   /// Says `text` to VoiceOver when the view appears.
   func announcedOnAppear(_ text: String) -> some View {
     onAppear { Announcer.announce(text) }
+  }
+}
+
+/// Over the conversation of an archived session: what it is, and the way back.
+private struct ArchivedConversationBar: View {
+  let unarchive: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "archivebox.fill")
+        .foregroundStyle(.secondary)
+      Text(
+        "This session is archived: nothing was deleted, and it cannot be reopened.",
+        bundle: .module
+      )
+      .font(.callout)
+      Spacer(minLength: 8)
+      Button(LocalizedStringResource("Unarchive", bundle: .module), action: unarchive)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
   }
 }
 

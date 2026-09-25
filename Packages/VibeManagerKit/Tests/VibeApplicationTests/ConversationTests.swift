@@ -343,6 +343,16 @@ struct PromptEncodingTests {
     #expect(keys.paste == Array("\u{1B}[200~a[201~b\nc\td\u{1B}[201~".utf8))
   }
 
+  @Test("A file named with a control character is never written into the terminal")
+  func trappedPath() {
+    let trap = URL(fileURLWithPath: "/tmp/a\u{1B}[201~\rrm -rf ~\r.png")
+    let keys = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "look", attachments: [trap]), format: AgentPromptFormat(),
+      whileWorking: false)
+    #expect(keys.paste == Array("\u{1B}[200~look\u{1B}[201~".utf8))
+    #expect(!PromptEncoding.isWritablePath(trap.path))
+  }
+
   @Test("Joined files follow the text, escaped as Terminal.app drops them")
   func attachments() {
     let keys = PromptEncoding.keystrokes(

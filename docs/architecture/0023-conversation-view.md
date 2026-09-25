@@ -52,7 +52,8 @@ never sent anywhere. Transcripts are never modified.
 
 It holds what a repository, a web page or an MCP server made the agent write. Only `http`,
 `https` and `mailto` links are links; no remote image is loaded (an image is a link to itself); no
-HTML is interpreted. A command's output is kept to 32 KiB (its start and its end), a diff to 2,000
+HTML is interpreted. The file a diff names is shown in the Finder, never opened: opening an
+application or a `.command` an agent was made to write would run it. A command's output is kept to 32 KiB (its start and its end), a diff to 2,000
 lines per file and 500 drawn; `originalFile` and base64 images are never decoded into the model.
 
 ### Lines in the order they were written
@@ -65,8 +66,11 @@ agent did. A conversation rewound with `/rewind` therefore still shows what was 
 
 `FileTranscriptTail` hands over whole lines only, resumes at its offset, and reads a file that got
 shorter or changed inode again from the start after a `.reset`. A `vnode` source wakes it, a
-one-second poll underneath covers a file that does not exist yet or was replaced. Only the five
-sessions last shown in conversation keep a model and a reader.
+one-second poll underneath covers a file that does not exist yet or was replaced. A snapshot is
+published only when lines arrived, and the folders are looked at again every two seconds while a
+file is awaited, every ten after. Only the five sessions last shown in conversation keep a model
+and a reader; a hidden conversation view is disabled, so that its composer never keeps the
+keyboard.
 
 ### Titles, groups, and the state that shows folded
 
@@ -83,7 +87,8 @@ that sends it. Measured against Claude Code 2.1.282 and Codex 0.157.0 in a real 
 both take a paste of several lines as one prompt and keep its line breaks. During a turn Codex
 sends a prompt given Return into the turn under way and queues one given Tab; Claude Code queues
 either way — each provider declares the key. Every control character but the line break and the
-tab is removed first, so that a pasted text cannot close the paste or send a sequence of its own.
+tab is removed first, so that a pasted text cannot close the paste or send a sequence of its own;
+a joined file whose path holds one is not written at all.
 The composer is closed while the agent waits for an answer in its terminal, where a prompt would
 be read as the answer. Files joined to a prompt are written as paths escaped the way Terminal.app
 drops them. The sent prompt shows as an echo until the transcript has it; after ten seconds without

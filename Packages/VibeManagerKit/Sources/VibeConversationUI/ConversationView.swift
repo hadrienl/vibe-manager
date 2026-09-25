@@ -163,7 +163,7 @@ public struct ConversationView: View {
       } else if model.isAgentWorking {
         ActivityLine(model: model)
       }
-      if model.composerState == .stopped, let restart = model.restart {
+      if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
         HStack {
           Label {
             Text("The session is stopped. Its history stays readable.", bundle: .module)

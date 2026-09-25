@@ -47,9 +47,9 @@ struct PromptComposer: View {
           .disabled(state != .ready)
           .accessibilityLabel(Text("Message to \(model.agentName)", bundle: .module))
           .onKeyPress(.return, phases: .down) { press in
-            guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option) else {
-              return .ignored
-            }
+            guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option),
+              !Self.isComposingText
+            else { return .ignored }
             Task { await model.send() }
             return .handled
           }
@@ -115,6 +115,12 @@ struct PromptComposer: View {
       if case .success(let files) = result { model.attach(files) }
     }
     .onChange(of: model.focusComposerRequest) { isFocused = true }
+  }
+
+  /// An input method — Japanese, Chinese — is still composing: Return confirms its text, and
+  /// must not send the prompt.
+  @MainActor static var isComposingText: Bool {
+    (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() ?? false
   }
 
   @ViewBuilder

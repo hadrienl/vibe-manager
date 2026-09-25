@@ -39,6 +39,9 @@ public final class ConversationWorkspace {
   /// Most recent last.
   public private(set) var mountedSessionIDs: [SessionID] = []
   @ObservationIgnored private var followed: [SessionID: [SessionAgentConfiguration]] = [:]
+  /// Which follow is the current one for a session: a stream that arrives after its model was
+  /// let go of, or after a newer one was asked for, is dropped — and stops its reader with it.
+  @ObservationIgnored private var generations: [SessionID: Int] = [:]
 
   /// Hooks the models up to the session's terminal: writing to it, reading whether it runs,
   /// bringing it forward.
@@ -92,8 +95,14 @@ public final class ConversationWorkspace {
     model.promptFormat = agent?.format ?? AgentPromptFormat()
     if followed[session.id] != session.conversationAgents, let follow {
       followed[session.id] = session.conversationAgents
-      Task {
+      let generation = (generations[session.id] ?? 0) + 1
+      generations[session.id] = generation
+      let id = session.id
+      Task { [weak self] in
         let stream = await follow.follow(session)
+        guard let self, self.generations[id] == generation, self.models[id] === model else {
+          return
+        }
         model.follow(stream)
       }
     }
@@ -116,6 +125,9 @@ public final class ConversationWorkspace {
   public func release(_ id: SessionID) {
     models.removeValue(forKey: id)?.stop()
     followed[id] = nil
+    generations[id] = nil
+    // What was said lives only as long as a view shows it (ADR 0023).
+    MarkdownCache.shared.removeAll()
     mountedSessionIDs.removeAll { $0 == id }
   }
 

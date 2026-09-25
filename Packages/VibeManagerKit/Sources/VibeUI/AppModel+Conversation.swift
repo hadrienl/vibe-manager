@@ -51,6 +51,12 @@ extension AppModel {
       model.restart = { [weak self] in
         Task { await self?.restart(id) }
       }
+      model.canRestart = { [weak self] in
+        guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
+          return false
+        }
+        return self.canRestart(session)
+      }
       model.activity = self?.activities[id]?.activity
     }
   }

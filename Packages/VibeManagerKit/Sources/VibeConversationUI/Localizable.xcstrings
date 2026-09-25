@@ -713,16 +713,6 @@
         }
       }
     },
-    "Open" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir"
-          }
-        }
-      }
-    },
     "Open sessions in" : {
       "localizations" : {
         "fr" : {
@@ -969,6 +959,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serveur"
+          }
+        }
+      }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher dans le Finder"
           }
         }
       }

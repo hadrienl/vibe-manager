@@ -71,6 +71,7 @@ public actor FollowConversation {
     var chapters: [Chapter] = []
     var isDirty = true
     var lastPublished: ConversationSnapshot?
+    var publishTask: Task<Void, Never>?
     var tasks: [Task<Void, Never>] = []
 
     init(
@@ -118,6 +119,7 @@ public actor FollowConversation {
   private func stop(_ key: UUID) {
     guard let following = followings.removeValue(forKey: key) else { return }
     following.tasks.forEach { $0.cancel() }
+    following.publishTask?.cancel()
     for chapter in following.chapters {
       chapter.readings.forEach { $0.task?.cancel() }
     }
@@ -135,16 +137,39 @@ public actor FollowConversation {
     }
     while !Task.isCancelled, followings[key] != nil {
       await refreshFiles(following, key: key)
-      let deadline = ContinuousClock.now.advanced(by: refreshInterval)
-      repeat {
-        publishIfNeeded(following)
-        if !following.live, isLoaded(following) {
-          following.continuation.finish()
-          return
+      guard following.live else {
+        // Read once: published when every file has been read, then done.
+        while !isLoaded(following), !Task.isCancelled {
+          try? await Task.sleep(for: publishInterval)
         }
-        try? await Task.sleep(for: publishInterval)
-      } while ContinuousClock.now < deadline && !Task.isCancelled
+        publishIfNeeded(following)
+        following.continuation.finish()
+        return
+      }
+      if following.isDirty { schedulePublish(following, key: key) }
+      // Nothing wakes the reader but the disk: lines are published as they arrive. The folders
+      // are looked at again for new files, often while one is still awaited, rarely after.
+      let everyFileFound = following.chapters.allSatisfy {
+        $0.reporter == nil || !$0.readings.isEmpty
+      }
+      try? await Task.sleep(for: everyFileFound ? refreshInterval * 5 : refreshInterval)
     }
+  }
+
+  /// One publication per pause, whatever the number of chunks that arrived in it.
+  private func schedulePublish(_ following: Following, key: UUID) {
+    guard following.publishTask == nil else { return }
+    let interval = publishInterval
+    following.publishTask = Task { [weak self] in
+      try? await Task.sleep(for: interval)
+      await self?.publishNow(key)
+    }
+  }
+
+  private func publishNow(_ key: UUID) {
+    guard let following = followings[key] else { return }
+    following.publishTask = nil
+    publishIfNeeded(following)
   }
 
   private func prepareChapters(_ following: Following) async {
@@ -207,6 +232,7 @@ public actor FollowConversation {
       reading.hasLoaded = true
     }
     following.isDirty = true
+    if following.live { schedulePublish(following, key: key) }
   }
 
   private func isLoaded(_ following: Following) -> Bool {

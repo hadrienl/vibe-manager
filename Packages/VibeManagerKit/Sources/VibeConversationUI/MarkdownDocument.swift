@@ -166,11 +166,17 @@ public enum MarkdownDocument {
 
 /// Parsed messages, kept so that scrolling back up does not parse them again.
 @MainActor
-final class MarkdownCache {
-  static let shared = MarkdownCache()
+public final class MarkdownCache {
+  public static let shared = MarkdownCache()
   private var blocks: [String: [MarkdownBlock]] = [:]
   private var order: [String] = []
   private let capacity = 2_000
+
+  /// Forgets every parsed message: what was said lives only as long as a view shows it.
+  public func removeAll() {
+    blocks.removeAll()
+    order.removeAll()
+  }
 
   func blocks(for text: String) -> [MarkdownBlock] {
     if let cached = blocks[text] { return cached }

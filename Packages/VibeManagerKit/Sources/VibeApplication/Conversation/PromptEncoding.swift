@@ -30,7 +30,9 @@ public enum PromptEncoding {
     for submission: PromptSubmission, format: AgentPromptFormat, whileWorking: Bool
   ) -> Keystrokes {
     var body = sanitized(submission.text).trimmingCharacters(in: .whitespacesAndNewlines)
-    let paths = submission.attachments.map { shellEscaped($0.path) }
+    // A file named with a control character could close the paste and type on its own: such a
+    // path is not written at all.
+    let paths = submission.attachments.map(\.path).filter(isWritablePath).map(shellEscaped)
     if !paths.isEmpty {
       body += (body.isEmpty ? "" : " ") + paths.joined(separator: " ")
     }
@@ -55,6 +57,13 @@ public enum PromptEncoding {
             !(scalar.value < 0x20 || scalar.value == 0x7F
             || (0x80...0x9F).contains(scalar.value))
         }))
+  }
+
+  /// Whether a path can be written into the terminal: no control character anywhere in it.
+  public static func isWritablePath(_ path: String) -> Bool {
+    !path.unicodeScalars.contains {
+      $0.value < 0x20 || $0.value == 0x7F || (0x80...0x9F).contains($0.value)
+    }
   }
 
   /// A path as Terminal.app writes a dropped file: every character a shell would read otherwise

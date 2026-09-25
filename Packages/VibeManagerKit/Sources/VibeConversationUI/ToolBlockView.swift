@@ -377,10 +377,12 @@ struct DiffView: View {
           .lineLimit(1)
           .truncationMode(.head)
         Spacer()
+        // Shown in the Finder, never opened: the path comes from the transcript, and opening an
+        // application or a `.command` an agent was made to write would run it.
         Button {
-          NSWorkspace.shared.open(URL(fileURLWithPath: change.path))
+          NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: change.path)])
         } label: {
-          Text("Open", bundle: .module).font(theme.interfaceFont(size: size))
+          Text("Show in Finder", bundle: .module).font(theme.interfaceFont(size: size))
         }
         .buttonStyle(.plain)
         .foregroundStyle(theme.accent.color)
