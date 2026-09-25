@@ -174,11 +174,11 @@ xcodebuild \
   archive
 
 step "Exporting"
-options="$work/ExportOptions.plist"
-cp Configuration/ExportOptions.plist "$options"
-plutil -replace teamID -string "$team" "$options"
+export_options="$work/ExportOptions.plist"
+cp Configuration/ExportOptions.plist "$export_options"
+plutil -replace teamID -string "$team" "$export_options"
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$exported" \
-  -exportOptionsPlist "$options"
+  -exportOptionsPlist "$export_options"
 [[ -d "$app" ]] || fail "the export has no application"
 
 # 4. The binary is what a release must be.
