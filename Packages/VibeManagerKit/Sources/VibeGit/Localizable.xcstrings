@@ -1,55 +1,55 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "Git did not say where this repository keeps its state.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Git n’a pas indiqué où ce dépôt conserve son état."
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Git did not say where this repository keeps its state." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git n’a pas indiqué où ce dépôt conserve son état."
           }
         }
       }
     },
-    "git did not answer within %lld seconds.": {
-      "localizations": {
-        "fr": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "git n’a pas répondu en %lld seconde."
+    "git did not answer within %lld seconds." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "git did not answer within %lld second."
                 }
               },
-              "many": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "git n’a pas répondu en %lld secondes."
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "git n’a pas répondu en %lld secondes."
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "git did not answer within %lld seconds."
                 }
               }
             }
           }
         },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "git did not answer within %lld second."
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "git n’a pas répondu en %lld secondes."
                 }
               },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "git did not answer within %lld seconds."
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "git n’a pas répondu en %lld seconde."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "git n’a pas répondu en %lld secondes."
                 }
               }
             }
@@ -57,16 +57,16 @@
         }
       }
     },
-    "git wrote more than can be read.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "git a écrit plus que ce qui peut être lu."
+    "git wrote more than can be read." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "git a écrit plus que ce qui peut être lu."
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

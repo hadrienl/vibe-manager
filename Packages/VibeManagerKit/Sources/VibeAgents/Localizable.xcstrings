@@ -1,100 +1,100 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "%@ %@ is older than the required %@.": {
-      "comment": "An agent's name, then two version numbers.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ %2$@ is older than the required %3$@."
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ %@ is older than the required %@." : {
+      "comment" : "An agent's name, then two version numbers.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ is older than the required %3$@."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ %2$@ est plus ancien que la version requise, %3$@."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ est plus ancien que la version requise, %3$@."
           }
         }
       }
     },
-    "%@ could not be inspected.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ n’a pas pu être examiné."
+    "%@ could not be inspected." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas pu être examiné."
           }
         }
       }
     },
-    "%@ did not answer in time.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ n’a pas répondu à temps."
+    "%@ did not answer in time." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas répondu à temps."
           }
         }
       }
     },
-    "%@ is installed but not signed in.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ est installé, mais vous n’y êtes pas connecté."
+    "%@ is installed but not signed in." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est installé, mais vous n’y êtes pas connecté."
           }
         }
       }
     },
-    "%@ is ready.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ est prêt."
+    "%@ is ready." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est prêt."
           }
         }
       }
     },
-    "%@ was not found on this Mac.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ est introuvable sur ce Mac."
+    "%@ was not found on this Mac." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est introuvable sur ce Mac."
           }
         }
       }
     },
-    "The %@ check was interrupted.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La vérification de %@ a été interrompue."
+    "The %@ check was interrupted." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vérification de %@ a été interrompue."
           }
         }
       }
     },
-    "The %@ command exists but cannot be run.": {
-      "comment": "An agent's name.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La commande %@ existe, mais ne peut pas être exécutée."
+    "The %@ command exists but cannot be run." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La commande %@ existe, mais ne peut pas être exécutée."
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

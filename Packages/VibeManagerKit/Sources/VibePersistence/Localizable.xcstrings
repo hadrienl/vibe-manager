@@ -1,204 +1,204 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "No valid session backup is available.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune sauvegarde valide des sessions n’est disponible."
+  "sourceLanguage" : "en",
+  "strings" : {
+    "No valid session backup is available." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune sauvegarde valide des sessions n’est disponible."
           }
         }
       }
     },
-    "The session store could not be accessed.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les sessions enregistrées ne sont pas accessibles."
+    "The session store could not be accessed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions enregistrées ne sont pas accessibles."
           }
         }
       }
     },
-    "The session store is damaged and no valid backup is available.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le fichier des sessions est endommagé et aucune sauvegarde valide n’est disponible."
+    "The session store is damaged and no valid backup is available." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier des sessions est endommagé et aucune sauvegarde valide n’est disponible."
           }
         }
       }
     },
-    "The session store is damaged, but a backup can be restored.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le fichier des sessions est endommagé, mais une sauvegarde peut être restaurée."
+    "The session store is damaged, but a backup can be restored." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier des sessions est endommagé, mais une sauvegarde peut être restaurée."
           }
         }
       }
     },
-    "The session store is healthy, so there is nothing to restore.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le fichier des sessions est intact : il n’y a rien à restaurer."
+    "The session store is healthy, so there is nothing to restore." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier des sessions est intact : il n’y a rien à restaurer."
           }
         }
       }
     },
-    "The session store was created by a newer version of Vibe Manager and must not be replaced by an older backup. Update Vibe Manager to open it.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le fichier des sessions a été créé par une version plus récente de Vibe Manager et ne doit pas être remplacé par une sauvegarde plus ancienne. Mettez à jour Vibe Manager pour l’ouvrir."
+    "The session store was created by a newer version of Vibe Manager and must not be replaced by an older backup. Update Vibe Manager to open it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier des sessions a été créé par une version plus récente de Vibe Manager et ne doit pas être remplacé par une sauvegarde plus ancienne. Mettez à jour Vibe Manager pour l’ouvrir."
           }
         }
       }
     },
-    "The session store was created by a newer version of Vibe Manager.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le fichier des sessions a été créé par une version plus récente de Vibe Manager."
+    "The session store was created by a newer version of Vibe Manager." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier des sessions a été créé par une version plus récente de Vibe Manager."
           }
         }
       }
     },
-    "The work session contains invalid data.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La session contient des données non valides."
+    "The work session contains invalid data." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session contient des données non valides."
           }
         }
       }
     },
-    "These templates were exported by a newer version of Vibe Manager (format %@). Update Vibe Manager to import them.": {
-      "comment": "The version number of the file's format.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ces modèles ont été exportés par une version plus récente de Vibe Manager (format %@). Mettez à jour Vibe Manager pour les importer."
+    "These templates were exported by a newer version of Vibe Manager (format %@). Update Vibe Manager to import them." : {
+      "comment" : "The version number of the file's format.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces modèles ont été exportés par une version plus récente de Vibe Manager (format %@). Mettez à jour Vibe Manager pour les importer."
           }
         }
       }
     },
-    "This file does not hold Vibe Manager prompt templates.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ce fichier ne contient pas de modèles de prompt Vibe Manager."
+    "This file does not hold Vibe Manager prompt templates." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier ne contient pas de modèles de prompt Vibe Manager."
           }
         }
       }
     },
-    "This file weighs %@; a template file is at most %@.": {
-      "comment": "Two sizes, formatted: “1.2 MB”, “1 MB”.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "This file weighs %1$@; a template file is at most %2$@."
+    "This file weighs %@; a template file is at most %@." : {
+      "comment" : "Two sizes, formatted: “1.2 MB”, “1 MB”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This file weighs %1$@; a template file is at most %2$@."
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ce fichier pèse %1$@ ; un fichier de modèles ne peut pas dépasser %2$@."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier pèse %1$@ ; un fichier de modèles ne peut pas dépasser %2$@."
           }
         }
       }
     },
-    "permission was denied.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "l’autorisation a été refusée."
+    "permission was denied." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’autorisation a été refusée."
           }
         }
       }
     },
-    "the disk is full.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le disque est plein."
+    "the disk is full." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le disque est plein."
           }
         }
       }
     },
-    "the file is damaged.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le fichier est endommagé."
+    "the file is damaged." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le fichier est endommagé."
           }
         }
       }
     },
-    "the file is not UTF-8 text.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le fichier n’est pas du texte UTF-8."
+    "the file is not UTF-8 text." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le fichier n’est pas du texte UTF-8."
           }
         }
       }
     },
-    "the file was written by a newer version of Vibe Manager.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le fichier a été écrit par une version plus récente de Vibe Manager."
+    "the file was written by a newer version of Vibe Manager." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le fichier a été écrit par une version plus récente de Vibe Manager."
           }
         }
       }
     },
-    "the folder is not writable.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le dossier n’est pas accessible en écriture."
+    "the folder is not writable." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le dossier n’est pas accessible en écriture."
           }
         }
       }
     },
-    "the notes folder is not writable.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le dossier des notes n’est pas accessible en écriture."
+    "the notes folder is not writable." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le dossier des notes n’est pas accessible en écriture."
           }
         }
       }
     },
-    "the volume is read-only.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "le volume est en lecture seule."
+    "the volume is read-only." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le volume est en lecture seule."
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

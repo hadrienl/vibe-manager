@@ -1,165 +1,165 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "Exited with code %@": {
-      "comment": "A terminal's state: its process ended with this exit status.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminé avec le code %@"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Exited with code %@" : {
+      "comment" : "A terminal's state: its process ended with this exit status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé avec le code %@"
           }
         }
       }
     },
-    "Finished": {
-      "comment": "A terminal's state.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminé"
+    "Finished" : {
+      "comment" : "A terminal's state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé"
           }
         }
       }
     },
-    "Read Last Output, Control-Option-Command-O, reads the last lines the agent wrote.": {
-      "comment": "Read Last Output is a command of the Session menu.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lire la dernière sortie, Contrôle-Option-Commande-O, lit les dernières lignes écrites par l’agent."
+    "Read Last Output, Control-Option-Command-O, reads the last lines the agent wrote." : {
+      "comment" : "Read Last Output is a command of the View menu.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire la dernière sortie, Contrôle-Option-Commande-O, lit les dernières lignes écrites par l’agent."
           }
         }
       }
     },
-    "Restart": {
-      "comment": "Starts the terminal's process again.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Relancer"
+    "Restart" : {
+      "comment" : "Starts the terminal's process again.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer"
           }
         }
       }
     },
-    "Running": {
-      "comment": "A terminal's state.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "En cours"
+    "Running" : {
+      "comment" : "A terminal's state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours"
           }
         }
       }
     },
-    "Starting terminal…": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Démarrage du terminal…"
+    "Starting terminal…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage du terminal…"
           }
         }
       }
     },
-    "Starting…": {
-      "comment": "A terminal's state.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Démarrage…"
+    "Starting…" : {
+      "comment" : "A terminal's state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage…"
           }
         }
       }
     },
-    "Stop": {
-      "comment": "Stops the terminal's process.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arrêter"
+    "Stop" : {
+      "comment" : "Stops the terminal's process.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêter"
           }
         }
       }
     },
-    "Terminal": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminal"
+    "Terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal"
           }
         }
       }
     },
-    "Terminal unavailable": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminal indisponible"
+    "Terminal unavailable" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal indisponible"
           }
         }
       }
     },
-    "Terminated by signal %@": {
-      "comment": "A terminal's state: its process was killed by this signal number.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Interrompu par le signal %@"
+    "Terminated by signal %@" : {
+      "comment" : "A terminal's state: its process was killed by this signal number.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompu par le signal %@"
           }
         }
       }
     },
-    "The terminal could not be started.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le terminal n’a pas pu être lancé."
+    "The terminal could not be started." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le terminal n’a pas pu être lancé."
           }
         }
       }
     },
-    "The terminal failed.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le terminal a échoué."
+    "The terminal failed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le terminal a échoué."
           }
         }
       }
     },
-    "Try Again": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Réessayer"
+    "Try Again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
           }
         }
       }
     },
-    "terminal": {
-      "comment": "What VoiceOver calls the element.",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "terminal"
+    "terminal" : {
+      "comment" : "What VoiceOver calls the element.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "terminal"
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }
