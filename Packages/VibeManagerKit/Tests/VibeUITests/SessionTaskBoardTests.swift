@@ -81,6 +81,32 @@ struct SessionTaskBoardTests {
     #expect(model.selectedSessionID == first.id)
   }
 
+  @Test("Moving the only row of a column keeps it selected")
+  func movingTheOnlyRow() async {
+    let only = session("Only")
+    let (model, _, _) = makeWorkspace([only])
+    await model.load()
+    model.select(only.id)
+
+    await model.setTaskStatus(.waiting, for: only.id)
+
+    #expect(model.visibleSessions.isEmpty)
+    #expect(model.selectedSessionID == only.id)
+  }
+
+  @Test("Archiving the only row of Done keeps it selected")
+  func archivingTheOnlyRow() async {
+    let only = session("Only", in: .done)
+    let (model, _, _) = makeWorkspace([only])
+    await model.load()
+    model.setColumn(.done)
+    model.select(only.id)
+
+    await model.archive(only.id)
+
+    #expect(model.selectedSessionID == only.id)
+  }
+
   @Test("⌥⌘→ and ⌥⌘← move one status at a time, and never archive")
   func shortcutsStepOneStatus() async {
     let subject = session("Subject", in: .waiting)

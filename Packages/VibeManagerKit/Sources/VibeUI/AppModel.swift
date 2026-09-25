@@ -993,6 +993,8 @@ public final class AppModel {
   /// its place: the one below, or the one above at the end of the column. Sorting a column is
   /// going down it, and the next session to look at is the one that moved up.
   ///
+  /// A column left empty keeps the selection where it is.
+  ///
   /// `wasSelected` is read before the change: the reload that follows it already moved the
   /// selection off a row it could no longer see, to the top of the column.
   private func handOffSelection(
@@ -1004,7 +1006,9 @@ public final class AppModel {
     let remaining = visible.filter { $0.id != id }
     let neighbour = remaining.indices.contains(index) ? remaining[index] : remaining.last
     guard let neighbour, visibleSessions.contains(where: { $0.id == neighbour.id }) else {
-      select(visibleSessions.first?.id)
+      // An emptied column keeps the selection, as `reconcileSelection` does: the session just
+      // moved stays on screen rather than leaving the main area blank.
+      if let first = visibleSessions.first { select(first.id) }
       return
     }
     guard selectedSessionID != neighbour.id else { return }
