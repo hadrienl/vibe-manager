@@ -284,6 +284,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   /// Every switch of agent or model, oldest first. Appended to and never rewritten, except for the
   /// outcome of the last one when it is undone.
   public private(set) var agentHistory: [AgentChange]
+  /// The ticket this session works on, when someone said which (#69). `nil` leaves it to the
+  /// branch.
+  public var ticket: SessionTicket?
 
   public var status: SessionStatus {
     lifecycle.status
@@ -330,7 +333,8 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     repositories: [RepositoryContext] = [],
     legacyNotes: String? = nil,
     template: PromptTemplateReference? = nil,
-    agentHistory: [AgentChange] = []
+    agentHistory: [AgentChange] = [],
+    ticket: SessionTicket? = nil
   ) {
     self.id = id
     self.name = name
@@ -349,6 +353,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     self.legacyNotes = legacyNotes
     self.template = template
     self.agentHistory = agentHistory
+    self.ticket = ticket
   }
 
   public mutating func close(at date: Date) throws {

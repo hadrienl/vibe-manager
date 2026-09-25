@@ -15,7 +15,11 @@ struct SessionStoreCodec {
   /// v4 adds the history of agent switches (#15). A build that only knows v2 would read such a
   /// document, ignore the history as an unknown key, and erase it at its first write; refusing
   /// the document is louder, and loses nothing.
-  static let currentSchemaVersion = 4
+  ///
+  /// v5 adds the ticket a session works on (#69), for the same reason: a v4 build would erase it.
+  /// Its shape is v4's with one more optional field, so both are read by the same structure.
+  static let currentSchemaVersion = 5
+  static let ticketlessSchemaVersion = 4
   static let previousSchemaVersion = 2
   /// Written only by a build of #12 that created a worktree per session, and was reworked before
   /// release. Read back so that the sessions it migrated are not lost; it is never written again.
@@ -59,6 +63,10 @@ struct SessionStoreCodec {
         let current = try Self.makeDecoder().decode(StoreEnvelopeV4.self, from: data)
         sessions = current.sessions.map(\.workSession)
         requiresRewrite = false
+      case Self.ticketlessSchemaVersion:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV4.self, from: data)
+        sessions = previous.sessions.map(\.workSession)
+        requiresRewrite = true
       case Self.abandonedSchemaVersion:
         let abandoned = try Self.makeDecoder().decode(StoreEnvelopeV3.self, from: data)
         sessions = abandoned.sessions.map(\.workSession)
@@ -132,7 +140,7 @@ private struct StoreEnvelopeV4: Codable {
   let sessions: [StoredSessionV4]
 }
 
-/// A v2 session and the history of its agent switches.
+/// A v2 session and the history of its agent switches, and from v5 its ticket.
 private struct StoredSessionV4: Codable {
   let id: UUID
   let name: String
@@ -144,6 +152,7 @@ private struct StoredSessionV4: Codable {
   let notes: String?
   let template: StoredTemplateV2?
   let agentHistory: [StoredAgentChangeV4]?
+  let ticket: StoredTicketV5?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
@@ -156,6 +165,7 @@ private struct StoredSessionV4: Codable {
     notes = session.legacyNotes
     template = session.template.map(StoredTemplateV2.init)
     agentHistory = session.agentHistory.map(StoredAgentChangeV4.init)
+    ticket = session.ticket.map(StoredTicketV5.init)
   }
 
   var workSession: WorkSession {
@@ -174,8 +184,28 @@ private struct StoredSessionV4: Codable {
       repositories: repositories.map(\.domainValue),
       legacyNotes: notes,
       template: template?.domainValue,
-      agentHistory: (agentHistory ?? []).map(\.domainValue)
+      agentHistory: (agentHistory ?? []).map(\.domainValue),
+      ticket: ticket?.domainValue
     )
+  }
+}
+
+/// A ticket, field by field: a source written by a later build reads as a manual one, and an
+/// address that is not one reads as no ticket rather than as a store that cannot be opened.
+private struct StoredTicketV5: Codable {
+  let url: String?
+  let source: String
+
+  init(_ ticket: SessionTicket) {
+    url = ticket.url?.absoluteString
+    source = ticket.source.rawValue
+  }
+
+  var domainValue: SessionTicket? {
+    let source = SessionTicket.Source(rawValue: source) ?? .manual
+    guard let url else { return SessionTicket(url: nil, source: source) }
+    guard let parsed = URL(string: url) else { return nil }
+    return SessionTicket(url: parsed, source: source)
   }
 }
 

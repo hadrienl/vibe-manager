@@ -16,6 +16,7 @@ public final class WorkspaceLayoutController {
     var layout = settings
     layout.sidebarWidth = measuredWidths.sidebar
     layout.inspectorWidth = measuredWidths.inspector
+    layout.browserWidth = measuredWidths.browser
     return layout
   }
   public private(set) var columns: WorkspaceColumns
@@ -30,7 +31,14 @@ public final class WorkspaceLayoutController {
   /// inspector and toolbar — and they measured again. A window snapped to half the screen
   /// resizes in a single display cycle: AppKit counted past its loop guard and threw, which with
   /// an application built for development is a crash.
-  @ObservationIgnored private var measuredWidths: (sidebar: Double, inspector: Double)
+  @ObservationIgnored private var measuredWidths:
+    (sidebar: Double, inspector: Double, browser: Double)
+
+  /// Whether the selected session asks for its web view (#69). It is the session's, not the
+  /// layout's: the workspace says it here each time the selection or the session changes it.
+  public private(set) var isBrowserRequested = false
+  /// Which of the two takes the room when they alternate: the web view, or the terminal.
+  public private(set) var showsBrowserWhenAlternating = true
 
   /// A column the user asked for while the window was too narrow for it.
   ///
@@ -53,8 +61,52 @@ public final class WorkspaceLayoutController {
     self.store = store
     self.saveDelay = saveDelay
     settings = layout
-    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth)
+    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth, layout.browserWidth)
     columns = WorkspaceLayoutPolicy.resolve(windowWidth: 0, intent: layout)
+  }
+
+  /// The web view's width, as last measured or restored.
+  public var browserWidth: Double {
+    measuredWidths.browser
+  }
+
+  public func setBrowserRequested(_ isRequested: Bool) {
+    guard isRequested != isBrowserRequested else { return }
+    let previous = allowances
+    isBrowserRequested = isRequested
+    // The web view coming or going changes what the width allows, as a resize would.
+    dropOverrides(from: previous)
+    resolveColumns()
+  }
+
+  /// In a window too narrow for both, which one is shown. Asking for one of them is what brings it
+  /// forward: the web view when an agent opens a page, the terminal when it is focused.
+  public func setShowsBrowserWhenAlternating(_ showsBrowser: Bool) {
+    showsBrowserWhenAlternating = showsBrowser
+  }
+
+  /// Whether the terminal is on screen at all: not when the web view has the room to itself.
+  public var isTerminalShown: Bool {
+    columns.browser != .alternating || !showsBrowserWhenAlternating
+  }
+
+  /// Whether the web view is on screen.
+  public var isBrowserShown: Bool {
+    switch columns.browser {
+    case .hidden: return false
+    case .beside: return true
+    case .alternating: return showsBrowserWhenAlternating
+    }
+  }
+
+  public func browserWidthChanged(to width: Double) {
+    guard let measured = WorkspaceLayout.measured(width, in: WorkspaceLayout.browserWidthRange),
+      abs(measured - measuredWidths.browser) >= 1
+    else {
+      return
+    }
+    measuredWidths.browser = measured
+    scheduleSave()
   }
 
   /// Reads back the stored layout and reports the selection it carried, which the caller is
@@ -133,6 +185,11 @@ public final class WorkspaceLayoutController {
     // granted for that column: widening the window is how they get the ordinary behaviour back.
     // Each column answers for itself, so revealing the inspector by hand does not survive, or
     // die with, a width that only concerns the sidebar.
+    dropOverrides(from: previous)
+    resolveColumns()
+  }
+
+  private func dropOverrides(from previous: WorkspaceColumns) {
     let current = allowances
     if current.isSidebarVisible != previous.isSidebarVisible {
       sidebarOverride = false
@@ -140,7 +197,6 @@ public final class WorkspaceLayoutController {
     if current.isInspectorVisible != previous.isInspectorVisible {
       inspectorOverride = false
     }
-    resolveColumns()
   }
 
   /// Column widths arrive from the views, which measure themselves: SwiftUI hands a split view
@@ -193,18 +249,20 @@ public final class WorkspaceLayoutController {
 
   private func apply(_ layout: WorkspaceLayout) {
     settings = layout
-    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth)
+    measuredWidths = (layout.sidebarWidth, layout.inspectorWidth, layout.browserWidth)
     resolveColumns()
   }
 
   /// What the window width alone would show.
   private var proposal: WorkspaceColumns {
-    WorkspaceLayoutPolicy.resolve(windowWidth: windowWidth, intent: intent)
+    WorkspaceLayoutPolicy.resolve(
+      windowWidth: windowWidth, intent: intent, isBrowserRequested: isBrowserRequested)
   }
 
   /// What the window is wide enough to hold, whatever the user asked for.
   private var allowances: WorkspaceColumns {
-    WorkspaceLayoutPolicy.allowances(windowWidth: windowWidth)
+    WorkspaceLayoutPolicy.allowances(
+      windowWidth: windowWidth, isBrowserRequested: isBrowserRequested)
   }
 
   private func updateIntent(_ change: (inout WorkspaceLayout) -> Void) {
@@ -219,7 +277,8 @@ public final class WorkspaceLayoutController {
     let proposal = proposal
     columns = WorkspaceColumns(
       isSidebarVisible: proposal.isSidebarVisible || sidebarOverride,
-      isInspectorVisible: proposal.isInspectorVisible || inspectorOverride
+      isInspectorVisible: proposal.isInspectorVisible || inspectorOverride,
+      browser: proposal.browser
     )
   }
 

@@ -17,6 +17,8 @@ public struct SessionDraft: Hashable, Sendable {
   /// The template being filled in, if any. While there is one, the prompt is its rendering and
   /// `initialPrompt` is not read.
   public var templateFill: PromptTemplateFill?
+  /// What was typed in the Ticket field (#69): an address, or `#12`. Empty for none.
+  public var ticketText: String
 
   public init(
     name: String = "",
@@ -25,7 +27,8 @@ public struct SessionDraft: Hashable, Sendable {
     modelID: String? = nil,
     appearance: SessionAppearance? = nil,
     workingDirectoryPath: String? = nil,
-    templateFill: PromptTemplateFill? = nil
+    templateFill: PromptTemplateFill? = nil,
+    ticketText: String = ""
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
@@ -34,6 +37,26 @@ public struct SessionDraft: Hashable, Sendable {
     self.appearance = appearance
     self.workingDirectoryPath = workingDirectoryPath
     self.templateFill = templateFill
+    self.ticketText = ticketText
+  }
+
+  /// The name of the template field that names the ticket, whatever its case.
+  public static let ticketFieldName = "ticket"
+
+  /// The ticket the session starts with: the one typed, else the one the template's `ticket` field
+  /// names. `#12` needs the repository the session works in to become an address.
+  public func ticket(repository: RepositoryWebAddress?) -> SessionTicket? {
+    if let url = TicketInput.url(from: ticketText, repository: repository) {
+      return SessionTicket(url: url, source: .manual)
+    }
+    guard let templateFill,
+      let field = templateFill.template.fields.first(where: {
+        $0.name.lowercased() == Self.ticketFieldName
+      }),
+      let url = TicketInput.url(
+        from: templateFill.value(for: field.name), repository: repository)
+    else { return nil }
+    return SessionTicket(url: url, source: .template)
   }
 
   public var trimmedName: String {
@@ -97,7 +120,11 @@ public struct SessionDraft: Hashable, Sendable {
 
   /// The session this draft becomes. Callers pass a validated draft; the value is still checked
   /// by `WorkSession.validate()` before it reaches the store.
-  public func session(id: SessionID = SessionID(), createdAt: Date = Date()) -> WorkSession {
+  public func session(
+    id: SessionID = SessionID(),
+    createdAt: Date = Date(),
+    repository: RepositoryWebAddress? = nil
+  ) -> WorkSession {
     WorkSession(
       id: id,
       name: trimmedName,
@@ -110,7 +137,8 @@ public struct SessionDraft: Hashable, Sendable {
       closedAt: createdAt,
       repositories: resolvedWorkingDirectoryPath.map { [RepositoryContext(path: $0)] } ?? [],
       // The rendered text is what the session keeps; the template is only where it came from.
-      template: templateFill?.reference
+      template: templateFill?.reference,
+      ticket: ticket(repository: repository)
     )
   }
 

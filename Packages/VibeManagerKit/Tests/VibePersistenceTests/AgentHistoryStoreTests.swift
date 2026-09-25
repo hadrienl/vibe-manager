@@ -142,3 +142,30 @@ struct AgentHistoryStoreTests {
     }
   }
 }
+
+@Suite("Keeping a session's ticket in the store")
+struct SessionTicketStoreTests {
+  @Test("A ticket comes back as it was written, a removed one included, and v4 reads as none")
+  func roundTrip() throws {
+    let codec = SessionStoreCodec()
+    let sessions = [
+      WorkSession(
+        name: "A",
+        ticket: SessionTicket(
+          url: URL(string: "https://github.com/o/r/issues/1")!, source: .template)),
+      WorkSession(name: "B", ticket: .removed),
+      WorkSession(name: "C"),
+    ]
+    let data = try codec.encode(sessions: sessions)
+    let text = String(decoding: data, as: UTF8.self)
+    #expect(text.contains(#""schemaVersion" : 5"#))
+    let decoded = try codec.decode(data)
+    #expect(decoded.sessions.map(\.ticket) == sessions.map(\.ticket))
+    #expect(!decoded.requiresRewrite)
+
+    let v4 = text.replacingOccurrences(of: #""schemaVersion" : 5"#, with: #""schemaVersion" : 4"#)
+    let old = try codec.decode(Data(v4.utf8))
+    #expect(old.requiresRewrite)
+    #expect(old.sessions.count == 3)
+  }
+}

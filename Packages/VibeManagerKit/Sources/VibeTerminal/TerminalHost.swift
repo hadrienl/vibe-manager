@@ -33,6 +33,12 @@ public struct TerminalHostLocation: Hashable, Sendable {
     directory.appendingPathComponent("host-v\(TerminalHostWire.protocolVersion).sock").path
   }
 
+  /// The socket the application listens on for the agents' web view tools (#69). In the host's
+  /// directory for its privacy and its short path; the application listens there, not the host.
+  public var browserSocketPath: String {
+    directory.appendingPathComponent("browser-v1.sock").path
+  }
+
   var lockPath: String {
     directory.appendingPathComponent("host.lock").path
   }
@@ -58,7 +64,7 @@ public struct TerminalHostLocation: Hashable, Sendable {
   }
 
   /// Creates the directory, private to the user.
-  func prepare() throws {
+  public func prepare() throws {
     try FileManager.default.createDirectory(
       at: directory,
       withIntermediateDirectories: true,

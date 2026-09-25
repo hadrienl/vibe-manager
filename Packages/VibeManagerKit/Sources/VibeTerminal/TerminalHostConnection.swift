@@ -2,12 +2,13 @@ import Darwin
 import Dispatch
 import Foundation
 
-/// The Unix-domain socket calls, kept to the few the host and its client need.
-enum UnixSocket {
+/// The Unix-domain socket calls, kept to the few the host and its client need — and the web view's
+/// channel (#69), which lives in the same private directory.
+public enum UnixSocket {
   /// `sun_path` is 104 bytes on Darwin, terminator included.
-  static let maximumPathLength = 103
+  public static let maximumPathLength = 103
 
-  static func listen(at path: String) throws -> Int32 {
+  public static func listen(at path: String) throws -> Int32 {
     let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
     guard descriptor >= 0 else { throw Self.lastError() }
     _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC)
@@ -30,7 +31,7 @@ enum UnixSocket {
   }
 
   /// A connected descriptor, or `nil` when nothing listens there.
-  static func connect(to path: String) -> Int32? {
+  public static func connect(to path: String) -> Int32? {
     let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
     guard descriptor >= 0 else { return nil }
     _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC)
@@ -46,7 +47,7 @@ enum UnixSocket {
   }
 
   /// The user on the other end of a connected socket.
-  static func peerUserIdentifier(of descriptor: Int32) -> uid_t? {
+  public static func peerUserIdentifier(of descriptor: Int32) -> uid_t? {
     var user: uid_t = 0
     var group: gid_t = 0
     guard getpeereid(descriptor, &user, &group) == 0 else { return nil }
@@ -55,7 +56,7 @@ enum UnixSocket {
 
   /// The audit token of the process on the other end, which — unlike its pid — cannot be worn by
   /// another process between the moment it is read and the moment its signature is checked.
-  static func peerAuditToken(of descriptor: Int32) -> audit_token_t? {
+  public static func peerAuditToken(of descriptor: Int32) -> audit_token_t? {
     var token = audit_token_t()
     var length = socklen_t(MemoryLayout<audit_token_t>.size)
     guard getsockopt(descriptor, SOL_LOCAL, LOCAL_PEERTOKEN, &token, &length) == 0 else {
