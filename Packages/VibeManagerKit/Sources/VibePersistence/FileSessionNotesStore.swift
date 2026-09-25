@@ -15,15 +15,21 @@ import VibeDomain
 public actor FileSessionNotesStore: SessionNotesStore {
   private let directory: URL
   private let beforeReplace: (@Sendable () throws -> Void)?
+  private let diagnostics: Diagnostics
 
-  public init(directory: URL = FileSessionNotesStore.defaultDirectory()) {
+  public init(
+    directory: URL = FileSessionNotesStore.defaultDirectory(),
+    diagnostics: Diagnostics = .disabled
+  ) {
     self.directory = directory
     beforeReplace = nil
+    self.diagnostics = diagnostics
   }
 
   init(directory: URL, beforeReplace: @escaping @Sendable () throws -> Void) {
     self.directory = directory
     self.beforeReplace = beforeReplace
+    diagnostics = .disabled
   }
 
   /// `Notes/` next to `sessions.json`.
@@ -86,6 +92,7 @@ public actor FileSessionNotesStore: SessionNotesStore {
     do {
       data = try Data(contentsOf: url)
     } catch {
+      note("notes.readFailed", id, error)
       throw SessionNotesError.unreadable(reason: Self.reason(error))
     }
     guard let text = String(data: data, encoding: .utf8) else {
@@ -108,11 +115,22 @@ public actor FileSessionNotesStore: SessionNotesStore {
       try ensureDirectory()
       try atomicWrite(Data(text.utf8), to: destination)
     } catch let error as SessionNotesError {
+      note("notes.writeFailed", id, error)
       throw error
     } catch {
+      note("notes.writeFailed", id, error)
       throw SessionNotesError.cannotWrite(reason: Self.reason(error))
     }
     return SessionNotes(text: text, modifiedAt: modificationDate(of: destination) ?? Date())
+  }
+
+  /// Which session, and the `errno`: never the text, nor the file's path.
+  private func note(_ name: StaticString, _ id: SessionID, _ error: any Error) {
+    var fields: [(name: StaticString, value: DiagnosticValue)] = [
+      ("session", diagnostics.pseudonym(id))
+    ]
+    if let code = DiagnosticValue.posixCode(of: error) { fields.append(("errno", code)) }
+    diagnostics.log.record(DiagnosticEvent(.notes, .error, name, fields: fields))
   }
 
   private func atomicWrite(_ data: Data, to destination: URL) throws {

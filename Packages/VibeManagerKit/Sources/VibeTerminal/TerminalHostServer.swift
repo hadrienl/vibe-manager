@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import VibeApplication
 import VibeDomain
+import VibeProcess
 
 /// The terminal host's side of the wire: the sessions it runs, and the one client it serves.
 ///
@@ -24,19 +25,30 @@ public actor TerminalHostServer {
     /// How long a session that ended with nobody attached waits to be read.
     public var endedRetention: Duration
     public var build: String
+    /// Sessions running at once. Each holds a terminal and a handful of descriptors: past this, the
+    /// host would run out of them in the middle of serving the others rather than refuse one.
+    public var maximumRunningSessions: Int
+    /// The host's own log, `host.jsonl`, keyed by the same salt as the application's.
+    public var diagnostics: Diagnostics
 
     public init(
       verifier: any TerminalHostPeerVerifier,
       idleGracePeriod: Duration = .seconds(5),
       endedRetention: Duration = .seconds(24 * 60 * 60),
-      build: String = TerminalHostServer.currentBuild
+      build: String = TerminalHostServer.currentBuild,
+      maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions,
+      diagnostics: Diagnostics = .disabled
     ) {
+      self.diagnostics = diagnostics
       self.verifier = verifier
       self.idleGracePeriod = idleGracePeriod
       self.endedRetention = endedRetention
       self.build = build
+      self.maximumRunningSessions = maximumRunningSessions
     }
   }
+
+  public static let defaultMaximumRunningSessions = 64
 
   public static var currentBuild: String {
     let info = Bundle.main.infoDictionary
@@ -87,6 +99,7 @@ public actor TerminalHostServer {
   /// Takes a connection freshly accepted on the listening socket.
   public func accept(descriptor: Int32) {
     guard configuration.verifier.accepts(peerOf: descriptor) else {
+      configuration.diagnostics.record(.host, .error, "host.peerRefused")
       close(descriptor)
       return
     }
@@ -128,11 +141,16 @@ public actor TerminalHostServer {
     else { return false }
 
     if version != TerminalHostWire.protocolVersion {
+      configuration.diagnostics.record(
+        .host, .notice, "host.clientRefused",
+        ["reason": .token(DiagnosticToken("incompatible")), "protocol": .code(Int32(version))])
       let reason = "This terminal host speaks protocol \(TerminalHostWire.protocolVersion)."
       await reply(request.request, .refused(reason: reason, refusal: .incompatible), to: client)
       return false
     }
     if owner != nil {
+      configuration.diagnostics.record(
+        .host, .notice, "host.clientRefused", ["reason": .token(DiagnosticToken("otherClient"))])
       let reason = "Another copy of Vibe Manager is attached to this terminal host."
       await reply(request.request, .refused(reason: reason, refusal: .otherClient), to: client)
       return false
@@ -140,13 +158,15 @@ public actor TerminalHostServer {
 
     owner = client
     keepsRunning = false
+    configuration.diagnostics.record(
+      .host, .info, "host.clientAttached", ["sessions": .count(sessions.count)])
     updateIdleState()
     await reply(
       request.request,
       .welcome(
         protocolVersion: TerminalHostWire.protocolVersion,
         build: configuration.build,
-        capabilities: [],
+        capabilities: TerminalHostCapability.all,
         processIdentifier: getpid(),
         startedAt: startedAt
       ),
@@ -204,6 +224,11 @@ public actor TerminalHostServer {
     case .release(let id):
       await release(id)
       await reply(number, .done, to: client)
+    case .stats:
+      await reply(
+        number,
+        .stats(footprintBytes: ProcessMetrics.physicalFootprint() ?? 0, sessions: sessions.count),
+        to: client)
     case .goodbye(let keepRunning):
       keepsRunning = keepRunning
       await reply(number, .done, to: client)
@@ -242,8 +267,21 @@ public actor TerminalHostServer {
       }
       await release(id)
     }
+    var running = 0
+    for hosted in sessions.values where await !hosted.session.state().isFinished {
+      running += 1
+    }
+    guard running < configuration.maximumRunningSessions else {
+      configuration.diagnostics.record(
+        .host, .error, "host.startRefused",
+        ["session": configuration.diagnostics.pseudonym(id), "running": .count(running)])
+      return .startFailed(.tooManySessions(limit: configuration.maximumRunningSessions))
+    }
     do {
       let session = try PTYTerminalSession.start(id: id, spec: spec)
+      configuration.diagnostics.record(
+        .session, .info, "host.sessionStarted",
+        ["session": configuration.diagnostics.pseudonym(id), "running": .count(running + 1)])
       sessions[id] = Hosted(session: session)
       watch(session)
       updateIdleState()
@@ -252,6 +290,13 @@ public actor TerminalHostServer {
       }
       return .started(processIdentifier: processIdentifier)
     } catch let error as TerminalError {
+      var fields: [(name: StaticString, value: DiagnosticValue)] = [
+        ("session", configuration.diagnostics.pseudonym(id)),
+        ("error", .token(error.diagnosticToken)),
+      ]
+      if let code = error.diagnosticCode { fields.append(("errorCode", .code(code))) }
+      configuration.diagnostics.log.record(
+        DiagnosticEvent(.session, .error, "host.startFailed", fields: fields))
       return .startFailed(error)
     } catch {
       return .startFailed(.spawnFailed(code: 0))
@@ -330,6 +375,9 @@ public actor TerminalHostServer {
       task.cancel()
     }
     forwards.removeAll()
+    configuration.diagnostics.record(
+      .host, keepsRunning ? .info : .notice, "host.clientDetached",
+      ["keepRunning": .flag(keepsRunning), "sessions": .count(sessions.count)])
     if !keepsRunning {
       await stopAll()
     }
@@ -367,6 +415,16 @@ public actor TerminalHostServer {
   private func sessionEnded(_ session: PTYTerminalSession) {
     guard sessions[session.id]?.session === session else { return }
     sessions[session.id]?.endedAt = Date()
+    let id = session.id
+    let diagnostics = configuration.diagnostics
+    Task {
+      let state = await session.state()
+      var fields: [(name: StaticString, value: DiagnosticValue)] = [
+        ("session", diagnostics.pseudonym(id)), ("state", .token(state.diagnosticToken)),
+      ]
+      fields += state.diagnosticFields
+      diagnostics.log.record(DiagnosticEvent(.session, .info, "host.sessionEnded", fields: fields))
+    }
     updateIdleState()
     // Kept for the next launch, but not for ever: an application never reopened must not leave a
     // host behind for the rest of the login, holding output nobody will read.
@@ -401,6 +459,8 @@ public actor TerminalHostServer {
 
   private func endIfStillIdle() {
     guard sessions.isEmpty, owner == nil else { return }
+    configuration.diagnostics.record(.host, .info, "host.idleExit")
+    configuration.diagnostics.flush()
     onIdle()
   }
 

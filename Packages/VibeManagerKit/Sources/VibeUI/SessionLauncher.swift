@@ -42,6 +42,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// assembled without it, and no run is then recorded.
   private let usage: UsageRecorder?
 
+  private let diagnostics: Diagnostics
+  /// When each running process was seen starting, for the duration its exit is logged with.
+  private var startedAt: [SessionID: ContinuousClock.Instant] = [:]
   private var panes: [SessionID: TerminalPaneModel] = [:]
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
@@ -73,8 +76,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     recorder: SessionRuntimeRecorder? = nil,
     usage: UsageRecorder? = nil,
     clock: any SessionClock = SystemSessionClock(),
-    viewportTimeout: Duration = .milliseconds(500)
+    viewportTimeout: Duration = .milliseconds(500),
+    diagnostics: Diagnostics = .disabled
   ) {
+    self.diagnostics = diagnostics
     self.supervisor = supervisor
     self.repository = repository
     self.agents = agents
@@ -115,14 +120,19 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // An archived session is out of reach by design. Refusing here, rather than only hiding the
     // command, is what lets #10's Restart and #11's restore walk the whole store without having
     // to remember the rule — and it is how "no process stays attached" survives their arrival.
-    guard session.status != .archived else { return .failed(reason: Self.archivedReason) }
+    guard session.status != .archived else {
+      refused(session.id, DiagnosticToken("archived"))
+      return .failed(reason: Self.archivedReason)
+    }
     guard !isRunning(session.id) else { return .alreadyRunning }
     // Asked of the store rather than of the value the caller holds. Between the moment a restart
     // read its session and the moment it gets here there is a detection and a launch plan, and a
     // session archived in that window would otherwise be handed a brand new process.
     if let current = try? await repository.session(id: session.id), current.status == .archived {
+      refused(session.id, DiagnosticToken("archived"))
       return .failed(reason: Self.archivedReason)
     }
+    let launchedAt = ContinuousClock.now
 
     // The pane a session already has is reused rather than replaced. The view that renders it
     // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
@@ -137,6 +147,16 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       // The separator announced a process that never started. Left queued it would be shown above
       // the *next* one, dating a restart that did not happen.
       _ = pane.takePendingNotice()
+      var fields: [(name: StaticString, value: DiagnosticValue)] = [
+        ("session", diagnostics.pseudonym(session.id)),
+        ("provider", .token(plan.providerID.diagnosticToken)),
+      ]
+      if let error = pane.launchError {
+        fields.append(("error", .token(error.diagnosticToken)))
+        if let code = error.diagnosticCode { fields.append(("errorCode", .code(code))) }
+      }
+      diagnostics.log.record(
+        DiagnosticEvent(.session, .error, "session.launchFailed", fields: fields))
       // The pane is kept, and it holds why: no reason is carried here, so the failure the user
       // reads is the terminal's own rather than a second, vaguer sentence over it.
       return .failed(reason: nil)
@@ -156,6 +176,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       let current = (try? await repository.session(id: session.id)) ?? nil
       guard current?.status == .active else {
         await dispose(session.id)
+        refused(
+          session.id,
+          current?.status == .archived ? DiagnosticToken("archived") : DiagnosticToken("store"))
         return .failed(
           reason: current?.status == .archived ? Self.archivedReason : Self.storeRefusedReason
         )
@@ -170,6 +193,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       session.id, providerID: plan.providerID.rawValue, modelID: model ?? session.agent?.modelID,
       context: run)
     watchForExit(id: session.id, terminal: terminal)
+    signpostFirstOutput(of: terminal)
     await startObserver(for: session, plan: plan, terminal: terminal)
     // Recorded once there is something to record, and from the terminal rather than from the
     // plan: the process group is the child's own pid, which only exists after the spawn. A
@@ -178,7 +202,37 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     if case .running(let processIdentifier) = await terminal.state() {
       await recorder?.started(session.id, processGroup: processIdentifier)
     }
+    startedAt[session.id] = launchedAt
+    diagnostics.record(
+      .session, .info, "session.launched",
+      [
+        "session": diagnostics.pseudonym(session.id),
+        "provider": .token(plan.providerID.diagnosticToken),
+        "kind": .token(run.kind.diagnosticToken),
+        "hosted": .flag(terminal is any HostedTerminal),
+        "duration": .duration(ContinuousClock.now - launchedAt),
+      ])
     return .started
+  }
+
+  /// From the launch to the first byte the agent writes, for Instruments.
+  private func signpostFirstOutput(of terminal: any TerminalSession) {
+    let state = Signposts.begin("session.firstOutput")
+    Task.detached {
+      let attachment = await terminal.attach()
+      if attachment.history.bytes.isEmpty {
+        for await event in attachment.events {
+          if case .output = event { break }
+        }
+      }
+      Signposts.end("session.firstOutput", state)
+    }
+  }
+
+  private func refused(_ id: SessionID, _ reason: DiagnosticToken) {
+    diagnostics.record(
+      .session, .notice, "session.launchRefused",
+      ["session": diagnostics.pseudonym(id), "reason": .token(reason)])
   }
 
   /// The port #11 restores through. One road to a process, and this is the door on it.
@@ -312,7 +366,12 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     guard let terminal = await supervisor.session(for: session.id) else { return false }
     let pane = pane(for: session.id) ?? makePane(for: session.id, spec: nil)
     await pane.adopt(terminal)
-    guard case .running(let processIdentifier) = await terminal.state() else { return true }
+    let state = await terminal.state()
+    diagnostics.record(
+      .session, .info, "session.adopted",
+      ["session": diagnostics.pseudonym(session.id), "state": .token(state.diagnosticToken)])
+    guard case .running(let processIdentifier) = state else { return true }
+    startedAt[session.id] = .now
     watchForExit(id: session.id, terminal: terminal)
     await recorder?.started(session.id, processGroup: processIdentifier)
     return true
@@ -357,6 +416,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     }
     // The run goes on without the application: the next launch says how it ended.
     await usage?.detached(id)
+    startedAt[id] = nil
+    diagnostics.record(.session, .info, "session.handedOff", ["session": diagnostics.pseudonym(id)])
     return true
   }
 
@@ -507,6 +568,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // The watch that reaches this point may have been superseded while it waited for the main
     // actor — by a detach, or by a relaunch that installed its own. Only the current one speaks.
     guard exitGenerations[id] == generation else { return }
+    var fields: [(name: StaticString, value: DiagnosticValue)] = [
+      ("session", diagnostics.pseudonym(id)), ("state", .token(state.diagnosticToken)),
+    ]
+    fields += state.diagnosticFields
+    if let started = startedAt.removeValue(forKey: id) {
+      fields.append(("duration", .duration(ContinuousClock.now - started)))
+    }
+    diagnostics.log.record(DiagnosticEvent(.session, .info, "session.exited", fields: fields))
     await recorder?.stopped(id)
     await usage?.ended(id, exit: .exited)
     // Asked again after every suspension: a switch can stop, record and relaunch the session

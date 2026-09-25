@@ -21,7 +21,10 @@ final class InProcessTerminalHost: @unchecked Sendable {
   private let source: any DispatchSourceRead
   private let idle = IdleFlag()
 
-  init(idleGracePeriod: Duration = .seconds(60)) throws {
+  init(
+    idleGracePeriod: Duration = .seconds(60),
+    maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions
+  ) throws {
     location = TerminalHostLocation(
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmh-\(UUID().uuidString.prefix(8))", isDirectory: true))
@@ -30,7 +33,8 @@ final class InProcessTerminalHost: @unchecked Sendable {
     let idle = idle
     server = TerminalHostServer(
       configuration: TerminalHostServer.Configuration(
-        verifier: SameUserPeerVerifier(), idleGracePeriod: idleGracePeriod),
+        verifier: SameUserPeerVerifier(), idleGracePeriod: idleGracePeriod,
+        maximumRunningSessions: maximumRunningSessions),
       onIdle: { idle.set() }
     )
     source = TerminalHost.accept(on: listener, into: server)
@@ -227,6 +231,39 @@ struct TerminalHostTests {
     await host.shutDown()
   }
 
+  @Test("Past its limit, the host refuses a session instead of running out of descriptors")
+  func refusesPastTheLimit() async throws {
+    let host = try InProcessTerminalHost(maximumRunningSessions: 2)
+    let supervisor = host.supervisor()
+    let first = try await supervisor.start(
+      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+    _ = try await supervisor.start(TerminalTestSupport.spec(script: idleScript), for: SessionID())
+
+    await #expect(throws: TerminalError.tooManySessions(limit: 2)) {
+      _ = try await supervisor.start(TerminalTestSupport.spec(script: "true"), for: SessionID())
+    }
+
+    // A session that ends makes room again.
+    await first.stop(gracePeriod: .seconds(3))
+    let next = try await supervisor.start(
+      TerminalTestSupport.spec(script: "printf room"), for: SessionID())
+    #expect(await Transcript.follow(next).waitFor("room"))
+    await supervisor.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("The host raises its descriptor limit, never above the hard one")
+  func raisesDescriptorLimit() {
+    var before = rlimit()
+    getrlimit(RLIMIT_NOFILE, &before)
+
+    let raised = TerminalHost.raiseDescriptorLimit()
+
+    #expect(raised >= min(before.rlim_max, TerminalHost.descriptorLimit))
+    #expect(raised <= before.rlim_max)
+    #expect(raised >= before.rlim_cur)
+  }
+
   @Test("A start the host refuses fails with the host's reason")
   func startFailureIsTyped() async throws {
     let host = try InProcessTerminalHost()
@@ -334,20 +371,34 @@ struct TerminalHostTests {
     await host.shutDown()
   }
 
-  @Test("A client that vanishes without saying goodbye takes its agents with it")
+  @Test("A client that vanishes without saying goodbye takes its agents with it, children too")
   func abruptDisconnectStopsEverything() async throws {
     let host = try InProcessTerminalHost()
     let supervisor = host.supervisor()
+    let childFile = NSTemporaryDirectory() + "vmh-child-\(UUID().uuidString.prefix(8))"
+    defer { try? FileManager.default.removeItem(atPath: childFile) }
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(
+        script: """
+          /bin/sh -c 'trap "" HUP TERM; while :; do sleep 1; done' &
+          echo $! > '\(childFile)'
+          \(idleScript)
+          """),
+      for: SessionID())
     guard case .running(let processIdentifier) = await session.state() else {
       Issue.record("The session did not start")
       return
     }
+    #expect(await eventually { FileManager.default.fileExists(atPath: childFile) })
+    let child =
+      Int32(
+        (try? String(contentsOfFile: childFile, encoding: .utf8))?
+          .trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
 
     await supervisor.dropConnection()
 
     #expect(await eventually { !isProcessAlive(processIdentifier) })
+    #expect(await eventually { !isProcessAlive(child) })
     #expect(await eventually { await host.server.sessionCount == 0 })
     await host.shutDown()
   }
@@ -558,7 +609,9 @@ struct TerminalHostProcessTests {
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
     defer { try? FileManager.default.removeItem(at: location.directory) }
-    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let id = SessionID()
 
     let application = HostedTerminalSupervisor(
@@ -607,7 +660,9 @@ struct TerminalHostProcessTests {
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
     defer { try? FileManager.default.removeItem(at: location.directory) }
-    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
@@ -641,7 +696,9 @@ struct TerminalHostProcessTests {
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
     defer { try? FileManager.default.removeItem(at: location.directory) }
-    let launcher = ExecutableTerminalHostLauncher(executableURL: try Self.fixtureURL())
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
@@ -660,4 +717,107 @@ struct TerminalHostProcessTests {
     #expect(await Transcript.follow(second).waitFor("served"))
     await application.relinquish(keepRunning: false)
   }
+
+  @Test("A host killed under a running application takes its agents with it, at once")
+  func hostDeathStopsItsAgents() async throws {
+    let location = TerminalHostLocation(
+      directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
+    defer { try? FileManager.default.removeItem(at: location.directory) }
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
+    let log = RecordingDiagnosticLog()
+    let application = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30),
+        diagnostics: Diagnostics(log: log, pseudonym: .ephemeral())))
+    let childFile = NSTemporaryDirectory() + "vmp-child-\(UUID().uuidString.prefix(8))"
+    defer { try? FileManager.default.removeItem(atPath: childFile) }
+    // An agent that survives the hang-up of its terminal, with a child that survives it too.
+    let session = try await application.start(
+      TerminalTestSupport.spec(
+        script: """
+          trap '' HUP
+          /bin/sh -c 'trap "" HUP TERM; while :; do sleep 1; done' &
+          echo $! > '\(childFile)'
+          while :; do sleep 0.1; done
+          """),
+      for: SessionID())
+    #expect(session is HostedTerminalSession)
+    guard case .running(let agent) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
+    #expect(await eventually { FileManager.default.fileExists(atPath: childFile) })
+    let child = try #require(
+      Int32(
+        (try? String(contentsOfFile: childFile, encoding: .utf8))?
+          .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
+    let identity = try #require(await application.hostIdentity())
+
+    kill(identity.processIdentifier, SIGKILL)
+
+    let clock = ContinuousClock()
+    let start = clock.now
+    #expect(await eventually { !isProcessAlive(agent) && !isProcessAlive(child) })
+    #expect(clock.now - start < .seconds(10))
+    #expect(await eventually { await session.state() == .failed(.hostStopped) })
+    #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(1))
+  }
+
+  @Test("An agent the application cannot show to be its own is not said to be stopped")
+  func hostDeathLeavesAnUnprovenAgentUnknown() async throws {
+    let location = TerminalHostLocation(
+      directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("vmp-\(UUID().uuidString.prefix(8))", isDirectory: true))
+    defer { try? FileManager.default.removeItem(at: location.directory) }
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: try Self.fixtureURL(),
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
+    let log = RecordingDiagnosticLog()
+    let application = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30),
+        diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()),
+        processes: StartTimeBlindProbe()))
+    let session = try await application.start(
+      TerminalTestSupport.spec(script: "trap '' HUP\nwhile :; do sleep 0.1; done"),
+      for: SessionID())
+    guard case .running(let agent) = await session.state() else {
+      Issue.record("The session did not start")
+      return
+    }
+    defer { kill(-agent, SIGKILL) }
+    let identity = try #require(await application.hostIdentity())
+
+    kill(identity.processIdentifier, SIGKILL)
+
+    #expect(
+      await eventually {
+        if case .failed(.processOutcomeUnknown) = await session.state() { return true }
+        return false
+      })
+    #expect(isProcessAlive(agent))
+    #expect(log.events(named: "host.connectionLost").first?.value(of: "stopped") == .count(0))
+  }
+}
+
+/// The system's answers, but no start time: no group can be shown to be the one recorded.
+private struct StartTimeBlindProbe: ProcessLivenessProbe {
+  private let system = SystemProcessLivenessProbe()
+
+  func isAlive(processIdentifier: Int32) -> Bool {
+    system.isAlive(processIdentifier: processIdentifier)
+  }
+
+  func startTime(of processIdentifier: Int32) -> Date? { nil }
+
+  func terminate(processGroup: Int32) -> Bool {
+    system.terminate(processGroup: processGroup)
+  }
+
+  func bootTime() -> Date? { system.bootTime() }
 }

@@ -1,7 +1,9 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeComposition
 import VibeDomain
+import VibePersistence
 import VibeTerminal
 import VibeUI
 
@@ -11,12 +13,17 @@ import VibeUI
 @main
 enum Entry {
   static func main() {
-    TerminalHost.runIfRequested()
+    TerminalHost.runIfRequested(diagnostics: { directory in
+      Diagnostics.standard(location: DiagnosticsLocation(directory: directory), origin: .host).0
+    })
     VibeManagerApp.main()
   }
 }
 
 struct VibeManagerApp: App {
+  private static let troubleshooting = URL(
+    string: "https://github.com/hadrienl/vibe-manager/blob/main/docs/operations.md")
+
   @State private var environment = AppEnvironment()
   @State private var windowFocus = WindowFocus()
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -91,9 +98,48 @@ struct VibeManagerApp: App {
           environment.appModel.cycleScope()
         }
         .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+
+        Divider()
+
+        // Between the three zones of the window, from the keyboard alone. An agent in the
+        // terminal loses these three combinations, which full-screen programs rarely use.
+        Button("Focus Sidebar") {
+          environment.appModel.focusSidebar()
+        }
+        .keyboardShortcut("1", modifiers: [.command, .option])
+
+        Button("Focus Terminal") {
+          environment.appModel.focusTerminal()
+        }
+        .keyboardShortcut("2", modifiers: [.command, .option])
+        .disabled(environment.appModel.selectedSessionID == nil)
+
+        Button("Focus Inspector") {
+          environment.appModel.focusInspector()
+        }
+        .keyboardShortcut("3", modifiers: [.command, .option])
+        .disabled(environment.appModel.selectedSessionID == nil)
+
+        // What the terminal said last, read by VoiceOver on demand rather than as it arrives.
+        Button("Read Last Output") {
+          Task { await environment.appModel.readLastOutput() }
+        }
+        .keyboardShortcut("o", modifiers: [.command, .option, .control])
       }
 
       SessionHistoryCommands(model: environment.appModel, focus: windowFocus)
+
+      // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
+      CommandGroup(after: .help) {
+        // Known limits, and how to recover from each thing that can go wrong.
+        if let troubleshooting = Self.troubleshooting {
+          Link("Troubleshooting", destination: troubleshooting)
+        }
+        Button("Export Diagnostics…") {
+          environment.appModel.beginDiagnosticsExport()
+        }
+        .disabled(!environment.appModel.canExportDiagnostics)
+      }
     }
 
     Settings {
@@ -312,6 +358,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
       Task {
         try? await Task.sleep(for: Self.shutdownDeadline)
+        guard !hasRepliedToTermination else { return }
+        environment.diagnostics.record(.lifecycle, .error, "app.quitDeadlineReached")
         replyToTermination()
       }
       await environment.shutdown(keepingAgentsRunning: keepingAgentsRunning)
@@ -444,6 +492,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func replyToTermination() {
     guard !hasRepliedToTermination else { return }
     hasRepliedToTermination = true
+    environment?.diagnostics.flush()
     NSApplication.shared.reply(toApplicationShouldTerminate: true)
   }
 }

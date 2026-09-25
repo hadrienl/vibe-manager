@@ -9,11 +9,13 @@ let package = Package(
     .library(name: "VibeDomain", targets: ["VibeDomain"]),
     .library(name: "VibeApplication", targets: ["VibeApplication"]),
     .library(name: "VibePersistence", targets: ["VibePersistence"]),
+    .library(name: "VibeProcess", targets: ["VibeProcess"]),
     .library(name: "VibeAgents", targets: ["VibeAgents"]),
     .library(name: "VibeTerminal", targets: ["VibeTerminal"]),
     .library(name: "VibeGit", targets: ["VibeGit"]),
     .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
+    .library(name: "VibeComposition", targets: ["VibeComposition"]),
   ],
   dependencies: [
     // Pinned exactly: the emulator parses untrusted output, so its version is a deliberate
@@ -24,13 +26,16 @@ let package = Package(
     .target(name: "VibeDomain"),
     .target(name: "VibeApplication", dependencies: ["VibeDomain"]),
     .target(name: "VibePersistence", dependencies: ["VibeApplication", "VibeDomain"]),
+    // The one way to run a child that is not a terminal, and the guard that stops every child
+    // group the application started when it exits. Depends on nothing: it is infrastructure.
+    .target(name: "VibeProcess"),
     .target(
       name: "VibeAgents",
-      dependencies: ["VibeApplication", "VibeDomain"],
+      dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"],
       resources: [.copy("Resources/mock-agent.sh")]
     ),
-    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain"]),
-    .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain"]),
+    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"]),
+    .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"]),
     .target(
       name: "VibeTerminalUI",
       dependencies: [
@@ -41,21 +46,31 @@ let package = Package(
       name: "VibeUI",
       dependencies: ["VibeApplication", "VibeDomain", "VibeTerminalUI"]
     ),
+    // The application, composed. Out of the application target so that a test can compose it.
+    .target(
+      name: "VibeComposition",
+      dependencies: [
+        "VibeAgents", "VibeApplication", "VibeDomain", "VibeGit", "VibePersistence",
+        "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeUI",
+      ]
+    ),
     // The terminal host in a process of its own, for the tests that need one to outlive their
     // client or to be killed. The application runs the same code from its own binary.
     .executableTarget(
       name: "VibeTerminalHostFixture",
-      dependencies: ["VibeTerminal"],
+      dependencies: ["VibeTerminal", "VibeApplication", "VibePersistence"],
       path: "Tests/VibeTerminalHostFixture"
     ),
     .testTarget(name: "VibeDomainTests", dependencies: ["VibeDomain"]),
+    .testTarget(name: "VibeProcessTests", dependencies: ["VibeProcess"]),
     .testTarget(
       name: "VibeApplicationTests",
       dependencies: ["VibeApplication", "VibeDomain"]
     ),
     .testTarget(
       name: "VibePersistenceTests",
-      dependencies: ["VibePersistence", "VibeApplication", "VibeDomain"]
+      // VibeProcess reads the diagnostics archive back with the system's `unzip`.
+      dependencies: ["VibePersistence", "VibeApplication", "VibeDomain", "VibeProcess"]
     ),
     .testTarget(
       name: "VibeAgentsTests",
@@ -78,6 +93,16 @@ let package = Package(
       dependencies: [
         "VibeTerminalUI", "VibeApplication", "VibeDomain",
         .product(name: "SwiftTerm", package: "SwiftTerm"),
+      ]
+    ),
+    // The application composed for real — file store, runtime document, terminal host in a process
+    // of its own, real Git repositories — driven the way the interface drives it (#19).
+    .testTarget(
+      name: "VibeScenarioTests",
+      dependencies: [
+        "VibeComposition", "VibeUI", "VibeApplication", "VibeDomain", "VibeAgents",
+        "VibeTerminal", "VibeTerminalUI", "VibePersistence", "VibeGit", "VibeProcess",
+        "VibeTerminalHostFixture",
       ]
     ),
     .testTarget(

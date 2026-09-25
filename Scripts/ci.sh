@@ -16,6 +16,7 @@ cd "$repository_root"
 echo "Checking Swift formatting"
 xcrun swift-format lint --recursive \
   App \
+  UITests \
   Packages/VibeManagerKit/Sources \
   Packages/VibeManagerKit/Tests \
   Packages/VibeManagerKit/Package.swift
@@ -28,11 +29,28 @@ swift test \
   --package-path "$package_path" \
   -Xswiftc -warnings-as-errors
 
-echo "Building the macOS application"
+echo "Building the macOS application, and its interface smoke test"
+# The smoke test is compiled here so that a pull request cannot break it; it is run by the
+# `ui-smoke` job, which needs a graphical session (`Scripts/ui-smoke.sh`).
 xcodebuild \
   -project VibeManager.xcodeproj \
   -scheme VibeManager \
   -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath "$derived_data_path" \
+  -clonedSourcePackagesDirPath "$source_packages_path" \
+  -skipPackagePluginValidation \
+  CODE_SIGNING_ALLOWED=NO \
+  build-for-testing
+
+echo "Building the macOS application in Release"
+# Whole-module optimization, -O and dead stripping are otherwise first compiled on the day of a
+# release. Unsigned here: signing and notarization are `Scripts/release.sh`'s, on the maintainer's
+# Mac.
+xcodebuild \
+  -project VibeManager.xcodeproj \
+  -scheme VibeManager \
+  -configuration Release \
   -destination 'platform=macOS' \
   -derivedDataPath "$derived_data_path" \
   -clonedSourcePackagesDirPath "$source_packages_path" \

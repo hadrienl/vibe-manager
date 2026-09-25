@@ -1,5 +1,6 @@
 import Foundation
 import VibeApplication
+import VibeProcess
 
 /// Runs the system's `git`, with an array of arguments and never through a shell.
 ///
@@ -7,43 +8,114 @@ import VibeApplication
 /// whose output is stable across versions and parses without heuristics. The environment is an
 /// allowlist, Git is told never to prompt, and reads take no optional lock, so inspecting a
 /// repository an agent is committing in never collides with it.
+///
+/// A repository is only ever read, and it may be one the user merely opened: its local
+/// configuration is not trusted to run anything. `hardeningOptions` switch off the two settings
+/// through which a plain `git status` executes a command of the repository's choosing.
 public struct ProcessGitCommandRunner: GitCommandRunner {
   private let executable: GitExecutable
   private let timeout: Duration
+  private let diagnostics: any DiagnosticLog
 
   public init(
     candidates: [String] = ProcessGitCommandRunner.defaultCandidates,
-    timeout: Duration = .seconds(120)
+    timeout: Duration = .seconds(120),
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) {
     executable = GitExecutable(candidates: candidates)
     self.timeout = timeout
+    self.diagnostics = diagnostics
   }
 
   public static let defaultCandidates = [
     "/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git",
   ]
 
+  /// Passed before every command. `core.fsmonitor` names a program Git runs to learn what changed,
+  /// and `core.hooksPath` a folder of programs it runs around some commands: both are read from a
+  /// repository's own `.git/config`, which is how a hostile repository runs code in whoever
+  /// inspects it. The user's global configuration is still read for everything else.
+  public static let hardeningOptions = [
+    "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null",
+  ]
+
+  /// Output kept from one command. A `status` of a repository of a hundred thousand files fits
+  /// many times over; a command that writes more is reported as failed rather than cut, since a
+  /// truncated `-z` listing would parse into a wrong one.
+  static let outputByteLimit = 64 << 20
+
   public func run(_ arguments: [String], in directory: String) async throws -> GitCommandResult {
     let path = try await executable.resolve()
-    let timeoutSeconds = Double(timeout.components.seconds)
-    let environment = Self.environment()
-    return try await withCheckedThrowingContinuation { continuation in
-      DispatchQueue.global(qos: .userInitiated).async {
-        do {
-          continuation.resume(
-            returning: try Self.execute(
-              path: path,
-              arguments: arguments,
-              directory: directory,
-              environment: environment,
-              timeoutSeconds: timeoutSeconds
-            )
-          )
-        } catch {
-          continuation.resume(throwing: error)
-        }
-      }
+    let startedAt = ContinuousClock.now
+    let result: BoundedProcessResult
+    do {
+      result = try await BoundedProcess.run(
+        BoundedProcessRequest(
+          executablePath: path,
+          arguments: Self.hardeningOptions + arguments,
+          environment: Self.environment(),
+          workingDirectoryPath: directory,
+          timeout: timeout,
+          outputByteLimit: Self.outputByteLimit
+        )
+      )
+    } catch BoundedProcessError.launchFailed(let code) {
+      diagnostics.record(
+        .git, .error, "git.launchFailed",
+        ["verb": .token(Self.verb(of: arguments)), "errno": .code(code)])
+      throw GitUnavailable.failedToStart(String(cString: strerror(code)))
     }
+    note(result, arguments: arguments, directory: directory, duration: .now - startedAt)
+
+    if result.didTimeOut {
+      return GitCommandResult(
+        exitCode: -1,
+        output: result.standardOutput,
+        errorOutput: "git did not answer within \(Int(timeout.components.seconds)) seconds."
+      )
+    }
+    if result.outputTruncated {
+      return GitCommandResult(exitCode: -1, errorOutput: "git wrote more than can be read.")
+    }
+    return GitCommandResult(
+      exitCode: result.exitCode,
+      output: result.standardOutput,
+      errorOutput: String(decoding: result.standardError, as: UTF8.self)
+    )
+  }
+
+  /// The verb alone: every other argument may be a path, a branch name or a revision.
+  static func verb(of arguments: [String]) -> DiagnosticToken {
+    switch arguments.first {
+    case "status": return DiagnosticToken("status")
+    case "rev-parse": return DiagnosticToken("rev-parse")
+    case "symbolic-ref": return DiagnosticToken("symbolic-ref")
+    case "reflog": return DiagnosticToken("reflog")
+    case "for-each-ref": return DiagnosticToken("for-each-ref")
+    case "merge-base": return DiagnosticToken("merge-base")
+    case "rev-list": return DiagnosticToken("rev-list")
+    case "diff": return DiagnosticToken("diff")
+    case "--no-optional-locks": return verb(of: Array(arguments.dropFirst()))
+    default: return DiagnosticToken("other")
+    }
+  }
+
+  /// Every command at `debug`: `git status` runs whenever a repository moves. A command that
+  /// timed out or wrote too much is an error, with the repository it was run in, redacted.
+  private func note(
+    _ result: BoundedProcessResult, arguments: [String], directory: String, duration: Duration
+  ) {
+    let failed = result.didTimeOut || result.outputTruncated
+    diagnostics.record(
+      .git, failed ? .error : .debug, failed ? "git.commandFailed" : "git.command",
+      [
+        "verb": .token(Self.verb(of: arguments)),
+        "code": .code(result.exitCode),
+        "timedOut": .flag(result.didTimeOut),
+        "truncated": .flag(result.outputTruncated),
+        "duration": .duration(duration),
+        "repository": .path(RedactedPath(directory)),
+      ])
   }
 
   static func environment(
@@ -63,56 +135,6 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
     environment["GIT_PAGER"] = "cat"
     return environment
   }
-
-  private static func execute(
-    path: String,
-    arguments: [String],
-    directory: String,
-    environment: [String: String],
-    timeoutSeconds: Double
-  ) throws -> GitCommandResult {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: path)
-    process.arguments = arguments
-    process.environment = environment
-    process.currentDirectoryURL = URL(fileURLWithPath: directory, isDirectory: true)
-    let output = Pipe()
-    let error = Pipe()
-    process.standardOutput = output
-    process.standardError = error
-    process.standardInput = FileHandle.nullDevice
-
-    let exited = DispatchSemaphore(value: 0)
-    process.terminationHandler = { _ in exited.signal() }
-    do {
-      try process.run()
-    } catch {
-      throw GitUnavailable.failedToStart(error.localizedDescription)
-    }
-
-    let buffers = PipeBuffers()
-    let readers = DispatchGroup()
-    buffers.drain(output.fileHandleForReading, into: .output, group: readers)
-    buffers.drain(error.fileHandleForReading, into: .error, group: readers)
-
-    if exited.wait(timeout: .now() + timeoutSeconds) == .timedOut {
-      process.terminate()
-      _ = exited.wait(timeout: .now() + 2)
-      if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-      readers.wait()
-      return GitCommandResult(
-        exitCode: -1,
-        output: buffers.output,
-        errorOutput: "git did not answer within \(Int(timeoutSeconds)) seconds."
-      )
-    }
-    readers.wait()
-    return GitCommandResult(
-      exitCode: process.terminationStatus,
-      output: buffers.output,
-      errorOutput: String(decoding: buffers.error, as: UTF8.self)
-    )
-  }
 }
 
 /// Finds a `git` that actually works, once.
@@ -130,18 +152,18 @@ actor GitExecutable {
 
   /// Only a success is kept. A Git found missing is looked for again next time: the remedy is to
   /// install it, and "try again" must then work without relaunching the application.
-  func resolve() throws -> String {
+  func resolve() async throws -> String {
     if let resolved { return resolved }
-    let path = try Self.locate(candidates).get()
+    let path = try await Self.locate(candidates).get()
     resolved = path
     return path
   }
 
-  private static func locate(_ candidates: [String]) -> Result<String, GitUnavailable> {
+  private static func locate(_ candidates: [String]) async -> Result<String, GitUnavailable> {
     let manager = FileManager.default
     var sawStub = false
     for candidate in candidates where manager.isExecutableFile(atPath: candidate) {
-      if candidate == "/usr/bin/git", !developerToolsInstalled() {
+      if candidate == "/usr/bin/git", await !developerToolsInstalled() {
         sawStub = true
         continue
       }
@@ -150,42 +172,18 @@ actor GitExecutable {
     return .failure(sawStub ? .commandLineToolsMissing : .notInstalled)
   }
 
-  private static func developerToolsInstalled() -> Bool {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
-    process.arguments = ["-p"]
-    process.standardOutput = FileHandle.nullDevice
-    process.standardError = FileHandle.nullDevice
-    do {
-      try process.run()
-    } catch {
-      return false
-    }
-    process.waitUntilExit()
-    return process.terminationStatus == 0
-  }
-}
-
-/// Both pipes are drained at once: a command that fills one of them would otherwise wait forever
-/// for a reader that is blocked on the other.
-private final class PipeBuffers: @unchecked Sendable {
-  enum Stream: Hashable {
-    case output
-    case error
-  }
-
-  private let lock = NSLock()
-  private var storage: [Stream: Data] = [:]
-
-  var output: Data { lock.withLock { storage[.output] ?? Data() } }
-  var error: Data { lock.withLock { storage[.error] ?? Data() } }
-
-  func drain(_ handle: FileHandle, into stream: Stream, group: DispatchGroup) {
-    group.enter()
-    DispatchQueue.global(qos: .userInitiated).async {
-      defer { group.leave() }
-      let data = (try? handle.readToEnd()) ?? Data()
-      self.lock.withLock { self.storage[stream] = data }
-    }
+  /// `xcode-select -p` answers at once, from a file; five seconds is for a Mac under load. One
+  /// that does not answer counts as no tools, and is asked again on the next look.
+  private static func developerToolsInstalled() async -> Bool {
+    let result = try? await BoundedProcess.run(
+      BoundedProcessRequest(
+        executablePath: "/usr/bin/xcode-select",
+        arguments: ["-p"],
+        environment: ProcessGitCommandRunner.environment(),
+        timeout: .seconds(5),
+        outputByteLimit: 4096
+      )
+    )
+    return result?.termination == .exited(0)
   }
 }

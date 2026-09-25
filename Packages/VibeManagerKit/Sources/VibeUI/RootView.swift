@@ -42,6 +42,11 @@ public struct RootView: View {
           Button("Try Again") {
             Task { await model.reload() }
           }
+          if model.canExportDiagnostics {
+            Button("Export Diagnostics…") {
+              model.beginDiagnosticsExport()
+            }
+          }
         }
       }
     }
@@ -118,6 +123,11 @@ public struct RootView: View {
           )
           .id(sheetModel.sessionID)
         }
+      case .diagnosticsExport:
+        if let export = model.diagnosticsExport {
+          DiagnosticsExportSheet(model: export, close: { model.endDiagnosticsExport() })
+            .id(export.id)
+        }
       }
     }
   }
@@ -147,6 +157,7 @@ public struct RootView: View {
     if model.isPresentingNewSession { return .newSession }
     if model.pendingRestart != nil { return .restartContext }
     if model.pendingSwitch != nil { return .agentSwitch }
+    if model.diagnosticsExport != nil { return .diagnosticsExport }
     return nil
   }
 
@@ -164,6 +175,8 @@ public struct RootView: View {
       model.cancelRestart()
     case .agentSwitch:
       model.cancelAgentSwitch()
+    case .diagnosticsExport:
+      model.endDiagnosticsExport()
     case nil:
       break
     }
@@ -180,6 +193,9 @@ public struct RootView: View {
     case restartContext
     /// Presented from the root for the same reason as the restart's summary.
     case agentSwitch
+    /// From the Help menu, Settings, or a store that could not be read: the last case has no
+    /// workspace to attach a sheet to.
+    case diagnosticsExport
 
     var id: Self { self }
   }
@@ -200,6 +216,7 @@ public struct RootView: View {
             failure: failure,
             retry: { Task { await model.reload() } },
             restore: { Task { await model.restoreBackup() } },
+            export: model.canExportDiagnostics ? { model.beginDiagnosticsExport() } : nil,
             dismiss: { model.dismissRefreshFailure() }
           )
           Divider()
@@ -479,6 +496,17 @@ public struct RootView: View {
     }
   }
 
+  /// "Terminal — <session> — <what its agent is doing>".
+  private func terminalTitle(for session: WorkSession, pane: TerminalPaneModel) -> String {
+    let status = SessionStatusPresentation.make(
+      session: session,
+      paneStatus: pane.status,
+      resolution: model.resolution(forID: session.id),
+      wasStoppedOnPurpose: pane.wasStoppedOnPurpose
+    )
+    return "Terminal — \(session.name) — \(status.label)"
+  }
+
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
     ZStack {
@@ -486,11 +514,14 @@ public struct RootView: View {
         if let pane = model.pane(for: listed.id) {
           let isActive = listed.id == session.id
           // Started by the launcher, so switching sessions never restarts an agent.
-          TerminalPaneView(model: pane, autoStart: false, isActive: isActive)
-            .id(listed.id)
-            .opacity(isActive ? 1 : 0)
-            .allowsHitTesting(isActive)
-            .accessibilityHidden(!isActive)
+          TerminalPaneView(
+            model: pane, autoStart: false, isActive: isActive,
+            accessibilityTitle: terminalTitle(for: listed, pane: pane)
+          )
+          .id(listed.id)
+          .opacity(isActive ? 1 : 0)
+          .allowsHitTesting(isActive)
+          .accessibilityHidden(!isActive)
         }
       }
 
@@ -614,6 +645,8 @@ private struct RestartFailureBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear("\(failure.sessionName): \(failure.message)")
   }
 }
 
@@ -702,6 +735,7 @@ private struct RefreshFailureBanner: View {
   let failure: AppModel.RefreshFailure
   let retry: () -> Void
   let restore: () -> Void
+  let export: (() -> Void)?
   let dismiss: () -> Void
 
   var body: some View {
@@ -718,6 +752,10 @@ private struct RefreshFailureBanner: View {
       }
       Button("Try Again", action: retry)
         .controlSize(.small)
+      if let export {
+        Button("Export Diagnostics…", action: export)
+          .controlSize(.small)
+      }
       Button {
         dismiss()
       } label: {
@@ -729,6 +767,8 @@ private struct RefreshFailureBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(failure.message)
   }
 }
 
@@ -760,6 +800,8 @@ private struct RestorationBanner: View {
     // Announced as it moves, once per session rather than once per line of output: the count and
     // the name are what tell a listener that the application is working and on what.
     .accessibilityAddTraits(.updatesFrequently)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(restoration.message)
   }
 }
 
@@ -792,6 +834,8 @@ private struct RestoreOfferBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(offer.message)
   }
 }
 
@@ -823,6 +867,10 @@ private struct OtherInstanceBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(
+      "Another copy of Vibe Manager is running these sessions. Nothing was restored or changed here."
+    )
   }
 }
 
@@ -883,6 +931,10 @@ private struct HostUnavailableBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(
+      "Your agents are still running in the background, but Vibe Manager could not reattach. \(reason)"
+    )
   }
 }
 
@@ -916,6 +968,8 @@ private struct DetachedNoticeBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(notice.message)
   }
 }
 
@@ -974,6 +1028,8 @@ private struct RestoreReportBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(report.message)
   }
 }
 
@@ -1005,6 +1061,8 @@ private struct DetachWarningBanner: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
     .background(.quaternary)
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(warning.message)
   }
 }
 
@@ -1111,6 +1169,8 @@ private struct WidthReporter: View {
 
 private struct SessionSidebar: View {
   @Bindable var model: AppModel
+  /// Focus Sidebar, ⌥⌘1, gives the list the keyboard.
+  @FocusState private var isListFocused: Bool
 
   var body: some View {
     VStack(spacing: 0) {
@@ -1128,6 +1188,14 @@ private struct SessionSidebar: View {
   }
 
   private var list: some View {
+    sessionList
+      .focused($isListFocused)
+      .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
+      .accessibilityLabel("Sessions")
+      .accessibilityIdentifier("session-list")
+  }
+
+  private var sessionList: some View {
     List(selection: Binding(get: { model.selectedSessionID }, set: { model.select($0) })) {
       ForEach(Array(model.visibleSessions.enumerated()), id: \.element.id) { index, session in
         SessionRow(
@@ -1372,6 +1440,7 @@ private struct SessionRow: View {
       SessionCommandButtons(commands: commands)
     }
     .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("session-row")
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
     .accessibilityValue(isRestoring ? "Restoring" : "")
     // The same commands, reachable without a pointer and without the menu bar.
@@ -1403,5 +1472,12 @@ private struct SessionRow: View {
     case .attention: return .orange
     case .error: return .red
     }
+  }
+}
+
+extension View {
+  /// Says `text` to VoiceOver when the view appears.
+  func announcedOnAppear(_ text: String) -> some View {
+    onAppear { Announcer.announce(text) }
   }
 }

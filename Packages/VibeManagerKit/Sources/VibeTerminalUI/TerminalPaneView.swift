@@ -13,11 +13,16 @@ public struct TerminalPaneView: View {
   private let autoStart: Bool
   /// False for a pane that stays mounted behind the one being shown.
   private let isActive: Bool
+  private let accessibilityTitle: String
 
-  public init(model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true) {
+  public init(
+    model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
+    accessibilityTitle: String = "Terminal"
+  ) {
     self.model = model
     self.autoStart = autoStart
     self.isActive = isActive
+    self.accessibilityTitle = accessibilityTitle
   }
 
   public var body: some View {
@@ -25,7 +30,8 @@ public struct TerminalPaneView: View {
       // The surface is mounted from the start: its measured size is what the process is
       // launched with, so it has to exist before there is a process to show.
       TerminalSurface(
-        pane: model, session: model.session, isActive: isActive, focusRequest: model.focusRequest
+        pane: model, session: model.session, isActive: isActive, focusRequest: model.focusRequest,
+        accessibilityTitle: accessibilityTitle
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .overlay {

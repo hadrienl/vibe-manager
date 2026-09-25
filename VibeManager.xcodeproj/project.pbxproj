@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		A00000000000000000000001 /* VibeManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* VibeManagerApp.swift */; };
 		A0000000000000000000000C /* WindowFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* WindowFocus.swift */; };
-		A00000000000000000000002 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* AppEnvironment.swift */; };
 		A00000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Assets.xcassets */; };
 		A00000000000000000000004 /* VibeUI in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000001 /* VibeUI */; };
 		A00000000000000000000005 /* VibePersistence in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000002 /* VibePersistence */; };
@@ -19,18 +18,32 @@
 		A00000000000000000000009 /* VibeTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000006 /* VibeTerminal */; };
 		A0000000000000000000000A /* VibeTerminalUI in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000007 /* VibeTerminalUI */; };
 		A0000000000000000000000B /* VibeGit in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000008 /* VibeGit */; };
+		A0000000000000000000000D /* VibeComposition in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000009 /* VibeComposition */; };
+		A0000000000000000000000E /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* SmokeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		B00000000000000000000001 /* VibeManagerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeManagerApp.swift; sourceTree = "<group>"; };
-		B00000000000000000000002 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		B00000000000000000000008 /* WindowFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowFocus.swift; sourceTree = "<group>"; };
 		B00000000000000000000003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B00000000000000000000004 /* Vibe Manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vibe Manager.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B00000000000000000000005 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		B00000000000000000000006 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		B00000000000000000000007 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		B00000000000000000000009 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000000A /* VibeManagerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VibeManagerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0000000000000000000000B /* UITests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = UITests.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		L00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E00000000000000000000001;
+			remoteInfo = VibeManager;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D00000000000000000000001 /* Frameworks */ = {
@@ -45,6 +58,14 @@
 				A00000000000000000000009 /* VibeTerminal in Frameworks */,
 				A0000000000000000000000A /* VibeTerminalUI in Frameworks */,
 				A0000000000000000000000B /* VibeGit in Frameworks */,
+				A0000000000000000000000D /* VibeComposition in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D00000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				C00000000000000000000002 /* App */,
+				C00000000000000000000006 /* UITests */,
 				C00000000000000000000005 /* Configuration */,
 				C00000000000000000000004 /* Products */,
 			);
@@ -72,7 +94,6 @@
 			isa = PBXGroup;
 			children = (
 				B00000000000000000000001 /* VibeManagerApp.swift */,
-				B00000000000000000000002 /* AppEnvironment.swift */,
 				B00000000000000000000008 /* WindowFocus.swift */,
 				B00000000000000000000003 /* Assets.xcassets */,
 			);
@@ -83,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				B00000000000000000000004 /* Vibe Manager.app */,
+				B0000000000000000000000A /* VibeManagerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,8 +115,25 @@
 				B00000000000000000000007 /* Shared.xcconfig */,
 				B00000000000000000000005 /* Debug.xcconfig */,
 				B00000000000000000000006 /* Release.xcconfig */,
+				B0000000000000000000000B /* UITests.xcconfig */,
 			);
 			path = Configuration;
+			sourceTree = "<group>";
+		};
+		C00000000000000000000006 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				C00000000000000000000007 /* VibeManagerUITests */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		C00000000000000000000007 /* VibeManagerUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000009 /* SmokeTests.swift */,
+			);
+			path = VibeManagerUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -123,10 +162,28 @@
 				J00000000000000000000006 /* VibeTerminal */,
 				J00000000000000000000007 /* VibeTerminalUI */,
 				J00000000000000000000008 /* VibeGit */,
+				J00000000000000000000009 /* VibeComposition */,
 			);
 			productName = VibeManager;
 			productReference = B00000000000000000000004 /* Vibe Manager.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E00000000000000000000002 /* VibeManagerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000003 /* Build configuration list for PBXNativeTarget "VibeManagerUITests" */;
+			buildPhases = (
+				D00000000000000000000005 /* Sources */,
+				D00000000000000000000006 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				K00000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = VibeManagerUITests;
+			productName = VibeManagerUITests;
+			productReference = B0000000000000000000000A /* VibeManagerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -140,6 +197,10 @@
 				TargetAttributes = {
 					E00000000000000000000001 = {
 						CreatedOnToolsVersion = 27.0;
+					};
+					E00000000000000000000002 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = E00000000000000000000001;
 					};
 				};
 			};
@@ -161,6 +222,7 @@
 			projectRoot = "";
 			targets = (
 				E00000000000000000000001 /* VibeManager */,
+				E00000000000000000000002 /* VibeManagerUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -203,13 +265,28 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00000000000000000000002 /* AppEnvironment.swift in Sources */,
 				A00000000000000000000001 /* VibeManagerApp.swift in Sources */,
 				A0000000000000000000000C /* WindowFocus.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D00000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0000000000000000000000E /* SmokeTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		K00000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E00000000000000000000001 /* VibeManager */;
+			targetProxy = L00000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		G00000000000000000000001 /* Debug */ = {
@@ -302,6 +379,20 @@
 			};
 			name = Release;
 		};
+		G00000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B0000000000000000000000B /* UITests.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		G00000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B0000000000000000000000B /* UITests.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -319,6 +410,15 @@
 			buildConfigurations = (
 				G00000000000000000000003 /* Debug */,
 				G00000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H00000000000000000000003 /* Build configuration list for PBXNativeTarget "VibeManagerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G00000000000000000000005 /* Debug */,
+				G00000000000000000000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -372,6 +472,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
 			productName = VibeGit;
+		};
+		J00000000000000000000009 /* VibeComposition */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
+			productName = VibeComposition;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

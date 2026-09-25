@@ -3,6 +3,7 @@ import Dispatch
 import Foundation
 import VibeApplication
 import VibeDomain
+import VibeProcess
 
 public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private static let forcedStopTimeout = Duration.seconds(2)
@@ -57,7 +58,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     historyBuffer = TerminalHistory(limits: spec.scrollback)
     currentState = .starting
     lastSize = spec.initialSize
-    TerminalProcessGroupGuard.register(terminal.processGroupIdentifier)
+    ChildProcessGroupGuard.register(terminal.processGroupIdentifier)
   }
 
   private func begin() {
@@ -134,10 +135,10 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     reader.stopThrottling()
 
     terminal.signalProcessGroup(SIGTERM)
-    if await waitForCompletion(within: gracePeriod) { return }
+    if await waitForCompletion(within: gracePeriod) { return sweepGroup() }
 
     terminal.signalProcessGroup(SIGKILL)
-    if await waitForCompletion(within: Self.forcedStopTimeout) { return }
+    if await waitForCompletion(within: Self.forcedStopTimeout) { return sweepGroup() }
 
     // The process is unreachable — a zombie parent or a stuck kernel wait. The session must
     // still release its descriptors and report an outcome, but the group may well be alive, so
@@ -154,12 +155,21 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     guard !isFinalized else { return await waitForEnd() }
     reader.stopThrottling()
     terminal.signalProcessGroup(SIGKILL)
-    if await waitForCompletion(within: Self.forcedStopTimeout) { return }
+    if await waitForCompletion(within: Self.forcedStopTimeout) { return sweepGroup() }
     finalize(
       with: .failed(.processOutcomeUnknown(processIdentifier: terminal.processIdentifier)),
       didReapProcess: false
     )
     await waitForEnd()
+  }
+
+  /// A session stopped on purpose leaves nothing behind. The agent may have exited on `SIGTERM`
+  /// while a child it started ignores it: the child is still in the group the agent led, with no
+  /// terminal and nobody to see it. The group outlives its leader only while it has members, and
+  /// no process can be given its number meanwhile, so it is still this session's to kill.
+  private func sweepGroup() {
+    guard Darwin.kill(-terminal.processGroupIdentifier, 0) == 0 else { return }
+    terminal.signalProcessGroup(SIGKILL)
   }
 
   var processIdentifierForTesting: pid_t {
@@ -316,7 +326,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     reader.finish()
     terminal.closeSlave()
     if didReapProcess {
-      TerminalProcessGroupGuard.unregister(terminal.processGroupIdentifier)
+      ChildProcessGroupGuard.unregister(terminal.processGroupIdentifier)
     }
     endIfDrained()
   }

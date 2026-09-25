@@ -41,17 +41,23 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   private let backupURL: URL
   private let codec = SessionStoreCodec()
   private let beforeReplace: (@Sendable () throws -> Void)?
+  private let diagnostics: any DiagnosticLog
 
-  public init(storeURL: URL = FileSessionRepository.defaultStoreURL()) {
+  public init(
+    storeURL: URL = FileSessionRepository.defaultStoreURL(),
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
+  ) {
     self.storeURL = storeURL
     backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
     beforeReplace = nil
+    self.diagnostics = diagnostics
   }
 
   init(storeURL: URL, beforeReplace: @escaping @Sendable () throws -> Void) {
     self.storeURL = storeURL
     backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
     self.beforeReplace = beforeReplace
+    diagnostics = NullDiagnosticLog()
   }
 
   public static func defaultStoreURL() -> URL {
@@ -62,6 +68,8 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       .appendingPathComponent("Library/Application Support", isDirectory: true)
     return
       applicationSupport
+      // The folder keeps the application's first identifier: renaming it would lose every
+      // session stored before the identifier changed.
       .appendingPathComponent("com.hadrienl.VibeManager", isDirectory: true)
       .appendingPathComponent("sessions.json", isDirectory: false)
   }
@@ -85,7 +93,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       }
       try persist(current)
     } catch {
-      throw mapStoreError(error)
+      throw noteWriteFailure(error)
     }
   }
 
@@ -109,7 +117,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       current[index] = session
       try persist(current)
     } catch {
-      throw mapStoreError(error)
+      throw noteWriteFailure(error)
     }
     return session
   }
@@ -159,6 +167,8 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       try atomicWrite(damagedData, to: quarantineURL, invokingInterruption: false)
       let recoveredData = try codec.encode(sessions: decoded.sessions)
       try commit(recoveredData, preservingCurrentAsBackup: false)
+      diagnostics.record(
+        .store, .notice, "store.backupRestored", ["sessions": .count(decoded.sessions.count)])
     } catch let error as SessionStoreError {
       throw error
     } catch {
@@ -185,9 +195,13 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       if decoded.requiresRewrite, persistingMigration {
         // Reading must succeed even when the migrated document cannot be written
         // back, for instance on a full disk or a read-only container.
-        if let migratedData = try? codec.encode(sessions: decoded.sessions) {
-          try? commit(migratedData, preservingCurrentAsBackup: true)
-        }
+        let written =
+          (try? codec.encode(sessions: decoded.sessions)).map {
+            (try? commit($0, preservingCurrentAsBackup: true)) != nil
+          } ?? false
+        diagnostics.record(
+          .store, .notice, "store.migrated",
+          ["sessions": .count(decoded.sessions.count), "written": .flag(written)])
       }
       return decoded.sessions
     } catch let error as SessionStoreCodecError {
@@ -200,8 +214,10 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   }
 
   private func persist(_ sessions: [WorkSession]) throws {
-    let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
-    try commit(data, preservingCurrentAsBackup: true)
+    try Signposts.interval("store.save") {
+      let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
+      try commit(data, preservingCurrentAsBackup: true)
+    }
   }
 
   private func commit(_ data: Data, preservingCurrentAsBackup: Bool) throws {
@@ -291,10 +307,30 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   private func mapCodecError(_ error: SessionStoreCodecError) -> SessionStoreError {
     switch error {
     case .unsupportedSchemaVersion(let version):
+      diagnostics.record(
+        .store, .error, "store.unsupportedSchema", ["version": .code(Int32(clamping: version))])
       return .unsupportedSchemaVersion(version)
     case .invalidStore:
-      return .corruptedStore(backupAvailable: backupIsValid())
+      let backupAvailable = backupIsValid()
+      diagnostics.record(
+        .store, .error, "store.corruptionDetected",
+        [
+          "kind": .token(DiagnosticToken("invalidStore")),
+          "backupAvailable": .flag(backupAvailable),
+        ])
+      return .corruptedStore(backupAvailable: backupAvailable)
     }
+  }
+
+  /// A write that failed, logged by its `errno` and the kind of refusal, never by its message.
+  private func noteWriteFailure(_ error: any Error) -> any Error {
+    let mapped = mapStoreError(error)
+    if mapped as? SessionStoreError == .cannotAccessStore {
+      var fields: [(name: StaticString, value: DiagnosticValue)] = []
+      if let code = DiagnosticValue.posixCode(of: error) { fields.append(("errno", code)) }
+      diagnostics.record(DiagnosticEvent(.store, .error, "store.writeFailed", fields: fields))
+    }
+    return mapped
   }
 
   private static func sessionOrdering(_ lhs: WorkSession, _ rhs: WorkSession) -> Bool {

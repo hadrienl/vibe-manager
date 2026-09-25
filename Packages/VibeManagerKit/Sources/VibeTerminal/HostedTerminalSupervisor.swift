@@ -21,14 +21,21 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     public var launchTimeout: Duration
     /// How long any reply that is not a stop may take.
     public var replyTimeout: Duration
+    public var diagnostics: Diagnostics
+    /// Tells a process group that is still ours from one that took its number.
+    public var processes: any ProcessLivenessProbe
 
     public init(
       location: TerminalHostLocation,
       launcher: (any TerminalHostLaunching)?,
       verifier: any TerminalHostPeerVerifier,
       launchTimeout: Duration = .seconds(10),
-      replyTimeout: Duration = .seconds(5)
+      replyTimeout: Duration = .seconds(5),
+      diagnostics: Diagnostics = .disabled,
+      processes: any ProcessLivenessProbe = SystemProcessLivenessProbe()
     ) {
+      self.diagnostics = diagnostics
+      self.processes = processes
       self.location = location
       self.launcher = launcher
       self.verifier = verifier
@@ -47,9 +54,12 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   }
 
   private let configuration: Configuration
+  private var diagnostics: Diagnostics { configuration.diagnostics }
   private let local: PTYTerminalSupervisor
   private var connection: TerminalHostConnection?
   private var identity: TerminalHostIdentity?
+  /// What the connected host said it speaks beyond the core.
+  private var hostCapabilities: Set<String> = []
   /// Set once starting a host has failed, so every later terminal falls back at once rather than
   /// paying the launch timeout again.
   private var isUnavailable = false
@@ -64,6 +74,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   /// from this copy would be refused as another client, and that terminal run in the application.
   private var connecting: Task<Bool, Never>?
   private var mirrors: [SessionID: HostedTerminalSession] = [:]
+  /// The process group of each agent the host runs for this copy, and when the kernel says it
+  /// started: what is stopped, after checking it is still the same, if the host dies.
+  private var groups: [SessionID: (group: Int32, startedAt: Date?)] = [:]
   private var pending: [UInt64: CheckedContinuation<TerminalHostMessage.Body?, Never>] = [:]
   private var nextRequest: UInt64 = 1
 
@@ -85,6 +98,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
 
     switch await request(.start(session: id, spec: spec)) {
     case .started(let processIdentifier):
+      remember(processIdentifier, for: id)
       let mirror = HostedTerminalSession(
         id: id,
         supervisor: self,
@@ -116,7 +130,10 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private func startLocally(_ spec: TerminalSpec, for id: SessionID) async throws
     -> any TerminalSession
   {
+    diagnostics.record(
+      .host, .notice, "host.fallbackInProcess", ["session": diagnostics.pseudonym(id)])
     mirrors[id] = nil
+    groups[id] = nil
     return try await local.start(spec, for: id)
   }
 
@@ -146,6 +163,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   // MARK: - TerminalHosting
 
   public func reconnect() async -> TerminalHostStatus {
+    let signpost = Signposts.begin("host.attach")
+    defer { Signposts.end("host.attach", signpost) }
     let host: TerminalHostIdentity
     // A host still busy with the previous client — one that crashed a moment ago, whose closed
     // socket it has not read yet — is asked again a few times before the answer is taken.
@@ -189,6 +208,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
         needsRedraw: !record.state.isFinished
       )
       mirrors[record.session] = mirror
+      if case .running(let processIdentifier) = record.state {
+        remember(processIdentifier, for: record.session)
+      }
       await attach(mirror)
       summaries.append(
         HostedSessionSummary(id: record.session, state: record.state, endedAt: record.endedAt))
@@ -204,7 +226,34 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     connection == nil ? nil : identity
   }
 
+  /// The host's physical footprint in bytes, when a host that can say it is connected.
+  public func hostFootprint() async -> Int? {
+    guard connection != nil, hostCapabilities.contains(TerminalHostCapability.stats),
+      case .stats(let bytes, _) = await request(.stats)
+    else { return nil }
+    return bytes
+  }
+
+  /// The host as the export reports it: its identity, and the state of each session it runs for
+  /// this copy, by pseudonym. Read from what the host last said, never asked again.
+  public func diagnosticReport() async -> DiagnosticSnapshot.Host? {
+    guard connection != nil, let identity else { return nil }
+    var sessions: [DiagnosticSnapshot.HostSession] = []
+    for (id, mirror) in mirrors {
+      guard case .session(let pseudonym) = diagnostics.pseudonym(id) else { continue }
+      sessions.append(
+        DiagnosticSnapshot.HostSession(
+          session: pseudonym, state: await mirror.state().diagnosticToken))
+    }
+    return DiagnosticSnapshot.Host(
+      processIdentifier: identity.processIdentifier,
+      startedAt: identity.processStartedAt,
+      protocolVersion: TerminalHostWire.protocolVersion,
+      sessions: sessions.sorted { $0.session.rawValue < $1.session.rawValue })
+  }
+
   public func discard(_ id: SessionID) async {
+    groups[id] = nil
     guard let mirror = mirrors.removeValue(forKey: id) else { return }
     await mirror.stop(gracePeriod: .seconds(3))
     _ = await request(.release(session: id))
@@ -231,9 +280,12 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     await connection.closeAfterPendingWrites()
   }
 
-  /// Closes the connection without a word, the way a crash of the application does.
+  /// Closes the connection without a word, the way a crash of the application does — and, like
+  /// a crash, does nothing about it on this side: what happens next is the host's to decide.
   func dropConnection() {
-    connection?.close()
+    let dropped = connection
+    connection = nil
+    dropped?.close()
   }
 
   // MARK: - Used by the mirrors
@@ -301,12 +353,23 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     let path = configuration.location.socketPath
     var descriptor = UnixSocket.connect(to: path)
     if descriptor == nil, launching, let launcher = configuration.launcher {
-      guard (try? launcher.launch(at: configuration.location)) != nil else { return .absent }
+      let launchedAt = ContinuousClock.now
+      do {
+        try launcher.launch(at: configuration.location)
+      } catch {
+        var fields: [(name: StaticString, value: DiagnosticValue)] = []
+        if let code = DiagnosticValue.posixCode(of: error) { fields.append(("errno", code)) }
+        diagnostics.log.record(DiagnosticEvent(.host, .error, "host.launchFailed", fields: fields))
+        return .absent
+      }
       let deadline = ContinuousClock.now + configuration.launchTimeout
       while descriptor == nil, ContinuousClock.now < deadline {
         try? await Task.sleep(for: .milliseconds(20))
         descriptor = UnixSocket.connect(to: path)
       }
+      diagnostics.record(
+        .host, descriptor == nil ? .error : .info, "host.launched",
+        ["listening": .flag(descriptor != nil), "duration": .duration(.now - launchedAt)])
     }
     guard let descriptor else { return .absent }
 
@@ -314,6 +377,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     // carry keystrokes and an agent's environment.
     guard configuration.verifier.accepts(peerOf: descriptor) else {
       close(descriptor)
+      diagnostics.record(.host, .error, "host.verifyFailed")
       return .refused("The terminal host could not prove it belongs to this application.")
     }
     let connection = TerminalHostConnection(descriptor: descriptor)
@@ -324,22 +388,33 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
           body: .hello(
             protocolVersion: TerminalHostWire.protocolVersion,
             build: TerminalHostServer.currentBuild,
-            capabilities: [])
+            capabilities: TerminalHostCapability.all)
         )))
 
     let reply = await firstMessage(on: connection)
     switch reply?.body {
-    case .welcome(let version, _, _, let processIdentifier, let startedAt)
+    case .welcome(let version, _, let capabilities, let processIdentifier, let startedAt)
     where version == TerminalHostWire.protocolVersion:
+      hostCapabilities = Set(capabilities)
+      diagnostics.record(
+        .host, .info, "host.connected",
+        [
+          "protocol": .code(Int32(version)),
+          "stats": .flag(capabilities.contains(TerminalHostCapability.stats)),
+        ])
       return .connected(
         connection,
         TerminalHostIdentity(processIdentifier: processIdentifier, processStartedAt: startedAt)
       )
-    case .refused(let reason, _):
+    case .refused(let reason, let refusal):
       connection.close()
+      diagnostics.record(
+        .host, .notice, "host.unavailable",
+        ["reason": .token(refusal == .otherClient ? "otherClient" : "incompatible")])
       return .unavailable(reason)
     default:
       connection.close()
+      diagnostics.record(.host, .notice, "host.unavailable", ["reason": .token("noAnswer")])
       return .unavailable("The terminal host did not answer.")
     }
   }
@@ -405,12 +480,17 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
   private func route(_ message: TerminalHostMessage) async {
     switch message.body {
     case .attached(let id, let state, let dropped):
+      noteGroup(of: state, for: id)
       await mirrors[id]?.receiveAttached(state: state, droppedByteCount: dropped)
       if state.isFinished { release(id) }
     case .state(let id, let state, _):
+      noteGroup(of: state, for: id)
       await mirrors[id]?.receive(state: state)
       if state.isFinished { release(id) }
     case .truncated(let id, let count):
+      diagnostics.record(
+        .host, .notice, "host.outputTruncated",
+        ["session": diagnostics.pseudonym(id), "bytes": .bytes(count)])
       await mirrors[id]?.receive(truncated: count)
     default:
       break
@@ -433,6 +513,32 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     pending.removeValue(forKey: number)?.resume(returning: body)
   }
 
+  /// A start the host answered before its process was running says so with a pid of 0: the group
+  /// is learnt from the state that follows.
+  private func noteGroup(of state: TerminalProcessState, for id: SessionID) {
+    guard mirrors[id] != nil else { return }
+    switch state {
+    case .running(let processIdentifier) where groups[id]?.group != processIdentifier:
+      remember(processIdentifier, for: id)
+    case .exited, .terminated, .failed:
+      groups[id] = nil
+    case .starting, .running:
+      break
+    }
+  }
+
+  private func remember(_ processIdentifier: Int32, for id: SessionID) {
+    guard processIdentifier > 0 else { return }
+    groups[id] = (processIdentifier, configuration.processes.startTime(of: processIdentifier))
+  }
+
+  /// The host closed the connection without a `done`: it crashed, or was killed. Its terminals
+  /// closed with it and sent their groups a hang-up, but an agent that ignores it would run on,
+  /// with no terminal and nobody to see it, until the next launch found it. Every group the host
+  /// ran for this copy is stopped now, once it is shown to still be ours (ADR 0011's rule: the
+  /// group and the instant it started), and its session ends saying why. A session whose group
+  /// was not recorded, or could not be shown to be ours, is not said to be stopped: whatever it
+  /// ran may still be running, and it ends as one whose outcome is unknown.
   private func connectionEnded(_ ended: TerminalHostConnection) async {
     guard connection === ended else { return }
     connection = nil
@@ -440,8 +546,64 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
       continuation.resume(returning: nil)
     }
     pending.removeAll()
-    for mirror in mirrors.values {
-      await mirror.connectionLost()
+    var stopped = 0
+    for (id, mirror) in mirrors {
+      guard await !mirror.state().isFinished else { continue }
+      let outcome = groups[id].map { stopGroup($0.group, startedAt: $0.startedAt, for: id) }
+      switch outcome {
+      case .stopped:
+        stopped += 1
+        await mirror.hostStopped()
+      case .alreadyGone:
+        await mirror.hostStopped()
+      case .unreachable, nil:
+        await mirror.connectionLost()
+      }
     }
+    groups.removeAll()
+    diagnostics.record(
+      .host, .error, "host.connectionLost",
+      ["sessions": .count(mirrors.count), "stopped": .count(stopped)])
+  }
+
+  private enum GroupOutcome {
+    /// Killed now.
+    case stopped
+    /// Its leader and every member had already exited: the hang-up of the terminal was enough.
+    case alreadyGone
+    /// Not shown to be ours, or the kill failed: it may still be running.
+    case unreachable
+  }
+
+  /// `SIGKILL` to a group, when it is the one this copy recorded. A group whose leader has exited
+  /// is still ours while it has members: the kernel gives no process a pid that names a live group.
+  private func stopGroup(_ group: Int32, startedAt: Date?, for id: SessionID) -> GroupOutcome {
+    let identity = configuration.processes.identify(processGroup: group, startedAt: startedAt)
+    let outcome: GroupOutcome
+    switch identity {
+    case .matches:
+      outcome = configuration.processes.terminate(processGroup: group) ? .stopped : .unreachable
+    case .gone where kill(-group, 0) != 0 && errno == ESRCH:
+      outcome = .alreadyGone
+    case .gone:
+      outcome = configuration.processes.terminate(processGroup: group) ? .stopped : .unreachable
+    case .differs, .unknown:
+      outcome = .unreachable
+    }
+    let stopped = outcome == .stopped
+    let token: DiagnosticToken
+    switch identity {
+    case .matches: token = "matches"
+    case .gone: token = "gone"
+    case .differs: token = "differs"
+    case .unknown: token = "unknown"
+    }
+    diagnostics.record(
+      .host, .notice, "host.agentStopped",
+      [
+        "session": diagnostics.pseudonym(id), "identity": .token(token),
+        "stopped": .flag(stopped), "errno": .code(stopped ? 0 : errno),
+      ])
+    return outcome
   }
 }

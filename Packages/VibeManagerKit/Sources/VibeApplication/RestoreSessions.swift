@@ -153,7 +153,9 @@ public struct RestoreSessions: Sendable {
 
       await onProgress(
         .started(sessionID: id, sessionName: name, index: index + 1, total: total))
-      let outcome = await restore(id: id, name: name)
+      let outcome = await Signposts.interval("restore.session") {
+        await restore(id: id, name: name)
+      }
       outcomes.append(outcome)
       await onProgress(.finished(outcome))
     }

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The interface smoke test, on demand: it blocks a release, not a pull request.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +17,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
@@ -26,3 +28,19 @@ jobs:
       - name: Build and test
         run: Scripts/ci.sh
 
+  # The nominal journey on the built application, driven by XCUITest (#19). Not on pull requests:
+  # a shared runner's graphical session is not stable enough to fail a pull request over, and the
+  # release checklist is where this job has to be green.
+  ui-smoke:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+
+      - name: Run the interface smoke test
+        run: Scripts/ui-smoke.sh

@@ -132,6 +132,12 @@ public actor HostedTerminalSession: HostedTerminal {
     apply(.failed(.processOutcomeUnknown(processIdentifier: processIdentifier)))
   }
 
+  /// The host is gone, and the application has stopped what it ran for this session.
+  func hostStopped() {
+    guard !hasEnded else { return }
+    apply(.failed(.hostStopped))
+  }
+
   private func settle(with reply: TerminalHostMessage.Body?) {
     guard case .stopped(let state) = reply else { return connectionLost() }
     apply(state)

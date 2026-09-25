@@ -1,5 +1,6 @@
 import Foundation
 import VibeApplication
+import VibeDomain
 
 /// A complete agent that needs neither Claude, Codex nor a network account.
 ///
@@ -26,23 +27,50 @@ public struct MockAgentProvider: AgentProvider {
     AgentModel(id: "mock-deep", displayName: "Mock Deep"),
   ]
 
-  public let descriptor = MockAgentProvider.agentDescriptor
+  /// A second mock, with models of its own, so that switching agents can be driven end to end.
+  public static let secondaryDescriptor = AgentDescriptor(
+    id: AgentProviderID("mock-b"),
+    displayName: "Mock Agent B",
+    symbolName: "ant",
+    minimumVersion: AgentVersion(major: 1, minor: 0, patch: 0),
+    capabilities: AgentCapabilities(
+      supportsModelSelection: true,
+      supportsInitialPrompt: true,
+      supportsResume: true,
+      reportsUsage: false
+    )
+  )
+
+  public static let secondaryModels = [
+    AgentModel(id: "mock-b-small", displayName: "Mock B Small", isDefault: true),
+    AgentModel(id: "mock-b-large", displayName: "Mock B Large"),
+  ]
+
+  public let descriptor: AgentDescriptor
 
   private let simulatedState: AgentAvailabilityState
   private let scriptURL: URL?
   private let environment: [String: String]
   private let now: @Sendable () -> Date
+  private let catalog: [AgentModel]
+  /// Passed to the script before anything else: `--hold`, `--flood 2048`, `--ignore-sigterm`…
+  private let behaviour: [String]
 
   public init(
     simulatedState: AgentAvailabilityState = .available,
     scriptURL: URL? = MockAgentProvider.defaultScriptURL(),
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    now: @escaping @Sendable () -> Date = Date.init
+    now: @escaping @Sendable () -> Date = Date.init,
+    secondary: Bool = false,
+    behaviour: [String] = []
   ) {
     self.simulatedState = simulatedState
     self.scriptURL = scriptURL
     self.environment = environment
     self.now = now
+    descriptor = secondary ? Self.secondaryDescriptor : Self.agentDescriptor
+    catalog = secondary ? Self.secondaryModels : Self.availableModels
+    self.behaviour = behaviour
   }
 
   public static func defaultScriptURL() -> URL? {
@@ -90,7 +118,7 @@ public struct MockAgentProvider: AgentProvider {
   }
 
   public func models() async -> [AgentModel] {
-    MockAgentProvider.availableModels
+    catalog
   }
 
   public func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
@@ -102,7 +130,7 @@ public struct MockAgentProvider: AgentProvider {
     try AgentLaunchValidation.validateWorkingDirectory(request.workingDirectoryPath)
     try AgentLaunchValidation.validateModel(
       request.modelID,
-      in: MockAgentProvider.availableModels,
+      in: catalog,
       descriptor: descriptor
     )
     try AgentLaunchValidation.validateResume(request.resume, descriptor: descriptor)
@@ -111,7 +139,7 @@ public struct MockAgentProvider: AgentProvider {
       descriptor: descriptor
     )
 
-    var arguments = [installation.executablePath]
+    var arguments = [installation.executablePath] + behaviour
     if let modelID = request.modelID {
       arguments.append(contentsOf: ["--model", modelID])
     }
@@ -140,6 +168,69 @@ public struct MockAgentProvider: AgentProvider {
   }
 }
 
+/// Keeps the identifier the mock prints, as the real providers keep theirs.
+public actor MockLaunchObserver: AgentLaunchObserver {
+  private let record: RecordAgentResumeIdentifier
+  private let sessionID: SessionID
+  private let extractor = MockResumeIdentifierExtractor()
+  private var pending = ""
+  private var observed = 0
+  private var isRecorded = false
+
+  public init(sessionID: SessionID, record: RecordAgentResumeIdentifier) {
+    self.sessionID = sessionID
+    self.record = record
+  }
+
+  /// An identifier the plan names — `--session-id`, or `--resume` — is the one the mock will
+  /// print: it is kept at once, as Claude Code's is, without waiting for output that may already
+  /// have gone by.
+  public func launched(plan: AgentLaunchPlan) async {
+    for flag in ["--resume", "--session-id"] {
+      guard let index = plan.arguments.firstIndex(of: flag), index + 1 < plan.arguments.count
+      else { continue }
+      await keep(plan.arguments[index + 1])
+      return
+    }
+  }
+
+  private func keep(_ identifier: String) async {
+    isRecorded =
+      (try? await record(sessionID: sessionID, identifier: identifier))?.isPersisted
+      ?? false
+  }
+
+  /// The identifier is printed first: past this much output, nothing is looked for any more.
+  static let observedLimit = 64 * 1024
+
+  public func observe(output: String) async {
+    guard !isRecorded, observed < Self.observedLimit else { return }
+    observed += output.utf8.count
+    pending += output
+    // Only whole lines: an identifier cut by a read would be recorded cut. A terminal ends its
+    // lines with `\r\n`, one `Character`, which `isNewline` recognises and `"\n"` does not.
+    guard let end = pending.lastIndex(where: \.isNewline) else { return }
+    let complete = String(pending[..<end])
+    pending = String(pending[pending.index(after: end)...])
+    guard let identifier = extractor.resumeIdentifier(in: complete) else { return }
+    await keep(identifier)
+  }
+
+  public func finished() async {}
+}
+
+extension MockAgentProvider: AgentLaunchObserverProviding {
+  public func launchObserver(
+    for sessionID: SessionID,
+    repository: any SessionRepository
+  ) -> any AgentLaunchObserver {
+    MockLaunchObserver(
+      sessionID: sessionID,
+      record: RecordAgentResumeIdentifier(
+        repository: repository, providerID: descriptor.id.rawValue, launchedAt: now()))
+  }
+}
+
 /// Reads the resume identifier the mock agent prints, the way #5 and #6 will for real CLIs.
 public struct MockResumeIdentifierExtractor: AgentResumeIdentifierExtractor {
   private static let marker = "mock-session-id: "
@@ -147,7 +238,7 @@ public struct MockResumeIdentifierExtractor: AgentResumeIdentifierExtractor {
   public init() {}
 
   public func resumeIdentifier(in chunk: String) -> String? {
-    for line in chunk.split(separator: "\n") where line.hasPrefix(Self.marker) {
+    for line in chunk.split(whereSeparator: \.isNewline) where line.hasPrefix(Self.marker) {
       let identifier = line.dropFirst(Self.marker.count).trimmingCharacters(in: .whitespaces)
       guard !identifier.isEmpty else { continue }
       return identifier

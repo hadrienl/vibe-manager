@@ -1,0 +1,47 @@
+name: Release
+
+# A tag `v<version>` pushed on a commit of `main` builds, signs, notarizes and packages that
+# version, and drafts it on GitHub Releases (ADR 0021). The draft is published by hand, once the
+# release checklist is ticked.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  # To check that CI went green on the tagged commit.
+  actions: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    # The signing secrets live in this environment only. Protect it with a required reviewer and
+    # restrict it to `v*` tags (Settings → Environments → release): no job reads them without that
+    # approval.
+    environment: release
+    steps:
+      # Pinned by commit: a moved tag must not run in the job that holds the certificate.
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The build number is the number of commits, and main is compared with the tag.
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+
+      - name: Build, sign, notarize and draft
+        env:
+          VIBE_TEAM_ID: ${{ vars.VIBE_TEAM_ID }}
+          DEVELOPER_ID_CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          NOTARY_API_KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: Scripts/release.sh "${GITHUB_REF_NAME#v}"

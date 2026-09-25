@@ -41,7 +41,9 @@ public struct GitStatusReader: RepositoryStatusReading {
     let started = clock.now
     let result: GitCommandResult
     do {
-      result = try await git.run(Self.arguments, in: path)
+      result = try await Signposts.interval("git.status") {
+        try await git.run(Self.arguments, in: path)
+      }
     } catch let unavailable as GitUnavailable {
       return .failure(.gitUnavailable(unavailable))
     } catch {
@@ -169,7 +171,10 @@ public struct GitStatusReader: RepositoryStatusReading {
     guard commitCount > 0 else { return .some(nil) }
     guard
       let diff = try? await git.run(
-        ["diff", "--no-color", "--name-status", "-z", "--find-renames", fork, head], in: path),
+        [
+          "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--name-status", "-z",
+          "--find-renames", fork, head,
+        ], in: path),
       diff.succeeded
     else { return nil }
     let (files, total) = GitDiffParser.parse(diff.output, limit: limit)

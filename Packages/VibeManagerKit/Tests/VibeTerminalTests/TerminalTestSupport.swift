@@ -5,6 +5,13 @@ import VibeDomain
 @testable import VibeTerminal
 
 enum TerminalTestSupport {
+  /// Whether the host a test starts answers for itself to TCC, as the application's does. A test
+  /// run inside a sandbox that kills such a child — an agent's command sandbox — sets
+  /// `VIBE_TESTS_WITHOUT_DISCLAIM` to run everything else about the host.
+  static var disclaimsResponsibility: Bool {
+    ProcessInfo.processInfo.environment["VIBE_TESTS_WITHOUT_DISCLAIM"] == nil
+  }
+
   static func spec(
     script: String,
     size: TerminalSize = .default,

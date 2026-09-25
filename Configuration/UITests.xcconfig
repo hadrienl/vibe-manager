@@ -1,0 +1,12 @@
+// The interface smoke test (#19). Signed like the application, from `Local.xcconfig`, so that
+// macOS lets the test runner drive it; ad hoc without a team.
+#include? "Local.xcconfig"
+
+MACOSX_DEPLOYMENT_TARGET = 14.0
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager.UITests
+PRODUCT_NAME = $(TARGET_NAME)
+GENERATE_INFOPLIST_FILE = YES
+TEST_TARGET_NAME = VibeManager
+CODE_SIGN_STYLE = Automatic
