@@ -48,7 +48,7 @@ public struct PromptTemplateExtraction: Hashable, Sendable {
   private static func reason(_ error: any Error) -> String {
     let description = (error as NSError).localizedFailureReason
     guard let description, !description.isEmpty else {
-      return "It is not a valid regular expression."
+      return String(localized: "It is not a valid regular expression.", bundle: .module)
     }
     return description
   }

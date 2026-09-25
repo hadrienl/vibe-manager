@@ -123,7 +123,12 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
     for template in incoming {
       guard seen.insert(template.id).inserted else {
         entries.append(
-          .init(template: template, outcome: .skipped("It appears twice in the file.")))
+          .init(
+            template: template,
+            outcome: .skipped(
+              String(
+                localized: "It appears twice in the file.", bundle: .module,
+                comment: "Why a prompt template of an imported file is skipped."))))
         continue
       }
       let problems = template.problems(among: [])
