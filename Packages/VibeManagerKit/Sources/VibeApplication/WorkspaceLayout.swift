@@ -42,6 +42,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// The folders whose group is folded. Never pruned: a group that went away because all of its
   /// sessions were archived folds back the way it was if it returns.
   public var collapsedFolders: Set<SessionFolderKey>
+  /// How each session the user switched is shown (#38), keyed by its identifier. A session that
+  /// is not listed follows the default of the Conversation settings.
+  public var sessionPresentations: [String: SessionPresentation]
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -55,7 +58,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     browserWidth: Double = 520,
     inspectorTopTab: InspectorTopTab = .activity,
     sidebarMode: SidebarMode = .flat,
-    collapsedFolders: Set<SessionFolderKey> = []
+    collapsedFolders: Set<SessionFolderKey> = [],
+    sessionPresentations: [String: SessionPresentation] = [:]
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -69,12 +73,13 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.inspectorTopTab = inspectorTopTab
     self.sidebarMode = sidebarMode
     self.collapsedFolders = collapsedFolders
+    self.sessionPresentations = sessionPresentations
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
     case sessionFilter, inspectorSplit, isSessionDetailsExpanded, browserWidth, inspectorTopTab
-    case sidebarMode, collapsedFolders
+    case sidebarMode, collapsedFolders, sessionPresentations
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -103,7 +108,10 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       sidebarMode: (try? container.decodeIfPresent(SidebarMode.self, forKey: .sidebarMode))
         ?? .flat,
       collapsedFolders: (try? container.decodeIfPresent(
-        Set<SessionFolderKey>.self, forKey: .collapsedFolders)) ?? []
+        Set<SessionFolderKey>.self, forKey: .collapsedFolders)) ?? [],
+      // A value a later build wrote, and this one cannot read, costs only this key.
+      sessionPresentations: (try? container.decodeIfPresent(
+        [String: SessionPresentation].self, forKey: .sessionPresentations)) ?? [:]
     )
   }
 }
@@ -115,6 +123,18 @@ public enum InspectorTopTab: String, Hashable, Codable, Sendable, CaseIterable {
 }
 
 extension WorkspaceLayout {
+  public func presentation(of id: SessionID, default fallback: SessionPresentation)
+    -> SessionPresentation
+  {
+    sessionPresentations[id.description] ?? fallback
+  }
+
+  /// Forgets the sessions that are gone, so that the preference does not grow forever.
+  public mutating func keepPresentations(of ids: Set<SessionID>) {
+    let kept = Set(ids.map(\.description))
+    sessionPresentations = sessionPresentations.filter { kept.contains($0.key) }
+  }
+
   /// Bounds a stored width. A width that is not a number at all — a corrupted preference, an
   /// unmeasured column — falls back rather than propagating into the layout.
   public static func bounded(
