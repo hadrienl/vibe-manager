@@ -423,7 +423,10 @@ public struct RootView: View {
               leaveNotes: { model.focusTerminal() },
               usage: model.usage,
               isDetailsExpanded: model.layout.intent.isSessionDetailsExpanded,
-              detailsExpandedChanged: { model.layout.setSessionDetailsExpanded($0) }
+              detailsExpandedChanged: { model.layout.setSessionDetailsExpanded($0) },
+              journal: model.journal,
+              topTab: model.layout.intent.inspectorTopTab,
+              topTabChanged: { model.layout.setInspectorTopTab($0) }
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear

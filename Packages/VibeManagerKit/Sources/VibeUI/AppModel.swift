@@ -100,12 +100,16 @@ public final class AppModel {
     didSet {
       fileOpeningPreferences.editor = fileEditor
       gitInspector.editor = fileEditor
+      journal?.editor = fileEditor
     }
   }
   /// The screen state of the inspector's Git pane, kept per session for the length of the run.
   let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
+  /// Every session's journal: its summary and its resources (#36). Absent in a workspace
+  /// assembled without it.
+  public let journal: SessionJournalModel?
   /// The prompt templates, shared by their settings tab and the New Session sheet.
   public let templates: PromptTemplateLibraryModel
   /// The usage figures (#18). Absent in a workspace assembled without them.
@@ -487,8 +491,12 @@ public final class AppModel {
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
     collectDiagnostics: (@MainActor (AppModel) async -> DiagnosticSnapshot)? = nil,
     /// Writes the archive of an export.
-    archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() }
+    archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() },
+    /// Keeps each session's journal. Absent, the inspector shows Git alone.
+    journal: SessionJournalModel? = nil
   ) {
+    self.journal = journal
+    journal?.editor = fileOpeningPreferences.editor
     self.activityTracker = activityTracker
     self.hookConsents = hookConsents
     self.browser = browser
@@ -1683,6 +1691,7 @@ public final class AppModel {
     // Before any process is started or adopted: what the last launch left unread comes back with
     // the first list.
     await startFollowingActivity()
+    await journal?.start()
     await reload()
     Signposts.end("launch.firstList", firstList)
     // Which agents write a usage is part of their description, known without probing any of them.
@@ -1926,6 +1935,10 @@ public final class AppModel {
     do {
       let sessions = try await loadSessions()
       state = .loaded(sessions)
+      // The journal follows every active session, and gives one that stopped its last pass.
+      if let journal {
+        Task { await journal.track(sessions) }
+      }
       refreshFailure = nil
       // A selection restored from a previous run may name a session that has been archived out
       // of the list, or that never came back at all. It falls back instead of blocking the
@@ -2100,6 +2113,9 @@ extension AppModel {
     isApplicationActive = true
     updateVisibleSession()
     if let id = selectedSessionID { refreshTicket(of: id) }
+    if let journal {
+      Task { await journal.refresh() }
+    }
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
   }
@@ -2141,7 +2157,11 @@ extension AppModel {
     if !layout.columns.isInspectorVisible {
       layout.setInspectorVisible(true)
     }
-    gitInspector.requestFocus()
+    if let journal, layout.intent.inspectorTopTab == .activity {
+      journal.requestFocus()
+    } else {
+      gitInspector.requestFocus()
+    }
   }
 
   /// Read Last Output, ⌃⌥⌘O: VoiceOver says the last lines the selected session's terminal
@@ -2164,6 +2184,8 @@ extension AppModel {
   public func stopWatchingRepositories() async {
     statusUpdates?.cancel()
     await repositoryStatus?.stop()
+    // Summaries under way are called off; the turns they covered wait for the next launch.
+    await journal?.stop()
   }
 
   func readBranches(of id: SessionID) async {

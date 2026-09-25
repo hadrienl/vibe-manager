@@ -62,6 +62,9 @@ public struct SettingsView: View {
         Section {
           SessionCloseRow(model: model)
           QuitBehaviorRow(model: model)
+          if let journal = model.journal {
+            SummaryRow(journal: journal)
+          }
         } header: {
           Text("Sessions", bundle: .module, comment: "A section of the Settings window.")
         }
@@ -221,6 +224,24 @@ private struct AgentActivityRow: View {
         bundle: .module,
         comment:
           "Under the setting that tracks an agent's activity; the argument is the agent's name.")
+    }
+  }
+}
+
+/// Whether each session's agent writes the summary of what it did (#36).
+private struct SummaryRow: View {
+  @Bindable var journal: SessionJournalModel
+
+  var body: some View {
+    Toggle(isOn: $journal.summariesEnabled) {
+      Text("Summarize sessions automatically", bundle: .module)
+      Text(
+        """
+        After each turn, the session's agent writes a short summary of what it did, with the same \
+        account, the lightest model it offers and at most one summary every five minutes. The \
+        tickets, requests, branches and worktrees used are listed either way.
+        """,
+        bundle: .module)
     }
   }
 }
