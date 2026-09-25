@@ -144,14 +144,19 @@ public actor TerminalHostServer {
       configuration.diagnostics.record(
         .host, .notice, "host.clientRefused",
         ["reason": .token(DiagnosticToken("incompatible")), "protocol": .code(Int32(version))])
-      let reason = "This terminal host speaks protocol \(TerminalHostWire.protocolVersion)."
+      let reason = String(
+        localized:
+          "This terminal host speaks protocol \(String(TerminalHostWire.protocolVersion)).",
+        bundle: .module, comment: "The version number of the protocol.")
       await reply(request.request, .refused(reason: reason, refusal: .incompatible), to: client)
       return false
     }
     if owner != nil {
       configuration.diagnostics.record(
         .host, .notice, "host.clientRefused", ["reason": .token(DiagnosticToken("otherClient"))])
-      let reason = "Another copy of Vibe Manager is attached to this terminal host."
+      let reason = String(
+        localized: "Another copy of Vibe Manager is attached to this terminal host.",
+        bundle: .module)
       await reply(request.request, .refused(reason: reason, refusal: .otherClient), to: client)
       return false
     }

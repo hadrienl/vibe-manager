@@ -1,0 +1,72 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Git did not say where this repository keeps its state.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Git n’a pas indiqué où ce dépôt conserve son état."
+          }
+        }
+      }
+    },
+    "git did not answer within %lld seconds.": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "git n’a pas répondu en %lld seconde."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "git n’a pas répondu en %lld secondes."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "git n’a pas répondu en %lld secondes."
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "git did not answer within %lld second."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "git did not answer within %lld seconds."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "git wrote more than can be read.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git a écrit plus que ce qui peut être lu."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

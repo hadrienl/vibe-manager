@@ -195,7 +195,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     // stops everything.
     guard case .sessions(let records) = await request(.list) else {
       await stepAway()
-      return .unavailable(reason: "The terminal host did not list its sessions.")
+      return .unavailable(
+        reason: String(localized: "The terminal host did not list its sessions.", bundle: .module))
     }
     awaitsReattach = false
     var summaries: [HostedSessionSummary] = []
@@ -378,7 +379,10 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     guard configuration.verifier.accepts(peerOf: descriptor) else {
       close(descriptor)
       diagnostics.record(.host, .error, "host.verifyFailed")
-      return .refused("The terminal host could not prove it belongs to this application.")
+      return .refused(
+        String(
+          localized: "The terminal host could not prove it belongs to this application.",
+          bundle: .module))
     }
     let connection = TerminalHostConnection(descriptor: descriptor)
     connection.send(
@@ -415,7 +419,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting {
     default:
       connection.close()
       diagnostics.record(.host, .notice, "host.unavailable", ["reason": .token("noAnswer")])
-      return .unavailable("The terminal host did not answer.")
+      return .unavailable(String(localized: "The terminal host did not answer.", bundle: .module))
     }
   }
 

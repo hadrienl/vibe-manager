@@ -44,10 +44,18 @@ let package = Package(
     .target(
       name: "VibeAgents",
       dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"],
-      resources: [.copy("Resources/mock-agent.sh")]
+      resources: [.copy("Resources/mock-agent.sh"), .process("Localizable.xcstrings")]
     ),
-    .target(name: "VibeTerminal", dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"]),
-    .target(name: "VibeGit", dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"]),
+    .target(
+      name: "VibeTerminal",
+      dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"],
+      resources: [.process("Localizable.xcstrings")]
+    ),
+    .target(
+      name: "VibeGit",
+      dependencies: ["VibeApplication", "VibeDomain", "VibeProcess"],
+      resources: [.process("Localizable.xcstrings")]
+    ),
     .target(
       name: "VibeTerminalUI",
       dependencies: [
