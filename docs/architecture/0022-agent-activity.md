@@ -67,9 +67,15 @@ yes, it asks Codex's local server (`codex app-server`, `hooks/list`) which hooks
 only those whose command is ours byte for byte, and writes their approval with `config/batchWrite`
 — the method Codex's own interface uses, which leaves the rest of the file, comments included, as
 it was — then asks again to confirm. The approval is remembered by a fingerprint of the CLI, its
-version and the hooks, so later launches ask nothing. On no, Codex's agents run without hooks, and
-the Settings can change that. If the server cannot be asked, the agent is launched with its hooks
-and Codex asks for itself.
+version, its `CODEX_HOME` and the hooks, so later launches ask nothing. On no, Codex's agents run
+without hooks, and the Settings can change that. Closing the sheet without a button, or quitting
+while it is shown, is no answer: that launch goes without hooks and nothing is remembered. Launches
+waiting on the sheet together share its answer. If the server cannot be asked, the agent is launched
+with its hooks and Codex asks for itself; the server is not asked again in that run.
+
+The server is started through `BoundedProcess`, like every command that is not a terminal. It stops
+at the end of its input before answering what is in flight, so `BoundedProcess` gained a standard
+input kept open until the output holds the answer, within the same timeout.
 
 ### Interruptions come from the transcript
 
@@ -103,7 +109,16 @@ unread answer that nothing reported.
 An answer is unread when its turn ended while its session was not visible — selected, with the
 application active and its window shown. Showing the session reads it; writing to the agent reads
 it too, but a background task resuming the agent does not. The mark survives a relaunch, and a
-native resume (#11); closing or archiving the session drops it.
+native resume (#11); closing or archiving the session drops it. It is shown while the agent runs:
+once its process has ended, the process's own state is the headline.
+
+A process adopted after a relaunch (ADR 0017) is read from where the last launch stopped, what it
+did meanwhile counting as unseen — unless its session is on screen, where it is read as it is
+replayed. Only hooks that had spoken are believed then: `agent-activity.json` keeps whether they
+had, and the event that opened the transcript, which is opened again.
+
+Only what a row shows is published and written: a keystroke, or a line of output, moves the
+instants the fallback counts from, and nothing on screen.
 
 ## Consequences
 

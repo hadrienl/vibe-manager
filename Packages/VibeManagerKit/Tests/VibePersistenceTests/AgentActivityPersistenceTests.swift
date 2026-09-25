@@ -119,9 +119,14 @@ struct FileAgentActivityLogTests {
       try await Task.sleep(for: .milliseconds(20))
     }
     #expect(!FileManager.default.fileExists(atPath: url.path))
-    FileManager.default.createFile(atPath: url.path, contents: Data("Next\t2\t\n".utf8))
-    let next = await take(1, from: stream)
-    #expect(next.map(\.0.name) == ["Next"])
+    // A hook that had opened the log before the rename still lands its line in it.
+    try append("Late\t2\t\n", to: FileAgentActivityLog.rotatedURL(of: url))
+    FileManager.default.createFile(
+      atPath: url.path, contents: Data("Next\t3\t\n".utf8), attributes: [.posixPermissions: 0o644])
+    let next = await take(2, from: stream)
+    #expect(next.map(\.0.name) == ["Late", "Next"])
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
   }
 
   @Test("Removing a session's log removes it")
@@ -144,12 +149,29 @@ struct FileAgentActivityStateStoreTests {
     let id = SessionID()
     let activity = PersistedAgentActivity(
       activity: .awaitingUser(.approval), unreadSince: Date(timeIntervalSince1970: 1_000.5),
-      log: AgentActivityLogPosition(fileIdentifier: 42, offset: 7))
+      log: AgentActivityLogPosition(fileIdentifier: 42, offset: 7), isConfirmed: true,
+      sourceEvent: PersistedAgentActivityEvent(
+        AgentActivityEvent(
+          name: "SessionStart", date: Date(timeIntervalSince1970: 900),
+          payload: Data(#"{"transcript_path":"/t.jsonl"}"#.utf8))))
     await store.write([id: activity])
     #expect(await store.read() == [id: activity])
     let text = try String(contentsOf: url, encoding: .utf8)
     #expect(text.contains(id.rawValue.uuidString))
     #expect(text.contains("awaitingUser.approval"))
+  }
+
+  @Test("A document written before a field existed reads it as its safe default")
+  func olderDocument() async throws {
+    let url = try temporaryDirectory().appendingPathComponent("agent-activity.json")
+    let id = SessionID()
+    try Data(
+      #"{"schemaVersion":1,"sessions":{"\#(id.rawValue.uuidString)":{"activity":"working"}}}"#.utf8
+    ).write(to: url)
+    let read = await FileAgentActivityStateStore(url: url).read()[id]
+    #expect(read?.activity == .working)
+    #expect(read?.isConfirmed == false)
+    #expect(read?.sourceEvent == nil)
   }
 
   @Test("A damaged or foreign document reads as nothing, and nothing to keep removes it")

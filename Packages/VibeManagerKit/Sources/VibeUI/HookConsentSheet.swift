@@ -6,7 +6,7 @@ import VibeApplication
 /// the tempting answer and approves more than these.
 struct HookConsentSheet: View {
   let request: HookConsentRequest
-  let answer: (Bool) -> Void
+  let answer: (AgentHookConsent) -> Void
   @State private var showsCommands = false
 
   var body: some View {
@@ -58,13 +58,13 @@ struct HookConsentSheet: View {
       HStack {
         Spacer()
         Button {
-          answer(false)
+          answer(.declined)
         } label: {
           Text("Not Now", bundle: .module, comment: "Declines to approve an agent's hooks.")
         }
         .keyboardShortcut(.cancelAction)
         Button {
-          answer(true)
+          answer(.approved)
         } label: {
           Text("Track Activity", bundle: .module, comment: "Approves an agent's hooks.")
         }

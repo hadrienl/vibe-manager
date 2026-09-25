@@ -48,7 +48,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private let reportActivity: ReportAgentActivity?
   /// Asked when a CLI needs its hooks approved before the first launch that carries them. Until
   /// the workspace sets it, the answer is no: the agent then simply runs without hooks.
-  public var askHookConsent: AgentHookConsentRequest = { _, _ in false }
+  public var askHookConsent: AgentHookConsentRequest = { _, _ in .undecided }
 
   private let diagnostics: Diagnostics
   /// When each running process was seen starting, for the duration its exit is logged with.

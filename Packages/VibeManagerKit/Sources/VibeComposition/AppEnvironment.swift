@@ -344,6 +344,9 @@ public final class AppEnvironment {
     // A restoration under way is called off *and waited for*: cancelling only asks, and a resume
     // already in flight would otherwise write `reopen` after this shutdown had decided what to
     // close.
+    // A launch waiting on the consent sheet is answered — no answer — so the restoration it
+    // belongs to can be called off and waited for.
+    appModel.answerHookConsent(.undecided)
     await appModel.stopRestoring()
     // What is unread, and how far each log was read, for the next launch.
     await activityTracker.flush()

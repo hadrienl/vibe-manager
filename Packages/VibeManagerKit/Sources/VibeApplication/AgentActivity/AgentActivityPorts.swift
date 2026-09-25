@@ -59,15 +59,57 @@ public struct PersistedAgentActivity: Hashable, Codable, Sendable {
   public var activity: AgentActivity
   public var unreadSince: Date?
   public var log: AgentActivityLogPosition?
+  /// Whether the hooks had spoken. A process adopted with hooks that never did is still on its
+  /// output, and what it was doing is not known from them.
+  public var isConfirmed: Bool
+  /// The event that opened a source beyond the hooks — Claude Code's `SessionStart`, which names
+  /// the transcript — for an adopted process to open it again.
+  public var sourceEvent: PersistedAgentActivityEvent?
 
   public init(
     activity: AgentActivity = .idle,
     unreadSince: Date? = nil,
-    log: AgentActivityLogPosition? = nil
+    log: AgentActivityLogPosition? = nil,
+    isConfirmed: Bool = false,
+    sourceEvent: PersistedAgentActivityEvent? = nil
   ) {
     self.activity = activity
     self.unreadSince = unreadSince
     self.log = log
+    self.isConfirmed = isConfirmed
+    self.sourceEvent = sourceEvent
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case activity, unreadSince, log, isConfirmed, sourceEvent
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      activity: try container.decodeIfPresent(AgentActivity.self, forKey: .activity) ?? .idle,
+      unreadSince: try container.decodeIfPresent(Date.self, forKey: .unreadSince),
+      log: try container.decodeIfPresent(AgentActivityLogPosition.self, forKey: .log),
+      isConfirmed: try container.decodeIfPresent(Bool.self, forKey: .isConfirmed) ?? false,
+      sourceEvent: try container.decodeIfPresent(
+        PersistedAgentActivityEvent.self, forKey: .sourceEvent))
+  }
+}
+
+/// An activity event kept across a relaunch, its payload as the text the hook wrote.
+public struct PersistedAgentActivityEvent: Hashable, Codable, Sendable {
+  public var name: String
+  public var date: Date
+  public var payload: String?
+
+  public init(_ event: AgentActivityEvent) {
+    name = event.name
+    date = event.date
+    payload = event.payload.map { String(decoding: $0, as: UTF8.self) }
+  }
+
+  public var event: AgentActivityEvent {
+    AgentActivityEvent(name: name, date: date, payload: payload.map { Data($0.utf8) })
   }
 }
 

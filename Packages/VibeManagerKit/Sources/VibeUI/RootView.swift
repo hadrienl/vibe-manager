@@ -198,7 +198,8 @@ public struct RootView: View {
     case .diagnosticsExport:
       model.endDiagnosticsExport()
     case .hookConsent:
-      model.answerHookConsent(false)
+      // Closed without a button: no answer, which nothing remembers.
+      model.answerHookConsent(.undecided)
     case nil:
       break
     }

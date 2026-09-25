@@ -102,15 +102,15 @@ private actor NoStore: AgentActivityStateStore {
 private final class ConsentCounter: @unchecked Sendable {
   private let lock = NSLock()
   private var asked: [[String]] = []
-  let answer: Bool
+  let answer: AgentHookConsent
 
-  init(answer: Bool) {
+  init(answer: AgentHookConsent) {
     self.answer = answer
   }
 
   var requests: [[String]] { lock.withLock { asked } }
 
-  func ask(_ name: String, _ commands: [String]) async -> Bool {
+  func ask(_ name: String, _ commands: [String]) async -> AgentHookConsent {
     lock.withLock { asked.append(commands) }
     return answer
   }
@@ -139,14 +139,14 @@ struct ReportAgentActivityTests {
   func notReporting() async {
     let launch = await report(
       [], "absent", consents: InMemoryAgentHookConsentStore(),
-      consent: ConsentCounter(answer: true))
+      consent: ConsentCounter(answer: .approved))
     #expect(launch.plan == plan("absent"))
     #expect(launch.decoder == nil)
   }
 
   @Test("A provider that never asks gets its hooks without a question")
   func openProvider() async {
-    let consent = ConsentCounter(answer: false)
+    let consent = ConsentCounter(answer: .declined)
     let launch = await report(
       [OpenProvider()], "open", consents: InMemoryAgentHookConsentStore(), consent: consent)
     #expect(launch.plan.arguments == ["-C", "/w", "--settings", "{}"])
@@ -158,7 +158,7 @@ struct ReportAgentActivityTests {
   func trustedIsRemembered() async {
     let provider = ReportingProvider(trust: .trusted)
     let consents = InMemoryAgentHookConsentStore()
-    let consent = ConsentCounter(answer: false)
+    let consent = ConsentCounter(answer: .declined)
     _ = await report([provider], "cli", consents: consents, consent: consent)
     _ = await report([provider], "cli", consents: consents, consent: consent)
     #expect(provider.trustChecks == 1)
@@ -169,7 +169,7 @@ struct ReportAgentActivityTests {
   func yesApproves() async {
     let provider = ReportingProvider(trust: .needsApproval(commands: ["hook"]))
     let consents = InMemoryAgentHookConsentStore()
-    let consent = ConsentCounter(answer: true)
+    let consent = ConsentCounter(answer: .approved)
     let launch = await report([provider], "cli", consents: consents, consent: consent)
     #expect(consent.requests == [["hook"]])
     #expect(provider.approvals == 1)
@@ -183,7 +183,7 @@ struct ReportAgentActivityTests {
   func noDeclines() async {
     let provider = ReportingProvider(trust: .needsApproval(commands: ["hook"]))
     let consents = InMemoryAgentHookConsentStore()
-    let consent = ConsentCounter(answer: false)
+    let consent = ConsentCounter(answer: .declined)
     let launch = await report([provider], "cli", consents: consents, consent: consent)
     #expect(launch.plan == plan("cli"))
     #expect(launch.decoder == nil)
@@ -199,14 +199,14 @@ struct ReportAgentActivityTests {
     failing.approvalFails = true
     let consents = InMemoryAgentHookConsentStore()
     let launch = await report(
-      [failing], "cli", consents: consents, consent: ConsentCounter(answer: true))
+      [failing], "cli", consents: consents, consent: ConsentCounter(answer: .approved))
     #expect(launch.decoder != nil)
     #expect(consents.approvedFingerprint(for: AgentProviderID("cli")) == nil)
 
     let unknown = ReportingProvider(trust: .unknown)
     let second = await report(
       [unknown], "cli", consents: InMemoryAgentHookConsentStore(),
-      consent: ConsentCounter(answer: true))
+      consent: ConsentCounter(answer: .approved))
     #expect(second.decoder != nil)
   }
 
@@ -232,5 +232,43 @@ struct ReportAgentActivityTests {
       ReportAgentActivity.fingerprint(of: hooked) != ReportAgentActivity.fingerprint(of: newer))
     #expect(
       ReportAgentActivity.fingerprint(of: hooked) != ReportAgentActivity.fingerprint(of: base))
+  }
+
+  @Test("No answer launches without hooks, remembers nothing, and asks again next time")
+  func undecided() async {
+    let provider = ReportingProvider(trust: .needsApproval(commands: ["hook"]))
+    let consents = InMemoryAgentHookConsentStore()
+    let consent = ConsentCounter(answer: .undecided)
+    let launch = await report([provider], "cli", consents: consents, consent: consent)
+    #expect(launch.decoder == nil)
+    #expect(!consents.isDeclined(AgentProviderID("cli")))
+    _ = await report([provider], "cli", consents: consents, consent: consent)
+    #expect(consent.requests.count == 2)
+  }
+
+  @Test("A yes lifts a no given before")
+  func yesLiftsNo() async {
+    let provider = ReportingProvider(trust: .needsApproval(commands: ["hook"]))
+    let consents = InMemoryAgentHookConsentStore()
+    consents.setDeclined(true, for: AgentProviderID("other"))
+    // Declined, then turned back on in the settings: the next launch asks, and the yes stays.
+    consents.setDeclined(false, for: AgentProviderID("cli"))
+    _ = await report(
+      [provider], "cli", consents: consents, consent: ConsentCounter(answer: .approved))
+    #expect(!consents.isDeclined(AgentProviderID("cli")))
+  }
+
+  @Test("A CLI that cannot be asked is asked once per run")
+  func unknownIsRemembered() async {
+    let provider = ReportingProvider(trust: .unknown)
+    let tracker = TrackAgentActivity(logs: NoLogs(), store: NoStore())
+    let use = ReportAgentActivity(
+      agents: Registry(providers: [provider]), tracker: tracker,
+      consents: InMemoryAgentHookConsentStore())
+    let consent = ConsentCounter(answer: .approved)
+    _ = await use(plan("cli"), for: SessionID(), askConsent: consent.ask)
+    let second = await use(plan("cli"), for: SessionID(), askConsent: consent.ask)
+    #expect(provider.trustChecks == 1)
+    #expect(second.decoder != nil)
   }
 }

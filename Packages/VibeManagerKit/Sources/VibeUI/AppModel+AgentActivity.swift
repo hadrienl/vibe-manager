@@ -48,24 +48,39 @@ extension AppModel {
 
   // MARK: - Consent
 
-  func requestHookConsent(agentName: String, commands: [String]) async -> Bool {
-    // One question at a time: a second launch waiting on the same CLI gets the first answer's
-    // effect through the preferences, and is asked only if that answer did not settle it.
-    if let pending = hookConsentContinuation {
-      hookConsentContinuation = nil
-      pending.resume(returning: false)
-    }
-    return await withCheckedContinuation { continuation in
-      hookConsentContinuation = continuation
-      hookConsentRequest = HookConsentRequest(agentName: agentName, commands: commands)
+  /// Shows the consent sheet, or joins the one already shown: every launch waiting on it gets the
+  /// same answer. A launch cancelled while it waits — a restoration called off on quit — gets no
+  /// answer, which nothing remembers.
+  func requestHookConsent(agentName: String, commands: [String]) async -> AgentHookConsent {
+    let key = UUID()
+    return await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        guard !Task.isCancelled else {
+          continuation.resume(returning: .undecided)
+          return
+        }
+        hookConsentWaiters[key] = continuation
+        if hookConsentRequest == nil {
+          hookConsentRequest = HookConsentRequest(agentName: agentName, commands: commands)
+        }
+      }
+    } onCancel: {
+      Task { @MainActor [weak self] in self?.settleHookConsent(key, .undecided) }
     }
   }
 
-  public func answerHookConsent(_ approved: Bool) {
+  private func settleHookConsent(_ key: UUID, _ answer: AgentHookConsent) {
+    guard let continuation = hookConsentWaiters.removeValue(forKey: key) else { return }
+    if hookConsentWaiters.isEmpty { hookConsentRequest = nil }
+    continuation.resume(returning: answer)
+  }
+
+  /// The buttons of the sheet give `approved` or `declined`; closing it otherwise is `undecided`.
+  public func answerHookConsent(_ answer: AgentHookConsent) {
     hookConsentRequest = nil
-    let continuation = hookConsentContinuation
-    hookConsentContinuation = nil
-    continuation?.resume(returning: approved)
+    let waiters = hookConsentWaiters
+    hookConsentWaiters = [:]
+    for continuation in waiters.values { continuation.resume(returning: answer) }
     Task { await loadHookTrustingAgents() }
   }
 

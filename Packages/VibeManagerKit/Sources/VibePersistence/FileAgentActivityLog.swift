@@ -136,6 +136,9 @@ final class AgentActivityLogFollower: @unchecked Sendable {
     }
     self.descriptor = descriptor
     fileIdentifier = UInt64(status.st_ino)
+    // Created again by a hook's `>>` after a rotation, it has the umask's mode: brought back to the
+    // owner's alone.
+    _ = fchmod(descriptor, 0o600)
     pending = Data()
     // A position is only good for the file it was taken in, and only if the file still reaches it.
     if let position, position.fileIdentifier == fileIdentifier,
@@ -149,6 +152,8 @@ final class AgentActivityLogFollower: @unchecked Sendable {
     let source = DispatchSource.makeFileSystemObjectSource(
       fileDescriptor: descriptor, eventMask: [.write, .extend, .delete, .rename, .revoke],
       queue: queue)
+    // The descriptor is closed once the source lets go of it, never under it.
+    source.setCancelHandler { Darwin.close(descriptor) }
     source.setEventHandler { [weak self] in
       guard let self, let source = self.source else { return }
       self.drain()
@@ -169,10 +174,15 @@ final class AgentActivityLogFollower: @unchecked Sendable {
   /// created by the next hook — is followed from its start.
   private func reopen() {
     let rotated = AgentActivityLogFollower.rotatedURL(of: url)
+    // No more events from this file, but it stays readable: a hook that opened it before the
+    // rename may still be writing to it, and its line is read once it has had a moment to land.
+    let kept = dup(descriptor)
     close()
-    // A hook that opened the old file before the rename may still be writing to it: its line is
-    // given a moment to land before the file is dropped.
     queue.asyncAfter(deadline: .now() + .milliseconds(500)) {
+      if kept >= 0 {
+        self.drain(kept)
+        Darwin.close(kept)
+      }
       try? FileManager.default.removeItem(at: rotated)
       self.open(resumingAt: nil)
     }
@@ -186,15 +196,21 @@ final class AgentActivityLogFollower: @unchecked Sendable {
   }
 
   private func close() {
-    source?.cancel()
-    source = nil
-    if descriptor >= 0 {
+    if let source {
+      // Its cancel handler closes the descriptor.
+      source.cancel()
+      self.source = nil
+    } else if descriptor >= 0 {
       Darwin.close(descriptor)
-      descriptor = -1
     }
+    descriptor = -1
   }
 
   private func drain() {
+    drain(descriptor)
+  }
+
+  private func drain(_ descriptor: Int32) {
     guard descriptor >= 0 else { return }
     var buffer = [UInt8](repeating: 0, count: 64 * 1024)
     while true {
@@ -208,16 +224,19 @@ final class AgentActivityLogFollower: @unchecked Sendable {
   }
 
   private func consumeLines() {
-    while let newline = pending.firstIndex(of: 0x0A) {
-      let line = pending[pending.startIndex..<newline]
-      let length = UInt64(newline - pending.startIndex + 1)
-      pending = Data(pending[(newline + 1)...])
-      offset += length
+    // Walked through once, and the rest kept once: a log read back from its start holds thousands
+    // of short lines.
+    var start = pending.startIndex
+    while let newline = pending[start...].firstIndex(of: 0x0A) {
+      let line = pending[start..<newline]
+      offset += UInt64(newline - start + 1)
+      start = newline + 1
       if let event = Self.parse(line) {
         continuation.yield(
           (event, AgentActivityLogPosition(fileIdentifier: fileIdentifier, offset: offset)))
       }
     }
+    if start > pending.startIndex { pending = Data(pending[start...]) }
     if pending.count > Self.maximumLineLength {
       offset += UInt64(pending.count)
       pending = Data()

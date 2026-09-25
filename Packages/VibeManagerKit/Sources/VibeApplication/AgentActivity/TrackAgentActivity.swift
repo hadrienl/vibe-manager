@@ -21,6 +21,11 @@ public actor TrackAgentActivity {
     var logPosition: AgentActivityLogPosition?
     /// What the previous launch left the agent doing, for a process adopted as it was.
     var restoredActivity: AgentActivity?
+    var restoredConfirmation = false
+    /// The event that opened the source beyond the hooks, and the task reading it. One at a time:
+    /// Claude Code starts a session again on every `/clear` and every compaction.
+    var sourceEvent: AgentActivityEvent?
+    var sourceTask: Task<Void, Never>?
     var tasks: [Task<Void, Never>] = []
     /// Which process the tasks belong to. A log line still on its way from the previous one must
     /// not move the new one.
@@ -34,10 +39,9 @@ public actor TrackAgentActivity {
   private let persistenceDelay: Duration
 
   private var sessions: [SessionID: Tracked] = [:]
+  /// The session in front of the user. What happens to it is seen as it happens — replayed after
+  /// an adoption included: it is on screen now.
   private var visibleSessionID: SessionID?
-  /// When the visible session became visible. An event older than that happened while nobody was
-  /// looking — the application was closed, or another session was in front.
-  private var visibleSince: Date?
   private var continuations: [UUID: AsyncStream<AgentActivityUpdate>.Continuation] = [:]
   private var timer: Task<Void, Never>?
   private var pendingWrite: Task<Void, Never>?
@@ -90,6 +94,8 @@ public actor TrackAgentActivity {
       tracked.state = AgentActivityState(unreadSince: persisted.unreadSince)
       tracked.logPosition = persisted.log
       tracked.restoredActivity = persisted.activity
+      tracked.restoredConfirmation = persisted.isConfirmed
+      tracked.sourceEvent = persisted.sourceEvent?.event
       sessions[id] = tracked
       publish(id)
     }
@@ -108,13 +114,16 @@ public actor TrackAgentActivity {
     if decoder == nil { await logs.removeLog(for: id) }
     var tracked = sessions[id] ?? Tracked()
     cancelTasks(of: &tracked)
+    let previous = tracked.state
     tracked.decoder = decoder
     tracked.logPosition = nil
     tracked.restoredActivity = nil
+    tracked.restoredConfirmation = false
+    tracked.sourceEvent = nil
     tracked.state = reduce(tracked.state, .processStarted(structured: decoder != nil), for: id)
     sessions[id] = tracked
     if decoder != nil { follow(id, from: nil) }
-    changed(id)
+    changed(id, from: previous, force: true)
   }
 
   /// A process the terminal host kept while the application was closed is back. What it did in
@@ -125,22 +134,32 @@ public actor TrackAgentActivity {
     let hasLog = decoder != nil ? await logs.existingLog(for: id) != nil : false
     var tracked = sessions[id] ?? Tracked()
     cancelTasks(of: &tracked)
+    let previous = tracked.state
     tracked.decoder = hasLog ? decoder : nil
-    // What the hooks left pending is still pending: the process never stopped.
-    tracked.state.activity = hasLog ? tracked.restoredActivity ?? .idle : .idle
+    // What the hooks left pending is still pending, the process never having stopped — but only
+    // hooks that had spoken are believed. Others still have ten seconds to, as at a launch.
+    let confirmed = hasLog && tracked.restoredConfirmation
+    tracked.state.activity = confirmed ? tracked.restoredActivity ?? .idle : .idle
+    tracked.state.source =
+      confirmed ? .structured : hasLog ? .unconfirmed(since: now()) : .inferred
     tracked.restoredActivity = nil
-    tracked.state.source = hasLog ? .structured : .inferred
+    if isVisible(id) { tracked.state.unreadSince = nil }
     sessions[id] = tracked
-    if hasLog { follow(id, from: tracked.logPosition) }
-    changed(id)
+    if hasLog {
+      follow(id, from: tracked.logPosition)
+      if let event = tracked.sourceEvent { openSource(after: event, for: id) }
+    }
+    changed(id, from: previous, force: true)
   }
 
   public func processEnded(_ id: SessionID) {
     guard var tracked = sessions[id] else { return }
     cancelTasks(of: &tracked)
+    let previous = tracked.state
     tracked.state = reduce(tracked.state, .processEnded, for: id)
+    tracked.sourceEvent = nil
     sessions[id] = tracked
-    changed(id)
+    changed(id, from: previous)
   }
 
   /// The session is closed or archived: closing it was its reading.
@@ -156,20 +175,18 @@ public actor TrackAgentActivity {
 
   public func output(_ id: SessionID) {
     guard var tracked = sessions[id], tracked.state.source != .structured else { return }
-    let next = reduce(tracked.state, .output, for: id)
-    guard next != tracked.state else { return }
-    tracked.state = next
+    let previous = tracked.state
+    tracked.state = reduce(tracked.state, .output, for: id)
     sessions[id] = tracked
-    changed(id)
+    changed(id, from: previous)
   }
 
   public func userInput(_ id: SessionID, _ bytes: [UInt8]) {
     guard var tracked = sessions[id] else { return }
-    let next = reduce(tracked.state, .userInput(bytes), for: id)
-    guard next != tracked.state else { return }
-    tracked.state = next
+    let previous = tracked.state
+    tracked.state = reduce(tracked.state, .userInput(bytes), for: id)
     sessions[id] = tracked
-    changed(id)
+    changed(id, from: previous)
   }
 
   /// The session now in front of the user, or `nil` when none is: the window is hidden, or
@@ -177,11 +194,11 @@ public actor TrackAgentActivity {
   public func setVisibleSession(_ id: SessionID?) {
     guard id != visibleSessionID else { return }
     visibleSessionID = id
-    visibleSince = id == nil ? nil : now()
     guard let id, var tracked = sessions[id], tracked.state.unreadSince != nil else { return }
+    let previous = tracked.state
     tracked.state.unreadSince = nil
     sessions[id] = tracked
-    changed(id)
+    changed(id, from: previous)
   }
 
   /// Writes what is pending at once, for the way out.
@@ -216,28 +233,40 @@ public actor TrackAgentActivity {
     guard var tracked = sessions[id], tracked.generation == generation,
       let decoder = tracked.decoder
     else { return }
+    let previous = tracked.state
     tracked.logPosition = position
     if let signal = decoder.signal(for: event) {
       tracked.state = reduce(tracked.state, .signal(signal), for: id, at: event.date)
     }
-    if let more = decoder.additionalSignals(after: event) {
-      tracked.tasks.append(
-        Task {
-          for await signal in more {
-            guard !Task.isCancelled else { return }
-            self.receivedAdditional(signal, for: id, generation: generation)
-          }
-        })
+    sessions[id] = tracked
+    openSource(after: event, for: id)
+    // The position moved: written down even when the state did not.
+    changed(id, from: previous, force: true)
+  }
+
+  /// Opens what an event names beyond the hooks, in place of what an earlier one had opened.
+  private func openSource(after event: AgentActivityEvent, for id: SessionID) {
+    guard var tracked = sessions[id], let decoder = tracked.decoder,
+      let more = decoder.additionalSignals(after: event)
+    else { return }
+    let generation = tracked.generation
+    tracked.sourceTask?.cancel()
+    tracked.sourceEvent = event
+    tracked.sourceTask = Task {
+      for await signal in more {
+        guard !Task.isCancelled else { return }
+        self.receivedAdditional(signal, for: id, generation: generation)
+      }
     }
     sessions[id] = tracked
-    changed(id)
   }
 
   private func receivedAdditional(_ signal: AgentSignal, for id: SessionID, generation: Int) {
     guard var tracked = sessions[id], tracked.generation == generation else { return }
+    let previous = tracked.state
     tracked.state = reduce(tracked.state, .signal(signal), for: id)
     sessions[id] = tracked
-    changed(id)
+    changed(id, from: previous)
   }
 
   // MARK: - Machine
@@ -252,28 +281,35 @@ public actor TrackAgentActivity {
       state, input,
       context: AgentActivityContext(
         now: date ?? now(),
-        isVisible: isVisible(id, at: date),
+        isVisible: isVisible(id),
         approvalAnswerKeys: sessions[id]?.decoder?.approvalAnswerKeys ?? []
       ))
   }
 
-  /// Whether the user had this session in front of them when something happened. The log dates
-  /// its lines to the second, so a line from the second the session was shown counts as seen.
-  private func isVisible(_ id: SessionID, at date: Date?) -> Bool {
-    guard visibleSessionID == id, let visibleSince else { return false }
-    guard let date else { return true }
-    return date >= visibleSince.addingTimeInterval(-1)
+  private func isVisible(_ id: SessionID) -> Bool {
+    visibleSessionID == id
   }
 
   private func cancelTasks(of tracked: inout Tracked) {
     for task in tracked.tasks { task.cancel() }
     tracked.tasks = []
+    tracked.sourceTask?.cancel()
+    tracked.sourceTask = nil
     tracked.generation += 1
   }
 
-  private func changed(_ id: SessionID) {
-    publish(id)
-    scheduleTick()
+  /// Said to the interface, and written down, only when what is shown changes: a keystroke, or a
+  /// line of output, moves the instants the fallback counts from and nothing a row displays.
+  /// `force` is for what must be written even so — a log position, a new process.
+  private func changed(_ id: SessionID, from previous: AgentActivityState, force: Bool = false) {
+    guard let current = sessions[id]?.state else { return }
+    if AgentActivityMachine.nextDeadline(of: current)
+      != AgentActivityMachine.nextDeadline(of: previous)
+    {
+      scheduleTick()
+    }
+    guard force || !current.showsTheSame(as: previous) else { return }
+    if !current.showsTheSame(as: previous) { publish(id) }
     schedulePersistence()
   }
 
@@ -312,7 +348,7 @@ public actor TrackAgentActivity {
     for id in sessions.keys {
       guard var tracked = sessions[id] else { continue }
       let next = reduce(tracked.state, .tick, for: id)
-      guard next != tracked.state else { continue }
+      guard !next.showsTheSame(as: tracked.state) else { continue }
       tracked.state = next
       sessions[id] = tracked
       publish(id)
@@ -346,7 +382,9 @@ public actor TrackAgentActivity {
       result[id] = PersistedAgentActivity(
         activity: tracked.state.activity,
         unreadSince: tracked.state.unreadSince,
-        log: tracked.logPosition
+        log: tracked.logPosition,
+        isConfirmed: tracked.state.source == .structured,
+        sourceEvent: tracked.sourceEvent.map(PersistedAgentActivityEvent.init)
       )
     }
     return result

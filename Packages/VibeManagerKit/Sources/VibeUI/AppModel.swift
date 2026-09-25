@@ -49,7 +49,8 @@ public final class AppModel {
   public internal(set) var reportsActivity: [AgentProviderID: Bool] = [:]
   let activityTracker: TrackAgentActivity?
   let hookConsents: any AgentHookConsentStore
-  var hookConsentContinuation: CheckedContinuation<Bool, Never>?
+  /// Every launch waiting on the consent sheet. One answer settles them all.
+  var hookConsentWaiters: [UUID: CheckedContinuation<AgentHookConsent, Never>] = [:]
   var activityUpdates: Task<Void, Never>?
   var isApplicationActive = true
   var isMainWindowVisible = true
@@ -549,7 +550,7 @@ public final class AppModel {
     usage?.connect { [weak self] in self?.sessions ?? [] }
 
     launcher?.askHookConsent = { [weak self] name, commands in
-      guard let self else { return false }
+      guard let self else { return .undecided }
       return await self.requestHookConsent(agentName: name, commands: commands)
     }
 

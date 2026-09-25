@@ -192,4 +192,10 @@ extension AgentActivityState {
   var isStructured: Bool {
     source == .structured
   }
+
+  /// Whether a row showing either state would look the same: the instants the fallback counts
+  /// from are nobody's to see.
+  public func showsTheSame(as other: AgentActivityState) -> Bool {
+    activity == other.activity && unreadSince == other.unreadSince && source == other.source
+  }
 }
