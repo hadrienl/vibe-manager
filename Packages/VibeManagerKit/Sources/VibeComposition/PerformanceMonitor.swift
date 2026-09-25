@@ -17,6 +17,7 @@ public final class MainThreadHangDetector: @unchecked Sendable {
   private let log: any DiagnosticLog
   private let interval: Duration
   private let threshold: Duration
+  private let watched: DispatchQueue
   private let queue = DispatchQueue(label: "com.hadrienl.VibeManager.hang-detector", qos: .utility)
   private let lock = NSLock()
   private var askedAt: ContinuousClock.Instant?
@@ -25,11 +26,13 @@ public final class MainThreadHangDetector: @unchecked Sendable {
   public init(
     log: any DiagnosticLog,
     interval: Duration = .milliseconds(100),
-    threshold: Duration = MainThreadHangDetector.defaultThreshold
+    threshold: Duration = MainThreadHangDetector.defaultThreshold,
+    watching watched: DispatchQueue = .main
   ) {
     self.log = log
     self.interval = interval
     self.threshold = threshold
+    self.watched = watched
   }
 
   public func start() {
@@ -60,7 +63,7 @@ public final class MainThreadHangDetector: @unchecked Sendable {
       return true
     }
     guard shouldAsk else { return }
-    DispatchQueue.main.async { [weak self] in self?.answered() }
+    watched.async { [weak self] in self?.answered() }
   }
 
   private func answered() {

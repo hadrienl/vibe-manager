@@ -11,15 +11,18 @@ struct PerformanceMonitorTests {
   @Test("A main thread held longer than the threshold is noted once, with how long it was held")
   func noticesHangs() async throws {
     let log = RecordingDiagnosticLog()
+    // A queue of the test's own: the main queue is shared with every other test running at the
+    // same time, and on a busy runner they hold it too.
+    let watched = DispatchQueue(label: "hang-detector-test")
     let detector = MainThreadHangDetector(
-      log: log, interval: .milliseconds(20), threshold: .milliseconds(150))
+      log: log, interval: .milliseconds(20), threshold: .milliseconds(150), watching: watched)
     detector.start()
     defer { detector.stop() }
     try await Task.sleep(for: .milliseconds(100))
     #expect(log.events(named: "perf.mainThreadHang").isEmpty)
 
-    // Held, the way a synchronous layout or a blocking read would hold it.
-    usleep(400_000)
+    // Held, the way a synchronous layout or a blocking read would hold the main thread.
+    watched.async { usleep(400_000) }
 
     #expect(
       await eventually(timeout: .seconds(5)) { !log.events(named: "perf.mainThreadHang").isEmpty })
