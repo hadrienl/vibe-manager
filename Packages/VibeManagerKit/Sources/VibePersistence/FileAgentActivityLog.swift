@@ -163,8 +163,9 @@ final class AgentActivityLogFollower: @unchecked Sendable {
       queue: queue)
     // The descriptor is closed once the source lets go of it, never under it.
     source.setCancelHandler { Darwin.close(descriptor) }
-    source.setEventHandler { [weak self] in
-      guard let self, let source = self.source else { return }
+    source.setEventHandler { [weak self, weak source] in
+      // An event still queued for a source already let go of says nothing about the current file.
+      guard let self, let source, source === self.source else { return }
       self.drain()
       let event = source.data
       if !event.intersection([.delete, .rename, .revoke]).isEmpty {
@@ -202,9 +203,13 @@ final class AgentActivityLogFollower: @unchecked Sendable {
 
   private func rotateIfNeeded() {
     guard descriptor >= 0, offset >= rotationThreshold, pending.isEmpty else { return }
-    // The next event on the descriptor reports the rename, and `reopen` takes it from there.
-    try? FileManager.default.moveItem(
-      at: url, to: AgentActivityLogFollower.rotatedURL(of: url))
+    // Taken from there at once, rather than when the rename is reported: the follower moved the
+    // file itself, and the event is not reported everywhere.
+    guard
+      (try? FileManager.default.moveItem(
+        at: url, to: AgentActivityLogFollower.rotatedURL(of: url))) != nil
+    else { return }
+    reopen()
   }
 
   private func close() {
