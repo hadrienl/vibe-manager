@@ -225,6 +225,41 @@ struct SidebarGroupsTests {
     #expect(model.displayedSessions.isEmpty)
   }
 
+  @Test("A fold asked for during a search is ignored rather than stored for later")
+  func noFoldingDuringASearch() async throws {
+    let model = await makeModel()
+    model.setSearchText("old")
+    #expect(!model.canFold)
+
+    model.setExpanded(false, group: try #require(model.groups.first))
+    model.setAllGroupsExpanded(false)
+    model.setArchivedSectionExpanded(true)
+    model.setSearchText("")
+
+    #expect(model.canFold)
+    #expect(model.layout.collapsedFolders.isEmpty)
+    #expect(!model.layout.isArchivedSectionExpanded)
+    #expect(model.displayedSessions.count == 4)
+  }
+
+  @Test("Without a selection to restore, the first row on screen is selected, not a folded one")
+  func fallbackSkipsFoldedGroups() async {
+    let model = await makeModel(
+      layout: WorkspaceLayout(sidebarMode: .byFolder, collapsedFolders: [.lexical("/work/api")]))
+
+    #expect(model.selectedSessionID == webNew.id)
+  }
+
+  @Test("With every group folded, the fallback selection unfolds its group")
+  func fallbackUnfoldsWhenEverythingIsFolded() async throws {
+    let model = await makeModel(
+      layout: WorkspaceLayout(
+        sidebarMode: .byFolder, collapsedFolders: [.lexical("/work/api"), .lexical("/work/web")]))
+
+    #expect(model.selectedSessionID == apiNew.id)
+    #expect(model.isExpanded(try #require(model.groups.first)))
+  }
+
   @Test("Folds, mode and selection come back at launch, a selection in a folded group included")
   func restoredAtLaunch() async throws {
     let store = RecordingLayoutStore()

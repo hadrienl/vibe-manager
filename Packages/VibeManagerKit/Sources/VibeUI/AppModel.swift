@@ -818,14 +818,22 @@ public final class AppModel {
 
   private func reconcileSelection() {
     let visible = visibleSessions
-    guard let first = visible.first else { return }
     if let selectedSessionID, visible.contains(where: { $0.id == selectedSessionID }) { return }
     if let shownArchivedSessionID, shownArchivedSessionID == selectedSessionID,
       selectedSession?.taskStatus == .archived
     {
       return
     }
-    apply(selection: first.id)
+    if let fallback = fallbackSelection() { apply(selection: fallback) }
+  }
+
+  /// Where the selection goes when the one it had is gone: the first row on screen, not the first
+  /// session a folded group hides. With every group folded, that first session's group unfolds.
+  private func fallbackSelection() -> SessionID? {
+    if let first = displayedSessions.first { return first.id }
+    guard let first = visibleSessions.first else { return nil }
+    reveal(first.id)
+    return first.id
   }
 
   // MARK: - Lifecycle commands
@@ -2186,8 +2194,8 @@ public final class AppModel {
       if let previousSelection, sessions.contains(where: { $0.id == previousSelection }) {
         preferredSelection = nil
         apply(selection: previousSelection)
-      } else if let first = visibleSessions.first {
-        apply(selection: first.id)
+      } else if let fallback = fallbackSelection() {
+        apply(selection: fallback)
       }
       // A selection restored from a previous run can name a session this scope does not list —
       // one archived since, or simply closed while the sidebar opens on Active. It falls back to

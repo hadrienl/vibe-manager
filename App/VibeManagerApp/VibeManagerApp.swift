@@ -281,23 +281,23 @@ private struct GroupCommands: View {
       model.collapseSelectedGroup()
     }
     .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-    .disabled(model.selectedGroup == nil)
+    .disabled(model.selectedGroup == nil || !model.canFold)
 
     Button("Expand Group") {
       model.expandSelectedGroup()
     }
     .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-    .disabled(model.selectedGroup == nil)
+    .disabled(model.selectedGroup == nil || !model.canFold)
 
     Button("Collapse All Groups") {
       model.setAllGroupsExpanded(false)
     }
-    .disabled(model.groups.isEmpty)
+    .disabled(model.groups.isEmpty || !model.canFold)
 
     Button("Expand All Groups") {
       model.setAllGroupsExpanded(true)
     }
-    .disabled(model.groups.isEmpty)
+    .disabled(model.groups.isEmpty || !model.canFold)
   }
 }
 

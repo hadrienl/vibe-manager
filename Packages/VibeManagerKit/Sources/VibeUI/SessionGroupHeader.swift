@@ -133,6 +133,7 @@ struct SessionGroupHeader: View {
     ) {
       model.setExpanded(!isExpanded, group: group)
     }
+    .disabled(!model.canFold)
     if let folder = group.id {
       Divider()
       Button(LocalizedStringResource("Reveal in Finder", bundle: .module)) {

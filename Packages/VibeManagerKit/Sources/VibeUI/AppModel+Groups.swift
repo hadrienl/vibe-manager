@@ -66,6 +66,12 @@ extension AppModel {
     isSearching || layout.isArchivedSectionExpanded
   }
 
+  /// A search shows every group unfolded: a fold made then would be stored without being seen,
+  /// and would only land once the search is cleared, hiding rows the user never chose to hide.
+  public var canFold: Bool {
+    !isSearching
+  }
+
   // MARK: - Commands
 
   /// The selection stays where it is: grouping changes how the list is drawn, not where the user is.
@@ -80,10 +86,12 @@ extension AppModel {
 
   /// Folding the group of the selected session keeps the selection, and its terminal on screen.
   public func setExpanded(_ isExpanded: Bool, group: SessionGroup) {
+    guard canFold else { return }
     layout.setCollapsed(!isExpanded, folders: [group.foldKey])
   }
 
   public func setArchivedSectionExpanded(_ isExpanded: Bool) {
+    guard canFold else { return }
     layout.setArchivedSectionExpanded(isExpanded)
   }
 
@@ -109,6 +117,7 @@ extension AppModel {
   }
 
   public func setAllGroupsExpanded(_ isExpanded: Bool) {
+    guard canFold else { return }
     layout.setCollapsed(!isExpanded, folders: Set(groups.map(\.foldKey)))
   }
 
