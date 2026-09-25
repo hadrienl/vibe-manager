@@ -102,6 +102,18 @@ if (( in_ci )); then
   rm -f "$secrets/certificate.p12"
   security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" \
     >/dev/null
+  # The runner's image may lack the intermediate that issued the certificate, and without it the
+  # identity is not valid for signing. Both Developer ID intermediates, pinned by digest: this job
+  # holds the certificate, and imports nothing it cannot name.
+  for intermediate in DeveloperIDCA:7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f \
+    DeveloperIDG2CA:f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a; do
+    name="${intermediate%%:*}"
+    curl --fail --silent --show-error --output "$secrets/$name.cer" \
+      "https://www.apple.com/certificateauthority/$name.cer"
+    [[ "$(shasum -a 256 "$secrets/$name.cer" | cut -d ' ' -f 1)" == "${intermediate#*:}" ]] \
+      || fail "the intermediate $name is not the one expected"
+    security import "$secrets/$name.cer" -k "$keychain"
+  done
   security list-keychains -d user -s "$keychain" "${saved_keychains[@]}"
   print -rn -- "$NOTARY_API_KEY_P8" | base64 --decode > "$secrets/notary.p8"
   notary_credentials=(
@@ -132,7 +144,11 @@ ci="$(gh run list --commit "$commit" --workflow CI --json conclusion,status \
 [[ "$ci" == "success" ]] || fail "CI is not green on $commit (found: ${ci:-nothing})"
 readonly identity="$(security find-identity -v -p codesigning \
   | sed -n "s/.*\"\(Developer ID Application: .*($team)\)\"/\1/p" | head -1)"
-[[ -n "$identity" ]] || fail "no Developer ID Application certificate for team $team in the keychain"
+if [[ -z "$identity" ]]; then
+  # What is there but not valid, and why: an untrusted chain, an expired certificate, no key.
+  security find-identity -p codesigning | sed -n '/Developer ID/p' >&2
+  fail "no valid Developer ID Application certificate for team $team in the keychain"
+fi
 
 # 2. The version is given to the build, not written into the repository.
 readonly build_number="$(git rev-list --count HEAD)"
