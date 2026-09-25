@@ -256,7 +256,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ de plus que ce avec quoi un agent peut être lancé. Raccourcissez le résumé."
+            "value" : "%@ de trop pour lancer un agent. Raccourcissez le résumé."
           }
         }
       }
@@ -1534,7 +1534,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agent changé"
+            "value" : "Changement d’agent"
           }
         }
       }
@@ -1597,7 +1597,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Également consulté : %@"
+            "value" : "Autres dossiers consultés : %@"
           }
         }
       }
@@ -1712,7 +1712,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "État à %@"
+            "value" : "Mis à jour à %@"
           }
         }
       }
@@ -2976,7 +2976,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle changé"
+            "value" : "Changement de modèle"
           }
         }
       }
@@ -3190,7 +3190,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun dépôt travaillé pour l’instant."
+            "value" : "Aucun dépôt utilisé pour l’instant."
           }
         }
       }
@@ -3241,7 +3241,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun modèle pour l’instant — « Gérer… » pour en écrire un, ou ajouter les exemples."
+            "value" : "Aucun modèle pour l’instant — cliquez sur « Gérer… » pour en écrire un, ou ajoutez les exemples."
           }
         }
       }
@@ -3557,7 +3557,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et la session reste consultable dans Fermées. Elle ne pourra plus être rouverte avant d’être désarchivée."
+            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et la session reste consultable dans « Fermées ». Elle ne pourra plus être rouverte avant d’être désarchivée."
           }
         }
       }
@@ -3788,7 +3788,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Appuyez sur ⌘N pour en lancer une, ou consultez Fermées pour retrouver un travail antérieur."
+            "value" : "Appuyez sur ⌘N pour en lancer une, ou consultez « Fermées » pour retrouver un travail antérieur."
           }
         }
       }
@@ -3965,7 +3965,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistré depuis le %@."
+            "value" : "Exécutions enregistrées depuis le %@."
           }
         }
       }
@@ -4049,7 +4049,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les dépôts, les métadonnées Git, les notes et le prompt initial sont conservés, et figurent dans la colonne de contexte. Une session archivée reste dans Fermées, mais ne peut pas être rouverte : désarchivez-la d’abord ; relancer son agent est ensuite une étape distincte et volontaire."
+            "value" : "Les dépôts, les métadonnées Git, les notes et le prompt initial sont conservés, et figurent dans la colonne de contexte. Une session archivée reste dans « Fermées », mais ne peut pas être rouverte : désarchivez-la d’abord ; relancer son agent est ensuite une étape distincte et volontaire."
           }
         }
       }
@@ -4290,7 +4290,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rétablir"
+            "value" : "Annuler les modifications"
           }
         }
       }
@@ -4438,7 +4438,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistré peu après que vous arrêtez de taper"
+            "value" : "Enregistrement automatique dès que vous arrêtez de taper"
           }
         }
       }
@@ -5446,7 +5446,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce résumé a été raccourci pour tenir dans ce que l’agent accepte."
+            "value" : "Ce résumé a été raccourci pour respecter la limite de l’agent."
           }
         }
       }
@@ -5797,7 +5797,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le suivi de l’utilisation est désactivé depuis le %@. Activez-le dans Réglages."
+            "value" : "Le suivi de l’utilisation est désactivé depuis le %@. Activez-le dans les Réglages."
           }
         }
       }

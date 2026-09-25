@@ -371,7 +371,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faites la revue de la merge request {{url}}. Lisez la description et le diff, récupérez la branche si besoin, et signalez d’abord les erreurs de fonctionnement, puis les tests manquants, puis le style. Ne poussez rien.\n\n{{focus?}}"
+            "value" : "Faites la revue de la merge request {{url}}. Lisez la description et le diff, basculez sur la branche si besoin, et signalez d’abord les erreurs de fonctionnement, puis les tests manquants, puis le style. Ne poussez rien.\n\n{{focus?}}"
           }
         }
       }

@@ -208,7 +208,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Activer l’inspecteur"
+            "value" : "Aller à l’inspecteur"
           }
         }
       }
@@ -218,7 +218,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Activer la barre latérale"
+            "value" : "Aller à la barre latérale"
           }
         }
       }
@@ -228,7 +228,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Activer le terminal"
+            "value" : "Aller au terminal"
           }
         }
       }
@@ -289,7 +289,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nouvelle session depuis"
+            "value" : "Nouvelle session à partir de"
           }
         }
       }
@@ -299,7 +299,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nouvelle session depuis un modèle"
+            "value" : "Nouvelle session à partir d’un modèle"
           }
         }
       }

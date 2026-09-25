@@ -423,7 +423,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Si plus aucune commande Git n’est en cours, le verrou a été oublié et peut être supprimé."
+            "value" : "Si plus aucune commande Git n’est en cours, le verrou est resté en place et peut être supprimé."
           }
         }
       }
@@ -922,7 +922,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les sessions enregistrées n’ont pas pu être lues."
+            "value" : "Le fichier des sessions n’a pas pu être lu."
           }
         }
       }
@@ -954,7 +954,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le résumé dépasse de %@ ce avec quoi un agent peut être lancé."
+            "value" : "Le résumé dépasse de %@ la taille qu’un agent accepte au lancement."
           }
         }
       }

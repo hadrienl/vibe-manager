@@ -16,7 +16,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les sessions enregistrées ne sont pas accessibles."
+            "value" : "Le fichier des sessions n’est pas accessible."
           }
         }
       }
