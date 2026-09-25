@@ -112,7 +112,9 @@ public enum BrowserMCPServer {
       "instructions": """
       These tools drive the web view of this Vibe Manager session, beside its terminal: open \
       a preview, reload it, read it, look at its console, click and type in it. The user sees \
-      every tab and every action.
+      every tab and every action. Whenever the user should see a page — a preview, a document \
+      or an artifact you made, a pull request, a ticket — open it with tab_open rather than in a \
+      browser: it appears beside this terminal.
       """,
     ]
   }

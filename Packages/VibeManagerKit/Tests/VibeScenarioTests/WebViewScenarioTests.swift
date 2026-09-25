@@ -40,6 +40,10 @@ struct WebViewScenarioTests {
     #expect(browser.tabs.first?.openedBy == .agent)
     #expect(browser.actionLog.records.contains { $0.tool == "tab_open" })
 
+    // A page the agent shows with `open`, as CLIs do, lands in the web view too.
+    await scenario.type("run:open http://localhost:9/shown\r", into: first, in: environment)
+    #expect(await eventually { browser.tabs.contains { $0.url.path == "/shown" } })
+
     // The other session's agent sees no tab of the first.
     await scenario.type("run:vibe browser list\r", into: second, in: environment)
     #expect(

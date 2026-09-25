@@ -194,7 +194,11 @@ public final class AppEnvironment {
             arguments: [BrowserBridge.bridgeFlag, socketPath])
         ],
         pathPrefix: commandDirectory?.path,
-        environment: [BrowserBridge.socketEnvironmentKey: socketPath])
+        environment: [BrowserBridge.socketEnvironmentKey: socketPath].merging(
+          commandDirectory.map {
+            ["BROWSER": $0.appendingPathComponent("open", isDirectory: false).path]
+          } ?? [:]
+        ) { $1 })
     }
     let launcher = SessionLauncher(
       supervisor: supervisor,
@@ -435,21 +439,43 @@ public final class AppEnvironment {
     return Bundle.main.executablePath
   }
 
-  /// Writes the `vibe` command, pointing at this binary, in the host's private directory: written
-  /// again at each launch, so that it follows the application if it is moved or updated.
+  /// Writes the session terminals' commands in the host's private directory, put in front of their
+  /// `PATH`: `vibe`, pointing at this binary, and `open`, which sends a web page to the session's
+  /// web view — how an agent that shows the user a page, as CLIs do with `open <url>`, shows it
+  /// beside its terminal rather than in another application (#69). Anything else `open` is given,
+  /// or a page when the application is not there, goes to macOS's own. Written again at each
+  /// launch, so that they follow the application when it moves.
   private static func installCommand(
     at location: TerminalHostLocation, executable: String?
   ) -> URL? {
     guard let executable, (try? location.prepare()) != nil else { return nil }
     let directory = location.directory.appendingPathComponent("bin", isDirectory: true)
-    let command = directory.appendingPathComponent("vibe", isDirectory: false)
     let quoted = "'" + executable.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
-    let script = "#!/bin/sh\nexec \(quoted) \(BrowserBridge.commandLineFlag) \"$@\"\n"
+    let flag = BrowserBridge.commandLineFlag
+    let scripts = [
+      "vibe": "#!/bin/sh\nexec \(quoted) \(flag) \"$@\"\n",
+      "open": """
+      #!/bin/sh
+      # A web page opened from a Vibe Manager session goes to the session's web view.
+      if [ "$#" -eq 1 ]; then
+        case "$1" in
+          http://*|https://*)
+            \(quoted) \(flag) browser open "$1" >/dev/null 2>&1 && exit 0
+            ;;
+        esac
+      fi
+      exec /usr/bin/open "$@"
+
+      """,
+    ]
     do {
       try FileManager.default.createDirectory(
         at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-      try Data(script.utf8).write(to: command, options: .atomic)
-      chmod(command.path, 0o700)
+      for (name, script) in scripts {
+        let command = directory.appendingPathComponent(name, isDirectory: false)
+        try Data(script.utf8).write(to: command, options: .atomic)
+        chmod(command.path, 0o700)
+      }
       return directory
     } catch {
       return nil

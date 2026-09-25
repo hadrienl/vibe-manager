@@ -60,9 +60,9 @@ public enum BrowserToolCatalog {
       name: "tab_open", actionClass: .navigate,
       description: """
         Opens an address in a new tab of this session's web view, beside the terminal — a local \
-        development server, a generated page, documentation — and waits up to 15 seconds for it \
-        to load. Says so when nothing listens yet on a local port: start the server, then call \
-        tab_reload.
+        development server, a generated page, an artifact, documentation — and waits up to 15 \
+        seconds for it to load. Use it rather than a browser whenever the user should see a page. \
+        Says so when nothing listens yet on a local port: start the server, then call tab_reload.
         """,
       inputSchema: schema(
         [

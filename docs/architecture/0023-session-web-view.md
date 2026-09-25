@@ -66,6 +66,11 @@ The same channel answers `vibe browser …`, a command put in front of the `PATH
 terminal (a script in the host's directory, written at each launch so that it follows the
 application when it moves), for the shell scripts of the agent and of the user.
 
+An agent that shows the user a page the way CLIs do — `open <url>` — shows it in the web view: the
+same directory holds an `open` that sends a lone `http(s)` address to the session's web view and
+everything else, or a page while the application is closed, to macOS's `open`; `BROWSER` names it
+too. The tools' instructions ask the agent to use `tab_open` whenever the user should see a page.
+
 Claude Code is started with `--allowedTools mcp__vibe-browser`: Vibe Manager asks the user itself
 before anything is done as them, and a second question for the same call would add nothing.
 
