@@ -56,6 +56,25 @@ final class SmokeTests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: "session-row")
   }
 
+  /// Waits for the rows, and on a failure keeps what the interface showed and what it exposed to
+  /// accessibility: a count of 0 alone does not tell a session not created from a row not found.
+  private func expectSessionRows(
+    _ expected: Int, in app: XCUIApplication, timeout: TimeInterval = 10
+  ) {
+    let rows = sessionRows(in: app)
+    let found = XCTNSPredicateExpectation(
+      predicate: NSPredicate { _, _ in rows.count == expected }, object: nil)
+    guard XCTWaiter.wait(for: [found], timeout: timeout) != .completed else { return }
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    let tree = XCTAttachment(string: app.debugDescription)
+    tree.name = "Accessibility tree"
+    tree.lifetime = .keepAlways
+    add(tree)
+    XCTAssertEqual(rows.count, expected)
+  }
+
   private func createSession(named name: String, in app: XCUIApplication) {
     app.typeKey("n", modifierFlags: .command)
     let nameField = app.textFields["new-session-name"]
@@ -77,7 +96,7 @@ final class SmokeTests: XCTestCase {
     for index in 1...3 {
       createSession(named: "Smoke \(index)", in: app)
     }
-    XCTAssertEqual(sessionRows(in: app).count, 3)
+    expectSessionRows(3, in: app)
     let terminal = app.descendants(matching: .any).matching(identifier: "terminal").firstMatch
     XCTAssertTrue(terminal.waitForExistence(timeout: 10))
 
@@ -120,9 +139,7 @@ final class SmokeTests: XCTestCase {
     XCTAssertTrue(app.wait(for: .notRunning, timeout: 30))
 
     app = launch()
-    let rows = sessionRows(in: app)
-    XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20))
-    XCTAssertEqual(rows.count, 3)
+    expectSessionRows(3, in: app, timeout: 20)
     app.terminate()
   }
 
