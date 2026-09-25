@@ -17,13 +17,18 @@ public actor FileAgentActivityLog: AgentActivityLogStore {
 
   private let directory: URL
   private let rotationThreshold: UInt64
+  private let rotationGrace: Duration
 
+  /// - Parameter rotationGrace: how long a log moved aside is still read, for the hooks that
+  ///   opened it before the rename.
   public init(
     directory: URL = FileAgentActivityLog.defaultDirectory(),
-    rotationThreshold: UInt64 = FileAgentActivityLog.rotationThreshold
+    rotationThreshold: UInt64 = FileAgentActivityLog.rotationThreshold,
+    rotationGrace: Duration = .milliseconds(500)
   ) {
     self.directory = directory
     self.rotationThreshold = rotationThreshold
+    self.rotationGrace = rotationGrace
   }
 
   public static func defaultDirectory() -> URL {
@@ -60,7 +65,8 @@ public actor FileAgentActivityLog: AgentActivityLogStore {
     let (stream, continuation) = AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>
       .makeStream(bufferingPolicy: .unbounded)
     let follower = AgentActivityLogFollower(
-      url: logURL(for: id), rotationThreshold: rotationThreshold, continuation: continuation)
+      url: logURL(for: id), rotationThreshold: rotationThreshold, rotationGrace: rotationGrace,
+      continuation: continuation)
     continuation.onTermination = { _ in follower.stop() }
     follower.start(from: position)
     return stream
@@ -90,6 +96,7 @@ final class AgentActivityLogFollower: @unchecked Sendable {
 
   private let url: URL
   private let rotationThreshold: UInt64
+  private let rotationGrace: Duration
   private let continuation: AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>.Continuation
   private let queue = DispatchQueue(label: "com.hadrienl.VibeManager.agent-activity-log")
 
@@ -103,10 +110,12 @@ final class AgentActivityLogFollower: @unchecked Sendable {
   init(
     url: URL,
     rotationThreshold: UInt64,
+    rotationGrace: Duration,
     continuation: AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>.Continuation
   ) {
     self.url = url
     self.rotationThreshold = rotationThreshold
+    self.rotationGrace = rotationGrace
     self.continuation = continuation
   }
 
@@ -178,7 +187,10 @@ final class AgentActivityLogFollower: @unchecked Sendable {
     // rename may still be writing to it, and its line is read once it has had a moment to land.
     let kept = dup(descriptor)
     close()
-    queue.asyncAfter(deadline: .now() + .milliseconds(500)) {
+    let (seconds, attoseconds) = rotationGrace.components
+    let grace = DispatchTimeInterval.milliseconds(
+      Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000))
+    queue.asyncAfter(deadline: .now() + grace) {
       if kept >= 0 {
         self.drain(kept)
         Darwin.close(kept)

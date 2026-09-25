@@ -106,24 +106,29 @@ struct FileAgentActivityLogTests {
   @Test("A log past its size is moved aside, and the next one is followed from its start")
   func rotates() async throws {
     let directory = try temporaryDirectory()
-    let logs = FileAgentActivityLog(directory: directory, rotationThreshold: 16)
+    // A grace long enough for a slow machine to write within it.
+    let logs = FileAgentActivityLog(
+      directory: directory, rotationThreshold: 16, rotationGrace: .seconds(3))
     let id = SessionID()
     let url = try await logs.prepareLog(for: id)
+    // A hook that opened the log before it is moved aside, and writes to it afterwards.
+    let lateHook = try FileHandle(forWritingTo: url)
     try append("Long\t1\t0123456789\n", to: url)
     let stream = await logs.events(for: id, from: nil)
     let first = await take(1, from: stream)
     #expect(first.map(\.0.name) == ["Long"])
 
     // The rotation happened: the hook's next append creates the log again.
-    for _ in 0..<100 where FileManager.default.fileExists(atPath: url.path) {
+    for _ in 0..<250 where FileManager.default.fileExists(atPath: url.path) {
       try await Task.sleep(for: .milliseconds(20))
     }
     #expect(!FileManager.default.fileExists(atPath: url.path))
-    // A hook that had opened the log before the rename still lands its line in it.
-    try append("Late\t2\t\n", to: FileAgentActivityLog.rotatedURL(of: url))
+    try lateHook.seekToEnd()
+    try lateHook.write(contentsOf: Data("Late\t2\t\n".utf8))
+    try lateHook.close()
     FileManager.default.createFile(
       atPath: url.path, contents: Data("Next\t3\t\n".utf8), attributes: [.posixPermissions: 0o644])
-    let next = await take(2, from: stream)
+    let next = await take(2, from: stream, within: .seconds(10))
     #expect(next.map(\.0.name) == ["Late", "Next"])
     let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
     #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
