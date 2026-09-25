@@ -174,20 +174,26 @@ xcodebuild \
   archive
 
 step "Exporting"
-options="$work/ExportOptions.plist"
-cp Configuration/ExportOptions.plist "$options"
-plutil -replace teamID -string "$team" "$options"
+export_options="$work/ExportOptions.plist"
+cp Configuration/ExportOptions.plist "$export_options"
+plutil -replace teamID -string "$team" "$export_options"
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$exported" \
-  -exportOptionsPlist "$options"
+  -exportOptionsPlist "$export_options"
 [[ -d "$app" ]] || fail "the export has no application"
 
 # 4. The binary is what a release must be.
 step "Verifying the signature"
 codesign --verify --deep --strict --verbose=2 "$app" || fail "the signature does not verify"
-entitlements="$(codesign -d --entitlements :- "$app" 2>/dev/null || true)"
-[[ -z "$entitlements" ]] || fail "the application has entitlements, and needs none (ADR 0001)"
-codesign -d --verbose=4 "$app" 2>&1 | grep -q 'flags=.*runtime' \
-  || fail "the hardened runtime is off"
+# The export signs with an empty dictionary: what matters is that it grants nothing.
+entitlements="$(codesign -d --entitlements - --xml "$app" 2>/dev/null || true)"
+if [[ -n "$entitlements" ]]; then
+  [[ "$(print -rn -- "$entitlements" | plutil -convert json -o - -)" == "{}" ]] \
+    || fail "the application has entitlements, and needs none (ADR 0001)"
+fi
+# Read whole, then matched: `grep -q` stops at the first match, the writer gets SIGPIPE, and
+# `pipefail` turns a pass into a failure.
+signature="$(codesign -d --verbose=4 "$app" 2>&1)"
+[[ "$signature" == *"flags="*"(runtime)"* ]] || fail "the hardened runtime is off"
 requirement="$(codesign -d -r- "$app" 2>&1)"
 [[ "$requirement" == *"certificate leaf[subject.OU] = \"$team\""* \
   || "$requirement" == *"certificate leaf[subject.OU] = $team"* ]] \
@@ -196,9 +202,9 @@ requirement="$(codesign -d -r- "$app" 2>&1)"
   || fail "unexpected bundle identifier"
 [[ "$(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString)" == "$version" ]] \
   || fail "the bundle does not carry version $version"
-find "$app" -name mock-agent.sh | grep -q . \
+[[ -n "$(find "$app" -name mock-agent.sh)" ]] \
   || fail "mock-agent.sh is missing: the smoke test runs against it (security review A8)"
-if find "$app" -name 'Local.xcconfig' | grep -q .; then
+if [[ -n "$(find "$app" -name 'Local.xcconfig')" ]]; then
   fail "a Local.xcconfig was bundled"
 fi
 
