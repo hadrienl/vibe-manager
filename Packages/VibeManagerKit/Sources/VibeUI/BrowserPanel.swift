@@ -41,7 +41,9 @@ struct BrowserPanel: View {
       ZStack {
         BrowserWebViewHost(
           workspace: workspace, tab: tab, focusRequest: model.webViewFocusRequest,
-          isPageFocused: { model.isWebPageFocused = $0 })
+          isPageFocused: { model.isWebPageFocused = $0 },
+          isAddressBarFocused: { model.isAddressBarFocused },
+          closeTab: { model.closeWebTab() })
         if let failure = tab.failure {
           BrowserFailureView(tab: tab, failure: failure)
         } else if tab.hasCrashed {
@@ -488,6 +490,8 @@ private struct BrowserWebViewHost: NSViewRepresentable {
   let tab: BrowserTabModel
   let focusRequest: Int
   let isPageFocused: (Bool) -> Void
+  let isAddressBarFocused: () -> Bool
+  let closeTab: () -> Void
 
   func makeCoordinator() -> Coordinator {
     Coordinator(workspace: workspace)
@@ -496,11 +500,15 @@ private struct BrowserWebViewHost: NSViewRepresentable {
   func makeNSView(context: Context) -> BrowserWebViewContainer {
     let container = BrowserWebViewContainer()
     container.focusChanged = isPageFocused
+    container.isAddressBarFocused = isAddressBarFocused
+    container.closeTab = closeTab
     return container
   }
 
   func updateNSView(_ container: BrowserWebViewContainer, context: Context) {
     container.focusChanged = isPageFocused
+    container.isAddressBarFocused = isAddressBarFocused
+    container.closeTab = closeTab
     let webView = workspace.show(tab)
     if webView.superview !== container {
       for case let other as WKWebView in container.subviews where other !== webView {
@@ -544,6 +552,27 @@ private struct BrowserWebViewHost: NSViewRepresentable {
 /// so that ⌘W closes a tab rather than the session while a page has it.
 final class BrowserWebViewContainer: NSView {
   var focusChanged: ((Bool) -> Void)?
+  var isAddressBarFocused: (() -> Bool)?
+  var closeTab: (() -> Void)?
+
+  /// ⌘W with the keyboard in the page or its address bar closes the tab, here rather than through
+  /// the menu. A `WKWebView` keeps ⌘ keys for its page and hands back the ones the page ignores
+  /// later, when the menu no longer takes them; AppKit asks the views of the key window before
+  /// the menu, and this view holds the page, so it is asked first.
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+      .subtracting([.capsLock, .numericPad, .function])
+    guard modifiers == .command, event.charactersIgnoringModifiers?.lowercased() == "w",
+      let closeTab
+    else { return super.performKeyEquivalent(with: event) }
+    let responder = window?.firstResponder as? NSView
+    let inPage = responder.map { $0.isDescendant(of: self) } ?? false
+    guard inPage || isAddressBarFocused?() == true else {
+      return super.performKeyEquivalent(with: event)
+    }
+    closeTab()
+    return true
+  }
   private var observation: NSKeyValueObservation?
 
   /// The page always fills the view: a page moved in from another panel, or from the parking

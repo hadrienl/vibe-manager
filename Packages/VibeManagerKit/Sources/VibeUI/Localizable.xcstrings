@@ -1756,16 +1756,6 @@
         }
       }
     },
-    "Agents may click, type and run JavaScript on this Mac’s pages without asking. On these sites too." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les agents peuvent cliquer, saisir et exécuter du JavaScript sans demander sur les pages de ce Mac, ainsi que sur ces sites."
-          }
-        }
-      }
-    },
     "All time" : {
       "comment" : "A period of the Usage window.",
       "localizations" : {
@@ -2154,32 +2144,12 @@
         }
       }
     },
-    "Claude Code and Codex are started with tools to open, read and use the pages of their session’s web view. Takes effect at the next start of an agent." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude Code et Codex sont lancés avec des outils pour ouvrir, lire et utiliser les pages de la vue web de leur session. Prend effet au prochain lancement d’un agent."
-          }
-        }
-      }
-    },
     "Clear" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer"
-          }
-        }
-      }
-    },
-    "Clear Browsing Data…" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Effacer les données de navigation…"
           }
         }
       }
@@ -2240,6 +2210,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer les données d’utilisation ?"
+          }
+        }
+      }
+    },
+    "Clear…" : {
+      "comment" : "Clears the web view's browsing data.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer…"
           }
         }
       }
@@ -2355,16 +2336,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Continuer quand même"
-          }
-        }
-      }
-    },
-    "Cookies and sign-ins are shared by every session’s web view, and kept apart from Safari’s." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les cookies et les connexions sont partagés par la vue web de toutes les sessions, et séparés de ceux de Safari."
           }
         }
       }
@@ -2784,6 +2755,16 @@
         }
       }
     },
+    "Elsewhere than this Mac, an agent asks before clicking, typing or running JavaScript." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ailleurs que sur ce Mac, un agent demande avant de cliquer, de saisir ou d’exécuter du JavaScript."
+          }
+        }
+      }
+    },
     "Enter an address or #ticket" : {
       "localizations" : {
         "fr" : {
@@ -2992,6 +2973,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "D’après le modèle « %1$@ », révision %2$@"
+          }
+        }
+      }
+    },
+    "From the next start of an agent." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À partir du prochain lancement d’un agent."
           }
         }
       }
@@ -3906,6 +3897,7 @@
       }
     },
     "None" : {
+      "comment" : "No site is always allowed.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3932,16 +3924,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune enregistrée"
-          }
-        }
-      }
-    },
-    "None yet: an agent asks before acting on any other site." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun pour l’instant : un agent demande avant d’agir sur tout autre site."
           }
         }
       }
@@ -5344,6 +5326,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Définir comme ticket"
+          }
+        }
+      }
+    },
+    "Shared by every session, apart from Safari." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partagées par toutes les sessions, séparées de Safari."
           }
         }
       }
@@ -6977,7 +6969,7 @@
       }
     },
     "Web View" : {
-      "comment" : "A section of the Settings window.",
+      "comment" : "A tab of the Settings window.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7886,16 +7878,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "→ %@ a échoué"
-          }
-        }
-      }
-    },
-    "⌥⌘-click opens a link the other way." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un ⌥⌘-clic ouvre un lien de l’autre façon."
           }
         }
       }
