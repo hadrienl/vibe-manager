@@ -12,6 +12,9 @@ public struct RootView: View {
   @State private var idealWidths: IdealColumnWidths?
   /// The "Don't ask again" box of the close confirmation, unticked each time it opens.
   @State private var suppressesCloseConfirmation = false
+  /// The window this view is drawn in: the only one whose visibility says whether its sessions
+  /// are in front of the user.
+  @State private var hostWindow = HostWindow()
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
 
@@ -144,11 +147,13 @@ public struct RootView: View {
     .onReceive(
       NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)
     ) { notification in
-      guard let window = notification.object as? NSWindow, window.isMainWindowCandidate else {
+      // Settings, Usage, a panel or a sheet coming and going says nothing about this window.
+      guard let window = notification.object as? NSWindow, window === hostWindow.window else {
         return
       }
       model.mainWindowVisibilityChanged(window.occlusionState.contains(.visible))
     }
+    .background(HostWindowReader(host: hostWindow))
   }
 
   private func session(_ id: SessionID?) -> WorkSession? {
@@ -1646,11 +1651,23 @@ private struct WorkingSymbolEffect: ViewModifier {
   }
 }
 
-extension NSWindow {
-  /// The workspace window, rather than Settings, a panel or a sheet.
-  fileprivate var isMainWindowCandidate: Bool {
-    canBecomeMain && !(self is NSPanel) && sheetParent == nil
-      && identifier?.rawValue.contains("Settings") != true
+/// Holds the window a view is drawn in, without keeping it alive.
+private final class HostWindow {
+  weak var window: NSWindow?
+}
+
+/// Hands the window a view is drawn in to `HostWindow`, once it has one.
+private struct HostWindowReader: NSViewRepresentable {
+  let host: HostWindow
+
+  func makeNSView(context: Context) -> NSView {
+    let view = NSView()
+    DispatchQueue.main.async { [weak view] in host.window = view?.window }
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    if let window = nsView.window { host.window = window }
   }
 }
 
