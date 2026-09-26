@@ -998,6 +998,27 @@ struct NewSessionRecentFolderTests {
     #expect(model.recentFolders.map { model.isSelected($0) } == [false, true])
   }
 
+  @Test("Without Full Disk Access, a card of a protected folder fills the field unread")
+  func protectedCardIsNotRead() async {
+    let documents = NSHomeDirectory() + "/Documents/api"
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let creationProbe = CountingFolders()
+    let model = NewSessionModel(
+      create: CreateSession(repository: SpyRepository(), agents: registry, folders: creationProbe),
+      registry: registry,
+      fullDiskAccess: .notGranted,
+      recentFolders: recent("/work/web", documents),
+      folderProbe: MappedFolders()
+    )
+    await model.load()
+
+    await model.chooseRecentFolder(model.recentFolders[1])
+
+    #expect(model.draft.workingDirectoryPath == documents)
+    #expect(await creationProbe.count == 0)
+    #expect(model.preselectedFolder == nil)
+  }
+
   @Test("A card is checked like a folder handed back by the open panel")
   func clickingACardChecksTheFolder() async {
     let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])

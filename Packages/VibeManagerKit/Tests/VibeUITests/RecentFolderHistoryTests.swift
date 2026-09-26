@@ -37,6 +37,38 @@ struct RecentFolderHistoryTests {
     #expect(await store.load() == model.recentFolders)
   }
 
+  @Test("A store that could not be read seeds nothing, so a later launch still can")
+  func unreadableStoreSeedsNothing() async {
+    let store = InMemoryRecentFolderStore()
+    let model = AppModel(repository: UnreadableRepository(), recentFolderStore: store)
+
+    await model.load()
+
+    #expect(model.recentFolders.entries.isEmpty)
+    #expect(await store.load() == nil)
+  }
+
+  @Test("A folder seeded by its spelling and created in again is one entry, not two")
+  func seededEntryMergesWithTheCanonicalOne() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
+      UUID().uuidString
+    ).path
+    try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(atPath: folder) }
+    // `/var/folders/…` is a link to `/private/var/folders/…`: two keys for one folder.
+    let linked = folder.replacingOccurrences(of: "/private/var/", with: "/var/")
+    let store = InMemoryRecentFolderStore()
+    let model = AppModel(
+      repository: HistoryRepository(values: [session(in: linked)]), recentFolderStore: store)
+    await model.load()
+
+    await model.complete(
+      SessionCreation(session: session(in: linked), plan: plan(linked)), launching: false)
+
+    #expect(model.recentFolders.entries.count == 1)
+    #expect(model.recentFolders.entries.first?.key == CanonicalPath.of(folder))
+  }
+
   @Test("A history already written is read as it is, even empty")
   func storedHistoryIsNotReseeded() async {
     let store = InMemoryRecentFolderStore(RecentFolders())
@@ -116,6 +148,14 @@ struct RecentFolderHistoryTests {
     }
     Issue.record("The condition never held.")
   }
+}
+
+private struct UnreadableRepository: SessionRepository {
+  struct Unreadable: Error {}
+
+  func sessions() throws -> [WorkSession] { throw Unreadable() }
+  func session(id: SessionID) throws -> WorkSession? { throw Unreadable() }
+  func save(_: WorkSession) throws { throw Unreadable() }
 }
 
 private actor HistoryRepository: SessionRepository {

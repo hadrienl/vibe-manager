@@ -36,7 +36,9 @@ one folder, `/var/x` and `/private/var/x`, are one entry, under the spelling use
 trip through the open panel, and the session schema does not change. It is read entry by entry, so
 an unreadable entry costs that entry only.
 
-An installation that never wrote a history starts from its sessions: their folders, the most
+An installation that never wrote a history starts from its sessions — when they could be read:
+seeding from a store in failure would write an empty history that no later launch replaces. It
+takes their folders, the most
 recently created first, compared by spelling since nothing may be read at launch. A history written
 empty is not seeded again, so folders removed one by one do not come back.
 
@@ -46,7 +48,13 @@ When the sheet opens, each recent folder is looked at through `WorkingDirectoryP
 within 300 ms. A folder macOS guards (`ProtectedFileLocation`) is only looked at when Full Disk
 Access is known to be granted: a `stat` inside `~/Documents` is enough to raise the alert ADR 0010
 took out of this sheet. Those, and the folders a slow volume has not answered for in time, are
-*unverified*: offered as they are, and checked at creation like any folder.
+*unverified*: offered as they are, and checked at creation like any folder. A folder counts as
+guarded when its path or its canonical key is: a link to `~/Documents` leads into `~/Documents`.
+
+`FileManagerWorkingDirectoryProbe` answers from a Dispatch queue, not from the cooperative pool:
+`stat` on a network volume that went away blocks its thread for as long as it takes, and ten such
+threads taken from the pool would starve every task and actor of the application — the budget
+meant to give up on them included.
 
 ### The last folder is preselected — or the next one, said aloud
 

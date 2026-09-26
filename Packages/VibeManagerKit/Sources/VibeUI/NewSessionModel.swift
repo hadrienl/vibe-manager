@@ -264,9 +264,11 @@ public final class NewSessionModel {
   }
 
   public func load() async {
+    // Side by side: the agents need not wait for the folders, nor the folders for the agents.
+    async let agents: Void = refreshAgents(forceRefresh: false)
     await checkRecentFolders()
     preselectRecentFolder()
-    await refreshAgents(forceRefresh: false)
+    await agents
   }
 
   public func refreshAgents(forceRefresh: Bool) async {
@@ -499,9 +501,25 @@ extension NewSessionModel {
     return RecentFolder.lexicalKey(of: path) == RecentFolder.lexicalKey(of: option.folder.path)
   }
 
-  /// A card clicked: the same gesture as a folder handed back by the open panel.
+  /// A card clicked: the same gesture as a folder handed back by the open panel, and checked the
+  /// same way — except a folder macOS guards, without Full Disk Access. The open panel grants
+  /// access to what it hands back; a card does not, so looking at that folder now could raise the
+  /// consent alert in the middle of the form. It is checked at creation, like a typed path.
   public func chooseRecentFolder(_ option: RecentFolderOption) async {
+    guard mayProbe(option.folder) else {
+      preselectedFolder = nil
+      draft.workingDirectoryPath = option.folder.path
+      return
+    }
     await folderChosen(option.folder.path)
+  }
+
+  /// Whether this folder may be looked at without a gesture through the system's own panel. Its
+  /// canonical key is asked too: a link to `~/Documents` is inside `~/Documents`.
+  private func mayProbe(_ folder: RecentFolder) -> Bool {
+    fullDiskAccess == .granted
+      || (ProtectedFileLocation.covering(path: folder.path) == nil
+        && ProtectedFileLocation.covering(path: folder.key) == nil)
   }
 
   /// Remove from Recents: gone from the sheet now, and from the history kept for the next one.
@@ -548,9 +566,7 @@ extension NewSessionModel {
   /// Those, and the ones a slow volume has not answered in time, stay unverified — offered as
   /// they are, and checked at creation like any folder.
   private func checkRecentFolders() async {
-    let probed = recentFolders.map(\.folder).filter { folder in
-      fullDiskAccess == .granted || ProtectedFileLocation.covering(path: folder.path) == nil
-    }
+    let probed = recentFolders.map(\.folder).filter(mayProbe)
     guard !probed.isEmpty else { return }
     let statuses = await RecentFolderProbe.statuses(
       of: probed, probe: folderProbe, budget: recentFolderProbeBudget)

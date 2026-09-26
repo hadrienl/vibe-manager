@@ -11,6 +11,9 @@ extension AppModel {
       recentFolders = stored
       return
     }
+    // A store that could not be read is not an installation without sessions: seeding from it
+    // would write an empty history, and no later launch would seed again.
+    guard case .loaded = state else { return }
     recentFolders = RecentFolders.seeded(from: sessions)
     await recentFolderStore.save(recentFolders)
   }
@@ -22,8 +25,11 @@ extension AppModel {
   /// this folder, so reading it again raises no consent alert that has not already been answered.
   func rememberFolder(of session: WorkSession) async {
     guard let path = session.repositories.first?.path, !path.isEmpty else { return }
-    let key = await Task.detached { CanonicalPath.of(RecentFolder.lexicalKey(of: path)) }.value
-    recentFolders = recentFolders.recording(RecentFolder(path: path, key: key))
+    let lexical = RecentFolder.lexicalKey(of: path)
+    let key = await Task.detached { CanonicalPath.of(lexical) }.value
+    // A folder seeded from the sessions was keyed by its spelling: that entry is this folder too.
+    recentFolders = recentFolders.removing(key: lexical).recording(
+      RecentFolder(path: path, key: key))
     await recentFolderStore.save(recentFolders)
     diagnostics.record(
       .session, .info, "recentFolders.recorded", ["count": .count(recentFolders.entries.count)])

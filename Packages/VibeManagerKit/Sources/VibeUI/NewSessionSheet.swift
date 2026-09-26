@@ -408,7 +408,7 @@ public struct NewSessionSheet: View {
   private var folderField: some View {
     LabeledField(
       Text("Working folder", bundle: .module),
-      help: (model.preselectionNotice ?? model.protectedLocationNotice).map { Text($0) }
+      help: folderNotice.map { Text($0) }
         ?? (model.folderComesFromTemplate
           ? Text("Proposed by the template — change it if needed.", bundle: .module) : nil),
       issues: model.issues(for: .workingDirectory)
@@ -418,6 +418,13 @@ public struct NewSessionSheet: View {
         folderPathField
       }
     }
+  }
+
+  /// What is said under the folder: the last folder gone, and a folder macOS guards, both when
+  /// both apply — neither may hide the other.
+  private var folderNotice: String? {
+    let notices = [model.preselectionNotice, model.protectedLocationNotice].compactMap { $0 }
+    return notices.isEmpty ? nil : notices.joined(separator: " ")
   }
 
   /// The folders sessions were created in, in one column like the agents: three, then the rest
