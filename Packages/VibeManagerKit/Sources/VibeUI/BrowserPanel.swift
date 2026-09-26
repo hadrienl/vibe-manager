@@ -516,8 +516,6 @@ private struct BrowserWebViewHost: NSViewRepresentable {
         workspace.hide(other)
       }
       webView.removeFromSuperview()
-      webView.frame = container.bounds
-      webView.autoresizingMask = [.width, .height]
       container.addSubview(webView)
     }
     if context.coordinator.focusRequest != focusRequest {
@@ -578,8 +576,27 @@ final class BrowserWebViewContainer: NSView {
 
   /// The page always fills the view: a page moved in from another panel, or from the parking
   /// window, keeps the size it had there otherwise.
+  ///
+  /// Never at an empty size, though: a view SwiftUI has just made has none yet, and a page handed
+  /// a zero frame on its way back from the parking window stayed blank — WebKit, waking it, drew
+  /// nothing at that size and did not take the real one until the panel was closed and reopened.
+  /// It keeps the size it had until this view has one.
   override func layout() {
     super.layout()
+    fillBounds()
+  }
+
+  override func resizeSubviews(withOldSize oldSize: NSSize) {
+    fillBounds()
+  }
+
+  override func didAddSubview(_ subview: NSView) {
+    super.didAddSubview(subview)
+    fillBounds()
+  }
+
+  private func fillBounds() {
+    guard !bounds.isEmpty else { return }
     for subview in subviews where subview.frame != bounds {
       subview.frame = bounds
     }
