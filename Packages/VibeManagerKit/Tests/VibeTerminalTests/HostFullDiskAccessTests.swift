@@ -43,6 +43,34 @@ struct HostFullDiskAccessTests {
     await host.shutDown()
   }
 
+  @Test("While another copy holds the host, the application answers for the agents")
+  func heldHostLeavesTheApplicationRunning() async throws {
+    let host = try InProcessTerminalHost(fullDiskAccess: FixedProbe(.granted))
+    let first = host.supervisor()
+    let go = GoFile()
+    _ = try await first.start(TerminalTestSupport.spec(script: go.script), for: SessionID())
+    await first.relinquish(keepRunning: true)
+    let other = host.supervisor()
+    guard case .connected = await other.reconnect() else {
+      Issue.record("The host was not found again")
+      return
+    }
+    let supervisor = host.supervisor()
+    guard case .unavailable = await supervisor.reconnect() else {
+      Issue.record("A second client was served")
+      return
+    }
+
+    // Every terminal of this run starts in the application until the kept agents are taken back:
+    // it is the application's access that counts, not the one a host born now would get.
+    #expect(await supervisor.agentRunnerAccess() == AgentRunnerAccess(runner: .application))
+
+    go.release()
+    await other.relinquish(keepRunning: false)
+    await supervisor.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
   @Test("An idle host is let go at once, without its grace period")
   func idleHostIsRetired() async throws {
     let host = try InProcessTerminalHost(

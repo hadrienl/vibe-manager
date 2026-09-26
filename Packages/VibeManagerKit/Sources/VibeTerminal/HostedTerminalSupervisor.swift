@@ -325,9 +325,13 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
         runner: .host, hostStatus: await hostAccess(),
         runningAgents: await runningHostedSessions().count)
     }
-    // Every terminal of this run starts here: the application answers for them.
-    if isUnavailable || configuration.launcher == nil {
-      return AgentRunnerAccess(runner: .application, runningAgents: await local.runningCount())
+    // The next terminal starts here — the host could not be used, is turned off, or keeps agents
+    // this copy has not taken back — or one already runs here: the application answers for them.
+    let runningHere = await local.runningCount()
+    if isUnavailable || isClosed || awaitsReattach || configuration.launcher == nil
+      || runningHere > 0
+    {
+      return AgentRunnerAccess(runner: .application, runningAgents: runningHere)
     }
     return .none
   }
