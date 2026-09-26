@@ -115,12 +115,16 @@ public struct ConversationView: View {
         .padding(.top, appearance.density == .compact ? 14 : 28)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView) } action: { frame in
+        .onGeometryChange(for: CGRect.self) {
+          $0.frame(in: .scrollView)
+        } action: { frame in
           contentFrame = frame
           model.scrollGeometryChanged(contentFrame: frame, viewportHeight: viewportHeight)
         }
       }
-      .onGeometryChange(for: Double.self) { $0.size.height } action: { height in
+      .onGeometryChange(for: Double.self) {
+        $0.size.height
+      } action: { height in
         viewportHeight = height
         model.scrollGeometryChanged(contentFrame: contentFrame, viewportHeight: height)
       }
