@@ -101,8 +101,9 @@ public struct SessionGroup: Identifiable, Equatable, Sendable {
 /// The sidebar, as a value: the list that is drawn and the rules it is drawn by.
 public enum SidebarContent: Equatable, Sendable {
   case flat([WorkSession])
-  /// The groups of the sessions that are not archived, then the archived ones on their own.
-  case grouped([SessionGroup], archived: [WorkSession])
+  /// One group per working folder. The archived sessions have no column of their own (#80), so
+  /// none are among them.
+  case grouped([SessionGroup])
 }
 
 /// Cuts a list of sessions into one group per working folder. Pure: the disk has been asked
@@ -121,12 +122,8 @@ public enum SessionGrouping {
     customNames: [SessionFolderKey: String] = [:],
     missingFolders: Set<SessionFolderKey> = []
   ) -> SidebarContent {
-    let archived = sessions.filter { $0.status == .archived }
-    let current = sessions.filter { $0.status != .archived }
-    return .grouped(
-      groups(
-        of: current, key: key, customNames: customNames, missingFolders: missingFolders),
-      archived: archived)
+    .grouped(
+      groups(of: sessions, key: key, customNames: customNames, missingFolders: missingFolders))
   }
 
   public static func groups(

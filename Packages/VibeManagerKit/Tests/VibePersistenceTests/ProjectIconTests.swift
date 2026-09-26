@@ -351,6 +351,19 @@ struct SessionStoreIconTests {
     #expect(!decoded.requiresRewrite)
   }
 
+  @Test("A v6 store keeps its task statuses, and is rewritten with room for icons")
+  func v6IsMigrated() throws {
+    let session = WorkSession(name: "Waiting", taskStatus: .waiting)
+    let codec = SessionStoreCodec()
+    let v6 = String(decoding: try codec.encode(sessions: [session]), as: UTF8.self)
+      .replacingOccurrences(of: #""schemaVersion" : 7"#, with: #""schemaVersion" : 6"#)
+
+    let decoded = try codec.decode(Data(v6.utf8))
+
+    #expect(decoded.sessions == [session])
+    #expect(decoded.requiresRewrite)
+  }
+
   @Test("An icon that does not name a digest is dropped, and the session kept")
   func invalidIconIsDropped() throws {
     let document =

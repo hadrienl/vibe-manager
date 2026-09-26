@@ -168,24 +168,3 @@ struct SessionGroupHeader: View {
     }
   }
 }
-
-/// The archived sessions of the Closed tab, apart from the groups: they no longer count in them.
-struct ArchivedSectionHeader: View {
-  let count: Int
-
-  var body: some View {
-    HStack(spacing: 6) {
-      Image(systemName: "archivebox")
-        .foregroundStyle(.secondary)
-        .frame(width: 16, height: 16)
-      Text("Archived Sessions", bundle: .module, comment: "A section of the sidebar.")
-      Spacer(minLength: 4)
-      Text(verbatim: "\(count)")
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
-    }
-    .font(.subheadline.weight(.semibold))
-    .accessibilityElement(children: .combine)
-    .accessibilityAddTraits(.isHeader)
-  }
-}

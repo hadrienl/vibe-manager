@@ -11,8 +11,8 @@ extension AppModel {
     layout.sidebarMode
   }
 
-  /// The sidebar as it is drawn: the same sessions as `visibleSessions`, in the same order, cut
-  /// into groups when the user asked for them.
+  /// The column on screen as it is drawn: the same sessions as `visibleSessions`, in the same
+  /// order, cut into groups when the user asked for them.
   public var sidebarContent: SidebarContent {
     let visible = visibleSessions
     guard sidebarMode == .byFolder else { return .flat(visible) }
@@ -29,9 +29,8 @@ extension AppModel {
     switch sidebarContent {
     case .flat(let sessions):
       return sessions
-    case .grouped(let groups, let archived):
+    case .grouped(let groups):
       return groups.flatMap { isExpanded($0) ? $0.sessions : [] }
-        + (isArchivedSectionExpanded ? archived : [])
     }
   }
 
@@ -40,8 +39,8 @@ extension AppModel {
     switch sidebarContent {
     case .flat(let sessions):
       return sessions
-    case .grouped(let groups, let archived):
-      return groups.flatMap(\.sessions) + archived
+    case .grouped(let groups):
+      return groups.flatMap(\.sessions)
     }
   }
 
@@ -60,10 +59,6 @@ extension AppModel {
 
   public func isExpanded(_ group: SessionGroup) -> Bool {
     isSearching || !layout.collapsedFolders.contains(group.foldKey)
-  }
-
-  public var isArchivedSectionExpanded: Bool {
-    isSearching || layout.isArchivedSectionExpanded
   }
 
   /// A search shows every group unfolded: a fold made then would be stored without being seen,
@@ -90,14 +85,9 @@ extension AppModel {
     layout.setCollapsed(!isExpanded, folders: [group.foldKey])
   }
 
-  public func setArchivedSectionExpanded(_ isExpanded: Bool) {
-    guard canFold else { return }
-    layout.setArchivedSectionExpanded(isExpanded)
-  }
-
   /// The group of the selected session, in the grouped view.
   public var selectedGroup: SessionGroup? {
-    guard case .grouped(let groups, _) = sidebarContent, let selectedSessionID else { return nil }
+    guard case .grouped(let groups) = sidebarContent, let selectedSessionID else { return nil }
     return groups.first { group in group.sessions.contains { $0.id == selectedSessionID } }
   }
 
@@ -112,7 +102,7 @@ extension AppModel {
   }
 
   public var groups: [SessionGroup] {
-    guard case .grouped(let groups, _) = sidebarContent else { return [] }
+    guard case .grouped(let groups) = sidebarContent else { return [] }
     return groups
   }
 
@@ -136,12 +126,8 @@ extension AppModel {
   /// Unfolds whatever hides a session.
   func reveal(_ id: SessionID) {
     guard sidebarMode == .byFolder,
-      let session = sessions.first(where: { $0.id == id })
+      let session = sessions.first(where: { $0.id == id }), session.taskStatus != .archived
     else { return }
-    if session.status == .archived {
-      if !layout.isArchivedSectionExpanded { layout.setArchivedSectionExpanded(true) }
-      return
-    }
     let key = folderKey(for: session) ?? .unfiled
     if layout.collapsedFolders.contains(key) {
       layout.setCollapsed(false, folders: [key])
@@ -166,20 +152,10 @@ extension AppModel {
 
   // MARK: - Status
 
-  /// What a session's row says, and what its group's header folds together.
-  public func status(of session: WorkSession) -> SessionStatusPresentation {
-    if isRestoring(session.id) { return .restoring }
-    let pane = pane(for: session.id)
-    return SessionStatusPresentation.make(
-      session: session,
-      paneStatus: pane?.status,
-      resolution: resolution(forID: session.id),
-      wasStoppedOnPurpose: pane?.wasStoppedOnPurpose == true,
-      activity: activity(for: session.id))
-  }
-
+  /// What a group's header folds together: its rows' states, a restoration included.
   public func summary(of group: SessionGroup) -> SessionGroupSummary {
-    SessionGroupStatus.aggregate(group.sessions.map(status(of:)))
+    SessionGroupStatus.aggregate(
+      group.sessions.map { isRestoring($0.id) ? .restoring : statusPresentation(for: $0) })
   }
 
   // MARK: - Loading

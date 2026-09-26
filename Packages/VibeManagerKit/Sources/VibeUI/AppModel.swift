@@ -925,7 +925,7 @@ public final class AppModel {
   /// clears `pendingArchive`. Reading it here made Archive do nothing at all.
   public func archive(_ id: SessionID) async {
     pendingArchive = nil
-    let visible = visibleSessions
+    let visible = orderedSessions
     let wasSelected = selectedSessionID == id
     do {
       let archival = try await archiveSession(id: id)
@@ -997,7 +997,7 @@ public final class AppModel {
       return
     }
 
-    let visible = visibleSessions
+    let visible = orderedSessions
     let wasSelected = selectedSessionID == id
     do {
       try await changeTaskStatus(id: id, to: status)
@@ -1039,7 +1039,8 @@ public final class AppModel {
       !visibleSessions.contains(where: { $0.id == id })
     else { return }
     let remaining = visible.filter { $0.id != id }
-    let neighbour = remaining.indices.contains(index) ? remaining[index] : remaining.last
+    let neighbour = Self.neighbour(
+      at: index, in: remaining, shown: Set(displayedSessions.map(\.id)))
     guard let neighbour, visibleSessions.contains(where: { $0.id == neighbour.id }) else {
       // An emptied column keeps the selection, as `reconcileSelection` does: the session just
       // moved stays on screen rather than leaving the main area blank.
@@ -1057,7 +1058,18 @@ public final class AppModel {
       return
     }
     let remaining = visible.filter { $0.id != id }
-    preferredSelection = (remaining.indices.contains(index) ? remaining[index] : remaining.last)?.id
+    preferredSelection =
+      Self.neighbour(at: index, in: remaining, shown: Set(displayedSessions.map(\.id)))?.id
+  }
+
+  /// The row that takes a leaving session's place, in the order the sidebar draws them: the next
+  /// one on screen, or the one above at the end. The rows a folded group hides are stepped over.
+  private static func neighbour(
+    at index: Int, in remaining: [WorkSession], shown: Set<SessionID>
+  ) -> WorkSession? {
+    let split = min(index, remaining.count)
+    return remaining[split...].first { shown.contains($0.id) }
+      ?? remaining[..<split].last { shown.contains($0.id) }
   }
 
   /// ⌥⌘→ and ⌥⌘←: the next or the previous status, without a confirmation — the shortcut is

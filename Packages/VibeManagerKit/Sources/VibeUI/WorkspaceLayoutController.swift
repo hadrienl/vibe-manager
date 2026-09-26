@@ -253,14 +253,6 @@ public final class WorkspaceLayoutController {
     }
   }
 
-  public var isArchivedSectionExpanded: Bool {
-    settings.isArchivedSectionExpanded
-  }
-
-  public func setArchivedSectionExpanded(_ isExpanded: Bool) {
-    updateIntent { $0.isArchivedSectionExpanded = isExpanded }
-  }
-
   /// Whether the agent and the initial prompt are unfolded under the notes.
   public func setSessionDetailsExpanded(_ isExpanded: Bool) {
     guard settings.isSessionDetailsExpanded != isExpanded else { return }

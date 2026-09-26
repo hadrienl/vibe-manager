@@ -2427,17 +2427,6 @@
         }
       }
     },
-    "Archived Sessions" : {
-      "comment" : "A section of the sidebar.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessions archivées"
-          }
-        }
-      }
-    },
     "Archive…" : {
       "comment" : "Changes a session's task status.",
       "localizations" : {

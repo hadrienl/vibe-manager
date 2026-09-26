@@ -280,13 +280,13 @@ private struct GroupCommands: View {
     Button("Collapse Group") {
       model.collapseSelectedGroup()
     }
-    .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+    .keyboardShortcut(.leftArrow, modifiers: [.command, .option, .control])
     .disabled(model.selectedGroup == nil || !model.canFold)
 
     Button("Expand Group") {
       model.expandSelectedGroup()
     }
-    .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+    .keyboardShortcut(.rightArrow, modifiers: [.command, .option, .control])
     .disabled(model.selectedGroup == nil || !model.canFold)
 
     Button("Collapse All Groups") {

@@ -104,25 +104,6 @@ struct SessionGroupingTests {
     #expect(result[0].sessions.count == 2)
   }
 
-  @Test("Archived sessions leave the groups, and a group left empty disappears")
-  func archivedSessionsAreApart() {
-    let content = SessionGrouping.content(
-      of: [
-        session("Closed", status: .closed),
-        session("Archived api", status: .archived),
-        session("Archived web", in: ["/work/web"], status: .archived),
-      ],
-      key: lexical)
-
-    guard case .grouped(let groups, let archived) = content else {
-      Issue.record("Expected groups")
-      return
-    }
-    #expect(groups.map(\.folderName) == ["api"])
-    #expect(groups[0].sessions.map(\.name) == ["Closed"])
-    #expect(Set(archived.map(\.name)) == ["Archived api", "Archived web"])
-  }
-
   @Test("A renamed group keeps its folder, its path and its sessions")
   func renamingTouchesNothingElse() {
     let key = SessionFolderKey(path: "/work/api")
@@ -233,12 +214,11 @@ struct SessionFolderKeyDiskTests {
 
 @Suite("Keeping the grouped sidebar in the layout")
 struct WorkspaceLayoutGroupingTests {
-  @Test("The mode, the folds and the archived section come back as they were left")
+  @Test("The mode and the folds come back as they were left")
   func roundTrip() throws {
     let layout = WorkspaceLayout(
       sidebarMode: .byFolder,
-      collapsedFolders: [SessionFolderKey(path: "/work/api"), SessionFolderKey(path: "")],
-      isArchivedSectionExpanded: true)
+      collapsedFolders: [SessionFolderKey(path: "/work/api"), SessionFolderKey(path: "")])
 
     let decoded = try JSONDecoder().decode(
       WorkspaceLayout.self, from: try JSONEncoder().encode(layout))

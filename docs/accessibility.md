@@ -24,7 +24,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌘1…⌘9 | The session at that position in the list, as drawn: folded groups are skipped | View |
 | ⌃⌘→ / ⌃⌘← | Next / Previous Column (To Do, In Progress, Waiting, Done) | View |
 | ⌃⌘G | Group Sessions by Folder | View |
-| ⌥⌘← / ⌥⌘→ | Collapse / Expand the group of the selected session | View |
+| ⌃⌥⌘← / ⌃⌥⌘→ | Collapse / Expand the group of the selected session | View |
 | ⌥⌘I | Show / Hide Context | View |
 | ⌃⌥⌘O | Read Last Output: VoiceOver says the last five lines the terminal showed | View |
 

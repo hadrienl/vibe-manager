@@ -160,12 +160,12 @@ struct SessionTicketStoreTests {
     ]
     let data = try codec.encode(sessions: sessions)
     let text = String(decoding: data, as: UTF8.self)
-    #expect(text.contains(#""schemaVersion" : 6"#))
+    #expect(text.contains(#""schemaVersion" : 7"#))
     let decoded = try codec.decode(data)
     #expect(decoded.sessions.map(\.ticket) == sessions.map(\.ticket))
     #expect(!decoded.requiresRewrite)
 
-    let v4 = text.replacingOccurrences(of: #""schemaVersion" : 6"#, with: #""schemaVersion" : 4"#)
+    let v4 = text.replacingOccurrences(of: #""schemaVersion" : 7"#, with: #""schemaVersion" : 4"#)
     let old = try codec.decode(Data(v4.utf8))
     #expect(old.requiresRewrite)
     #expect(old.sessions.count == 3)

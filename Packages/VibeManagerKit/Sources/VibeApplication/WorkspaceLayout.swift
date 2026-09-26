@@ -42,8 +42,6 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// The folders whose group is folded. Never pruned: a group that went away because all of its
   /// sessions were archived folds back the way it was if it returns.
   public var collapsedFolders: Set<SessionFolderKey>
-  /// Whether the archived sessions, listed apart in the grouped Closed tab, are unfolded.
-  public var isArchivedSectionExpanded: Bool
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -57,8 +55,7 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     browserWidth: Double = 520,
     inspectorTopTab: InspectorTopTab = .activity,
     sidebarMode: SidebarMode = .flat,
-    collapsedFolders: Set<SessionFolderKey> = [],
-    isArchivedSectionExpanded: Bool = false
+    collapsedFolders: Set<SessionFolderKey> = []
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -72,13 +69,12 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.inspectorTopTab = inspectorTopTab
     self.sidebarMode = sidebarMode
     self.collapsedFolders = collapsedFolders
-    self.isArchivedSectionExpanded = isArchivedSectionExpanded
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
     case sessionFilter, inspectorSplit, isSessionDetailsExpanded, browserWidth, inspectorTopTab
-    case sidebarMode, collapsedFolders, isArchivedSectionExpanded
+    case sidebarMode, collapsedFolders
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -107,9 +103,7 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       sidebarMode: (try? container.decodeIfPresent(SidebarMode.self, forKey: .sidebarMode))
         ?? .flat,
       collapsedFolders: (try? container.decodeIfPresent(
-        Set<SessionFolderKey>.self, forKey: .collapsedFolders)) ?? [],
-      isArchivedSectionExpanded: (try? container.decodeIfPresent(
-        Bool.self, forKey: .isArchivedSectionExpanded)) ?? false
+        Set<SessionFolderKey>.self, forKey: .collapsedFolders)) ?? []
     )
   }
 }

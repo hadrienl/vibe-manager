@@ -174,18 +174,29 @@ struct SidebarGroupsTests {
     #expect(model.isExpanded(try #require(model.groups.first)))
   }
 
-  @Test("Closing a session a fold hides moves the selection to the nearest row on screen")
-  func closingAHiddenSelection() async throws {
+  @Test("A session moved out of the column hands the selection to the next row drawn")
+  func movingHandsOffInTheDrawnOrder() async throws {
     let model = await makeModel()
-    model.select(apiNew.id)
-    model.collapseSelectedGroup()
+    // Drawn: Api new, Api old, Web new, Web old — not the order of the sort.
+    model.select(apiOld.id)
 
-    await model.close(apiNew.id)
+    await model.setTaskStatus(.done, for: apiOld.id)
 
     #expect(model.selectedSessionID == webNew.id)
-    #expect(model.filter.scope == .active)
-    let api = try #require(model.groups.first { $0.folderName == "api" })
-    #expect(!model.isExpanded(api))
+  }
+
+  @Test("The row that takes a moved session's place is never one a fold hides")
+  func movingSkipsFoldedRows() async throws {
+    let model = await makeModel()
+    model.select(webNew.id)
+    model.setExpanded(false, group: try #require(model.groups.first { $0.folderName == "api" }))
+    model.select(apiNew.id)
+    model.setExpanded(false, group: try #require(model.groups.first { $0.folderName == "api" }))
+
+    await model.setTaskStatus(.done, for: apiNew.id)
+
+    #expect(model.selectedSessionID == webNew.id)
+    #expect(!model.isExpanded(try #require(model.groups.first { $0.folderName == "api" })))
   }
 
   @Test("The list dropping the selection of a row it folds away does not clear it")
@@ -233,12 +244,10 @@ struct SidebarGroupsTests {
 
     model.setExpanded(false, group: try #require(model.groups.first))
     model.setAllGroupsExpanded(false)
-    model.setArchivedSectionExpanded(true)
     model.setSearchText("")
 
     #expect(model.canFold)
     #expect(model.layout.collapsedFolders.isEmpty)
-    #expect(!model.layout.isArchivedSectionExpanded)
     #expect(model.displayedSessions.count == 4)
   }
 

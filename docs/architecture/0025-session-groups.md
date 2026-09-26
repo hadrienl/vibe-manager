@@ -19,6 +19,11 @@ narrowed, scoped and sorted — into one group per folder, and never sorts it ag
 sessions in the order of the sort, and the groups come in the order of their first session. The
 grouped view therefore shows exactly the sessions of the flat one, in the same relative order.
 
+Grouping cuts the column on screen (ADR 0024), not the whole store: each of To Do, In Progress,
+Waiting and Done is grouped on its own, and a folder has a group in every column that holds one of
+its sessions. The folds are the folder's, shared by every column. A swipe works in a group as in the
+flat list; a group's header is a row of the table, with nothing to swipe.
+
 The folder is the session's first repository (#7, #10), where its agent starts. A second repository
 (#12) or a worktree the agent made (`git.worktreePath`) never makes a group of its own.
 
@@ -28,7 +33,6 @@ Only what the user wrote or arranged is kept, under the folder's canonical path:
 |---|---|---|
 | Flat or grouped | `WorkspaceLayout.sidebarMode` | an arrangement of the view, like the sort |
 | Folded groups | `WorkspaceLayout.collapsedFolders` | the same; never pruned, so a group that comes back folds back |
-| The archived section, unfolded | `WorkspaceLayout.isArchivedSectionExpanded` | the same |
 | Group names | `folders.json`, next to `sessions.json` | text the user wrote, which a corrupted preference must not cost |
 
 Each new layout field is decoded on its own, like the filter: a value a later build wrote costs the
@@ -54,9 +58,9 @@ A folder that was moved or deleted keeps its group under its old path, with `que
 and « Folder not found ». The application does not follow it: its sessions still point at the old
 path, and restarting them already says why it cannot (#10).
 
-Sessions without a folder — a store older than #7 — are filed last, under « No Folder ». In the
-Closed tab, the archived sessions are listed apart, in an « Archived Sessions » section folded by
-default: they no longer count in their groups, and a group whose sessions are all archived is gone.
+Sessions without a folder — a store older than #7 — are filed last, under « No Folder ». The
+archived sessions have no column (ADR 0024), and are never grouped: they stay in the list at the
+foot of the sidebar.
 
 ### The keyboard follows what is drawn
 
@@ -66,10 +70,13 @@ its own order. From a selection a fold hides, ⌥⌘↓ goes on from where that 
 
 Folding the group of the selection keeps it, and its terminal on screen; the header then says it
 holds the selection. Selecting a hidden session — quick switch, a new session, a banner — unfolds its
-group. A search shows every group unfolded, without touching the folds stored. At launch, folds,
+group. A search shows every group unfolded, without touching the folds stored; folding is disabled
+while it lasts, so that no fold is stored unseen and lands once the search is cleared. A session
+that leaves the column — moved, archived — hands the selection to the next row on screen, in the
+order the groups draw them. At launch, folds,
 mode and selection come back as they were, a selection in a folded group included.
 
-The View menu has Group Sessions by Folder (⌃⌘G), Collapse Group (⌥⌘←) and Expand Group (⌥⌘→) for
+The View menu has Group Sessions by Folder (⌃⌘G), Collapse Group (⌃⌥⌘←) and Expand Group (⌃⌥⌘→) for
 the group of the selection, and Collapse / Expand All Groups. The footer of the sidebar has the same
 toggle. A header is an accessibility header, so the rotor walks the groups, with Expand / Collapse
 and Rename as named actions.
@@ -138,4 +145,4 @@ that names one.
 ## Out of scope
 
 Following a moved folder (bookmarks), reordering groups by hand (#44 will move the mode toggle
-where Active and Closed are), and grouping by priority (#63).
+where Active and Closed were), and grouping by priority (#63).

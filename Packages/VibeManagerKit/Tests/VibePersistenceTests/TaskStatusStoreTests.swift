@@ -90,7 +90,7 @@ struct TaskStatusStoreTests {
     #expect(decoded.sessions == [session])
     #expect(decoded.requiresRewrite == false)
     let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-    #expect(object["schemaVersion"] as? Int == 6)
+    #expect(object["schemaVersion"] as? Int == 7)
   }
 
   @Test("A status written by a later build is read from the lifecycle")
