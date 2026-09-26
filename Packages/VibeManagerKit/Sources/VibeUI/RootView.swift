@@ -1602,6 +1602,8 @@ struct SidebarFooter: View {
       }
       .menuStyle(.borderlessButton)
       .fixedSize()
+      // Where the order arranged by hand is found, for whoever looks for how to drag a row (#44).
+      .help(model.reorderUnavailableReason.map { Text($0) } ?? Text(model.filter.sort.label))
 
       Spacer(minLength: 0)
 
@@ -1667,6 +1669,10 @@ struct SessionCommands {
   /// Spoken rather than read, so it says what the command will actually do.
   var restartAnnouncement: String { model.expectedRestartMode(for: session) }
   var canSwitchAgent: Bool { model.canSwitchAgent(session) }
+  /// Whether the order can be arranged at all: the Manual sort, nothing narrowing the list (#44).
+  var canReorder: Bool { model.canReorder }
+  var canMoveUp: Bool { model.canMove(session.id, by: -1) }
+  var canMoveDown: Bool { model.canMove(session.id, by: 1) }
   var taskStatus: SessionTaskStatus { session.taskStatus }
   /// The statuses the session can be moved to by hand. Archiving and unarchiving keep their own
   /// commands, which say what they do to the process.
@@ -1679,6 +1685,8 @@ struct SessionCommands {
   func restore() { Task { await model.restore(session.id) } }
   func restart() { Task { await model.restart(session.id) } }
   func switchAgent() { model.beginAgentSwitch(session.id) }
+  func moveUp() { Task { await model.move(session.id, by: -1) } }
+  func moveDown() { Task { await model.move(session.id, by: 1) } }
   func setTaskStatus(_ status: SessionTaskStatus) {
     Task { await model.setTaskStatus(status, for: session.id) }
   }
@@ -1703,6 +1711,14 @@ struct SessionCommandButtons: View {
         Text(
           "Status", bundle: .module, comment: "The submenu that moves a session between columns.")
       }
+      Divider()
+    }
+    // Only where the order can be arranged: in any other sort they would always be greyed out.
+    if commands.canReorder {
+      Button(LocalizedStringResource("Move Up", bundle: .module)) { commands.moveUp() }
+        .disabled(!commands.canMoveUp)
+      Button(LocalizedStringResource("Move Down", bundle: .module)) { commands.moveDown() }
+        .disabled(!commands.canMoveDown)
       Divider()
     }
     if commands.canRestart {
@@ -1815,6 +1831,23 @@ struct SessionRow: View {
     .accessibilityAction(named: Text("Unarchive", bundle: .module)) {
       guard commands.canRestore else { return }
       commands.restore()
+    }
+    // The drag that reorders, reachable without it (#44).
+    .accessibilityActions {
+      if commands.canMoveUp {
+        Button {
+          commands.moveUp()
+        } label: {
+          Text("Move Up", bundle: .module)
+        }
+      }
+      if commands.canMoveDown {
+        Button {
+          commands.moveDown()
+        } label: {
+          Text("Move Down", bundle: .module)
+        }
+      }
     }
     // The swipe's buttons, reachable without it: one action per status the session can go to.
     .accessibilityActions {

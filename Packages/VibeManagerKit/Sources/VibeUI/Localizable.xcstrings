@@ -623,6 +623,17 @@
         }
       }
     },
+    "%@, group %lld of %lld" : {
+      "comment" : "Said after a group is moved: its name, where it is now.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, groupe %2$lld sur %3$lld"
+          }
+        }
+      }
+    },
     "%@, no commits yet" : {
       "comment" : "A branch's name, before its first commit.",
       "localizations" : {
@@ -650,6 +661,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@, ouvert par l’agent, l’agent est en train d’agir"
+          }
+        }
+      }
+    },
+    "%@, position %lld of %lld" : {
+      "comment" : "Said after a session is moved: its name, where it is now.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, position %2$lld sur %3$lld"
           }
         }
       }
@@ -3058,6 +3080,16 @@
         }
       }
     },
+    "Choose Sort By › Manual to reorder the sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez Trier par › Manuel pour réordonner les sessions."
+          }
+        }
+      }
+    },
     "Choose a folder" : {
       "localizations" : {
         "fr" : {
@@ -3125,6 +3157,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer le filtre"
+          }
+        }
+      }
+    },
+    "Clear the filter to reorder the sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacez le filtre pour réordonner les sessions."
           }
         }
       }
@@ -4811,6 +4853,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Descendre"
+          }
+        }
+      }
+    },
+    "Move Group Down" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descendre le groupe"
+          }
+        }
+      }
+    },
+    "Move Group Up" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monter le groupe"
           }
         }
       }

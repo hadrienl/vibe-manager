@@ -114,7 +114,7 @@ func legacyStoreMigration() async throws {
   let migratedData = try Data(contentsOf: storeURL)
   let rawObject = try JSONSerialization.jsonObject(with: migratedData)
   let object = try #require(rawObject as? [String: Any])
-  #expect(object["schemaVersion"] as? Int == 7)
+  #expect(object["schemaVersion"] as? Int == 8)
 }
 
 @Test("A future schema is rejected without modifying the store")
@@ -407,6 +407,8 @@ func subMillisecondDatesRoundTrip() async throws {
       updatedAt: now
     )
     try await repository.save(session)
+    // Each new session enters above the last one (#44).
+    session.rank = -index
     saved.append(session)
   }
 

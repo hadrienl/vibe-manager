@@ -18,9 +18,12 @@ struct SessionStoreCodec {
   ///
   /// v5 adds the ticket a session works on (#69), and v6 each session's task status (#80), for
   /// the same reason: an older build would erase them. v7 adds the project icon of a session's
-  /// appearance (#27), again for that reason. Each shape is the one before with one more optional
-  /// field, so all four are read by the same structure.
-  static let currentSchemaVersion = 7
+  /// appearance (#27), again for that reason. v8 adds each session's place in the order arranged
+  /// by hand (#44). Each shape is the one before with one more optional field, so all five are
+  /// read by the same structure.
+  static let currentSchemaVersion = 8
+  /// v7 is v8 without the ranks: the sessions are ranked in the order the store lists them.
+  static let ranklessSchemaVersion = 7
   /// v6 is v7 without the project icon: the session wears the symbol and the colour it had.
   static let iconlessSchemaVersion = 6
   /// v5 is v6 without the task status, which is read from the lifecycle instead.
@@ -33,10 +36,10 @@ struct SessionStoreCodec {
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV7(
+    let envelope = StoreEnvelopeV8(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV7.init)
+      sessions: sessions.map(StoredSessionV8.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -49,7 +52,7 @@ struct SessionStoreCodec {
       throw SessionStoreCodecError.invalidStore
     }
 
-    let sessions: [WorkSession]
+    var sessions: [WorkSession]
     let requiresRewrite: Bool
     do {
       switch probe.schemaVersion {
@@ -66,15 +69,15 @@ struct SessionStoreCodec {
         sessions = previous.sessions.map(\.workSession)
         requiresRewrite = true
       case Self.ticketlessSchemaVersion, Self.statuslessSchemaVersion:
-        let previous = try Self.makeDecoder().decode(StoreEnvelopeV7.self, from: data)
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV8.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: false) }
         requiresRewrite = true
-      case Self.iconlessSchemaVersion:
-        let previous = try Self.makeDecoder().decode(StoreEnvelopeV7.self, from: data)
+      case Self.iconlessSchemaVersion, Self.ranklessSchemaVersion:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV8.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = true
       case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV7.self, from: data)
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV8.self, from: data)
         sessions = current.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = false
       case Self.abandonedSchemaVersion:
@@ -84,6 +87,9 @@ struct SessionStoreCodec {
       default:
         throw SessionStoreCodecError.unsupportedSchemaVersion(probe.schemaVersion)
       }
+      if probe.schemaVersion < Self.currentSchemaVersion {
+        sessions = Self.rankedByActivity(sessions)
+      }
       try validate(sessions)
     } catch let error as SessionStoreCodecError {
       throw error
@@ -91,6 +97,22 @@ struct SessionStoreCodec {
       throw SessionStoreCodecError.invalidStore
     }
     return SessionStoreDecodeResult(sessions: sessions, requiresRewrite: requiresRewrite)
+  }
+
+  /// The order a store written before #44 is given: the one it was listed in, last activity
+  /// first. Choosing Manual in the sort menu at the first launch then moves nothing.
+  static func rankedByActivity(_ sessions: [WorkSession]) -> [WorkSession] {
+    sessions
+      .sorted {
+        $0.updatedAt != $1.updatedAt
+          ? $0.updatedAt > $1.updatedAt : $0.id.description < $1.id.description
+      }
+      .enumerated()
+      .map { index, session in
+        var ranked = session
+        ranked.rank = index
+        return ranked
+      }
   }
 
   private func validate(_ sessions: [WorkSession]) throws {
@@ -144,17 +166,17 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-/// Reads v4 to v6 as well: a v6 session is a v7 one without an icon, a v5 one has no `taskStatus`
-/// either, and a v4 one no `ticket`.
-private struct StoreEnvelopeV7: Codable {
+/// Reads v4 to v7 as well: a v7 session is a v8 one without a rank, a v6 one has no icon either,
+/// a v5 one no `taskStatus`, and a v4 one no `ticket`.
+private struct StoreEnvelopeV8: Codable {
   let schemaVersion: Int
   let savedAt: Date
-  let sessions: [StoredSessionV7]
+  let sessions: [StoredSessionV8]
 }
 
 /// A v2 session, the history of its agent switches (v4), its ticket (v5), its task status (v6) and
-/// its project icon (v7).
-private struct StoredSessionV7: Codable {
+/// its project icon (v7) and its rank (v8).
+private struct StoredSessionV8: Codable {
   let id: UUID
   let name: String
   let initialPrompt: String
@@ -169,6 +191,8 @@ private struct StoredSessionV7: Codable {
   /// Spelled out rather than decoded as the enum: a status written by a later build is read from
   /// the lifecycle, as if it had never been written, instead of taking the whole store down.
   let taskStatus: String?
+  /// Absent before v8, where the codec ranks the sessions itself.
+  let rank: Int?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
@@ -183,6 +207,7 @@ private struct StoredSessionV7: Codable {
     agentHistory = session.agentHistory.map(StoredAgentChangeV4.init)
     ticket = session.ticket.map(StoredTicketV5.init)
     taskStatus = session.taskStatus.rawValue
+    rank = session.rank
   }
 
   /// - Parameter recordsStart: the document was written by a build that records the start of
@@ -208,6 +233,7 @@ private struct StoredSessionV7: Codable {
       agentHistory: (agentHistory ?? []).map(\.domainValue),
       ticket: ticket?.domainValue,
       taskStatus: storedTaskStatus,
+      rank: rank ?? 0,
       infersStartedAt: !recordsStart
     )
   }

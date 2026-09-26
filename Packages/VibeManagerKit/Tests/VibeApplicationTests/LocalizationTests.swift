@@ -9,10 +9,10 @@ struct LocalizationTests {
   func sorts() {
     #expect(
       SessionSort.allCases.map { Localization.string($0.label, in: "en") }
-        == ["Last Activity", "Date Created", "Name"])
+        == ["Last Activity", "Date Created", "Name", "Manual"])
     #expect(
       SessionSort.allCases.map { Localization.string($0.label, in: "fr") }
-        == ["Dernière activité", "Date de création", "Nom"])
+        == ["Dernière activité", "Date de création", "Nom", "Manuel"])
   }
 
   @Test(

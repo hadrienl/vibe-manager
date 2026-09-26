@@ -151,6 +151,22 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut(.upArrow, modifiers: [.command, .option])
 
+        // The order arranged by hand (#44), as the prompt templates are: only in the Manual sort,
+        // and never out of the session's group. Over Settings, the same keys move a template.
+        Button("Move Up") {
+          Task { await environment.appModel.moveSelection(by: -1) }
+        }
+        .keyboardShortcut(.upArrow, modifiers: [.command, .control])
+        .disabled(
+          windowFocus.front != .workspace || !environment.appModel.canMoveSelection(by: -1))
+
+        Button("Move Down") {
+          Task { await environment.appModel.moveSelection(by: 1) }
+        }
+        .keyboardShortcut(.downArrow, modifiers: [.command, .control])
+        .disabled(
+          windowFocus.front != .workspace || !environment.appModel.canMoveSelection(by: 1))
+
         SessionPositionCommands(model: environment.appModel)
 
         Divider()
@@ -178,6 +194,17 @@ struct VibeManagerApp: App {
           environment.appModel.focusSidebar()
         }
         .keyboardShortcut("1", modifiers: [.command, .option])
+
+        // The quiet way in to the archive, from the keyboard (#44).
+        Button(
+          String(
+            localized: "Show Archived Sessions (\(environment.appModel.archivedSessions.count))",
+            comment: "Opens the list of the archived sessions; how many there are.")
+        ) {
+          environment.appModel.showArchivedSessions()
+        }
+        .keyboardShortcut("a", modifiers: [.command, .option])
+        .disabled(!environment.appModel.isLoaded)
 
         Button("Focus Terminal") {
           environment.appModel.focusTerminal()
@@ -342,6 +369,17 @@ private struct GroupCommands: View {
       model.setAllGroupsExpanded(true)
     }
     .disabled(model.groups.isEmpty || !model.canFold)
+
+    // A whole group, in the order arranged by hand (#44). No shortcut: ⌃⌘↑/↓ move the session.
+    Button("Move Group Up") {
+      Task { await model.moveSelectedGroup(by: -1) }
+    }
+    .disabled(!model.canMoveSelectedGroup(by: -1))
+
+    Button("Move Group Down") {
+      Task { await model.moveSelectedGroup(by: 1) }
+    }
+    .disabled(!model.canMoveSelectedGroup(by: 1))
   }
 }
 
