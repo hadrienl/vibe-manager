@@ -90,6 +90,8 @@ public final class AppEnvironment {
   public let dataDirectory: URL
   public let terminalSupervisor: HostedTerminalSupervisor
   public let launcher: SessionLauncher
+  /// Each session's drawer of side terminals (#43).
+  public let terminals: SessionTerminals
   private let prepareForQuit: PrepareForQuit
   private let detachForQuit: DetachForQuit
   /// On in Debug and with `DiagnosticsVerbose`: a timer that asks the main thread ten times a
@@ -111,7 +113,7 @@ public final class AppEnvironment {
     // application's own are brought back to owner only before anything is read from them.
     let repaired = DataDirectoryPermissions.repair([
       data.store.deletingLastPathComponent(), data.notes, data.journal, data.usage, data.logs,
-      data.icons, data.drops,
+      data.icons, data.drops, Self.terminalsDirectory(of: data),
     ])
     let diagnosticsLocation = DiagnosticsLocation(directory: data.logs)
     self.diagnosticsLocation = diagnosticsLocation
@@ -277,6 +279,20 @@ public final class AppEnvironment {
         repository: repository, runtime: launcher, recorder: recorder, control: supervisor)
     )
     self.permissions = permissions
+    // Each session's drawer of side terminals (#43): its tabs and their histories beside the
+    // store, in the same host as the agents, following what happens to their session.
+    let terminals = SessionTerminals(
+      supervisor: supervisor,
+      store: FileSessionTerminalsStore(directory: Self.terminalsDirectory(of: data)),
+      inspector: DarwinShellProcessInspector(),
+      recorder: recorder,
+      preferences: UserDefaultsTerminalPreferences(suiteName: data.defaultsSuite),
+      diagnostics: diagnostics,
+      sessionFolder: { [repository] id in
+        guard let session = try? await repository.session(id: id) else { return nil }
+        return RestartSession.workingDirectoryPath(of: session)
+      })
+    self.terminals = terminals
     let transcripts = AgentTranscriptReader()
     // Each session's journal (#36): read from the transcripts of every active session, summarized
     // by its own agent, kept in a file per session beside the notes.
@@ -347,6 +363,7 @@ public final class AppEnvironment {
         diagnostics: diagnostics),
       requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
       browser: browser,
+      terminals: terminals,
       ticketContext: ReadTicketContext(
         git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
       diagnostics: diagnostics,
@@ -425,9 +442,7 @@ public final class AppEnvironment {
         isolatedData: context.data.defaultsSuite != nil,
         terminalHost: context.hostEnabled),
       agents: model.agentDiagnostics.map(DiagnosticSnapshot.Agent.init),
-      store: DiagnosticsCollector.store(
-        storeURL: context.data.store, notesDirectory: context.data.notes,
-        statuses: model.sessions.map(\.status)),
+      store: await storeSnapshot(of: model, context: context),
       runtime: DiagnosticSnapshot.Runtime(
         phase: runtime?.phase.diagnosticToken,
         updatedAt: runtime?.updatedAt,
@@ -437,6 +452,21 @@ public final class AppEnvironment {
         sessionsRunningInApplication: context.launcher.inProcessRunningCount),
       logs: DiagnosticsCollector.logs(in: context.location),
       crashReports: DiagnosticsCollector.crashReports(in: context.crashReports))
+  }
+
+  private static func storeSnapshot(
+    of model: AppModel, context: SnapshotContext
+  ) async -> DiagnosticSnapshot.Store {
+    var store = DiagnosticsCollector.store(
+      storeURL: context.data.store, notesDirectory: context.data.notes,
+      statuses: model.sessions.map(\.status))
+    store.terminalHistoryBytes = await model.terminals?.scrollbackByteCount() ?? 0
+    return store
+  }
+
+  /// `Terminals/`, beside the store: each session's drawer of side terminals (#43).
+  static func terminalsDirectory(of data: DataLocation) -> URL {
+    data.store.deletingLastPathComponent().appendingPathComponent("Terminals", isDirectory: true)
   }
 
   /// Sessions whose agent could be left running when the application quits.
@@ -485,6 +515,9 @@ public final class AppEnvironment {
     // calls now is told the application is closed.
     await browser.flush()
     browserChannel.stop()
+    // Where every drawer stood — shown or hidden, how tall, which tab in front — before the
+    // sessions' own stops write down each terminal's history on their way (#43).
+    await terminals.flush()
     if keepingAgentsRunning {
       await detachForQuit()
       // The lines of this very path are the ones worth reading if the agents are not found again.

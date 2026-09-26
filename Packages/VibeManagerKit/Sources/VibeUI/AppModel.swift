@@ -489,6 +489,10 @@ public final class AppModel {
   /// Every session's web view (#69). Absent in a workspace assembled without it: no web view is
   /// offered, and a link clicked in a terminal opens in the default browser.
   public let browser: BrowserWorkspace?
+  /// Each session's drawer of side terminals (#43). A workspace assembled without one offers none.
+  public let terminals: SessionTerminals?
+  /// A side terminal the user asked to close while a command runs in it.
+  public internal(set) var pendingTerminalClose: PendingTerminalClose?
   let readTicketContext: ReadTicketContext?
   /// The branch and forge each session's ticket was last deduced from.
   var ticketContexts: [SessionID: TicketContext] = [:]
@@ -613,6 +617,9 @@ public final class AppModel {
     requestPreferences: any RequestPreferences = InMemoryRequestPreferences(),
     /// Every session's web view (#69). A workspace assembled without one offers none.
     browser: BrowserWorkspace? = nil,
+    /// Every session's drawer of side terminals (#43). A workspace assembled without one offers
+    /// none.
+    terminals: SessionTerminals? = nil,
     /// Reads a session's branch and forge, for the ticket it deduces. Absent without Git.
     ticketContext: ReadTicketContext? = nil,
     /// The diagnostics log. Nothing the user typed ever reaches it: see `DiagnosticEvent`.
@@ -652,6 +659,7 @@ public final class AppModel {
     showsRequestDockBadge = requestPreferences.showsDockBadge
     expandsPaletteOnRequest = requestPreferences.expandsPaletteOnRequest
     self.browser = browser
+    self.terminals = terminals
     readTicketContext = ticketContext
     self.diagnostics = diagnostics
     self.collectDiagnostics = collectDiagnostics
@@ -735,6 +743,8 @@ public final class AppModel {
     journal?.journalDidChange = { [quickOpen] id, journal in
       quickOpen.journalChanged(journal, for: id)
     }
+
+    launcher?.sideTerminals = terminals
 
     launcher?.askHookConsent = { [weak self] name, commands in
       guard let self else { return .undecided }
@@ -1732,6 +1742,9 @@ public final class AppModel {
       if launcher.isRunning(id) || plan.session.status == .active {
         closingSessionIDs.insert(id)
         defer { closingSessionIDs.remove(id) }
+        // The drawer's shells are the user's, not the agent's: they go on through the switch.
+        launcher.preserveSideTerminals(of: id)
+        defer { launcher.stopPreservingSideTerminals(of: id) }
         let closure = try await closeSession(id: id)
         if case .unreachable(let pid) = closure.detachment {
           throw AgentSwitchRefusal.stopUnconfirmed(processIdentifier: pid)

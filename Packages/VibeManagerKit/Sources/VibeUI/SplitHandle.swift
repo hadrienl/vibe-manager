@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The handle between two panes that share a length: seen, easy to grab, and driven from the
 /// keyboard and VoiceOver. One component, so that every divider of the window reads the same way:
-/// the web view's beside the terminal (#69), the context column's between its sections (#66).
+/// the web view's beside the terminal (#69), the context column's between its sections (#66), the
+/// one above a session's drawer of side terminals (#43).
 struct SplitHandle: View {
   enum Axis {
     /// Panes side by side; the length is the width of the pane after the handle, which grows as
@@ -23,6 +24,9 @@ struct SplitHandle: View {
   var value: Text?
   /// How far one step of the keyboard or VoiceOver moves the handle.
   var step: Double = 40
+  /// On the vertical axis, the length is the height of the pane *below* the handle, which grows as
+  /// the handle moves up: the drawer of side terminals (#43).
+  var sizesPaneBelow = false
   let onChange: (Double) -> Void
   /// Once the drag, or a step, is over: where a handle that only shows its length while it moves
   /// writes it for good.
@@ -72,7 +76,7 @@ struct SplitHandle: View {
           let next = bounded(
             axis == .horizontal
               ? start - Double(value.translation.width)
-              : start + Double(value.translation.height))
+              : start + Double(value.translation.height) * verticalDirection)
           dragged = next
           onChange(next)
         }
@@ -90,7 +94,7 @@ struct SplitHandle: View {
     .focusEffectDisabled()
     .onKeyPress(keys: [.upArrow, .downArrow]) { press in
       guard axis == .vertical else { return .ignored }
-      adjust(press.key == .downArrow ? step : -step)
+      adjust((press.key == .downArrow ? step : -step) * verticalDirection)
       return .handled
     }
     .accessibilityElement()
@@ -104,6 +108,11 @@ struct SplitHandle: View {
     .accessibilityAdjustableAction { direction in
       adjust(direction == .increment ? step : -step)
     }
+  }
+
+  /// How the length follows a move down.
+  private var verticalDirection: Double {
+    sizesPaneBelow ? -1 : 1
   }
 
   private func adjust(_ delta: Double) {

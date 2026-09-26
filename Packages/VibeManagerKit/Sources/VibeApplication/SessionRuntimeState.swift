@@ -42,6 +42,54 @@ public struct SessionRuntimeRecord: Hashable, Codable, Sendable {
   }
 }
 
+/// A side terminal of a session's drawer (#43) that is running, as the instance that started it
+/// knows it: the same pair of process group and start instant as a session's agent, so a shell
+/// that outlived a crash — a dev server started in it — is found and stopped like any leftover.
+public struct AuxiliaryRuntimeRecord: Hashable, Codable, Sendable {
+  public let terminalID: TerminalID
+  public let sessionID: SessionID
+  public let processGroup: Int32?
+  public let processStartedAt: Date?
+
+  public init(
+    terminalID: TerminalID, sessionID: SessionID, processGroup: Int32? = nil,
+    processStartedAt: Date? = nil
+  ) {
+    self.terminalID = terminalID
+    self.sessionID = sessionID
+    self.processGroup = processGroup
+    self.processStartedAt = processStartedAt?.storageRounded
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case terminalID, sessionID, processGroup, processStartedAt
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      terminalID: TerminalID(rawValue: try container.decode(UUID.self, forKey: .terminalID)),
+      sessionID: SessionID(rawValue: try container.decode(UUID.self, forKey: .sessionID)),
+      processGroup: try container.decodeIfPresent(Int32.self, forKey: .processGroup),
+      processStartedAt: try container.decodeIfPresent(Date.self, forKey: .processStartedAt)
+    )
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(terminalID.rawValue, forKey: .terminalID)
+    try container.encode(sessionID.rawValue, forKey: .sessionID)
+    try container.encodeIfPresent(processGroup, forKey: .processGroup)
+    try container.encodeIfPresent(processStartedAt, forKey: .processStartedAt)
+  }
+
+  /// The same terminal, seen as a leftover: what the check for leftovers reads.
+  var asLeftover: SessionRuntimeRecord {
+    SessionRuntimeRecord(
+      sessionID: sessionID, processGroup: processGroup, processStartedAt: processStartedAt)
+  }
+}
+
 /// What the application was running, and whether it was still running when it last wrote this.
 ///
 /// It is deliberately *not* part of the session store. A session is durable work; this is the
@@ -80,6 +128,10 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
   /// Sessions a `detached` quit stopped rather than left running — their process would have died
   /// with the application — and which are resumed the way a clean quit resumes its own.
   public var resuming: [SessionRuntimeRecord]?
+  /// The side terminals running (#43). When the phase is `detached`, the ones left running in the
+  /// host with their session's agent, to be taken back rather than let go at the next launch.
+  /// Absent from a document written before side terminals existed.
+  public var auxiliary: [AuxiliaryRuntimeRecord]?
 
   public init(
     phase: Phase,
@@ -90,7 +142,8 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
     stoppedAt: Date? = nil,
     sessions: [SessionRuntimeRecord] = [],
     host: TerminalHostIdentity? = nil,
-    resuming: [SessionRuntimeRecord]? = nil
+    resuming: [SessionRuntimeRecord]? = nil,
+    auxiliary: [AuxiliaryRuntimeRecord]? = nil
   ) {
     self.phase = phase
     self.processIdentifier = processIdentifier
@@ -101,6 +154,7 @@ public struct SessionRuntimeState: Hashable, Codable, Sendable {
     self.sessions = sessions
     self.host = host
     self.resuming = resuming
+    self.auxiliary = auxiliary
   }
 
   /// The last instant this document is known to have been written, which is as close as anything

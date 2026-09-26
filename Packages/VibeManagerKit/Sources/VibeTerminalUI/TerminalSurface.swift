@@ -16,19 +16,25 @@ public struct TerminalSurface: NSViewRepresentable {
   private let focusRequest: Int
   /// What VoiceOver calls the terminal: see `AccessibleTerminalView`.
   private let accessibilityTitle: String?
+  /// Whether becoming the terminal on screen takes the keyboard. A side terminal of the drawer
+  /// (#43) does not: shown with its session, it would take the keyboard from the agent's terminal.
+  /// It takes it when asked to, through `focusRequest`.
+  private let claimsKeyboardOnActivation: Bool
 
   public init(
     pane: TerminalPaneModel,
     session: (any TerminalSession)?,
     isActive: Bool = true,
     focusRequest: Int = 0,
-    accessibilityTitle: String? = nil
+    accessibilityTitle: String? = nil,
+    claimsKeyboardOnActivation: Bool = true
   ) {
     self.pane = pane
     self.session = session
     self.isActive = isActive
     self.focusRequest = focusRequest
     self.accessibilityTitle = accessibilityTitle
+    self.claimsKeyboardOnActivation = claimsKeyboardOnActivation
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
@@ -61,8 +67,10 @@ public struct TerminalSurface: NSViewRepresentable {
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
-    context.coordinator.followActivation(isActive, in: nsView)
+    context.coordinator.followActivation(
+      isActive, claimingKeyboard: claimsKeyboardOnActivation, in: nsView)
     context.coordinator.followFocusRequest(focusRequest, isActive: isActive, in: nsView)
+    context.coordinator.observeKeyboardFocus(of: nsView)
   }
 
   public static func dismantleNSView(
@@ -88,6 +96,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   private var attachedSession: ObjectIdentifier?
   private var wasActive: Bool?
   private var lastFocusRequest: Int?
+  private var focusObservation: NSKeyValueObservation?
+  private weak var observedWindow: NSWindow?
   private let commands: AsyncStream<TerminalCommand>.Continuation
   private var commandTask: Task<Void, Never>?
 
@@ -154,7 +164,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// Only a *change* of activation moves the keyboard. Claiming it on every update would fight
   /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
   /// active terminal would steal the focus back from the sidebar mid-keystroke.
-  func followActivation(_ isActive: Bool, in view: TerminalView) {
+  func followActivation(_ isActive: Bool, claimingKeyboard: Bool = true, in view: TerminalView) {
     // Every pane stays mounted, and a pane at zero opacity is still drawn: each busy agent behind
     // the visible one repainted its whole screen on the main thread at every spinner frame, and the
     // terminal being typed in waited behind them for its echo. A hidden view is not drawn at all.
@@ -167,13 +177,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       view.isHidden = false
       view.needsDisplay = true
     }
-    moveKeyboard(following: isActive, in: view)
+    moveKeyboard(following: isActive, claimingKeyboard: claimingKeyboard, in: view)
     if !isActive, !view.isHidden {
       view.isHidden = true
     }
   }
 
-  private func moveKeyboard(following isActive: Bool, in view: TerminalView) {
+  private func moveKeyboard(
+    following isActive: Bool, claimingKeyboard: Bool, in view: TerminalView
+  ) {
     // No window yet: nothing can hold the keyboard, and this is not the change we are waiting
     // for — leave the state untouched so the next update still acts on it.
     guard let window = view.window else { return }
@@ -181,7 +193,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     wasActive = isActive
 
     if isActive {
-      window.makeFirstResponder(view)
+      if claimingKeyboard { window.makeFirstResponder(view) }
     } else if window.firstResponder === view {
       window.makeFirstResponder(nil)
     }
@@ -194,6 +206,21 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     guard lastFocusRequest != request else { return }
     lastFocusRequest = request
     if isActive { window.makeFirstResponder(view) }
+  }
+
+  /// Tells the pane whether its view holds the keyboard, from the window's first responder.
+  func observeKeyboardFocus(of view: TerminalView) {
+    guard let window = view.window, observedWindow !== window else { return }
+    observedWindow = window
+    // Compared by identity: the view itself cannot cross into the observation's closure.
+    let target = ObjectIdentifier(view)
+    focusObservation = window.observe(\.firstResponder, options: [.initial, .new]) {
+      [weak self] window, _ in
+      MainActor.assumeIsolated {
+        let responder = window.firstResponder.map(ObjectIdentifier.init)
+        self?.pane.setKeyboardFocus(responder == target)
+      }
+    }
   }
 
   func attachIfNeeded(to session: any TerminalSession) {
@@ -220,6 +247,9 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     eventTask?.cancel()
     eventTask = nil
     attachedSession = nil
+    focusObservation = nil
+    observedWindow = nil
+    pane.setKeyboardFocus(false)
     view = nil
   }
 
@@ -240,7 +270,11 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   nonisolated public func setTerminalTitle(source: TerminalView, title: String) {}
 
-  nonisolated public func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+  nonisolated public func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+    Task { @MainActor [weak self] in
+      self?.pane.reportDirectory(directory)
+    }
+  }
 
   nonisolated public func clipboardCopy(source: TerminalView, content: Data) {}
 

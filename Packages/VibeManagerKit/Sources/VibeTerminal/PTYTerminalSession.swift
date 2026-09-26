@@ -27,6 +27,12 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private var subscribers: [UUID: AsyncStream<TerminalEvent>.Continuation] = [:]
   private var exitSource: DispatchSourceProcess?
   private var lastSize: TerminalSize
+  /// A side terminal's shell (#43) is hung up on, as a terminal window closing does, and each of
+  /// its jobs with it: they live in groups of their own under job control, which a signal to the
+  /// shell's group alone would leave running.
+  private let hangsUpOnStop: Bool
+  /// The other groups of the child's session when it was stopped — its jobs — swept with its own.
+  private var stoppedJobGroups: Set<pid_t> = []
   private var isReaderFinished = false
   /// The process source said the child exited.
   private var hasExited = false
@@ -58,6 +64,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     historyBuffer = TerminalHistory(limits: spec.scrollback)
     currentState = .starting
     lastSize = spec.initialSize
+    hangsUpOnStop = spec.role == .auxiliary
     ChildProcessGroupGuard.register(terminal.processGroupIdentifier)
   }
 
@@ -134,6 +141,15 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     // A process cannot finish exiting while its output waits to be read.
     reader.stopThrottling()
 
+    if hangsUpOnStop {
+      // Every job is hung up on directly: a shell busy with a foreground command, or killed
+      // before it could pass the hang-up on, would leave the others running.
+      stoppedJobGroups = terminal.otherProcessGroupsOfSession()
+      for group in stoppedJobGroups { Darwin.kill(-group, SIGHUP) }
+      terminal.signalProcessGroup(SIGHUP)
+      if await waitForCompletion(within: gracePeriod) { return sweepGroup() }
+    }
+
     terminal.signalProcessGroup(SIGTERM)
     if await waitForCompletion(within: gracePeriod) { return sweepGroup() }
 
@@ -168,6 +184,9 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   /// terminal and nobody to see it. The group outlives its leader only while it has members, and
   /// no process can be given its number meanwhile, so it is still this session's to kill.
   private func sweepGroup() {
+    for group in stoppedJobGroups where Darwin.kill(-group, 0) == 0 {
+      Darwin.kill(-group, SIGKILL)
+    }
     guard Darwin.kill(-terminal.processGroupIdentifier, 0) == 0 else { return }
     terminal.signalProcessGroup(SIGKILL)
   }

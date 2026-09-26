@@ -532,8 +532,32 @@ public struct RootView: View {
       Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
         model.cancelClose()
       }
-    } message: { _ in
-      Text("The agent will be stopped. The session can be restarted later.", bundle: .module)
+    } message: { session in
+      Text(closeConfirmationMessage(for: session))
+    }
+    // A side terminal is closed at once, unless a command runs in its foreground (#43).
+    .confirmationDialog(
+      Text("Close this terminal?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingTerminalClose != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelCloseDrawerTerminal()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingTerminalClose
+    ) { pending in
+      Button(LocalizedStringResource("Close Terminal", bundle: .module), role: .destructive) {
+        model.confirmCloseDrawerTerminal(pending)
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelCloseDrawerTerminal()
+      }
+    } message: { pending in
+      Text(
+        "“\(pending.command)” is still running in this terminal and will be stopped.",
+        bundle: .module, comment: "The argument is the command running in a side terminal.")
     }
     // Closing several sessions asks #51's question once, with its "Don't ask again" (#77).
     .confirmationDialog(
@@ -620,6 +644,18 @@ public struct RootView: View {
     )
   }
 
+  private func closeConfirmationMessage(for session: WorkSession) -> String {
+    let consequence = String(
+      localized: "The agent will be stopped. The session can be restarted later.", bundle: .module)
+    let commands = model.runningDrawerCommands(of: session.id)
+    guard !commands.isEmpty else { return consequence }
+    let list = commands.map { "“\($0)”" }.formatted(.list(type: .and))
+    return consequence + " "
+      + String(
+        localized: "What runs in its side terminals will be stopped: \(list).", bundle: .module,
+        comment: "The argument lists the commands running in the session's side terminals.")
+  }
+
   private func archiveConfirmationMessage(for session: WorkSession) -> String {
     let isRunning = model.pane(for: session.id)?.status == .running
     let consequence = String(
@@ -687,7 +723,7 @@ public struct RootView: View {
           InProcessAgentBar()
           Divider()
         }
-        sessionContent(for: session)
+        sessionWithDrawer(for: session)
       }
     } else {
       ContentUnavailableView {
@@ -708,6 +744,44 @@ public struct RootView: View {
 
   /// About eighty columns at the terminal's default font: the web view never takes more.
   private static let terminalMinimumWidth: Double = 560
+  /// About eight lines and the status bar: the drawer of side terminals gives way before the
+  /// session's own terminal gets any shorter.
+  private static let sessionMinimumHeight: Double = 160
+
+  /// The session's content, and its drawer of side terminals under it, the whole width (#43).
+  @ViewBuilder
+  private func sessionWithDrawer(for session: WorkSession) -> some View {
+    if model.canUseDrawer(session), let drawer = model.terminals?.drawer(for: session.id) {
+      GeometryReader { proxy in
+        let total = Double(proxy.size.height)
+        let lower = SessionTerminalsDocument.heightRange.lowerBound
+        let upper = max(lower, min(total * 0.7, total - Self.sessionMinimumHeight))
+        let height = min(max(drawer.height, lower), upper)
+        VStack(spacing: 0) {
+          sessionContent(for: session)
+          if drawer.isVisible, !drawer.terminals.isEmpty {
+            SplitHandle(
+              axis: .vertical,
+              length: height, range: lower...upper,
+              label: Text(
+                "Divider between the session and its side terminals", bundle: .module),
+              value: Text(
+                "\(Int(height)) points tall", bundle: .module,
+                comment: "The height of the drawer of side terminals, read by VoiceOver on its divider."
+              ),
+              sizesPaneBelow: true,
+              onChange: { drawer.setHeight($0) })
+            TerminalDrawerView(model: model, drawer: drawer, sessionName: session.name)
+              .frame(height: height)
+              .id(session.id)
+          }
+        }
+      }
+      .task(id: session.id) { await model.terminals?.prepare(session.id) }
+    } else {
+      sessionContent(for: session)
+    }
+  }
 
   /// The terminal, and the web view beside it or in turns with it (#69).
   ///
@@ -785,7 +859,9 @@ public struct RootView: View {
           // Started by the launcher, so switching sessions never restarts an agent.
           TerminalPaneView(
             model: pane, autoStart: false, isActive: isActive,
-            accessibilityTitle: terminalTitle(for: listed, pane: pane)
+            accessibilityTitle: terminalTitle(for: listed, pane: pane),
+            statusAccessory: model.terminals == nil
+              ? nil : AnyView(DrawerStatusButton(model: model, session: listed))
           )
           .id(listed.id)
           .opacity(isActive ? 1 : 0)

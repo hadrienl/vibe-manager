@@ -9,6 +9,9 @@ import VibeTerminal
 // `--log-directory`, it writes `host.jsonl` there, as the application's host does.
 // `--probe-full-disk-access` makes the fixture answer as the application's binary does, from a
 // witness the test controls rather than from the real permission of whoever runs the tests.
+// Side terminals are started through the binary that runs the host, as the application's are.
+ControllingTerminal.runIfRequested()
+ControllingTerminal.useTrampoline(at: CommandLine.arguments[0])
 FullDiskAccessProbeCommand.runIfRequested(
   probe: TCCFullDiskAccessProbe(
     witnessPath: ProcessInfo.processInfo.environment["TMPDIR", default: "/tmp"]

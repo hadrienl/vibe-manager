@@ -132,7 +132,10 @@ struct DetachedShutdownTests {
     let host = FakeTerminalHost(
       .connected(
         hostIdentity,
-        sessions: [HostedSessionSummary(id: running.id.agentTerminal, state: .running(processIdentifier: 902))]
+        sessions: [
+          HostedSessionSummary(
+            id: running.id.agentTerminal, state: .running(processIdentifier: 902))
+        ]
       ))
 
     let (verdict, repository, store) = await detect(
@@ -159,7 +162,10 @@ struct DetachedShutdownTests {
     let host = FakeTerminalHost(
       .connected(
         hostIdentity,
-        sessions: [HostedSessionSummary(id: running.id.agentTerminal, state: .running(processIdentifier: 902))]
+        sessions: [
+          HostedSessionSummary(
+            id: running.id.agentTerminal, state: .running(processIdentifier: 902))
+        ]
       ))
     let document = detachedDocument(running: [SessionRuntimeRecord(sessionID: running.id)])
 
@@ -183,7 +189,10 @@ struct DetachedShutdownTests {
     let host = FakeTerminalHost(
       .connected(
         hostIdentity,
-        sessions: [HostedSessionSummary(id: ended.id.agentTerminal, state: .exited(code: 0), endedAt: endedAt)]
+        sessions: [
+          HostedSessionSummary(
+            id: ended.id.agentTerminal, state: .exited(code: 0), endedAt: endedAt)
+        ]
       ))
 
     let (verdict, repository, _) = await detect(
@@ -209,7 +218,10 @@ struct DetachedShutdownTests {
     let host = FakeTerminalHost(
       .connected(
         hostIdentity,
-        sessions: [HostedSessionSummary(id: running.id.agentTerminal, state: .running(processIdentifier: 902))]
+        sessions: [
+          HostedSessionSummary(
+            id: running.id.agentTerminal, state: .running(processIdentifier: 902))
+        ]
       ))
 
     let (verdict, _, _) = await detect(
@@ -260,7 +272,10 @@ struct DetachedShutdownTests {
     let host = FakeTerminalHost(
       .connected(
         hostIdentity,
-        sessions: [HostedSessionSummary(id: archived.id.agentTerminal, state: .running(processIdentifier: 903))]
+        sessions: [
+          HostedSessionSummary(
+            id: archived.id.agentTerminal, state: .running(processIdentifier: 903))
+        ]
       ))
 
     _ = await detect(

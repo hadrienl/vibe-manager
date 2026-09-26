@@ -65,6 +65,17 @@ public struct SettingsView: View {
             }
             .tag(SettingsTab.webView)
         }
+        if let terminals = model.terminals {
+          TerminalSettings(terminals: terminals)
+            .tabItem {
+              Label {
+                Text("Terminals", bundle: .module, comment: "A tab of the Settings window.")
+              } icon: {
+                Image(systemName: "apple.terminal")
+              }
+            }
+            .tag(SettingsTab.terminals)
+        }
         if let journal = model.journal {
           ActivitySettings(journal: journal)
             .tabItem {
@@ -202,6 +213,8 @@ public enum SettingsTab: String, Hashable, Sendable {
   case templates
   /// The session's web view (#69): what agents may do there, and where links go.
   case webView
+  /// Each session's drawer of side terminals (#43): whether their history is kept.
+  case terminals
   /// What each session's journal does: the summary its agent writes (#36).
   case activity
   /// The conversation view of #38: its theme, its fonts, what it unfolds.
@@ -648,6 +661,38 @@ private struct AgentActivityRow: View {
 }
 
 /// The settings of the sessions' journal (#36), in a tab of their own.
+/// Each session's drawer of side terminals (#43).
+private struct TerminalSettings: View {
+  let terminals: SessionTerminals
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle(
+          isOn: Binding(
+            get: { terminals.keepsScrollback },
+            set: { keeps in Task { await terminals.setKeepsScrollback(keeps) } })
+        ) {
+          Text("Keep the history of side terminals", bundle: .module)
+          Text(
+            """
+            What each side terminal showed is written to disk, so that it is still there when its \
+            session is reopened or Vibe Manager relaunched. It stays on this Mac, readable by you \
+            alone and out of backups. Turned off, the histories already kept are erased.
+            """,
+            bundle: .module)
+        }
+      } header: {
+        Text("Side Terminals", bundle: .module, comment: "A section of the Settings window.")
+      }
+    }
+    .formStyle(.grouped)
+    .scrollDisabled(true)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(width: 500)
+  }
+}
+
 private struct ActivitySettings: View {
   let journal: SessionJournalModel
 

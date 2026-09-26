@@ -39,6 +39,15 @@ public final class TerminalPaneModel {
   /// An agent that refused the conversation it was handed exits before a key is pressed. One the
   /// user actually worked in did not refuse anything, whatever it exits with afterwards.
   public private(set) var hasReceivedInput = false
+  /// Whether this terminal's view holds the keyboard: ⌘W and ⌃⇥ act on the drawer's tabs while
+  /// one of its terminals does (#43).
+  public private(set) var hasKeyboardFocus = false
+
+  func setKeyboardFocus(_ focused: Bool) {
+    guard hasKeyboardFocus != focused else { return }
+    hasKeyboardFocus = focused
+  }
+
   /// Bumped to hand the keyboard back to this terminal — from the notes, on Escape. A counter
   /// rather than a flag: the same request twice in a row must still move the focus twice.
   public private(set) var focusRequest = 0
@@ -172,6 +181,12 @@ public final class TerminalPaneModel {
     pendingNotice.append(contentsOf: Array(text.utf8))
   }
 
+  /// The same, as bytes: a side terminal's restored history (#43) is written as it was read, since
+  /// decoding it as text would break a sequence its buffer cut in two.
+  public func post(notice bytes: [UInt8]) {
+    pendingNotice.append(contentsOf: bytes)
+  }
+
   /// The pending notice, handed over once.
   public func takePendingNotice() -> [UInt8] {
     defer { pendingNotice = [] }
@@ -195,6 +210,22 @@ public final class TerminalPaneModel {
   /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
   /// agent's question is how its state is known to have moved before the agent says so (#45).
   @ObservationIgnored public var onUserInput: (([UInt8]) -> Void)?
+
+  /// Told of the folder the shell says it is in (OSC 7), for a side terminal's title (#43). Most
+  /// shells say nothing unless configured to, so the folder is also read from the kernel.
+  @ObservationIgnored public var onReportedDirectory: ((String) -> Void)?
+
+  func reportDirectory(_ directory: String?) {
+    guard let directory, let path = Self.path(fromReportedDirectory: directory) else { return }
+    onReportedDirectory?(path)
+  }
+
+  /// OSC 7 names a `file://host/path` URL; some shells send a bare path.
+  static func path(fromReportedDirectory text: String) -> String? {
+    if text.hasPrefix("/") { return text }
+    guard let url = URL(string: text), url.isFileURL, !url.path.isEmpty else { return nil }
+    return url.path
+  }
 
   /// Told of an address clicked in the terminal, with whether it was ⌥⌘-clicked (#69). Unset, the
   /// address opens in the default browser, as it would from any terminal.
@@ -235,9 +266,9 @@ public final class TerminalPaneModel {
     await session?.write(bytes)
   }
 
-  public func stop() async {
+  public func stop(gracePeriod: Duration = .seconds(3)) async {
     wasStoppedOnPurpose = true
-    await supervisor.stop(id: terminalID, gracePeriod: .seconds(3))
+    await supervisor.stop(id: terminalID, gracePeriod: gracePeriod)
     if let session {
       apply(await session.state())
     }

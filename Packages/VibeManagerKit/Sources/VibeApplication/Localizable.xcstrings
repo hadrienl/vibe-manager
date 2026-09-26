@@ -98,6 +98,28 @@
         }
       }
     },
+    "%@ no longer exists: opened in the session's folder." : {
+      "comment" : "Written in a side terminal. The argument is a folder's path.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’existe plus : ouvert dans le dossier de la session."
+          }
+        }
+      }
+    },
+    "%@ no longer exists: opened in your home folder." : {
+      "comment" : "Written in a side terminal. The argument is a folder's path.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’existe plus : ouvert dans votre dossier personnel."
+          }
+        }
+      }
+    },
     "%@ stopped as soon as this conversation was resumed last time, so it is not being resumed again." : {
       "comment" : "An agent's name.",
       "localizations" : {
@@ -2026,12 +2048,59 @@
         }
       }
     },
+    "new shell" : {
+      "comment" : "In the line a side terminal shows above a shell it started again: what it is.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nouveau shell"
+          }
+        }
+      }
+    },
     "not allowed" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "non autorisé"
+          }
+        }
+      }
+    },
+    "separator.relaunched" : {
+      "comment" : "The title of the line a side terminal shows above a shell started again after the previous one ended: a noun.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Restarted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relance"
+          }
+        }
+      }
+    },
+    "separator.resumed" : {
+      "comment" : "The title of the line a side terminal shows above the shell that replaced the one it had before the session was closed or the application quit: a noun.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Resumed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise"
           }
         }
       }

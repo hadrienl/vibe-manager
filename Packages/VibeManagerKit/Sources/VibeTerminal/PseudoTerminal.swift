@@ -60,6 +60,32 @@ struct PseudoTerminal: Sendable {
   func signalProcessGroup(_ signalNumber: Int32) -> Bool {
     kill(-processGroupIdentifier, signalNumber) == 0
   }
+
+  /// The other process groups on this terminal: the jobs a shell with job control runs, in the
+  /// foreground and in the background, each in a group of its own (#43). Every process whose
+  /// controlling terminal this is belongs to the child's session. Empty for a terminal that is
+  /// nobody's controlling one, which is what an agent's terminal is.
+  func otherProcessGroupsOfSession() -> Set<pid_t> {
+    var status = stat()
+    guard fstat(slaveDescriptor, &status) == 0 else { return [] }
+    var name: [Int32] = [
+      CTL_KERN, KERN_PROC, KERN_PROC_TTY, Int32(bitPattern: UInt32(status.st_rdev)),
+    ]
+    var size = 0
+    guard sysctl(&name, 4, nil, &size, nil, 0) == 0, size > 0 else { return [] }
+    // Room for a few more, started between the two calls.
+    var processes = [kinfo_proc](
+      repeating: kinfo_proc(), count: size / MemoryLayout<kinfo_proc>.stride + 8)
+    size = processes.count * MemoryLayout<kinfo_proc>.stride
+    guard sysctl(&name, 4, &processes, &size, nil, 0) == 0 else { return [] }
+    let count = size / MemoryLayout<kinfo_proc>.stride
+    var groups = Set<pid_t>()
+    for process in processes.prefix(count) {
+      let group = process.kp_eproc.e_pgid
+      if group > 0, group != processGroupIdentifier { groups.insert(group) }
+    }
+    return groups
+  }
 }
 
 enum PseudoTerminalLauncher {
@@ -188,13 +214,24 @@ enum PseudoTerminalLauncher {
     posix_spawnattr_setflags(&attributes, Int16(flags))
 
     let executablePath = spec.executableURL.path
-    let arguments = [executablePath] + spec.arguments
+    var spawnPath = executablePath
+    var arguments = [executablePath] + spec.arguments
+    // A side terminal's shell needs its terminal as its controlling one (#43); the trampoline
+    // takes it and becomes the shell. The shell was validated above, so a trampoline that fails
+    // to `exec` it has nothing left to report but its status.
+    if spec.role == .auxiliary,
+      let (trampoline, trampolineArguments) = ControllingTerminal.arguments(
+        for: executablePath, arguments: spec.arguments)
+    {
+      spawnPath = trampoline
+      arguments = trampolineArguments
+    }
     let environment = spec.environment.map { "\($0.key)=\($0.value)" }.sorted()
 
     var processIdentifier: pid_t = 0
     let result = withCStrings(arguments) { argv in
       withCStrings(environment) { envp in
-        posix_spawn(&processIdentifier, executablePath, &fileActions, &attributes, argv, envp)
+        posix_spawn(&processIdentifier, spawnPath, &fileActions, &attributes, argv, envp)
       }
     }
 

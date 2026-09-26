@@ -124,7 +124,9 @@ private actor ReluctantHost: TerminalHosting {
     guard isAvailable else { return .unavailable(reason: "The terminal host did not answer.") }
     return .connected(
       TerminalHostIdentity(processIdentifier: 815, processStartedAt: nil),
-      sessions: [HostedSessionSummary(id: running.agentTerminal, state: .running(processIdentifier: 902))])
+      sessions: [
+        HostedSessionSummary(id: running.agentTerminal, state: .running(processIdentifier: 902))
+      ])
   }
 
   func hostIdentity() -> TerminalHostIdentity? { nil }
@@ -160,7 +162,8 @@ struct SessionAdoptionTests {
   func adoptsARunningAgent() async {
     let stored = session()
     let terminal = HostedWorkspaceTerminal(
-      id: stored.id.agentTerminal, state: .running(processIdentifier: 902), output: "halfway through")
+      id: stored.id.agentTerminal, state: .running(processIdentifier: 902),
+      output: "halfway through")
     let supervisor = HostSupervisor([terminal])
     let repository = WorkspaceRepository(sessions: [stored])
     let launcher = SessionLauncher(
@@ -179,7 +182,8 @@ struct SessionAdoptionTests {
   @Test("An adopted agent that ends closes its session, as any agent does")
   func adoptedExitClosesTheSession() async {
     let stored = session()
-    let terminal = HostedWorkspaceTerminal(id: stored.id.agentTerminal, state: .running(processIdentifier: 902))
+    let terminal = HostedWorkspaceTerminal(
+      id: stored.id.agentTerminal, state: .running(processIdentifier: 902))
     let repository = WorkspaceRepository(sessions: [stored])
     let launcher = SessionLauncher(
       supervisor: HostSupervisor([terminal]), repository: repository,
@@ -194,7 +198,8 @@ struct SessionAdoptionTests {
   @Test("Handed off on the way out, an agent's exit is no longer this launch's to record")
   func handOffRetiresTheExitWatch() async {
     let stored = session()
-    let terminal = HostedWorkspaceTerminal(id: stored.id.agentTerminal, state: .running(processIdentifier: 902))
+    let terminal = HostedWorkspaceTerminal(
+      id: stored.id.agentTerminal, state: .running(processIdentifier: 902))
     let repository = WorkspaceRepository(sessions: [stored])
     let launcher = SessionLauncher(
       supervisor: HostSupervisor([terminal]), repository: repository,
@@ -281,7 +286,8 @@ struct SessionAdoptionTests {
     let running = session()
     let ended = session()
     let supervisor = HostSupervisor([
-      HostedWorkspaceTerminal(id: running.id.agentTerminal, state: .running(processIdentifier: 902)),
+      HostedWorkspaceTerminal(
+        id: running.id.agentTerminal, state: .running(processIdentifier: 902)),
       HostedWorkspaceTerminal(id: ended.id.agentTerminal, state: .exited(code: 0), output: "done"),
     ])
     let repository = WorkspaceRepository(sessions: [running, ended])

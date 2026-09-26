@@ -164,6 +164,17 @@
         }
       }
     },
+    "Close Terminal" : {
+      "comment" : "Closes the side terminal in front.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer le terminal"
+          }
+        }
+      }
+    },
     "Close Window" : {
       "localizations" : {
         "fr" : {
@@ -294,6 +305,16 @@
         }
       }
     },
+    "Focus Side Terminals" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aller aux terminaux annexes"
+          }
+        }
+      }
+    },
     "Focus Sidebar" : {
       "localizations" : {
         "fr" : {
@@ -361,6 +382,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer le contexte"
+          }
+        }
+      }
+    },
+    "Hide Terminals" : {
+      "comment" : "Hides the drawer of the session's side terminals.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les terminaux"
           }
         }
       }
@@ -482,6 +514,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle session à partir d’un modèle"
+          }
+        }
+      }
+    },
+    "New Terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau terminal"
           }
         }
       }
@@ -708,6 +750,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher le terminal"
+          }
+        }
+      }
+    },
+    "Show Terminals" : {
+      "comment" : "Shows the drawer of the session's side terminals.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les terminaux"
           }
         }
       }
