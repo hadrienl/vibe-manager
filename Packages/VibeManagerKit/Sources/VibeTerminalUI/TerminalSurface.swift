@@ -124,6 +124,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   func bind(to view: TerminalView) {
     self.view = view
+    connectPasteMode()
+  }
+
+  /// Whether the program in the terminal asked for bracketed pastes: known to the view alone, and
+  /// read by the pane when a drop types into it (#42).
+  private func connectPasteMode() {
+    pane.isBracketedPasteEnabled = { [weak view] in
+      view?.getTerminal().bracketedPasteMode ?? false
+    }
   }
 
   /// Points the coordinator at the pane the view now renders.
@@ -133,6 +142,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func adopt(pane: TerminalPaneModel) {
     guard self.pane !== pane else { return }
     self.pane = pane
+    connectPasteMode()
     eventTask?.cancel()
     eventTask = nil
     attachedSession = nil

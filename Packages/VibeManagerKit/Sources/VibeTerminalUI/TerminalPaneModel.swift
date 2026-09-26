@@ -197,6 +197,23 @@ public final class TerminalPaneModel {
     }
   }
 
+  /// Whether the program running asked for bracketed pastes. Set by the surface, which alone reads
+  /// the terminal's modes.
+  @ObservationIgnored public var isBracketedPasteEnabled: () -> Bool = { false }
+
+  /// Types what was dropped on the session at the cursor of the program, never followed by Return
+  /// (#42), and gives the terminal the keyboard. A user's gesture, so it travels as typing does.
+  /// Returns whether anything was written.
+  @discardableResult
+  public func insert(_ payloads: [DropPayload]) async -> Bool {
+    guard status == .running else { return false }
+    let bytes = PathInsertion.terminalBytes(for: payloads, bracketed: isBracketedPasteEnabled())
+    guard !bytes.isEmpty else { return false }
+    await write(bytes)
+    requestFocus()
+    return true
+  }
+
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
     guard !bytes.isEmpty else { return }
