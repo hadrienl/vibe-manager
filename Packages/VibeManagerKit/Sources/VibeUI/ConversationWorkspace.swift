@@ -135,7 +135,7 @@ public final class ConversationWorkspace {
     models.removeValue(forKey: id)?.stop()
     followed[id] = nil
     generations[id] = nil
-    // What was said lives only as long as a view shows it (ADR 0023).
+    // What was said lives only as long as a view shows it (ADR 0025).
     MarkdownCache.shared.removeAll()
     mountedSessionIDs.removeAll { $0 == id }
   }

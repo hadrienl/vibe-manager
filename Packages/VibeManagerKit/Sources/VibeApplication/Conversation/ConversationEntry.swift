@@ -105,7 +105,7 @@ public struct ToolCall: Hashable, Sendable {
   }
 
   /// The image a call produced, when it is one that can be shown: a file that exists, of a type
-  /// an image viewer reads. Nothing else a transcript names is ever opened (ADR 0023).
+  /// an image viewer reads. Nothing else a transcript names is ever opened (ADR 0025).
   public var producedImage: URL? {
     guard kind == .image, let path = parameter(.path), path.hasPrefix("/") else { return nil }
     let url = URL(fileURLWithPath: path)

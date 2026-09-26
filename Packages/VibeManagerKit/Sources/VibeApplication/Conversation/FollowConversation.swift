@@ -36,7 +36,7 @@ public struct ConversationSnapshot: Hashable, Sendable {
 ///
 /// Every conversation of the session is read — a switch of agent starts a new one — and they are
 /// shown one after the other. What is read stays in memory, in the snapshots handed out, and is
-/// never written anywhere (ADR 0023).
+/// never written anywhere (ADR 0025).
 public actor FollowConversation {
   private let agents: any AgentProviderResolving
   private let tail: any TranscriptTailing

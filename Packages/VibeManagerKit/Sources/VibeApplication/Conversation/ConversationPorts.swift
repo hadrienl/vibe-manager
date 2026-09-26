@@ -35,7 +35,7 @@ public protocol ConversationDecoding: AnyObject {
 
 /// How a prompt typed in the conversation view is written into an agent's terminal.
 ///
-/// Measured against Claude Code 2.1.282 and Codex 0.157.0 in a real terminal (ADR 0023): both take
+/// Measured against Claude Code 2.1.282 and Codex 0.157.0 in a real terminal (ADR 0025): both take
 /// a bracketed paste of several lines as one prompt, keep its line breaks, and send it on Return.
 public struct AgentPromptFormat: Hashable, Sendable {
   /// Written as one bracketed paste, so that a line break is text rather than a validation.

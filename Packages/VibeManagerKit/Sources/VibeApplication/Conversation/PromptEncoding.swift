@@ -18,7 +18,7 @@ public struct PromptSubmission: Hashable, Sendable {
 /// The bytes a prompt becomes in the agent's terminal (#38).
 ///
 /// The conversation view writes to the agent exactly as a keyboard would, and by no other road:
-/// the terminal stays the one channel to it (ADR 0023). A paste, then the key that sends it,
+/// the terminal stays the one channel to it (ADR 0025). A paste, then the key that sends it,
 /// written apart so that the TUI has seen the paste end.
 public enum PromptEncoding {
   public struct Keystrokes: Hashable, Sendable {

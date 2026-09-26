@@ -1,4 +1,4 @@
-# 0023 — The session as a conversation
+# 0025 — The session as a conversation
 
 - Status: accepted
 - Date: 2026-09-25

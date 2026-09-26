@@ -10,7 +10,7 @@ public struct InlineRun: Hashable, Sendable {
   public var isCode = false
   public var isStrikethrough = false
   /// Only `http`, `https` and `mailto` survive: a transcript holds what a web page or a server
-  /// made the agent write, and a link to anything else must not be one click away (ADR 0023).
+  /// made the agent write, and a link to anything else must not be one click away (ADR 0025).
   public var link: URL?
 
   public init(text: String) {
