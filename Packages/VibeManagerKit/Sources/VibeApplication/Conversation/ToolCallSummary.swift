@@ -36,6 +36,7 @@ public enum ToolCallSummary {
     case .todo: return "checklist"
     case .plan: return "list.bullet.clipboard"
     case .question: return "questionmark.bubble"
+    case .image: return "photo"
     case .other: return "wrench.and.screwdriver"
     }
   }
@@ -121,6 +122,11 @@ public enum ToolCallSummary {
         symbolName: symbol,
         title: call.parameter(.question).map(firstLine)
           ?? text(LocalizedStringResource("Question", bundle: .module)))
+    case .image:
+      return ToolCallTitle(
+        symbolName: symbol,
+        title: text(LocalizedStringResource("Generated an image", bundle: .module)),
+        detail: file.isEmpty ? nil : file)
     case .other(let name):
       return ToolCallTitle(symbolName: symbol, title: name)
     }
@@ -157,7 +163,7 @@ public enum ToolCallSummary {
       title = text(LocalizedStringResource("\(count) calls to \(server)", bundle: .module))
     case .other(let name):
       title = text(LocalizedStringResource("\(count) calls to \(name)", bundle: .module))
-    case .subagent, .todo, .plan, .question:
+    case .subagent, .todo, .plan, .question, .image:
       title = text(LocalizedStringResource("\(count) calls", bundle: .module))
     }
     let detail: String?

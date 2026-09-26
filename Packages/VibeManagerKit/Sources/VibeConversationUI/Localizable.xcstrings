@@ -753,6 +753,16 @@
         }
       }
     },
+    "Open in the Web View" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans la vue web"
+          }
+        }
+      }
+    },
     "Open sessions in" : {
       "localizations" : {
         "fr" : {
@@ -1129,6 +1139,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Taille du texte"
+          }
+        }
+      }
+    },
+    "The image is no longer where the agent saved it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image n’est plus là où l’agent l’a enregistrée."
           }
         }
       }

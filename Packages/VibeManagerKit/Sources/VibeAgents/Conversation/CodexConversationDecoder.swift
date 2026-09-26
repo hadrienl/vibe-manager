@@ -100,6 +100,20 @@ public final class CodexConversationDecoder: ConversationDecoding {
         callID: id, kind: .subagent, state: .succeeded,
         parameters: [ToolParameter(.description, name)])
       append(ConversationEntry(id: id, date: date, content: .tool(call)))
+    case "Extension":
+      // Codex's image generation: the image is saved to a file, whose path is kept. The image
+      // itself, in base64 in the same item, is never decoded here.
+      guard (item["kind"] as? String)?.hasPrefix("image_gen") == true else { return }
+      var parameters: [ToolParameter] = []
+      if let path = item["savedPath"] as? String { parameters.append(ToolParameter(.path, path)) }
+      if let prompt = item["revisedPrompt"] as? String {
+        parameters.append(ToolParameter(.prompt, prompt))
+      }
+      let failed = item["status"] as? String == "failed"
+      let call = ToolCall(
+        callID: id, kind: .image, state: failed ? .failed(exitCode: nil) : .succeeded,
+        parameters: parameters)
+      append(ConversationEntry(id: id, date: date, content: .tool(call)))
     case "ContextCompaction":
       append(ConversationEntry(id: id, date: date, content: .notice(.compacted)))
     default:

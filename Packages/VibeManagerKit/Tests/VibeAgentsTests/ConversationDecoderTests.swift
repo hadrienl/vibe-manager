@@ -252,6 +252,26 @@ struct CodexConversationDecoderTests {
     #expect(aborted[2].content == .notice(.interrupted))
   }
 
+  @Test("A generated image keeps where it was saved, never its bytes")
+  func generatedImage() throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeImage-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let png = folder.appendingPathComponent("plane.png")
+    try Data([0x89, 0x50, 0x4E, 0x47]).write(to: png)
+    let entries = decode([
+      item(
+        #"{"type":"Extension","kind":"image_gen.generation","id":"x","status":"completed","revisedPrompt":"a plane","result":"iVBORw0KGgoAAAANSUhEUg","savedPath":"\#(png.path)"}"#
+      )
+    ])
+    let call = try #require(entries.first?.toolCall)
+    #expect(call.kind == .image)
+    #expect(call.producedImage == png)
+    #expect(call.parameter(.prompt) == "a plane")
+    #expect(!String(describing: entries).contains("iVBORw0KGgo"))
+  }
+
   @Test("An MCP call, a failed one")
   func mcp() {
     let entries = decode([

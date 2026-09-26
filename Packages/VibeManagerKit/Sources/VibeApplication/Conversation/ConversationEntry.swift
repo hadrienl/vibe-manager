@@ -103,6 +103,19 @@ public struct ToolCall: Hashable, Sendable {
   public func parameter(_ key: ToolParameter.Key) -> String? {
     parameters.first { $0.key == key }?.value
   }
+
+  /// The image a call produced, when it is one that can be shown: a file that exists, of a type
+  /// an image viewer reads. Nothing else a transcript names is ever opened (ADR 0023).
+  public var producedImage: URL? {
+    guard kind == .image, let path = parameter(.path), path.hasPrefix("/") else { return nil }
+    let url = URL(fileURLWithPath: path)
+    guard Self.imageExtensions.contains(url.pathExtension.lowercased()),
+      FileManager.default.fileExists(atPath: path)
+    else { return nil }
+    return url
+  }
+
+  static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "heic", "tiff"]
 }
 
 /// What a tool does, as far as the view needs to know: its icon, its title, and what it may be
@@ -121,6 +134,8 @@ public enum ToolKind: Hashable, Sendable {
   case todo
   case plan
   case question
+  /// An image the agent generated, saved to a file.
+  case image
   case other(String)
 
   /// Calls of the same family, one after the other, are shown as one block.
@@ -136,6 +151,7 @@ public enum ToolKind: Hashable, Sendable {
     case .todo: return "todo"
     case .plan: return "plan"
     case .question: return "question"
+    case .image: return "image"
     case .other(let name): return "other:\(name)"
     }
   }
@@ -144,7 +160,7 @@ public enum ToolKind: Hashable, Sendable {
   /// one, and a to-do list replaces the previous one rather than adding to it.
   public var isGroupable: Bool {
     switch self {
-    case .todo, .plan, .question, .subagent: return false
+    case .todo, .plan, .question, .subagent, .image: return false
     default: return true
     }
   }
@@ -152,7 +168,7 @@ public enum ToolKind: Hashable, Sendable {
   /// Shown unfolded: what they hold is the message, not a detail.
   public var isShownOpen: Bool {
     switch self {
-    case .todo, .plan, .question: return true
+    case .todo, .plan, .question, .image: return true
     default: return false
     }
   }

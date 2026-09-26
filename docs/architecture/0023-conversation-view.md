@@ -56,6 +56,14 @@ HTML is interpreted. The file a diff names is shown in the Finder, never opened:
 application or a `.command` an agent was made to write would run it. A command's output is kept to 32 KiB (its start and its end), a diff to 2,000
 lines per file and 500 drawn; `originalFile` and base64 images are never decoded into the model.
 
+### What the agent makes is shown
+
+An image the agent generated — Codex's `image_gen`, saved to a file — is shown in the
+conversation, and opened in the session's web view (#69) when it is produced while the session
+runs; images already in the history are not. The web view comes forward or not by its own
+preference for pages an agent opens. Only a file of an image type that exists is opened: a page
+written by the agent would run its scripts with access to its folder.
+
 ### Lines in the order they were written
 
 The `parentUuid` tree of a Claude Code transcript is not followed: parallel tool calls branch it on

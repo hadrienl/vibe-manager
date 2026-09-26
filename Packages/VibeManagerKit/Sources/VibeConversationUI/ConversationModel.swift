@@ -94,6 +94,13 @@ public final class ConversationModel {
   @ObservationIgnored public var write: (([UInt8]) async -> Void)?
   /// Brings the terminal forward and gives it the keyboard.
   @ObservationIgnored public var showTerminal: (() -> Void)?
+  /// Shows a file in the session's web view. `automatically` when the agent just produced it,
+  /// rather than the user asking: the web view's own preference then decides whether it comes
+  /// forward. `nil` without a web view.
+  @ObservationIgnored public var openInWebView: ((URL, _ automatically: Bool) -> Void)?
+  /// The images already there when the conversation was first read: only those produced after are
+  /// shown on their own.
+  @ObservationIgnored private var knownImages: Set<String>?
   /// Restarts the session, from the composer of a session whose agent stopped.
   @ObservationIgnored public var restart: (() -> Void)?
   /// Whether the session can be restarted now: an archived one cannot.
@@ -128,6 +135,22 @@ public final class ConversationModel {
     self.snapshot = snapshot
     confirmEchoes()
     rebuild()
+    showNewImages()
+  }
+
+  private func showNewImages() {
+    guard snapshot.availability != .loading else { return }
+    let images = snapshot.entries.compactMap { entry -> (String, URL)? in
+      entry.toolCall?.producedImage.map { (entry.id, $0) }
+    }
+    guard let known = knownImages else {
+      knownImages = Set(images.map(\.0))
+      return
+    }
+    for (id, url) in images where !known.contains(id) {
+      openInWebView?(url, true)
+    }
+    knownImages = known.union(images.map(\.0))
   }
 
   private func rebuild() {

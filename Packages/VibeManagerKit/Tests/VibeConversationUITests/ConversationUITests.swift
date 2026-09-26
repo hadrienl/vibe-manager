@@ -265,6 +265,40 @@ struct ConversationModelTests {
     #expect(await model.send())
   }
 
+  @Test("An image produced while the session runs goes to the web view; the history's do not")
+  func newImages() throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeImages-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    func image(_ name: String) throws -> ConversationEntry {
+      let url = folder.appendingPathComponent(name)
+      try Data([1]).write(to: url)
+      return ConversationEntry(
+        id: name,
+        content: .tool(
+          ToolCall(
+            callID: name, kind: .image, state: .succeeded,
+            parameters: [ToolParameter(.path, url.path)])))
+    }
+    let model = ConversationModel(sessionID: SessionID())
+    var opened: [String] = []
+    model.openInWebView = { url, automatically in
+      if automatically { opened.append(url.lastPathComponent) }
+    }
+    let old = try image("old.png")
+    model.apply(ConversationSnapshot(entries: [old], availability: .available))
+    #expect(opened.isEmpty)
+    model.apply(
+      ConversationSnapshot(entries: [old, try image("new.png")], availability: .available))
+    #expect(opened == ["new.png"])
+    let page = folder.appendingPathComponent("page.html")
+    try Data("<script>".utf8).write(to: page)
+    let html = ToolCall(
+      callID: "h", kind: .image, parameters: [ToolParameter(.path, page.path)])
+    #expect(html.producedImage == nil)
+  }
+
   @Test("The echo of a prompt goes once the transcript has it")
   func echo() async {
     let (model, _) = model()

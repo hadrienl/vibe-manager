@@ -131,7 +131,7 @@ struct ToolBlockView: View {
     switch block {
     case .entry(let entry):
       if let call = entry.toolCall {
-        ToolCallDetails(call: call)
+        ToolCallDetails(call: call, model: model)
           .padding(12)
       }
     case .toolGroup(_, let entries):
@@ -212,6 +212,7 @@ struct StateSymbol: View {
 /// What a call was asked and what it gave back.
 struct ToolCallDetails: View {
   let call: ToolCall
+  var model: ConversationModel?
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -225,6 +226,8 @@ struct ToolCallDetails: View {
         if let plan = call.parameter(.plan) { MarkdownView(text: plan) }
       case .question:
         question(size: size)
+      case .image:
+        ProducedImageView(call: call, model: model)
       default:
         parameters(size: size)
       }
@@ -472,5 +475,50 @@ struct DiffView: View {
         ? Text("Added: \(line.text)", bundle: .module)
         : line.kind == .removed
           ? Text("Removed: \(line.text)", bundle: .module) : Text(verbatim: line.text))
+  }
+}
+
+/// An image the agent generated: shown, and offered to the web view and the Finder.
+struct ProducedImageView: View {
+  let call: ToolCall
+  let model: ConversationModel?
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if let url = call.producedImage, let image = NSImage(contentsOf: url) {
+        Image(nsImage: image)
+          .resizable()
+          .scaledToFit()
+          .frame(maxWidth: 480, maxHeight: 360, alignment: .leading)
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .accessibilityLabel(Text(verbatim: call.parameter(.prompt) ?? url.lastPathComponent))
+        HStack(spacing: 14) {
+          if let open = model?.openInWebView {
+            Button {
+              open(url, false)
+            } label: {
+              Label {
+                Text("Open in the Web View", bundle: .module)
+              } icon: {
+                Image(systemName: "globe")
+              }
+            }
+          }
+          Button {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+          } label: {
+            Text("Show in Finder", bundle: .module)
+          }
+        }
+        .buttonStyle(.plain)
+        .font(theme.interfaceFont(size: 12))
+        .foregroundStyle(theme.accent.color)
+      } else {
+        Text("The image is no longer where the agent saved it.", bundle: .module)
+          .font(theme.interfaceFont(size: 12))
+          .foregroundStyle(theme.secondaryText.color)
+      }
+    }
   }
 }
