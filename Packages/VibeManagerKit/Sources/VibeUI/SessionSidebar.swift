@@ -134,7 +134,9 @@ struct SessionSidebar: View {
     ForEach(sessions) { session in
       row(for: session, position: positions[session.id], width: width)
         .tag(session.id)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowFrames.space)) } action: {
+        .onGeometryChange(for: CGRect.self) {
+          $0.frame(in: .named(RowFrames.space))
+        } action: {
           rowFrames.frames[session.id] = $0
         }
         .onDisappear { rowFrames.frames[session.id] = nil }
