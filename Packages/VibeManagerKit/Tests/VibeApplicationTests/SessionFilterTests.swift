@@ -7,8 +7,9 @@ import VibeDomain
 private func session(
   id: SessionID = SessionID(),
   name: String,
-  // Active by default, so a test that says nothing about scope lands in the default one.
+  // Active by default, so a test that says nothing about columns lands In Progress, the default.
   status: SessionStatus = .active,
+  taskStatus: SessionTaskStatus? = nil,
   providerID: String? = "claude-code",
   repositoryPaths: [String] = ["/work/api"],
   prompt: String = "",
@@ -25,38 +26,55 @@ private func session(
     updatedAt: updatedAt,
     closedAt: status == .closed || status == .archived ? createdAt : nil,
     archivedAt: status == .archived ? updatedAt : nil,
-    repositories: repositoryPaths.map { RepositoryContext(path: $0) }
+    repositories: repositoryPaths.map { RepositoryContext(path: $0) },
+    taskStatus: taskStatus
   )
 }
 
 @Suite("Filtering the session history")
-struct SessionFilterScopeTests {
+struct SessionFilterColumnTests {
   private let sessions = [
+    session(name: "Planned", status: .closed, taskStatus: .todo),
     session(name: "Running", status: .active),
-    session(name: "Closed", status: .closed),
+    session(name: "Stopped but ongoing", status: .closed, taskStatus: .doing),
+    session(name: "In review", status: .active, taskStatus: .waiting),
+    session(name: "Finished", status: .closed, taskStatus: .done),
     session(name: "Archived", status: .archived),
   ]
 
-  @Test("Active shows only the sessions with a live agent")
-  func activeShowsOnlyRunningSessions() {
-    let visible = SessionFilter(scope: .active).apply(to: sessions)
-    #expect(visible.map(\.name) == ["Running"])
+  /// The columns are split on where the work stands, not on whether an agent runs (#80).
+  @Test("Each column lists the sessions of its task status, whatever their process")
+  func columnsFollowTheTaskStatus() {
+    #expect(SessionFilter(column: .todo).apply(to: sessions).map(\.name) == ["Planned"])
+    #expect(
+      SessionFilter(column: .doing).apply(to: sessions).map(\.name).sorted() == [
+        "Running", "Stopped but ongoing",
+      ])
+    #expect(SessionFilter(column: .waiting).apply(to: sessions).map(\.name) == ["In review"])
+    #expect(SessionFilter(column: .done).apply(to: sessions).map(\.name) == ["Finished"])
   }
 
-  /// The split is running / finished, not archived / not. An archived session is a closed one
-  /// that may not be reopened, so it is listed with the others rather than hidden away.
-  @Test("Closed shows every finished session, archived ones included")
-  func closedShowsArchivedToo() {
-    let visible = SessionFilter(scope: .closed).apply(to: sessions)
-    #expect(visible.map(\.name).sorted() == ["Archived", "Closed"])
-  }
-
-  @Test("A session is in exactly one scope")
-  func scopesPartitionTheStore() {
-    for session in sessions {
-      let scopes = SessionScope.allCases.filter { $0.includes(session.status) }
-      #expect(scopes.count == 1)
+  @Test("An archived session is in no column")
+  func archivedIsInNoColumn() {
+    for column in SessionTaskStatus.columns {
+      #expect(!SessionFilter(column: column).apply(to: sessions).map(\.name).contains("Archived"))
     }
+  }
+
+  @Test("A filter never shows the archived as a column")
+  func archivedIsNotAColumn() {
+    #expect(SessionFilter(column: .archived).column == .done)
+    var filter = SessionFilter(column: .waiting)
+    filter.column = .archived
+    #expect(filter.column == .waiting)
+  }
+
+  @Test("The search and the facets narrow a session whatever its column")
+  func narrowingIgnoresTheColumn() {
+    let filter = SessionFilter(column: .todo, searchText: "review")
+    let inReview = sessions[3]
+    #expect(!filter.matches(inReview))
+    #expect(filter.matchesNarrowing(inReview))
   }
 }
 
@@ -87,16 +105,16 @@ struct SessionFilterSearchTests {
     #expect(filter.apply(to: [session(name: "Anything")]).count == 1)
   }
 
-  @Test("Search and scope narrow together")
-  func searchAppliesWithinTheScope() {
+  @Test("Search and column narrow together")
+  func searchAppliesWithinTheColumn() {
     let sessions = [
       session(name: "Refactor", status: .active),
-      session(name: "Refactor", status: .closed),
+      session(name: "Refactor", status: .closed, taskStatus: .done),
     ]
 
-    let filter = SessionFilter(scope: .closed, searchText: "refactor")
+    let filter = SessionFilter(column: .done, searchText: "refactor")
 
-    #expect(filter.apply(to: sessions).map(\.status) == [.closed])
+    #expect(filter.apply(to: sessions).map(\.taskStatus) == [.done])
   }
 }
 
@@ -203,10 +221,10 @@ struct SessionFilterFacetTests {
 
 @Suite("What a filter remembers")
 struct SessionFilterCodingTests {
-  @Test("Scope, sort and facets are stored; the search text is not")
+  @Test("Column, sort and facets are stored; the search text is not")
   func searchTextIsNeverPersisted() throws {
     let filter = SessionFilter(
-      scope: .closed,
+      column: .waiting,
       sort: .name,
       searchText: "half-typed query",
       agentProviderIDs: ["codex"],
@@ -216,7 +234,7 @@ struct SessionFilterCodingTests {
     let data = try JSONEncoder().encode(filter)
     let restored = try JSONDecoder().decode(SessionFilter.self, from: data)
 
-    #expect(restored.scope == .closed)
+    #expect(restored.column == .waiting)
     #expect(restored.sort == .name)
     #expect(restored.agentProviderIDs == ["codex"])
     #expect(restored.repositoryPath == "/work/api")
@@ -230,7 +248,29 @@ struct SessionFilterCodingTests {
     let restored = try JSONDecoder().decode(SessionFilter.self, from: data)
 
     #expect(restored == SessionFilter())
-    #expect(restored.scope == .active)
+    #expect(restored.column == .doing)
+  }
+
+  /// Active became In Progress and Closed became Done: the sessions each tab listed land, for
+  /// the most part, in exactly that column once the store is migrated.
+  @Test("A scope saved before the columns reads as the column that replaced it")
+  func legacyScopeIsMigrated() throws {
+    let active = try JSONDecoder().decode(
+      SessionFilter.self, from: Data(#"{"scope":"active","sort":"name"}"#.utf8))
+    let closed = try JSONDecoder().decode(
+      SessionFilter.self, from: Data(#"{"scope":"closed"}"#.utf8))
+
+    #expect(active.column == .doing)
+    #expect(active.sort == .name)
+    #expect(closed.column == .done)
+  }
+
+  @Test("The scope is never written again")
+  func legacyScopeIsNotWritten() throws {
+    let data = try JSONEncoder().encode(SessionFilter(column: .todo))
+    let text = String(decoding: data, as: UTF8.self)
+    #expect(!text.contains("scope"))
+    #expect(text.contains(#""column":"todo""#))
   }
 
   /// A filter is a preference, and a preference cannot be allowed to take the whole layout down
@@ -238,11 +278,11 @@ struct SessionFilterCodingTests {
   /// worst, not their columns, their widths and their selection.
   @Test("A value written by a later build falls back instead of throwing")
   func unknownRawValuesFallBack() throws {
-    let data = Data(#"{"scope":"someFutureScope","sort":"byVibes"}"#.utf8)
+    let data = Data(#"{"column":"someFutureColumn","sort":"byVibes"}"#.utf8)
 
     let restored = try JSONDecoder().decode(SessionFilter.self, from: data)
 
-    #expect(restored.scope == .active)
+    #expect(restored.column == .doing)
     #expect(restored.sort == .lastActivity)
   }
 }
@@ -255,7 +295,7 @@ struct SessionFilterTemplateTests {
     reviewed.template = PromptTemplateReference(id: "t", name: "Révision", revision: "1")
     let other = session(name: "Other")
 
-    var filter = SessionFilter(scope: .active)
+    var filter = SessionFilter(column: .doing)
     filter.searchText = "revision"
     #expect(filter.apply(to: [reviewed, other]).map(\.name) == ["MR 1315"])
   }

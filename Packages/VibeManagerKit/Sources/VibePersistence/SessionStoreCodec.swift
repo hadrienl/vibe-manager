@@ -16,9 +16,12 @@ struct SessionStoreCodec {
   /// document, ignore the history as an unknown key, and erase it at its first write; refusing
   /// the document is louder, and loses nothing.
   ///
-  /// v5 adds the ticket a session works on (#69), for the same reason: a v4 build would erase it.
-  /// Its shape is v4's with one more optional field, so both are read by the same structure.
-  static let currentSchemaVersion = 5
+  /// v5 adds the ticket a session works on (#69), and v6 each session's task status (#80), for
+  /// the same reason: an older build would erase them. Each shape is the one before with one more
+  /// optional field, so all three are read by the same structure.
+  static let currentSchemaVersion = 6
+  /// v5 is v6 without the task status, which is read from the lifecycle instead.
+  static let statuslessSchemaVersion = 5
   static let ticketlessSchemaVersion = 4
   static let previousSchemaVersion = 2
   /// Written only by a build of #12 that created a worktree per session, and was reworked before
@@ -27,10 +30,10 @@ struct SessionStoreCodec {
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV4(
+    let envelope = StoreEnvelopeV6(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV4.init)
+      sessions: sessions.map(StoredSessionV6.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -59,14 +62,14 @@ struct SessionStoreCodec {
         let previous = try Self.makeDecoder().decode(StoreEnvelopeV2.self, from: data)
         sessions = previous.sessions.map(\.workSession)
         requiresRewrite = true
-      case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV4.self, from: data)
-        sessions = current.sessions.map(\.workSession)
-        requiresRewrite = false
-      case Self.ticketlessSchemaVersion:
-        let previous = try Self.makeDecoder().decode(StoreEnvelopeV4.self, from: data)
-        sessions = previous.sessions.map(\.workSession)
+      case Self.ticketlessSchemaVersion, Self.statuslessSchemaVersion:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV6.self, from: data)
+        sessions = previous.sessions.map { $0.workSession(recordsStart: false) }
         requiresRewrite = true
+      case Self.currentSchemaVersion:
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV6.self, from: data)
+        sessions = current.sessions.map { $0.workSession(recordsStart: true) }
+        requiresRewrite = false
       case Self.abandonedSchemaVersion:
         let abandoned = try Self.makeDecoder().decode(StoreEnvelopeV3.self, from: data)
         sessions = abandoned.sessions.map(\.workSession)
@@ -134,14 +137,16 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-private struct StoreEnvelopeV4: Codable {
+/// Reads v4 and v5 as well: a v5 session is a v6 one without `taskStatus`, and a v4 one has no
+/// `ticket` either.
+private struct StoreEnvelopeV6: Codable {
   let schemaVersion: Int
   let savedAt: Date
-  let sessions: [StoredSessionV4]
+  let sessions: [StoredSessionV6]
 }
 
-/// A v2 session and the history of its agent switches, and from v5 its ticket.
-private struct StoredSessionV4: Codable {
+/// A v2 session, the history of its agent switches (v4), its ticket (v5) and its task status (v6).
+private struct StoredSessionV6: Codable {
   let id: UUID
   let name: String
   let initialPrompt: String
@@ -153,6 +158,9 @@ private struct StoredSessionV4: Codable {
   let template: StoredTemplateV2?
   let agentHistory: [StoredAgentChangeV4]?
   let ticket: StoredTicketV5?
+  /// Spelled out rather than decoded as the enum: a status written by a later build is read from
+  /// the lifecycle, as if it had never been written, instead of taking the whole store down.
+  let taskStatus: String?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
@@ -166,9 +174,14 @@ private struct StoredSessionV4: Codable {
     template = session.template.map(StoredTemplateV2.init)
     agentHistory = session.agentHistory.map(StoredAgentChangeV4.init)
     ticket = session.ticket.map(StoredTicketV5.init)
+    taskStatus = session.taskStatus.rawValue
   }
 
-  var workSession: WorkSession {
+  /// - Parameter recordsStart: the document was written by a build that records the start of
+  ///   every session (v6). A missing start then means never started, and is not inferred: moving a
+  ///   session that never ran between columns touches it, and the inference would read that as a
+  ///   run, so that moving it In Progress would restart it instead of starting it with its prompt.
+  func workSession(recordsStart: Bool) -> WorkSession {
     WorkSession(
       id: SessionID(rawValue: id),
       name: name,
@@ -185,8 +198,17 @@ private struct StoredSessionV4: Codable {
       legacyNotes: notes,
       template: template?.domainValue,
       agentHistory: (agentHistory ?? []).map(\.domainValue),
-      ticket: ticket?.domainValue
+      ticket: ticket?.domainValue,
+      taskStatus: storedTaskStatus,
+      infersStartedAt: !recordsStart
     )
+  }
+
+  /// A status that contradicts the lifecycle is dropped the same way: archived is the one status
+  /// the lifecycle decides, and a store that disagreed would otherwise fail validation whole.
+  private var storedTaskStatus: SessionTaskStatus? {
+    guard let status = taskStatus.flatMap(SessionTaskStatus.init(rawValue:)) else { return nil }
+    return (status == .archived) == (lifecycle.status == .archived) ? status : nil
   }
 }
 

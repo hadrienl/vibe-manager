@@ -36,6 +36,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private let repository: any SessionRepository
   private let agents: any AgentProviderResolving
   private let changeStatus: ChangeSessionStatus
+  private let changeTaskStatus: ChangeTaskStatus
   /// Where what is running is written down, for the next launch to read. Absent in a workspace
   /// assembled without the system around it, and the launcher then simply keeps no record.
   private let recorder: SessionRuntimeRecorder?
@@ -115,6 +116,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     self.provideTools = provideTools
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
+    changeTaskStatus = ChangeTaskStatus(repository: repository, clock: clock)
   }
 
   public func pane(for id: SessionID) -> TerminalPaneModel? {
@@ -232,6 +234,11 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
           reason: current?.status == .archived ? Self.archivedReason : Self.storeRefusedReason
         )
       }
+    }
+    // Starting a planned task, or restarting a finished one, is going back to work on it (#80).
+    // A restoration after a relaunch is not: it brings back what was running, where it was.
+    if !run.afterRelaunch {
+      _ = try? await changeTaskStatus.beginWork(id: session.id)
     }
     // The run is recorded before the exit is watched: a process that ends at once — a resume the
     // CLI refuses — has its exit seen during the awaits below, and a start written after that

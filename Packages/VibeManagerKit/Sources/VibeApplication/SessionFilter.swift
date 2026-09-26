@@ -1,34 +1,18 @@
 import Foundation
 import VibeDomain
 
-/// Which part of the history a view is looking at.
+/// The scope the sidebar was split on before #80, kept only to read a layout saved then.
 ///
-/// The split is "is something running here", not "has this been archived". Those are two
-/// different questions: the first is what the user is doing right now, the second is whether a
-/// finished session may be picked up again. Archiving therefore does not move a session between
-/// the two — a closed session and an archived one are both done — it decides whether the one in
-/// the closed list can be reopened.
-public enum SessionScope: String, Codable, CaseIterable, Sendable {
-  /// Sessions with a live agent.
+/// Active became the In Progress column and Closed the Done one: the sessions each tab listed
+/// land, for the most part, in exactly that column after the migration of the store.
+enum LegacySessionScope: String, Decodable {
   case active
-  /// Everything that is finished, archived or not.
   case closed
 
-  public var label: LocalizedStringResource {
+  var column: SessionTaskStatus {
     switch self {
-    case .active:
-      return LocalizedStringResource(
-        "Active", bundle: .module, comment: "The sessions whose agent is running.")
-    case .closed:
-      return LocalizedStringResource(
-        "Closed", bundle: .module, comment: "The sessions that are finished, archived or not.")
-    }
-  }
-
-  public func includes(_ status: SessionStatus) -> Bool {
-    switch self {
-    case .active: return status == .active
-    case .closed: return status != .active
+    case .active: return .doing
+    case .closed: return .done
     }
   }
 }
@@ -59,22 +43,25 @@ public enum SessionSort: String, Codable, CaseIterable, Sendable {
 /// all read the same one. `apply(to:)` is pure: the same store and the same filter always draw
 /// the same list, in the same order, which is what makes the order survive a restart.
 public struct SessionFilter: Equatable, Sendable, Codable {
-  public var scope: SessionScope
+  /// The column on screen (#80). Never `archived`: archived sessions have their own way in.
+  public var column: SessionTaskStatus {
+    didSet { if column == .archived { column = oldValue } }
+  }
   public var sort: SessionSort
-  /// Deliberately not persisted. Scope and sort are settings; a half-typed query is an action in
+  /// Deliberately not persisted. Column and sort are settings; a half-typed query is an action in
   /// progress, and finding it still applied three days later would look like an empty store.
   public var searchText: String
   public var agentProviderIDs: Set<String>
   public var repositoryPath: String?
 
   public init(
-    scope: SessionScope = .active,
+    column: SessionTaskStatus = .doing,
     sort: SessionSort = .lastActivity,
     searchText: String = "",
     agentProviderIDs: Set<String> = [],
     repositoryPath: String? = nil
   ) {
-    self.scope = scope
+    self.column = column == .archived ? .done : column
     self.sort = sort
     self.searchText = searchText
     self.agentProviderIDs = agentProviderIDs
@@ -82,17 +69,31 @@ public struct SessionFilter: Equatable, Sendable, Codable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case scope, sort, agentProviderIDs, repositoryPath
+    case column, sort, agentProviderIDs, repositoryPath
+    /// Written before #80, read and never written again.
+    case scope
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(column, forKey: .column)
+    try container.encode(sort, forKey: .sort)
+    try container.encode(agentProviderIDs, forKey: .agentProviderIDs)
+    try container.encodeIfPresent(repositoryPath, forKey: .repositoryPath)
   }
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     // Each field is decoded on its own terms, and a value this build does not know falls back
-    // rather than throwing. A scope written by a later version must cost the user their sort
+    // rather than throwing. A column written by a later version must cost the user their sort
     // order at worst — thrown from here, it would take the whole layout down with it, columns,
     // widths and selection included.
+    let column =
+      (try? container.decodeIfPresent(SessionTaskStatus.self, forKey: .column))
+      ?? (try? container.decodeIfPresent(LegacySessionScope.self, forKey: .scope))?.column
+      ?? .doing
     self.init(
-      scope: (try? container.decodeIfPresent(SessionScope.self, forKey: .scope)) ?? .active,
+      column: column,
       sort: (try? container.decodeIfPresent(SessionSort.self, forKey: .sort)) ?? .lastActivity,
       agentProviderIDs: (try? container.decodeIfPresent(
         Set<String>.self, forKey: .agentProviderIDs)) ?? [],
@@ -100,7 +101,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     )
   }
 
-  /// Whether anything beyond the scope is hiding sessions. The empty state uses it to tell
+  /// Whether anything beyond the column is hiding sessions. The empty state uses it to tell
   /// "nothing archived yet" from "nothing matches what you typed".
   public var isNarrowing: Bool {
     !trimmedSearchText.isEmpty || !agentProviderIDs.isEmpty || repositoryPath != nil
@@ -120,7 +121,13 @@ public struct SessionFilter: Equatable, Sendable, Codable {
   }
 
   public func matches(_ session: WorkSession, notes: String? = nil) -> Bool {
-    guard scope.includes(session.status) else { return false }
+    guard session.taskStatus == column else { return false }
+    return matchesNarrowing(session, notes: notes)
+  }
+
+  /// Whether the search and the facets let this session through, whatever its column. The tabs
+  /// count with it, so that a number says what clicking the tab will show.
+  public func matchesNarrowing(_ session: WorkSession, notes: String? = nil) -> Bool {
 
     if !agentProviderIDs.isEmpty {
       guard let providerID = session.agent?.providerID, agentProviderIDs.contains(providerID)

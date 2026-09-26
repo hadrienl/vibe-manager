@@ -109,10 +109,16 @@ struct VibeManagerApp: App {
 
         Divider()
 
-        Button("Next Scope") {
-          environment.appModel.cycleScope()
+        // The columns of the sidebar (#80), in their order, stopping at both ends.
+        Button("Next Column") {
+          environment.appModel.showNextColumn()
         }
         .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+
+        Button("Previous Column") {
+          environment.appModel.showPreviousColumn()
+        }
+        .keyboardShortcut(.leftArrow, modifiers: [.command, .control])
 
         Divider()
 
@@ -279,6 +285,37 @@ private struct SessionHistoryCommands: Commands {
       }
       .keyboardShortcut("m", modifiers: [.command, .control])
       .disabled(!(model.selectedSession.map(model.canSwitchAgent) ?? false))
+
+      Divider()
+
+      // The swipe's keyboard equivalent (#80): the shortcut is the decision, so it asks nothing.
+      Menu("Status") {
+        ForEach(SessionTaskStatus.columns, id: \.self) { status in
+          Toggle(
+            isOn: Binding(
+              get: { model.selectedSession?.taskStatus == status },
+              set: { isOn in
+                guard isOn, let session = model.selectedSession else { return }
+                Task { await model.setTaskStatus(status, for: session.id) }
+              }
+            )
+          ) {
+            Text(status.label)
+          }
+        }
+        Divider()
+        Button("Move to Next Status") {
+          guard let session = model.selectedSession else { return }
+          Task { await model.moveTaskStatus(of: session.id, forward: true) }
+        }
+        .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+        Button("Move to Previous Status") {
+          guard let session = model.selectedSession else { return }
+          Task { await model.moveTaskStatus(of: session.id, forward: false) }
+        }
+        .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+      }
+      .disabled(model.selectedSession.map { $0.taskStatus == .archived } ?? true)
 
       Divider()
 

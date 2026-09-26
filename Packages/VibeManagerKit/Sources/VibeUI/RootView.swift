@@ -100,7 +100,9 @@ public struct RootView: View {
           NewSessionSheet(
             model: sheetModel,
             defaultWorkingDirectoryPath: model.newSessionDefaultWorkingDirectoryPath,
-            created: { creation in Task { await model.complete(creation) } },
+            created: { creation, launching in
+              Task { await model.complete(creation, launching: launching) }
+            },
             cancelled: { model.cancelNewSession() },
             manageTemplates: {
               model.settingsTab = .templates
@@ -325,6 +327,12 @@ public struct RootView: View {
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
       // whole application. Repeating it bound the same key twice, under two conditions.
       .toolbar {
+        // Where the work on the session on screen stands, and a way to change it (#80).
+        ToolbarItem(placement: .primaryAction) {
+          if let session = model.selectedSession, session.taskStatus != .archived {
+            TaskStatusMenu(commands: SessionCommands(model: model, session: session))
+          }
+        }
         ToolbarItem(placement: .primaryAction) {
           Button {
             model.beginNewSession()
@@ -522,9 +530,10 @@ public struct RootView: View {
     let consequence = String(
       localized: """
         Nothing is deleted: notes, repositories and Git metadata are kept, and the session stays \
-        readable under Closed. It can no longer be reopened until it is unarchived.
+        readable under Archived. It can no longer be reopened until it is unarchived.
         """,
-      bundle: .module, comment: "Closed is the tab of the sidebar that lists closed sessions.")
+      bundle: .module,
+      comment: "Archived is the line at the foot of the sidebar that lists archived sessions.")
     guard isRunning else { return consequence }
     return String(localized: "Its running agent will be stopped.", bundle: .module) + " "
       + consequence
@@ -708,6 +717,43 @@ public struct RootView: View {
     // relaunch — left this stack at the size of its "no terminal" card, and the bar above it was
     // then centred in the column instead of sitting under the toolbar.
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+/// The status of the session on screen, in the toolbar, as a menu of the four columns.
+private struct TaskStatusMenu: View {
+  let commands: SessionCommands
+
+  var body: some View {
+    let current = commands.taskStatus
+    Menu {
+      ForEach(commands.movableStatuses, id: \.self) { status in
+        Toggle(
+          status.label,
+          isOn: Binding(
+            get: { current == status },
+            set: { isOn in if isOn { commands.setTaskStatus(status) } }
+          )
+        )
+      }
+    } label: {
+      Label {
+        Text(current.label)
+      } icon: {
+        Image(systemName: current.symbolName)
+          .foregroundStyle(current.tint)
+      }
+      .labelStyle(.titleAndIcon)
+    }
+    .help(
+      Text("Status", bundle: .module, comment: "The submenu that moves a session between columns.")
+    )
+    .accessibilityLabel(
+      Text(
+        "Status: \(String(localized: current.label))", bundle: .module,
+        comment: "The toolbar menu of a session's task status.")
+    )
+    .accessibilityIdentifier("task-status-menu")
   }
 }
 
@@ -1386,137 +1432,9 @@ private struct WidthReporter: View {
   }
 }
 
-private struct SessionSidebar: View {
-  @Bindable var model: AppModel
-  /// Focus Sidebar, ⌥⌘1, gives the list the keyboard.
-  @FocusState private var isListFocused: Bool
-
-  var body: some View {
-    VStack(spacing: 0) {
-      ScopePicker(model: model)
-      Divider()
-      list
-      Divider()
-      SidebarFooter(model: model)
-    }
-    .searchable(
-      text: Binding(get: { model.filter.searchText }, set: { model.setSearchText($0) }),
-      placement: .sidebar,
-      prompt: Text("Search sessions", bundle: .module)
-    )
-  }
-
-  private var list: some View {
-    sessionList
-      .focused($isListFocused)
-      .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
-      .accessibilityLabel(Text("Sessions", bundle: .module))
-      .accessibilityIdentifier("session-list")
-  }
-
-  private var sessionList: some View {
-    List(selection: Binding(get: { model.selectedSessionID }, set: { model.select($0) })) {
-      ForEach(Array(model.visibleSessions.enumerated()), id: \.element.id) { index, session in
-        SessionRow(
-          session: session,
-          status: SessionStatusPresentation.make(
-            session: session,
-            paneStatus: model.pane(for: session.id)?.status,
-            resolution: model.resolution(forID: session.id),
-            wasStoppedOnPurpose: model.pane(for: session.id)?.wasStoppedOnPurpose == true,
-            activity: model.activity(for: session.id)
-          ),
-          isRestoring: model.isRestoring(session.id),
-          webView: model.webViewAttention(for: session.id),
-          // Only the rows a shortcut can reach claim one.
-          shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,
-          commands: SessionCommands(model: model, session: session)
-        )
-        .tag(session.id)
-      }
-    }
-    .listStyle(.sidebar)
-    .overlay {
-      if model.visibleSessions.isEmpty {
-        emptyState
-      }
-    }
-  }
-
-  /// Three different silences, told apart. "Nothing here" and "nothing matched what you typed"
-  /// look identical on screen and mean opposite things, and only one of them has a way out.
-  @ViewBuilder
-  private var emptyState: some View {
-    if model.filter.isNarrowing {
-      ContentUnavailableView {
-        Label(
-          LocalizedStringResource("No matching session", bundle: .module),
-          systemImage: "line.3.horizontal.decrease.circle")
-      } description: {
-        switch model.filter.scope {
-        case .active:
-          Text("No session in active matches this filter.", bundle: .module)
-        case .closed:
-          Text("No session in closed matches this filter.", bundle: .module)
-        }
-      } actions: {
-        Button(LocalizedStringResource("Clear Filter", bundle: .module)) { model.clearNarrowing() }
-      }
-    } else if model.filter.scope == .closed {
-      ContentUnavailableView {
-        Label {
-          Text("No closed session", bundle: .module)
-        } icon: {
-          Image(systemName: "stop.circle")
-        }
-      } description: {
-        Text("Sessions land here when their agent stops. Nothing is ever deleted.", bundle: .module)
-      }
-    } else {
-      ContentUnavailableView {
-        Label {
-          Text("No active session", bundle: .module)
-        } icon: {
-          Image(systemName: "square.stack.3d.up")
-        }
-      } description: {
-        Text(
-          "Press ⌘N to start one, or look under Closed for earlier work.", bundle: .module,
-          comment: "Closed is the tab of the sidebar that lists closed sessions.")
-      }
-    }
-  }
-}
-
-/// Two tabs, split on whether something is running — not on whether it was archived.
-///
-/// An archived session is a closed session that may not be reopened, so it belongs in Closed
-/// beside the others rather than in a list of its own: the user looking for past work should
-/// find all of it in one place, and only then discover which of it is still resumable.
-private struct ScopePicker: View {
-  let model: AppModel
-
-  var body: some View {
-    Picker(
-      LocalizedStringResource(
-        "Scope", bundle: .module, comment: "Which sessions the sidebar lists."),
-      selection: Binding(get: { model.filter.scope }, set: { model.setScope($0) })
-    ) {
-      ForEach(SessionScope.allCases, id: \.self) { scope in
-        Text(scope.label).tag(scope)
-      }
-    }
-    .pickerStyle(.segmented)
-    .labelsHidden()
-    .padding(.horizontal, 10)
-    .padding(.vertical, 8)
-    .accessibilityLabel(Text("Sessions shown", bundle: .module))
-  }
-}
-
 /// Sort and facets live at the foot of the column rather than above the list: they are consulted
 /// rarely, and the rows are what the column is for.
-private struct SidebarFooter: View {
+struct SidebarFooter: View {
   let model: AppModel
 
   var body: some View {
@@ -1609,18 +1527,44 @@ struct SessionCommands {
   /// Spoken rather than read, so it says what the command will actually do.
   var restartAnnouncement: String { model.expectedRestartMode(for: session) }
   var canSwitchAgent: Bool { model.canSwitchAgent(session) }
+  var taskStatus: SessionTaskStatus { session.taskStatus }
+  /// The statuses the session can be moved to by hand. Archiving and unarchiving keep their own
+  /// commands, which say what they do to the process.
+  var movableStatuses: [SessionTaskStatus] {
+    session.taskStatus == .archived ? [] : SessionTaskStatus.columns
+  }
 
   func close() { Task { await model.requestClose(session.id) } }
   func requestArchive() { model.requestArchive(session.id) }
   func restore() { Task { await model.restore(session.id) } }
   func restart() { Task { await model.restart(session.id) } }
   func switchAgent() { model.beginAgentSwitch(session.id) }
+  func setTaskStatus(_ status: SessionTaskStatus) {
+    Task { await model.setTaskStatus(status, for: session.id) }
+  }
 }
 
-private struct SessionCommandButtons: View {
+struct SessionCommandButtons: View {
   let commands: SessionCommands
 
   var body: some View {
+    if !commands.movableStatuses.isEmpty {
+      Menu {
+        ForEach(commands.movableStatuses, id: \.self) { status in
+          Toggle(
+            status.label,
+            isOn: Binding(
+              get: { commands.taskStatus == status },
+              set: { isOn in if isOn { commands.setTaskStatus(status) } }
+            )
+          )
+        }
+      } label: {
+        Text(
+          "Status", bundle: .module, comment: "The submenu that moves a session between columns.")
+      }
+      Divider()
+    }
     if commands.canRestart {
       Button(commands.restartTitle) { commands.restart() }
     }
@@ -1639,7 +1583,7 @@ private struct SessionCommandButtons: View {
   }
 }
 
-private struct SessionRow: View {
+struct SessionRow: View {
   let session: WorkSession
   let status: SessionStatusPresentation
   /// The one row the restoration is working on. Said on the row rather than only in the banner,
@@ -1729,6 +1673,17 @@ private struct SessionRow: View {
     .accessibilityAction(named: Text("Unarchive", bundle: .module)) {
       guard commands.canRestore else { return }
       commands.restore()
+    }
+    // The swipe's buttons, reachable without it: one action per status the session can go to.
+    .accessibilityActions {
+      ForEach(commands.movableStatuses.filter { $0 != commands.taskStatus }, id: \.self) {
+        status in
+        Button {
+          commands.setTaskStatus(status)
+        } label: {
+          Text(status.moveTitle)
+        }
+      }
     }
   }
 

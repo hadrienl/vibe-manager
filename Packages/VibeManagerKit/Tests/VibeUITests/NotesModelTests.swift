@@ -338,7 +338,7 @@ struct NotesIndexTests {
     await model.load()
     await settle { !model.notes.searchIndex.isEmpty }
 
-    model.setScope(.closed)
+    model.setColumn(.done)
     model.setSearchText("refactoring")
 
     #expect(model.visibleSessions.map(\.id) == [session.id])

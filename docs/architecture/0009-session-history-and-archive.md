@@ -89,6 +89,9 @@ hostage to a zombie.
 
 ### Two scopes, split on what is running — not on what was archived
 
+> Superseded by [ADR 0024](0024-sessions-as-tasks.md): the sidebar's columns follow the task
+> status, not the process.
+
 The sidebar has exactly two tabs, **Active** and **Closed**, and they partition the store: a
 session is in one or the other, never both, never neither.
 

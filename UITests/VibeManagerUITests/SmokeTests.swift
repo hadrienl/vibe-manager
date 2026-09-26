@@ -60,18 +60,17 @@ final class SmokeTests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: "session-row")
   }
 
-  /// Waits for the rows of both tabs together: the mock agent says its piece and exits, so a
-  /// session may be in Closed as soon as it is created. On a failure, keeps what the interface
-  /// showed and what it exposed to accessibility. Leaves the Closed tab selected, where the
-  /// sessions are: the shortcuts that follow select among the rows shown.
+  /// Waits for the rows of the four columns together (#80). On a failure, keeps what the
+  /// interface showed and what it exposed to accessibility. Leaves In Progress selected, where
+  /// launched sessions are: the shortcuts that follow select among the rows shown.
   private func expectSessionRows(
     _ expected: Int, in app: XCUIApplication, timeout: TimeInterval = 10
   ) {
     let deadline = Date().addingTimeInterval(timeout)
     var found = 0
     repeat {
-      found = ["Active", "Closed"].reduce(0) { total, scope in
-        app.radioButtons[scope].click()
+      found = ["todo", "waiting", "done", "doing"].reduce(0) { total, column in
+        app.buttons["column-tab-\(column)"].click()
         return total + sessionRows(in: app).count
       }
       if found == expected { return }
@@ -84,7 +83,7 @@ final class SmokeTests: XCTestCase {
     tree.name = "Accessibility tree"
     tree.lifetime = .keepAlways
     add(tree)
-    XCTAssertEqual(found, expected, "Sessions in Active and Closed together")
+    XCTAssertEqual(found, expected, "Sessions in the four columns together")
   }
 
   private func createSession(named name: String, in app: XCUIApplication) {
@@ -160,8 +159,8 @@ final class SmokeTests: XCTestCase {
   func testTheInterfaceSpeaksFrench() throws {
     let app = launch(language: "fr", locale: "fr_FR")
     XCTAssertTrue(app.buttons["Nouvelle session"].waitForExistence(timeout: 10))
-    XCTAssertTrue(app.radioButtons["Actives"].exists)
-    XCTAssertTrue(app.radioButtons["Fermées"].exists)
+    XCTAssertTrue(app.buttons["column-tab-todo"].label.hasPrefix("À faire"))
+    XCTAssertTrue(app.buttons["column-tab-doing"].label.hasPrefix("En cours"))
 
     app.menuBars.menuBarItems["Aide"].click()
     XCTAssertTrue(app.menuBars.menuItems["Exporter les diagnostics…"].waitForExistence(timeout: 5))

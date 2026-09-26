@@ -22,7 +22,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌥⌘N | Edit Notes; Escape gives the keyboard back to the terminal | View |
 | ⌥⌘↓ / ⌥⌘↑ | Next / Previous Session | View |
 | ⌘1…⌘9 | The session at that position in the list | View |
-| ⌃⌘→ | Next scope (Current, Closed, Archived, All) | View |
+| ⌃⌘→ / ⌃⌘← | Next / Previous Column (To Do, In Progress, Waiting, Done) | View |
 | ⌥⌘I | Show / Hide Context | View |
 | ⌃⌥⌘O | Read Last Output: VoiceOver says the last five lines the terminal showed | View |
 
@@ -56,6 +56,7 @@ the session.
 | Switch Agent… | ⌃⌘M | Session |
 | Close Session | ⌘W | Session |
 | Archive… / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
+| Move to Next / Previous Status, without a swipe | ⌥⌘→ / ⌥⌘← | Session › Status |
 | Close Window | ⇧⌘W | File |
 | Usage window | ⌥⌘U | Window |
 | Export Diagnostics… | — | Help |
@@ -64,8 +65,11 @@ the session.
 
 | Element | Label | Value | Actions | Identifier |
 |---|---|---|---|---|
+| Column tabs | the column and its count ("Waiting, 2 sessions"), and "one waits for you" when a session there does | selected | — | `column-tab-todo`, `-doing`, `-waiting`, `-done` |
 | Session list | "Sessions" | — | — | `session-list` |
-| A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Close Session, Archive, Unarchive — each only when it applies | `session-row` |
+| A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
+| Swipe buttons | "Move to ‹status›", "Archive…" | — | — | `swipe-‹status›` |
+| Archived sessions | "Archived (N)", opens the list | — | Show, Unarchive | `archived-sessions` |
 | Terminal | "Terminal — ‹session› — ‹status›" | the visible screen, as text, read-only | Read Last Output (⌃⌥⌘O) | `terminal` |
 | Notes | "Notes for ‹session›" | the text | editable | `notes-editor` |
 | Git inspector | the list of repositories and files | — | Open, Reveal in Finder, from the context menu | `inspector-git` |

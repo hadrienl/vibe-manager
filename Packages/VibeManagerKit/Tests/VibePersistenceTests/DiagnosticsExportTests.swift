@@ -168,7 +168,7 @@ struct DiagnosticsExportTests {
     let store = DiagnosticsCollector.store(
       storeURL: storeURL, notesDirectory: notes, statuses: [.active, .active, .closed])
 
-    #expect(store.schemaVersion == 5)
+    #expect(store.schemaVersion == 6)
     #expect(store.sessionsByStatus == [.active: 2, .closed: 1])
     #expect((store.storeBytes ?? 0) > 0)
     #expect(store.backupBytes != nil)
