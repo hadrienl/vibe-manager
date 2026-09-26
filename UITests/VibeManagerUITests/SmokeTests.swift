@@ -188,6 +188,56 @@ final class SmokeTests: XCTestCase {
 
   /// The application in French: a button of the window, a tab of the sidebar, a command of the
   /// Help menu — whose own title comes from macOS — and the New Session sheet.
+  /// Several sessions selected in the sidebar, one command for all of them (#77).
+  func testArchivingASelection() throws {
+    let app = launch()
+    for index in 1...3 {
+      createSession(named: "Batch \(index)", isFirst: index == 1, in: app)
+    }
+    expectSessionRows(3, in: app)
+    let column = ["doing", "todo", "waiting", "done"].first { column in
+      app.buttons["column-tab-\(column)"].click()
+      return sessionRows(in: app).count == 3
+    }
+    XCTAssertNotNil(column, "The three sessions share a column")
+
+    let rows = sessionRows(in: app)
+    rows.element(boundBy: 0).click()
+    XCUIElement.perform(withKeyModifiers: .command) {
+      rows.element(boundBy: 1).click()
+      rows.element(boundBy: 2).click()
+    }
+    let session = app.menuBars.menuBarItems["Session"]
+    session.click()
+    XCTAssertTrue(app.menuItems["Archive 3 Sessions…"].waitForExistence(timeout: 5))
+    app.typeKey(.escape, modifierFlags: [])
+
+    // The keyboard gone to the terminal, the commands are back on the session on screen.
+    let terminal = app.descendants(matching: .any).matching(identifier: "terminal").firstMatch
+    if terminal.waitForExistence(timeout: 5) {
+      terminal.click()
+      session.click()
+      XCTAssertTrue(app.menuItems["Archive…"].waitForExistence(timeout: 5))
+      app.typeKey(.escape, modifierFlags: [])
+    }
+
+    rows.element(boundBy: 0).click()
+    XCUIElement.perform(withKeyModifiers: .shift) {
+      rows.element(boundBy: 2).click()
+    }
+    rows.element(boundBy: 1).rightClick()
+    let archive = app.menuItems["Archive 3 Sessions…"]
+    XCTAssertTrue(archive.waitForExistence(timeout: 5))
+    archive.click()
+    let confirm = app.buttons["Archive"].firstMatch
+    XCTAssertTrue(confirm.waitForExistence(timeout: 5), "One question for the three sessions")
+    confirm.click()
+
+    expectSessionRows(0, in: app, timeout: 20)
+    XCTAssertTrue(app.buttons["archived-sessions"].label.contains("3"))
+    app.terminate()
+  }
+
   func testTheInterfaceSpeaksFrench() throws {
     let app = launch(language: "fr", locale: "fr_FR")
     XCTAssertTrue(app.buttons["Nouvelle session"].waitForExistence(timeout: 10))
