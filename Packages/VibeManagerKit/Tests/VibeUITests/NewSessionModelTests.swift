@@ -707,7 +707,7 @@ struct NewSessionProjectIconTests {
     let repository = SpyRepository()
     let store = InMemorySessionIconStore()
     let model = makeModel(icons: ["/work/api": icon], repository: repository, store: store)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
 
     await model.folderChosen("/work/api")
@@ -723,7 +723,7 @@ struct NewSessionProjectIconTests {
   @Test("A symbol picked by the user is never replaced, not even by another folder's icon")
   func explicitChoiceIsKept() async {
     let model = makeModel(icons: ["/work/api": projectIcon("a"), "/work/web": projectIcon("b")])
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     await model.folderChosen("/work/api")
     await waitUntil { model.draft.projectIcon != nil }
@@ -742,7 +742,7 @@ struct NewSessionProjectIconTests {
   @Test("Without an icon, the name decides, as it always has")
   func noIcon() async {
     let model = makeModel(icons: [:])
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
 
     await model.folderChosen("/work/api")
@@ -755,7 +755,7 @@ struct NewSessionProjectIconTests {
   @Test("An answer about a folder the field no longer names is dropped")
   func staleAnswerIsDropped() async throws {
     let model = makeModel(icons: ["/work/api": projectIcon("a")], delay: .milliseconds(100))
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     await model.folderChosen("/work/api")
     model.draft.workingDirectoryPath = "/work/other"
@@ -772,7 +772,7 @@ struct NewSessionProjectIconTests {
     let model = makeModel(
       icons: ["/work/api": projectIcon("a")], repository: repository,
       store: InMemorySessionIconStore(failure: Full()))
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     await model.folderChosen("/work/api")
     await waitUntil { model.draft.projectIcon != nil }
@@ -787,7 +787,7 @@ struct NewSessionProjectIconTests {
   func comingBackToTheFolder() async throws {
     let repository = SpyRepository()
     let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     await model.folderChosen("/work/api")
     await waitUntil { model.draft.projectIcon != nil }
@@ -805,7 +805,7 @@ struct NewSessionProjectIconTests {
   func typedFolderAtCreation() async throws {
     let repository = SpyRepository()
     let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     model.draft.workingDirectoryPath = "/work/api"
 
