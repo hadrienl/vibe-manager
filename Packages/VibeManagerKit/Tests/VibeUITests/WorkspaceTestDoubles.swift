@@ -12,7 +12,7 @@ import VibeDomain
 actor WorkspaceSupervisor: TerminalSupervisor {
   private(set) var startCount = 0
   private(set) var lastSpec: TerminalSpec?
-  private var sessions: [SessionID: WorkspaceTerminal] = [:]
+  private var sessions: [TerminalID: WorkspaceTerminal] = [:]
   private let failure: TerminalError?
   private var initialState: TerminalProcessState
   /// What a stop leaves behind: a clean exit, or a process group the kernel would not let go of.
@@ -34,7 +34,7 @@ actor WorkspaceSupervisor: TerminalSupervisor {
     initialState = state
   }
 
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
+  func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
     if let failure { throw failure }
     startCount += 1
     lastSpec = spec
@@ -43,9 +43,9 @@ actor WorkspaceSupervisor: TerminalSupervisor {
     return session
   }
 
-  func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
+  func session(for id: TerminalID) -> (any TerminalSession)? { sessions[id] }
 
-  func stop(id: SessionID, gracePeriod: Duration) async {
+  func stop(id: TerminalID, gracePeriod: Duration) async {
     // Released as well as finished, exactly as `PTYTerminalSupervisor` does: a double that kept
     // the entry would let a test claim nothing is attached while the supervisor still holds it.
     await sessions.removeValue(forKey: id)?.finish(state: stopState)
@@ -54,16 +54,16 @@ actor WorkspaceSupervisor: TerminalSupervisor {
   func stopAll(gracePeriod: Duration) {}
 
   func finish(id: SessionID, state: TerminalProcessState) async {
-    await sessions[id]?.finish(state: state)
+    await sessions[id.agentTerminal]?.finish(state: state)
   }
 }
 
 actor WorkspaceTerminal: TerminalSession {
-  nonisolated let id: SessionID
+  nonisolated let id: TerminalID
   private var current: TerminalProcessState
   private var continuations: [AsyncStream<TerminalEvent>.Continuation] = []
 
-  init(id: SessionID, state: TerminalProcessState) {
+  init(id: TerminalID, state: TerminalProcessState) {
     self.id = id
     current = state
   }

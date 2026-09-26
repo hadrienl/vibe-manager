@@ -148,7 +148,7 @@ struct TerminalHostTests {
     let supervisor = host.supervisor()
 
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: "printf 'hello from the host'; exit 3"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf 'hello from the host'; exit 3"), for: TerminalID())
     let transcript = await Transcript.follow(session)
 
     #expect(session is HostedTerminalSession)
@@ -166,7 +166,7 @@ struct TerminalHostTests {
 
     let session = try await supervisor.start(
       TerminalTestSupport.spec(script: "read first; read second; echo \"got:$first/$second\""),
-      for: SessionID())
+      for: TerminalID())
     let transcript = await Transcript.follow(session)
     await session.write("one\r")
     await session.write("two\r")
@@ -186,7 +186,7 @@ struct TerminalHostTests {
       TerminalTestSupport.spec(
         script: "head -c 3000000 /dev/zero | tr '\\0' 'x'; printf '\\nend-of-output\\n'",
         scrollback: TerminalScrollbackLimits(maximumLineCount: 10, maximumByteCount: 8_000_000)),
-      for: SessionID())
+      for: TerminalID())
     let transcript = await Transcript.follow(session)
 
     #expect(await transcript.waitFor("end-of-output"))
@@ -201,14 +201,14 @@ struct TerminalHostTests {
     let host = try InProcessTerminalHost()
     let supervisor = host.supervisor()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(script: idleScript), for: TerminalID())
 
     // Sent whole, it would exceed what the host accepts in a frame, and the host would read the
     // closed connection as a crash of the application — stopping every agent.
     await session.write([UInt8](repeating: UInt8(ascii: "y"), count: 1_500_000))
 
     let next = try await supervisor.start(
-      TerminalTestSupport.spec(script: "printf still-connected"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf still-connected"), for: TerminalID())
     #expect(next is HostedTerminalSession)
     #expect(await Transcript.follow(next).waitFor("still-connected"))
     #expect(await session.state().isFinished == false)
@@ -225,7 +225,7 @@ struct TerminalHostTests {
         script:
           "trap 'printf \"parting words\\n\"; exit 0' TERM; printf 'up\\n'; while :; do sleep 0.05; done"
       ),
-      for: SessionID())
+      for: TerminalID())
     let transcript = await Transcript.follow(session)
     #expect(await transcript.waitFor("up"))
 
@@ -242,17 +242,17 @@ struct TerminalHostTests {
     let host = try InProcessTerminalHost(maximumRunningSessions: 2)
     let supervisor = host.supervisor()
     let first = try await supervisor.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
-    _ = try await supervisor.start(TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(script: idleScript), for: TerminalID())
+    _ = try await supervisor.start(TerminalTestSupport.spec(script: idleScript), for: TerminalID())
 
     await #expect(throws: TerminalError.tooManySessions(limit: 2)) {
-      _ = try await supervisor.start(TerminalTestSupport.spec(script: "true"), for: SessionID())
+      _ = try await supervisor.start(TerminalTestSupport.spec(script: "true"), for: TerminalID())
     }
 
     // A session that ends makes room again.
     await first.stop(gracePeriod: .seconds(3))
     let next = try await supervisor.start(
-      TerminalTestSupport.spec(script: "printf room"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf room"), for: TerminalID())
     #expect(await Transcript.follow(next).waitFor("room"))
     await supervisor.relinquish(keepRunning: false)
     await host.shutDown()
@@ -278,7 +278,7 @@ struct TerminalHostTests {
     spec.executableURL = URL(fileURLWithPath: "/nowhere/agent")
 
     await #expect(throws: TerminalError.executableNotFound(path: "/nowhere/agent")) {
-      _ = try await supervisor.start(spec, for: SessionID())
+      _ = try await supervisor.start(spec, for: TerminalID())
     }
     await supervisor.relinquish(keepRunning: false)
     await host.shutDown()
@@ -288,7 +288,7 @@ struct TerminalHostTests {
   func reattachesToARunningSession() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    let id = SessionID()
+    let id = TerminalID()
     let session = try await first.start(
       TerminalTestSupport.spec(script: "printf 'before\\n'; read go; printf 'after\\n'"), for: id)
     try #require(session is HostedTerminalSession)
@@ -319,7 +319,7 @@ struct TerminalHostTests {
   func goodbyeIsNotCutOff() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    let id = SessionID()
+    let id = TerminalID()
     let session = try await first.start(TerminalTestSupport.spec(script: idleScript), for: id)
     // Megabytes queued ahead of the goodbye: closing as soon as it is queued would drop it, and the
     // host would take the departure for a crash — stopping the agent it was asked to keep.
@@ -342,7 +342,7 @@ struct TerminalHostTests {
   func keepsWhatEndedWhileAway() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    let id = SessionID()
+    let id = TerminalID()
     // Told to end only once its client has left: ending on a timer, it ended before the goodbye on
     // a loaded runner, and the client still attached read it and released it.
     let go = host.location.directory.appendingPathComponent("go").path
@@ -390,7 +390,7 @@ struct TerminalHostTests {
           echo $! > '\(childFile)'
           \(idleScript)
           """),
-      for: SessionID())
+      for: TerminalID())
     guard case .running(let processIdentifier) = await session.state() else {
       Issue.record("The session did not start")
       return
@@ -414,7 +414,7 @@ struct TerminalHostTests {
     let host = try InProcessTerminalHost()
     let supervisor = host.supervisor()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(script: idleScript), for: TerminalID())
     guard case .running(let processIdentifier) = await session.state() else {
       Issue.record("The session did not start")
       return
@@ -430,7 +430,7 @@ struct TerminalHostTests {
   func refusesASecondClient() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    _ = try await first.start(TerminalTestSupport.spec(script: idleScript), for: SessionID())
+    _ = try await first.start(TerminalTestSupport.spec(script: idleScript), for: TerminalID())
 
     let second = host.supervisor()
     guard case .unavailable = await second.reconnect() else {
@@ -445,7 +445,7 @@ struct TerminalHostTests {
   func steppingAwayKeepsTheAgents() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    let id = SessionID()
+    let id = TerminalID()
     let session = try await first.start(TerminalTestSupport.spec(script: idleScript), for: id)
     guard case .running(let processIdentifier) = await session.state() else {
       Issue.record("The session did not start")
@@ -475,7 +475,7 @@ struct TerminalHostTests {
   func keptAgentsAreNotOverridden() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    let kept = SessionID()
+    let kept = TerminalID()
     _ = try await first.start(TerminalTestSupport.spec(script: idleScript), for: kept)
     await first.relinquish(keepRunning: true)
     // Another copy holds the host while this one launches.
@@ -494,7 +494,7 @@ struct TerminalHostTests {
     // Connecting for it would make this copy the host's client without the kept agent, and its
     // goodbye would stop an agent nobody had seen again.
     let started = try await supervisor.start(
-      TerminalTestSupport.spec(script: "printf local"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf local"), for: TerminalID())
     #expect(started is PTYTerminalSession)
 
     guard case .connected(_, let sessions) = await supervisor.reconnect() else {
@@ -510,7 +510,7 @@ struct TerminalHostTests {
   func localRestartIsNotShadowed() async throws {
     let host = try InProcessTerminalHost()
     let supervisor = host.supervisor()
-    let id = SessionID()
+    let id = TerminalID()
     let hosted = try await supervisor.start(TerminalTestSupport.spec(script: "exit 0"), for: id)
     #expect(await Transcript.follow(hosted).waitForEnd())
     await host.shutDown()
@@ -528,7 +528,7 @@ struct TerminalHostTests {
   func redrawsAfterReattaching() async throws {
     let host = try InProcessTerminalHost()
     let first = host.supervisor()
-    let id = SessionID()
+    let id = TerminalID()
     let session = try await first.start(
       TerminalTestSupport.spec(
         script: "trap 'echo WINCH' WINCH; printf 'ready\\n'; while :; do sleep 0.05; done"),
@@ -553,7 +553,7 @@ struct TerminalHostTests {
     let host = try InProcessTerminalHost(idleGracePeriod: .milliseconds(200))
     let supervisor = host.supervisor()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: "exit 0"), for: SessionID())
+      TerminalTestSupport.spec(script: "exit 0"), for: TerminalID())
     #expect(await Transcript.follow(session).waitForEnd())
     #expect(!host.becameIdle)
 
@@ -575,7 +575,7 @@ struct TerminalHostTests {
       ))
 
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: "printf local"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf local"), for: TerminalID())
 
     #expect(session is PTYTerminalSession)
     #expect(await Transcript.follow(session).waitForEnd())
@@ -618,7 +618,7 @@ struct TerminalHostProcessTests {
     let launcher = ExecutableTerminalHostLauncher(
       executableURL: try Self.fixtureURL(),
       disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
-    let id = SessionID()
+    let id = TerminalID()
 
     let application = HostedTerminalSupervisor(
       configuration: HostedTerminalSupervisor.Configuration(
@@ -674,7 +674,7 @@ struct TerminalHostProcessTests {
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
         launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
     let session = try await application.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(script: idleScript), for: TerminalID())
     let identity = try #require(await application.hostIdentity())
     await application.relinquish(keepRunning: true)
     let before = Date()
@@ -691,7 +691,7 @@ struct TerminalHostProcessTests {
       configuration: HostedTerminalSupervisor.Configuration(
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
         launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
-    _ = try await next.start(TerminalTestSupport.spec(script: "true"), for: SessionID())
+    _ = try await next.start(TerminalTestSupport.spec(script: "true"), for: TerminalID())
     #expect(location.lastStopRequest() == nil)
     await next.relinquish(keepRunning: false)
   }
@@ -710,7 +710,7 @@ struct TerminalHostProcessTests {
         location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
         launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
     let first = try await application.start(
-      TerminalTestSupport.spec(script: idleScript), for: SessionID())
+      TerminalTestSupport.spec(script: idleScript), for: TerminalID())
 
     try launcher.launch(at: location)
     try await Task.sleep(for: .milliseconds(500))
@@ -718,7 +718,7 @@ struct TerminalHostProcessTests {
     // Still the first host: it still runs the first session, and still takes new ones.
     #expect(await first.state().isFinished == false)
     let second = try await application.start(
-      TerminalTestSupport.spec(script: "printf served"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf served"), for: TerminalID())
     #expect(second is HostedTerminalSession)
     #expect(await Transcript.follow(second).waitFor("served"))
     await application.relinquish(keepRunning: false)
@@ -750,7 +750,7 @@ struct TerminalHostProcessTests {
           echo $! > '\(childFile)'
           while :; do sleep 0.1; done
           """),
-      for: SessionID())
+      for: TerminalID())
     #expect(session is HostedTerminalSession)
     guard case .running(let agent) = await session.state() else {
       Issue.record("The session did not start")
@@ -794,7 +794,7 @@ struct TerminalHostProcessTests {
         processes: probe))
     let session = try await application.start(
       TerminalTestSupport.spec(script: "trap '' HUP\nwhile :; do sleep 0.1; done"),
-      for: SessionID())
+      for: TerminalID())
     guard case .running(let agent) = await session.state() else {
       Issue.record("The session did not start")
       return

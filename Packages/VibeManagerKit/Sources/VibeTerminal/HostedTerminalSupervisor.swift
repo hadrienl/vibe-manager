@@ -83,10 +83,13 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
   /// The connection under way, which a terminal started meanwhile waits for: a second `hello`
   /// from this copy would be refused as another client, and that terminal run in the application.
   private var connecting: Task<Bool, Never>?
-  private var mirrors: [SessionID: HostedTerminalSession] = [:]
+  private var mirrors: [TerminalID: HostedTerminalSession] = [:]
+  /// The side terminals among them (#43): not agents, so neither counted as agents nor waited for
+  /// when the host is to be let go.
+  private var auxiliary: Set<TerminalID> = []
   /// The process group of each agent the host runs for this copy, and when the kernel says it
   /// started: what is stopped, after checking it is still the same, if the host dies.
-  private var groups: [SessionID: (group: Int32, startedAt: Date?)] = [:]
+  private var groups: [TerminalID: (group: Int32, startedAt: Date?)] = [:]
   private var pending: [UInt64: CheckedContinuation<TerminalHostMessage.Body?, Never>] = [:]
   private var nextRequest: UInt64 = 1
 
@@ -98,9 +101,14 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   // MARK: - TerminalSupervisor
 
-  public func start(_ spec: TerminalSpec, for id: SessionID) async throws -> any TerminalSession {
+  public func start(_ spec: TerminalSpec, for id: TerminalID) async throws -> any TerminalSession {
     if let existing = await session(for: id), await !existing.state().isFinished {
       throw TerminalError.sessionAlreadyRunning(id)
+    }
+    if spec.role == .auxiliary {
+      auxiliary.insert(id)
+    } else {
+      auxiliary.remove(id)
     }
     guard await connectedOutsideRetirement() else {
       return try await startLocally(spec, for: id)
@@ -142,7 +150,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   /// The mirror of an earlier run of this session in the host would stand in front of the local
   /// terminal: `session(for:)` and `stop(id:)` would find it, finished, and never reach the process.
-  private func startLocally(_ spec: TerminalSpec, for id: SessionID) async throws
+  private func startLocally(_ spec: TerminalSpec, for id: TerminalID) async throws
     -> any TerminalSession
   {
     diagnostics.record(
@@ -152,12 +160,12 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     return try await local.start(spec, for: id)
   }
 
-  public func session(for id: SessionID) async -> (any TerminalSession)? {
+  public func session(for id: TerminalID) async -> (any TerminalSession)? {
     if let mirror = mirrors[id] { return mirror }
     return await local.session(for: id)
   }
 
-  public func stop(id: SessionID, gracePeriod: Duration) async {
+  public func stop(id: TerminalID, gracePeriod: Duration) async {
     if let mirror = mirrors[id] {
       await mirror.stop(gracePeriod: gracePeriod)
       return
@@ -224,6 +232,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
         needsRedraw: !record.state.isFinished
       )
       mirrors[record.session] = mirror
+      if record.role == .auxiliary {
+        auxiliary.insert(record.session)
+      }
       if case .running(let processIdentifier) = record.state {
         remember(processIdentifier, for: record.session)
       }
@@ -268,8 +279,9 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
       sessions: sessions.sorted { $0.session.rawValue < $1.session.rawValue })
   }
 
-  public func discard(_ id: SessionID) async {
+  public func discard(_ id: TerminalID) async {
     groups[id] = nil
+    auxiliary.remove(id)
     guard let mirror = mirrors.removeValue(forKey: id) else { return }
     await mirror.stop(gracePeriod: .seconds(3))
     _ = await request(.release(session: id))
@@ -336,10 +348,13 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     return .none
   }
 
+  /// The sessions whose agent runs in the host. A side terminal (#43) is not an agent: its shell
+  /// is always running, and counting it would keep the host from ever being idle.
   public func runningHostedSessions() async -> [SessionID] {
     var running: [SessionID] = []
-    for (id, mirror) in mirrors where await !mirror.state().isFinished {
-      running.append(id)
+    for (id, mirror) in mirrors where !auxiliary.contains(id) {
+      guard await !mirror.state().isFinished else { continue }
+      running.append(id.agentSession)
     }
     return running
   }
@@ -427,7 +442,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     connection.send(.control(TerminalHostRequest(request: 0, body: body)))
   }
 
-  func sendInput(_ bytes: [UInt8], to id: SessionID) {
+  func sendInput(_ bytes: [UInt8], to id: TerminalID) {
     guard let connection else { return }
     for frame in TerminalHostFrame.terminalChunks(.input, session: id, bytes: bytes) {
       connection.send(frame)
@@ -643,7 +658,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   /// A session that has ended is read, and the host has no reason to keep it any longer. The
   /// mirror stays: it is what the pane shows, and the last output with it.
-  private func release(_ id: SessionID) {
+  private func release(_ id: TerminalID) {
     // A client on its way out has not shown that output to anybody: the session is left for the
     // next launch to read, as one that ended while nobody was attached.
     guard !isClosed else { return }
@@ -656,7 +671,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   /// A start the host answered before its process was running says so with a pid of 0: the group
   /// is learnt from the state that follows.
-  private func noteGroup(of state: TerminalProcessState, for id: SessionID) {
+  private func noteGroup(of state: TerminalProcessState, for id: TerminalID) {
     guard mirrors[id] != nil else { return }
     switch state {
     case .running(let processIdentifier) where groups[id]?.group != processIdentifier:
@@ -668,7 +683,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     }
   }
 
-  private func remember(_ processIdentifier: Int32, for id: SessionID) {
+  private func remember(_ processIdentifier: Int32, for id: TerminalID) {
     guard processIdentifier > 0 else { return }
     groups[id] = (processIdentifier, configuration.processes.startTime(of: processIdentifier))
   }
@@ -718,7 +733,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   /// `SIGKILL` to a group, when it is the one this copy recorded. A group whose leader has exited
   /// is still ours while it has members: the kernel gives no process a pid that names a live group.
-  private func stopGroup(_ group: Int32, startedAt: Date?, for id: SessionID) -> GroupOutcome {
+  private func stopGroup(_ group: Int32, startedAt: Date?, for id: TerminalID) -> GroupOutcome {
     let identity = configuration.processes.identify(processGroup: group, startedAt: startedAt)
     let outcome: GroupOutcome
     switch identity {

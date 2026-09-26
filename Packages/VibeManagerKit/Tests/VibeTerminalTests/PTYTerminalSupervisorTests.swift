@@ -13,7 +13,7 @@ private let idleScript = """
 @Test("The supervisor refuses to start a second terminal for a live session")
 func refusesConcurrentSessionsForTheSameIdentifier() async throws {
   let supervisor = PTYTerminalSupervisor()
-  let id = SessionID()
+  let id = TerminalID()
   _ = try await supervisor.start(TerminalTestSupport.spec(script: idleScript), for: id)
 
   await #expect(throws: TerminalError.sessionAlreadyRunning(id)) {
@@ -26,7 +26,7 @@ func refusesConcurrentSessionsForTheSameIdentifier() async throws {
 @Test("A finished session can be restarted under the same identifier")
 func restartsFinishedSession() async throws {
   let supervisor = PTYTerminalSupervisor()
-  let id = SessionID()
+  let id = TerminalID()
   let first = try await supervisor.start(TerminalTestSupport.spec(script: "exit 0"), for: id)
   while await !first.state().isFinished {
     try await Task.sleep(for: .milliseconds(20))
@@ -46,7 +46,7 @@ func stopAllTerminatesEveryProcess() async throws {
   for _ in 0..<3 {
     let session = try await supervisor.start(
       TerminalTestSupport.spec(script: idleScript),
-      for: SessionID()
+      for: TerminalID()
     )
     guard case .running(let processIdentifier) = await session.state() else {
       // The session may still be starting; wait for the running state.
@@ -70,5 +70,5 @@ func stopAllTerminatesEveryProcess() async throws {
   for identifier in identifiers {
     #expect(!isProcessAlive(identifier))
   }
-  #expect(await supervisor.session(for: SessionID()) == nil)
+  #expect(await supervisor.session(for: TerminalID()) == nil)
 }

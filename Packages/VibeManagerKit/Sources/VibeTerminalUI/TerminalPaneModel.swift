@@ -43,7 +43,8 @@ public final class TerminalPaneModel {
   /// rather than a flag: the same request twice in a row must still move the focus twice.
   public private(set) var focusRequest = 0
 
-  private let sessionID: SessionID
+  /// The terminal this pane shows: its session's agent, or one of its side terminals (#43).
+  public let terminalID: TerminalID
   private let supervisor: any TerminalSupervisor
   /// What `start()` launches. `nil` for a pane that took over a process it never started — one the
   /// terminal host kept running while the application was closed — until a restart hands it one.
@@ -55,15 +56,27 @@ public final class TerminalPaneModel {
   private var pendingNotice: [UInt8] = []
 
   public init(
+    terminalID: TerminalID,
+    supervisor: any TerminalSupervisor,
+    spec: TerminalSpec?,
+    viewportTimeout: Duration = .milliseconds(500)
+  ) {
+    self.terminalID = terminalID
+    self.supervisor = supervisor
+    self.spec = spec
+    self.viewportTimeout = viewportTimeout
+  }
+
+  /// The pane of a session's agent.
+  public convenience init(
     sessionID: SessionID,
     supervisor: any TerminalSupervisor,
     spec: TerminalSpec?,
     viewportTimeout: Duration = .milliseconds(500)
   ) {
-    self.sessionID = sessionID
-    self.supervisor = supervisor
-    self.spec = spec
-    self.viewportTimeout = viewportTimeout
+    self.init(
+      terminalID: sessionID.agentTerminal, supervisor: supervisor, spec: spec,
+      viewportTimeout: viewportTimeout)
   }
 
   /// Asks the surface to take the keyboard, if it is the terminal on screen.
@@ -115,7 +128,7 @@ public final class TerminalPaneModel {
     }
 
     do {
-      let session = try await supervisor.start(launchSpec, for: sessionID)
+      let session = try await supervisor.start(launchSpec, for: terminalID)
       self.session = session
       observe(session)
     } catch let error as TerminalError {
@@ -224,7 +237,7 @@ public final class TerminalPaneModel {
 
   public func stop() async {
     wasStoppedOnPurpose = true
-    await supervisor.stop(id: sessionID, gracePeriod: .seconds(3))
+    await supervisor.stop(id: terminalID, gracePeriod: .seconds(3))
     if let session {
       apply(await session.state())
     }

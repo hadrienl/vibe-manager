@@ -37,7 +37,7 @@ enum TerminalTestSupport {
     scrollback: TerminalScrollbackLimits = .default
   ) throws -> PTYTerminalSession {
     try PTYTerminalSession.start(
-      id: SessionID(),
+      id: TerminalID(),
       spec: spec(
         script: script,
         size: size,

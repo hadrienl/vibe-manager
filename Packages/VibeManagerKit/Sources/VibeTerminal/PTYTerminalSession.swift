@@ -15,7 +15,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   // reported, exactly as the bounded history does.
   private static let subscriberBufferLimit = 512
 
-  public nonisolated let id: SessionID
+  public nonisolated let id: TerminalID
 
   private let terminal: PseudoTerminal
   private let reader: TerminalOutputReader
@@ -37,7 +37,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private var isReaderDrained = false
   private var hasEnded = false
 
-  public static func start(id: SessionID, spec: TerminalSpec) throws -> PTYTerminalSession {
+  public static func start(id: TerminalID, spec: TerminalSpec) throws -> PTYTerminalSession {
     let terminal = try PseudoTerminalLauncher.launch(spec)
     let session = PTYTerminalSession(id: id, terminal: terminal, spec: spec)
     // The initial input is enqueued before the session handle is handed out, so a caller that
@@ -49,7 +49,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     return session
   }
 
-  private init(id: SessionID, terminal: PseudoTerminal, spec: TerminalSpec) {
+  private init(id: TerminalID, terminal: PseudoTerminal, spec: TerminalSpec) {
     self.id = id
     self.terminal = terminal
     reader = TerminalOutputReader(descriptor: terminal.masterDescriptor)

@@ -216,14 +216,14 @@ private actor MutableRepository: SessionRepository {
 
 private actor SpySupervisor: TerminalSupervisor {
   private(set) var startCount = 0
-  private var sessions: [SessionID: FakeTerminalSession] = [:]
+  private var sessions: [TerminalID: FakeTerminalSession] = [:]
   private let failure: TerminalError?
 
   init(failure: TerminalError? = nil) {
     self.failure = failure
   }
 
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
+  func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
     if let failure { throw failure }
     startCount += 1
     let session = FakeTerminalSession(id: id)
@@ -231,17 +231,17 @@ private actor SpySupervisor: TerminalSupervisor {
     return session
   }
 
-  func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
+  func session(for id: TerminalID) -> (any TerminalSession)? { sessions[id] }
 
-  func stop(id: SessionID, gracePeriod: Duration) {}
+  func stop(id: TerminalID, gracePeriod: Duration) {}
 
   func stopAll(gracePeriod: Duration) {}
 }
 
 private actor FakeTerminalSession: TerminalSession {
-  nonisolated let id: SessionID
+  nonisolated let id: TerminalID
 
-  init(id: SessionID) {
+  init(id: TerminalID) {
     self.id = id
   }
 

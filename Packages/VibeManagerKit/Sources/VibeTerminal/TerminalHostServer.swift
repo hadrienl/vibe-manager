@@ -64,6 +64,7 @@ public actor TerminalHostServer {
 
   private struct Hosted {
     let session: PTYTerminalSession
+    let role: TerminalRole
     var endedAt: Date?
   }
 
@@ -78,10 +79,10 @@ public actor TerminalHostServer {
 
   private let configuration: Configuration
   private let onIdle: @Sendable () -> Void
-  private var sessions: [SessionID: Hosted] = [:]
+  private var sessions: [TerminalID: Hosted] = [:]
   private var owner: Client?
   private var keepsRunning = false
-  private var forwards: [SessionID: Task<Void, Never>] = [:]
+  private var forwards: [TerminalID: Task<Void, Never>] = [:]
   private var idleTask: Task<Void, Never>?
   /// Set by `retire`: the host leaves as soon as it is idle, without its grace period.
   private var isRetiring = false
@@ -303,12 +304,13 @@ public actor TerminalHostServer {
     for (id, hosted) in sessions {
       records.append(
         HostedSessionRecord(
-          session: id, state: await hosted.session.state(), endedAt: hosted.endedAt))
+          session: id, state: await hosted.session.state(), endedAt: hosted.endedAt,
+          role: hosted.role))
     }
     return records
   }
 
-  private func start(_ spec: TerminalSpec, for id: SessionID) async -> TerminalHostMessage.Body {
+  private func start(_ spec: TerminalSpec, for id: TerminalID) async -> TerminalHostMessage.Body {
     // On its way out, with the goodbye that follows stopping everything: an agent started now
     // would be stopped with it. The client waits for the next host instead of asking this one.
     guard !isRetiring else { return .startFailed(.spawnFailed(code: EAGAIN)) }
@@ -333,7 +335,7 @@ public actor TerminalHostServer {
       configuration.diagnostics.record(
         .session, .info, "host.sessionStarted",
         ["session": configuration.diagnostics.pseudonym(id), "running": .count(running + 1)])
-      sessions[id] = Hosted(session: session)
+      sessions[id] = Hosted(session: session, role: spec.role)
       watch(session)
       updateIdleState()
       guard case .running(let processIdentifier) = await session.state() else {
@@ -356,7 +358,7 @@ public actor TerminalHostServer {
 
   /// History first, then `attached`, then the live stream — one consistent value, as
   /// `TerminalSession.attach()` promises, cut into frames.
-  private func attach(_ id: SessionID, request: UInt64, client: Client) async {
+  private func attach(_ id: TerminalID, request: UInt64, client: Client) async {
     guard let hosted = sessions[id] else {
       return await reply(request, .unknownSession, to: client)
     }
@@ -408,11 +410,11 @@ public actor TerminalHostServer {
     }
   }
 
-  private func endedAt(of id: SessionID) -> Date? {
+  private func endedAt(of id: TerminalID) -> Date? {
     sessions[id]?.endedAt
   }
 
-  private func release(_ id: SessionID) async {
+  private func release(_ id: TerminalID) async {
     guard let hosted = sessions[id], await hosted.session.state().isFinished else { return }
     sessions[id] = nil
     forwards.removeValue(forKey: id)?.cancel()

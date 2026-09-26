@@ -312,7 +312,7 @@ public struct DetectPreviousShutdown: Sendable {
     // Only a session the host lost can have left a process nobody holds.
     // Identified, they are stopped here, as after a crash; one that cannot be identified is left
     // alone, and a reattach has no offer on screen to carry that warning.
-    _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID] == nil })
+    _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID.agentTerminal] == nil })
     await recorder.claim()
 
     let storedByID = Dictionary(
@@ -323,7 +323,7 @@ public struct DetectPreviousShutdown: Sendable {
     var ended: [SessionID] = []
     var stale: [WorkSession] = []
     for session in active {
-      guard let summary = byID[session.id] else {
+      guard let summary = byID[session.id.agentTerminal] else {
         stale.append(session)
         continue
       }
@@ -335,7 +335,7 @@ public struct DetectPreviousShutdown: Sendable {
     }
     // What the host holds for a session the store no longer calls active — archived, deleted by
     // hand, closed by a copy that could not reach the host — has nobody left to show it to.
-    for summary in hosted where storedByID[summary.id]?.status != .active {
+    for summary in hosted where storedByID[summary.id.agentSession]?.status != .active {
       await host?.discard(summary.id)
     }
 

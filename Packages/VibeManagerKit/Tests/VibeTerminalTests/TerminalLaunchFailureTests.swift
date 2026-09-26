@@ -13,7 +13,7 @@ private func makeTemporaryDirectory() throws -> URL {
 }
 
 private func start(_ spec: TerminalSpec) throws -> PTYTerminalSession {
-  try PTYTerminalSession.start(id: SessionID(), spec: spec)
+  try PTYTerminalSession.start(id: TerminalID(), spec: spec)
 }
 
 @Test("A missing executable is reported as such")
@@ -78,7 +78,7 @@ func launchFailuresAreActionable() {
     .pseudoTerminalUnavailable(code: EAGAIN),
     .resourceLimitReached(code: EAGAIN),
     .spawnFailed(code: EINVAL),
-    .sessionAlreadyRunning(SessionID()),
+    .sessionAlreadyRunning(TerminalID()),
   ]
 
   for failure in failures {

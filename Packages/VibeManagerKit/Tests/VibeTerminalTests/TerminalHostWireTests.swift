@@ -10,8 +10,8 @@ import VibeDomain
 struct TerminalHostWireTests {
   private let frames: [TerminalHostFrame] = [
     .control(TerminalHostRequest(request: 7, body: .list)),
-    .terminal(.input, session: SessionID(), bytes: Array("ls -la\r".utf8)),
-    .terminal(.output, session: SessionID(), bytes: [0x1B, 0x5B, 0x32, 0x4A, 0xE2, 0x94]),
+    .terminal(.input, session: TerminalID(), bytes: Array("ls -la\r".utf8)),
+    .terminal(.output, session: TerminalID(), bytes: [0x1B, 0x5B, 0x32, 0x4A, 0xE2, 0x94]),
     TerminalHostFrame(kind: .output, payload: []),
   ]
 
@@ -59,7 +59,7 @@ struct TerminalHostWireTests {
 
   @Test("Terminal bytes carry the session they belong to")
   func terminalBytesNameTheirSession() {
-    let id = SessionID()
+    let id = TerminalID()
     let frame = TerminalHostFrame.terminal(.output, session: id, bytes: [1, 2, 3])
 
     #expect(frame.terminalBytes?.session == id)
@@ -69,7 +69,7 @@ struct TerminalHostWireTests {
 
   @Test("Terminal bytes too large for a frame are cut, and come back whole")
   func terminalBytesAreCut() throws {
-    let id = SessionID()
+    let id = TerminalID()
     let bytes = (0..<2_500_000).map { UInt8(truncatingIfNeeded: $0) }
 
     let frames = TerminalHostFrame.terminalChunks(.output, session: id, bytes: bytes)
@@ -86,7 +86,7 @@ struct TerminalHostWireTests {
   func startRequestRoundTrip() {
     let spec = TerminalTestSupport.spec(
       script: "echo hi", size: TerminalSize(columns: 132, rows: 40), initialInput: "go\r")
-    let request = TerminalHostRequest(request: 3, body: .start(session: SessionID(), spec: spec))
+    let request = TerminalHostRequest(request: 3, body: .start(session: TerminalID(), spec: spec))
 
     #expect(TerminalHostFrame.control(request).decode(TerminalHostRequest.self) == request)
   }
