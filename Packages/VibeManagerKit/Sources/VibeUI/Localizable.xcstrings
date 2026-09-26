@@ -490,6 +490,23 @@
         }
       }
     },
+    "%@, %@. Folder not found" : {
+      "comment" : "VoiceOver: a recent folder that has gone. Its name, then its path.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@. Folder not found"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@. Dossier introuvable"
+          }
+        }
+      }
+    },
     "%@, %lld sessions" : {
       "comment" : "A column tab: its name, how many sessions it holds.",
       "localizations" : {
@@ -5718,6 +5735,17 @@
         }
       }
     },
+    "Remove from Recents" : {
+      "comment" : "Forgets a recent folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer des récents"
+          }
+        }
+      }
+    },
     "Remove the folder" : {
       "localizations" : {
         "fr" : {
@@ -6467,11 +6495,23 @@
       }
     },
     "Show %lld More" : {
+      "comment" : "Shows the other recent folders. The number of them.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher %lld de plus"
+          }
+        }
+      }
+    },
+    "Show %lld more recent folders" : {
+      "comment" : "VoiceOver: shows the other recent folders. The number of them.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher %lld dossiers récents de plus"
           }
         }
       }
@@ -6508,6 +6548,17 @@
         }
       }
     },
+    "Show Fewer" : {
+      "comment" : "Folds the recent folders back to three.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher moins"
+          }
+        }
+      }
+    },
     "Show Web View" : {
       "comment" : "Shows the session's web view beside its terminal.",
       "localizations" : {
@@ -6515,6 +6566,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la vue web"
+          }
+        }
+      }
+    },
+    "Show fewer recent folders" : {
+      "comment" : "VoiceOver: folds the recent folders back to three.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher moins de dossiers récents"
           }
         }
       }
@@ -6528,6 +6590,17 @@
           }
         }
       }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher dans le Finder"
+          }
+        }
+      },
+      "comment" : "Reveals a recent folder in the Finder."
     },
     "Show prompt" : {
       "localizations" : {
@@ -9375,6 +9448,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "{{name}} est un champ, {{name?}} un champ facultatif, {{name|/regex/}} en garde une partie. Écrivez \\{{ pour garder les accolades comme du texte."
+          }
+        }
+      }
+    },
+    "“%@” was not found — the next recent folder is proposed." : {
+      "comment" : "Under the working folder: the last folder used has gone. The name of that folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est introuvable : le dossier récent suivant est proposé."
           }
         }
       }

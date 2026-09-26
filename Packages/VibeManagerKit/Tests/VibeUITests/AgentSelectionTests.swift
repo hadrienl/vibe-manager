@@ -23,7 +23,8 @@ struct AgentSelectionTests {
   @Test("The models offered are those of the selected agent")
   func modelsFollowTheSelectedAgent() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     #expect(model.draft.providerID == "claude-code")
     #expect(model.models.map(\.id) == ["claude-opus-5"])
 
@@ -35,7 +36,8 @@ struct AgentSelectionTests {
   @Test("Changing agent drops the model the previous one offered")
   func modelIsClearedWithTheAgent() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     model.draft.modelID = "claude-opus-5"
 
     await model.select(agent: "codex")
@@ -46,7 +48,8 @@ struct AgentSelectionTests {
   @Test("Selecting the agent already selected changes nothing")
   func reselectingIsANoOp() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     model.draft.modelID = "claude-opus-5"
 
     await model.select(agent: "claude-code")

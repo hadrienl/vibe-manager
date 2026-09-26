@@ -93,8 +93,14 @@ final class SmokeTests: XCTestCase {
     nameField.click()
     nameField.typeText(name)
     let folder = app.textFields["new-session-folder"]
-    folder.click()
-    folder.typeText(workDirectory.path)
+    if (folder.value as? String ?? "").isEmpty {
+      folder.click()
+      folder.typeText(workDirectory.path)
+    } else {
+      // The folder of the previous session is proposed again, with its card (#39).
+      XCTAssertEqual(folder.value as? String, workDirectory.path)
+      XCTAssertTrue(app.buttons["new-session-recent-folder-0"].exists)
+    }
     // ⌘↩ creates from anywhere in the form.
     app.typeKey(.return, modifierFlags: .command)
     XCTAssertTrue(

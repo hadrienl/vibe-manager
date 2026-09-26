@@ -432,7 +432,9 @@ public final class AppModel {
   private let recovery: (any SessionStoreRecovery)?
   let agents: (any AgentProviderResolving)?
   let launcher: SessionLauncher?
-  private let defaultWorkingDirectoryPath: String?
+  /// The folders sessions were created in, offered again by the New Session sheet (#39).
+  let recentFolderStore: any RecentFolderStore
+  public internal(set) var recentFolders = RecentFolders()
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
   private let quitPreferences: any QuitPreferences
@@ -483,7 +485,9 @@ public final class AppModel {
     recovery: (any SessionStoreRecovery)? = nil,
     agents: (any AgentProviderResolving)? = nil,
     launcher: SessionLauncher? = nil,
-    defaultWorkingDirectoryPath: String? = nil,
+    /// Where the recent working folders are kept. A workspace assembled without one keeps them in
+    /// memory for the run.
+    recentFolderStore: any RecentFolderStore = InMemoryRecentFolderStore(),
     layout: WorkspaceLayoutController = WorkspaceLayoutController(),
     permissions: PermissionsModel? = nil,
     /// Where the previous run wrote what it was running. Absent in a workspace assembled without
@@ -588,7 +592,7 @@ public final class AppModel {
     self.recovery = recovery
     self.agents = agents
     self.launcher = launcher
-    self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
+    self.recentFolderStore = recentFolderStore
     self.layout = layout
 
     // A workspace without a launcher has nothing running, so the use cases are handed a runtime
@@ -1917,10 +1921,6 @@ public final class AppModel {
     agents != nil && launcher != nil
   }
 
-  public var newSessionDefaultWorkingDirectoryPath: String? {
-    defaultWorkingDirectoryPath
-  }
-
   public func load() async {
     // Taken synchronously, before the first `await`. `state` only becomes `.loading` inside the
     // reload, several suspensions later, so two loads — a second window, a `.task` run twice —
@@ -1961,6 +1961,8 @@ public final class AppModel {
     // a store that could not be read rather than one without sessions.
     if !sessions.isEmpty { layout.keepPresentations(of: Set(sessions.map(\.id))) }
     Signposts.end("launch.firstList", firstList)
+    // After the first list, which is what an installation that never kept any seeds them from.
+    await loadRecentFolders()
     // Which agents write a usage is part of their description, known without probing any of them.
     if let usage, let agents {
       usage.reportingProviderIDs = Set(
@@ -2175,7 +2177,9 @@ public final class AppModel {
       fullDiskAccess: permissions?.status,
       templates: templates.all,
       projectIcons: projectIcons,
-      icons: icons
+      icons: icons,
+      recentFolders: recentFolders.entries,
+      forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) }
     )
     if let template {
       model.selectTemplate(template)
@@ -2214,6 +2218,7 @@ public final class AppModel {
         "session": diagnostics.pseudonym(creation.session.id),
         "provider": .token(AgentProviderID(creation.plan.providerID.rawValue).diagnosticToken),
       ])
+    await rememberFolder(of: creation.session)
     guard launching, let launcher else {
       // Shown in To Do, where it was put: the column follows what the user just made.
       follow(creation.session.id)
