@@ -42,7 +42,9 @@ struct WorkspaceLayoutTests {
       isInspectorVisible: false,
       sidebarWidth: 300,
       inspectorWidth: 320,
-      inspectorSplit: 0.4
+      inspectorSections: InspectorArrangement(entries: [
+        .init(id: .notes, isCollapsed: false, weight: 2), .init(id: .git, isCollapsed: true),
+      ])
     )
 
     let data = try JSONEncoder().encode(layout)
@@ -61,24 +63,74 @@ struct WorkspaceLayoutTests {
     #expect(layout.isInspectorVisible)
   }
 
-  @Test("A layout stored before the inspector was split reads back with Git given 60 %")
-  func layoutWithoutSplit() throws {
-    let json = Data(#"{"sidebarWidth": 300, "inspectorWidth": 320}"#.utf8)
+  @Test("A layout stored before #66 arranges the sections as the column was")
+  func migratesTheColumn() throws {
+    let json = Data(
+      #"""
+      {"sidebarWidth": 300, "inspectorWidth": 320, "inspectorSplit": 0.7,
+       "isSessionDetailsExpanded": false, "inspectorTopTab": "git"}
+      """#.utf8)
 
-    #expect(try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSplit == 0.6)
-    #expect(WorkspaceLayout(inspectorSplit: 0.99).inspectorSplit == 0.85)
-    #expect(WorkspaceLayout(inspectorSplit: 0).inspectorSplit == 0.25)
-    #expect(WorkspaceLayout(inspectorSplit: .nan).inspectorSplit == 0.6)
+    let sections = try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSections
+
+    let six: [InspectorSectionID] = [.activity, .git, .notes, .agent, .usage, .prompt]
+    #expect(sections.order(of: six) == [.git, .activity, .notes, .agent, .usage, .prompt])
+    #expect(!sections.isCollapsed(.git))
+    #expect(sections.isCollapsed(.activity))
+    #expect(!sections.isCollapsed(.notes))
+    #expect(sections.isCollapsed(.agent) && sections.isCollapsed(.usage))
+    #expect(sections.isCollapsed(.prompt))
+    #expect(abs(sections.weight(.git) - 0.7) < 0.0001)
+    #expect(abs(sections.weight(.notes) - 0.3) < 0.0001)
   }
 
-  @Test("A layout saved before the notes editor unfolds the agent and prompt under it")
-  func layoutWithoutDetailsState() throws {
-    let json = Data(#"{"sidebarWidth": 300, "inspectorWidth": 320}"#.utf8)
-    #expect(try JSONDecoder().decode(WorkspaceLayout.self, from: json).isSessionDetailsExpanded)
+  @Test("The activity on top, the details unfolded, and a split out of bounds")
+  func migratesActivityOnTop() throws {
+    let json = Data(
+      #"{"inspectorSplit": 0.99, "isSessionDetailsExpanded": true, "inspectorTopTab": "activity"}"#
+        .utf8)
 
-    let folded = WorkspaceLayout(isSessionDetailsExpanded: false)
-    let data = try JSONEncoder().encode(folded)
-    #expect(!(try JSONDecoder().decode(WorkspaceLayout.self, from: data).isSessionDetailsExpanded))
+    let sections = try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSections
+
+    #expect(sections.entries.map(\.id).prefix(3) == [.activity, .git, .notes])
+    #expect(!sections.isCollapsed(.activity) && sections.isCollapsed(.git))
+    #expect(!sections.isCollapsed(.agent) && !sections.isCollapsed(.prompt))
+    #expect(abs(sections.weight(.activity) - 0.85) < 0.0001)
+  }
+
+  @Test("A layout that never arranged the column gets the default sections")
+  func noColumnYet() throws {
+    let json = Data(#"{"sidebarWidth": 300, "inspectorWidth": 320}"#.utf8)
+
+    #expect(
+      try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSections == .default)
+  }
+
+  @Test("Unreadable sections cost the sections, not the rest of the layout")
+  func unreadableSections() throws {
+    let json = Data(#"{"sidebarWidth": 300, "inspectorSections": "nonsense"}"#.utf8)
+
+    let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
+
+    #expect(layout.inspectorSections == .default)
+    #expect(layout.sidebarWidth == 300)
+  }
+
+  @Test("The keys of the old column are never written again")
+  func legacyKeysAreDropped() throws {
+    let json = Data(#"{"inspectorSplit": 0.4, "inspectorTopTab": "git"}"#.utf8)
+    let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
+
+    let written = try #require(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
+
+    #expect(written["inspectorSplit"] == nil)
+    #expect(written["inspectorTopTab"] == nil)
+    #expect(written["isSessionDetailsExpanded"] == nil)
+    #expect(written["inspectorSections"] != nil)
+    // Once written in the new form, the old keys no longer say anything.
+    let again = try JSONDecoder().decode(WorkspaceLayout.self, from: JSONEncoder().encode(layout))
+    #expect(again.inspectorSections == layout.inspectorSections)
   }
 }
 

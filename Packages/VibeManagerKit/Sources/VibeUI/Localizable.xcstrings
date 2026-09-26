@@ -1014,6 +1014,47 @@
         }
       }
     },
+    "%lld changes" : {
+      "comment" : "What the Git section holds once folded: how many changed files.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modification"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modifications"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld commits since %@ (merge base %@)" : {
       "comment" : "A number of commits, the branch they are compared with, and an abbreviated commit.",
       "localizations" : {
@@ -1505,13 +1546,19 @@
         }
       }
     },
-    "%lld percent for Git" : {
-      "comment" : "The share of the inspector's height given to the Git list.",
+    "%lld percent for %@" : {
+      "comment" : "The share of two sections' height given to the first one, and its name.",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld percent for %2$@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld pour cent pour Git"
+            "value" : "%1$lld %% pour %2$@"
           }
         }
       }
@@ -1649,6 +1696,88 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld questions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld repositories" : {
+      "comment" : "What the Git section holds once folded: how many repositories.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld repository"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld repositories"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dépôt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dépôts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld resources" : {
+      "comment" : "How many links a session's activity holds.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resource"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resources"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ressource"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ressources"
                 }
               }
             }
@@ -2352,7 +2481,7 @@
       }
     },
     "Activity" : {
-      "comment" : "A tab of the Settings window.\nA tab of the inspector.",
+      "comment" : "A section of the inspector.\nA tab of the Settings window.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2425,16 +2554,6 @@
         }
       }
     },
-    "Agent & initial prompt" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent et prompt initial"
-          }
-        }
-      }
-    },
     "Agent Actions" : {
       "localizations" : {
         "fr" : {
@@ -2452,16 +2571,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activité des agents"
-          }
-        }
-      }
-    },
-    "Agent and initial prompt" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent et prompt initial"
           }
         }
       }
@@ -2484,26 +2593,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agent indisponible"
-          }
-        }
-      }
-    },
-    "Agent, usage & initial prompt" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent, utilisation et prompt initial"
-          }
-        }
-      }
-    },
-    "Agent, usage and initial prompt" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent, utilisation et prompt initial"
           }
         }
       }
@@ -2817,7 +2906,7 @@
       }
     },
     "Archived" : {
-      "comment" : "A session's state in the sidebar; also labels the date it took that state.\nA task status: the session is archived.\nA tag on a session of Open Quickly that is archived.",
+      "comment" : "A session's state in the sidebar; also labels the date it took that state.\nA tag on a session of Open Quickly that is archived.\nA task status: the session is archived.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3255,7 +3344,7 @@
       }
     },
     "Collapse" : {
-      "comment" : "Folds a group of the sidebar.",
+      "comment" : "Folds a group of the sidebar.\nHides a section of the inspector.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3271,6 +3360,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replier le groupe"
+          }
+        }
+      }
+    },
+    "Collapse Others" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier les autres"
           }
         }
       }
@@ -3727,12 +3826,19 @@
         }
       }
     },
-    "Divider between Git and the session" : {
+    "Divider between %@ and %@" : {
+      "comment" : "Two sections of the inspector: Git, Notes.",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Divider between %1$@ and %2$@"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Séparateur entre Git et la session"
+            "value" : "Séparateur entre %1$@ et %2$@"
           }
         }
       }
@@ -3849,6 +3955,17 @@
         }
       }
     },
+    "Empty" : {
+      "comment" : "Said of a session's notes that hold nothing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vides"
+          }
+        }
+      }
+    },
     "Enter an address or #ticket" : {
       "localizations" : {
         "fr" : {
@@ -3871,7 +3988,7 @@
       }
     },
     "Expand" : {
-      "comment" : "Unfolds a group of the sidebar.",
+      "comment" : "Shows a section of the inspector.\nUnfolds a group of the sidebar.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4121,7 +4238,7 @@
       }
     },
     "Folder not found" : {
-      "comment" : "The working folder of a group has been moved or deleted.",
+      "comment" : "A recent folder that has gone.\nThe working folder of a group has been moved or deleted.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4201,6 +4318,7 @@
       }
     },
     "Full Disk Access" : {
+      "comment" : "A section of the Settings window.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4425,6 +4543,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer les fichiers de ce dossier"
+          }
+        }
+      }
+    },
+    "Hide this section. Option-click hides them all." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier cette section. Option-clic les replie toutes."
           }
         }
       }
@@ -5182,6 +5310,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune page ouverte"
+          }
+        }
+      }
+    },
+    "No prompt" : {
+      "comment" : "A session was started without a prompt.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans prompt"
           }
         }
       }
@@ -6143,7 +6282,7 @@
       }
     },
     "Privacy" : {
-      "comment" : "A section of the Settings window.",
+      "comment" : "A section of the Settings window.\nA tab of the Settings window.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -6573,6 +6712,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Obligatoire"
+          }
+        }
+      }
+    },
+    "Reset Column Layout" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir la disposition de la colonne"
           }
         }
       }
@@ -7543,16 +7692,6 @@
         }
       }
     },
-    "Show prompt" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher le prompt"
-          }
-        }
-      }
-    },
     "Show the files of this folder" : {
       "localizations" : {
         "fr" : {
@@ -7599,6 +7738,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la vue web quand un agent ouvre une page"
+          }
+        }
+      }
+    },
+    "Show this section. Option-click shows them all." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier cette section. Option-clic les déplie toutes."
           }
         }
       }

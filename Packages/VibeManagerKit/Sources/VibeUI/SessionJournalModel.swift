@@ -141,6 +141,15 @@ public final class SessionJournalModel {
 
   func requestFocus() {
     focusRequest += 1
+    isFocusPending = true
+  }
+
+  /// Set until the list has taken the keyboard. A request made while its section is folded is
+  /// taken by the list that unfolding brings on screen, which never sees the bump itself (#66).
+  private(set) var isFocusPending = false
+
+  func focusTaken() {
+    isFocusPending = false
   }
 
   func selection(in id: SessionID) -> ActivityRowID? {

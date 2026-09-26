@@ -219,16 +219,6 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
-  /// The divider between Git and the notes, as a share of the inspector's height.
-  public func inspectorSplitChanged(to fraction: Double) {
-    guard fraction.isFinite else { return }
-    let bounded = WorkspaceLayout.bounded(
-      fraction, in: WorkspaceLayout.inspectorSplitRange, fallback: settings.inspectorSplit)
-    guard abs(bounded - settings.inspectorSplit) >= 0.005 else { return }
-    settings.inspectorSplit = bounded
-    scheduleSave()
-  }
-
   /// One list, or one section per working folder (#27).
   public var sidebarMode: SidebarMode {
     settings.sidebarMode
@@ -253,18 +243,62 @@ public final class WorkspaceLayoutController {
     }
   }
 
-  /// Whether the agent and the initial prompt are unfolded under the notes.
-  public func setSessionDetailsExpanded(_ isExpanded: Bool) {
-    guard settings.isSessionDetailsExpanded != isExpanded else { return }
-    settings.isSessionDetailsExpanded = isExpanded
-    scheduleSave()
+  // MARK: - The sections of the context column (#66)
+
+  public var inspectorSections: InspectorArrangement {
+    settings.inspectorSections
   }
 
-  /// Activity or Git, above the notes.
-  public func setInspectorTopTab(_ tab: InspectorTopTab) {
-    guard settings.inspectorTopTab != tab else { return }
-    settings.inspectorTopTab = tab
-    scheduleSave()
+  public func setSectionCollapsed(_ id: InspectorSectionID, _ isCollapsed: Bool) {
+    updateIntent { $0.inspectorSections.setCollapsed(id, isCollapsed) }
+  }
+
+  /// ⌥-click on a chevron.
+  public func setAllSectionsCollapsed(_ isCollapsed: Bool, among shown: [InspectorSectionID]) {
+    updateIntent { $0.inspectorSections.setCollapsed(isCollapsed, among: shown) }
+  }
+
+  public func collapseOtherSections(
+    than kept: InspectorSectionID, among shown: [InspectorSectionID]
+  ) {
+    updateIntent { $0.inspectorSections.collapseOthers(than: kept, among: shown) }
+  }
+
+  /// Move Up (`-1`) and Move Down (`+1`).
+  public func moveSection(
+    _ id: InspectorSectionID, by offset: Int, among shown: [InspectorSectionID]
+  ) {
+    updateIntent { $0.inspectorSections.move(id, by: offset, among: shown) }
+  }
+
+  /// A header dropped on another one: before it, or after it.
+  public func moveSection(
+    _ id: InspectorSectionID, to target: InspectorSectionID, after: Bool,
+    among shown: [InspectorSectionID]
+  ) {
+    updateIntent {
+      $0.inspectorSections = $0.inspectorSections.resolved(declared: shown)
+      if after {
+        $0.inspectorSections.move(id, after: target)
+      } else {
+        $0.inspectorSections.move(id, before: target)
+      }
+    }
+  }
+
+  /// Written when a handle is let go, never at every point of the drag: the heights the sections
+  /// then have become their weights.
+  public func resizeSections(to heights: [InspectorSectionID: Double]) {
+    updateIntent { $0.inspectorSections.resize(to: heights) }
+  }
+
+  public var isInspectorArrangementDefault: Bool {
+    settings.inspectorSections == .default
+  }
+
+  /// Reset Column Layout.
+  public func resetInspectorSections() {
+    updateIntent { $0.inspectorSections = .default }
   }
 
   /// How a session is shown, the Conversation settings giving the default (#38).
