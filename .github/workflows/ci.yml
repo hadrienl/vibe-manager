@@ -16,14 +16,18 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_27.app
+
+      # Since Xcode 26 the Metal toolchain is a separate download, and SwiftTerm compiles a shader.
+      - name: Install the Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
 
       - name: Build and test
         run: Scripts/ci.sh
@@ -33,14 +37,18 @@ jobs:
   # release checklist is where this job has to be green.
   ui-smoke:
     if: github.event_name != 'pull_request'
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_27.app
+
+      # Since Xcode 26 the Metal toolchain is a separate download, and SwiftTerm compiles a shader.
+      - name: Install the Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
 
       - name: Run the interface smoke test
         run: Scripts/ui-smoke.sh

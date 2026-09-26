@@ -18,8 +18,10 @@ struct SessionSidebar: View {
   @State private var dragBase: CGFloat?
   /// A drag that started vertical, and stays a drag of the list whatever it does next.
   @State private var isDragDeclined = false
-  /// The row under the pointer, for when the table cannot say which row is under the fingers.
+  /// The row under the pointer, for when no row's frame holds the fingers.
   @State private var hoveredSessionID: SessionID?
+  /// Where each row is drawn, to find the one under the fingers.
+  @State private var rowFrames = RowFrames()
   @State private var isShowingArchive = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -55,12 +57,13 @@ struct SessionSidebar: View {
         .frame(width: width, height: geometry.size.height, alignment: .topLeading)
         .background(
           HorizontalSwipeMonitor(
-            began: { row in beginTrackpadSwipe(row: row, width: width) },
+            began: { point in beginTrackpadSwipe(at: point, width: width) },
             changed: { delta in swipe?.translation += delta },
             ended: { settleSwipe() },
             interrupted: { closeSwipe(animated: true) }
           )
         )
+        .coordinateSpace(.named(RowFrames.space))
         // Over the foot of the list, never over the session on screen, and the list's last rows
         // stay reachable above it (#40).
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -96,7 +99,9 @@ struct SessionSidebar: View {
     }
     .listStyle(.sidebar)
     .scrollContentBackground(.hidden)
-    .animation(reduceMotion ? nil : .snappy, value: model.visibleSessions.map(\.id))
+    // No implicit animation on the list: linked against the macOS 15 SDK, the table it stands on
+    // left rows of an animated update behind, drawn over the others and deaf to clicks. The
+    // table animates its own insertions and removals.
     .focused($isListFocused)
     .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
     .onKeyPress(.escape) {
@@ -129,6 +134,12 @@ struct SessionSidebar: View {
     ForEach(sessions) { session in
       row(for: session, position: positions[session.id], width: width)
         .tag(session.id)
+        .onGeometryChange(for: CGRect.self) {
+          $0.frame(in: .named(RowFrames.space))
+        } action: {
+          rowFrames.frames[session.id] = $0
+        }
+        .onDisappear { rowFrames.frames[session.id] = nil }
     }
   }
 
@@ -175,11 +186,12 @@ struct SessionSidebar: View {
       }
     }
     .simultaneousGesture(drag(for: session, width: width))
-    // A click on the open row puts its buttons away, as a click anywhere else does.
+    // A click on the open row puts its buttons away, as a click anywhere else does. Only the open
+    // row has it: linked against the macOS 15 SDK, a tap gesture on every row takes the click
+    // the list needs to select it.
     .simultaneousGesture(
-      TapGesture().onEnded {
-        if isSwiped { closeSwipe(animated: true) }
-      })
+      TapGesture().onEnded { closeSwipe(animated: true) },
+      including: isSwiped ? .all : .subviews)
   }
 
   // MARK: - Swipe
@@ -193,37 +205,22 @@ struct SessionSidebar: View {
     )
   }
 
-  /// - Parameter row: the row of the table under the fingers, as `tableRows` numbers them. The
-  ///   hover is only asked when the table could not say.
-  private func beginTrackpadSwipe(row: Int?, width: CGFloat) -> Bool {
+  /// - Parameter point: where the fingers are, in the list's own coordinates. The hover is only
+  ///   asked when the monitor could not say.
+  private func beginTrackpadSwipe(at point: CGPoint?, width: CGFloat) -> Bool {
     let visible = model.visibleSessions
-    let session: WorkSession?
-    if let row {
-      let rows = tableRows
-      let id = rows.indices.contains(row) ? rows[row] : nil
-      session = id.flatMap { id in visible.first { $0.id == id } }
-    } else {
-      session = hoveredSessionID.flatMap { id in visible.first { $0.id == id } }
-    }
-    guard let session else { return false }
+    // Found by where the rows are drawn, never by the table's row numbers: they do not count the
+    // same rows from one SDK to the next, and the swipe went to the row below.
+    let id =
+      point.flatMap { point in
+        visible.first { rowFrames.frames[$0.id]?.contains(point) == true }?.id
+      } ?? hoveredSessionID
+    guard let session = id.flatMap({ id in visible.first { $0.id == id } }) else { return false }
     // A swipe on the row already open takes it from where it is.
     if swipe?.sessionID != session.id {
       swipe = makeSwipe(for: session, width: width)
     }
     return true
-  }
-
-  /// The session each row of the table draws, in order: a group's header is a row of its own,
-  /// with no session to swipe, and the sessions of a folded group are no rows at all.
-  private var tableRows: [SessionID?] {
-    switch model.sidebarContent {
-    case .flat(let sessions):
-      return sessions.map(\.id)
-    case .grouped(let groups):
-      return groups.flatMap { group -> [SessionID?] in
-        [nil] + (model.isExpanded(group) ? group.sessions.map(\.id) : [])
-      }
-    }
   }
 
   /// The pointer's equivalent: a drag that starts out horizontal.
@@ -326,6 +323,13 @@ struct SessionSidebar: View {
         "Nothing done yet. Swipe a session to move it here.", bundle: .module)
     }
   }
+}
+
+/// Where each row of the list is drawn, in the list's coordinates. Not observed: the rows move on
+/// every scroll, and only a swipe's first movement reads it.
+private final class RowFrames {
+  static let space = "session-list"
+  var frames: [SessionID: CGRect] = [:]
 }
 
 // MARK: - Tabs

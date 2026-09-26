@@ -10,15 +10,16 @@ import SwiftUI
 /// and so does the end of a swipe, so that the list never waits for the end of a gesture it saw
 /// begin.
 ///
-/// The row is found where the fingers are, in the table the list draws, rather than from the last
-/// row the pointer entered: a list scrolled under a still pointer does not say it moved.
+/// The row is found where the fingers are, among the frames the rows are drawn at, rather than
+/// from the last row the pointer entered: a list scrolled under a still pointer does not say it
+/// moved.
 ///
 /// The inertia that follows a swipe is swallowed and not followed: the decision is taken when the
 /// fingers leave the trackpad.
 struct HorizontalSwipeMonitor: NSViewRepresentable {
-  /// Asked when a gesture turns out horizontal, with the row under the fingers when the table
-  /// says. `false` leaves the gesture to the list.
-  var began: (_ row: Int?) -> Bool
+  /// Asked when a gesture turns out horizontal, with where the fingers are in the list's
+  /// coordinates. `false` leaves the gesture to the list.
+  var began: (_ point: CGPoint?) -> Bool
   /// The distance the fingers moved since the last call, positive to the right.
   var changed: (CGFloat) -> Void
   var ended: () -> Void
@@ -151,7 +152,7 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
             tracking = .deciding(x: x, y: y)
             return false
           }
-          guard abs(x) > abs(y) * 1.2, handlers?.began(row(at: event.location)) == true else {
+          guard abs(x) > abs(y) * 1.2, handlers?.began(point(at: event.location)) == true else {
             tracking = .declined
             handlers?.interrupted()
             return false
@@ -179,17 +180,12 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
       return false
     }
 
-    /// The row of the table under a point of the window, if the list draws one there.
-    private func row(at location: CGPoint) -> Int? {
-      guard let content = window?.contentView else { return nil }
-      let point = content.superview?.convert(location, from: nil) ?? location
-      var view = content.hitTest(point)
-      while let current = view, !(current is NSTableView) {
-        view = current.superview
-      }
-      guard let table = view as? NSTableView else { return nil }
-      let index = table.row(at: table.convert(location, from: nil))
-      return index >= 0 ? index : nil
+    /// Where the fingers are, in the coordinates SwiftUI gives the list this view sits behind:
+    /// from its top-left corner.
+    private func point(at location: CGPoint) -> CGPoint? {
+      let local = convert(location, from: nil)
+      guard bounds.contains(local) else { return nil }
+      return CGPoint(x: local.x, y: isFlipped ? local.y : bounds.height - local.y)
     }
   }
 }
