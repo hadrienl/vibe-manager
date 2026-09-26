@@ -60,6 +60,25 @@ The requests of the sessions in the background (#40), over the foot of the sideb
 | Open the request's session | ⌘↩ |
 | Back to the terminal of the session in front | Escape |
 
+## The floating panel of requests
+
+When Settings › Requests › "Show requests above other applications" is on, and Vibe Manager is not
+in front, the requests are presented by an avatar in a bubble above the other applications (#41).
+Its window never takes the keyboard by itself: the application in front keeps it.
+
+| Action | Keys |
+|---|---|
+| Give the bubble the keyboard, from any application; press again to give it back | ⌃⌥⌘P |
+| Previous / next request | ← / → |
+| The answers of the request | Tab, then Space |
+| Open the request's session: Vibe Manager comes forward | ⌘↩ |
+| Fold the bubble into the avatar | ⌘- |
+| Give the keyboard back to the application in front | Escape |
+
+The avatar is decorative: VoiceOver skips it, the bubble says everything. With Reduce Motion, the
+avatar neither blinks nor moves its mouth: it shows one still expression per state, and changes
+at once.
+
 ## Sessions
 
 | Action | Shortcut | Menu |
@@ -85,6 +104,9 @@ The requests of the sessions in the background (#40), over the foot of the sideb
 | Column tabs | the column and its count ("Waiting, 2 sessions"), and "one waits for you" when a session there does | selected | — | `column-tab-todo`, `-doing`, `-waiting`, `-done` |
 | Session list | "Sessions" | — | — | `session-list` |
 | Palette of requests | "Pending requests: 2"; folded, "Pending requests: 2. Show" | — | a "Requests" rotor, one entry per request | `request-palette`, `request-palette-collapsed` |
+| Floating panel | "Pending requests: 2" | — | — | `floating-request-panel` |
+| Its counter | "Request 1 of 2" | — | Previous request, Next request | — |
+| Avatar preview, in Settings › Avatar | "Animated preview of the avatar" | — | — | — |
 | A request's card | session, agent, folder, branch, age, then what it asks ("Refactor, Claude Code, app, branch feat/40, 2 minutes ago. Shell command: swift test") | — | Allow, Always, Refuse — each only when the agent's dialog can take it from here; Open Session | `request-card` |
 | A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
 | Swipe buttons | "Move to ‹status›", "Archive…" | — | — | `swipe-‹status›` |

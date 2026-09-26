@@ -100,6 +100,9 @@ the bundle: build a second time before testing a translation.
 | Needs attention | Action requise |
 | request (of an agent), pending requests | demande, demandes en attente |
 | palette (of requests) | palette |
+| floating panel, bubble | panneau flottant, bulle |
+| avatar, expression, sprite sheet | avatar, expression, planche |
+| generate, generate again | générer, régénérer |
 | allow, always, refuse | autoriser, toujours, refuser |
 | prompt template, template | modèle de prompt, modèle |
 | model (of an agent) | modèle — where both are on screen, the template is « Modèle de prompt » |
