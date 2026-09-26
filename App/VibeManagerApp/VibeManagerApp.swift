@@ -79,7 +79,9 @@ struct VibeManagerApp: App {
           environment.appModel.presentQuickOpen()
         }
         .keyboardShortcut("p", modifiers: .command)
-        .disabled(windowFocus.front == .sheet || !environment.appModel.isLoaded)
+        .disabled(
+          windowFocus.front == .sheet || !windowFocus.hasWorkspace
+            || !environment.appModel.isLoaded)
       }
 
       // In the menus rather than bound to the views: a shortcut that only works while a

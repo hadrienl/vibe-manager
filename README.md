@@ -199,6 +199,14 @@ kept through close, relaunch and archive, and searched by the sidebar. Quitting 
 could not be saved asks first. The decisions are documented in
 [`docs/architecture/0016-session-notes.md`](docs/architecture/0016-session-notes.md).
 
+File ▸ Open Quickly… (⌘P) finds a session from what is at hand: a ticket number (`36`, `#36`,
+`owner/repo#36`, `!12`), the URL of a ticket or of a pull or merge request pasted as it is — tab,
+anchor or trailing slash included — a branch, a worktree or a folder, or words of its title,
+summary or notes. The exact resource comes first, then fragments, the title, the folders, the
+summary and the notes; archived sessions are included, after current ones of the same rank. Each
+result says why it matches, and Return brings the session on screen in its column. The decisions are
+documented in [`docs/architecture/0025-quick-open.md`](docs/architecture/0025-quick-open.md).
+
 A session can start from a prompt template: a prompt with fields — `Review {{url}}` — picked at
 the top of the New Session sheet or from File ▸ New Session from (⇧⌘N for the first). Each field
 becomes a control, a required one keeps Create out of reach until it is filled, and the prompt is

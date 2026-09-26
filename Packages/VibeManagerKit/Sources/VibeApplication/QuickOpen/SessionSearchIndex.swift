@@ -227,11 +227,14 @@ struct IndexedResource: Sendable {
     involvement = resource.involvement
     isGitLab = resource.key.hasPrefix("gitlab:")
     isMergeRequest = isGitLab && resource.key.contains("#mr/")
-    number = resource.key.split(separator: "/").last.flatMap { Int($0.split(separator: "#").last ?? "") }
-      .flatMap { resource.kind == .issue || resource.kind == .pullRequest ? $0 : nil }
+    number = resource.key.split(separator: "/").last.flatMap {
+      Int($0.split(separator: "#").last ?? "")
+    }
+    .flatMap { resource.kind == .issue || resource.kind == .pullRequest ? $0 : nil }
     contextComponents = (resource.context ?? "").lowercased().split(separator: "/").map(String.init)
     name = FoldedText(resource.label)
-    searchable = FoldedText([resource.label, resource.context].compactMap { $0 }.joined(separator: " "))
+    searchable = FoldedText(
+      [resource.label, resource.context].compactMap { $0 }.joined(separator: " "))
     if case .folder(let folder) = resource.target {
       path = canonical(folder)
     } else {

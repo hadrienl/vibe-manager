@@ -49,7 +49,9 @@ public struct QuickOpenQuery: Hashable, Sendable {
     if text.contains("://") {
       while let last = text.last, ".,;:!?".contains(last) { text.removeLast() }
     }
-    let pairs: [(Character, Character)] = [("<", ">"), ("(", ")"), ("\"", "\""), ("'", "'"), ("`", "`")]
+    let pairs: [(Character, Character)] = [
+      ("<", ">"), ("(", ")"), ("\"", "\""), ("'", "'"), ("`", "`"),
+    ]
     var changed = true
     while changed, text.count >= 2 {
       changed = false
@@ -71,13 +73,17 @@ public struct QuickOpenQuery: Hashable, Sendable {
     }
     if let number = number(in: text) {
       var criteria: [Criterion] = [number]
-      // A bare number is also a fragment of a branch or a title: `36` finds `feat/36-journal`.
-      if case .number(_, .bare, _) = number { criteria.append(.text(words(text))) }
+      // A number without its repository is also a fragment of a branch or a title: `36` and
+      // `#36` find `feat/36-journal`, and a session older than the journal titled "Fix #36".
+      if case .number(let value, let sign, let context) = number, context.isEmpty, sign != .bang {
+        criteria.append(.text(sign == .bare ? words(text) : [String(value)]))
+      }
       return criteria
     }
     if text.hasPrefix("/") || text == "~" || text.hasPrefix("~/") {
-      let expanded = (text as NSString).expandingTildeInPath
-      return [.path(CanonicalPath.of((expanded as NSString).standardizingPath))]
+      let expanded = ((text as NSString).expandingTildeInPath as NSString).standardizingPath
+      // As text too: a folder typed halfway, `~/Documents/vibe-man`, is found before its name ends.
+      return [.path(CanonicalPath.of(expanded)), .text([Folding.fold(expanded)])]
     }
     let words = words(text)
     return words.isEmpty ? [] : [.text(words)]
@@ -155,6 +161,7 @@ public struct QuickOpenQuery: Hashable, Sendable {
 /// Text made comparable the way the Finder compares it: no case, no accents, no width.
 public enum Folding {
   public static func fold(_ text: String) -> String {
-    text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+    text.folding(
+      options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
   }
 }

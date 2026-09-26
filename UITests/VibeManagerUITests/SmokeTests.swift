@@ -119,6 +119,20 @@ final class SmokeTests: XCTestCase {
     app.typeKey("1", modifierFlags: [.command, .option])
     app.typeKey("2", modifierFlags: [.command, .option])
 
+    // Open Quickly: a session found by its title and opened with Return; Escape closes it too.
+    app.typeKey("p", modifierFlags: .command)
+    let quickOpen = app.textFields["quick-open-field"]
+    XCTAssertTrue(quickOpen.waitForExistence(timeout: 5))
+    app.typeText("Smoke 2")
+    let result = app.descendants(matching: .any).matching(identifier: "quick-open-row").firstMatch
+    XCTAssertTrue(result.waitForExistence(timeout: 5))
+    app.typeKey(.return, modifierFlags: [])
+    XCTAssertTrue(quickOpen.waitForNonExistence(timeout: 5))
+    app.typeKey("p", modifierFlags: .command)
+    XCTAssertTrue(quickOpen.waitForExistence(timeout: 5))
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(quickOpen.waitForNonExistence(timeout: 5))
+
     // A note, typed after Edit Notes, and handed back with Escape.
     app.typeKey("n", modifierFlags: [.command, .option])
     let notes = app.textViews["notes-editor"]

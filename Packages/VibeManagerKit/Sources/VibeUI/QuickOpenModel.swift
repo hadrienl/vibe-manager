@@ -29,6 +29,12 @@ public final class QuickOpenModel {
   @ObservationIgnored private var excluded: SessionID?
   /// Where the keyboard was before the palette took it, given back when it closes unanswered.
   @ObservationIgnored weak var previousResponder: NSResponder?
+  /// The text the answer on screen was searched for.
+  @ObservationIgnored private var answeredText: String?
+  /// Return pressed before the answer to what was typed arrived: it opens that answer's first row.
+  @ObservationIgnored private var confirmsWhenAnswered = false
+  /// Brings a session chosen on screen.
+  @ObservationIgnored var opened: ((QuickOpenResult) -> Void)?
   /// How long the palette waits for the typing to pause before saying the count to VoiceOver.
   @ObservationIgnored var announcementDelay: Duration = .milliseconds(500)
 
@@ -80,9 +86,11 @@ public final class QuickOpenModel {
       return
     }
     excluded = selected
-    previousResponder = NSApp?.keyWindow?.firstResponder
+    previousResponder = Self.owner(of: NSApp?.keyWindow?.firstResponder)
     text = ""
     answer = nil
+    answeredText = nil
+    confirmsWhenAnswered = false
     selectedIndex = 0
     isPresented = true
     let index = index
@@ -93,11 +101,23 @@ public final class QuickOpenModel {
     }
   }
 
+  /// A text field being edited holds the keyboard through the window's shared field editor, which
+  /// the palette's own field takes over: the field is what gets the keyboard back.
+  static func owner(of responder: NSResponder?) -> NSResponder? {
+    if let editor = responder as? NSTextView, editor.isFieldEditor,
+      let field = editor.delegate as? NSView
+    {
+      return field
+    }
+    return responder
+  }
+
   /// Closes the palette. `restoringFocus` when nothing was chosen: the keyboard goes back where
   /// it was.
   func dismiss(restoringFocus: Bool) {
     guard isPresented else { return }
     isPresented = false
+    confirmsWhenAnswered = false
     search?.cancel()
     announcement?.cancel()
     if restoringFocus, let responder = previousResponder, let window = NSApp?.keyWindow {
@@ -123,8 +143,16 @@ public final class QuickOpenModel {
   private func run(_ typed: String) async {
     let answer = await index.search(typed, excluding: excluded)
     guard !Task.isCancelled, isPresented, typed == text else { return }
+    // The same text searched again — the journals finished loading — keeps the row the user was on.
+    let kept = typed == answeredText ? selectedResult?.sessionID : nil
     self.answer = answer
-    selectedIndex = 0
+    answeredText = typed
+    selectedIndex = kept.flatMap { id in answer.results.firstIndex { $0.sessionID == id } } ?? 0
+    if confirmsWhenAnswered {
+      confirmsWhenAnswered = false
+      confirm()
+      return
+    }
     scheduleAnnouncement()
   }
 
@@ -141,11 +169,18 @@ public final class QuickOpenModel {
     selectedIndex = position
   }
 
-  /// The session Return opens. The palette closes.
-  func confirm() -> SessionID? {
-    guard let result = selectedResult else { return nil }
-    dismiss(restoringFocus: false)
-    return result.sessionID
+  /// Return: the selected session is brought on screen, and the palette closes. Pressed before
+  /// the answer to what was typed arrived — a URL pasted and Return at once — it waits for it: the
+  /// rows on screen answer an older text.
+  func confirm() {
+    guard answeredText == text else {
+      confirmsWhenAnswered = true
+      return
+    }
+    guard let result = selectedResult else { return }
+    // An archived session is in no list of the sidebar: the keyboard goes back where it was.
+    dismiss(restoringFocus: result.isArchived)
+    opened?(result)
   }
 
   /// The count, said once the typing pauses: never at each keystroke.

@@ -622,6 +622,7 @@ public final class AppModel {
     usage?.connect { [weak self] in self?.sessions ?? [] }
 
     journal?.showSettingsTab = { [weak self] in self?.settingsTab = .activity }
+    quickOpen.opened = { [weak self] result in self?.goToSession(result.sessionID) }
     journal?.journalDidChange = { [quickOpen] id, journal in
       quickOpen.journalChanged(journal, for: id)
     }
@@ -844,8 +845,7 @@ public final class AppModel {
 
   /// Return in the palette: the session chosen is brought on screen.
   public func openQuickOpenSelection() {
-    guard let id = quickOpen.confirm() else { return }
-    reveal(id)
+    quickOpen.confirm()
   }
 
   /// Brings a session on screen wherever it is, the way a click in the sidebar would: its column,
@@ -854,12 +854,13 @@ public final class AppModel {
   /// its agent runs, and to its row otherwise.
   public func goToSession(_ id: SessionID) {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
+    if !filter.matchesNarrowing(session, notes: notes.searchIndex[id]) { clearNarrowing() }
     if session.taskStatus == .archived {
+      // In no list of the sidebar: the keyboard stays where the palette left it.
       showArchived(id)
-    } else {
-      if !filter.matchesNarrowing(session, notes: notes.searchIndex[id]) { clearNarrowing() }
-      follow(id)
+      return
     }
+    follow(id)
     if launcher?.isRunning(id) == true {
       focusTerminal()
     } else {

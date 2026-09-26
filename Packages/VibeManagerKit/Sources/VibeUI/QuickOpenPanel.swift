@@ -63,7 +63,10 @@ struct QuickOpenPanel: View {
       .padding(.horizontal, 16)
       .accessibilityElement(children: .contain)
       .accessibilityLabel(
-        Text("Open Quickly", bundle: .module, comment: "The name of the palette that finds a session, for VoiceOver."))
+        Text(
+          "Open Quickly", bundle: .module,
+          comment: "The name of the palette that finds a session, for VoiceOver.")
+      )
       .accessibilityIdentifier("quick-open")
       .accessibilityAddTraits(.isModal)
     }
@@ -78,7 +81,8 @@ struct QuickOpenPanel: View {
         VStack(alignment: .leading, spacing: 4) {
           Text(
             verbatim: answer.unmatchedResource.flatMap(QuickOpenPresentation.unused)
-              ?? QuickOpenPresentation.noMatch(answer.query.text))
+              ?? QuickOpenPresentation.noMatch(answer.query.text)
+          )
           .font(.body)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,12 +92,14 @@ struct QuickOpenPanel: View {
     } else {
       VStack(alignment: .leading, spacing: 0) {
         if results.first?.rank == .recent {
-          Text("Recent", bundle: .module, comment: "The header of the latest sessions in Open Quickly.")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.top, 8)
-            .accessibilityAddTraits(.isHeader)
+          Text(
+            "Recent", bundle: .module, comment: "The header of the latest sessions in Open Quickly."
+          )
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 14)
+          .padding(.top, 8)
+          .accessibilityAddTraits(.isHeader)
         }
         ScrollViewReader { proxy in
           ScrollView {
@@ -115,8 +121,7 @@ struct QuickOpenPanel: View {
     }
   }
 
-  @ViewBuilder private func row(_ result: QuickOpenResult, position: Int, count: Int) -> some View
-  {
+  @ViewBuilder private func row(_ result: QuickOpenResult, position: Int, count: Int) -> some View {
     if let session = model.sessions.first(where: { $0.id == result.sessionID }) {
       let isSelected = position == palette.selectedIndex
       let reason = QuickOpenPresentation.reason(result.reason)
@@ -164,7 +169,9 @@ struct QuickOpenPanel: View {
       }
       .buttonStyle(.plain)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel(Text(verbatim: spoken(result, session: session, position: position, count: count)))
+      .accessibilityLabel(
+        Text(verbatim: spoken(result, session: session, position: position, count: count))
+      )
       .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
       .accessibilityIdentifier("quick-open-row")
     }
@@ -178,7 +185,8 @@ struct QuickOpenPanel: View {
         if let indexing = palette.indexing {
           HStack(spacing: 6) {
             ProgressView().controlSize(.mini)
-            Text(verbatim: QuickOpenPresentation.indexing(done: indexing.done, total: indexing.total))
+            Text(
+              verbatim: QuickOpenPresentation.indexing(done: indexing.done, total: indexing.total))
           }
         }
         if showsHelp {
@@ -221,7 +229,8 @@ struct QuickOpenPanel: View {
       let session = model.sessions.first(where: { $0.id == result.sessionID })
     else { return }
     Announcer.announce(
-      spoken(result, session: session, position: palette.selectedIndex, count: palette.results.count))
+      spoken(
+        result, session: session, position: palette.selectedIndex, count: palette.results.count))
   }
 }
 

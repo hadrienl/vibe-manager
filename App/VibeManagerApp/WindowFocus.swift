@@ -22,6 +22,8 @@ final class WindowFocus {
   }
 
   private(set) var front: Front = .none
+  /// Whether the workspace window is there to be brought forward: not after ⇧⌘W closed it.
+  private(set) var hasWorkspace = false
 
   @ObservationIgnored private weak var workspaceWindow: NSWindow?
   @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -34,6 +36,16 @@ final class WindowFocus {
           MainActor.assumeIsolated { self?.refresh() }
         })
     }
+    // Still visible as it closes: told apart here, rather than read from the window.
+    observers.append(
+      center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) {
+        [weak self] notification in
+        let closing = notification.object as? NSWindow
+        MainActor.assumeIsolated {
+          guard let self, closing != nil, closing === self.workspaceWindow else { return }
+          self.hasWorkspace = false
+        }
+      })
   }
 
   func attach(_ window: NSWindow?) {
@@ -53,6 +65,11 @@ final class WindowFocus {
   }
 
   private func refresh() {
+    if let window = workspaceWindow, window.isVisible || window.isMiniaturized {
+      hasWorkspace = true
+    } else if workspaceWindow == nil {
+      hasWorkspace = false
+    }
     guard let key = NSApp.keyWindow else {
       front = .none
       return

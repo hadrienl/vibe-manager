@@ -66,6 +66,8 @@ public struct RootView: View {
         QuickOpenPanel(model: model)
       }
     }
+    // A window closed with the palette open does not reopen on it.
+    .onDisappear { model.quickOpen.dismiss(restoringFocus: false) }
     // Narrower than the two sidebars plus a usable terminal on purpose: below the layout
     // thresholds the columns fold, and the window is still worth opening.
     .frame(minWidth: 640, minHeight: 480)

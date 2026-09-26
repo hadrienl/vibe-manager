@@ -14,6 +14,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 
 | Shortcut | Command | Menu |
 |---|---|---|
+| ⌘P | Open Quickly: find a session by ticket, request URL, branch, folder or title; arrows, ⌃N / ⌃P and Page Up / Down move, Return opens, Escape closes | File |
 | ⌥⌘1 | Focus Sidebar: the session list takes the keyboard | View |
 | ⌥⌘2 | Focus Terminal: the selected session's terminal | View |
 | ⌥⌘3 | Focus Inspector: the Git list, the inspector shown if it was hidden | View |
@@ -84,6 +85,9 @@ the session.
 | Agent's request banner | the question, the value typed, the expiry | — | Deny, Always Allow for ‹site›, Allow Once; announced when it appears | — |
 | A session row whose web view waits | as above | "Waiting for your approval in the web view", "The agent opened a page" | — | `session-row` |
 | New Session: ticket | "Ticket" | — | — | `new-session-ticket` |
+| Open Quickly | "Open Quickly", a modal group; the count said once the typing pauses ("3 results", "No results") | — | — | `quick-open` |
+| Open Quickly's field | "Open Quickly" | the text typed | editable; keeps the keyboard while the arrows move through the results | `quick-open-field` |
+| A result, one element | title, status, why it matches, "Archived", its place ("Refactor, In Progress, Pull request #62, o/r, created, 2 of 5"); said as the arrows reach it | selected | open | `quick-open-row` |
 
 ### The terminal
 
