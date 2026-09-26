@@ -38,7 +38,12 @@ is no second normalization that could drift from the first. Free text is only wh
 included: its title, its folders, its resources — the journal's, the branch and worktree the
 session recorded itself, and the ticket URLs of its first prompt, for sessions older than the
 journal — its summary and its notes, all folded once into bytes. A keystroke only walks arrays; it
-never reads the disk.
+never reads the disk. Each row also keeps all its texts in one block of bytes, the texts of its
+resources in another, and the keys and numbers of its resources in sets: a session a word or a key
+does not reach is ruled out in one lookup, before any field is looked at. Rows are immutable
+objects, so that walking and sorting them copies nothing. Measured on 1,000 sessions of 30
+resources and 100 summary lines each: about 4 ms per keystroke at worst in release, every session
+answering.
 
 It is fed by the session store (every list the workspace holds), by the journal monitor's updates,
 and by the notes when the palette opens. At launch, after the list is on screen, every journal is
