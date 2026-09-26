@@ -105,6 +105,14 @@ struct AvatarArchiveTests {
     #expect(avatar.manifest.source == .bundled)
   }
 
+  @Test("The default avatar passes the whole import, as any archive would")
+  func defaultAvatarImports() throws {
+    let url = try #require(DefaultAvatar.archiveURL)
+    let (avatar, ignored) = try processor.avatar(fromArchive: Data(contentsOf: url))
+    #expect(avatar.isComplete)
+    #expect(ignored == 0)
+  }
+
   @Test("An archive without a manifest is read from the names of its images")
   func withoutManifest() throws {
     let zip = HandMadeZip(entries: [

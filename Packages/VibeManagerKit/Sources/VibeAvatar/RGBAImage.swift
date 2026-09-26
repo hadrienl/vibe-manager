@@ -69,6 +69,19 @@ enum ImageCodec {
     return try pixels(of: image)
   }
 
+  /// Whether `data` is a PNG of a sprite's size, read from its header alone.
+  static func isSprite(_ data: Data) -> Bool {
+    let options = [kCGImageSourceShouldCache: false] as CFDictionary
+    guard let source = CGImageSourceCreateWithData(data as CFData, options),
+      let type = CGImageSourceGetType(source).flatMap({ UTType($0 as String) }),
+      type.conforms(to: .png),
+      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options) as? [CFString: Any]
+    else { return false }
+    let side = AvatarSpriteSet.spriteSide
+    return properties[kCGImagePropertyPixelWidth] as? Int == side
+      && properties[kCGImagePropertyPixelHeight] as? Int == side
+  }
+
   /// Draws `image` into RGBA, and takes the premultiplication back out.
   static func pixels(of image: CGImage) throws -> RGBAImage {
     let width = image.width
