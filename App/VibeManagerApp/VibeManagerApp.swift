@@ -51,6 +51,12 @@ struct VibeManagerApp: App {
       RootView(model: environment.appModel)
         .onAppear {
           appDelegate.environment = environment
+          // Notifications need the application's bundle: the notifier is made here, not in the
+          // package, whose tests have none (#40).
+          if environment.appModel.requestNotifier == nil {
+            environment.appModel.requestNotifier = SystemRequestNotifier(
+              model: environment.appModel)
+          }
         }
         .background(WorkspaceWindowReader(focus: windowFocus))
     }
@@ -190,6 +196,13 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("4", modifiers: [.command, .option])
         .disabled(!environment.appModel.isWebViewAvailable)
+
+        // The requests of the sessions in the background (#40).
+        Button("Focus Pending Requests") {
+          environment.appModel.focusRequestPalette()
+        }
+        .keyboardShortcut("p", modifiers: [.command, .option])
+        .disabled(environment.appModel.pendingRequests.isEmpty)
 
         // What the terminal said last, read by VoiceOver on demand rather than as it arrives.
         Button("Read Last Output") {

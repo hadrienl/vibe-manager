@@ -289,6 +289,11 @@ public final class WorkspaceLayoutController {
     updateIntent { $0.keepPresentations(of: ids) }
   }
 
+  /// Folds the palette of pending requests into its count, or unfolds it (#40).
+  public func setRequestPaletteCollapsed(_ isCollapsed: Bool) {
+    updateIntent { $0.isRequestPaletteCollapsed = isCollapsed }
+  }
+
   /// Writes whatever is pending right away. Called when the application is about to quit, where
   /// waiting out the delay would mean losing the last arrangement.
   public func flush() async {

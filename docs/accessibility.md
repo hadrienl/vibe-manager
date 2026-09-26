@@ -19,6 +19,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌥⌘2 | Focus Terminal: the selected session's terminal | View |
 | ⌥⌘3 | Focus Inspector: the Git list, the inspector shown if it was hidden | View |
 | ⌥⌘4 | Focus Web View: the page in front, the web view shown if it was hidden | View |
+| ⌥⌘P | Focus Pending Requests: the palette unfolds and its oldest request takes the keyboard | View |
 | ⌥⌘B | Show / Hide Web View; in a window where the two take turns, swaps terminal and web view | View |
 | ⌥⌘N | Edit Notes; Escape gives the keyboard back to the terminal | View |
 | ⌥⌘↓ / ⌥⌘↑ | Next / Previous Session | View |
@@ -47,6 +48,18 @@ menus already took the others before #19.
 Session menu's item then reads "Close Tab". On the ticket's pinned tab it beeps rather than closing
 the session.
 
+## The palette of requests
+
+The requests of the sessions in the background (#40), over the foot of the sidebar.
+
+| Action | Keys |
+|---|---|
+| Go to the palette | ⌥⌘P |
+| Previous / next request | ↑ / ↓ |
+| The answers of a request | Tab, then Space |
+| Open the request's session | ⌘↩ |
+| Back to the terminal of the session in front | Escape |
+
 ## Sessions
 
 | Action | Shortcut | Menu |
@@ -70,6 +83,8 @@ the session.
 |---|---|---|---|---|
 | Column tabs | the column and its count ("Waiting, 2 sessions"), and "one waits for you" when a session there does | selected | — | `column-tab-todo`, `-doing`, `-waiting`, `-done` |
 | Session list | "Sessions" | — | — | `session-list` |
+| Palette of requests | "Pending requests: 2"; folded, "Pending requests: 2. Show" | — | a "Requests" rotor, one entry per request | `request-palette`, `request-palette-collapsed` |
+| A request's card | session, agent, folder, branch, age, then what it asks ("Refactor, Claude Code, app, branch feat/40, 2 minutes ago. Shell command: swift test") | — | Allow, Always, Refuse — each only when the agent's dialog can take it from here; Open Session | `request-card` |
 | A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
 | Swipe buttons | "Move to ‹status›", "Archive…" | — | — | `swipe-‹status›` |
 | Archived sessions | "Archived (N)", opens the list | — | Show, Unarchive | `archived-sessions` |

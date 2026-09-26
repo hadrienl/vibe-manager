@@ -65,6 +65,49 @@ public final class AppModel {
   /// Whether each of those agents reports its activity, as the setting shows it.
   public internal(set) var reportsActivity: [AgentProviderID: Bool] = [:]
   let activityTracker: TrackAgentActivity?
+  /// How each pending request can be answered now, as the tracker last said (#40).
+  public internal(set) var requestAnswering: [AgentRequestID: AgentRequestAnswering] = [:]
+  /// Types an answer into the terminal of the request's session. Absent, nothing is answered
+  /// from the palette.
+  let answerRequest: AnswerAgentRequest?
+  let requestPreferences: any RequestPreferences
+  /// Requests whose answer is being typed: their buttons wait.
+  public internal(set) var answeringRequestIDs: Set<AgentRequestID> = []
+  /// The last answer given from outside the terminal, said for a moment in the palette.
+  public internal(set) var requestOutcome: RequestOutcome?
+  /// ⌥⌘P: the palette takes the keyboard.
+  public internal(set) var requestPaletteFocusRequest = 0
+  /// The request a notification was clicked for, for the palette to bring into view.
+  public internal(set) var revealedRequestID: AgentRequestID?
+  /// Posts the system notifications and the Dock badge. Set by the application: a workspace
+  /// assembled without it notifies nothing.
+  public var requestNotifier: (any RequestNotifying)? {
+    didSet { requestsDidChange() }
+  }
+  /// The requests already accounted for: notified, or seen arriving while the application was in
+  /// front. Only one arriving in the background is notified.
+  var knownRequestIDs: Set<AgentRequestID> = []
+  var postedRequestIDs: Set<AgentRequestID> = []
+  var announcedRequestIDs: Set<AgentRequestID> = []
+  /// Mirrored here so the settings window changes what the notifications do at once.
+  public var notifiesRequests: Bool {
+    didSet {
+      requestPreferences.notifiesRequests = notifiesRequests
+      requestsDidChange()
+    }
+  }
+  public var requestNotificationContent: RequestNotificationContent {
+    didSet { requestPreferences.notificationContent = requestNotificationContent }
+  }
+  public var showsRequestDockBadge: Bool {
+    didSet {
+      requestPreferences.showsDockBadge = showsRequestDockBadge
+      requestsDidChange()
+    }
+  }
+  public var expandsPaletteOnRequest: Bool {
+    didSet { requestPreferences.expandsPaletteOnRequest = expandsPaletteOnRequest }
+  }
   let hookConsents: any AgentHookConsentStore
   /// Every launch waiting on the consent sheet. One answer settles them all.
   var hookConsentWaiters: [UUID: CheckedContinuation<AgentHookConsent, Never>] = [:]
@@ -528,6 +571,9 @@ public final class AppModel {
     activityTracker: TrackAgentActivity? = nil,
     /// What the user decided about the hooks of the CLIs that ask before running them.
     hookConsents: any AgentHookConsentStore = InMemoryAgentHookConsentStore(),
+    /// Answers a request of a background session by typing into its terminal (#40).
+    answerRequest: AnswerAgentRequest? = nil,
+    requestPreferences: any RequestPreferences = InMemoryRequestPreferences(),
     /// Every session's web view (#69). A workspace assembled without one offers none.
     browser: BrowserWorkspace? = nil,
     /// Reads a session's branch and forge, for the ticket it deduces. Absent without Git.
@@ -559,6 +605,12 @@ public final class AppModel {
     self.activityTracker = activityTracker
     self.conversations = conversations
     self.hookConsents = hookConsents
+    self.answerRequest = answerRequest
+    self.requestPreferences = requestPreferences
+    notifiesRequests = requestPreferences.notifiesRequests
+    requestNotificationContent = requestPreferences.notificationContent
+    showsRequestDockBadge = requestPreferences.showsDockBadge
+    expandsPaletteOnRequest = requestPreferences.expandsPaletteOnRequest
     self.browser = browser
     readTicketContext = ticketContext
     self.diagnostics = diagnostics
@@ -2069,6 +2121,7 @@ public final class AppModel {
     watchBranches()
     updateVisibleSession()
     selectionDidChange(to: id)
+    requestsDidChange()
   }
 
   /// Moves through the sidebar in the order it is drawn, and stops at both ends rather than
@@ -2448,6 +2501,7 @@ extension AppModel {
   public func applicationDidBecomeActive() {
     isApplicationActive = true
     updateVisibleSession()
+    requestsDidChange()
     if let id = selectedSessionID { refreshTicket(of: id) }
     if let journal {
       Task { await journal.refresh() }
@@ -2463,6 +2517,7 @@ extension AppModel {
   public func applicationWillResignActive() {
     isApplicationActive = false
     updateVisibleSession()
+    requestsDidChange()
     Task { [notes] in _ = await notes.flushAll() }
   }
 

@@ -101,8 +101,10 @@ public struct CodexQuestionWatch: Sendable {
           return
         }
         var pending: Set<String> = []
-        let lines = AppendedLines(file: rollout, start: .beginning, pollInterval: watch.pollInterval)
-        for await line in lines.lines() {
+        let lines = AppendedLines(
+          file: rollout, start: .beginning, pollInterval: watch.pollInterval
+        ).lines()
+        for await line in lines {
           guard !Task.isCancelled else { break }
           for signal in Self.signals(in: line, pending: &pending) { continuation.yield(signal) }
         }

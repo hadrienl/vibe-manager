@@ -157,7 +157,8 @@ public struct MockAnswerKeymap: AgentAnswerKeymap {
         switch answer {
         case .option(let index): return Array("option \(index + 1)\r".utf8)
         case .options(let indices):
-          return Array("options \(indices.sorted().map { String($0 + 1) }.joined(separator: ","))\r".utf8)
+          let numbers = indices.sorted().map { String($0 + 1) }.joined(separator: ",")
+          return Array("options \(numbers)\r".utf8)
         case .text(let text): return Array("text \(text)\r".utf8)
         }
       }

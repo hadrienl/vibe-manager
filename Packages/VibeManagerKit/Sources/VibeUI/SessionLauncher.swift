@@ -64,6 +64,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// Tells the activity tracker that a terminal wrote something: the only signal an agent without
   /// hooks gives.
   private var activityTasks: [SessionID: Task<Void, Never>] = [:]
+  /// When each terminal last wrote something, for an answer typed in several keystrokes to wait
+  /// until the interface has redrawn between two (#40).
+  private var lastOutputAt: [SessionID: ContinuousClock.Instant] = [:]
   /// Which exit watch is the current one for a session.
   ///
   /// Cancelling a task only asks. A watch that has already seen its process end, and is waiting
@@ -553,6 +556,21 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     return pane
   }
 
+  /// Types an answer into the terminal of a session whose agent runs (#40). Straight to the
+  /// terminal, not through its pane: the user did not type it, and the pane's keystrokes are
+  /// read as the user's.
+  public func writeAnswer(_ bytes: [UInt8], to id: SessionID) async -> Bool {
+    guard let pane = panes[id], pane.status == .running, let terminal = pane.session else {
+      return false
+    }
+    await terminal.write(bytes)
+    return true
+  }
+
+  public func lastOutput(of id: SessionID) -> ContinuousClock.Instant? {
+    lastOutputAt[id]
+  }
+
   public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {
     panes[id]?.failure
   }
@@ -732,6 +750,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       for await event in attachment.events {
         guard case .output = event else { continue }
         let now = ContinuousClock.now
+        self.lastOutputAt[id] = now
         if let last, now - last < .milliseconds(250) { continue }
         last = now
         await activity.output(id)

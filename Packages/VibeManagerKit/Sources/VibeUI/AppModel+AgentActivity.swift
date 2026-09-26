@@ -24,10 +24,18 @@ extension AppModel {
         guard let self else { return }
         self.activities[update.sessionID] = update.state
         self.conversations.activityChanged(update.sessionID, to: update.state)
+        self.requestAnswering = self.requestAnswering.filter {
+          $0.key.sessionID != update.sessionID
+        }.merging(update.answering) { $1 }
+        self.requestsDidChange()
       }
     }
     await activityTracker.load()
     activities = await activityTracker.states()
+    for id in activities.keys {
+      requestAnswering.merge(await activityTracker.answering(for: id)) { $1 }
+    }
+    requestsDidChange()
     await loadHookTrustingAgents()
     updateVisibleSession()
   }

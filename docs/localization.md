@@ -98,6 +98,9 @@ the bundle: build a second time before testing a translation.
 |---|---|
 | session, agent, worktree, prompt | session, agent, worktree, prompt (kept) |
 | Needs attention | Action requise |
+| request (of an agent), pending requests | demande, demandes en attente |
+| palette (of requests) | palette |
+| allow, always, refuse | autoriser, toujours, refuser |
 | prompt template, template | modèle de prompt, modèle |
 | model (of an agent) | modèle — where both are on screen, the template is « Modèle de prompt » |
 | working folder | dossier de travail |

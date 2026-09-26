@@ -337,6 +337,14 @@ public final class AppEnvironment {
       usage: UsageModel(service: usage),
       activityTracker: activityTracker,
       hookConsents: hookConsents,
+      // Typed into the terminal of the request's own session, looked up when the keys are
+      // written: the session on screen is never sent anything (#40).
+      answerRequest: AnswerAgentRequest(
+        tracker: activityTracker,
+        write: { [weak launcher] id, bytes in await launcher?.writeAnswer(bytes, to: id) ?? false },
+        lastOutput: { [weak launcher] id in await launcher?.lastOutput(of: id) },
+        diagnostics: diagnostics),
+      requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
       browser: browser,
       ticketContext: ReadTicketContext(
         git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
