@@ -10,9 +10,9 @@ import VibeDomain
 /// uncovers the buttons of the statuses next to its own; the rest of the column does not move. A
 /// click on one moves the session, and the column on screen stays where it is.
 ///
-/// The swipe is the trackpad's only: no SwiftUI gesture sits on the rows, where a drag gesture
-/// kept the clicks the list needs to select a row until a right click released it. With a mouse,
-/// the row's menu moves the session.
+/// The swipe is a two-finger scroll, on a trackpad or a Magic Mouse; a row is not dragged with the
+/// button held. No SwiftUI gesture sits on the rows: a drag gesture there kept the clicks the list
+/// needs to select a row until a right click released it. The row's menu moves the session too.
 struct SessionSidebar: View {
   @Bindable var model: AppModel
   /// Focus Sidebar, ⌥⌘1, gives the list the keyboard.
