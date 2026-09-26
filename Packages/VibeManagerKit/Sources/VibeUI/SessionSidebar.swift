@@ -9,19 +9,17 @@ import VibeDomain
 /// Only the column on screen is a list. A swipe slides the row under the fingers aside, and
 /// uncovers the buttons of the statuses next to its own; the rest of the column does not move. A
 /// click on one moves the session, and the column on screen stays where it is.
+///
+/// The swipe is a two-finger scroll, on a trackpad or a Magic Mouse; a row is not dragged with the
+/// button held. No SwiftUI gesture sits on the rows: a drag gesture there kept the clicks the list
+/// needs to select a row until a right click released it. The row's menu moves the session too.
 struct SessionSidebar: View {
   @Bindable var model: AppModel
   /// Focus Sidebar, ⌥⌘1, gives the list the keyboard.
   @FocusState private var isListFocused: Bool
   @State private var swipe: SessionSwipe?
-  /// Where a drag started from, for a swipe made with the pointer.
-  @State private var dragBase: CGFloat?
-  /// A drag that started vertical, and stays a drag of the list whatever it does next.
-  @State private var isDragDeclined = false
-  /// The row under the pointer, for when no row's frame holds the fingers.
+  /// The row under the pointer, for when no row is drawn under the fingers.
   @State private var hoveredSessionID: SessionID?
-  /// Where each row is drawn, to find the one under the fingers.
-  @State private var rowFrames = RowFrames()
   @State private var isShowingArchive = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -57,13 +55,17 @@ struct SessionSidebar: View {
         .frame(width: width, height: geometry.size.height, alignment: .topLeading)
         .background(
           HorizontalSwipeMonitor(
-            began: { point in beginTrackpadSwipe(at: point, width: width) },
+            began: { id in beginTrackpadSwipe(on: id, width: width) },
             changed: { delta in swipe?.translation += delta },
             ended: { settleSwipe() },
+            // A click on the open row puts its buttons away, as a click anywhere else does. With
+            // Reduce Motion the row stays under its buttons, and only they answer.
+            clicked: { id in
+              if !reduceMotion, id != nil, id == swipe?.sessionID { closeSwipe(animated: true) }
+            },
             interrupted: { closeSwipe(animated: true) }
           )
         )
-        .coordinateSpace(.named(RowFrames.space))
         // Over the foot of the list, never over the session on screen, and the list's last rows
         // stay reachable above it (#40).
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -134,12 +136,6 @@ struct SessionSidebar: View {
     ForEach(sessions) { session in
       row(for: session, position: positions[session.id], width: width)
         .tag(session.id)
-        .onGeometryChange(for: CGRect.self) {
-          $0.frame(in: .named(RowFrames.space))
-        } action: {
-          rowFrames.frames[session.id] = $0
-        }
-        .onDisappear { rowFrames.frames[session.id] = nil }
     }
   }
 
@@ -155,6 +151,8 @@ struct SessionSidebar: View {
       shortcutPosition: position,
       commands: commands
     )
+    // Moves with the row: a click on the buttons a swipe uncovered is not a click on the row.
+    .background(SwipeRowMarker(sessionID: session.id))
     // Only the swiped row moves, out of the way of its buttons. With Reduce Motion it stays,
     // and the buttons fade in over it.
     .offset(x: isSwiped && !reduceMotion ? swipe?.offset ?? 0 : 0)
@@ -185,13 +183,6 @@ struct SessionSidebar: View {
         hoveredSessionID = nil
       }
     }
-    .simultaneousGesture(drag(for: session, width: width))
-    // A click on the open row puts its buttons away, as a click anywhere else does. Only the open
-    // row has it: linked against the macOS 15 SDK, a tap gesture on every row takes the click
-    // the list needs to select it.
-    .simultaneousGesture(
-      TapGesture().onEnded { closeSwipe(animated: true) },
-      including: isSwiped ? .all : .subviews)
   }
 
   // MARK: - Swipe
@@ -205,49 +196,17 @@ struct SessionSidebar: View {
     )
   }
 
-  /// - Parameter point: where the fingers are, in the list's own coordinates. The hover is only
-  ///   asked when the monitor could not say.
-  private func beginTrackpadSwipe(at point: CGPoint?, width: CGFloat) -> Bool {
+  /// - Parameter id: the session of the row drawn under the fingers. The hover is only asked when
+  ///   the monitor found none.
+  private func beginTrackpadSwipe(on id: SessionID?, width: CGFloat) -> Bool {
     let visible = model.visibleSessions
-    // Found by where the rows are drawn, never by the table's row numbers: they do not count the
-    // same rows from one SDK to the next, and the swipe went to the row below.
-    let id =
-      point.flatMap { point in
-        visible.first { rowFrames.frames[$0.id]?.contains(point) == true }?.id
-      } ?? hoveredSessionID
-    guard let session = id.flatMap({ id in visible.first { $0.id == id } }) else { return false }
+    guard let session = (id ?? hoveredSessionID).flatMap({ id in visible.first { $0.id == id } })
+    else { return false }
     // A swipe on the row already open takes it from where it is.
     if swipe?.sessionID != session.id {
       swipe = makeSwipe(for: session, width: width)
     }
     return true
-  }
-
-  /// The pointer's equivalent: a drag that starts out horizontal.
-  private func drag(for session: WorkSession, width: CGFloat) -> some Gesture {
-    DragGesture(minimumDistance: 8)
-      .onChanged { value in
-        guard !isDragDeclined else { return }
-        if dragBase == nil {
-          // Judged once, on the first movement: a drag that starts vertical is the list's.
-          guard abs(value.translation.width) > abs(value.translation.height) else {
-            isDragDeclined = true
-            return
-          }
-          if swipe?.sessionID != session.id {
-            swipe = makeSwipe(for: session, width: width)
-          }
-          dragBase = swipe?.translation ?? 0
-        }
-        guard let dragBase else { return }
-        swipe?.translation = dragBase + value.translation.width
-      }
-      .onEnded { _ in
-        isDragDeclined = false
-        guard dragBase != nil else { return }
-        dragBase = nil
-        settleSwipe()
-      }
   }
 
   private func settleSwipe() {
@@ -323,13 +282,6 @@ struct SessionSidebar: View {
         "Nothing done yet. Swipe a session to move it here.", bundle: .module)
     }
   }
-}
-
-/// Where each row of the list is drawn, in the list's coordinates. Not observed: the rows move on
-/// every scroll, and only a swipe's first movement reads it.
-private final class RowFrames {
-  static let space = "session-list"
-  var frames: [SessionID: CGRect] = [:]
 }
 
 // MARK: - Tabs
