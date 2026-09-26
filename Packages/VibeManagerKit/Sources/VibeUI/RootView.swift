@@ -331,6 +331,10 @@ public struct RootView: View {
           RestoreReportBanner(report: report, dismiss: { model.dismissRestoreReport() })
           Divider()
         }
+        if let report = model.batchReport {
+          BatchReportBanner(report: report, dismiss: { model.dismissBatchReport() })
+          Divider()
+        }
         if let reason = model.hostUnavailableReason {
           HostUnavailableBanner(
             reason: reason,
@@ -528,6 +532,23 @@ public struct RootView: View {
     } message: { _ in
       Text("The agent will be stopped. The session can be restarted later.", bundle: .module)
     }
+    // Closing several sessions asks #51's question once, with its "Don't ask again" (#77).
+    .confirmationDialog(
+      Text(verbatim: model.pendingBatch?.title ?? ""),
+      isPresented: batchBinding(close: true),
+      titleVisibility: .visible,
+      presenting: model.pendingBatch
+    ) { confirmation in
+      Button(confirmation.confirmTitle) {
+        let askAgain = !suppressesCloseConfirmation
+        Task { await model.confirmBatch(confirmation, askAgain: askAgain) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelBatch()
+      }
+    } message: { confirmation in
+      Text(verbatim: confirmation.message)
+    }
     // Before the archive dialog in the chain: the toggle reaches every dialog it wraps, and the
     // archive question has no "Don't ask again".
     .dialogSuppressionToggle(
@@ -535,6 +556,25 @@ public struct RootView: View {
     )
     .onChange(of: model.pendingClose?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
+    }
+    .onChange(of: model.pendingBatch?.id) { _, id in
+      if id != nil { suppressesCloseConfirmation = false }
+    }
+    // Every other command on several sessions: one question, Cancel by default (#77).
+    .confirmationDialog(
+      Text(verbatim: model.pendingBatch?.title ?? ""),
+      isPresented: batchBinding(close: false),
+      titleVisibility: .visible,
+      presenting: model.pendingBatch
+    ) { confirmation in
+      Button(confirmation.confirmTitle) {
+        Task { await model.confirmBatch(confirmation) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelBatch()
+      }
+    } message: { confirmation in
+      Text(verbatim: confirmation.message)
     }
     // Archiving is reversible, so the question is short and says what actually happens. Cancel
     // is the default button: the pointer slip that opened this must not also answer it.
@@ -564,6 +604,17 @@ public struct RootView: View {
     } message: { session in
       Text(archiveConfirmationMessage(for: session))
     }
+  }
+
+  /// One binding per dialog: the close question carries a toggle the others must not show.
+  private func batchBinding(close: Bool) -> Binding<Bool> {
+    Binding(
+      get: { model.pendingBatch.map { $0.isClose == close } ?? false },
+      set: { isPresented in
+        guard !isPresented else { return }
+        model.cancelBatch()
+      }
+    )
   }
 
   private func archiveConfirmationMessage(for session: WorkSession) -> String {
@@ -1417,6 +1468,62 @@ private struct RestoreReportBanner: View {
   }
 }
 
+/// What a command on several sessions could not do (#77).
+private struct BatchReportBanner: View {
+  let report: SessionBatchReport
+  let dismiss: () -> Void
+
+  @State private var isShowingDetails = true
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "info.circle")
+        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(verbatim: report.message)
+          .font(.callout)
+        if isShowingDetails {
+          ForEach(report.lines) { line in
+            VStack(alignment: .leading, spacing: 1) {
+              Text(verbatim: line.text)
+                .font(.caption)
+              if let suggestion = line.suggestion {
+                Text(verbatim: suggestion)
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+        }
+      }
+      Spacer(minLength: 8)
+      if !report.lines.isEmpty {
+        Button(
+          isShowingDetails
+            ? LocalizedStringResource("Hide Details", bundle: .module)
+            : LocalizedStringResource("Show Details", bundle: .module)
+        ) {
+          isShowingDetails.toggle()
+        }
+        .controlSize(.small)
+      }
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+    .accessibilityIdentifier("batch-report")
+    // Said as it appears: VoiceOver does not read what shows up away from its cursor.
+    .announcedOnAppear(report.message)
+  }
+}
+
 /// A stop the system would not confirm, shown over a workspace that keeps working.
 private struct DetachWarningBanner: View {
   let warning: AppModel.DetachWarning
@@ -1827,9 +1934,7 @@ struct SessionRow: View {
       }
     }
     .padding(.vertical, 4)
-    .contextMenu {
-      SessionCommandButtons(commands: commands)
-    }
+    // The menu is the list's (#77): it knows whether the click landed in a selection of several.
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("session-row")
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))

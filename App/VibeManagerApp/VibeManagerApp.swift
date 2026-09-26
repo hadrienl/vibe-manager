@@ -409,14 +409,21 @@ private struct SessionHistoryCommands: Commands {
     CommandMenu("Session") {
       // The label follows the session: one that was created and never ran is started, not
       // restarted, and the menu is where a keyboard-only user reads which of the two this is.
-      Button(
-        model.selectedSession.map(model.restartTitle) ?? String(localized: "Restart Session")
-      ) {
-        guard let session = model.selectedSession else { return }
-        Task { await model.restart(session.id) }
+      // With several sessions selected in the sidebar, each command applies to all of them and
+      // says how many it will act on (#77).
+      if let plan = batchPlan(.restart) {
+        Button(model.batchTitle(for: plan)) { request(plan) }
+          .keyboardShortcut("r", modifiers: [.command, .control])
+      } else {
+        Button(
+          model.selectedSession.map(model.restartTitle) ?? String(localized: "Restart Session")
+        ) {
+          guard let session = model.selectedSession else { return }
+          Task { await model.restart(session.id) }
+        }
+        .keyboardShortcut("r", modifiers: [.command, .control])
+        .disabled(!(model.selectedSession.map(model.canRestart) ?? false))
       }
-      .keyboardShortcut("r", modifiers: [.command, .control])
-      .disabled(!(model.selectedSession.map(model.canRestart) ?? false))
 
       // Another agent or another model for the same work. Offered on a running session too: the
       // sheet says the agent will be stopped, and nothing is stopped before it is confirmed.
@@ -425,7 +432,8 @@ private struct SessionHistoryCommands: Commands {
         model.beginAgentSwitch(session.id)
       }
       .keyboardShortcut("m", modifiers: [.command, .control])
-      .disabled(!(model.selectedSession.map(model.canSwitchAgent) ?? false))
+      .disabled(
+        model.hasMultipleSelection || !(model.selectedSession.map(model.canSwitchAgent) ?? false))
 
       // The keyboard's way to a drop (#42): chips in a conversation, paths in a terminal.
       Button("Attach Files…") {
@@ -438,26 +446,35 @@ private struct SessionHistoryCommands: Commands {
 
       // The swipe's keyboard equivalent (#80): the shortcut is the decision, so it asks nothing.
       Menu("Status") {
-        ForEach(SessionTaskStatus.columns, id: \.self) { status in
-          Toggle(
-            isOn: Binding(
-              get: { model.selectedSession?.taskStatus == status },
-              set: { isOn in
-                guard isOn, let session = model.selectedSession else { return }
-                Task { await model.setTaskStatus(status, for: session.id) }
-              }
-            )
-          ) {
-            Text(status.label)
+        if model.hasMultipleSelection {
+          ForEach(SessionTaskStatus.columns, id: \.self) { status in
+            let plan = model.batchPlan(.move(to: status), for: model.commandTargets)
+            Button {
+              request(plan)
+            } label: {
+              // The column the selection is already in reads as itself, and stays unavailable.
+              plan.isEmpty ? Text(status.label) : Text(verbatim: model.batchTitle(for: plan))
+            }
+            .disabled(plan.isEmpty)
           }
+        } else {
+          statusToggles
         }
         Divider()
         Button("Move to Next Status") {
+          if let plan = model.batchMovePlan(forward: true), model.hasMultipleSelection {
+            request(plan)
+            return
+          }
           guard let session = model.selectedSession else { return }
           Task { await model.moveTaskStatus(of: session.id, forward: true) }
         }
         .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
         Button("Move to Previous Status") {
+          if let plan = model.batchMovePlan(forward: false), model.hasMultipleSelection {
+            request(plan)
+            return
+          }
           guard let session = model.selectedSession else { return }
           Task { await model.moveTaskStatus(of: session.id, forward: false) }
         }
@@ -467,35 +484,71 @@ private struct SessionHistoryCommands: Commands {
 
       Divider()
 
-      // With the keyboard in the web view, ⌘W closes its tab, and the item says so: the menu is
-      // where the user reads which of the two it will do (ADR 0023).
-      Button(
-        closesWebTab
-          ? String(localized: "Close Tab", comment: "Closes the web view's tab in front.")
-          : String(localized: "Close Session")
-      ) {
-        // Over Settings or any other window, ⌘W keeps closing that window.
-        guard focus.front == .workspace else {
-          focus.closeKeyWindow()
-          return
-        }
-        if closesWebTab {
-          model.closeWebTab()
-          return
-        }
-        guard let session = model.selectedSession else { return }
-        Task { await model.requestClose(session.id) }
-      }
-      .keyboardShortcut("w", modifiers: .command)
-      .disabled(!isCloseEnabled)
+      closeButton
+      archiveButtons
+    }
+  }
 
+  @ViewBuilder
+  private var statusToggles: some View {
+    ForEach(SessionTaskStatus.columns, id: \.self) { status in
+      Toggle(
+        isOn: Binding(
+          get: { model.selectedSession?.taskStatus == status },
+          set: { isOn in
+            guard isOn, let session = model.selectedSession else { return }
+            Task { await model.setTaskStatus(status, for: session.id) }
+          }
+        )
+      ) {
+        Text(status.label)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var closeButton: some View {
+    // With the keyboard in the web view, ⌘W closes its tab, and the item says so: the menu is
+    // where the user reads which of the two it will do (ADR 0023).
+    Button(closeTitle) {
+      // Over Settings or any other window, ⌘W keeps closing that window.
+      guard focus.front == .workspace else {
+        focus.closeKeyWindow()
+        return
+      }
+      if closesWebTab {
+        model.closeWebTab()
+        return
+      }
+      if let plan = batchPlan(.close) {
+        request(plan)
+        return
+      }
+      guard let session = model.selectedSession else { return }
+      Task { await model.requestClose(session.id) }
+    }
+    .keyboardShortcut("w", modifiers: .command)
+    .disabled(!isCloseEnabled)
+  }
+
+  @ViewBuilder
+  private var archiveButtons: some View {
+    if let plan = batchPlan(.archive) {
+      Button(model.batchTitle(for: plan)) { request(plan) }
+        .keyboardShortcut("a", modifiers: [.command, .control])
+    } else {
       Button("Archive…") {
         guard let session = model.selectedSession else { return }
         model.requestArchive(session.id)
       }
       .keyboardShortcut("a", modifiers: [.command, .control])
       .disabled(!(model.selectedSession.map(model.canArchive) ?? false))
+    }
 
+    if let plan = batchPlan(.unarchive) {
+      Button(model.batchTitle(for: plan)) { request(plan) }
+        .keyboardShortcut("a", modifiers: [.command, .control, .shift])
+    } else {
       Button("Unarchive") {
         guard let session = model.selectedSession else { return }
         Task { await model.restore(session.id) }
@@ -503,6 +556,27 @@ private struct SessionHistoryCommands: Commands {
       .keyboardShortcut("a", modifiers: [.command, .control, .shift])
       .disabled(!(model.selectedSession.map(model.canRestore) ?? false))
     }
+  }
+
+  /// The selection's plan for a command, when several sessions are selected and it applies to at
+  /// least one; `nil` otherwise. The session on screen is one of them and follows the same rules,
+  /// so the item it falls back on is unavailable too, under its usual name.
+  private func batchPlan(_ action: SessionBatchAction) -> SessionBatchPlan? {
+    guard model.hasMultipleSelection else { return nil }
+    let plan = model.batchPlan(action, for: model.commandTargets)
+    return plan.isEmpty ? nil : plan
+  }
+
+  private func request(_ plan: SessionBatchPlan) {
+    Task { await model.requestBatch(plan) }
+  }
+
+  private var closeTitle: String {
+    if closesWebTab {
+      return String(localized: "Close Tab", comment: "Closes the web view's tab in front.")
+    }
+    if let plan = batchPlan(.close) { return model.batchTitle(for: plan) }
+    return String(localized: "Close Session")
   }
 
   private var closesWebTab: Bool {
@@ -515,7 +589,9 @@ private struct SessionHistoryCommands: Commands {
     case .other: return true
     case .workspace:
       // On the ticket's pinned tab, ⌘W is enabled and beeps: it never falls back on the session.
-      return closesWebTab || (model.selectedSession.map(model.canClose) ?? false)
+      if closesWebTab { return true }
+      if let plan = batchPlan(.close) { return !plan.isEmpty }
+      return model.selectedSession.map(model.canClose) ?? false
     case .sheet, .none: return false
     }
   }
