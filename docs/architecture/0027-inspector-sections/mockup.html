@@ -1,0 +1,270 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head><body style="margin:0">
+<title>Colonne de contexte #66</title>
+<style>
+:root{
+  --page:#eceef1; --ink:#1d1f23; --muted:#5d636d; --faint:#8a9099;
+  --col:#f6f6f8; --head:#eef0f3; --headHover:#e6e9ee; --line:#d6d9de; --field:#ffffff;
+  --accent:#0a6cff; --accentSoft:rgba(10,108,255,.14); --win:#ffffff; --shadow:0 18px 50px rgba(20,30,50,.16);
+  --add:#1f9d45; --mod:#c7700a; --del:#d0342c; --tag:#e4e7ec;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--page:#16171a;--ink:#e9eaed;--muted:#a3a8b1;--faint:#7c818a;
+  --col:#232427;--head:#2b2d31;--headHover:#33363b;--line:#3b3e44;--field:#1b1c1f;
+  --accent:#3d8bff;--accentSoft:rgba(61,139,255,.2);--win:#1e1f22;--shadow:0 18px 50px rgba(0,0,0,.5);
+  --add:#4cc36b;--mod:#f0a23b;--del:#ff6b61;--tag:#34373c;}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--page:#16171a;--ink:#e9eaed;--muted:#a3a8b1;--faint:#7c818a;
+  --col:#232427;--head:#2b2d31;--headHover:#33363b;--line:#3b3e44;--field:#1b1c1f;
+  --accent:#3d8bff;--accentSoft:rgba(61,139,255,.2);--win:#1e1f22;--shadow:0 18px 50px rgba(0,0,0,.5);
+  --add:#4cc36b;--mod:#f0a23b;--del:#ff6b61;--tag:#34373c;}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:13px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;padding-inline:16px;padding-block:24px 40px}
+main{max-width:1080px;margin:0 auto;display:grid;gap:20px}
+h1{font-size:20px;margin:0;text-wrap:balance}
+.lede{color:var(--muted);max-width:68ch;margin:4px 0 0}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar label{color:var(--muted);font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--win)}
+.seg button{border:0;background:none;color:var(--ink);padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.btn{border:1px solid var(--line);background:var(--win);color:var(--ink);border-radius:7px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.stage{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:start}
+@media (max-width:760px){.stage{grid-template-columns:1fr}}
+.window{background:var(--win);border-radius:10px;box-shadow:var(--shadow);display:flex;overflow:hidden;max-width:100%}
+.term{width:150px;background:repeating-linear-gradient(var(--win) 0 17px,var(--page) 17px 18px);border-right:1px solid var(--line);opacity:.55}
+@media (max-width:520px){.term{display:none}}
+.col{background:var(--col);height:620px;display:flex;flex-direction:column;overflow-y:auto;position:relative;transition:width .15s}
+.sec{display:flex;flex-direction:column;flex:none}
+.hdr{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 6px;background:var(--head);border-bottom:1px solid var(--line);cursor:default;user-select:none;position:relative}
+.hdr:hover{background:var(--headHover)}
+.hdr .chev{width:16px;height:16px;border:0;background:none;color:var(--muted);display:grid;place-items:center;padding:0;cursor:pointer;flex:none}
+.hdr .chev svg{transition:transform .12s}
+.sec.open .chev svg{transform:rotate(90deg)}
+.hdr .ico{width:14px;height:14px;color:var(--muted);flex:none}
+.hdr .ttl{font-weight:600;font-size:12px;white-space:nowrap}
+.hdr .sum{color:var(--faint);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.hdr .sp{flex:1}
+.sec.open .sum{display:none}
+.hdr .act{border:0;background:none;color:var(--accent);font:inherit;font-size:11px;padding:2px 4px;border-radius:4px;cursor:pointer;flex:none}
+.hdr .act:hover{background:var(--accentSoft)}
+.hdr.dragging{opacity:.4}
+.drop-before::before,.drop-after::after{content:"";position:absolute;left:4px;right:4px;height:3px;border-radius:2px;background:var(--accent);z-index:3}
+.drop-before::before{top:-2px}.drop-after::after{bottom:-2px}
+.body{overflow-y:auto;padding:6px 10px;border-bottom:1px solid var(--line)}
+.handle{height:9px;flex:none;display:grid;place-items:center;cursor:row-resize;margin-top:-5px;margin-bottom:-4px;position:relative;z-index:2}
+.handle i{display:block;height:1px;width:100%;background:transparent;transition:height .12s,background .12s}
+.handle:hover i,.handle.active i,.handle:focus-visible i{height:3px;background:var(--accent);opacity:.75}
+.handle .tip{position:absolute;right:8px;top:-20px;background:var(--ink);color:var(--win);font-size:10px;padding:1px 6px;border-radius:4px;white-space:nowrap;display:none;font-variant-numeric:tabular-nums}
+.handle.active .tip{display:block}
+.row{display:flex;gap:6px;align-items:baseline;padding:1px 0;white-space:nowrap}
+.row b{font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace;width:14px}
+.row span{overflow:hidden;text-overflow:ellipsis}
+.a{color:var(--add)}.m{color:var(--mod)}.d{color:var(--del)}
+.cap{color:var(--muted);font-size:11px}
+.repo{font-weight:600;margin-top:4px}
+.mono{font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.pill{font-size:10px;font-weight:600;padding:0 6px;border-radius:9px;background:var(--tag)}
+textarea{width:100%;height:100%;min-height:60px;resize:none;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink);font:inherit;padding:6px}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:1px 0}.kv span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+.menu{position:fixed;z-index:10;background:var(--win);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:4px;min-width:230px}
+.menu button{display:flex;justify-content:space-between;width:100%;border:0;background:none;color:var(--ink);font:inherit;font-size:12px;text-align:left;padding:4px 10px;border-radius:5px;cursor:pointer}
+.menu button:hover:not(:disabled){background:var(--accent);color:#fff}
+.menu button:disabled{color:var(--faint);cursor:default}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.menu kbd{font:inherit;opacity:.6}
+.spacer{flex:1;min-height:0}
+.notes{display:grid;gap:14px}
+.notes h2{font-size:13px;margin:0 0 4px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.notes ul{margin:0;padding-left:18px;display:grid;gap:4px;max-width:62ch}
+.notes code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--tag);padding:0 4px;border-radius:4px}
+.ref{font-size:11px;color:var(--faint)}
+</style>
+
+<main>
+  <header>
+    <h1>Colonne de contexte en sections — maquette #66</h1>
+    <p class="lede">Maquette manipulable de la colonne de droite. Cliquez un en-tête pour replier, ⌥-clic sur un chevron pour tout replier ou déplier, glissez un en-tête pour le déplacer, clic droit pour le menu, glissez une poignée pour redimensionner, double-clic pour répartir également.</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="Réglages de la maquette">
+    <label>Largeur</label>
+    <div class="seg" id="widths">
+      <button data-w="260" aria-pressed="false">260 pt (min)</button>
+      <button data-w="300" aria-pressed="true">300 pt</button>
+      <button data-w="420" aria-pressed="false">420 pt (max)</button>
+    </div>
+    <label>Thème</label>
+    <div class="seg" id="themes">
+      <button data-t="system" aria-pressed="true">Système</button>
+      <button data-t="light" aria-pressed="false">Clair</button>
+      <button data-t="dark" aria-pressed="false">Sombre</button>
+    </div>
+    <button class="btn" id="allClosed">Tout replier</button>
+    <button class="btn" id="fake">Ajouter une section factice</button>
+    <button class="btn" id="reset">Rétablir la disposition par défaut</button>
+  </div>
+
+  <div class="stage">
+    <div class="window" aria-label="Fenêtre de Vibe Manager, terminal et colonne de contexte">
+      <div class="term" aria-hidden="true"></div>
+      <div class="col" id="col" style="width:300px"></div>
+    </div>
+
+    <section class="notes" aria-label="Ce que montre la maquette">
+      <div>
+        <h2>En-tête</h2>
+        <ul>
+          <li>Chevron, icône, titre ; une fois replié, un résumé (<code>2 dépôts · 14 fichiers</code>) ; actions propres à droite.</li>
+          <li>28 pt de haut, fond distinct de la colonne : une pile repliée se lit comme une liste d'onglets.</li>
+          <li>À 260 pt, le résumé se tronque en premier, jamais le titre ni l'action.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Poignée</h2>
+        <ul>
+          <li>Zone de saisie de 9 pt centrée sur le trait d'un point, curseur de redimensionnement.</li>
+          <li>Au survol, au focus et pendant le glissement : trait de 3 pt à la couleur d'accent, et une bulle donne les hauteurs.</li>
+          <li>Seulement entre deux sections dépliées ; elle s'arrête au minimum de chacune.</li>
+          <li>Double-clic : répartit également les deux voisines.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Hauteurs</h2>
+        <ul>
+          <li>Git, Activité et Notes prennent la place qu'on leur donne.</li>
+          <li>Agent, Usage et Prompt initial ne prennent jamais plus que leur contenu ; le reste revient aux autres.</li>
+          <li>Tout replié : les en-têtes restent groupés en haut.</li>
+        </ul>
+      </div>
+      <p class="ref">Maquette HTML : couleurs et typographie approchées de macOS, pas de rendu SwiftUI.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+const ICONS={
+  activity:'<path d="M1 8h3l2-5 4 10 2-5h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>',
+  git:'<circle cx="4" cy="3.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="12.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 5.3v5.4M12 6.8c0 3-8 2-8 4" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  notes:'<rect x="2.5" y="1.5" width="11" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.5h6M5 8h6M5 10.5h4" stroke="currentColor" stroke-width="1.3"/>',
+  agent:'<rect x="3" y="3" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="6" y="6" width="4" height="4" fill="currentColor"/><path d="M6 1v2M10 1v2M6 13v2M10 13v2M1 6h2M1 10h2M13 6h2M13 10h2" stroke="currentColor" stroke-width="1.2"/>',
+  usage:'<path d="M2 14V9M6 14V5M10 14V7M14 14V2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  prompt:'<path d="M2 3h12v8H7l-3 3v-3H2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
+  fake:'<circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2"/>'
+};
+const files=[["M","SessionContextInspector.swift","Sources/VibeUI"],["A","InspectorSections.swift","Sources/VibeUI"],["A","InspectorArrangement.swift","Sources/VibeApplication"],["M","WorkspaceLayout.swift","Sources/VibeApplication"],["M","WorkspaceLayoutController.swift","Sources/VibeUI"],["M","SplitHandle.swift","Sources/VibeUI"],["M","RootView.swift","Sources/VibeUI"],["M","AppModel.swift","Sources/VibeUI"],["A","InspectorArrangementTests.swift","Tests/VibeApplicationTests"],["M","WorkspaceLayoutTests.swift","Tests/VibeApplicationTests"],["D","InspectorSplit.swift","Sources/VibeUI"],["M","Localizable.xcstrings","Sources/VibeUI/Resources"],["A","0027-inspector-sections.md","docs/architecture"],["M","VibeManagerApp.swift","App/VibeManagerApp"]];
+const cls={A:"a",M:"m",D:"d"};
+const CONTENT={
+  activity:()=>`<div class="cap" style="font-weight:600">Résumé</div><p style="margin:2px 0 6px">Refonte de l'inspecteur en sections. Modèle de disposition ajouté et testé ; la vue est en cours.</p><div class="cap" style="font-weight:600">Ressources</div><div class="row"><span class="pill">#66</span><span>Refondre la colonne de droite</span></div><div class="row"><span class="pill">PR</span><span>feat/66-inspector-sections</span></div><div class="row"><span class="pill">branche</span><span class="mono">feat/66-inspector-sections</span></div>`,
+  git:()=>`<div class="repo">vibe-manager <span class="cap">· worktree 66</span></div><div class="row cap"><span class="mono">feat/66-inspector-sections</span><span class="pill">nouvelle</span><span>↑3</span></div><div class="cap" style="margin:4px 0 2px;font-weight:600">Modifiés 14</div>`+files.map(f=>`<div class="row"><b class="${cls[f[0]]}">${f[0]}</b><span>${f[1]}</span><span class="cap">${f[2]}</span></div>`).join("")+`<div class="repo" style="margin-top:8px">prisme.ai</div><div class="cap">Aucune modification.</div>`,
+  notes:()=>`<textarea aria-label="Notes de la session">Décider : double-clic = répartir également.
+Vérifier ⌥⌘N quand Notes est repliée.
+Migration : inspectorSplit → poids Git/Notes.</textarea>`,
+  agent:()=>`<div class="row"><span>Claude Code · opus-5-5</span></div><div class="cap">Prêt à reprendre.</div><div class="cap" style="margin-top:6px;font-weight:600">Historique</div><div class="cap">Codex → Claude Code · 25 sept. 14:02 · résumé, 2,1 Kio</div><div class="cap">Démarré avec Codex · gpt-5</div>`,
+  usage:()=>`<div class="kv"><span>Durée d'exécution</span><span>1 h 42 min</span></div><div class="kv"><span>Exécutions</span><span>4</span></div><div class="kv"><span>Jetons</span><span>≈ 1,8 M</span></div><div class="kv"><span>Coût</span><span>≈ 4,20 $</span></div>`,
+  prompt:()=>`<div class="cap">Depuis le modèle « Conception de ticket », révision 3</div><p style="margin:4px 0 0">Fais la conception de https://github.com/hadrienl/vibe-manager/issues/66 dans le même ticket…</p>`,
+  fake:()=>`<div class="cap">Section déclarée par un test : identifiant, titre, icône, contenu, hauteur minimale. Aucune ligne de mise en page modifiée.</div>`
+};
+const DEF=[
+  {id:"activity",title:"Activité",summary:"Résumé à jour · 3 ressources",min:90,fill:true,open:true,w:1},
+  {id:"git",title:"Git",summary:"2 dépôts · 14 fichiers",min:120,fill:true,open:true,w:1.4,action:"↻",actionLabel:"Relire les dépôts"},
+  {id:"notes",title:"Notes",summary:"3 lignes · enregistré",min:90,fill:true,open:true,w:1},
+  {id:"agent",title:"Agent",summary:"Claude Code · opus-5-5",min:60,fit:118,open:false,w:1,action:"Switch…",actionLabel:"Changer d'agent"},
+  {id:"usage",title:"Usage",summary:"1 h 42 min · ≈ 4,20 $",min:60,fit:84,open:false,w:1},
+  {id:"prompt",title:"Prompt initial",summary:"Modèle « Conception de ticket »",min:60,fit:96,open:false,w:1},
+];
+const HDR=29,HANDLE=0,H=620;
+let secs=clone(DEF),heights={},menuEl=null;
+function clone(a){return a.map(s=>({...s}))}
+function layout(){
+  const open=secs.filter(s=>s.open);
+  let avail=H-secs.length*HDR;
+  const h={};let free=open.slice();
+  for(let pass=0;pass<6;pass++){
+    const sw=free.reduce((t,s)=>t+s.w,0);let changed=false;
+    for(const s of free){const share=avail*s.w/sw;const max=s.fit??Infinity;
+      if(share<s.min){h[s.id]=s.min;changed=true}else if(share>max){h[s.id]=max;changed=true}}
+    if(!changed){free.forEach(s=>h[s.id]=Math.max(s.min,avail*s.w/sw));break}
+    free=free.filter(s=>h[s.id]===undefined);avail=H-secs.length*HDR-Object.values(h).reduce((a,b)=>a+b,0);
+    if(!free.length)break;
+  }
+  heights=h;
+}
+const svg=k=>`<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">${ICONS[k]}</svg>`;
+const chev=`<svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function render(){
+  layout();const col=document.getElementById("col");col.innerHTML="";
+  secs.forEach((s,i)=>{
+    const el=document.createElement("div");el.className="sec"+(s.open?" open":"");el.dataset.id=s.id;
+    el.innerHTML=`<div class="hdr" draggable="true" tabindex="-1"><button class="chev" aria-expanded="${s.open}" aria-label="${s.title}, ${s.open?"déplié":"replié"}">${chev}</button>${svg(s.id)}<span class="ttl">${s.title}</span><span class="sum">${s.summary}</span><span class="sp"></span>${s.action?`<button class="act" title="${s.actionLabel}" aria-label="${s.actionLabel}">${s.action}</button>`:""}</div>`;
+    if(s.open){const b=document.createElement("div");b.className="body";b.style.height=heights[s.id]+"px";b.innerHTML=CONTENT[s.id]();el.appendChild(b)}
+    col.appendChild(el);
+    const next=secs.slice(i+1).find(x=>x.open);
+    if(s.open&&next){col.appendChild(makeHandle(s,next))}
+    wireHeader(el,s,i);
+  });
+  const sp=document.createElement("div");sp.className="spacer";col.appendChild(sp);
+}
+function makeHandle(a,b){
+  const hd=document.createElement("div");hd.className="handle";hd.tabIndex=0;hd.setAttribute("role","slider");
+  hd.setAttribute("aria-label",`Séparation entre ${a.title} et ${b.title}`);
+  const pct=Math.round(heights[a.id]/(heights[a.id]+heights[b.id])*100);hd.setAttribute("aria-valuenow",pct);hd.setAttribute("aria-valuetext",`${pct} % pour ${a.title}`);
+  hd.innerHTML=`<i></i><span class="tip"></span>`;
+  const tip=hd.querySelector(".tip");
+  const apply=(ha)=>{const tot=heights[a.id]+heights[b.id];ha=Math.max(a.min,Math.min(tot-b.min,ha));
+    if(a.fit)ha=Math.min(ha,a.fit);let hb=tot-ha;if(b.fit&&hb>b.fit){hb=b.fit;ha=tot-hb}
+    secs.filter(s=>s.open).forEach(s=>s.w=heights[s.id]);a.w=ha;b.w=hb;return[ha,hb]};
+  hd.addEventListener("pointerdown",e=>{e.preventDefault();hd.setPointerCapture(e.pointerId);hd.classList.add("active");const y0=e.clientY,h0=heights[a.id];
+    const mv=ev=>{const[ha,hb]=apply(h0+ev.clientY-y0);tip.textContent=`${a.title} ${Math.round(ha)} · ${b.title} ${Math.round(hb)} pt`;liveHeights();};
+    const up=()=>{hd.removeEventListener("pointermove",mv);hd.removeEventListener("pointerup",up);render()};
+    hd.addEventListener("pointermove",mv);hd.addEventListener("pointerup",up);});
+  hd.addEventListener("dblclick",()=>{const tot=heights[a.id]+heights[b.id];apply(tot/2);render()});
+  hd.addEventListener("keydown",e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();apply(heights[a.id]+(e.key==="ArrowUp"?-24:24));render();focusHandle(a.id)}});
+  hd.dataset.a=a.id;return hd;
+}
+function liveHeights(){layout();document.querySelectorAll(".sec.open").forEach(el=>{el.querySelector(".body").style.height=heights[el.dataset.id]+"px"})}
+function focusHandle(id){const h=document.querySelector(`.handle[data-a="${id}"]`);h&&h.focus()}
+function wireHeader(el,s,i){
+  const hdr=el.querySelector(".hdr"),chevB=el.querySelector(".chev");
+  const toggle=(e)=>{if(e&&e.altKey){const anyOpen=secs.some(x=>x.open);secs.forEach(x=>x.open=!anyOpen)}else s.open=!s.open;render();document.querySelector(`.sec[data-id="${s.id}"] .chev`).focus()};
+  chevB.addEventListener("click",e=>{e.stopPropagation();toggle(e)});
+  hdr.addEventListener("click",e=>{if(e.target.closest(".act"))return;toggle(e)});
+  chevB.addEventListener("keydown",e=>{if(e.metaKey&&e.altKey&&(e.key==="ArrowUp"||e.key==="ArrowDown")){e.preventDefault();move(s.id,e.key==="ArrowUp"?-1:1)}});
+  hdr.addEventListener("contextmenu",e=>{e.preventDefault();openMenu(e.clientX,e.clientY,s)});
+  hdr.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",s.id);hdr.classList.add("dragging")});
+  hdr.addEventListener("dragend",()=>{hdr.classList.remove("dragging");clearDrop()});
+  hdr.addEventListener("dragover",e=>{e.preventDefault();clearDrop();const r=hdr.getBoundingClientRect();hdr.classList.add(e.clientY<r.top+r.height/2?"drop-before":"drop-after")});
+  hdr.addEventListener("drop",e=>{e.preventDefault();const id=e.dataTransfer.getData("text/plain");const before=hdr.classList.contains("drop-before");clearDrop();
+    const from=secs.findIndex(x=>x.id===id);if(from<0||id===s.id)return;const [m]=secs.splice(from,1);let to=secs.findIndex(x=>x.id===s.id);if(!before)to++;secs.splice(to,0,m);render()});
+}
+function clearDrop(){document.querySelectorAll(".drop-before,.drop-after").forEach(x=>x.classList.remove("drop-before","drop-after"))}
+function move(id,d){const i=secs.findIndex(x=>x.id===id),j=i+d;if(j<0||j>=secs.length)return;[secs[i],secs[j]]=[secs[j],secs[i]];render();document.querySelector(`.sec[data-id="${id}"] .chev`).focus()}
+function openMenu(x,y,s){closeMenu();const i=secs.indexOf(s);menuEl=document.createElement("div");menuEl.className="menu";menuEl.setAttribute("role","menu");
+  const items=[[s.open?"Replier":"Déplier",()=>{s.open=!s.open},""],["Replier les autres",()=>{secs.forEach(x=>x.open=x===s)},""],null,["Monter",()=>move(s.id,-1),"⌥⌘↑",i===0],["Descendre",()=>move(s.id,1),"⌥⌘↓",i===secs.length-1],null,["Rétablir la disposition par défaut",resetAll,""]];
+  items.forEach(it=>{if(!it){menuEl.appendChild(document.createElement("hr"));return}const b=document.createElement("button");b.setAttribute("role","menuitem");b.innerHTML=`<span>${it[0]}</span><kbd>${it[2]}</kbd>`;b.disabled=!!it[3];b.onclick=()=>{it[1]();closeMenu();render()};menuEl.appendChild(b)});
+  document.body.appendChild(menuEl);const r=menuEl.getBoundingClientRect();menuEl.style.left=Math.min(x,innerWidth-r.width-8)+"px";menuEl.style.top=Math.min(y,innerHeight-r.height-8)+"px";menuEl.querySelector("button:not(:disabled)").focus()}
+function closeMenu(){menuEl&&menuEl.remove();menuEl=null}
+addEventListener("click",e=>{if(menuEl&&!menuEl.contains(e.target))closeMenu()});
+addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
+function resetAll(){const hasFake=secs.some(s=>s.id==="fake");secs=clone(DEF);if(hasFake)secs.push(fakeSec())}
+const fakeSec=()=>({id:"fake",title:"Section factice",summary:"déclarée par un test",min:60,fit:70,open:true,w:1});
+document.getElementById("reset").onclick=()=>{resetAll();render()};
+document.getElementById("allClosed").onclick=()=>{const anyOpen=secs.some(x=>x.open);secs.forEach(x=>x.open=!anyOpen);document.getElementById("allClosed").textContent=anyOpen?"Tout déplier":"Tout replier";render()};
+document.getElementById("fake").onclick=()=>{if(!secs.some(s=>s.id==="fake")){secs.push(fakeSec());render()}};
+document.querySelectorAll("#widths button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#widths button").forEach(x=>x.setAttribute("aria-pressed",x===b));document.getElementById("col").style.width=b.dataset.w+"px"});
+document.querySelectorAll("#themes button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#themes button").forEach(x=>x.setAttribute("aria-pressed",x===b));const t=b.dataset.t;if(t==="system")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",t)});
+render();
+(()=>{const q=new URLSearchParams(location.search);if(!q.has("shot"))return;
+  document.querySelectorAll("main>header,.bar,.stage>.notes").forEach(e=>e.style.display="none");
+  document.querySelector(".stage").style.gridTemplateColumns="auto";
+  if(q.get("theme"))document.documentElement.setAttribute("data-theme",q.get("theme"));
+  if(q.get("w"))document.getElementById("col").style.width=q.get("w")+"px";
+  const st=q.get("state");
+  if(st==="collapsed"){secs.forEach(s=>s.open=false)}
+  if(st==="mixed"){secs.forEach(s=>s.open=["git","notes","usage"].includes(s.id));secs.push(fakeSec())}
+  render();
+  if(st==="drag"){const h=document.querySelector('.handle[data-a="git"]');h.classList.add("active");h.querySelector(".tip").textContent=`Git ${Math.round(heights.git)} · Notes ${Math.round(heights.notes)} pt`;
+    const hd=document.querySelector('.sec[data-id="agent"] .hdr');hd.classList.add("drop-before");}
+})();
+</script>
+</body></html>
