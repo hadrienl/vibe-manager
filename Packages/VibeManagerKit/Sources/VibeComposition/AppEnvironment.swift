@@ -1,6 +1,7 @@
 import Foundation
 import VibeAgents
 import VibeApplication
+import VibeAvatar
 import VibeBrowser
 import VibeDomain
 import VibeGit
@@ -368,6 +369,17 @@ public final class AppEnvironment {
       iconStore: FileSessionIconStore(directory: data.icons),
       dropStore: FileSessionDropStore(directory: data.drops)
     )
+    // The requests above the other applications, and the avatar that presents them (#41).
+    appModel.floatingPanel = FloatingRequestPanelModel(
+      preferences: UserDefaultsFloatingPanelPreferences(suiteName: data.defaultsSuite))
+    let avatarStudio = AvatarStudioModel(
+      workshop: AvatarWorkshop(processing: AvatarImageProcessor(), diagnostics: diagnostics),
+      store: FileAvatarStore(
+        directory: dataFolder.appendingPathComponent("Avatar", isDirectory: true)),
+      generators: AgentAvatarGenerators(agents: registry),
+      defaultAvatar: { DefaultAvatar.load() })
+    appModel.avatarStudio = avatarStudio
+    Task { await avatarStudio.load() }
   }
 
   /// Everything the export gathers besides the model.

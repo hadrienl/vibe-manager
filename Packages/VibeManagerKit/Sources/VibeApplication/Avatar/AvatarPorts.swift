@@ -131,6 +131,14 @@ public protocol AvatarImageProcessing: Sendable {
   func archive(_ avatar: AvatarSpriteSet) throws -> Data
 }
 
+/// Why the avatar kept on disk cannot be used. The default one is shown meanwhile, and nothing is
+/// deleted: the user decides.
+public enum AvatarStoreError: Error, Hashable, Sendable {
+  case unreadable
+  /// It lacks expressions this version shows: kept from an older one.
+  case incomplete([AvatarExpression])
+}
+
 /// Where the avatar in use is kept. None kept: the default one.
 public protocol AvatarStore: Sendable {
   /// The avatar in use, or `nil` for the default one.

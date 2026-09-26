@@ -94,6 +94,17 @@ public struct SettingsView: View {
             }
           }
           .tag(SettingsTab.requests)
+        if let studio = model.avatarStudio {
+          AvatarSettings(studio: studio)
+            .tabItem {
+              Label {
+                Text("Avatar", bundle: .module, comment: "A tab of the Settings window.")
+              } icon: {
+                Image(systemName: "face.smiling")
+              }
+            }
+            .tag(SettingsTab.avatar)
+        }
       }
     } else {
       general
@@ -195,8 +206,10 @@ public enum SettingsTab: String, Hashable, Sendable {
   case activity
   /// The conversation view of #38: its theme, its fonts, what it unfolds.
   case conversation
-  /// How the requests of background sessions are signalled (#40).
+  /// How the requests of background sessions are signalled (#40), and the floating panel (#41).
   case requests
+  /// The avatar of the floating panel: made, imported, exported (#41).
+  case avatar
 }
 
 /// How the requests of background sessions are signalled (#40): notifications, the Dock badge,
@@ -254,6 +267,9 @@ private struct RequestSettings: View {
         }
       } header: {
         Text("Palette", bundle: .module, comment: "A section of the Settings window.")
+      }
+      if let panel = model.floatingPanel {
+        FloatingPanelSettingsSection(panel: panel)
       }
     }
     .formStyle(.grouped)

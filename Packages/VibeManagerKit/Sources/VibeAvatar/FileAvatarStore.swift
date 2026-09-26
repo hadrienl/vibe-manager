@@ -1,15 +1,7 @@
 import Foundation
 import VibeApplication
 
-/// Why the avatar kept on disk cannot be used. The default one is shown meanwhile, and nothing is
-/// deleted: the user decides.
-public enum AvatarStoreError: Error, Hashable, Sendable {
-  case unreadable
-  /// It lacks expressions this version shows: kept from an older one.
-  case incomplete([AvatarExpression])
-}
-
-/// The avatar in use, in `Application Support/Vibe Manager/Avatar/` (#41): its manifest and its
+/// The avatar in use, in `Avatar/` beside the session store (#41): its manifest and its
 /// PNGs, in a folder only its owner reads. No folder: the default avatar.
 ///
 /// A new avatar is written beside the old one and swapped in with a single rename, so that a
@@ -20,17 +12,6 @@ public actor FileAvatarStore: AvatarStore {
 
   public init(directory: URL) {
     self.directory = directory
-  }
-
-  public static func defaultDirectory() -> URL {
-    let applicationSupport =
-      FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-      ?? FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent("Library/Application Support", isDirectory: true)
-    return
-      applicationSupport
-      .appendingPathComponent("Vibe Manager", isDirectory: true)
-      .appendingPathComponent("Avatar", isDirectory: true)
   }
 
   public func load() async throws -> AvatarSpriteSet? {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import VibeApplication
@@ -83,6 +84,21 @@ public final class AppModel {
   /// assembled without it notifies nothing.
   public var requestNotifier: (any RequestNotifying)? {
     didSet { requestsDidChange() }
+  }
+  /// The requests above the other applications, by an avatar (#41). Set by the application: a
+  /// workspace assembled without it has only the palette.
+  public var floatingPanel: FloatingRequestPanelModel? {
+    didSet {
+      floatingPanel?.attach(self)
+      requestsDidChange()
+    }
+  }
+  /// The avatar in use and the one being made (#41).
+  public var avatarStudio: AvatarStudioModel?
+  /// Brings the application forward: "Open Session" from the floating panel, while another
+  /// application is in front.
+  @ObservationIgnored public var activateApplication: @MainActor () -> Void = {
+    NSApp.activate()
   }
   /// The requests already accounted for: notified, or seen arriving while the application was in
   /// front. Only one arriving in the background is notified.
