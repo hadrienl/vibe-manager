@@ -91,6 +91,8 @@ public final class ConversationModel {
   public var draft = ""
   public private(set) var attachments: [URL] = []
   public private(set) var echoes: [PendingEcho] = []
+  /// A prompt pasted whose Return is not written yet: another pasted now would join it.
+  public private(set) var isSubmitting = false
   /// Writes into the session's terminal, as a keyboard would.
   @ObservationIgnored public var write: (([UInt8]) async -> Void)?
   /// Brings the terminal forward and gives it the keyboard.
@@ -259,7 +261,7 @@ public final class ConversationModel {
   }
 
   public var canSend: Bool {
-    composerState == .ready
+    composerState == .ready && !isSubmitting
       && !PromptSubmission(text: draft, attachments: attachments).isEmpty
   }
 
@@ -281,6 +283,8 @@ public final class ConversationModel {
   @discardableResult
   public func send() async -> Bool {
     guard canSend, let write else { return false }
+    isSubmitting = true
+    defer { isSubmitting = false }
     let submission = PromptSubmission(text: draft, attachments: attachments)
     let keystrokes = PromptEncoding.keystrokes(
       for: submission, format: promptFormat, whileWorking: isAgentWorking)
@@ -293,12 +297,13 @@ public final class ConversationModel {
         id: UUID(), text: PromptEncoding.sanitized(submission.text),
         attachmentCount: attachments.count,
         sentAt: Date(), promptCountAtSend: promptCount, state: .sending))
+    let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
     attachments = []
     scroll.jumpedToBottom()
     scrollToBottomRequest += 1
     await write(keystrokes.paste)
-    try? await Task.sleep(for: promptFormat.submitDelay)
+    try? await Task.sleep(for: submitDelay)
     await write(keystrokes.submit)
     scheduleEchoCheck()
     return true
