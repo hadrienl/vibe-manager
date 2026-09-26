@@ -90,14 +90,19 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     try loadSessions(persistingMigration: true).first { $0.id == id }
   }
 
+  /// A session the store does not hold yet enters at the top of the order (#44), and one it holds
+  /// keeps its place: the rank is the store's, never the caller's copy of it.
   public func save(_ session: WorkSession) throws {
     do {
       try session.validate()
       var current = try loadSessions(persistingMigration: false)
+      var saved = session
       if let index = current.firstIndex(where: { $0.id == session.id }) {
-        current[index] = session
+        saved.rank = current[index].rank
+        current[index] = saved
       } else {
-        current.append(session)
+        saved.rank = (current.map(\.rank).min() ?? 1) - 1
+        current.append(saved)
       }
       try persist(current)
     } catch {
@@ -128,6 +133,30 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       throw noteWriteFailure(error)
     }
     return session
+  }
+
+  /// One read and one write, whatever the number of sessions moved: an order half written would
+  /// put a session somewhere the user never dropped it.
+  public func reorder(_ ranks: [SessionID: Int]) throws {
+    guard !ranks.isEmpty else { return }
+    var current: [WorkSession]
+    do {
+      current = try loadSessions(persistingMigration: false)
+    } catch {
+      throw mapStoreError(error)
+    }
+    var changed = false
+    for index in current.indices {
+      guard let rank = ranks[current[index].id], current[index].rank != rank else { continue }
+      current[index].rank = rank
+      changed = true
+    }
+    guard changed else { return }
+    do {
+      try persist(current)
+    } catch {
+      throw noteWriteFailure(error)
+    }
   }
 
   public func recoveryStatus() -> SessionStoreRecoveryStatus {

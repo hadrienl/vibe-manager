@@ -21,8 +21,17 @@ public actor InMemorySessionRepository: SessionRepository {
     storage[id]
   }
 
+  /// A new session enters at the top, and a known one keeps its place, as in the file store.
   public func save(_ session: WorkSession) {
-    storage[session.id] = session
+    var saved = session
+    saved.rank = storage[session.id]?.rank ?? ((storage.values.map(\.rank).min() ?? 1) - 1)
+    storage[session.id] = saved
+  }
+
+  public func reorder(_ ranks: [SessionID: Int]) {
+    for (id, rank) in ranks where storage[id] != nil {
+      storage[id]?.rank = rank
+    }
   }
 
   public func mutate(
