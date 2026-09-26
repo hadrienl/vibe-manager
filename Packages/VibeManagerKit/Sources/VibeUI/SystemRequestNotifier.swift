@@ -104,7 +104,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   }
 
   public func isAuthorized() async -> Bool? {
-    switch await center.notificationSettings().authorizationStatus {
+    switch await authorizationStatus() {
     case .notDetermined: return nil
     case .denied: return false
     default: return true
@@ -114,7 +114,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   /// What the system allows now: notifications turned on in System Settings after a refusal
   /// count from the next request, without a relaunch. The question itself is asked once.
   private func authorized() async -> Bool {
-    switch await center.notificationSettings().authorizationStatus {
+    switch await authorizationStatus() {
     case .denied: return false
     case .notDetermined: break
     default: return true
@@ -128,6 +128,16 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     let granted = await task.value
     authorization = nil
     return granted
+  }
+
+  /// Only the status leaves the handler: the settings themselves are not `Sendable` in every SDK
+  /// the application is built with.
+  private func authorizationStatus() async -> UNAuthorizationStatus {
+    await withCheckedContinuation { continuation in
+      center.getNotificationSettings { settings in
+        continuation.resume(returning: settings.authorizationStatus)
+      }
+    }
   }
 
   static func identifier(of id: AgentRequestID) -> String {
