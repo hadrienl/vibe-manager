@@ -124,21 +124,27 @@ struct BoundedProcessTests {
 
   @Test("Cancelling the task stops the group instead of waiting for the timeout")
   func cancellation() async throws {
-    let marker = FileManager.default.temporaryDirectory
+    let started = FileManager.default.temporaryDirectory
       .appendingPathComponent("vibe-bounded-\(UUID().uuidString)")
-    let request = shell("trap '' TERM; sleep 30; touch '\(marker.path)'", timeout: .seconds(30))
-    let task = Task { try await BoundedProcess.run(request) }
-
-    try await Task.sleep(for: .milliseconds(200))
+    defer { try? FileManager.default.removeItem(at: started) }
+    // Only the timeout would end it otherwise: the shell ignores SIGTERM, and so does its `sleep`.
+    let request = shell(
+      "trap '' TERM; echo $$ > '\(started.path)'; sleep 60", timeout: .seconds(60))
     let clock = ContinuousClock()
     let start = clock.now
+    let task = Task { try await BoundedProcess.run(request) }
+
+    // Cancelled once it runs — before it is spawned would prove nothing — its pid leading its group.
+    let written = { (try? Data(contentsOf: started)).flatMap { pid_t(text($0)) } }
+    #expect(await eventually { written() != nil })
+    let group = try #require(written())
     task.cancel()
 
     await #expect(throws: BoundedProcessError.cancelled) { try await task.value }
-    // Well under the 30 seconds of the timeout; 5 seconds measured the runner's load, and failed
-    // at 6 on a busy one.
-    #expect(clock.now - start < .seconds(20))
-    #expect(!FileManager.default.fileExists(atPath: marker.path))
+    // Compared with the timeout rather than a delay: however busy the runner, a cancellation that
+    // waited for the timeout is the only way to reach it.
+    #expect(clock.now - start < request.timeout)
+    #expect(await eventually { kill(-group, 0) != 0 })
   }
 
   @Test("Output beyond the limit is drained, dropped and reported")
