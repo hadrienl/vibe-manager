@@ -145,6 +145,7 @@ public struct AvatarWorkshop: Sendable {
     case .imageNotSquare: return "imageNotSquare"
     case .imageTooSmall: return "imageTooSmall"
     case .imagesOfDifferentSizes: return "imagesOfDifferentSizes"
+    case .duplicateExpression: return "duplicateExpression"
     }
   }
 }

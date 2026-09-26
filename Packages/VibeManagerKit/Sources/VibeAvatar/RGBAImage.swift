@@ -49,7 +49,7 @@ enum ImageCodec {
   static let maximumSide = 8_192
 
   /// The pixels of a PNG or JPEG, never more than the bounds allow.
-  static func decode(_ data: Data) throws -> RGBAImage {
+  static func decode(_ data: Data, maximumSide: Int = ImageCodec.maximumSide) throws -> RGBAImage {
     guard data.count <= maximumBytes else { throw AvatarProblem.imageTooLarge }
     let options = [kCGImageSourceShouldCache: false] as CFDictionary
     guard let source = CGImageSourceCreateWithData(data as CFData, options),
@@ -60,7 +60,9 @@ enum ImageCodec {
       let height = properties[kCGImagePropertyPixelHeight] as? Int
     else { throw AvatarProblem.unreadableImage }
     guard width > 0, height > 0 else { throw AvatarProblem.unreadableImage }
-    guard width <= maximumSide, height <= maximumSide else { throw AvatarProblem.imageTooLarge }
+    guard width <= maximumSide, height <= maximumSide else {
+      throw AvatarProblem.imageTooLarge
+    }
     guard let image = CGImageSourceCreateImageAtIndex(source, 0, options) else {
       throw AvatarProblem.unreadableImage
     }

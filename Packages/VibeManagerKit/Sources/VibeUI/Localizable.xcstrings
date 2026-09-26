@@ -10420,6 +10420,17 @@
         }
       }
     },
+    "The archive holds more than one image of “%@”." : {
+      "comment" : "An avatar problem.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’archive contient plus d’une image de « %@ »."
+          }
+        }
+      }
+    },
     "The archive holds no image named after an expression (neutral.png, pleased.png…)." : {
       "comment" : "An avatar problem.",
       "localizations" : {

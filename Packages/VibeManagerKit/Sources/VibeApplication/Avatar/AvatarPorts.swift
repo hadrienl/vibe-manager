@@ -86,7 +86,8 @@ public struct AgentAvatarGenerators: AvatarGeneratorResolving {
         let drawing = provider as? any AvatarGeneratingProviding
       else {
         result.append(
-          AvatarGeneratorOption(descriptor: descriptor, unavailability: .notCapable, generator: nil))
+          AvatarGeneratorOption(descriptor: descriptor, unavailability: .notCapable, generator: nil)
+        )
         continue
       }
       let unavailability = availabilities[descriptor.id].flatMap { Self.unavailability(of: $0) }

@@ -119,7 +119,9 @@ struct AvatarSettings: View {
             }
             importArchive(at: url)
             return true
-          } isTargeted: { isDropTargeted = $0 }
+          } isTargeted: {
+            isDropTargeted = $0
+          }
           .overlay(
             RoundedRectangle(cornerRadius: 12)
               .strokeBorder(Color.accentColor, lineWidth: isDropTargeted ? 3 : 0))
@@ -132,6 +134,7 @@ struct AvatarSettings: View {
             } label: {
               Text("Import…", bundle: .module)
             }
+            .disabled(studio.work != nil || studio.isImporting)
             .accessibilityIdentifier("avatar-import")
             Button {
               exportDocument = studio.exportArchive(includingDescription: includesDescription)
@@ -352,7 +355,8 @@ struct AvatarSettings: View {
         .help(
           image == nil
             ? Text("Generate this expression", bundle: .module)
-            : Text("Generate this expression again", bundle: .module))
+            : Text("Generate this expression again", bundle: .module)
+        )
         .accessibilityLabel(
           image == nil
             ? Text("Generate \(AvatarPresentation.name(expression))", bundle: .module)
@@ -373,15 +377,19 @@ struct AvatarSettings: View {
     let scoped = url.startAccessingSecurityScopedResource()
     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
     // Read with the same bound as the archive itself: a larger file is not read at all.
-    guard
-      let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize,
-      size <= 30 * 1024 * 1024,
-      let data = try? Data(contentsOf: url)
-    else {
+    guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else {
+      studio.reject(.archiveUnreadable)
+      return
+    }
+    guard size <= 30 * 1024 * 1024 else {
       studio.reject(.archiveTooLarge)
       return
     }
-    studio.importArchive(data)
+    guard let data = try? Data(contentsOf: url) else {
+      studio.reject(.archiveUnreadable)
+      return
+    }
+    Task { await studio.importArchive(data) }
   }
 }
 

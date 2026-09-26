@@ -23,6 +23,8 @@ public enum AvatarProblem: Error, Hashable, Sendable {
   case archiveHasNoImage
   case imageNotSquare(AvatarExpression)
   case imageTooSmall(AvatarExpression)
+  /// Two images of the archive are for the same expression.
+  case duplicateExpression(AvatarExpression)
   /// Two images of the archive have different sizes.
   case imagesOfDifferentSizes(AvatarExpression)
 }
@@ -120,6 +122,7 @@ public enum SpriteSetValidation {
     let sorted = values.sorted()
     guard !sorted.isEmpty else { return 0 }
     let middle = sorted.count / 2
-    return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+    return sorted.count.isMultiple(of: 2)
+      ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
   }
 }

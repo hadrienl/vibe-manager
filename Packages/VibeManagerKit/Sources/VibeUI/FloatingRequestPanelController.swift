@@ -34,9 +34,21 @@ final class FloatingPanelWindow: NSPanel {
   override var canBecomeMain: Bool { false }
 }
 
-/// A hosting view that acts on the first click: the panel's application is never the active one.
+/// A hosting view that acts on the first click — the panel's application is never the active
+/// one — and says when its content takes another size, for the window to follow.
 private final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+  var sizeChanged: ((CGSize) -> Void)?
+
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+  override func invalidateIntrinsicContentSize() {
+    super.invalidateIntrinsicContentSize()
+    // Read once SwiftUI has finished the layout pass that changed it.
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.sizeChanged?(self.intrinsicContentSize)
+    }
+  }
 }
 
 /// Shows and hides the floating panel as its model says, keeps it where the user put it on each
@@ -55,7 +67,9 @@ public final class FloatingRequestPanelController {
   /// Where the avatar's centre stands, in screen coordinates.
   private var anchor: CGPoint = .zero
   private var screen: NSScreen?
-  private var layout = FloatingPanelLayout()
+  /// Where the bubble opens, observed by the view: changing it keeps the view and its state.
+  private let placement = FloatingPanelPlacement()
+  private var layout: FloatingPanelLayout { placement.layout }
   private var contentSize: CGSize = .zero
   private var dragOrigin: CGPoint?
   private var hotKey: GlobalHotKey?
@@ -110,7 +124,15 @@ public final class FloatingRequestPanelController {
       placeOnScreen(Self.screenUnderPointer())
     }
     guard !window.isVisible else { return }
+    reposition()
     window.orderFrontRegardless()
+    animator.start()
+    // It comes because a request waits: the avatar calls for it.
+    if let current = panelModel.current {
+      animator.send(
+        .requestArrived(
+          speech: panelModel.isCollapsed ? nil : FloatingRequestPanelModel.speech(of: current)))
+    }
     Announcer.floatingElement = window
     if hotKey == nil {
       hotKey = GlobalHotKey(
@@ -122,6 +144,8 @@ public final class FloatingRequestPanelController {
   private func hide() {
     hotKey = nil
     Announcer.floatingElement = nil
+    // An ordered out window keeps its views: the animation is stopped here, not on disappear.
+    animator.stop()
     guard let window, window.isVisible else { return }
     if window.isKeyWindow { releaseKeyboard() }
     window.orderOut(nil)
@@ -129,20 +153,30 @@ public final class FloatingRequestPanelController {
 
   private func makeWindow() -> FloatingPanelWindow {
     let window = FloatingPanelWindow()
-    window.contentView = FirstClickHostingView(rootView: content())
+    window.contentView = hostingView()
     self.window = window
     return window
+  }
+
+  /// The window's size is the controller's to set, from the content's: the hosting view must not
+  /// resize the window on its own, from its corner.
+  private func hostingView() -> NSView {
+    let view = FirstClickHostingView(rootView: content())
+    view.sizingOptions = [.intrinsicContentSize]
+    view.sizeChanged = { [weak self] size in self?.contentSizeChanged(size) }
+    contentSize = view.intrinsicContentSize
+    return view
   }
 
   private func content() -> some View {
     FloatingRequestPanelHost(controller: self)
   }
 
-  /// What the SwiftUI side needs, read at each layout.
+  /// What the SwiftUI side needs.
   fileprivate var viewState:
-    (AppModel, FloatingRequestPanelModel, AvatarAnimator, FloatingPanelLayout, CGFloat)
+    (AppModel, FloatingRequestPanelModel, AvatarAnimator, FloatingPanelPlacement)
   {
-    (model, panelModel, animator, layout, (screen?.visibleFrame.height ?? 800) * 0.6)
+    (model, panelModel, animator, placement)
   }
 
   // MARK: - Placing
@@ -168,21 +202,21 @@ public final class FloatingRequestPanelController {
     guard let frame = screen?.visibleFrame else { return }
     let newLayout = FloatingPanelLayout(
       bubbleLeading: anchor.x > frame.midX, alignedBottom: anchor.y < frame.midY)
-    if newLayout != layout {
-      layout = newLayout
-      window?.contentView = FirstClickHostingView(rootView: content())
-    }
+    if newLayout != layout { placement.layout = newLayout }
+    placement.maxBubbleHeight = frame.height * 0.6
     reposition()
   }
 
   /// The content took a new size: the window follows, the avatar stays where it stands.
   fileprivate func contentSizeChanged(_ size: CGSize) {
+    guard size != contentSize else { return }
     contentSize = size
     reposition()
   }
 
   private func reposition() {
-    guard let window, contentSize.width > 0 else { return }
+    guard let window else { return }
+    guard contentSize.width > 0, contentSize.height > 0 else { return }
     let half = FloatingRequestPanel.avatarSize / 2 + FloatingRequestPanel.padding
     let avatarX = layout.bubbleLeading ? contentSize.width - half : half
     let avatarY = layout.alignedBottom ? half : contentSize.height - half
@@ -228,8 +262,10 @@ public final class FloatingRequestPanelController {
   /// A screen came or went: the panel goes back to its place on a screen still there.
   private func screensChanged() {
     guard let window, window.isVisible else { return }
-    if let screen, NSScreen.screens.contains(screen) {
-      placeOnScreen(screen)
+    // Screens are other objects after a reconfiguration: told apart by their identifier.
+    let current = screen.flatMap(Self.key(of:))
+    if let current, let same = NSScreen.screens.first(where: { Self.key(of: $0) == current }) {
+      placeOnScreen(same)
     } else {
       placeOnScreen(NSScreen.main)
     }
@@ -279,36 +315,35 @@ public final class FloatingRequestPanelController {
     if let owner, owner != NSRunningApplication.current {
       owner.activate()
     }
-  }
-}
-
-/// The SwiftUI side of the panel, reporting its size to the window.
-private struct FloatingRequestPanelHost: View {
-  let controller: FloatingRequestPanelController
-
-  var body: some View {
-    let (model, panel, animator, layout, maxHeight) = controller.viewState
-    FloatingRequestPanel(
-      model: model, panel: panel, animator: animator, layout: layout,
-      maxBubbleHeight: maxHeight,
-      onDrag: { controller.dragged(by: $0) },
-      onReleaseKeyboard: { controller.releaseKeyboard() }
-    )
-    .background(
-      GeometryReader { proxy in
-        Color.clear.preference(key: PanelSizeKey.self, value: proxy.size)
-      }
-    )
-    .onPreferenceChange(PanelSizeKey.self) { size in
-      MainActor.assumeIsolated { controller.contentSizeChanged(size) }
+    // Activating an application already active may do nothing: the panel stops being key by
+    // leaving the screen and coming back, without taking anything.
+    if window.isKeyWindow {
+      window.orderOut(nil)
+      window.orderFrontRegardless()
     }
   }
 }
 
-private struct PanelSizeKey: PreferenceKey {
-  static let defaultValue: CGSize = .zero
-  static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-    value = nextValue()
+/// Where the bubble opens and how tall it may grow, for the view to follow.
+@MainActor
+@Observable
+final class FloatingPanelPlacement {
+  var layout = FloatingPanelLayout()
+  var maxBubbleHeight: CGFloat = 480
+}
+
+/// The SwiftUI side of the panel.
+private struct FloatingRequestPanelHost: View {
+  let controller: FloatingRequestPanelController
+
+  var body: some View {
+    let (model, panel, animator, placement) = controller.viewState
+    FloatingRequestPanel(
+      model: model, panel: panel, animator: animator, layout: placement.layout,
+      maxBubbleHeight: placement.maxBubbleHeight,
+      onDrag: { controller.dragged(by: $0) },
+      onReleaseKeyboard: { controller.releaseKeyboard() }
+    )
   }
 }
 
@@ -327,21 +362,29 @@ final class GlobalHotKey: @unchecked Sendable {
     let context = Unmanaged.passUnretained(self).toOpaque()
     let installed = InstallEventHandler(
       GetApplicationEventTarget(),
-      { _, _, context in
-        guard let context else { return OSStatus(eventNotHandledErr) }
+      { _, event, context in
+        guard let context, let event else { return OSStatus(eventNotHandledErr) }
+        // Only this shortcut: another part of the application may register its own.
+        var pressed = EventHotKeyID()
+        let status = GetEventParameter(
+          event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+          MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+        guard status == noErr, pressed.signature == GlobalHotKey.signature, pressed.id == 1
+        else { return OSStatus(eventNotHandledErr) }
         let hotKey = Unmanaged<GlobalHotKey>.fromOpaque(context).takeUnretainedValue()
         MainActor.assumeIsolated { hotKey.action() }
         return noErr
       }, 1, &type, context, &handler)
-    // "VMfp": Vibe Manager's floating panel.
-    let identifier = EventHotKeyID(signature: OSType(0x564D_6670), id: 1)
+    let identifier = EventHotKeyID(signature: Self.signature, id: 1)
     let registered = RegisterEventHotKey(
       keyCode, modifiers, identifier, GetApplicationEventTarget(), 0, &reference)
-    guard installed == noErr, registered == noErr else {
-      if let handler { RemoveEventHandler(handler) }
-      return nil
-    }
+    // Taken by another application, or refused: no shortcut, and `deinit` releases what was
+    // installed — once.
+    guard installed == noErr, registered == noErr else { return nil }
   }
+
+  /// "VMfp": Vibe Manager's floating panel.
+  static let signature = OSType(0x564D_6670)
 
   deinit {
     if let reference { UnregisterEventHotKey(reference) }

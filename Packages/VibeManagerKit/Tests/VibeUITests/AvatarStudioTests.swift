@@ -37,9 +37,15 @@ private struct FakeProcessing: AvatarImageProcessing {
 
 private struct FakeGenerator: AvatarGenerating {
   var answer: Result<Data, AvatarGenerationError> = .success(Data("sheet".utf8))
+  /// Waits until cancelled, then fails as a process stopped while it started would.
+  var waitsForCancellation = false
 
   func generate(_ request: AvatarGenerationRequest) async throws -> Data {
-    try answer.get()
+    if waitsForCancellation {
+      while !Task.isCancelled { await Task.yield() }
+      throw AvatarGenerationError.failed("no launch plan")
+    }
+    return try answer.get()
   }
 }
 
@@ -155,6 +161,19 @@ struct AvatarStudioTests {
           .rejected(.wrongGrid(expectedColumns: 5, expectedRows: 2, width: 1, height: 1))))
   }
 
+  @Test("A generation cancelled that fails afterwards changes nothing")
+  func cancelledThenFailed() async {
+    let studio = studio(generator: FakeGenerator(waitsForCancellation: true))
+    await studio.refreshOptions()
+    studio.description = "a frog"
+    studio.generate()
+    let old = studio.task
+    studio.cancel()
+    await old?.value
+    #expect(studio.problem == nil)
+    #expect(studio.work == nil)
+  }
+
   @Test("One expression is drawn again, the others kept")
   func regenerate() async throws {
     let studio = studio()
@@ -177,7 +196,7 @@ struct AvatarStudioTests {
     partial.sprites[.thinking] = nil
     let studio = studio(processing: FakeProcessing(archived: partial))
     await studio.load()
-    studio.importArchive(Data("zip".utf8))
+    await studio.importArchive(Data("zip".utf8))
 
     let candidate = try #require(studio.candidate)
     #expect(candidate.missingExpressions == [.thinking])
@@ -199,7 +218,7 @@ struct AvatarStudioTests {
   func unreadableImport() async {
     let studio = studio()
     await studio.load()
-    studio.importArchive(Data("zip".utf8))
+    await studio.importArchive(Data("zip".utf8))
     #expect(studio.problem == .archive(.archiveUnreadable))
     #expect(studio.candidate == nil)
   }

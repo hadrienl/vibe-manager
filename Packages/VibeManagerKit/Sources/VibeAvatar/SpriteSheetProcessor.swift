@@ -93,16 +93,24 @@ enum SpriteSheetProcessor {
     let targetCentreX = Double(target.x) + Double(target.width) / 2
     let originX = boxCentreX - targetCentreX / scale
     let originY = Double(box.y + box.height) - Double(target.y + target.height) / scale
+    let matched = try ImageCodec.render(
+      image, from: CGRect(x: originX, y: originY, width: sourceSide, height: sourceSide),
+      into: side)
+    // Wider, or lower, than the neutral one: at its height, it would lose its sides. It is then
+    // fitted whole instead.
+    if let rendered = measure(matched).content,
+      rendered.x >= 1, rendered.y >= 1, rendered.x + rendered.width <= side - 1,
+      rendered.y + rendered.height <= side - 1
+    {
+      return try ImageCodec.png(matched)
+    }
     return try ImageCodec.png(
-      ImageCodec.render(
-        image, from: CGRect(x: originX, y: originY, width: sourceSide, height: sourceSide),
-        into: side))
+      ImageCodec.render(image, from: squareFrame(around: box), into: side))
   }
 
   /// An image of an archive: square, background removed if it has one, checked alone, and scaled
   /// whole to the sprite's side — its author framed it.
-  static func sprite(fromDrawing image: RGBAImage, as expression: AvatarExpression) throws -> Data
-  {
+  static func sprite(fromDrawing image: RGBAImage, as expression: AvatarExpression) throws -> Data {
     let cleared = try removingBackground(image, as: expression)
     try SpriteSetValidation.validate(measure(cleared), as: expression)
     return try ImageCodec.png(

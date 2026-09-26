@@ -82,7 +82,8 @@ struct AvatarAnimationTests {
   @Test("Sending an answer: thinking, as long as it takes; then pleased, then at rest")
   func answering() {
     var animation = AvatarAnimation(seed: 6)
-    #expect(animation.handle(.answerSending, at: .zero) == .init(expression: .thinking, nextChange: nil))
+    #expect(
+      animation.handle(.answerSending, at: .zero) == .init(expression: .thinking, nextChange: nil))
     #expect(animation.handle(.tick, at: .seconds(30)).expression == .thinking)
     let pleased = animation.handle(.answerSucceeded(next: nil), at: .seconds(30))
     #expect(pleased.expression == .pleased)
@@ -113,7 +114,8 @@ struct AvatarAnimationTests {
   func arrivalWhileThinking() {
     var animation = AvatarAnimation(seed: 9)
     _ = animation.handle(.answerSending, at: .zero)
-    #expect(animation.handle(.requestArrived(speech: "Another"), at: ms(10)).expression == .thinking)
+    #expect(
+      animation.handle(.requestArrived(speech: "Another"), at: ms(10)).expression == .thinking)
     _ = animation.handle(.answerSucceeded(next: "Another"), at: ms(20))
     _ = animation.handle(.tick, at: ms(20) + AvatarAnimation.pleasedDuration)
     #expect(animation.mood == .attention)

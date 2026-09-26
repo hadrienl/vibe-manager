@@ -1,8 +1,8 @@
 import CoreGraphics
 import CoreVideo
 import Foundation
-import Vision
 import VibeApplication
+import Vision
 
 /// Takes the flat background out of an image the generator drew (#41).
 ///

@@ -106,7 +106,10 @@ struct CodexAvatarGeneratorTests {
         FakeRunner(termination: .exited(2), standardError: "error: unknown feature flag"),
         .unavailable(.outdated)
       ),
-      (FakeRunner(termination: .exited(1), standardError: "Not logged in"), .unavailable(.signedOut)),
+      (
+        FakeRunner(termination: .exited(1), standardError: "Not logged in"),
+        .unavailable(.signedOut)
+      ),
       (FakeRunner(termination: .exited(1), standardError: "boom"), .failed("exit 1")),
     ]
     for (runner, expected) in cases {
@@ -120,7 +123,8 @@ struct CodexAvatarGeneratorTests {
   @Test("An agent that is not installed cannot draw")
   func unavailable() async {
     let generator = CodexAvatarGenerator(
-      provider: MockAgentProvider(simulatedState: .notFound, environment: [:]), runner: FakeRunner())
+      provider: MockAgentProvider(simulatedState: .notFound, environment: [:]), runner: FakeRunner()
+    )
     await #expect(throws: AvatarGenerationError.unavailable(.missing)) {
       try await generator.generate(AvatarGenerationRequest(prompt: "Draw"))
     }
@@ -139,7 +143,8 @@ struct AvatarGeneratorOptionsTests {
     #expect(claude?.unavailability == .notCapable)
     #expect(claude?.generator == nil)
     #expect(options.first?.id == MockAgentProvider.id)
-    #expect(CodexAgentProvider.make(environment: [:]) is any AvatarGeneratingProviding)
+    let codex: any AgentProvider = CodexAgentProvider.make(environment: [:])
+    #expect(codex is any AvatarGeneratingProviding)
   }
 }
 

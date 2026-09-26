@@ -83,7 +83,13 @@ public final class AvatarStudioModel {
     } catch {
       problem = .storedAvatar(missing: [])
     }
-    setCurrent(defaultAvatar(), isCustom: false)
+    setCurrent(await loadDefault(), isCustom: false)
+  }
+
+  /// The default avatar, read off the main actor: it is an archive, decoded and checked.
+  private func loadDefault() async -> AvatarSpriteSet? {
+    let defaultAvatar = defaultAvatar
+    return await Task.detached(priority: .utility) { defaultAvatar() }.value
   }
 
   /// Which agents can draw now. Asked when the screen opens.
@@ -100,7 +106,7 @@ public final class AvatarStudioModel {
   }
 
   public var canGenerate: Bool {
-    work == nil && selectedGenerator != nil
+    work == nil && !isImporting && selectedGenerator != nil
       && !AvatarPrompt.sanitizedDescription(description).isEmpty
   }
 
@@ -121,7 +127,7 @@ public final class AvatarStudioModel {
   /// Draws one expression of the candidate again — or of the avatar in use, which then becomes
   /// the candidate.
   public func regenerate(_ expression: AvatarExpression) {
-    guard work == nil, let generator = selectedGenerator,
+    guard work == nil, !isImporting, let generator = selectedGenerator,
       let base = candidate ?? (isCustom ? current : nil)
     else { return }
     run(.expression(expression)) { workshop in
@@ -131,6 +137,7 @@ public final class AvatarStudioModel {
 
   /// Stops the generation under way: its process is stopped, nothing changes.
   public func cancel() {
+    currentRun = nil
     task?.cancel()
     task = nil
     work = nil
@@ -142,22 +149,27 @@ public final class AvatarStudioModel {
     problem = nil
     work = (kind, Date())
     let workshop = workshop
+    let run = UUID()
+    currentRun = run
     task = Task { [weak self] in
       do {
         let result = try await body(workshop)
-        guard !Task.isCancelled else { return }
-        self?.finish(with: result)
-      } catch is CancellationError {
-        return
+        self?.finish(with: result, run: run)
       } catch let error as AvatarGenerationError {
-        self?.fail(.generation(error))
+        self?.fail(.generation(error), run: run)
       } catch {
-        self?.fail(.generation(.failed("unexpected")))
+        self?.fail(.generation(.failed("unexpected")), run: run)
       }
     }
   }
 
-  private func finish(with avatar: AvatarSpriteSet) {
+  /// The run whose result counts. A run cancelled, or replaced, may still end — in any way,
+  /// cancelled in the middle of launching its process — and must then change nothing.
+  @ObservationIgnored private var currentRun: UUID?
+
+  private func finish(with avatar: AvatarSpriteSet, run: UUID) {
+    guard currentRun == run else { return }
+    currentRun = nil
     work = nil
     task = nil
     setCandidate(avatar)
@@ -172,7 +184,9 @@ public final class AvatarStudioModel {
           comment: "Said when an incomplete avatar can be previewed."))
   }
 
-  private func fail(_ problem: Problem) {
+  private func fail(_ problem: Problem, run: UUID) {
+    guard currentRun == run else { return }
+    currentRun = nil
     work = nil
     task = nil
     self.problem = problem
@@ -182,11 +196,18 @@ public final class AvatarStudioModel {
 
   // MARK: - Archives
 
-  /// Reads an archive into the candidate. Nothing changes in use until it is accepted.
-  public func importArchive(_ data: Data) {
+  /// Reads an archive into the candidate, off the main actor: decoding its images takes time.
+  /// Nothing changes in use until it is accepted, and nothing is read while a generation runs.
+  public func importArchive(_ data: Data) async {
+    guard work == nil, !isImporting else { return }
     problem = nil
+    isImporting = true
+    defer { isImporting = false }
+    let workshop = workshop
     do {
-      var (avatar, ignored) = try workshop.importArchive(data)
+      var (avatar, ignored) = try await Task.detached(priority: .userInitiated) {
+        try workshop.importArchive(data)
+      }.value
       if avatar.manifest.name.isEmpty {
         avatar.manifest.name = String(
           localized: LocalizedStringResource(
@@ -202,6 +223,9 @@ public final class AvatarStudioModel {
       problem = .archive(.archiveUnreadable)
     }
   }
+
+  /// An archive being read.
+  public private(set) var isImporting = false
 
   /// An archive refused before it was read: too large to be one.
   public func reject(_ problem: AvatarProblem) {
@@ -252,7 +276,7 @@ public final class AvatarStudioModel {
   public func resetToDefault() async {
     do {
       try await store.remove()
-      setCurrent(defaultAvatar(), isCustom: false)
+      setCurrent(await loadDefault(), isCustom: false)
       problem = nil
     } catch {
       problem = .saving

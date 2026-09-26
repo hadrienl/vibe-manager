@@ -1,7 +1,4 @@
-#!/usr/bin/env swift
-
-// Draws the placeholder default avatar of #41 — a round face in ten expressions — and packs it
-// as the archive the application ships, until an avatar made with the application replaces it:
+#!/usr/bin/env swift  // Draws the placeholder default avatar of #41 — a round face in ten expressions — and packs it  // as the archive the application ships, until an avatar made with the application replaces it:
 //
 //   swift Scripts/render-placeholder-avatar.swift \
 //     Packages/VibeManagerKit/Sources/VibeAvatar/Resources/DefaultAvatar.zip
@@ -18,7 +15,8 @@ let expressions = [
 let side: CGFloat = 512
 
 guard CommandLine.arguments.count == 2 else {
-  FileHandle.standardError.write(Data("usage: render-placeholder-avatar.swift <archive.zip>\n".utf8))
+  FileHandle.standardError.write(
+    Data("usage: render-placeholder-avatar.swift <archive.zip>\n".utf8))
   exit(64)
 }
 let archive = URL(fileURLWithPath: CommandLine.arguments[1])
@@ -67,7 +65,8 @@ func draw(_ expression: String) -> Data {
       line.stroke()
     case "surprised":
       NSColor.white.setFill()
-      let white = NSBezierPath(ovalIn: NSRect(x: centre.x - 34, y: centre.y - 34, width: 68, height: 68))
+      let white = NSBezierPath(
+        ovalIn: NSRect(x: centre.x - 34, y: centre.y - 34, width: 68, height: 68))
       white.fill()
       white.lineWidth = 8
       white.stroke()

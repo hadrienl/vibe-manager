@@ -102,9 +102,10 @@ public enum AvatarPrompt {
     for tag in [openingTag, closingTag] {
       text = text.replacingOccurrences(of: tag, with: "", options: .caseInsensitive)
     }
-    text = String(text.unicodeScalars.filter { $0 == "\n" || !CharacterSet.controlCharacters.contains($0) })
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    text = String(
+      text.unicodeScalars.filter { $0 == "\n" || !CharacterSet.controlCharacters.contains($0) }
+    )
+    .trimmingCharacters(in: .whitespacesAndNewlines)
     return String(text.prefix(maximumDescriptionLength))
   }
 }
-

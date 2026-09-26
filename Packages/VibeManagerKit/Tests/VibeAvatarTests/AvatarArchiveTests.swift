@@ -47,8 +47,12 @@ struct HandMadeZip {
     return archive
   }
 
-  private func le16(_ value: UInt16) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
-  private func le32(_ value: UInt32) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
+  private func le16(_ value: UInt16) -> Data {
+    withUnsafeBytes(of: value.littleEndian) { Data($0) }
+  }
+  private func le32(_ value: UInt32) -> Data {
+    withUnsafeBytes(of: value.littleEndian) { Data($0) }
+  }
 }
 
 @Suite("Avatar archives")
@@ -193,6 +197,25 @@ struct AvatarArchiveTests {
       .init(name: "pleased.png", contents: try sprite(side: 300)),
     ])
     #expect(throws: AvatarProblem.imagesOfDifferentSizes(.pleased)) {
+      try processor.avatar(fromArchive: zip.data())
+    }
+  }
+
+  @Test("Two images of one expression are refused")
+  func duplicate() throws {
+    let zip = HandMadeZip(entries: [
+      .init(name: "neutral.png", contents: try sprite()),
+      .init(name: "Neutral.PNG", contents: try sprite()),
+    ])
+    #expect(throws: AvatarProblem.duplicateExpression(.neutral)) {
+      try processor.avatar(fromArchive: zip.data())
+    }
+  }
+
+  @Test("An image larger than an avatar needs is refused")
+  func tooLargeDrawing() throws {
+    let zip = HandMadeZip(entries: [.init(name: "neutral.png", contents: try sprite(side: 2_100))])
+    #expect(throws: AvatarProblem.imageTooLarge) {
       try processor.avatar(fromArchive: zip.data())
     }
   }

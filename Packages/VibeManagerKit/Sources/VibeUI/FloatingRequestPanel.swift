@@ -80,14 +80,9 @@ struct FloatingRequestPanel: View {
     }
     .padding(Self.padding)
     .fixedSize()
-    .onAppear {
-      animator.reducesMotion = reduceMotion
-      animator.start()
-      if let current, !panel.isCollapsed {
-        animator.send(.requestArrived(speech: FloatingRequestPanelModel.speech(of: current)))
-      }
-    }
-    .onDisappear { animator.stop() }
+    // Started and stopped with the window, by its controller: an ordered out window keeps its
+    // views, and never sees them disappear.
+    .onAppear { animator.reducesMotion = reduceMotion }
     .onChange(of: reduceMotion) { _, reduces in animator.reducesMotion = reduces }
     .onChange(of: panel.requests.map(\.id)) { old, new in
       guard Set(new).subtracting(old).isEmpty == false else { return }
@@ -137,7 +132,8 @@ struct FloatingRequestPanel: View {
     .accessibilityLabel(
       Text(
         "Pending requests: \(panel.requests.count)", bundle: .module,
-        comment: "VoiceOver, on the palette of requests."))
+        comment: "VoiceOver, on the palette of requests.")
+    )
     .accessibilityIdentifier("floating-request-panel")
   }
 

@@ -172,6 +172,10 @@ public enum AvatarPresentation {
       return LocalizedStringResource(
         "The image of “\(name(expression))” is too small: 128 pixels at least.", bundle: .module,
         comment: "An avatar problem.")
+    case .duplicateExpression(let expression):
+      return LocalizedStringResource(
+        "The archive holds more than one image of “\(name(expression))”.", bundle: .module,
+        comment: "An avatar problem.")
     case .imagesOfDifferentSizes(let expression):
       return LocalizedStringResource(
         "The image of “\(name(expression))” is not the size of the others.", bundle: .module,

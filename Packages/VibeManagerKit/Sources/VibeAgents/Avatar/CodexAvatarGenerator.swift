@@ -48,7 +48,8 @@ public struct CodexAvatarGenerator: AvatarGenerating {
       }
     } catch let failure as OneShotAgentRun.Failure {
       switch failure {
-      case .unavailable(let state): throw AvatarGenerationError.unavailable(Self.unavailability(state))
+      case .unavailable(let state):
+        throw AvatarGenerationError.unavailable(Self.unavailability(state))
       case .noWorkspace: throw AvatarGenerationError.failed("no temporary folder")
       case .noLaunchPlan: throw AvatarGenerationError.failed("no launch plan")
       case .couldNotStart: throw AvatarGenerationError.failed("could not start")
@@ -73,13 +74,19 @@ public struct CodexAvatarGenerator: AvatarGenerating {
   /// The file the agent was told to write: a plain file, not a link to one elsewhere, and not
   /// larger than any image is read.
   static func image(in workspace: URL) throws -> Data {
-    let url = workspace.appendingPathComponent(AvatarPrompt.outputFileName)
-    guard
-      let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-      attributes[.type] as? FileAttributeType == .typeRegular
-    else { throw AvatarGenerationError.noImage }
-    guard let size = attributes[.size] as? Int, size > 0, size <= 25 * 1024 * 1024,
-      let data = try? Data(contentsOf: url)
+    let path = workspace.appendingPathComponent(AvatarPrompt.outputFileName).path
+    // Opened without following a link, then checked on what was opened: nothing can be swapped
+    // in between.
+    let descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+    guard descriptor >= 0 else { throw AvatarGenerationError.noImage }
+    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    var status = stat()
+    guard fstat(descriptor, &status) == 0, status.st_mode & S_IFMT == S_IFREG else {
+      throw AvatarGenerationError.noImage
+    }
+    let limit = 25 * 1024 * 1024
+    guard status.st_size > 0, status.st_size <= limit,
+      let data = try? handle.read(upToCount: limit + 1), data.count <= limit
     else { throw AvatarGenerationError.rejected(.imageTooLarge) }
     return data
   }

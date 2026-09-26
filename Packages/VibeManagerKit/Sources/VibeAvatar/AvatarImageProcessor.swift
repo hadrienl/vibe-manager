@@ -9,6 +9,8 @@ public struct AvatarImageProcessor: AvatarImageProcessing {
   static let maximumManifestBytes = 64 * 1024
   /// The smallest side an image of an archive may have.
   static let minimumDrawingSide = 128
+  /// The largest side an image of an archive may have: four times a sprite's.
+  static let maximumDrawingSide = 2_048
 
   public init() {}
 
@@ -28,32 +30,43 @@ public struct AvatarImageProcessor: AvatarImageProcessing {
   {
     let entries = try ZipArchiveReader.entries(of: data)
     var manifest: AvatarManifest?
-    var drawings: [(AvatarExpression, RGBAImage)] = []
     var sheet: Data?
     var ignored = 0
+    var drawings: [(AvatarExpression, Data)] = []
     for entry in entries {
       let lowered = entry.name.lowercased()
       if lowered == Self.manifestFileName {
+        guard manifest == nil else { throw AvatarProblem.archiveUnsafeEntry(entry.name) }
         manifest = try Self.manifest(from: entry.contents)
       } else if lowered == Self.sheetFileName {
+        guard sheet == nil else { throw AvatarProblem.archiveUnsafeEntry(entry.name) }
         // Kept only as the reference to draw from, and only if it reads as an image.
         sheet = (try? ImageCodec.decode(entry.contents)).flatMap { try? ImageCodec.png($0) }
       } else if let expression = Self.expression(named: entry.name) {
-        drawings.append((expression, try ImageCodec.decode(entry.contents)))
+        // `neutral.png` and `Neutral.jpg` would be two images for one expression.
+        guard !drawings.contains(where: { $0.0 == expression }) else {
+          throw AvatarProblem.duplicateExpression(expression)
+        }
+        drawings.append((expression, entry.contents))
       } else {
         ignored += 1
       }
     }
-    guard let first = drawings.first else { throw AvatarProblem.archiveHasNoImage }
+    guard !drawings.isEmpty else { throw AvatarProblem.archiveHasNoImage }
+    // One image decoded at a time, and none larger than an avatar needs: an archive of large
+    // images is refused rather than held in memory all at once.
+    var side: Int?
     var sprites: [AvatarExpression: Data] = [:]
-    for (expression, image) in drawings.sorted(by: { Self.order($0.0) < Self.order($1.0) }) {
+    for (expression, contents) in drawings.sorted(by: { Self.order($0.0) < Self.order($1.0) }) {
+      let image = try ImageCodec.decode(contents, maximumSide: Self.maximumDrawingSide)
       guard image.width == image.height else { throw AvatarProblem.imageNotSquare(expression) }
       guard image.width >= Self.minimumDrawingSide else {
         throw AvatarProblem.imageTooSmall(expression)
       }
-      guard image.width == first.1.width else {
+      guard image.width == side ?? image.width else {
         throw AvatarProblem.imagesOfDifferentSizes(expression)
       }
+      side = image.width
       sprites[expression] = try SpriteSheetProcessor.sprite(fromDrawing: image, as: expression)
     }
     var result = manifest ?? AvatarManifest(name: "", source: .imported)

@@ -62,7 +62,8 @@ struct SpriteSheetProcessorTests {
       #expect(BackgroundRemoval.transparentShare(ofBorderOf: image) > 0.99, "\(expression)")
       // No pixel that shows is the background's magenta: the edge was cleaned of it.
       var fringe = 0
-      for index in stride(from: 0, to: image.pixels.count, by: 4) where image.pixels[index + 3] > 64 {
+      for index in stride(from: 0, to: image.pixels.count, by: 4) where image.pixels[index + 3] > 64
+      {
         let r = Int(image.pixels[index])
         let g = Int(image.pixels[index + 1])
         let b = Int(image.pixels[index + 2])
@@ -100,7 +101,8 @@ struct SpriteSheetProcessorTests {
   @Test("A sheet of the wrong proportions is refused, saying what was found")
   func wrongGrid() throws {
     #expect(
-      throws: AvatarProblem.wrongGrid(expectedColumns: 5, expectedRows: 2, width: 1200, height: 1200)
+      throws: AvatarProblem.wrongGrid(
+        expectedColumns: 5, expectedRows: 2, width: 1200, height: 1200)
     ) {
       try SpriteSheetProcessor.sprites(
         fromSheet: try drawnSheet(columns: 4, rows: 4), expressions: AvatarExpression.allCases)
