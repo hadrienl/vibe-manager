@@ -343,6 +343,10 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   /// Where the work stands (#80). Changed by `setTaskStatus`, and by archiving and unarchiving,
   /// which are the only moves that touch the process as well.
   public private(set) var taskStatus: SessionTaskStatus
+  /// Where the session stands in the order the user arranged by hand (#44), smaller first. Every
+  /// column and every group is a subsequence of that one order. The store gives it: a session
+  /// enters at the top, and keeps its place through a restart, a status change or an archive.
+  public var rank: Int
 
   public var status: SessionStatus {
     lifecycle.status
@@ -393,6 +397,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     ticket: SessionTicket? = nil,
     /// `nil` reads it from the lifecycle, as for a session stored before it existed.
     taskStatus: SessionTaskStatus? = nil,
+    rank: Int = 0,
     /// See `SessionLifecycle.init`: whether a `nil` start is inferred or means never started.
     infersStartedAt: Bool = true
   ) {
@@ -418,6 +423,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     self.taskStatus =
       taskStatus
       ?? SessionTaskStatus.inferred(from: status, hasEverStarted: lifecycle.startedAt != nil)
+    self.rank = rank
   }
 
   public mutating func close(at date: Date) throws {

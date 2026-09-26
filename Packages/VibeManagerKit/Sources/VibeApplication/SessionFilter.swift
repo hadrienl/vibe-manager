@@ -21,6 +21,8 @@ public enum SessionSort: String, Codable, CaseIterable, Sendable {
   case lastActivity
   case created
   case name
+  /// The order the user arranged by hand (#44): the only one sessions can be moved in.
+  case manual
 
   public var label: LocalizedStringResource {
     switch self {
@@ -33,6 +35,9 @@ public enum SessionSort: String, Codable, CaseIterable, Sendable {
     case .name:
       return LocalizedStringResource(
         "Name", bundle: .module, comment: "A way to sort the sessions.")
+    case .manual:
+      return LocalizedStringResource(
+        "Manual", bundle: .module, comment: "A way to sort the sessions: the order set by hand.")
     }
   }
 }
@@ -165,6 +170,8 @@ public struct SessionFilter: Equatable, Sendable, Codable {
     case .name:
       let comparison = lhs.name.localizedStandardCompare(rhs.name)
       if comparison != .orderedSame { return comparison == .orderedAscending }
+    case .manual:
+      if lhs.rank != rhs.rank { return lhs.rank < rhs.rank }
     }
     return lhs.id.description < rhs.id.description
   }

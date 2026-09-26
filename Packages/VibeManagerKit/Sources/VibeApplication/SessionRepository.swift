@@ -11,6 +11,9 @@ public protocol SessionRepository: Sendable {
     id: SessionID,
     _ transform: @Sendable (inout WorkSession) throws -> Void
   ) async throws -> WorkSession?
+  /// Gives the sessions named their new rank in a single write (#44). Nothing else is touched —
+  /// not even the last activity. A session no longer stored is skipped.
+  func reorder(_ ranks: [SessionID: Int]) async throws
 }
 
 extension SessionRepository {
@@ -30,6 +33,15 @@ extension SessionRepository {
     try transform(&session)
     try await save(session)
     return session
+  }
+
+  /// Fallback for repositories that cannot write several sessions at once: one `mutate` per
+  /// session, so a failure halfway leaves part of the order written. The file store and the
+  /// in-memory one write it in one step.
+  public func reorder(_ ranks: [SessionID: Int]) async throws {
+    for (id, rank) in ranks {
+      _ = try await mutate(id: id) { $0.rank = rank }
+    }
   }
 }
 

@@ -1055,6 +1055,17 @@
         }
       }
     },
+    "Manual" : {
+      "comment" : "A way to sort the sessions: the order set by hand.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manuel"
+          }
+        }
+      }
+    },
     "Mark it as safe if you trust it." : {
       "localizations" : {
         "fr" : {
