@@ -48,6 +48,26 @@ struct RecentFolderHistoryTests {
     #expect(await store.load() == nil)
   }
 
+  @Test("A session created while the store was unreadable waits for the seeding, then joins it")
+  func creationBeforeSeedingKeepsTheSessionsFolders() async {
+    let store = InMemoryRecentFolderStore()
+    let repository = RecoveringRepository(values: [session(in: "/work/old", createdAt: 1)])
+    let model = AppModel(repository: repository, recentFolderStore: store)
+    await model.load()
+
+    await model.complete(
+      SessionCreation(session: session(in: "/work/new"), plan: plan("/work/new")),
+      launching: false)
+    // One folder written now would be the whole history for good.
+    #expect(await store.load() == nil)
+
+    await repository.recover()
+    await model.reload()
+
+    #expect(model.recentFolders.entries.map(\.path) == ["/work/new", "/work/old"])
+    #expect(await store.load() == model.recentFolders)
+  }
+
   @Test("A folder seeded by its spelling and created in again is one entry, not two")
   func seededEntryMergesWithTheCanonicalOne() async throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -169,6 +189,31 @@ private actor HistoryRepository: SessionRepository {
 
   func session(id: SessionID) -> WorkSession? {
     values.first { $0.id == id }
+  }
+
+  func save(_: WorkSession) {}
+}
+
+/// Unreadable until told otherwise, like a store waiting on a recovery.
+private actor RecoveringRepository: SessionRepository {
+  struct Unreadable: Error {}
+
+  private let values: [WorkSession]
+  private var isReadable = false
+
+  init(values: [WorkSession]) {
+    self.values = values
+  }
+
+  func recover() { isReadable = true }
+
+  func sessions() throws -> [WorkSession] {
+    guard isReadable else { throw Unreadable() }
+    return values
+  }
+
+  func session(id: SessionID) throws -> WorkSession? {
+    try sessions().first { $0.id == id }
   }
 
   func save(_: WorkSession) {}

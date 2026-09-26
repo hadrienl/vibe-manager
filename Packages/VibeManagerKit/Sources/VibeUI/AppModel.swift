@@ -435,6 +435,7 @@ public final class AppModel {
   /// The folders sessions were created in, offered again by the New Session sheet (#39).
   let recentFolderStore: any RecentFolderStore
   public internal(set) var recentFolders = RecentFolders()
+  var recentFolderHistory = RecentFolderHistory.unread
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
   private let quitPreferences: any QuitPreferences
@@ -2260,6 +2261,11 @@ public final class AppModel {
       state = .loaded(sessions)
       refreshFailure = nil
       resolveFolders()
+      // The launch could not seed the recent folders from a store it could not read; this list
+      // is the first it can trust.
+      if recentFolderHistory == .awaitingSessions {
+        await loadRecentFolders()
+      }
       // A selection restored from a previous run may name a session that has been archived out
       // of the list, or that never came back at all. It falls back instead of blocking the
       // launch on a session that no longer exists.

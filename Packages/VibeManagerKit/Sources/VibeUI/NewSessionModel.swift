@@ -506,7 +506,14 @@ extension NewSessionModel {
   /// access to what it hands back; a card does not, so looking at that folder now could raise the
   /// consent alert in the middle of the form. It is checked at creation, like a typed path.
   public func chooseRecentFolder(_ option: RecentFolderOption) async {
-    guard mayProbe(option.folder) else {
+    let folder = option.folder
+    var mayRead = mayProbe(folder)
+    if mayRead, fullDiskAccess != .granted {
+      mayRead = await Task.detached {
+        RecentFolderProbe.staysOutsideProtectedLocations(folder)
+      }.value
+    }
+    guard mayRead else {
       preselectedFolder = nil
       draft.workingDirectoryPath = option.folder.path
       return
@@ -514,8 +521,11 @@ extension NewSessionModel {
     await folderChosen(option.folder.path)
   }
 
-  /// Whether this folder may be looked at without a gesture through the system's own panel. Its
-  /// canonical key is asked too: a link to `~/Documents` is inside `~/Documents`.
+  /// Whether this folder may be looked at without a gesture through the system's own panel, as far
+  /// as its spellings tell. Its canonical key is asked too: a link to `~/Documents` is inside
+  /// `~/Documents`. A key seeded from the spelling alone says nothing of links, so without Full
+  /// Disk Access the folder's links are also followed, outside the guarded places, before anything
+  /// reads it — see `RecentFolderProbe.staysOutsideProtectedLocations`.
   private func mayProbe(_ folder: RecentFolder) -> Bool {
     fullDiskAccess == .granted
       || (ProtectedFileLocation.covering(path: folder.path) == nil
@@ -525,6 +535,20 @@ extension NewSessionModel {
   /// Remove from Recents: gone from the sheet now, and from the history kept for the next one.
   public func forget(_ option: RecentFolderOption) {
     recentFolders.removeAll { $0.id == option.id }
+    // The sheet's own default goes with its card: left in the field, Create would start the agent
+    // in the folder just dismissed, and put it back at the top of the history.
+    if let preselected = preselectedFolder, preselected == option.folder.path {
+      if draft.workingDirectoryPath == preselected {
+        draft.workingDirectoryPath = nil
+      }
+      if folderBeforePreset == .some(preselected) {
+        folderBeforePreset = .some(nil)
+      }
+      preselectedFolder = nil
+    }
+    if skippedRecentFolder?.id == option.id {
+      skippedRecentFolder = nil
+    }
     if hiddenRecentFolderCount == 0 {
       isShowingMoreFolders = false
     }
@@ -569,7 +593,8 @@ extension NewSessionModel {
     let probed = recentFolders.map(\.folder).filter(mayProbe)
     guard !probed.isEmpty else { return }
     let statuses = await RecentFolderProbe.statuses(
-      of: probed, probe: folderProbe, budget: recentFolderProbeBudget)
+      of: probed, probe: folderProbe, budget: recentFolderProbeBudget,
+      followingLinks: fullDiskAccess != .granted)
     recentFolders = recentFolders.map { option in
       guard let status = statuses[option.id] else { return option }
       return option.with(RecentFolderOption.Availability(status))
@@ -631,14 +656,21 @@ public struct RecentFolderOption: Identifiable, Equatable, Sendable {
 /// takes — so they run detached, and the ones still out when the budget ends are left to finish
 /// on their own while the sheet goes on without them.
 enum RecentFolderProbe {
+  /// - Parameter followingLinks: whether each folder's links are followed first, and the folder
+  ///   left unread when one leads into a place macOS guards.
   static func statuses(
     of folders: [RecentFolder],
     probe: any WorkingDirectoryProbe,
-    budget: Duration
+    budget: Duration,
+    followingLinks: Bool = false
   ) async -> [String: WorkingDirectoryStatus] {
     let collector = Collector(expected: folders.count)
     for folder in folders {
       Task.detached {
+        guard !followingLinks || staysOutsideProtectedLocations(folder) else {
+          await collector.record(nil, for: folder.key)
+          return
+        }
         let status = await probe.inspect(path: RecentFolder.lexicalKey(of: folder.path))
         await collector.record(status, for: folder.key)
       }
@@ -650,8 +682,41 @@ enum RecentFolderProbe {
     return await collector.results()
   }
 
+  /// Whether the folder's links, followed one component at a time, never lead into a place macOS
+  /// guards.
+  ///
+  /// Only links are read, and only outside those places: `readlink` on `~/code` says where it
+  /// points without opening `~/Documents/code`, and a component that is itself guarded is judged
+  /// by its path and never read. This is what a key seeded from the spelling alone cannot say.
+  static func staysOutsideProtectedLocations(_ folder: RecentFolder) -> Bool {
+    var resolved = "/"
+    var pending = Array(
+      URL(fileURLWithPath: RecentFolder.lexicalKey(of: folder.path)).pathComponents.dropFirst())
+    var hops = 0
+    while !pending.isEmpty {
+      let candidate = (resolved as NSString).appendingPathComponent(pending.removeFirst())
+      guard ProtectedFileLocation.covering(path: candidate) == nil else { return false }
+      guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: candidate)
+      else {
+        resolved = candidate
+        continue
+      }
+      // A loop of links is not worth untangling: the folder is simply left unread.
+      hops += 1
+      guard hops <= 32 else { return false }
+      let absolute =
+        target.hasPrefix("/") ? target : (resolved as NSString).appendingPathComponent(target)
+      resolved = "/"
+      pending =
+        Array(URL(fileURLWithPath: absolute).standardizedFileURL.pathComponents.dropFirst())
+        + pending
+    }
+    return true
+  }
+
   private actor Collector {
     private let expected: Int
+    private var answered = 0
     private var statuses: [String: WorkingDirectoryStatus] = [:]
     private var isFinished = false
     private var waiter: CheckedContinuation<[String: WorkingDirectoryStatus], Never>?
@@ -660,10 +725,12 @@ enum RecentFolderProbe {
       self.expected = expected
     }
 
-    func record(_ status: WorkingDirectoryStatus, for key: String) {
+    /// `nil`: the folder was left unread, and stays unverified.
+    func record(_ status: WorkingDirectoryStatus?, for key: String) {
       guard !isFinished else { return }
       statuses[key] = status
-      if statuses.count == expected {
+      answered += 1
+      if answered == expected {
         finish()
       }
     }

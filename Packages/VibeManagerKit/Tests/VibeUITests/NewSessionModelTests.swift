@@ -1085,6 +1085,59 @@ struct NewSessionRecentFolderTests {
     #expect(!model.isShowingMoreFolders)
   }
 
+  @Test("Removing the preselected folder empties the field rather than creating there")
+  func forgettingThePreselectedFolder() async {
+    let model = makeModel(recentFolders: recent("/work/api", "/work/web"))
+    await model.load()
+
+    model.forget(model.recentFolders[0])
+
+    #expect(model.draft.workingDirectoryPath == nil)
+    #expect(model.preselectedFolder == nil)
+    #expect(!model.canSubmit)
+  }
+
+  @Test("Removing the folder that had gone takes its remark away, not the proposed one")
+  func forgettingTheSkippedFolder() async {
+    let probe = MappedFolders(["/work/gone": .missing])
+    let model = makeModel(recentFolders: recent("/work/gone", "/work/web"), probe: probe)
+    await model.load()
+
+    model.forget(model.recentFolders[0])
+
+    #expect(model.preselectionNotice == nil)
+    #expect(model.draft.workingDirectoryPath == "/work/web")
+  }
+
+  @Test("A folder seeded by its spelling that links into Documents is never looked at")
+  func linkIntoAProtectedFolderIsNotRead() async throws {
+    let parent = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: parent) }
+    // Dangling on purpose: the test must not open the real Documents folder either.
+    let link = parent.appendingPathComponent("code").path
+    try FileManager.default.createSymbolicLink(
+      atPath: link, withDestinationPath: NSHomeDirectory() + "/Documents/\(UUID().uuidString)")
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let creationProbe = CountingFolders()
+    let probe = MappedFolders()
+    let model = NewSessionModel(
+      create: CreateSession(repository: SpyRepository(), agents: registry, folders: creationProbe),
+      registry: registry,
+      fullDiskAccess: .notGranted,
+      recentFolders: recent(link, "/work/web"),
+      folderProbe: probe
+    )
+
+    await model.load()
+    await model.chooseRecentFolder(model.recentFolders[0])
+
+    #expect(await probe.inspected == ["/work/web"])
+    #expect(model.recentFolders.first?.availability == .unverified)
+    #expect(model.draft.workingDirectoryPath == link)
+    #expect(await creationProbe.count == 0)
+  }
+
   @Test("Two folders of one name are told apart on their cards")
   func namesakesOnCards() {
     let model = makeModel(recentFolders: recent("/work/client-a/api", "/work/client-b/api"))

@@ -6,16 +6,32 @@ import VibeDomain
 extension AppModel {
   /// Reads the history, or seeds it from the sessions when none was ever written: an existing
   /// installation gets its folders offered from the first sheet, not after three new sessions.
+  ///
+  /// A store of sessions that could not be read is not an installation without sessions: seeding
+  /// from it would write an empty history, and no later launch would seed again. The history then
+  /// waits for the first list read in full, and nothing is written until it has one.
   func loadRecentFolders() async {
-    if let stored = await recentFolderStore.load() {
-      recentFolders = stored
+    guard recentFolderHistory != .ready else { return }
+    let stored = await recentFolderStore.load()
+    guard recentFolderHistory != .ready else { return }
+    let base: RecentFolders
+    if let stored {
+      base = stored
+    } else if case .loaded(let sessions) = state {
+      base = RecentFolders.seeded(from: sessions)
+    } else {
+      recentFolderHistory = .awaitingSessions
       return
     }
-    // A store that could not be read is not an installation without sessions: seeding from it
-    // would write an empty history, and no later launch would seed again.
-    guard case .loaded = state else { return }
-    recentFolders = RecentFolders.seeded(from: sessions)
-    await recentFolderStore.save(recentFolders)
+    // Folders recorded while the history waited stay on top of it, and replace the entries that
+    // were only their spelling.
+    let recorded = recentFolders.entries
+    let spellings = Set(recorded.map { RecentFolder.lexicalKey(of: $0.path) })
+    recentFolders = RecentFolders(recorded + base.entries.filter { !spellings.contains($0.key) })
+    recentFolderHistory = .ready
+    if stored == nil || !recorded.isEmpty {
+      await recentFolderStore.save(recentFolders)
+    }
   }
 
   /// Puts the session's folder at the top of the history, whatever gave it: the open panel, a
@@ -30,6 +46,9 @@ extension AppModel {
     // A folder seeded from the sessions was keyed by its spelling: that entry is this folder too.
     recentFolders = recentFolders.removing(key: lexical).recording(
       RecentFolder(path: path, key: key))
+    // A history of this one folder, once written, would never be seeded again: until the history
+    // is read or seeded, the folder is only kept in memory, and joins it then.
+    guard recentFolderHistory == .ready else { return }
     await recentFolderStore.save(recentFolders)
     diagnostics.record(
       .session, .info, "recentFolders.recorded", ["count": .count(recentFolders.entries.count)])
@@ -38,7 +57,18 @@ extension AppModel {
   /// Remove from Recents, from a card of the sheet.
   func forgetRecentFolder(_ folder: RecentFolder) {
     recentFolders = recentFolders.removing(key: folder.key)
+    guard recentFolderHistory == .ready else { return }
     let folders = recentFolders
     Task { await recentFolderStore.save(folders) }
   }
+}
+
+/// Where the recent folders stand: whether what `AppModel.recentFolders` holds may be written.
+enum RecentFolderHistory: Equatable {
+  /// The launch has not read it yet.
+  case unread
+  /// Never written, and the sessions to seed it from could not be read.
+  case awaitingSessions
+  /// Read from the store, or seeded from sessions read in full.
+  case ready
 }
