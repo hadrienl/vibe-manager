@@ -91,6 +91,17 @@ public final class TerminalPaneModel {
   /// Asks the surface to take the keyboard, if it is the terminal on screen.
   public func requestFocus() {
     focusRequest += 1
+    hasPendingFocusRequest = true
+  }
+
+  /// A request made while the view was not there to take it, consumed once. A side terminal
+  /// (#43) takes the keyboard on a request only: shown again with its session, it must not take
+  /// it from the agent's terminal.
+  @ObservationIgnored private var hasPendingFocusRequest = false
+
+  func takePendingFocusRequest() -> Bool {
+    defer { hasPendingFocusRequest = false }
+    return hasPendingFocusRequest
   }
 
   /// Starts the process, once the pane knows how big it is.

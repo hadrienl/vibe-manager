@@ -647,13 +647,18 @@ public struct RootView: View {
   private func closeConfirmationMessage(for session: WorkSession) -> String {
     let consequence = String(
       localized: "The agent will be stopped. The session can be restarted later.", bundle: .module)
+    guard let drawer = drawerCommandsSentence(for: session) else { return consequence }
+    return consequence + " " + drawer
+  }
+
+  /// The commands a close or an archive stops in the session's side terminals (#43), named.
+  private func drawerCommandsSentence(for session: WorkSession) -> String? {
     let commands = model.runningDrawerCommands(of: session.id)
-    guard !commands.isEmpty else { return consequence }
+    guard !commands.isEmpty else { return nil }
     let list = commands.map { "“\($0)”" }.formatted(.list(type: .and))
-    return consequence + " "
-      + String(
-        localized: "What runs in its side terminals will be stopped: \(list).", bundle: .module,
-        comment: "The argument lists the commands running in the session's side terminals.")
+    return String(
+      localized: "What runs in its side terminals will be stopped: \(list).", bundle: .module,
+      comment: "The argument lists the commands running in the session's side terminals.")
   }
 
   private func archiveConfirmationMessage(for session: WorkSession) -> String {
@@ -665,9 +670,10 @@ public struct RootView: View {
         """,
       bundle: .module,
       comment: "Archived is the line at the foot of the sidebar that lists archived sessions.")
-    guard isRunning else { return consequence }
+    let drawer = drawerCommandsSentence(for: session).map { " " + $0 } ?? ""
+    guard isRunning else { return consequence + drawer }
     return String(localized: "Its running agent will be stopped.", bundle: .module) + " "
-      + consequence
+      + consequence + drawer
   }
 
   /// `.detailOnly` is the only hidden state worth recording; the others all show the sidebar.
@@ -749,37 +755,41 @@ public struct RootView: View {
   private static let sessionMinimumHeight: Double = 160
 
   /// The session's content, and its drawer of side terminals under it, the whole width (#43).
-  @ViewBuilder
+  ///
+  /// One structure whatever the session, the drawer alone being conditional: the terminal stack
+  /// holds every session's terminal, and a branch that swapped it for another would remount them
+  /// all — a replayed history and a lost scroll position for each — at every change between a
+  /// session that has a drawer and one that has not.
   private func sessionWithDrawer(for session: WorkSession) -> some View {
-    if model.canUseDrawer(session), let drawer = model.terminals?.drawer(for: session.id) {
-      GeometryReader { proxy in
-        let total = Double(proxy.size.height)
-        let lower = SessionTerminalsDocument.heightRange.lowerBound
-        let upper = max(lower, min(total * 0.7, total - Self.sessionMinimumHeight))
-        let height = min(max(drawer.height, lower), upper)
-        VStack(spacing: 0) {
-          sessionContent(for: session)
-          if drawer.isVisible, !drawer.terminals.isEmpty {
-            SplitHandle(
-              axis: .vertical,
-              length: height, range: lower...upper,
-              label: Text(
-                "Divider between the session and its side terminals", bundle: .module),
-              value: Text(
-                "\(Int(height)) points tall", bundle: .module,
-                comment: "The height of the drawer of side terminals, read by VoiceOver on its divider."
-              ),
-              sizesPaneBelow: true,
-              onChange: { drawer.setHeight($0) })
-            TerminalDrawerView(model: model, drawer: drawer, sessionName: session.name)
-              .frame(height: height)
-              .id(session.id)
-          }
+    let drawer = model.canUseDrawer(session) ? model.terminals?.drawer(for: session.id) : nil
+    return GeometryReader { proxy in
+      let total = Double(proxy.size.height)
+      let lower = SessionTerminalsDocument.heightRange.lowerBound
+      let upper = max(lower, min(total * 0.7, total - Self.sessionMinimumHeight))
+      VStack(spacing: 0) {
+        sessionContent(for: session)
+        if let drawer, drawer.isVisible, !drawer.terminals.isEmpty {
+          let height = min(max(drawer.height, lower), upper)
+          SplitHandle(
+            axis: .vertical,
+            length: height, range: lower...upper,
+            label: Text("Divider between the session and its side terminals", bundle: .module),
+            value: Text(
+              "\(Int(height)) points tall", bundle: .module,
+              comment: "The height of the drawer of side terminals, read by VoiceOver on its divider."
+            ),
+            sizesPaneBelow: true,
+            onChange: { drawer.setHeight($0) })
+          TerminalDrawerView(model: model, drawer: drawer, sessionName: session.name)
+            .frame(height: height)
+            .id(session.id)
         }
       }
-      .task(id: session.id) { await model.terminals?.prepare(session.id) }
-    } else {
-      sessionContent(for: session)
+    }
+    // Asked again when the session becomes active: a drawer left open comes back with it.
+    .task(id: DrawerPreparationKey(session: session.id, isActive: drawer != nil)) {
+      guard drawer != nil else { return }
+      await model.terminals?.prepare(session.id)
     }
   }
 
@@ -945,6 +955,12 @@ public struct RootView: View {
     // then centred in the column instead of sitting under the toolbar.
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
+}
+
+/// What the drawer of the session on screen is prepared for: that session, once it is active.
+private struct DrawerPreparationKey: Hashable {
+  let session: SessionID
+  let isActive: Bool
 }
 
 /// The status of the session on screen, in the toolbar, as a menu of the four columns.

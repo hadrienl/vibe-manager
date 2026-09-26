@@ -121,6 +121,22 @@ struct ShellProcessInspectorTests {
     return Array(buffer.prefix(max(0, Int(count))))
   }
 
+  @Test("The trampoline refuses to run anything outside a terminal it leads")
+  func trampolineRefusesOutsideATerminal() throws {
+    let process = Process()
+    process.executableURL = try TerminalHostProcessTests.fixtureURL()
+    process.arguments = [ControllingTerminal.argument, "/bin/echo", "echo", "ran"]
+    process.standardInput = FileHandle.nullDevice
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    process.waitUntilExit()
+
+    #expect(process.terminationStatus == 126)
+    #expect(output.fileHandleForReading.readDataToEndOfFile().isEmpty)
+  }
+
   @Test("A process that is gone says nothing")
   func goneProcess() async {
     #expect(await DarwinShellProcessInspector().inspect(processIdentifier: 0) == nil)

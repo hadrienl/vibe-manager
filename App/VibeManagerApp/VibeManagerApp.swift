@@ -908,6 +908,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             restart them with it.
             """)
     }
+    // Their side terminals follow them either way (#43): a dev server in one is part of the answer.
+    if environment.terminals.runningTerminalCount > 0 {
+      information +=
+        "\n\n"
+        + String(
+          localized: """
+            Their side terminals follow them: left running with them, or stopped with them.
+            """)
+    }
     let inProcess = environment.inProcessRunningCount
     if inProcess > 0 {
       information +=

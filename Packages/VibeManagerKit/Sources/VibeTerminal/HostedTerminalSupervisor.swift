@@ -113,6 +113,11 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     guard await connectedOutsideRetirement() else {
       return try await startLocally(spec, for: id)
     }
+    // A host left running by an earlier build would start the shell without a controlling
+    // terminal, and list it as an agent after a relaunch: it runs here until that host is gone.
+    if spec.role == .auxiliary, !hostCapabilities.contains(TerminalHostCapability.sideTerminals) {
+      return try await startLocally(spec, for: id)
+    }
 
     // Counted until its mirror exists: before that, nothing else says an agent is on its way, and
     // a host let go meanwhile would take it with it.

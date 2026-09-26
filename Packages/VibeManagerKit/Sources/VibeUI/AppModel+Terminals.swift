@@ -95,12 +95,14 @@ extension AppModel {
       NSSound.beep()
       return
     }
-    if terminal.isRunningCommand, let command = terminal.foregroundCommand {
-      pendingTerminalClose = PendingTerminalClose(
-        sessionID: drawer.sessionID, terminalID: terminal.id, command: command)
-      return
+    Task {
+      if let command = await drawer.runningCommand(of: terminal.id) {
+        pendingTerminalClose = PendingTerminalClose(
+          sessionID: drawer.sessionID, terminalID: terminal.id, command: command)
+        return
+      }
+      await drawer.close(terminal.id)
     }
-    Task { await drawer.close(terminal.id) }
   }
 
   public func cancelCloseDrawerTerminal() {

@@ -69,11 +69,16 @@ private actor FakeShells: TerminalSupervisor {
   private(set) var shells: [TerminalID: FakeShell] = [:]
   private(set) var stopped: [TerminalID] = []
   private var nextPID: Int32 = 1_000
+  /// Holds every start until the test opens it, the way a slow spawn would.
+  private var gate: ProbeGate?
 
   /// A shell the terminal host kept running while the application was closed.
   func keep(_ shell: FakeShell) { shells[shell.id] = shell }
 
-  func start(_ spec: TerminalSpec, for id: TerminalID) -> any TerminalSession {
+  func holdStarts(at gate: ProbeGate) { self.gate = gate }
+
+  func start(_ spec: TerminalSpec, for id: TerminalID) async -> any TerminalSession {
+    if let gate { await gate.wait() }
     nextPID += 1
     let shell = FakeShell(id: id, state: .running(processIdentifier: nextPID))
     specs[id] = spec
@@ -93,6 +98,46 @@ private actor FakeShells: TerminalSupervisor {
   }
 
   var startCount: Int { specs.count }
+
+  /// The shells still running.
+  func running() async -> [TerminalID] {
+    var running: [TerminalID] = []
+    for (id, shell) in shells where await !shell.state().isFinished { running.append(id) }
+    return running
+  }
+}
+
+/// A store whose reading waits until the test lets it.
+private actor SlowStore: SessionTerminalsStore {
+  let base = InMemorySessionTerminalsStore()
+  let gate = ProbeGate()
+
+  func load(_ session: SessionID) async -> SessionTerminalsDocument? {
+    await gate.wait()
+    return await base.load(session)
+  }
+
+  func save(_ document: SessionTerminalsDocument, for session: SessionID) async {
+    await base.save(document, for: session)
+  }
+
+  func loadScrollback(of terminal: TerminalID, in session: SessionID) async -> [UInt8]? {
+    await base.loadScrollback(of: terminal, in: session)
+  }
+
+  func saveScrollback(_ bytes: [UInt8], of terminal: TerminalID, in session: SessionID) async {
+    await base.saveScrollback(bytes, of: terminal, in: session)
+  }
+
+  func removeScrollback(of terminal: TerminalID, in session: SessionID) async {
+    await base.removeScrollback(of: terminal, in: session)
+  }
+
+  func removeAllScrollback() async { await base.removeAllScrollback() }
+
+  func remove(_ session: SessionID) async { await base.remove(session) }
+
+  func scrollbackByteCount() async -> Int { await base.scrollbackByteCount() }
 }
 
 /// Says a command runs in the foreground of any shell, when told to.
@@ -450,6 +495,57 @@ struct SessionTerminalsTests {
     #expect(first.terminals.count == 2)
     #expect(second.terminals.count == 1)
     #expect(Set(first.terminals.map(\.id)).isDisjoint(with: second.terminals.map(\.id)))
+  }
+
+  @Test("A drawer shut down while it is being restored starts nothing after, and leaves nothing")
+  func shutDownDuringRestore() async throws {
+    let harness = Harness()
+    let session = SessionID()
+    let ids = [TerminalID(), TerminalID()]
+    let document = SessionTerminalsDocument(
+      isVisible: true, activeTerminal: ids[0],
+      terminals: ids.map { DrawerTerminalRecord(id: $0, directory: "/work/app") })
+    await harness.store.save(document, for: session)
+    let gate = ProbeGate()
+    await harness.shells.holdStarts(at: gate)
+
+    let restoring = Task { await harness.terminals.sessionStarted(session) }
+    let drawer = harness.terminals.drawer(for: session)
+    #expect(await eventually { drawer.terminals.count == 2 })
+    let closing = Task { await harness.terminals.shutDown(session) }
+    await gate.open()
+    await restoring.value
+    await closing.value
+
+    #expect(await harness.shells.running().isEmpty)
+    #expect(await harness.shells.startCount <= 1)
+    // The document is kept whole, for the next reopening.
+    #expect(await harness.store.load(session)?.terminals.map(\.id) == ids)
+  }
+
+  @Test("⌘J while the drawer is being read opens no tab of its own over the ones written down")
+  func showDuringLoad() async throws {
+    let session = SessionID()
+    let written = TerminalID()
+    let store = SlowStore()
+    await store.base.save(
+      SessionTerminalsDocument(
+        isVisible: false, terminals: [DrawerTerminalRecord(id: written, directory: "/work/app")]),
+      for: session)
+    let shells = FakeShells()
+    let terminals = SessionTerminals(
+      supervisor: shells, store: store, probe: Folders(), clock: FixedClock(),
+      viewportTimeout: .milliseconds(1), sessionFolder: { _ in "/work/app" })
+    let drawer = terminals.drawer(for: session)
+
+    let preparing = Task { await terminals.prepare(session) }
+    let showing = Task { await drawer.show() }
+    await store.gate.open()
+    await preparing.value
+    await showing.value
+
+    #expect(drawer.terminals.map(\.id) == [written])
+    #expect(await shells.startCount == 1)
   }
 
   @Test("With the history turned off, nothing is written, and what was is erased")

@@ -219,5 +219,9 @@ enum TerminalHostCapability {
   static let stats = "stats"
   static let fullDiskAccess = "fullDiskAccess"
   static let retire = "retire"
-  static let all = [stats, fullDiskAccess, retire]
+  /// Starts a side terminal's shell through the trampoline, and says which of its sessions are
+  /// side terminals (#43). A host without it runs them as agents: without job control, and
+  /// counted as agents after a relaunch.
+  static let sideTerminals = "sideTerminals"
+  static let all = [stats, fullDiskAccess, retire, sideTerminals]
 }

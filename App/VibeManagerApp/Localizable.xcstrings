@@ -874,6 +874,16 @@
         }
       }
     },
+    "Their side terminals follow them: left running with them, or stopped with them." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leurs terminaux annexes les suivent : laissés en marche avec eux, ou arrêtés avec eux."
+          }
+        }
+      }
+    },
     "They still won't have Full Disk Access when you reopen Vibe Manager: stop them to restart them with it." : {
       "localizations" : {
         "fr" : {

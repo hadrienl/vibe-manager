@@ -53,6 +53,11 @@ public struct TerminalSurface: NSViewRepresentable {
     view.getTerminal().changeScrollback(TerminalScrollbackLimits.default.maximumLineCount)
     view.terminalDelegate = context.coordinator
     view.configureNativeColors()
+    let coordinator = context.coordinator
+    view.onWindowChange = { [weak coordinator, weak view] in
+      guard let coordinator, let view else { return }
+      coordinator.observeKeyboardFocus(of: view)
+    }
     context.coordinator.bind(to: view)
     return view
   }
@@ -69,7 +74,9 @@ public struct TerminalSurface: NSViewRepresentable {
     }
     context.coordinator.followActivation(
       isActive, claimingKeyboard: claimsKeyboardOnActivation, in: nsView)
-    context.coordinator.followFocusRequest(focusRequest, isActive: isActive, in: nsView)
+    context.coordinator.followFocusRequest(
+      focusRequest, isActive: isActive, claimingOnFirstSight: claimsKeyboardOnActivation,
+      in: nsView)
     context.coordinator.observeKeyboardFocus(of: nsView)
   }
 
@@ -99,6 +106,11 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   private var focusObservation: NSKeyValueObservation?
   private weak var observedWindow: NSWindow?
   private let commands: AsyncStream<TerminalCommand>.Continuation
+  /// On while a restored history is fed to the view (#43). The programs that wrote it asked the
+  /// terminal questions — its attributes, the cursor's position, its colours — and the view
+  /// answers them as it reads them: sent on, those answers would reach the new shell's prompt as
+  /// keystrokes. A folder the history names (OSC 7) is not where the new shell is either.
+  private let replay = ReplayGate()
   private var commandTask: Task<Void, Never>?
 
   init(pane: TerminalPaneModel) {
@@ -201,10 +213,20 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   /// Takes the keyboard when asked to, and only when this terminal is the one on screen. Like
   /// activation, only a *new* request moves it: a redraw must not steal the focus back.
-  func followFocusRequest(_ request: Int, isActive: Bool, in view: TerminalView) {
+  ///
+  /// The first request a view sees was made before it existed. A pane that claims the keyboard
+  /// on activation takes it then, as it always has; one that does not — a side terminal — takes
+  /// it only if the request is still waiting to be honoured, not for having been asked once long
+  /// ago, before its session was last put away.
+  func followFocusRequest(
+    _ request: Int, isActive: Bool, claimingOnFirstSight: Bool = true, in view: TerminalView
+  ) {
     guard let window = view.window else { return }
     guard lastFocusRequest != request else { return }
+    let isFirstSight = lastFocusRequest == nil
     lastFocusRequest = request
+    let isWaiting = pane.takePendingFocusRequest()
+    if isFirstSight, !claimingOnFirstSight, !isWaiting { return }
     if isActive { window.makeFirstResponder(view) }
   }
 
@@ -232,7 +254,9 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       let attachment = await session.attach()
       // Before the history of the new session, and in the same task, so a restart's separator
       // cannot race the first bytes of the process it announces.
+      replay.isOn = true
       feed(pane.takePendingNotice())
+      replay.isOn = false
       feed(attachment.history.bytes)
       for await event in attachment.events {
         guard !Task.isCancelled else { return }
@@ -259,6 +283,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   }
 
   nonisolated public func send(source: TerminalView, data: ArraySlice<UInt8>) {
+    guard !replay.isOn else { return }
     commands.yield(.write([UInt8](data)))
   }
 
@@ -271,6 +296,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   nonisolated public func setTerminalTitle(source: TerminalView, title: String) {}
 
   nonisolated public func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+    guard !replay.isOn else { return }
     Task { @MainActor [weak self] in
       self?.pane.reportDirectory(directory)
     }
@@ -296,4 +322,16 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   nonisolated public func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
 
   nonisolated public func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+}
+
+/// A flag the view's delegate reads from the thread SwiftTerm calls it on, which is the one that
+/// feeds it, while the surface sets it around a feed.
+private final class ReplayGate: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value = false
+
+  var isOn: Bool {
+    get { lock.withLock { value } }
+    set { lock.withLock { value = newValue } }
+  }
 }

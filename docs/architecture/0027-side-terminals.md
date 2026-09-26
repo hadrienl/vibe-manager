@@ -32,9 +32,16 @@ would have been taken for one by every later piece of code — restoration, jour
 
 `TerminalSpec` carries a `role`, `agent` or `auxiliary`. It crosses to the host, and comes back in its
 list of sessions (additively: a host that predates it lists agents, the only kind it knew). A side
-terminal's shell is always "running" — an idle prompt — so it is counted neither as an agent that
-quitting asks about nor as activity that keeps the host from being let go when Full Disk Access
-needs a new one (ADR 0010).
+terminal's shell is always "running" — an idle prompt — so it is not counted as an agent: not in
+the question asked when quitting, not among the agents a restart of the host for Full Disk Access
+waits for (ADR 0010). The host itself still refuses to retire while any terminal runs; it never has
+to wait for a side terminal, which stops with its session's agent — and that restart closes those
+sessions first.
+
+A host left running by an earlier build (Keep Running across an update) knows neither the role nor
+the trampoline below: it would start the shell without job control and list it as an agent after a
+relaunch. A new host says it can with the `sideTerminals` capability; until the old host is gone,
+side terminals are started in the application, and stop with it.
 
 ### A controlling terminal, through the application's own binary
 
@@ -50,8 +57,11 @@ its terminals through a helper: `Vibe Manager --terminal-exec <path> <argv0> <ar
 first thing the entry point looks at; it takes the terminal and `exec`s the shell in the same
 process, which keeps nothing of the application but its pid, session and descriptors. The shell
 was validated before the spawn, so the helper failing to `exec` it only has its status to give
-(127). An agent's terminal is started exactly as before: changing how every agent gets its terminal
-was not this ticket's to risk.
+(127). It refuses (126) unless it leads its session with a terminal on its input, the only way
+`PseudoTerminal` starts it; run otherwise, it would give nothing a program run directly does not
+have — `exec` replaces the application's image and identity — but it has no reason to run anything.
+An agent's terminal is started exactly as before: changing how every agent gets its terminal was
+not this ticket's to risk.
 
 Stopping a side terminal hangs up on it, as closing a terminal window does: `SIGHUP` to the shell
 and to every job it runs. Under job control each job lives in a group of its own, where a signal to
@@ -72,8 +82,10 @@ history is the conversation, which the agent keeps, and which #10 replaces with 
 - **What**: the raw bytes of the terminal's history, exactly what `attach()` would replay, bounded
   like the history in memory (5,000 lines, 4 MiB). Bytes rather than the text SwiftTerm renders:
   colours are kept, and the replay is the road reattaching already takes.
-- **When**: two seconds after output, at most every fifteen seconds per terminal, so that a crash
-  loses little; and immediately when the session closes, is archived, or the application quits.
+- **When**: five seconds after output, at most every two minutes per terminal, so that a crash
+  loses little without a followed log rewriting up to 4 MiB every few seconds — eight of them would
+  write gigabytes an hour; and immediately when the session closes, is archived, or the application
+  quits.
 - **Where**: `Terminals/<session>/<terminal>.scrollback` beside the store, `0600` in `0700` folders,
   the folder excluded from backups — a history can hold a token a command printed. The diagnostics
   export reads their total size, never a byte of them.
@@ -81,12 +93,16 @@ history is the conversation, which the agent keeps, and which #10 replaces with 
 
 A history is cut wherever its buffer was trimmed, and may end inside an editor's alternate screen,
 with a hidden cursor or a scrolling region. After the replay, a soft reset puts those back before
-the separator and the new shell.
+the separator and the new shell. The programs that wrote it also asked the terminal questions — its
+attributes, the cursor's position, its colours — which the view answers as it reads them: while a
+restored history is fed, those answers are dropped rather than typed into the new shell's prompt,
+and a folder it names (OSC 7) is not taken for the new shell's.
 
 ### What a drawer is, and where it is kept
 
 `Terminals/<session>/drawer.json`: the tabs in order, the one in front, each one's name, folder and
-size, and whether the drawer is shown and how tall. Beside the store and never inside it: those
+size, and whether the drawer is shown and how tall. Never a command line: one can hold a password,
+and this document is written whether histories are kept or not. Beside the store and never inside it: those
 change all the time, and each change written into `sessions.json` would rewrite it and could touch
 the date that orders the sessions. A document that cannot be read is set aside, dated, rather than
 overwritten.
@@ -117,7 +133,13 @@ that is gone — a worktree removed — on the home folder, with a line saying w
 
 `exit` at a prompt closes its tab, as Terminal.app does by default; a shell that ends any other way
 keeps its tab, with its status, **Restart** and **Close**. A hidden terminal that writes something,
-or ends, marks the status bar's button until it is seen.
+or ends, marks the status bar's button until it is seen. Closing a tab asks first when a command
+runs in it, read from the kernel at that moment. Closing or archiving the session names the
+commands it stops, and quitting says the side terminals follow their agents.
+
+A restoration, a close and a shutdown never cross: reading the document and restoring its tabs are
+each done once and waited for by everything else, and a shell whose tab was closed, or whose
+session shut down, while it was starting is stopped as soon as it has started.
 
 ## Consequences
 

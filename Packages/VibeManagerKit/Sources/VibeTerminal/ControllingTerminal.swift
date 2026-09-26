@@ -46,6 +46,13 @@ public enum ControllingTerminal {
     guard arguments.count >= 4, arguments[1] == argument else { return }
     let path = arguments[2]
     let argv = Array(arguments[3...])
+    // Only as `PseudoTerminal` starts it: leading a session of its own, a terminal on its input.
+    // Run any other way it has no terminal to take, and refuses rather than run a program.
+    guard getsid(0) == getpid(), isatty(0) == 1 else {
+      let refusal = "vibe-manager: \(argument) is only run for a side terminal\n"
+      _ = refusal.withCString { write(2, $0, strlen($0)) }
+      _exit(126)
+    }
     // Refused only if the terminal is already another session's, which a new session's terminal
     // is not; the shell then runs as before rather than not at all.
     _ = ioctl(0, setControllingTerminalRequest, 0)

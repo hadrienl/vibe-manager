@@ -197,10 +197,14 @@ public actor TerminalHostServer {
   }
 
   /// What this host speaks beyond the core. It cannot say whether it has Full Disk Access
-  /// without a probe to ask.
+  /// without a probe to ask, nor start side terminals properly without the trampoline.
   private var capabilities: [String] {
     TerminalHostCapability.all.filter {
-      $0 != TerminalHostCapability.fullDiskAccess || configuration.fullDiskAccess != nil
+      switch $0 {
+      case TerminalHostCapability.fullDiskAccess: return configuration.fullDiskAccess != nil
+      case TerminalHostCapability.sideTerminals: return ControllingTerminal.trampolinePath != nil
+      default: return true
+      }
     }
   }
 

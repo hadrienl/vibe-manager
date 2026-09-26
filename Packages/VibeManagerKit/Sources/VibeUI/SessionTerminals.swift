@@ -140,7 +140,14 @@ public final class SessionTerminalDrawer {
   /// The document read at the first use, whose tabs have not been built yet.
   @ObservationIgnored private var pending: SessionTerminalsDocument?
   @ObservationIgnored private var isLoaded = false
-  @ObservationIgnored private var isRestoring = false
+  /// The reading of the document, which every use waits for: a ⌘J pressed while the session's own
+  /// preparation reads it must not open a tab the document then writes over.
+  @ObservationIgnored private var loading: Task<Void, Never>?
+  /// The restoration under way, which everything that changes the tabs waits for.
+  @ObservationIgnored private var restoring: Task<Void, Never>?
+  /// Bumped when the session shuts its drawer down: a restoration or a start begun before then
+  /// starts nothing after it.
+  @ObservationIgnored private var generation = 0
   @ObservationIgnored private var saveTask: Task<Void, Never>?
   @ObservationIgnored private let dependencies: DrawerDependencies
 
@@ -190,9 +197,16 @@ public final class SessionTerminalDrawer {
 
   /// Reads what was written down, once. Nothing is started.
   func load() async {
-    guard !isLoaded else { return }
+    if let loading { return await loading.value }
+    let task = Task { [weak self] () -> Void in await self?.readDocument() }
+    loading = task
+    await task.value
+  }
+
+  private func readDocument() async {
+    let document = await dependencies.store.load(sessionID)
     isLoaded = true
-    guard let document = await dependencies.store.load(sessionID) else { return }
+    guard let document else { return }
     isVisible = document.isVisible
     height = document.height
     activeTerminalID = document.activeTerminal
@@ -239,10 +253,13 @@ public final class SessionTerminalDrawer {
   public func newTerminal() async {
     await load()
     await restore()
+    let generation = generation
     guard canAddTerminal else { return }
     let folder = await dependencies.sessionFolder(sessionID)
     let (directory, fallback) = await DrawerRestoration.directory(
       remembered: nil, sessionFolder: folder, probe: dependencies.probe)
+    // The session may have closed meanwhile, or another tab taken the last place.
+    guard generation == self.generation, canAddTerminal else { return }
     let terminal = makeTerminal(id: TerminalID(), size: nil)
     terminal.currentDirectory = directory
     terminals.append(terminal)
@@ -253,7 +270,7 @@ public final class SessionTerminalDrawer {
     if let fallback {
       terminal.pane.post(notice: DrawerRestoration.fallbackNotice(fallback))
     }
-    await start(terminal, in: directory, size: nil)
+    await start(terminal, in: directory, size: nil, generation: generation)
     dependencies.diagnostics.record(
       .session, .info, "drawer.terminalOpened",
       [
@@ -335,6 +352,7 @@ public final class SessionTerminalDrawer {
     guard let terminal = terminals.first(where: { $0.id == id }), !terminal.isRunning else {
       return
     }
+    let generation = generation
     terminal.hasUnseenExit = false
     let folder = await dependencies.sessionFolder(sessionID)
     let (directory, fallback) = await DrawerRestoration.directory(
@@ -344,7 +362,16 @@ public final class SessionTerminalDrawer {
       notice: DrawerRestoration.notice(
         scrollback: nil, resumption: .relaunched, at: dependencies.clock.now(),
         fallback: fallback))
-    await start(terminal, in: directory, size: terminal.pane.viewportSize)
+    guard isStillOpen(terminal, generation: generation) else { return }
+    await start(terminal, in: directory, size: terminal.pane.viewportSize, generation: generation)
+  }
+
+  /// What a command started in the tab is, asked of the kernel now rather than read from the last
+  /// look: a ⌘W right after Return must not stop a build without asking.
+  public func runningCommand(of id: TerminalID) async -> String? {
+    guard let terminal = terminals.first(where: { $0.id == id }) else { return nil }
+    await inspect(terminal)
+    return terminal.isRunningCommand ? terminal.foregroundCommand : nil
   }
 
   // MARK: - Restoring and stopping
@@ -352,11 +379,22 @@ public final class SessionTerminalDrawer {
   /// Rebuilds the tabs written down: each one takes back its shell if the terminal host kept it
   /// running, and otherwise gets a new one, in the folder it was in, under the history it showed.
   func restore() async {
-    guard let document = pending, !isRestoring else { return }
-    isRestoring = true
+    if let restoring { return await restoring.value }
+    guard pending != nil else { return }
+    let generation = generation
+    let task = Task { [weak self] () -> Void in
+      await self?.performRestore(generation: generation)
+    }
+    restoring = task
+    await task.value
+    restoring = nil
+  }
+
+  private func performRestore(generation: Int) async {
+    // Nothing is taken from the document before it is certain to be used: a drawer shut down in
+    // the meantime keeps it whole for the next reopening.
+    guard generation == self.generation, let document = pending else { return }
     pending = nil
-    defer { isRestoring = false }
-    let folder = await dependencies.sessionFolder(sessionID)
     let now = dependencies.clock.now()
     var restored: [DrawerTerminal] = []
     for record in document.terminals.prefix(SessionTerminalsDocument.maximumTerminalCount) {
@@ -366,12 +404,16 @@ public final class SessionTerminalDrawer {
       terminal.currentDirectory = record.directory
       restored.append(terminal)
     }
-    terminals = restored
+    // In place before the first suspension, so that nothing sees the drawer empty meanwhile.
+    terminals = restored + terminals.filter { open in !restored.contains { $0.id == open.id } }
     if activeTerminalID == nil || !terminals.contains(where: { $0.id == activeTerminalID }) {
       activeTerminalID = terminals.first?.id
     }
+    let folder = await dependencies.sessionFolder(sessionID)
     for (terminal, record) in zip(restored, document.terminals) {
-      await bringBack(terminal, record: record, folder: folder, at: now)
+      // Closed by ×, or its session shut down, while an earlier tab was starting.
+      guard isStillOpen(terminal, generation: generation) else { continue }
+      await bringBack(terminal, record: record, folder: folder, at: now, generation: generation)
     }
     dependencies.diagnostics.record(
       .session, .info, "drawer.restored",
@@ -382,7 +424,8 @@ public final class SessionTerminalDrawer {
   }
 
   private func bringBack(
-    _ terminal: DrawerTerminal, record: DrawerTerminalRecord, folder: String?, at date: Date
+    _ terminal: DrawerTerminal, record: DrawerTerminalRecord, folder: String?, at date: Date,
+    generation: Int
   ) async {
     var scrollback: [UInt8]?
     if let kept = await dependencies.supervisor.session(for: terminal.id) {
@@ -390,6 +433,10 @@ public final class SessionTerminalDrawer {
       if !state.isFinished {
         // Left running with its session's agent: taken back as it is, nothing started or typed.
         await terminal.pane.adopt(kept)
+        guard isStillOpen(terminal, generation: generation) else {
+          await terminal.pane.stop(gracePeriod: Self.stopGracePeriod)
+          return
+        }
         await running(terminal)
         return
       }
@@ -402,15 +449,23 @@ public final class SessionTerminalDrawer {
     let (directory, fallback) = await DrawerRestoration.directory(
       remembered: record.directory, sessionFolder: folder, probe: dependencies.probe)
     terminal.currentDirectory = directory
+    guard isStillOpen(terminal, generation: generation) else { return }
     terminal.pane.post(
       notice: DrawerRestoration.notice(
         scrollback: scrollback, resumption: .resumed, at: date, fallback: fallback))
-    await start(terminal, in: directory, size: record.size)
+    await start(terminal, in: directory, size: record.size, generation: generation)
   }
 
   /// Writes down what each tab shows, then stops them all: the session is closing. The drawer
   /// comes back as it was when the session is reopened.
   func shutDown() async {
+    // Whatever is starting starts nothing after this, and stops what it started.
+    generation += 1
+    for terminal in terminals {
+      terminal.isEnding = true
+      terminal.cancelTasks()
+    }
+    await restoring?.value
     guard !terminals.isEmpty else {
       await flush()
       return
@@ -465,7 +520,10 @@ public final class SessionTerminalDrawer {
           title: terminal.customTitle,
           directory: terminal.currentDirectory,
           size: terminal.pane.viewportSize,
-          lastSeenTitle: terminal.title)
+          // The folder's name, never the command: a command line can hold a password, and this
+          // document is written whether histories are kept or not.
+          lastSeenTitle: terminal.customTitle
+            ?? terminal.currentDirectory.map(DrawerTerminal.displayName(of:)))
       })
   }
 
@@ -519,16 +577,26 @@ public final class SessionTerminalDrawer {
     return terminal
   }
 
-  private func start(_ terminal: DrawerTerminal, in directory: String, size: TerminalSize?)
-    async
-  {
-    terminal.isEnding = false
+  private func start(
+    _ terminal: DrawerTerminal, in directory: String, size: TerminalSize?, generation: Int
+  ) async {
     let spec = TerminalSpec.loginShell(
       workingDirectoryURL: URL(fileURLWithPath: directory, isDirectory: true),
       size: size ?? .default, role: .auxiliary)
     await terminal.pane.start(spec: spec)
     guard terminal.pane.session != nil else { return }
+    // Closed, or its session shut down, while its shell was starting: nothing it started may be
+    // left running without a tab.
+    guard isStillOpen(terminal, generation: generation) else {
+      await terminal.pane.stop(gracePeriod: Self.stopGracePeriod)
+      return
+    }
     await running(terminal)
+  }
+
+  private func isStillOpen(_ terminal: DrawerTerminal, generation: Int) -> Bool {
+    generation == self.generation && !terminal.isEnding
+      && terminals.contains { $0 === terminal }
   }
 
   /// Arms what follows a running shell: its record, its output, its end.
@@ -651,8 +719,8 @@ public final class SessionTerminals: SessionSideTerminals {
     public init(
       saveDelay: Duration = .milliseconds(500),
       inspectionInterval: Duration = .milliseconds(500),
-      snapshotDelay: Duration = .seconds(2),
-      snapshotInterval: Duration = .seconds(15)
+      snapshotDelay: Duration = .seconds(5),
+      snapshotInterval: Duration = .seconds(120)
     ) {
       self.saveDelay = saveDelay
       self.inspectionInterval = inspectionInterval
@@ -713,6 +781,11 @@ public final class SessionTerminals: SessionSideTerminals {
     keepsScrollback = keeps
     dependencies.preferences.keepsScrollback = keeps
     if !keeps { await dependencies.store.removeAllScrollback() }
+  }
+
+  /// How many side terminals run, in every session: what quitting says follows the agents.
+  public var runningTerminalCount: Int {
+    drawers.values.reduce(0) { $0 + $1.terminals.filter(\.isRunning).count }
   }
 
   /// What the histories weigh on disk, for the diagnostics.
