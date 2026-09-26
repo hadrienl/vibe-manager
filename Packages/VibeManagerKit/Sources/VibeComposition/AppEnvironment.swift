@@ -277,7 +277,8 @@ public final class AppEnvironment {
     let conversations = ConversationWorkspace(
       follow: FollowConversation(
         agents: registry, tail: FileTranscriptTail(),
-        hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }),
+        hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) },
+        current: { [repository] id in try? await repository.session(id: id) }),
       store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),
       agents: registry)
     appModel = AppModel(

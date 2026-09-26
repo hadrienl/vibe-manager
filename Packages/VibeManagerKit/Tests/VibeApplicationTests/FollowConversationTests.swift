@@ -113,6 +113,12 @@ private actor ScriptedTail: TranscriptTailing {
   }
 }
 
+private actor Store {
+  var session: WorkSession
+  init(_ session: WorkSession) { self.session = session }
+  func set(_ session: WorkSession) { self.session = session }
+}
+
 @Suite("Following a session's conversation")
 struct FollowConversationTests {
   private let alpha = AgentDescriptor(id: AgentProviderID("alpha"), displayName: "Alpha")
@@ -148,6 +154,29 @@ struct FollowConversationTests {
     await tail.replace(file, with: ["user:again"])
     let third = await next(&iterator) { $0.entries.count == 1 }
     #expect(third?.entries.first?.content == .userPrompt("again", attachments: 0))
+  }
+
+  @Test("An identifier the agent gives after the start is read from the store, then followed")
+  func identifierArrivesLater() async throws {
+    let file = URL(fileURLWithPath: "/t/late.jsonl")
+    let tail = ScriptedTail([file: ["user:bonjour", "agent:salut"]])
+    let id = SessionID()
+    let pending = WorkSession(
+      id: id, name: "S", agent: SessionAgentConfiguration(providerID: "alpha"))
+    let known = WorkSession(
+      id: id, name: "S",
+      agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "late"))
+    let store = Store(pending)
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      current: { _ in await store.session },
+      refreshInterval: .milliseconds(50), publishInterval: .milliseconds(10))
+    var iterator = await follow.follow(pending).makeAsyncIterator()
+    let empty = await next(&iterator) { _ in true }
+    #expect(empty?.availability == .notYetWritten(providerName: "Alpha"))
+    await store.set(known)
+    let found = await next(&iterator) { $0.entries.count == 2 }
+    #expect(found?.entries.last?.content == .agentText("salut"))
   }
 
   @Test("After a switch of agent, both conversations, the second opened by a notice")

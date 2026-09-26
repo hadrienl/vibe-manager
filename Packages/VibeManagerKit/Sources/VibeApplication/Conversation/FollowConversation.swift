@@ -41,6 +41,10 @@ public actor FollowConversation {
   private let agents: any AgentProviderResolving
   private let tail: any TranscriptTailing
   private let hint: @Sendable (SessionID) async -> AgentActivityEvent?
+  /// The session as the store has it now. Codex tells its conversation's identifier only once it
+  /// has started, and a switch of agent adds a conversation: what was followed at first goes
+  /// stale, and is read again.
+  private let current: @Sendable (SessionID) async -> WorkSession?
   private let refreshInterval: Duration
   private let publishInterval: Duration
 
@@ -65,7 +69,7 @@ public actor FollowConversation {
   }
 
   private final class Following {
-    let session: WorkSession
+    var session: WorkSession
     let live: Bool
     let continuation: AsyncStream<ConversationSnapshot>.Continuation
     var chapters: [Chapter] = []
@@ -90,12 +94,14 @@ public actor FollowConversation {
     agents: any AgentProviderResolving,
     tail: any TranscriptTailing,
     hint: @escaping @Sendable (SessionID) async -> AgentActivityEvent? = { _ in nil },
+    current: @escaping @Sendable (SessionID) async -> WorkSession? = { _ in nil },
     refreshInterval: Duration = .seconds(2),
     publishInterval: Duration = .milliseconds(50)
   ) {
     self.agents = agents
     self.tail = tail
     self.hint = hint
+    self.current = current
     self.refreshInterval = refreshInterval
     self.publishInterval = publishInterval
   }
@@ -172,6 +178,26 @@ public actor FollowConversation {
     publishIfNeeded(following)
   }
 
+  /// Follows the session as it is now: the chapters it already had keep what they read, a
+  /// conversation that gained its identifier starts reading, a new one is added.
+  private func adopt(_ latest: WorkSession, in following: Following) async {
+    let previous = following.chapters
+    let previousAgents = following.session.conversationAgents
+    following.session = latest
+    await prepareChapters(following)
+    for (index, agent) in latest.conversationAgents.enumerated() {
+      guard let kept = previousAgents.firstIndex(of: agent), kept < previous.count,
+        index < following.chapters.count
+      else { continue }
+      following.chapters[index].readings = previous[kept].readings
+    }
+    let reused = Set(following.chapters.flatMap(\.readings).map(ObjectIdentifier.init))
+    for reading in previous.flatMap(\.readings) where !reused.contains(ObjectIdentifier(reading)) {
+      reading.task?.cancel()
+    }
+    following.isDirty = true
+  }
+
   private func prepareChapters(_ following: Following) async {
     var chapters: [Chapter] = []
     for conversation in following.session.conversationAgents {
@@ -187,6 +213,11 @@ public actor FollowConversation {
   /// Looks for files the CLIs started since the last look: a first exchange, a `/clear`, a resume
   /// the next day.
   private func refreshFiles(_ following: Following, key: UUID) async {
+    if let latest = await current(following.session.id),
+      latest.conversationAgents != following.session.conversationAgents
+    {
+      await adopt(latest, in: following)
+    }
     let conversations = following.session.conversationAgents
     let lastHint = await hint(following.session.id)
     for index in following.chapters.indices {
