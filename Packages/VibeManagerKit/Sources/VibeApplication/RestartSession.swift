@@ -466,7 +466,7 @@ public struct RestartSession: Sendable {
   ///
   /// The first repository, and it is said out loud rather than left to be discovered: several
   /// repositories per session are #12, and until then a session has exactly one place to run.
-  static func workingDirectoryPath(of session: WorkSession) -> String? {
+  public static func workingDirectoryPath(of session: WorkSession) -> String? {
     guard let repository = session.repositories.first else { return nil }
     return repository.git?.worktreePath ?? repository.path
   }

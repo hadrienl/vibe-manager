@@ -348,6 +348,12 @@ public struct RootView: View {
       // No shortcut here: ⌘N belongs to the New Session menu command, which owns it for the
       // whole application. Repeating it bound the same key twice, under two conditions.
       .toolbar {
+        // With the sidebar folded, its palette is reached from here (#40).
+        ToolbarItem(placement: .navigation) {
+          if !model.layout.columns.isSidebarVisible, !model.pendingRequests.isEmpty {
+            RequestPaletteToolbarButton(model: model)
+          }
+        }
         // Where the work on the session on screen stands, and a way to change it (#80).
         ToolbarItem(placement: .primaryAction) {
           if let session = model.selectedSession, session.taskStatus != .archived {

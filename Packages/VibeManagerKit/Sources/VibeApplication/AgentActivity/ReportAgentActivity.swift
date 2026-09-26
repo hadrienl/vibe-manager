@@ -112,7 +112,10 @@ public struct ReportAgentActivity: Sendable {
       return ReportedLaunch(plan: plan, decoder: nil)
     }
     let reported = reporting.reportingActivity(plan, to: log)
-    let launch = ReportedLaunch(plan: reported, decoder: reporting.activityDecoder())
+    let launch = ReportedLaunch(
+      plan: reported,
+      decoder: reporting.activityDecoder(
+        workingDirectoryPath: reported.workingDirectoryPath, environment: reported.environment))
     guard let trusting else { return launch }
 
     let fingerprint = Self.fingerprint(of: reported)

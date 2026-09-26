@@ -69,21 +69,41 @@ public enum CodexActivityHooks {
 public struct CodexSignalDecoder: AgentSignalDecoding {
   /// `y` approves, `a` approves for the rest of the session, `n` refuses, Enter takes the
   /// highlighted choice.
-  public let approvalAnswerKeys: Set<[UInt8]> = [[0x79], [0x61], [0x6E], [0x0D]]
+  public let approvalAnswerKeys: Set<[UInt8]> = [[0x79], [0x61], [0x70], [0x6E], [0x0D]]
 
-  public init() {}
+  /// Follows the session's rollout for the questions no hook reports (#40); `nil` without one.
+  private let questions: (@Sendable (Date) -> AsyncStream<AgentSignal>)?
+
+  public init(questions: (@Sendable (Date) -> AsyncStream<AgentSignal>)? = nil) {
+    self.questions = questions
+  }
+
+  public var answerKeymap: (any AgentAnswerKeymap)? {
+    CodexAnswerKeymap()
+  }
 
   public func signal(for event: AgentActivityEvent) -> AgentSignal? {
     switch event.name {
     case "SessionStart": return .channelConfirmed
     case "UserPromptSubmit": return .promptSubmitted(byUser: true)
-    case "PermissionRequest": return .questionAsked(.approval)
+    case "PermissionRequest":
+      // Codex reports the permission once its dialog is drawn: checked against 0.157.1.
+      return .questionAsked(
+        .approval,
+        notice: event.requestNotice(isShown: true, alwaysAllow: CodexAnswerKeymap.alwaysAllow))
     case "PostToolUse": return .questionResolved
     case "Stop": return .turnEnded
     case "Interrupt": return .interrupted
     case "SessionEnd": return .agentEnded
     default: return nil
     }
+  }
+
+  /// Codex's `request_user_input` has no hook of its own: its questions are read from the rollout
+  /// the session writes, found once the session has started.
+  public func additionalSignals(after event: AgentActivityEvent) -> AsyncStream<AgentSignal>? {
+    guard event.name == "SessionStart", let questions else { return nil }
+    return questions(event.date)
   }
 }
 
@@ -94,5 +114,18 @@ extension CodexAgentProvider: AgentActivityReporting {
 
   public func activityDecoder() -> any AgentSignalDecoding {
     CodexSignalDecoder()
+  }
+
+  public func activityDecoder(workingDirectoryPath: String?, environment: [String: String])
+    -> any AgentSignalDecoding
+  {
+    guard let workingDirectoryPath else { return CodexSignalDecoder() }
+    let sessions = CodexHome.sessionsDirectory(
+      environment: ProcessInfo.processInfo.environment.merging(environment) { $1 })
+    return CodexSignalDecoder { since in
+      CodexQuestionWatch(
+        sessionsDirectory: sessions, workingDirectoryPath: workingDirectoryPath, since: since
+      ).signals()
+    }
   }
 }

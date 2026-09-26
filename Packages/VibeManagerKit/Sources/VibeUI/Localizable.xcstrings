@@ -216,6 +216,17 @@
         }
       }
     },
+    "%@ is no longer running: nothing was sent." : {
+      "comment" : "Said when an answer from the palette found its session stopped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » ne tourne plus : rien n’a été envoyé."
+          }
+        }
+      }
+    },
     "%@ is not a field — names use letters, digits, - and _ — so it stays as text." : {
       "comment" : "What the user wrote between double braces.",
       "localizations" : {
@@ -1576,6 +1587,53 @@
         }
       }
     },
+    "%lld questions" : {
+      "comment" : "The title of a request of an agent: several questions at once.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld question"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld questions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld questions"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld question"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld questions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld results" : {
       "comment" : "Said by VoiceOver: how many sessions Open Quickly found.",
       "localizations" : {
@@ -2037,6 +2095,53 @@
         }
       }
     },
+    "%lld waiting" : {
+      "comment" : "The folded palette of requests.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld waiting"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en attente"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en attente"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en attente"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld with an error" : {
       "comment" : "How many sessions of a group ended badly or lost their agent.",
       "localizations" : {
@@ -2276,6 +2381,17 @@
         }
       }
     },
+    "After the previous request of this session." : {
+      "comment" : "Why a request cannot be answered yet: another request of its session comes first.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Après la demande précédente de cette session."
+          }
+        }
+      }
+    },
     "Agent" : {
       "comment" : "The coding agent the session runs.\nThe heading of the session's agent.\nWhat the Usage window groups its figures by.",
       "localizations" : {
@@ -2401,6 +2517,17 @@
         }
       }
     },
+    "Allow" : {
+      "comment" : "Allows what an agent asks, this once.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser"
+          }
+        }
+      }
+    },
     "Allow Once" : {
       "localizations" : {
         "fr" : {
@@ -2422,6 +2549,17 @@
         }
       }
     },
+    "Allowed · %@" : {
+      "comment" : "Said once an agent's request was allowed from the palette.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisé · %@"
+          }
+        }
+      }
+    },
     "Also looked in: %@" : {
       "comment" : "A list of folders the agent visited that are not repositories.",
       "localizations" : {
@@ -2433,8 +2571,19 @@
         }
       }
     },
+    "Also stops the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request from the palette does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
     "Always" : {
-      "comment" : "An agent action allowed by Always Allow.",
+      "comment" : "Allows what an agent asks, from now on.\nAn agent action allowed by Always Allow.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2454,12 +2603,56 @@
         }
       }
     },
+    "Always allow %@ everywhere" : {
+      "comment" : "A button answering an agent's permission. The argument lists what is allowed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autoriser %@ partout"
+          }
+        }
+      }
+    },
+    "Always allow %@ for this session" : {
+      "comment" : "A button answering an agent's permission. The argument lists what is allowed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autoriser %@ pour cette session"
+          }
+        }
+      }
+    },
+    "Always allow %@ in this project" : {
+      "comment" : "A button answering an agent's permission. The argument lists what is allowed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autoriser %@ dans ce projet"
+          }
+        }
+      }
+    },
     "Always allowed sites" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sites toujours autorisés"
+          }
+        }
+      }
+    },
+    "An agent is asking for something" : {
+      "comment" : "A notification whose details are hidden, on the lock screen.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un agent demande quelque chose"
           }
         }
       }
@@ -2495,6 +2688,28 @@
         }
       }
     },
+    "Answer this question in the session." : {
+      "comment" : "Why a request is answered in its terminal: its CLI never says when its dialog is shown.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondez à cette question dans la session."
+          }
+        }
+      }
+    },
+    "Answered · %@" : {
+      "comment" : "Said once an agent's question was answered from the palette.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondu · %@"
+          }
+        }
+      }
+    },
     "Any folder" : {
       "localizations" : {
         "fr" : {
@@ -2512,6 +2727,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apparence"
+          }
+        }
+      }
+    },
+    "Approve" : {
+      "comment" : "Approves an agent's plan.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider"
+          }
+        }
+      }
+    },
+    "Approve, Accepting Edits" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider, modifications acceptées d’office"
+          }
+        }
+      }
+    },
+    "Approve, Reviewing Each Edit" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider, chaque modification à approuver"
           }
         }
       }
@@ -3073,6 +3319,7 @@
       }
     },
     "Conversation" : {
+      "comment" : "A tab of the Settings window.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3540,6 +3787,16 @@
         }
       }
     },
+    "Either way, the lock screen shows only that a request arrived." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans tous les cas, l’écran verrouillé indique seulement qu’une demande est arrivée."
+          }
+        }
+      }
+    },
     "Elsewhere than this Mac, an agent asks before clicking, typing or running JavaScript." : {
       "localizations" : {
         "fr" : {
@@ -3705,6 +3962,50 @@
         }
       }
     },
+    "File changes" : {
+      "comment" : "A permission an agent asks for: a patch to apply to files.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifications de fichiers"
+          }
+        }
+      }
+    },
+    "File edit" : {
+      "comment" : "A permission an agent asks for: its tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modification de fichier"
+          }
+        }
+      }
+    },
+    "File read" : {
+      "comment" : "A permission an agent asks for: its tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de fichier"
+          }
+        }
+      }
+    },
+    "File write" : {
+      "comment" : "A permission an agent asks for: its tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture de fichier"
+          }
+        }
+      }
+    },
     "Filtering is on. Click to clear it." : {
       "localizations" : {
         "fr" : {
@@ -3732,6 +4033,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminée"
+          }
+        }
+      }
+    },
+    "Fold the requests" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier les demandes"
+          }
+        }
+      }
+    },
+    "Folded, the palette shows how many requests wait, and VoiceOver says each one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repliée, la palette indique combien de demandes attendent, et VoiceOver annonce chacune."
           }
         }
       }
@@ -3764,6 +4085,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dossier introuvable"
+          }
+        }
+      }
+    },
+    "Form to fill in" : {
+      "comment" : "The title of a request of an agent: a form an MCP server asks for.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formulaire à remplir"
           }
         }
       }
@@ -4378,6 +4710,17 @@
         }
       }
     },
+    "MCP tool" : {
+      "comment" : "A permission an agent asks for: its tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil MCP"
+          }
+        }
+      }
+    },
     "Main View" : {
       "localizations" : {
         "fr" : {
@@ -4638,6 +4981,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle réponse"
+          }
+        }
+      }
+    },
+    "New request: %@, %@" : {
+      "comment" : "Said when an agent in the background asks the user something.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New request: %1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle demande : %@, %@"
           }
         }
       }
@@ -5334,6 +5694,47 @@
         }
       }
     },
+    "Notifications" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications"
+          }
+        }
+      }
+    },
+    "Notifications are turned off for Vibe Manager." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notifications sont désactivées pour Vibe Manager."
+          }
+        }
+      }
+    },
+    "Notifications show" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notifications affichent"
+          }
+        }
+      }
+    },
+    "Notify me of requests" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me notifier des demandes"
+          }
+        }
+      }
+    },
     "Now" : {
       "comment" : "The agent the session runs now.",
       "localizations" : {
@@ -5408,6 +5809,16 @@
         }
       }
     },
+    "Open Session" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la session"
+          }
+        }
+      }
+    },
     "Open Settings…" : {
       "localizations" : {
         "fr" : {
@@ -5424,6 +5835,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir Réglages Système"
+          }
+        }
+      }
+    },
+    "Open System Settings…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les Réglages Système…"
           }
         }
       }
@@ -5529,6 +5950,17 @@
         }
       }
     },
+    "Other Answer…" : {
+      "comment" : "Answers a question in free text.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre réponse…"
+          }
+        }
+      }
+    },
     "Other…" : {
       "comment" : "Picks another application to open files with.",
       "localizations" : {
@@ -5540,12 +5972,89 @@
         }
       }
     },
+    "Palette" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palette"
+          }
+        }
+      }
+    },
+    "Pending Requests" : {
+      "comment" : "The title of the palette of requests.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandes en attente"
+          }
+        }
+      }
+    },
+    "Pending requests: %lld" : {
+      "comment" : "VoiceOver, on the palette of requests.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandes en attente : %lld"
+          }
+        }
+      }
+    },
+    "Pending requests: %lld. Show" : {
+      "comment" : "VoiceOver, on the folded palette of requests.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandes en attente : %lld. Afficher"
+          }
+        }
+      }
+    },
     "Period" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Période"
+          }
+        }
+      }
+    },
+    "Permission" : {
+      "comment" : "The title of a request of an agent whose details could not be read.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisation"
+          }
+        }
+      }
+    },
+    "Permission requested: %@" : {
+      "comment" : "The body of a notification. The argument is the kind of tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande d’autorisation : %@"
+          }
+        }
+      }
+    },
+    "Plan to approve" : {
+      "comment" : "The title of a request of an agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plan à valider"
           }
         }
       }
@@ -5665,6 +6174,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pull request %@"
+          }
+        }
+      }
+    },
+    "Question" : {
+      "comment" : "The title of a request of an agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question"
           }
         }
       }
@@ -5814,6 +6334,28 @@
         }
       }
     },
+    "Refuse" : {
+      "comment" : "Refuses what an agent asks.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser"
+          }
+        }
+      }
+    },
+    "Refused · %@" : {
+      "comment" : "Said once an agent's request was refused from the palette.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refusé · %@"
+          }
+        }
+      }
+    },
     "Regenerate the summary" : {
       "localizations" : {
         "fr" : {
@@ -5830,6 +6372,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Régénérer le résumé, en abandonnant vos modifications"
+          }
+        }
+      }
+    },
+    "Reject" : {
+      "comment" : "Rejects an agent's plan.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rejeter"
           }
         }
       }
@@ -5936,6 +6489,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dépôt %@"
+          }
+        }
+      }
+    },
+    "Requests" : {
+      "comment" : "A VoiceOver rotor.\nA tab of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandes"
           }
         }
       }
@@ -6472,6 +7036,26 @@
         }
       }
     },
+    "Send" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer"
+          }
+        }
+      }
+    },
+    "Send Answers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer les réponses"
+          }
+        }
+      }
+    },
     "Session" : {
       "comment" : "What the Usage window groups its figures by.",
       "localizations" : {
@@ -6585,6 +7169,17 @@
         }
       }
     },
+    "Several requests are waiting in this session: answer in the session." : {
+      "comment" : "Why a request is answered in its terminal: which of them is on screen is not known.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs demandes attendent dans cette session : répondez dans la session."
+          }
+        }
+      }
+    },
     "Several “Vibe Manager” in the list? Drag this copy into it to add the right one." : {
       "localizations" : {
         "fr" : {
@@ -6622,6 +7217,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Partagé avec %@"
+          }
+        }
+      }
+    },
+    "Shell command" : {
+      "comment" : "A permission an agent asks for: its tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commande shell"
           }
         }
       }
@@ -6778,6 +7384,17 @@
         }
       }
     },
+    "Show All" : {
+      "comment" : "Unfolds everything a tool was handed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout afficher"
+          }
+        }
+      }
+    },
     "Show All (%lld)" : {
       "comment" : "Shows every file of a list: their number.",
       "localizations" : {
@@ -6854,6 +7471,7 @@
       }
     },
     "Show in Finder" : {
+      "comment" : "Reveals a recent folder in the Finder.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -6861,8 +7479,7 @@
             "value" : "Afficher dans le Finder"
           }
         }
-      },
-      "comment" : "Reveals a recent folder in the Finder."
+      }
     },
     "Show prompt" : {
       "localizations" : {
@@ -6880,6 +7497,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher les fichiers de ce dossier"
+          }
+        }
+      }
+    },
+    "Show the number of requests on the Dock icon" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le nombre de demandes sur l’icône du Dock"
           }
         }
       }
@@ -7356,6 +7983,7 @@
       }
     },
     "Terminal" : {
+      "comment" : "The raw terminal of a session, as a view.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7612,6 +8240,16 @@
         }
       }
     },
+    "The command or the question" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La commande ou la question"
+          }
+        }
+      }
+    },
     "The conversation continues with %@." : {
       "comment" : "A model's name.",
       "localizations" : {
@@ -7694,6 +8332,16 @@
         }
       }
     },
+    "The kind of request" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le type de demande"
+          }
+        }
+      }
+    },
     "The last summary could not be written, at %@." : {
       "comment" : "A time of day.",
       "localizations" : {
@@ -7746,6 +8394,16 @@
         }
       }
     },
+    "The plan goes on in the session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La suite du plan est dans la session."
+          }
+        }
+      }
+    },
     "The prompt is empty." : {
       "localizations" : {
         "fr" : {
@@ -7763,6 +8421,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le fournisseur %@ n’est pas inclus dans cette version."
+          }
+        }
+      }
+    },
+    "The request of %@ changed while its answer was being typed: finish it in the session." : {
+      "comment" : "Said when an answer from the palette was typed only in part into its session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande de « %@ » a changé pendant la saisie de sa réponse : terminez-la dans la session."
+          }
+        }
+      }
+    },
+    "The request of %@ was no longer waiting: nothing was sent." : {
+      "comment" : "Said when an answer from the palette could not be typed into its session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande de « %@ » n’attendait plus : rien n’a été envoyé."
           }
         }
       }
@@ -7891,6 +8571,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet agent s’arrêtera quand vous quitterez Vibe Manager."
+          }
+        }
+      }
+    },
+    "This agent's dialog can only be answered in the session." : {
+      "comment" : "Why a request is answered in its terminal: its CLI cannot be answered from outside.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dialogue de cet agent ne se répond que dans la session."
           }
         }
       }
@@ -8265,6 +8956,28 @@
         }
       }
     },
+    "Too long to be shown in full: allow it in the session." : {
+      "comment" : "Why a permission cannot be granted from the palette: it was cut short.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop longue pour être affichée en entier : autorisez-la dans la session."
+          }
+        }
+      }
+    },
+    "Tool" : {
+      "comment" : "A permission an agent asks for: a tool of another kind.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil"
+          }
+        }
+      }
+    },
     "Total" : {
       "comment" : "The last row of the Usage window's table.",
       "localizations" : {
@@ -8416,6 +9129,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désarchiver"
+          }
+        }
+      }
+    },
+    "Unfold the palette when a request arrives" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier la palette à l’arrivée d’une demande"
           }
         }
       }
@@ -8697,6 +9420,17 @@
         }
       }
     },
+    "Waiting for the agent to show its dialog…" : {
+      "comment" : "Why a request cannot be answered yet: its dialog is not on screen yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de l’affichage du dialogue de l’agent…"
+          }
+        }
+      }
+    },
     "Waiting for your approval in the web view" : {
       "localizations" : {
         "fr" : {
@@ -8724,6 +9458,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vue web"
+          }
+        }
+      }
+    },
+    "Web access" : {
+      "comment" : "A permission an agent asks for: its tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès web"
           }
         }
       }
@@ -8784,6 +9529,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce que vous avez tapé est conservé jusqu’à son enregistrement."
+          }
+        }
+      }
+    },
+    "When an agent in the background asks for something while Vibe Manager is not in front." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand un agent en arrière-plan demande quelque chose alors que Vibe Manager n’est pas au premier plan."
           }
         }
       }
@@ -8934,6 +9689,16 @@
         }
       }
     },
+    "Your answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre réponse"
+          }
+        }
+      }
+    },
     "Your changes are lost if you don't save them." : {
       "localizations" : {
         "fr" : {
@@ -8951,6 +9716,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "une session"
+          }
+        }
+      }
+    },
+    "access to %@" : {
+      "comment" : "What always allowing grants: access to these folders.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’accès à %@"
           }
         }
       }
@@ -9023,12 +9799,34 @@
       }
     },
     "branch %@" : {
-      "comment" : "What VoiceOver says of a repository's branch: its name.",
+      "comment" : "Said by VoiceOver on a request's card.\nWhat VoiceOver says of a repository's branch: its name.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "branche %@"
+          }
+        }
+      }
+    },
+    "changes to these files" : {
+      "comment" : "What always allowing grants: further changes to the same files.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les modifications de ces fichiers"
+          }
+        }
+      }
+    },
+    "commands starting the same way" : {
+      "comment" : "What always allowing grants: commands with the same beginning.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les commandes qui commencent de la même façon"
           }
         }
       }
@@ -9186,6 +9984,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "résumé modifié, %@"
+          }
+        }
+      }
+    },
+    "file edits" : {
+      "comment" : "What always allowing grants: the agent's file edits, accepted as they come.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les modifications de fichiers"
           }
         }
       }

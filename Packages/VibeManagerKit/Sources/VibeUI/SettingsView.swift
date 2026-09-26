@@ -85,6 +85,15 @@ public struct SettingsView: View {
             }
           }
           .tag(SettingsTab.conversation)
+        RequestSettings(model: model)
+          .tabItem {
+            Label {
+              Text("Requests", bundle: .module, comment: "A tab of the Settings window.")
+            } icon: {
+              Image(systemName: "hand.raised")
+            }
+          }
+          .tag(SettingsTab.requests)
       }
     } else {
       general
@@ -186,6 +195,83 @@ public enum SettingsTab: String, Hashable, Sendable {
   case activity
   /// The conversation view of #38: its theme, its fonts, what it unfolds.
   case conversation
+  /// How the requests of background sessions are signalled (#40).
+  case requests
+}
+
+/// How the requests of background sessions are signalled (#40): notifications, the Dock badge,
+/// the palette.
+private struct RequestSettings: View {
+  @Bindable var model: AppModel
+  @State private var isAuthorized: Bool?
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle(isOn: $model.notifiesRequests) {
+          Text("Notify me of requests", bundle: .module)
+          Text(
+            "When an agent in the background asks for something while Vibe Manager is not in front.",
+            bundle: .module)
+        }
+        Picker(selection: $model.requestNotificationContent) {
+          Text("The kind of request", bundle: .module).tag(RequestNotificationContent.kind)
+          Text("The command or the question", bundle: .module).tag(
+            RequestNotificationContent.detail)
+        } label: {
+          Text("Notifications show", bundle: .module)
+          Text(
+            "Either way, the lock screen shows only that a request arrived.", bundle: .module)
+        }
+        .disabled(!model.notifiesRequests)
+        if isAuthorized == false, model.notifiesRequests {
+          LabeledContent {
+            Button {
+              Self.openNotificationSettings()
+            } label: {
+              Text("Open System Settings…", bundle: .module)
+            }
+          } label: {
+            Label {
+              Text("Notifications are turned off for Vibe Manager.", bundle: .module)
+            } icon: {
+              Image(systemName: "bell.slash")
+            }
+          }
+        }
+      } header: {
+        Text("Notifications", bundle: .module, comment: "A section of the Settings window.")
+      }
+      Section {
+        Toggle(isOn: $model.showsRequestDockBadge) {
+          Text("Show the number of requests on the Dock icon", bundle: .module)
+        }
+        Toggle(isOn: $model.expandsPaletteOnRequest) {
+          Text("Unfold the palette when a request arrives", bundle: .module)
+          Text(
+            "Folded, the palette shows how many requests wait, and VoiceOver says each one.",
+            bundle: .module)
+        }
+      } header: {
+        Text("Palette", bundle: .module, comment: "A section of the Settings window.")
+      }
+    }
+    .formStyle(.grouped)
+    .scrollDisabled(true)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(width: 500)
+    .task { isAuthorized = await model.requestNotifier?.isAuthorized() }
+  }
+
+  static func openNotificationSettings() {
+    let identifier = Bundle.main.bundleIdentifier ?? ""
+    if let url = URL(
+      string:
+        "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(identifier)")
+    {
+      NSWorkspace.shared.open(url)
+    }
+  }
 }
 
 /// Full Disk Access, and whether it has reached the agents yet.

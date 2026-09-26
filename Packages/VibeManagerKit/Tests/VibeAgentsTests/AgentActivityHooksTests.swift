@@ -5,7 +5,7 @@ import VibeApplication
 @testable import VibeAgents
 
 /// Runs a hook command the way a CLI does: through a shell, with its input on stdin.
-private func runHook(
+func runHook(
   _ command: String, input: String, log: URL?
 ) throws -> (status: Int32, output: String) {
   let process = Process()
@@ -26,14 +26,14 @@ private func runHook(
   return (process.terminationStatus, output)
 }
 
-private func temporaryLog() throws -> URL {
+func temporaryLog() throws -> URL {
   let directory = FileManager.default.temporaryDirectory
     .appendingPathComponent("vibe-activity-\(UUID().uuidString)", isDirectory: true)
   try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
   return directory.appendingPathComponent("session.log")
 }
 
-private func lines(of url: URL) -> [[String]] {
+func lines(of url: URL) -> [[String]] {
   let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
   return text.split(separator: "\n").map {
     $0.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
@@ -87,18 +87,22 @@ struct AgentActivityHookCommandTests {
     #expect(written.map(\.last) == [marker, ""])
   }
 
-  @Test("A field writes back only that field, as JSON, and nothing when it is missing")
-  func field() throws {
+  @Test("Fields write back only those fields, as JSON, escapes kept, and nothing when missing")
+  func fields() throws {
     let log = try temporaryLog()
     let command = AgentActivityHookCommand.command(
-      event: "PostToolUse", payload: .field("tool_name"))
+      event: "PostToolUse", payload: .fields(["agent_id", "tool_name", "command"]))
     _ = try runHook(
       command,
       input:
-        #"{"session_id":"s","tool_name":"Bash","tool_input":{"command":"echo \"tool_name\":\"x\""},"tool_response":{"stdout":"secret"}}"#,
+        #"{"session_id":"s","tool_name":"Bash","tool_input":{"command":"echo \"tool_name\":\"x\""},"tool_response":{"stdout":"secret","command":"no"}}"#,
       log: log)
     _ = try runHook(command, input: #"{"session_id":"s"}"#, log: log)
-    #expect(lines(of: log).map(\.last) == [#"{"tool_name":"Bash"}"#, ""])
+    let written = lines(of: log).map(\.last)
+    #expect(written == [#"{"tool_name":"Bash","command":"echo \"tool_name\":\"x\""}"#, ""])
+    let object = try #require(
+      try JSONSerialization.jsonObject(with: Data((written[0] ?? "").utf8)) as? [String: String])
+    #expect(object["command"] == #"echo "tool_name":"x""#)
   }
 
   @Test("Without a log to write to, or with one it cannot write, it still succeeds silently")
@@ -197,19 +201,19 @@ struct ClaudeCodeSignalDecoderTests {
       decoder.signal(for: event("UserPromptSubmit", #""prompt":"<task-notification>"#))
         == .promptSubmitted(byUser: false))
     #expect(
-      decoder.signal(for: event("PermissionRequest", ClaudePayloads.bashPermission))
+      decoder.signal(for: event("PermissionRequest", ClaudePayloads.bashPermission))?.withoutNotice
         == .questionAsked(.approval, tool: "Bash"))
     #expect(
-      decoder.signal(for: event("PermissionRequest", ClaudePayloads.askUserQuestion))
+      decoder.signal(for: event("PermissionRequest", ClaudePayloads.askUserQuestion))?.withoutNotice
         == .questionAsked(.question, tool: "AskUserQuestion"))
     #expect(
-      decoder.signal(for: event("PreToolUse", ClaudePayloads.exitPlanMode))
+      decoder.signal(for: event("PreToolUse", ClaudePayloads.exitPlanMode))?.withoutNotice
         == .questionAsked(.approval, tool: "ExitPlanMode"))
     // A permission for a large `Write` is cut short past the byte limit: still a permission.
     #expect(
-      decoder.signal(for: event("PermissionRequest", #"{"tool_name":"Ba"#))
+      decoder.signal(for: event("PermissionRequest", #"{"tool_name":"Ba"#))?.withoutNotice
         == .questionAsked(.approval))
-    #expect(decoder.signal(for: event("Elicitation")) == .questionAsked(.question))
+    #expect(decoder.signal(for: event("Elicitation"))?.withoutNotice == .questionAsked(.question))
     for name in ["PostToolUse", "PostToolUseFailure", "PermissionDenied", "ElicitationResult"] {
       #expect(decoder.signal(for: event(name)) == .questionResolved)
     }
@@ -328,7 +332,7 @@ struct CodexActivityReportingTests {
     #expect(stop.contains("timeout=\(AgentActivityHookCommand.timeoutSeconds)"))
   }
 
-  @Test("Codex's own interruption is read, and y, a, n and Enter answer it")
+  @Test("Codex's own interruption is read, and y, a, p, n and Enter answer it")
   func decoder() {
     let decoder = CodexSignalDecoder()
     let expected: [String: AgentSignal] = [
@@ -337,8 +341,17 @@ struct CodexActivityReportingTests {
       "Stop": .turnEnded, "Interrupt": .interrupted, "SessionEnd": .agentEnded,
     ]
     for (name, signal) in expected {
-      #expect(decoder.signal(for: AgentActivityEvent(name: name, date: Date())) == signal)
+      #expect(
+        decoder.signal(for: AgentActivityEvent(name: name, date: Date()))?.withoutNotice == signal)
     }
-    #expect(decoder.approvalAnswerKeys == [[0x79], [0x61], [0x6E], [0x0D]])
+    #expect(decoder.approvalAnswerKeys == [[0x79], [0x61], [0x70], [0x6E], [0x0D]])
+  }
+}
+
+extension AgentSignal {
+  /// The signal without the request it carries (#40), for comparing only what #45 reads.
+  var withoutNotice: AgentSignal {
+    if case .questionAsked(let kind, let tool, _) = self { return .questionAsked(kind, tool: tool) }
+    return self
   }
 }

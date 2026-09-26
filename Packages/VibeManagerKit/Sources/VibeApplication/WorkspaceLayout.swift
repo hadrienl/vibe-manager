@@ -45,6 +45,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// How each session the user switched is shown (#38), keyed by its identifier. A session that
   /// is not listed follows the default of the Conversation settings.
   public var sessionPresentations: [String: SessionPresentation]
+  /// Whether the palette of pending requests is folded into its count (#40).
+  public var isRequestPaletteCollapsed: Bool
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -59,7 +61,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     inspectorTopTab: InspectorTopTab = .activity,
     sidebarMode: SidebarMode = .flat,
     collapsedFolders: Set<SessionFolderKey> = [],
-    sessionPresentations: [String: SessionPresentation] = [:]
+    sessionPresentations: [String: SessionPresentation] = [:],
+    isRequestPaletteCollapsed: Bool = false
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -74,12 +77,14 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.sidebarMode = sidebarMode
     self.collapsedFolders = collapsedFolders
     self.sessionPresentations = sessionPresentations
+    self.isRequestPaletteCollapsed = isRequestPaletteCollapsed
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
     case sessionFilter, inspectorSplit, isSessionDetailsExpanded, browserWidth, inspectorTopTab
     case sidebarMode, collapsedFolders, sessionPresentations
+    case isRequestPaletteCollapsed
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -111,7 +116,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
         Set<SessionFolderKey>.self, forKey: .collapsedFolders)) ?? [],
       // A value a later build wrote, and this one cannot read, costs only this key.
       sessionPresentations: (try? container.decodeIfPresent(
-        [String: SessionPresentation].self, forKey: .sessionPresentations)) ?? [:]
+        [String: SessionPresentation].self, forKey: .sessionPresentations)) ?? [:],
+      isRequestPaletteCollapsed: (try? container.decodeIfPresent(
+        Bool.self, forKey: .isRequestPaletteCollapsed)) ?? false
     )
   }
 }

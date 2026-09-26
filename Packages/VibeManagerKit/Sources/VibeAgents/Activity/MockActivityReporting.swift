@@ -8,12 +8,21 @@ public struct MockSignalDecoder: AgentSignalDecoding {
 
   public init() {}
 
+  public var answerKeymap: (any AgentAnswerKeymap)? {
+    MockAnswerKeymap()
+  }
+
   public func signal(for event: AgentActivityEvent) -> AgentSignal? {
     switch event.name {
     case "SessionStart": return .channelConfirmed
     case "UserPromptSubmit": return .promptSubmitted(byUser: true)
-    case "PermissionRequest": return .questionAsked(.approval)
-    case "AskUserQuestion": return .questionAsked(.question)
+    // The script writes Claude Code's payloads, when a line gives one.
+    case "PermissionRequest":
+      return .questionAsked(
+        .approval, notice: event.payload == nil ? nil : event.requestNotice(isShown: true))
+    case "AskUserQuestion":
+      return .questionAsked(
+        .question, notice: event.payload == nil ? nil : event.requestNotice(isShown: true))
     case "PostToolUse": return .questionResolved
     case "Stop": return .turnEnded
     case "Interrupt": return .interrupted

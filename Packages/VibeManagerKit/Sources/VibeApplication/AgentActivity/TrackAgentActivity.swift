@@ -6,6 +6,18 @@ public struct AgentActivityUpdate: Hashable, Sendable {
   public let sessionID: SessionID
   /// `nil` once the session is forgotten.
   public let state: AgentActivityState?
+  /// How each of its requests can be answered now (#40).
+  public let answering: [AgentRequestID: AgentRequestAnswering]
+
+  public init(
+    sessionID: SessionID,
+    state: AgentActivityState?,
+    answering: [AgentRequestID: AgentRequestAnswering] = [:]
+  ) {
+    self.sessionID = sessionID
+    self.state = state
+    self.answering = answering
+  }
 }
 
 /// Follows what the agent of every running session is doing (#45), and remembers what the user
@@ -22,6 +34,8 @@ public actor TrackAgentActivity {
     /// What the previous launch left the agent doing, for a process adopted as it was.
     var restoredActivity: AgentActivity?
     var restoredConfirmation = false
+    var restoredRequests: [AgentRequest] = []
+    var restoredUncertainty = false
     /// The event that opened the source beyond the hooks, and the task reading it. One at a time:
     /// Claude Code starts a session again on every `/clear` and every compaction.
     var sourceEvent: AgentActivityEvent?
@@ -101,6 +115,8 @@ public actor TrackAgentActivity {
       tracked.logPosition = persisted.log
       tracked.restoredActivity = persisted.activity
       tracked.restoredConfirmation = persisted.isConfirmed
+      tracked.restoredRequests = persisted.requests
+      tracked.restoredUncertainty = persisted.isFirstRequestUncertain
       tracked.sourceEvent = persisted.sourceEvent?.event
       sessions[id] = tracked
       publish(id)
@@ -125,6 +141,8 @@ public actor TrackAgentActivity {
     tracked.logPosition = nil
     tracked.restoredActivity = nil
     tracked.restoredConfirmation = false
+    tracked.restoredRequests = []
+    tracked.restoredUncertainty = false
     tracked.sourceEvent = nil
     tracked.state = reduce(tracked.state, .processStarted(structured: decoder != nil), for: id)
     sessions[id] = tracked
@@ -148,7 +166,13 @@ public actor TrackAgentActivity {
     tracked.state.activity = confirmed ? tracked.restoredActivity ?? .idle : .idle
     tracked.state.source =
       confirmed ? .structured : hasLog ? .unconfirmed(since: now()) : .inferred
+    tracked.state.requests = confirmed ? tracked.restoredRequests : []
+    tracked.state.isFirstRequestUncertain = confirmed && tracked.restoredUncertainty
+    // Why it was in doubt is not kept: it lasts, as after a guess, until the queue drains.
+    tracked.state.isTrackLost = tracked.state.isFirstRequestUncertain
     tracked.restoredActivity = nil
+    tracked.restoredRequests = []
+    tracked.restoredUncertainty = false
     if isVisible(id) { tracked.state.unreadSince = nil }
     sessions[id] = tracked
     if hasLog {
@@ -207,6 +231,52 @@ public actor TrackAgentActivity {
     changed(id, from: previous)
   }
 
+  // MARK: - Requests (#40)
+
+  /// How each request of the session can be answered now.
+  public func answering(for id: SessionID) -> [AgentRequestID: AgentRequestAnswering] {
+    guard let state = sessions[id]?.state else { return [:] }
+    return answering(of: state, for: id)
+  }
+
+  private func answering(of state: AgentActivityState, for id: SessionID)
+    -> [AgentRequestID: AgentRequestAnswering]
+  {
+    let keymap = sessions[id]?.decoder?.answerKeymap
+    var result: [AgentRequestID: AgentRequestAnswering] = [:]
+    for request in state.requests {
+      result[request.id] = state.answering(request, keymap: keymap)
+    }
+    return result
+  }
+
+  /// The keystrokes that give `answer` to the request, if it is still the one on screen and this
+  /// answer can be given to it from outside the terminal.
+  public func keystrokes(for answer: AgentAnswer, to id: AgentRequestID) -> [[UInt8]]? {
+    guard let tracked = sessions[id.sessionID],
+      let request = tracked.state.requests.first, request.id == id,
+      let keymap = tracked.decoder?.answerKeymap
+    else { return nil }
+    let offered = tracked.state.answering(request, keymap: keymap).answers
+    guard answer.requiredKinds.isSubset(of: offered) else { return nil }
+    return keymap.keystrokes(for: answer, to: request.content)
+  }
+
+  /// Whether the request is still the one the agent's terminal shows.
+  public func isFirstRequest(_ id: AgentRequestID) -> Bool {
+    sessions[id.sessionID]?.state.requests.first?.id == id
+  }
+
+  /// The answer to the request was typed into its terminal: the agent is at work again, and the
+  /// next request of the session, if any, is on screen.
+  public func answerSent(_ id: AgentRequestID) {
+    guard var tracked = sessions[id.sessionID] else { return }
+    let previous = tracked.state
+    tracked.state = reduce(tracked.state, .answerSent(id), for: id.sessionID)
+    sessions[id.sessionID] = tracked
+    changed(id.sessionID, from: previous)
+  }
+
   /// Writes what is pending at once, for the way out.
   public func flush() async {
     pendingWrite?.cancel()
@@ -242,7 +312,11 @@ public actor TrackAgentActivity {
     let previous = tracked.state
     tracked.logPosition = position
     if let signal = decoder.signal(for: event) {
-      tracked.state = reduce(tracked.state, .signal(signal), for: id, at: event.date)
+      // The line that carried a request is what it is known by, across relaunches too.
+      let requestID = AgentRequestID(
+        sessionID: id, key: "log:\(position.fileIdentifier):\(position.offset)")
+      tracked.state = reduce(
+        tracked.state, .signal(signal), for: id, at: event.date, requestID: requestID)
     }
     sessions[id] = tracked
     openSource(after: event, for: id)
@@ -270,7 +344,9 @@ public actor TrackAgentActivity {
   private func receivedAdditional(_ signal: AgentSignal, for id: SessionID, generation: Int) {
     guard var tracked = sessions[id], tracked.generation == generation else { return }
     let previous = tracked.state
-    tracked.state = reduce(tracked.state, .signal(signal), for: id)
+    tracked.state = reduce(
+      tracked.state, .signal(signal), for: id,
+      requestID: AgentRequestID(sessionID: id, key: "source:\(UUID().uuidString)"))
     sessions[id] = tracked
     changed(id, from: previous)
   }
@@ -281,14 +357,16 @@ public actor TrackAgentActivity {
     _ state: AgentActivityState,
     _ input: AgentActivityInput,
     for id: SessionID,
-    at date: Date? = nil
+    at date: Date? = nil,
+    requestID: AgentRequestID? = nil
   ) -> AgentActivityState {
     AgentActivityMachine.reduce(
       state, input,
       context: AgentActivityContext(
         now: date ?? now(),
         isVisible: isVisible(id),
-        approvalAnswerKeys: sessions[id]?.decoder?.approvalAnswerKeys ?? []
+        approvalAnswerKeys: sessions[id]?.decoder?.approvalAnswerKeys ?? [],
+        requestID: requestID
       ))
   }
 
@@ -324,7 +402,8 @@ public actor TrackAgentActivity {
   }
 
   private func publish(_ id: SessionID, state: AgentActivityState?) {
-    let update = AgentActivityUpdate(sessionID: id, state: state)
+    let update = AgentActivityUpdate(
+      sessionID: id, state: state, answering: state.map { answering(of: $0, for: id) } ?? [:])
     for continuation in continuations.values { continuation.yield(update) }
   }
 
@@ -390,7 +469,9 @@ public actor TrackAgentActivity {
         unreadSince: tracked.state.unreadSince,
         log: tracked.logPosition,
         isConfirmed: tracked.state.source == .structured,
-        sourceEvent: tracked.sourceEvent.map(PersistedAgentActivityEvent.init)
+        sourceEvent: tracked.sourceEvent.map(PersistedAgentActivityEvent.init),
+        requests: tracked.state.requests,
+        isFirstRequestUncertain: tracked.state.isFirstRequestUncertain
       )
     }
     return result

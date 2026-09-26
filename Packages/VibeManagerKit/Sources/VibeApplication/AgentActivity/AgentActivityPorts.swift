@@ -11,6 +11,18 @@ public protocol AgentActivityReporting: Sendable {
   func reportingActivity(_ plan: AgentLaunchPlan, to log: URL) -> AgentLaunchPlan
   /// Reads the lines this provider's hooks write.
   func activityDecoder() -> any AgentSignalDecoding
+  /// Reads the lines the hooks of an agent running there write. What the agent keeps beyond its
+  /// hooks — a journal found by its working directory — is followed as well.
+  func activityDecoder(workingDirectoryPath: String?, environment: [String: String])
+    -> any AgentSignalDecoding
+}
+
+extension AgentActivityReporting {
+  public func activityDecoder(workingDirectoryPath: String?, environment: [String: String])
+    -> any AgentSignalDecoding
+  {
+    activityDecoder()
+  }
 }
 
 /// Turns an agent's own reports into signals.
@@ -22,10 +34,17 @@ public protocol AgentSignalDecoding: Sendable {
   /// reports no interruption, but writes one into its transcript, whose path its `SessionStart`
   /// carries. `nil` when this event opens no such source.
   func additionalSignals(after event: AgentActivityEvent) -> AsyncStream<AgentSignal>?
+  /// How this agent's dialogs are answered from outside its terminal (#40); `nil` when they
+  /// cannot be.
+  var answerKeymap: (any AgentAnswerKeymap)? { get }
 }
 
 extension AgentSignalDecoding {
   public func additionalSignals(after event: AgentActivityEvent) -> AsyncStream<AgentSignal>? {
+    nil
+  }
+
+  public var answerKeymap: (any AgentAnswerKeymap)? {
     nil
   }
 }
@@ -65,23 +84,31 @@ public struct PersistedAgentActivity: Hashable, Codable, Sendable {
   /// The event that opened a source beyond the hooks — Claude Code's `SessionStart`, which names
   /// the transcript — for an adopted process to open it again.
   public var sourceEvent: PersistedAgentActivityEvent?
+  /// What the agent was waiting on (#40). Its reports were read already: a process adopted after
+  /// a relaunch would not say it again.
+  public var requests: [AgentRequest]
+  public var isFirstRequestUncertain: Bool
 
   public init(
     activity: AgentActivity = .idle,
     unreadSince: Date? = nil,
     log: AgentActivityLogPosition? = nil,
     isConfirmed: Bool = false,
-    sourceEvent: PersistedAgentActivityEvent? = nil
+    sourceEvent: PersistedAgentActivityEvent? = nil,
+    requests: [AgentRequest] = [],
+    isFirstRequestUncertain: Bool = false
   ) {
     self.activity = activity
     self.unreadSince = unreadSince
     self.log = log
     self.isConfirmed = isConfirmed
     self.sourceEvent = sourceEvent
+    self.requests = requests
+    self.isFirstRequestUncertain = isFirstRequestUncertain
   }
 
   private enum CodingKeys: String, CodingKey {
-    case activity, unreadSince, log, isConfirmed, sourceEvent
+    case activity, unreadSince, log, isConfirmed, sourceEvent, requests, isFirstRequestUncertain
   }
 
   public init(from decoder: any Decoder) throws {
@@ -92,7 +119,12 @@ public struct PersistedAgentActivity: Hashable, Codable, Sendable {
       log: try container.decodeIfPresent(AgentActivityLogPosition.self, forKey: .log),
       isConfirmed: try container.decodeIfPresent(Bool.self, forKey: .isConfirmed) ?? false,
       sourceEvent: try container.decodeIfPresent(
-        PersistedAgentActivityEvent.self, forKey: .sourceEvent))
+        PersistedAgentActivityEvent.self, forKey: .sourceEvent),
+      // Requests written by a later version, in a shape this one cannot read, are dropped: they
+      // are asked again in the terminal.
+      requests: (try? container.decodeIfPresent([AgentRequest].self, forKey: .requests)) ?? [],
+      isFirstRequestUncertain: try container.decodeIfPresent(
+        Bool.self, forKey: .isFirstRequestUncertain) ?? false)
   }
 }
 

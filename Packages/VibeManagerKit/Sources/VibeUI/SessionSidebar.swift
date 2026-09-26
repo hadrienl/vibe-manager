@@ -61,6 +61,11 @@ struct SessionSidebar: View {
             interrupted: { closeSwipe(animated: true) }
           )
         )
+        // Over the foot of the list, never over the session on screen, and the list's last rows
+        // stay reachable above it (#40).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          RequestPalette(model: model, maxHeight: geometry.size.height * 0.6)
+        }
     }
   }
 
