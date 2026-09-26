@@ -3319,6 +3319,7 @@
       }
     },
     "Conversation" : {
+      "comment" : "A tab of the Settings window.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7982,6 +7983,7 @@
       }
     },
     "Terminal" : {
+      "comment" : "The raw terminal of a session, as a view.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

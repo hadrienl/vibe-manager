@@ -1,4 +1,4 @@
-# 0025 — Answering agents from the palette
+# 0026 — Answering agents from the palette
 
 - Status: accepted
 - Date: 2026-09-26

@@ -230,7 +230,7 @@ struct ClaudeCodeSignalDecoderTests {
   func silence() {
     #expect(
       decoder.signal(for: event("Notification", ClaudePayloads.permissionNotification)) == nil)
-    #expect(decoder.signal(for: event("PreToolUse", #"{"tool_name":"Bash"}"#))?.withoutNotice == nil)
+    #expect(decoder.signal(for: event("PreToolUse", #"{"tool_name":"Bash"}"#)) == nil)
     #expect(decoder.signal(for: event("SubagentStop")) == nil)
   }
 
