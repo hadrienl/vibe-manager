@@ -83,13 +83,23 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
         Self.sessionKey: notification.id.sessionID.rawValue.uuidString,
         Self.requestKey: notification.id.key,
       ]
-      try? await center.add(
-        UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
-      // Taken away while it was being added.
-      if !wanted.contains(identifier) {
-        center.removeDeliveredNotifications(withIdentifiers: [identifier])
-      }
+      deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
+  }
+
+  /// Adds it, with a handler: the center is not `Sendable` in every SDK the application is built
+  /// with, and is only called here, on the main actor.
+  private func deliver(_ request: UNNotificationRequest) {
+    let identifier = request.identifier
+    center.add(request) { [weak self] _ in
+      Task { @MainActor in self?.withdrawIfUnwanted(identifier) }
+    }
+  }
+
+  /// Taken away while it was being added: it must not stay.
+  private func withdrawIfUnwanted(_ identifier: String) {
+    guard !wanted.contains(identifier) else { return }
+    center.removeDeliveredNotifications(withIdentifiers: [identifier])
   }
 
   public func remove(_ ids: [AgentRequestID]) {
@@ -120,14 +130,21 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     default: return true
     }
     if let authorization { return await authorization.value }
-    let center = center
-    let task = Task {
-      (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
-    }
+    let task = Task { await self.requestAuthorization() }
     authorization = task
     let granted = await task.value
     authorization = nil
     return granted
+  }
+
+  /// The center is not `Sendable` in every SDK the application is built with: it is only called
+  /// here, on the main actor, with handlers.
+  private func requestAuthorization() async -> Bool {
+    await withCheckedContinuation { continuation in
+      center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+        continuation.resume(returning: granted)
+      }
+    }
   }
 
   /// Only the status leaves the handler: the settings themselves are not `Sendable` in every SDK
