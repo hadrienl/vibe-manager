@@ -161,7 +161,8 @@ public struct CodexQuestionWatch: Sendable {
     case "function_call" where payload["name"] as? String == tool:
       guard pending.insert(callID).inserted else { return [] }
       let arguments = (payload["arguments"] as? String).flatMap {
-        (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [String: Any]
+        (text: String) -> [String: Any]? in
+        (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any]
       }
       let questions = AgentRequestReading.questions(in: arguments ?? [:])
       let notice = AgentRequestNotice(

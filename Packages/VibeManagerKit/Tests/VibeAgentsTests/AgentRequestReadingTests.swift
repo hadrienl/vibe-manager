@@ -40,7 +40,7 @@ private func event(_ name: String, _ payload: String?) -> AgentActivityEvent {
   AgentActivityEvent(name: name, date: Date(), payload: payload.map { Data($0.utf8) })
 }
 
-private func notice(of signal: AgentSignal?) -> AgentRequestNotice? {
+private func requestNotice(in signal: AgentSignal?) -> AgentRequestNotice? {
   if case .questionAsked(_, _, let notice) = signal { return notice }
   return nil
 }
@@ -52,7 +52,7 @@ struct AgentRequestReadingTests {
   @Test("A permission names its tool, its exact command, and what always allowing would allow")
   func permission() throws {
     let notice = try #require(
-      notice(of: claude.signal(for: event("PermissionRequest", RequestPayloads.bash))))
+      requestNotice(in: claude.signal(for: event("PermissionRequest", RequestPayloads.bash))))
     #expect(notice.isShown)
     guard case .permission(let permission) = notice.content else {
       Issue.record("not a permission")
@@ -73,7 +73,8 @@ struct AgentRequestReadingTests {
   @Test("A sub-agent's permission is told apart, and the tool it runs settles it")
   func subAgent() throws {
     let asked = try #require(
-      notice(of: claude.signal(for: event("PermissionRequest", RequestPayloads.subAgentBash))))
+      requestNotice(
+        in: claude.signal(for: event("PermissionRequest", RequestPayloads.subAgentBash))))
     #expect(asked.reference.agentID == "a89e4f8137e913354")
     let done = claude.signal(for: event("PostToolUse", RequestPayloads.subAgentDone))
     #expect(
@@ -87,7 +88,7 @@ struct AgentRequestReadingTests {
   @Test("A question is announced before its dialog is drawn, with its options")
   func question() throws {
     let announced = try #require(
-      notice(of: claude.signal(for: event("PreToolUse", RequestPayloads.question))))
+      requestNotice(in: claude.signal(for: event("PreToolUse", RequestPayloads.question))))
     #expect(!announced.isShown)
     #expect(
       announced.content
@@ -100,8 +101,8 @@ struct AgentRequestReadingTests {
             ])
         ]))
     let shown = try #require(
-      notice(
-        of: claude.signal(
+      requestNotice(
+        in: claude.signal(
           for: event(
             "PermissionRequest",
             RequestPayloads.question.replacingOccurrences(
@@ -113,12 +114,12 @@ struct AgentRequestReadingTests {
   @Test("A plan, an MCP call, a cut-short report")
   func others() throws {
     let plan = try #require(
-      notice(of: claude.signal(for: event("PermissionRequest", RequestPayloads.plan))))
+      requestNotice(in: claude.signal(for: event("PermissionRequest", RequestPayloads.plan))))
     #expect(
       plan.content == .plan(excerpt: "## Plan\n- Create plan.txt with Write.", isComplete: true))
 
     let mcp = try #require(
-      notice(of: claude.signal(for: event("PermissionRequest", RequestPayloads.mcp))))
+      requestNotice(in: claude.signal(for: event("PermissionRequest", RequestPayloads.mcp))))
     guard case .permission(let permission) = mcp.content else {
       Issue.record("not a permission")
       return
@@ -127,7 +128,8 @@ struct AgentRequestReadingTests {
     #expect(permission.details?.contains("It breaks") == true)
 
     let cut = String(RequestPayloads.bash.prefix(300))
-    let truncated = try #require(notice(of: claude.signal(for: event("PermissionRequest", cut))))
+    let truncated = try #require(
+      requestNotice(in: claude.signal(for: event("PermissionRequest", cut))))
     #expect(truncated.content == .unreadable(tool: "Bash"))
     #expect(truncated.isShown)
   }
@@ -148,7 +150,7 @@ struct AgentRequestReadingTests {
   func codex() throws {
     let decoder = CodexSignalDecoder()
     let bash = try #require(
-      notice(of: decoder.signal(for: event("PermissionRequest", RequestPayloads.codexBash))))
+      requestNotice(in: decoder.signal(for: event("PermissionRequest", RequestPayloads.codexBash))))
     guard case .permission(let command) = bash.content else {
       Issue.record("not a permission")
       return
@@ -157,7 +159,8 @@ struct AgentRequestReadingTests {
     #expect(command.alwaysAllow == AgentAlwaysAllow(rules: [.commandPrefix], scope: .session))
 
     let patch = try #require(
-      notice(of: decoder.signal(for: event("PermissionRequest", RequestPayloads.codexPatch))))
+      requestNotice(in: decoder.signal(for: event("PermissionRequest", RequestPayloads.codexPatch)))
+    )
     guard case .permission(let edit) = patch.content else {
       Issue.record("not a permission")
       return
@@ -187,7 +190,7 @@ struct CodexQuestionWatchTests {
     var pending: Set<String> = []
     let asked = CodexQuestionWatch.signals(
       in: Data(RequestPayloads.codexQuestionCall.utf8), pending: &pending)
-    let notice = try #require(asked.first.flatMap(notice(of:)))
+    let notice = try #require(asked.first.flatMap(requestNotice(in:)))
     #expect(!notice.isShown)
     #expect(notice.key == "codex:call_1")
     #expect(
@@ -239,7 +242,7 @@ struct CodexQuestionWatchTests {
       pollInterval: .milliseconds(20), discoveryTimeout: .seconds(2))
     var iterator = watch.signals().makeAsyncIterator()
     let first = await iterator.next()
-    #expect(notice(of: first)?.key == "codex:call_3")
+    #expect(requestNotice(in: first)?.key == "codex:call_3")
 
     // Then what the session writes next, as it comes.
     let handle = try FileHandle(forWritingTo: rollout)
