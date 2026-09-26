@@ -18,6 +18,8 @@ No session carries a group. `SessionGrouping` cuts the list the filter already p
 narrowed, scoped and sorted — into one group per folder, and never sorts it again: a group lists its
 sessions in the order of the sort, and the groups come in the order of their first session. The
 grouped view therefore shows exactly the sessions of the flat one, in the same relative order.
+In the Manual sort, that order is the one arranged by hand, and a group can be dragged by its
+header (ADR 0027).
 
 Grouping cuts the column on screen (ADR 0024), not the whole store: each of To Do, In Progress,
 Waiting and Done is grouped on its own, and a folder has a group in every column that holds one of

@@ -117,6 +117,12 @@ after its folder or renamed, whose header says how many sessions it holds and th
 their states. A new session wears its project's icon — an app icon, a favicon or a logo found in the
 folder — until another one is picked. See
 [`docs/architecture/0025-session-groups.md`](docs/architecture/0025-session-groups.md).
+In the Manual sort, the sessions are arranged by hand: a row is dragged anywhere in its column, or
+anywhere in its group when the sidebar is grouped, and a group's header is dragged to move the whole
+group. ⌃⌘↑ and ⌃⌘↓ do the same from the keyboard. A new session arrives at the top, and a session
+keeps its place when it is restarted, closed, archived or moved to another column. Show Archived
+Sessions (⌥⌘A) opens the archive from the menu. See
+[`docs/architecture/0027-manual-session-order.md`](docs/architecture/0027-manual-session-order.md).
 
 A closed session goes back to work with one command. When the agent can resume its own
 conversation, it does, and it is handed no prompt; when it cannot — no identifier was ever kept,
