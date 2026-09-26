@@ -72,6 +72,23 @@ struct SessionGroupHeader: View {
     .accessibilityAction(named: Text("Rename", bundle: .module, comment: "Renames a group.")) {
       beginRename()
     }
+    // Dragging the header, without the drag (#44).
+    .accessibilityActions {
+      if model.canMoveGroup(group, by: -1) {
+        Button {
+          Task { await model.moveGroup(group, by: -1) }
+        } label: {
+          Text("Move Group Up", bundle: .module)
+        }
+      }
+      if model.canMoveGroup(group, by: 1) {
+        Button {
+          Task { await model.moveGroup(group, by: 1) }
+        } label: {
+          Text("Move Group Down", bundle: .module)
+        }
+      }
+    }
   }
 
   @ViewBuilder
@@ -134,6 +151,17 @@ struct SessionGroupHeader: View {
       model.setExpanded(!isExpanded, group: group)
     }
     .disabled(!model.canFold)
+    if group.id != nil, model.canReorder {
+      Divider()
+      Button(LocalizedStringResource("Move Group Up", bundle: .module)) {
+        Task { await model.moveGroup(group, by: -1) }
+      }
+      .disabled(!model.canMoveGroup(group, by: -1))
+      Button(LocalizedStringResource("Move Group Down", bundle: .module)) {
+        Task { await model.moveGroup(group, by: 1) }
+      }
+      .disabled(!model.canMoveGroup(group, by: 1))
+    }
     if let folder = group.id {
       Divider()
       Button(LocalizedStringResource("Reveal in Finder", bundle: .module)) {

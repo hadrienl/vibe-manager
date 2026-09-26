@@ -386,6 +386,46 @@
         }
       }
     },
+    "Move Down" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descendre"
+          }
+        }
+      }
+    },
+    "Move Group Down" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descendre le groupe"
+          }
+        }
+      }
+    },
+    "Move Group Up" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monter le groupe"
+          }
+        }
+      }
+    },
+    "Move Up" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monter"
+          }
+        }
+      }
+    },
     "Move to Next Status" : {
       "localizations" : {
         "fr" : {
@@ -584,6 +624,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Session %lld"
+          }
+        }
+      }
+    },
+    "Show Archived Sessions (%lld)" : {
+      "comment" : "Opens the list of the archived sessions; how many there are.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les sessions archivées (%lld)"
           }
         }
       }

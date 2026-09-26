@@ -493,12 +493,16 @@ public final class AppModel {
   private let archiveDiagnostics: @Sendable ([DiagnosticFile], Date) -> Data
   /// Bumped to give the keyboard to the session list: Focus Sidebar, ⌥⌘1.
   public private(set) var sidebarFocusRequest = 0
+  /// Whether the list of the archived sessions is open at the foot of the sidebar. Here rather
+  /// than in the view, so that the menu can open it.
+  public var isArchiveListPresented = false
   /// The export under way, from its preview to the file saved.
   public private(set) var diagnosticsExport: DiagnosticsExportModel?
   /// How the previous run ended, as this launch found it: for the export.
   public private(set) var previousShutdownVerdict: DiagnosticToken?
   private let restoreSession: RestoreSession
   private let changeTaskStatus: ChangeTaskStatus
+  private let reorderSessions: ReorderSessions
   private let restartSession: RestartSession?
   private let planAgentSwitch: PlanAgentSwitch?
   private let recordAgentSwitch: RecordAgentSwitch
@@ -658,6 +662,7 @@ public final class AppModel {
     archiveSession = ArchiveSession(repository: repository, runtime: runtime)
     restoreSession = RestoreSession(repository: repository)
     changeTaskStatus = ChangeTaskStatus(repository: repository)
+    reorderSessions = ReorderSessions(repository: repository)
     // A workspace without agents cannot build a launch plan, so it cannot restart anything —
     // and saying that with an optional is clearer than a use case that would refuse every call.
     let restart = agents.map {
@@ -2311,6 +2316,28 @@ public final class AppModel {
     await task.value
   }
 
+  /// Writes a column or a group in its new order (#44). The rows move at once, before the store
+  /// is written: a drop that snapped back for the length of a write would read as refused. A
+  /// failed write is reported, and the reload puts back what the store holds.
+  func commitOrder(_ reordered: [WorkSession]) async {
+    let ranks = SessionOrder.redistribute(reordered)
+    guard !ranks.isEmpty, case .loaded(let current) = state else { return }
+    state = .loaded(
+      current.map { session in
+        guard let rank = ranks[session.id] else { return session }
+        var moved = session
+        moved.rank = rank
+        return moved
+      })
+    do {
+      try await reorderSessions(reordered)
+      diagnostics.record(.session, .info, "session.reordered", ["sessions": .count(ranks.count)])
+    } catch {
+      await report(error)
+    }
+    await reload()
+  }
+
   private func performReload() async {
     // A refresh over something already on screen never blanks it. The spinner belongs to the
     // first load, when there is genuinely nothing to show.
@@ -2549,6 +2576,15 @@ extension AppModel {
       layout.setSidebarVisible(true)
     }
     sidebarFocusRequest += 1
+  }
+
+  /// Show Archived Sessions, ⌥⌘A: the list at the foot of the sidebar, which is shown first if it
+  /// was hidden — the list opens from it.
+  public func showArchivedSessions() {
+    if !layout.columns.isSidebarVisible {
+      layout.setSidebarVisible(true)
+    }
+    isArchiveListPresented = true
   }
 
   /// Focus Inspector, ⌥⌘3: the inspector is shown if it was hidden, and its list takes the

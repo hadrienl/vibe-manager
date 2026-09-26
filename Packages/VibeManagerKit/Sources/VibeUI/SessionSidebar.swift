@@ -20,7 +20,9 @@ struct SessionSidebar: View {
   @State private var swipe: SessionSwipe?
   /// The row under the pointer, for when no row is drawn under the fingers.
   @State private var hoveredSessionID: SessionID?
-  @State private var isShowingArchive = false
+  /// The group whose header is being dragged, and the one it is over (#44).
+  @State private var draggedGroup: SessionFolderKey?
+  @State private var targetedGroup: SessionFolderKey?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -28,7 +30,7 @@ struct SessionSidebar: View {
       ColumnTabs(model: model)
       columns
       Divider()
-      ArchivedSessionsBar(model: model, isShowingArchive: $isShowingArchive)
+      ArchivedSessionsBar(model: model)
       Divider()
       SidebarFooter(model: model)
     }
@@ -94,7 +96,7 @@ struct SessionSidebar: View {
           ) {
             rows(group.sessions, positions: positions, width: width)
           } header: {
-            SessionGroupHeader(model: model, group: group)
+            groupHeader(group)
           }
         }
       }
@@ -130,6 +132,8 @@ struct SessionSidebar: View {
     }
   }
 
+  /// A row is dragged among the rows of its own `ForEach`: its column, or its group. The list
+  /// draws no insertion point in another group, which is how a drop there is refused (#44).
   private func rows(
     _ sessions: [WorkSession], positions: [SessionID: Int], width: CGFloat
   ) -> some View {
@@ -137,6 +141,67 @@ struct SessionSidebar: View {
       row(for: session, position: positions[session.id], width: width)
         .tag(session.id)
     }
+    .onMove(perform: model.canReorder ? { move(sessions, from: $0, to: $1) } : nil)
+  }
+
+  /// `destination` counts the rows before the move; the model counts them without the one moved.
+  private func move(_ sessions: [WorkSession], from source: IndexSet, to destination: Int) {
+    guard let first = source.first, sessions.indices.contains(first) else { return }
+    closeSwipe(animated: false)
+    let id = sessions[first].id
+    let index = destination > first ? destination - 1 : destination
+    Task { await model.move(id, toIndex: index) }
+  }
+
+  // MARK: - Groups
+
+  /// A header is dragged onto another one to move its whole group there. The list cannot move
+  /// sections itself, so the header carries the drag: its folder's path, which is what a header
+  /// dropped anywhere else in the system would mean.
+  @ViewBuilder
+  private func groupHeader(_ group: SessionGroup) -> some View {
+    let header = SessionGroupHeader(model: model, group: group)
+      .overlay(alignment: .top) {
+        if let folder = group.id, targetedGroup == folder, let draggedGroup,
+          draggedGroup != folder
+        {
+          Rectangle()
+            .fill(Color.accentColor)
+            .frame(height: 2)
+            .accessibilityHidden(true)
+        }
+      }
+    if let folder = group.id, model.canReorder {
+      header
+        .onDrag {
+          closeSwipe(animated: false)
+          draggedGroup = folder
+          return NSItemProvider(object: folder.path as NSString)
+        }
+        .onDrop(
+          of: [.text],
+          delegate: GroupDropDelegate(
+            target: folder,
+            dragged: $draggedGroup,
+            targeted: $targetedGroup,
+            drop: { [model] dragged in Self.dropGroup(dragged, on: folder, model: model) }
+          )
+        )
+    } else {
+      header
+    }
+  }
+
+  /// The group dropped takes the place of the one it was dropped on: above it when it came from
+  /// below, under it when it came from above.
+  private static func dropGroup(
+    _ dragged: SessionFolderKey, on target: SessionFolderKey, model: AppModel
+  ) {
+    let groups = model.groups
+    guard dragged != target, let group = groups.first(where: { $0.id == dragged }),
+      let index = groups.filter({ $0.id != nil }).firstIndex(where: { $0.id == target })
+    else { return }
+    Task { await model.moveGroup(group, toIndex: index) }
   }
 
   private func row(for session: WorkSession, position: Int?, width: CGFloat) -> some View {
@@ -281,6 +346,51 @@ struct SessionSidebar: View {
       return LocalizedStringResource(
         "Nothing done yet. Swipe a session to move it here.", bundle: .module)
     }
+  }
+}
+
+// MARK: - Group drop
+
+/// Takes only a header of this list: text dragged in from elsewhere is not a group.
+private struct GroupDropDelegate: DropDelegate {
+  let target: SessionFolderKey
+  @Binding var dragged: SessionFolderKey?
+  @Binding var targeted: SessionFolderKey?
+  let drop: @MainActor @Sendable (SessionFolderKey) -> Void
+
+  func validateDrop(info: DropInfo) -> Bool {
+    dragged != nil
+  }
+
+  func dropEntered(info: DropInfo) {
+    guard dragged != nil else { return }
+    targeted = target
+  }
+
+  func dropExited(info: DropInfo) {
+    if targeted == target { targeted = nil }
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    DropProposal(operation: dragged == nil || dragged == target ? .forbidden : .move)
+  }
+
+  /// A header dragged out of the window and dropped elsewhere never says so, and leaves `dragged`
+  /// behind: the text carried is checked, so that a path dropped later from another application
+  /// is not taken for that old drag.
+  func performDrop(info: DropInfo) -> Bool {
+    let moved = dragged
+    dragged = nil
+    targeted = nil
+    guard let moved, moved != target,
+      let provider = info.itemProviders(for: [.text]).first
+    else { return false }
+    let drop = drop
+    _ = provider.loadObject(ofClass: NSString.self) { object, _ in
+      guard let path = object as? String, path == moved.path else { return }
+      Task { @MainActor in drop(moved) }
+    }
+    return true
   }
 }
 
@@ -429,12 +539,11 @@ private struct SwipeButtons: View {
 /// The quiet way in to the archived sessions: a line at the foot of the sidebar, and a list with
 /// Unarchive. Archived is a status, not a column: nothing there is being worked on.
 private struct ArchivedSessionsBar: View {
-  let model: AppModel
-  @Binding var isShowingArchive: Bool
+  @Bindable var model: AppModel
 
   var body: some View {
     Button {
-      isShowingArchive.toggle()
+      model.isArchiveListPresented.toggle()
     } label: {
       HStack(spacing: 6) {
         Image(systemName: SessionTaskStatus.archived.symbolName)
@@ -452,7 +561,7 @@ private struct ArchivedSessionsBar: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .accessibilityIdentifier("archived-sessions")
-    .popover(isPresented: $isShowingArchive, arrowEdge: .trailing) {
+    .popover(isPresented: $model.isArchiveListPresented, arrowEdge: .trailing) {
       ArchivedSessionsList(model: model)
     }
   }
