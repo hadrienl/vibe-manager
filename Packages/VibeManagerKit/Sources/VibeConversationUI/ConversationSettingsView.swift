@@ -221,7 +221,8 @@ public struct ConversationSettingsView: View {
   private var accentRow: some View {
     LabeledContent {
       HStack(spacing: 8) {
-        ForEach(ConversationAppearance.Accent.allCases, id: \.self) { accent in
+        ForEach(ConversationAppearance.Accent.allCases.filter { $0 != .custom }, id: \.self) {
+          accent in
           Button {
             appearance.accent = accent
           } label: {
@@ -233,20 +234,51 @@ public struct ConversationSettingsView: View {
                   .padding(-3))
           }
           .buttonStyle(.plain)
+          .help(Text(Self.accentName(accent)))
           .accessibilityLabel(Text(Self.accentName(accent)))
           .accessibilityAddTraits(appearance.accent == accent ? .isSelected : [])
         }
+        // Any colour at all: the system's colour picker.
+        ColorPicker(selection: customAccent, supportsOpacity: false) {
+          Text("Custom", bundle: .module)
+        }
+        .labelsHidden()
+        .overlay(
+          Circle().stroke(Color.accentColor, lineWidth: appearance.accent == .custom ? 2 : 0)
+            .frame(width: 24, height: 24)
+            .allowsHitTesting(false)
+        )
+        .help(Text("Choose a colour of your own", bundle: .module))
+        .accessibilityLabel(Text("Custom colour", bundle: .module))
+        Text(Self.accentName(appearance.accent))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize()
       }
     } label: {
       Text("Accent colour", bundle: .module)
     }
   }
 
+  /// The colour picker's colour: the one chosen, or the accent in force until one is.
+  private var customAccent: Binding<Color> {
+    Binding(
+      get: { currentTheme.accent.color },
+      set: { color in
+        guard let chosen = ThemeColor(color) else { return }
+        appearance.customAccent = chosen.hex
+        appearance.accent = .custom
+      })
+  }
+
   private func swatch(_ accent: ConversationAppearance.Accent) -> AnyShapeStyle {
     guard let colors = ConversationTheme.accentColors[accent] else {
-      return AnyShapeStyle(
-        AngularGradient(
-          colors: [.blue, .orange, .green, .purple, .blue], center: .center))
+      // The theme's own accent, as the current theme draws it.
+      let base =
+        ConversationTheme.named(
+          appearance.themeIdentifier(isDark: colorScheme == .dark))
+        ?? (colorScheme == .dark ? .systemDark : .systemLight)
+      return AnyShapeStyle(base.accent.color)
     }
     return AnyShapeStyle((colorScheme == .dark ? colors.dark : colors.light).color)
   }
@@ -260,6 +292,7 @@ public struct ConversationSettingsView: View {
     case .orange: return LocalizedStringResource("Orange", bundle: .module)
     case .green: return LocalizedStringResource("Green", bundle: .module)
     case .graphite: return LocalizedStringResource("Graphite", bundle: .module)
+    case .custom: return LocalizedStringResource("Custom colour", bundle: .module)
     }
   }
 

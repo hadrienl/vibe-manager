@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import VibeApplication
 
@@ -27,6 +28,20 @@ public struct ThemeColor: Hashable, Sendable, ExpressibleByStringLiteral {
     green = Double((value >> 8) & 0xFF) / 255
     blue = Double(value & 0xFF) / 255
     opacity = 1
+  }
+
+  /// The colour as `#RRGGBB`, the form a theme and the settings keep it in.
+  public var hex: String {
+    func byte(_ value: Double) -> Int { Int((min(max(value, 0), 1) * 255).rounded()) }
+    return String(format: "#%02X%02X%02X", byte(red), byte(green), byte(blue))
+  }
+
+  /// A colour of the interface, in sRGB.
+  public init?(_ color: Color) {
+    guard let srgb = NSColor(color).usingColorSpace(.sRGB) else { return nil }
+    self.init(
+      red: Double(srgb.redComponent), green: Double(srgb.greenComponent),
+      blue: Double(srgb.blueComponent))
   }
 
   public var color: Color {
@@ -149,6 +164,14 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
     if let accent = Self.accentColors[appearance.accent] {
       theme.accent = isDark ? accent.dark : accent.light
       theme.onAccent = isDark ? "#0B1420" : "#FFFFFF"
+    } else if appearance.accent == .custom,
+      let custom = appearance.customAccent.flatMap(ThemeColor.init(hex:))
+    {
+      theme.accent = custom
+      // Whichever of black and white reads best on the colour the user chose.
+      let white: ThemeColor = "#FFFFFF"
+      let black: ThemeColor = "#000000"
+      theme.onAccent = custom.contrast(with: white) >= custom.contrast(with: black) ? white : black
     }
     // The system's own families are reached by their design: SwiftUI does not know them by name.
     switch appearance.messageFont {

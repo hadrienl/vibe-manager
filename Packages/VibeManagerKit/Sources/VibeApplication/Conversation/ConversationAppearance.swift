@@ -14,7 +14,7 @@ public enum SessionPresentation: String, Codable, Hashable, Sendable {
 /// never costs the others.
 public struct ConversationAppearance: Codable, Hashable, Sendable {
   public enum Accent: String, Codable, CaseIterable, Hashable, Sendable {
-    case theme, blue, purple, pink, orange, green, graphite
+    case theme, blue, purple, pink, orange, green, graphite, custom
   }
 
   public enum TextSize: String, Codable, CaseIterable, Hashable, Sendable {
@@ -52,6 +52,8 @@ public struct ConversationAppearance: Codable, Hashable, Sendable {
   public var lightTheme: String
   public var darkTheme: String
   public var accent: Accent
+  /// The colour chosen with the colour picker, as `#RRGGBB`, used when `accent` is `.custom`.
+  public var customAccent: String?
   /// A font family, `nil` for the theme's own.
   public var messageFont: String?
   public var codeFont: String?
@@ -74,6 +76,7 @@ public struct ConversationAppearance: Codable, Hashable, Sendable {
     lightTheme: String = ConversationAppearance.defaultLightTheme,
     darkTheme: String = ConversationAppearance.defaultDarkTheme,
     accent: Accent = .theme,
+    customAccent: String? = nil,
     messageFont: String? = nil,
     codeFont: String? = nil,
     textSize: TextSize = .medium,
@@ -91,6 +94,7 @@ public struct ConversationAppearance: Codable, Hashable, Sendable {
     self.lightTheme = lightTheme
     self.darkTheme = darkTheme
     self.accent = accent
+    self.customAccent = customAccent
     self.messageFont = messageFont
     self.codeFont = codeFont
     self.textSize = textSize
@@ -116,6 +120,7 @@ public struct ConversationAppearance: Codable, Hashable, Sendable {
       lightTheme: value(.lightTheme, fallback.lightTheme),
       darkTheme: value(.darkTheme, fallback.darkTheme),
       accent: value(.accent, fallback.accent),
+      customAccent: (try? container.decodeIfPresent(String.self, forKey: .customAccent)) ?? nil,
       messageFont: (try? container.decodeIfPresent(String.self, forKey: .messageFont)) ?? nil,
       codeFont: (try? container.decodeIfPresent(String.self, forKey: .codeFont)) ?? nil,
       textSize: value(.textSize, fallback.textSize),

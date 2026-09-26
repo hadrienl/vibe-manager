@@ -101,16 +101,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld pièce jointe"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld pièces jointes"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pièce jointe"
                 }
               },
               "other" : {
@@ -147,16 +147,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld ligne de plus, non affichée"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld lignes de plus, non affichées"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ligne de plus, non affichée"
                 }
               },
               "other" : {
@@ -193,16 +193,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld nouveau message"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld nouveaux messages"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouveau message"
                 }
               },
               "other" : {
@@ -302,6 +302,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bulles"
+          }
+        }
+      }
+    },
+    "Choose a colour of your own" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir votre propre couleur"
           }
         }
       }
@@ -412,6 +422,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copier le code"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisée"
+          }
+        }
+      }
+    },
+    "Custom colour" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur personnalisée"
           }
         }
       }
@@ -1345,7 +1375,6 @@
     },
     "theme.terminal" : {
       "comment" : "The name of a theme that looks like a terminal.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {

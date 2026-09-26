@@ -34,13 +34,26 @@ struct ConversationThemeTests {
 
   @Test("Every accent reads on every theme it can be given to")
   func accents() {
-    for accent in ConversationAppearance.Accent.allCases where accent != .theme {
+    for accent in ConversationAppearance.Accent.allCases where ![.theme, .custom].contains(accent) {
       for base in ConversationTheme.builtIn {
         let theme = base.applying(ConversationAppearance(accent: accent))
         #expect(theme.onAccent.contrast(with: theme.accent) >= 4.5, "\(accent) on \(base.id)")
         #expect(theme.accent.contrast(with: theme.background) >= 3, "\(accent) on \(base.id)")
       }
     }
+  }
+
+  @Test("A colour of the user's own, with black or white on it, whichever reads")
+  func customAccent() {
+    let light = ConversationTheme.systemLight.applying(
+      ConversationAppearance(accent: .custom, customAccent: "#FFD60A"))
+    #expect(light.accent.hex == "#FFD60A")
+    #expect(light.onAccent.hex == "#000000")
+    let dark = ConversationTheme.systemDark.applying(
+      ConversationAppearance(accent: .custom, customAccent: "#3A1D8C"))
+    #expect(dark.onAccent.hex == "#FFFFFF")
+    let none = ConversationTheme.systemLight.applying(ConversationAppearance(accent: .custom))
+    #expect(none.accent == ConversationTheme.systemLight.accent)
   }
 
   @Test("The theme follows the system, and more contrast asked for gives High Contrast")
