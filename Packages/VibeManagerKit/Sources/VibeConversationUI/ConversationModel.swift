@@ -7,16 +7,32 @@ import VibeDomain
 ///
 /// Pure, so that the rule is tested without a scroll view: following stops as soon as the reader
 /// scrolls up, resumes when they come back down, and what arrived meanwhile is counted.
+///
+/// Read from the scroll geometry rather than from a marker at the end appearing and disappearing:
+/// a block arriving pushed such a marker out before the view followed it, which stopped the
+/// following while the reader sat at the end, and counted as unseen what they had in front of them.
 public struct ConversationScrollState: Hashable, Sendable {
   public private(set) var isFollowing = true
   public private(set) var unseenCount = 0
 
+  /// How far from the end still counts as being there.
+  static let bottomTolerance = 24.0
+
   public init() {}
 
-  /// The end of the conversation came into view, or left it.
-  public mutating func bottomVisibilityChanged(_ isVisible: Bool) {
-    isFollowing = isVisible
-    if isVisible { unseenCount = 0 }
+  /// The view scrolled, or its content changed size.
+  ///
+  /// - Parameters:
+  ///   - distanceToBottom: how much content lies below the visible part.
+  ///   - contentMovedDown: how far the content's top moved down since the last reading — positive
+  ///     only when the reader scrolled up, since what grows at the end leaves the top in place.
+  public mutating func scrolled(distanceToBottom: Double, contentMovedDown: Double) {
+    if distanceToBottom <= Self.bottomTolerance {
+      isFollowing = true
+      unseenCount = 0
+    } else if contentMovedDown > 0.5 {
+      isFollowing = false
+    }
   }
 
   /// Blocks were added at the end. Returns whether the view should scroll to them.
@@ -62,6 +78,8 @@ public final class ConversationModel {
   public private(set) var scroll = ConversationScrollState()
   /// Bumped when the view should scroll to the end: a counter, so that twice in a row still moves.
   public private(set) var scrollToBottomRequest = 0
+  /// Where the content's top was at the last scroll reading, to tell a scroll up from growth.
+  @ObservationIgnored private var lastContentTop: Double?
 
   public var activity: AgentActivity? {
     didSet { if activity != oldValue { rebuild() } }
@@ -230,8 +248,15 @@ public final class ConversationModel {
 
   // MARK: - Scrolling
 
-  public func bottomVisibilityChanged(_ isVisible: Bool) {
-    scroll.bottomVisibilityChanged(isVisible)
+  /// The content's frame in the scroll view's coordinates, and the height the scroll view shows.
+  public func scrollGeometryChanged(contentFrame: CGRect, viewportHeight: Double) {
+    let movedDown = lastContentTop.map { contentFrame.minY - $0 } ?? 0
+    lastContentTop = contentFrame.minY
+    var next = scroll
+    next.scrolled(
+      distanceToBottom: contentFrame.maxY - viewportHeight, contentMovedDown: movedDown)
+    // Read on every frame of a scroll: only a change should reach the views that observe it.
+    if next != scroll { scroll = next }
   }
 
   public func jumpToBottom() {

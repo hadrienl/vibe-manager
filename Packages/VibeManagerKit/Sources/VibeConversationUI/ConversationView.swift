@@ -13,6 +13,8 @@ public struct ConversationView: View {
   let theme: ConversationTheme
   let appearance: ConversationAppearance
   @State private var isDropTargeted = false
+  @State private var contentFrame = CGRect.zero
+  @State private var viewportHeight = 0.0
   @AccessibilityFocusState private var bannerFocused: Bool
 
   private static let bottomID = "conversation.bottom"
@@ -107,14 +109,20 @@ public struct ConversationView: View {
           Color.clear
             .frame(height: 1)
             .id(Self.bottomID)
-            .onAppear { model.bottomVisibilityChanged(true) }
-            .onDisappear { model.bottomVisibilityChanged(false) }
         }
         .frame(maxWidth: 820)
         .padding(.horizontal, 32)
         .padding(.top, appearance.density == .compact ? 14 : 28)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView) } action: { frame in
+          contentFrame = frame
+          model.scrollGeometryChanged(contentFrame: frame, viewportHeight: viewportHeight)
+        }
+      }
+      .onGeometryChange(for: Double.self) { $0.size.height } action: { height in
+        viewportHeight = height
+        model.scrollGeometryChanged(contentFrame: contentFrame, viewportHeight: height)
       }
       .defaultScrollAnchor(.bottom)
       .onChange(of: model.scrollToBottomRequest) {

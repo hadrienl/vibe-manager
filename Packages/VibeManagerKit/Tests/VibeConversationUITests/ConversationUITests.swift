@@ -193,18 +193,56 @@ struct ConversationScrollStateTests {
     var state = ConversationScrollState()
     let followed = state.blocksAppended(2)
     #expect(followed)
-    state.bottomVisibilityChanged(false)
+    state.scrolled(distanceToBottom: 300, contentMovedDown: 300)
     let scrolled = state.blocksAppended(3)
     #expect(!scrolled)
     #expect(state.unseenCount == 3)
-    state.bottomVisibilityChanged(true)
-    #expect(state.unseenCount == 0)
-    state.bottomVisibilityChanged(false)
+    state.scrolled(distanceToBottom: 0, contentMovedDown: -300)
+    #expect(state.isFollowing && state.unseenCount == 0)
+    state.scrolled(distanceToBottom: 300, contentMovedDown: 300)
     _ = state.blocksAppended(1)
     state.jumpedToBottom()
     #expect(state.isFollowing && state.unseenCount == 0)
     let nothing = state.blocksAppended(0)
     #expect(!nothing)
+  }
+
+  @Test("A block growing the end, before the view follows it, does not stop the following")
+  func growthKeepsFollowing() {
+    var state = ConversationScrollState()
+    // The block is laid out below the visible part; the top of the content has not moved.
+    state.scrolled(distanceToBottom: 400, contentMovedDown: 0)
+    let followed = state.blocksAppended(1)
+    #expect(followed)
+    #expect(state.unseenCount == 0)
+  }
+
+  @Test("Coming back to the end, or near it, clears what was counted")
+  func backAtTheEnd() {
+    var state = ConversationScrollState()
+    state.scrolled(distanceToBottom: 500, contentMovedDown: 500)
+    _ = state.blocksAppended(32)
+    #expect(state.unseenCount == 32)
+    state.scrolled(distanceToBottom: 10, contentMovedDown: -490)
+    #expect(state.isFollowing && state.unseenCount == 0)
+  }
+
+  @MainActor
+  @Test("The model tells a scroll up from content growing at the end")
+  func geometry() {
+    let model = ConversationModel(sessionID: SessionID())
+    let viewport = 600.0
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -400, width: 800, height: 1000), viewportHeight: viewport)
+    #expect(model.scroll.isFollowing)
+    // A block arrives below: the content is taller, its top has not moved.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -400, width: 800, height: 1500), viewportHeight: viewport)
+    #expect(model.scroll.isFollowing)
+    // The reader scrolls up.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -300, width: 800, height: 1500), viewportHeight: viewport)
+    #expect(!model.scroll.isFollowing)
   }
 }
 
