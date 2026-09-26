@@ -75,7 +75,7 @@ struct WorkspaceLayoutControllerTests {
     await #expect(store.load().isInspectorVisible == false)
   }
 
-  @Test("A drag is written once, not at every width it passes through")
+  @Test("A drag is written once, not at every width it passes through", .timeLimit(.minutes(1)))
   func widthsAreWrittenOncePerPause() async throws {
     let store = RecordingLayoutStore()
     let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(20))
@@ -84,9 +84,9 @@ struct WorkspaceLayoutControllerTests {
       controller.sidebarWidthChanged(to: width)
     }
     // What is being checked is that twenty widths did not become twenty writes, not how fast
-    // one of them lands: a loaded CI runner may take seconds to run the delayed save.
-    let deadline = ContinuousClock.now + .seconds(10)
-    while await store.saves.isEmpty, ContinuousClock.now < deadline {
+    // one of them lands: a CI runner that freezes may take any time to run the delayed save, so
+    // the save is waited for, and the time limit stops a wait that never ends.
+    while await store.saves.isEmpty {
       try await Task.sleep(for: .milliseconds(10))
     }
     try await Task.sleep(for: .milliseconds(100))
@@ -95,7 +95,7 @@ struct WorkspaceLayoutControllerTests {
     #expect(controller.intent.sidebarWidth == 320)
   }
 
-  @Test("The divider between Git and the notes is kept, within its bounds")
+  @Test("The divider between Git and the notes is kept, within its bounds", .timeLimit(.minutes(1)))
   func inspectorSplit() async throws {
     let store = RecordingLayoutStore()
     let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(20))
@@ -107,8 +107,8 @@ struct WorkspaceLayoutControllerTests {
     controller.inspectorSplitChanged(to: .nan)
     #expect(controller.intent.inspectorSplit == WorkspaceLayout.inspectorSplitRange.upperBound)
 
-    let deadline = ContinuousClock.now + .seconds(10)
-    while await store.saves.isEmpty, ContinuousClock.now < deadline {
+    // The save is waited for, however late a frozen runner runs it.
+    while await store.saves.isEmpty {
       try await Task.sleep(for: .milliseconds(10))
     }
     await #expect(

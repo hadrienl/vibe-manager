@@ -840,12 +840,16 @@ private func recent(_ paths: String...) -> [RecentFolder] {
 }
 
 @MainActor
-@Suite("The recent folders of the new session sheet")
+@Suite("The recent folders of the new session sheet", .timeLimit(.minutes(1)))
 struct NewSessionRecentFolderTests {
   private func makeModel(
     recentFolders: [RecentFolder],
     probe: MappedFolders = MappedFolders(),
-    budget: Duration = .seconds(5),
+    // What a test checks is what the probe answered, not how fast: a CI runner that freezes its
+    // cooperative pool lets a budget of seconds expire before a probe that takes none. The budget
+    // is out of reach, and the time limit stops a probe that never answers. The test of the
+    // budget itself gives its own.
+    budget: Duration = .seconds(3_600),
     fullDiskAccess: FullDiskAccessStatus? = .notGranted,
     templates: [PromptTemplate] = [],
     forgotten: @escaping @MainActor (RecentFolder) -> Void = { _ in }
