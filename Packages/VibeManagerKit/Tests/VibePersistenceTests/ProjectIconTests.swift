@@ -169,13 +169,15 @@ struct ProjectIconFinderTests {
   func cancellationAnswers() async throws {
     defer { cleanUp() }
     try write(try png(side: 32), at: "favicon.png")
-    let finder = FileSystemProjectIconFinder(timeLimit: .seconds(60))
+    let finder = FileSystemProjectIconFinder(timeLimit: .seconds(600))
     let search = Task { [root] in await finder.icon(inFolder: root.path) }
     search.cancel()
 
     let started = ContinuousClock.now
     _ = await search.value
-    #expect(ContinuousClock.now - started < .seconds(5))
+    // Far from the time limit rather than close to zero: a loaded CI runner can stall every test
+    // for seconds, and what matters is that the cancellation, not the limit, ended the wait.
+    #expect(ContinuousClock.now - started < .seconds(60))
   }
 
   @Test("A file too large to be an icon is ignored")

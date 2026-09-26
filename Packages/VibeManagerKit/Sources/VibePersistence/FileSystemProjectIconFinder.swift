@@ -62,21 +62,44 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
     }
   }
 
+  /// The walk and the decoding wait on the disk: they run on a queue of their own, not on the few
+  /// threads of the cooperative pool, which every other task of the application shares.
+  private static let queue = DispatchQueue(
+    label: "com.hadrienl.VibeManager.project-icons", qos: .userInitiated,
+    attributes: .concurrent)
+
   private func search(_ path: String) -> Task<ProjectIcon?, Never> {
     let timeLimit = timeLimit
     return Task.detached(priority: .userInitiated) {
-      let deadline = ContinuousClock.now.advanced(by: timeLimit)
-      let root = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
-      let files = Self.walk(root, until: deadline)
-      for tier in Self.tiers(of: files) {
-        // The largest first, and the next one when it cannot be read.
-        for candidate in tier.sorted(by: { $0.rank > $1.rank }) {
-          guard ContinuousClock.now < deadline, !Task.isCancelled else { return nil }
-          if let icon = ProjectIconImporter.icon(from: candidate.url) { return icon }
+      let cancellation = CancellationFlag()
+      return await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+          Self.queue.async {
+            continuation.resume(
+              returning: Self.find(
+                in: path, timeLimit: timeLimit, isCancelled: cancellation.isRaised))
+          }
         }
+      } onCancel: {
+        cancellation.raise()
       }
-      return nil
     }
+  }
+
+  private static func find(
+    in path: String, timeLimit: Duration, isCancelled: () -> Bool
+  ) -> ProjectIcon? {
+    let deadline = ContinuousClock.now.advanced(by: timeLimit)
+    let root = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
+    let files = walk(root, until: deadline, isCancelled: isCancelled)
+    for tier in tiers(of: files) {
+      // The largest first, and the next one when it cannot be read.
+      for candidate in tier.sorted(by: { $0.rank > $1.rank }) {
+        guard ContinuousClock.now < deadline, !isCancelled() else { return nil }
+        if let icon = ProjectIconImporter.icon(from: candidate.url) { return icon }
+      }
+    }
+    return nil
   }
 
   /// A file found by the walk, and where it sits relative to the project.
@@ -99,14 +122,16 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
   }
 
   /// Every file within reach, breadth first, so that the root is read before anything deeper.
-  static func walk(_ root: URL, until deadline: ContinuousClock.Instant) -> [Entry] {
+  static func walk(
+    _ root: URL, until deadline: ContinuousClock.Instant, isCancelled: () -> Bool = { false }
+  ) -> [Entry] {
     let manager = FileManager.default
     let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
     var files: [Entry] = []
     var listed = 0
     var queue: [(url: URL, relative: String, depth: Int)] = [(root, "", 0)]
     while !queue.isEmpty, listed < maximumEntries, ContinuousClock.now < deadline,
-      !Task.isCancelled
+      !isCancelled()
     {
       let (directory, relative, depth) = queue.removeFirst()
       guard
@@ -263,6 +288,20 @@ enum ProjectIconImporter {
     CGImageDestinationAddImage(destination, rendered, nil)
     guard CGImageDestinationFinalize(destination) else { return nil }
     return output as Data
+  }
+}
+
+/// Raised once, read from any thread: how a cancelled task stops work running outside of it.
+final class CancellationFlag: @unchecked Sendable {
+  private let lock = NSLock()
+  private var isSet = false
+
+  func raise() {
+    lock.withLock { isSet = true }
+  }
+
+  func isRaised() -> Bool {
+    lock.withLock { isSet }
   }
 }
 
