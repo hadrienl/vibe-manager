@@ -19,6 +19,9 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌥⌘2 | Focus Terminal: the selected session's terminal | View |
 | ⌥⌘3 | Focus Inspector: the Git list, the inspector shown if it was hidden | View |
 | ⌥⌘4 | Focus Web View: the page in front, the web view shown if it was hidden | View |
+| ⌥⌘5 | Focus Side Terminals: the terminal in front of the drawer, the drawer shown if it was hidden | View |
+| ⌘J | Show / Hide Terminals: the session's drawer of side terminals; hiding it stops nothing | View |
+| ⌘T | New Terminal: a new tab in the drawer, a shell in the session's folder | View |
 | ⌥⌘P | Focus Pending Requests: the palette unfolds and its oldest request takes the keyboard | View |
 | ⌥⌘B | Show / Hide Web View; in a window where the two take turns, swaps terminal and web view | View |
 | ⌥⌘N | Edit Notes; Escape gives the keyboard back to the terminal | View |
@@ -32,6 +35,23 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 
 An agent running in the terminal loses ⌥⌘1, ⌥⌘2 and ⌥⌘3, which full-screen programs rarely use; the
 menus already took the others before #19.
+
+## The side terminals
+
+| Action | Shortcut | Menu |
+|---|---|---|
+| Show / Hide Terminals | ⌘J, or the terminal button of the status bar | View |
+| New Terminal | ⌘T, or + in the tab bar | View |
+| Close Terminal, with the keyboard in the drawer | ⌘W | Session ("Close Terminal") |
+| Show Next / Previous Tab, with the keyboard in the drawer | ⌃⇥ / ⌃⇧⇥ | Web |
+| Rename…, Move Left, Move Right, Close Terminal | — | A tab's context menu, and its VoiceOver actions |
+| The drawer's height | ↑ / ↓ on its divider with VoiceOver's adjust gestures | — |
+
+Each tab is a button named after its title and its state ("npm run dev, running a command, new
+output"), and its × a button of its own ("Close npm run dev"). The status bar's button says how many
+side terminals are open and which hidden one wrote something or ended. A side terminal is the same
+component as the agent's, and VoiceOver reads it the same way ("Side terminal — npm run dev —
+<session>"). Closing a terminal in which a command runs asks first.
 
 ## The web view
 

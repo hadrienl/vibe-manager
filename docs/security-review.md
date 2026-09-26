@@ -6,13 +6,15 @@ environment updates this document in the same pull request.
 
 `ProcessLaunchInventoryTests` enforces the first table. It fails when `Process(`, `posix_spawn(`,
 `system(`, `popen(`, `fork(` or `exec*(` appears in a production source other than the four
-launchers listed below.
+launchers listed below, and the `execv` of `ControllingTerminal`, which only turns a process one
+of them started into the shell it was started for.
 
 ## Process launch inventory
 
 | Launcher | What it starts | argv | Environment | Timeout | Stopped by |
 |---|---|---|---|---|---|
-| `PseudoTerminal` (`VibeTerminal`) | An agent, or a login shell, in a terminal | `TerminalSpec.arguments`, an array; the provider puts `--` before the prompt | `TerminalSpec.environment`: `AgentEnvironmentPolicy` allowlist plus what the provider declares; never an `*_API_KEY` | None: a session lasts as long as the user wants it | `SIGTERM` to the session's group, 3 s, then `SIGKILL` to the group. `ChildProcessGroupGuard` kills the group from `atexit`. |
+| `PseudoTerminal` (`VibeTerminal`) | An agent, or a login shell, in a terminal | `TerminalSpec.arguments`, an array; the provider puts `--` before the prompt | `TerminalSpec.environment`: `AgentEnvironmentPolicy` allowlist plus what the provider declares; never an `*_API_KEY` | None: a session lasts as long as the user wants it | `SIGTERM` to the session's group, 3 s, then `SIGKILL` to the group. A side terminal (#43) is hung up on first — `SIGHUP` to its shell and to every group whose controlling terminal it is (`KERN_PROC_TTY`), 1 s — and those groups are swept with the shell's. `ChildProcessGroupGuard` kills the group from `atexit`. |
+| `ControllingTerminal` (`VibeTerminal`) | Not a launch: the application's own binary, started by `PseudoTerminal` with `--terminal-exec <path> <argv0> <arguments…>` for a side terminal's shell, takes its terminal with `TIOCSCTTY` and `execv`s the shell in the same process (ADR 0027) | The shell's, passed through unchanged | The shell's, from `posix_spawn` | As the shell | As the shell: it is the shell once `execv` returns; a failed `execv` exits 127 |
 | `ExecutableTerminalHostLauncher` (`TerminalHost.swift`) | The terminal host: the application's own binary with `--terminal-host <directory>` | Fixed | `HOME USER LOGNAME TMPDIR PATH LANG SHELL` | None: the host leaves by itself when it has no session and no client for 5 s | `stopAll`, then `goodbye(keepRunning: false)`. A client that vanishes without `goodbye` makes the host stop everything (ADR 0017). |
 | `SpawnedFullDiskAccessProbe` (`CurrentFullDiskAccess.swift`) | The application's own binary with `--probe-full-disk-access`, answering for itself to TCC: it opens the TCC database's path, reads nothing, and exits `0` or `1` (#76) | Fixed | `HOME USER LOGNAME TMPDIR PATH` | 10 s, then `SIGKILL` | Exits by itself at once; reaped with `waitpid` |
 | `BoundedProcess` (`VibeProcess`) | Everything else, below | An array | Explicit, required by the type | Required by the type | `SIGTERM` to the group, a grace period, then `SIGKILL` to the group; whatever the command left in its group once it has exited is stopped the same way |
@@ -92,6 +94,11 @@ pid, so a `git` that started a helper or a login shell whose profile started one
 - **"Always Allow" is a preference.** It lives in the user defaults, which an agent's shell can
   write like any file of the user's: the question stops a mistaken or misled agent, not a program
   bent on acting as the user.
+- **The history of side terminals is on disk** (#43, ADR 0027). What a side terminal showed —
+  possibly a token a command printed — is written to `Terminals/<session>/*.scrollback`, `0600` in
+  `0700` folders excluded from backups, bounded to 4 MiB per terminal, never read by the
+  diagnostics beyond its total size, and erased when the setting is turned off. A process of your
+  user can read it, as it can read the terminal itself. The agent's terminal is never written.
 - **The web view's trace and tabs.** `Browser/*.json` are `0600` in a `0700` folder; a process of
   the same user can read or rewrite them. A typed value is kept cut short, and never for a password,
   card or one-time-code field.

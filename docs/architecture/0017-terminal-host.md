@@ -1,6 +1,8 @@
 # 0017 — A terminal host, so the agents can outlive the application
 
-- Status: accepted
+- Status: accepted; amended by [0027](0027-side-terminals.md): terminals are keyed by `TerminalID`
+  (the agent's keeps its session's UUID, so the protocol is unchanged), and side terminals run in the
+  same host
 - Date: 2026-09-24
 - Issue: [#58](https://github.com/hadrienl/vibe-manager/issues/58)
 - Supersedes: ADR 0011's "An agent does not outlive the application that spawned it", and ADR
