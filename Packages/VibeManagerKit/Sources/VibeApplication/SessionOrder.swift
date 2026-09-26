@@ -20,19 +20,30 @@ public enum SessionOrder {
   /// The ranks `reordered` already held, handed back to it in its new order. Only the sessions
   /// whose rank changes are returned.
   ///
-  /// Two sessions of the subset with the same rank would keep sharing it, and their order would
-  /// be left to their identifiers: the ranks are spread apart first, above the smallest one, so
-  /// the order asked for is the order stored.
-  public static func redistribute(_ reordered: [WorkSession]) -> [SessionID: Int] {
-    var slots = reordered.map(\.rank).sorted()
-    for index in slots.indices.dropFirst() where slots[index] <= slots[index - 1] {
-      slots[index] = slots[index - 1] + 1
-    }
-    var ranks: [SessionID: Int] = [:]
-    for (session, rank) in zip(reordered, slots) where session.rank != rank {
+  /// Two sessions of the subset with the same rank — a store edited by hand — would keep sharing
+  /// it, and their order would be left to their identifiers. Spreading them apart in place could
+  /// land on a rank a session outside the subset holds, and only move the tie elsewhere: the whole
+  /// order, `all`, is numbered afresh first, as it reads, so every rank is distinct and nothing
+  /// changes place but the subset.
+  public static func redistribute(
+    _ reordered: [WorkSession], among all: [WorkSession]
+  ) -> [SessionID: Int] {
+    let held = reordered.map(\.rank).sorted()
+    let tied = zip(held, held.dropFirst()).contains { $0 == $1 }
+    let known = Set(all.map(\.id))
+    let everyone = tied ? all + reordered.filter { !known.contains($0.id) } : reordered
+    // Without a tie the subset only swaps the ranks it holds; with one, every session first
+    // takes its place in the order as it reads.
+    var ranks = Dictionary(
+      uniqueKeysWithValues: (tied ? ordered(everyone) : everyone).enumerated().map {
+        ($1.id, tied ? $0 : $1.rank)
+      })
+    let slots = reordered.compactMap { ranks[$0.id] }.sorted()
+    for (session, rank) in zip(reordered, slots) {
       ranks[session.id] = rank
     }
-    return ranks
+    let stored = Dictionary(uniqueKeysWithValues: everyone.map { ($0.id, $0.rank) })
+    return ranks.filter { stored[$0.key] != $0.value }
   }
 
   /// `subset` with `moved` taken out and put back at `index`, counted in the subset without it:
@@ -83,7 +94,7 @@ public struct ReorderSessions: Sendable {
   /// - Returns: the sessions whose rank changed.
   @discardableResult
   public func callAsFunction(_ reordered: [WorkSession]) async throws -> Int {
-    let ranks = SessionOrder.redistribute(reordered)
+    let ranks = SessionOrder.redistribute(reordered, among: try await repository.sessions())
     guard !ranks.isEmpty else { return 0 }
     try await repository.reorder(ranks)
     return ranks.count

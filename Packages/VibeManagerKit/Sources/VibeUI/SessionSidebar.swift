@@ -564,6 +564,8 @@ private struct ArchivedSessionsBar: View {
     .popover(isPresented: $model.isArchiveListPresented, arrowEdge: .trailing) {
       ArchivedSessionsList(model: model)
     }
+    // After the line is laid out, not as it appears: the popover needs its anchor on screen.
+    .task { model.presentPendingArchiveList() }
   }
 }
 

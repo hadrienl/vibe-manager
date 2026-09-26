@@ -58,7 +58,7 @@ struct SessionOrderTests {
     let column = [session("A", rank: 0), session("B", rank: 3), session("C", rank: 7)]
     let reordered = try #require(SessionOrder.moving(column[2].id, to: 0, in: column))
 
-    let ranks = SessionOrder.redistribute(reordered)
+    let ranks = SessionOrder.redistribute(reordered, among: column)
 
     #expect(Set(ranks.values).isSubset(of: [0, 3, 7]))
     #expect(ranks == [column[2].id: 0, column[0].id: 3, column[1].id: 7])
@@ -68,10 +68,25 @@ struct SessionOrderTests {
   func tiesAreSpread() {
     let a = session("A", rank: 4)
     let b = session("B", rank: 4)
-    let ranks = SessionOrder.redistribute([b, a])
+    let ranks = SessionOrder.redistribute([b, a], among: [a, b])
     let stored = applying(ranks, to: [a, b])
 
     #expect(SessionOrder.ordered(stored).map(\.name) == ["B", "A"])
+  }
+
+  @Test("A tie is never pushed onto a session outside the subset")
+  func tiesStayOutOfOtherSessions() throws {
+    let sessions = [
+      session("Api 1", rank: 5, folder: "/work/api"),
+      session("Api 2", rank: 5, folder: "/work/api"),
+      session("Web 1", rank: 6, folder: "/work/web"),
+    ]
+    let api = try #require(grouped(sessions).first)
+    let reordered = try #require(SessionOrder.moving(api.sessions[1].id, to: 0, in: api.sessions))
+    let after = applying(SessionOrder.redistribute(reordered, among: sessions), to: sessions)
+
+    #expect(Set(after.map(\.rank)).count == after.count)
+    #expect(SessionOrder.ordered(after).map(\.name) == reordered.map(\.name) + ["Web 1"])
   }
 
   @Test("Moving a session inside its group never moves the group")
@@ -85,7 +100,7 @@ struct SessionOrderTests {
     // The first session of the group goes under the second one: inserted into the global order,
     // Api 1 would land after Web 1, and the group of Web would take the top.
     let reordered = try #require(SessionOrder.moving(api.sessions[0].id, to: 1, in: api.sessions))
-    let after = applying(SessionOrder.redistribute(reordered), to: sessions)
+    let after = applying(SessionOrder.redistribute(reordered, among: sessions), to: sessions)
 
     #expect(grouped(after).map(\.folderName) == ["api", "web"])
     #expect(grouped(after).first?.sessions.map(\.name) == ["Api 2", "Api 1"])
@@ -104,14 +119,15 @@ struct SessionOrderTests {
     // Rearranged in the grouped view: Web 2 above Web 1.
     let web = try #require(grouped(sessions).last)
     let inGroup = try #require(SessionOrder.moving(web.sessions[1].id, to: 0, in: web.sessions))
-    let afterGroupMove = applying(SessionOrder.redistribute(inGroup), to: sessions)
+    let afterGroupMove = applying(SessionOrder.redistribute(inGroup, among: sessions), to: sessions)
     #expect(
       flat.apply(to: afterGroupMove).map(\.name) == ["Api 1", "Web 2", "Api 2", "Web 1"])
 
     // Rearranged in the flat list: Api 2 to the top.
     let list = flat.apply(to: afterGroupMove)
     let inList = try #require(SessionOrder.moving(list[2].id, to: 0, in: list))
-    let afterListMove = applying(SessionOrder.redistribute(inList), to: afterGroupMove)
+    let afterListMove = applying(
+      SessionOrder.redistribute(inList, among: afterGroupMove), to: afterGroupMove)
     #expect(grouped(afterListMove).first?.sessions.map(\.name) == ["Api 2", "Api 1"])
   }
 
@@ -130,7 +146,7 @@ struct SessionOrderTests {
     let reordered = try #require(SessionOrder.movingGroup(cli, to: 0, in: groups))
     #expect(reordered.map(\.name) == ["Cli 1", "Api 1", "Api 2", "Web 1", "Loose"])
 
-    let after = applying(SessionOrder.redistribute(reordered), to: sessions)
+    let after = applying(SessionOrder.redistribute(reordered, among: sessions), to: sessions)
     #expect(grouped(after).map(\.folderName) == ["cli", "api", "web", ""])
     #expect(SessionOrder.movingGroup(cli, to: 0, in: grouped(after)) == nil)
   }

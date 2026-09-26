@@ -138,7 +138,23 @@ struct SessionOrderModelTests {
 
     model.showArchivedSessions()
 
-    #expect(model.isArchiveListPresented)
+    // The popover waits for its anchor: the sidebar is only being shown.
+    #expect(!model.isArchiveListPresented)
     #expect(model.layout.intent.isSidebarVisible)
+
+    model.presentPendingArchiveList()
+    #expect(model.isArchiveListPresented)
+    #expect(!model.isArchiveListPending)
+  }
+
+  @Test("Show Archived Sessions opens the list at once when the sidebar is there")
+  func archiveCommandWithSidebar() async {
+    let model = await makeModel()
+    model.layout.setSidebarVisible(true)
+
+    model.showArchivedSessions()
+
+    #expect(model.isArchiveListPresented)
+    #expect(!model.isArchiveListPending)
   }
 }

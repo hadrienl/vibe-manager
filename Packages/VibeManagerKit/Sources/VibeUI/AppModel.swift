@@ -496,6 +496,10 @@ public final class AppModel {
   /// Whether the list of the archived sessions is open at the foot of the sidebar. Here rather
   /// than in the view, so that the menu can open it.
   public var isArchiveListPresented = false
+  /// The list asked for while the sidebar was hidden: its anchor is not drawn yet, and a popover
+  /// whose binding is already true when its anchor appears is not shown. It opens once the line
+  /// at the foot of the sidebar is on screen.
+  public private(set) var isArchiveListPending = false
   /// The export under way, from its preview to the file saved.
   public private(set) var diagnosticsExport: DiagnosticsExportModel?
   /// How the previous run ended, as this launch found it: for the export.
@@ -2320,8 +2324,9 @@ public final class AppModel {
   /// is written: a drop that snapped back for the length of a write would read as refused. A
   /// failed write is reported, and the reload puts back what the store holds.
   func commitOrder(_ reordered: [WorkSession]) async {
-    let ranks = SessionOrder.redistribute(reordered)
-    guard !ranks.isEmpty, case .loaded(let current) = state else { return }
+    guard case .loaded(let current) = state else { return }
+    let ranks = SessionOrder.redistribute(reordered, among: current)
+    guard !ranks.isEmpty else { return }
     state = .loaded(
       current.map { session in
         guard let rank = ranks[session.id] else { return session }
@@ -2581,9 +2586,18 @@ extension AppModel {
   /// Show Archived Sessions, ⌥⌘A: the list at the foot of the sidebar, which is shown first if it
   /// was hidden — the list opens from it.
   public func showArchivedSessions() {
-    if !layout.columns.isSidebarVisible {
+    guard layout.columns.isSidebarVisible else {
       layout.setSidebarVisible(true)
+      isArchiveListPending = true
+      return
     }
+    isArchiveListPresented = true
+  }
+
+  /// Opens the list asked for while the sidebar was hidden, now that its anchor is on screen.
+  public func presentPendingArchiveList() {
+    guard isArchiveListPending else { return }
+    isArchiveListPending = false
     isArchiveListPresented = true
   }
 
