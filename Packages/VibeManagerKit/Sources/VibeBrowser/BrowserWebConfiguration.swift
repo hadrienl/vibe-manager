@@ -91,14 +91,7 @@ public final class BrowserWebConfiguration {
   private func parkingWindow() -> NSWindow? {
     if let parking { return parking }
     guard NSApp != nil else { return nil }
-    let window = NSWindow(
-      contentRect: NSRect(x: -32_000, y: -32_000, width: 1_280, height: 800),
-      styleMask: [.borderless], backing: .buffered, defer: false)
-    window.isReleasedWhenClosed = false
-    window.isExcludedFromWindowsMenu = true
-    window.ignoresMouseEvents = true
-    window.collectionBehavior = [.transient, .ignoresCycle, .stationary]
-    window.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 1_280, height: 800))
+    let window = ParkingWindow()
     window.orderFrontRegardless()
     parking = window
     return window
@@ -124,5 +117,50 @@ public final class BrowserWebConfiguration {
       atPath: file.path, contents: Data(identifier.uuidString.utf8),
       attributes: [.posixPermissions: 0o600])
     return identifier
+  }
+}
+
+/// The window parked pages wait in, far off every screen, and kept there.
+///
+/// AppKit brings a window lying off every screen back onto one when the displays change — a
+/// wake, a monitor plugged in or out. This one then showed, over the application, the pages of
+/// every session stacked in it, and hid what was under it.
+final class ParkingWindow: NSWindow {
+  static let parkedFrame = NSRect(x: -32_000, y: -32_000, width: 1_280, height: 800)
+
+  /// Kept for the window's life, which is the application's: it is never closed.
+  private var observers: [any NSObjectProtocol] = []
+
+  init() {
+    super.init(
+      contentRect: Self.parkedFrame, styleMask: [.borderless], backing: .buffered, defer: false)
+    isReleasedWhenClosed = false
+    isExcludedFromWindowsMenu = true
+    ignoresMouseEvents = true
+    collectionBehavior = [.transient, .ignoresCycle, .stationary]
+    contentView = NSView(frame: NSRect(origin: .zero, size: Self.parkedFrame.size))
+    let center = NotificationCenter.default
+    observers = [
+      center.addObserver(
+        forName: NSWindow.didMoveNotification, object: self, queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.returnToParking() }
+      },
+      center.addObserver(
+        forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.returnToParking() }
+      },
+    ]
+  }
+
+  /// Off every screen is where it belongs: nothing moves it onto one.
+  override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+    frameRect
+  }
+
+  func returnToParking() {
+    guard frame.origin != Self.parkedFrame.origin else { return }
+    setFrameOrigin(Self.parkedFrame.origin)
   }
 }
