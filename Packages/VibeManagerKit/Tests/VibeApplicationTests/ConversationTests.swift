@@ -37,6 +37,30 @@ struct UnifiedDiffParserTests {
     #expect(hunks[1].oldStart == 40 && hunks[1].newStart == 41)
   }
 
+  @Test("Within a hunk's counts, a line reading like a file header is content")
+  func contentLikeHeaders() {
+    let diff = """
+      --- a/q.sql
+      +++ b/q.sql
+      @@ -1,3 +1,3 @@
+       select 1;
+      --- TODO
+      +++ counter
+       select 2;
+      --- a/next.sql
+      +++ b/next.sql
+      @@ -1 +1 @@
+      -a
+      +b
+      """
+    let (hunks, _) = UnifiedDiffParser.hunks(in: diff)
+    #expect(hunks.count == 2)
+    #expect(hunks[0].lines.map(\.kind) == [.context, .removed, .added, .context])
+    #expect(hunks[0].lines[1].text == "-- TODO")
+    #expect(hunks[0].lines[3].oldNumber == 3 && hunks[0].lines[3].newNumber == 3)
+    #expect(hunks[1].lines.map(\.kind) == [.removed, .added])
+  }
+
   @Test("Past the limit, lines are counted rather than kept")
   func limit() {
     let diff = "@@ -1,5 +1,5 @@\n" + (1...5).map { "+line \($0)" }.joined(separator: "\n")
@@ -65,6 +89,7 @@ struct TestOutcomeRecognizerTests {
     arguments: [
       ("✔ Test run with 42 tests in 5 suites passed after 1.2 seconds.", 42, 0),
       ("✘ Test run with 9 tests in 2 suites failed after 0.004 seconds with 1 issue.", 9, 1),
+      ("✘ Test run with 9 tests failed after 0.1 seconds with 4 issues.", 9, 4),
       ("Executed 42 tests, with 3 failures (0 unexpected) in 1.234 (1.240) seconds", 42, 3),
       ("===== 3 failed, 39 passed in 1.23s =====", 42, 3),
       ("======== 12 passed in 0.50s ========", 12, 0),

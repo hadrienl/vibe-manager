@@ -936,6 +936,7 @@ public final class AppModel {
       let archival = try await archiveSession(id: id)
       await activityTracker?.forget(id)
       browser?.release(id)
+      conversations.release(id)
       diagnostics.record(
         .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)

@@ -66,7 +66,8 @@ public struct DiffLine: Hashable, Sendable {
 }
 
 /// Reads the hunks of a unified diff: `@@ -a,b +c,d @@` headers, then lines that start with a
-/// space, `+` or `-`. File headers and `\ No newline at end of file` are skipped.
+/// space, `+` or `-`. File headers and `\ No newline at end of file` are skipped. When a header
+/// gives line counts, every line they cover is content, even one that reads `--- ` or `+++ `.
 public enum UnifiedDiffParser {
   public static func hunks(in text: String, limit: Int = DiffHunk.lineLimit) -> (
     hunks: [DiffHunk], omitted: Int
@@ -75,34 +76,44 @@ public enum UnifiedDiffParser {
     var current: DiffHunk?
     var oldLine = 0
     var newLine = 0
+    // Lines the hunk header announces and that are still to come; nil when it gives no counts.
+    var remaining: (old: Int, new: Int)?
     var kept = 0
     var omitted = 0
     for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
       let line = raw.hasSuffix("\r") ? raw.dropLast() : raw[...]
       if line.hasPrefix("@@") {
         if let current { hunks.append(current) }
-        let (old, new) = header(String(line))
-        oldLine = old
-        newLine = new
-        current = DiffHunk(oldStart: old, newStart: new, lines: [])
+        let range = header(String(line))
+        oldLine = range.oldStart
+        newLine = range.newStart
+        remaining = range.counts
+        current = DiffHunk(oldStart: range.oldStart, newStart: range.newStart, lines: [])
         continue
       }
       guard current != nil, let first = line.first else { continue }
+      // Past the announced lines, whatever comes before the next `@@` is a file header.
+      if let left = remaining, left.old <= 0, left.new <= 0 { continue }
+      let isFileHeader = remaining == nil && (line.hasPrefix("+++ ") || line.hasPrefix("--- "))
       let body = String(line.dropFirst())
       let parsed: DiffLine
       switch first {
       case "+":
-        guard !line.hasPrefix("+++ ") else { continue }
+        guard !isFileHeader else { continue }
         parsed = DiffLine(kind: .added, text: body, oldNumber: nil, newNumber: newLine)
         newLine += 1
+        remaining?.new -= 1
       case "-":
-        guard !line.hasPrefix("--- ") else { continue }
+        guard !isFileHeader else { continue }
         parsed = DiffLine(kind: .removed, text: body, oldNumber: oldLine, newNumber: nil)
         oldLine += 1
+        remaining?.old -= 1
       case " ":
         parsed = DiffLine(kind: .context, text: body, oldNumber: oldLine, newNumber: newLine)
         oldLine += 1
         newLine += 1
+        remaining?.old -= 1
+        remaining?.new -= 1
       default:
         continue
       }
@@ -129,14 +140,21 @@ public enum UnifiedDiffParser {
     return ([DiffHunk(oldStart: 0, newStart: 1, lines: kept)], max(0, lines.count - limit))
   }
 
-  private static func header(_ line: String) -> (Int, Int) {
-    // @@ -12,7 +12,9 @@ optional section name
+  private static func header(_ line: String) -> (
+    oldStart: Int, newStart: Int, counts: (old: Int, new: Int)?
+  ) {
+    // @@ -12,7 +12,9 @@ optional section name — a missing count means one line.
+    // Codex's patches write a bare `@@`, with neither starts nor counts.
     let parts = line.split(separator: " ")
-    func start(_ prefix: Character) -> Int {
-      guard let part = parts.first(where: { $0.first == prefix }) else { return 1 }
-      let digits = part.dropFirst().split(separator: ",").first ?? ""
-      return Int(digits) ?? 1
+    func range(_ prefix: Character) -> (start: Int, count: Int)? {
+      guard let part = parts.first(where: { $0.first == prefix }) else { return nil }
+      let numbers = part.dropFirst().split(separator: ",", omittingEmptySubsequences: false)
+      guard let start = numbers.first.flatMap({ Int($0) }) else { return nil }
+      return (start, numbers.count > 1 ? Int(numbers[1]) ?? 1 : 1)
     }
-    return (start("-"), start("+"))
+    guard let old = range("-"), let new = range("+") else {
+      return (range("-")?.start ?? 1, range("+")?.start ?? 1, nil)
+    }
+    return (old.start, new.start, (old.count, new.count))
   }
 }

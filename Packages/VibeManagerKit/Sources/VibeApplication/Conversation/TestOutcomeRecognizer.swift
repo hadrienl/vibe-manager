@@ -49,7 +49,7 @@ public enum TestOutcomeRecognizer {
   static func swiftTesting(_ text: String) -> TestOutcome? {
     guard
       let match = lastMatch(
-        #"Test run with (\d+) tests?(?: in \d+ suites?)? (passed|failed)[^\n]*?(?:with (\d+) issues?)?"#,
+        #"Test run with (\d+) tests?(?: in \d+ suites?)? (passed|failed)(?:[^\n]*? with (\d+) issues?)?"#,
         in: text),
       let total = Int(match[1])
     else { return nil }

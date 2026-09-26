@@ -46,7 +46,8 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   public let text: String
   public let attachmentCount: Int
   public let sentAt: Date
-  /// How many prompts the conversation held when this one was sent: it is confirmed by the next.
+  /// How many prompts the conversation will hold before this one — those in the transcript, and
+  /// those sent before it and still coming: it is confirmed by the next.
   let promptCountAtSend: Int
   public var state: State
 }
@@ -283,7 +284,10 @@ public final class ConversationModel {
     let submission = PromptSubmission(text: draft, attachments: attachments)
     let keystrokes = PromptEncoding.keystrokes(
       for: submission, format: promptFormat, whileWorking: isAgentWorking)
-    let promptCount = snapshot.entries.filter(\.isUserPrompt).count
+    // Prompts still on their way reach the transcript first: this one is confirmed only once
+    // they are in too. One the agent never took past ten seconds is no longer waited for.
+    let promptCount =
+      snapshot.entries.filter(\.isUserPrompt).count + echoes.filter { $0.state == .sending }.count
     echoes.append(
       PendingEcho(
         id: UUID(), text: PromptEncoding.sanitized(submission.text),

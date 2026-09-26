@@ -91,17 +91,19 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     }
     guard let content = message["content"] as? [[String: Any]] else { return }
     var texts: [String] = []
-    var attachments = 0
+    var images = 0
+    // `[Image #1]` or `[Image: source: …]` alone in a block: the CLI's placeholder for a picture.
+    var placeholders = 0
     for block in content {
       switch block["type"] as? String {
       case "tool_result":
         apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
       case "image":
-        attachments += 1
+        images += 1
       case "text":
         guard let text = block["text"] as? String else { continue }
-        if text.hasPrefix("[Image") {
-          attachments += 1
+        if Self.isImagePlaceholder(text) {
+          placeholders += 1
         } else {
           texts.append(text)
         }
@@ -109,6 +111,8 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
         continue
       }
     }
+    // A placeholder usually stands beside the image it names; count the picture once.
+    let attachments = max(images, placeholders)
     guard !texts.isEmpty || attachments > 0 else { return }
     readTypedText(texts.joined(separator: "\n\n"), uuid: uuid, date: date, attachments: attachments)
   }
@@ -147,10 +151,28 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       return
     }
     // The CLI's own plumbing: command output, caveats, reminders, background task notices.
-    if trimmed.hasPrefix("<") { return }
+    if Self.isPlumbing(trimmed) { return }
     guard !trimmed.isEmpty || attachments > 0 else { return }
     append(
       ConversationEntry(id: uuid, date: date, content: .userPrompt(text, attachments: attachments)))
+  }
+
+  /// Tags the CLI wraps its own messages in. A prompt that merely starts with `<` — a pasted
+  /// snippet, `<Button>` — is the user's.
+  private static let plumbingTags = [
+    "local-command-", "system-reminder", "task-notification", "agent-message",
+    "cross-session-message", "command-message", "command-args", "user-prompt-submit-hook",
+  ]
+
+  static func isPlumbing(_ text: String) -> Bool {
+    guard text.hasPrefix("<") else { return false }
+    let name = text.dropFirst()
+    return plumbingTags.contains { name.hasPrefix($0) }
+  }
+
+  static func isImagePlaceholder(_ text: String) -> Bool {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.range(of: #"^\[Image[^\]\n]*\]$"#, options: .regularExpression) != nil
   }
 
   private func readSystem(_ object: [String: Any], uuid: String, date: Date?) {

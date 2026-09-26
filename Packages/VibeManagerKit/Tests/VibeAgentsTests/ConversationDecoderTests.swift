@@ -157,6 +157,23 @@ struct ClaudeCodeConversationDecoderTests {
     #expect(entries[1].toolCall?.parameter(.arguments) == #"{"action":"get"}"#)
   }
 
+  @Test("A prompt that starts with a tag or names an image is the user's all the same")
+  func promptsThatLookLikePlumbing() {
+    let entries = decode([
+      #"{"type":"user","uuid":"a","message":{"content":"<Button> is cut off"}}"#,
+      #"{"type":"user","uuid":"b","message":{"content":"<local-command-stdout>x</local-command-stdout>"}}"#,
+      #"{"type":"user","uuid":"c","message":{"content":"<task-notification>done</task-notification>"}}"#,
+      #"{"type":"user","uuid":"d","message":{"content":[{"type":"text","text":"[Image #1] why is it cut?"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}}"#,
+      #"{"type":"user","uuid":"e","message":{"content":[{"type":"text","text":"[Image: source: /tmp/a.png]"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}}"#,
+    ])
+    #expect(
+      entries.map(\.content) == [
+        .userPrompt("<Button> is cut off", attachments: 0),
+        .userPrompt("[Image #1] why is it cut?", attachments: 1),
+        .userPrompt("", attachments: 1),
+      ])
+  }
+
   @Test("A line that is not JSON, or cut short, is skipped")
   func garbage() {
     #expect(decode(["not json", #"{"type":"user","uuid":"x","message":{"content":"#]).isEmpty)
