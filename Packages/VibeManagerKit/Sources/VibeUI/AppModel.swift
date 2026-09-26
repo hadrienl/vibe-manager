@@ -28,7 +28,10 @@ public final class AppModel {
     // Every list the workspace holds — a reload, a session just created — is the journal's too:
     // it follows the active sessions, and gives one that stopped its last pass.
     didSet {
-      if case .loaded(let sessions) = state { journal?.track(sessions) }
+      if case .loaded(let sessions) = state {
+        journal?.track(sessions)
+        quickOpen.sessionsChanged(sessions)
+      }
     }
   }
   public private(set) var refreshFailure: RefreshFailure?
@@ -114,6 +117,8 @@ public final class AppModel {
   /// Every session's journal: its summary and its resources (#36). Absent in a workspace
   /// assembled without it.
   public let journal: SessionJournalModel?
+  /// Open Quickly, ⌘P (#37): every session, found by a ticket, a request, a branch or a folder.
+  public let quickOpen = QuickOpenModel()
   /// The prompt templates, shared by their settings tab and the New Session sheet.
   public let templates: PromptTemplateLibraryModel
   /// The usage figures (#18). Absent in a workspace assembled without them.
@@ -617,6 +622,9 @@ public final class AppModel {
     usage?.connect { [weak self] in self?.sessions ?? [] }
 
     journal?.showSettingsTab = { [weak self] in self?.settingsTab = .activity }
+    journal?.journalDidChange = { [quickOpen] id, journal in
+      quickOpen.journalChanged(journal, for: id)
+    }
 
     launcher?.askHookConsent = { [weak self] name, commands in
       guard let self else { return .undecided }
@@ -651,6 +659,12 @@ public final class AppModel {
   public var sessions: [WorkSession] {
     guard case .loaded(let sessions) = state else { return [] }
     return sessions
+  }
+
+  /// Whether the sessions are on screen: Open Quickly has nothing to search before.
+  public var isLoaded: Bool {
+    if case .loaded = state { return true }
+    return false
   }
 
   public var selectedSession: WorkSession? {
@@ -819,6 +833,38 @@ public final class AppModel {
       update { $0.column = session.taskStatus }
     }
     select(id)
+  }
+
+  // MARK: - Open Quickly
+
+  /// ⌘P: opens the palette, or selects its text when it is already open.
+  public func presentQuickOpen() {
+    quickOpen.present(excluding: selectedSessionID, notes: notes.searchIndex)
+  }
+
+  /// Return in the palette: the session chosen is brought on screen.
+  public func openQuickOpenSelection() {
+    guard let id = quickOpen.confirm() else { return }
+    reveal(id)
+  }
+
+  /// Brings a session on screen wherever it is, the way a click in the sidebar would: its column,
+  /// or the archive. A search or a facet of the sidebar that hides it is cleared, or the next
+  /// reload would take the selection away from it. The keyboard then goes to its terminal when
+  /// its agent runs, and to its row otherwise.
+  public func goToSession(_ id: SessionID) {
+    guard let session = sessions.first(where: { $0.id == id }) else { return }
+    if session.taskStatus == .archived {
+      showArchived(id)
+    } else {
+      if !filter.matchesNarrowing(session, notes: notes.searchIndex[id]) { clearNarrowing() }
+      follow(id)
+    }
+    if launcher?.isRunning(id) == true {
+      focusTerminal()
+    } else {
+      focusSidebar()
+    }
   }
 
   private func reconcileSelection() {
@@ -1904,6 +1950,11 @@ public final class AppModel {
     // a store that could not be read rather than one without sessions.
     if !sessions.isEmpty { layout.keepPresentations(of: Set(sessions.map(\.id))) }
     Signposts.end("launch.firstList", firstList)
+    // Every journal, archived sessions' included, for Open Quickly: in the background, after the
+    // list is on screen.
+    if let journal {
+      quickOpen.loadJournals(for: sessions.map(\.id), read: journal.reader)
+    }
     // Which agents write a usage is part of their description, known without probing any of them.
     if let usage, let agents {
       usage.reportingProviderIDs = Set(

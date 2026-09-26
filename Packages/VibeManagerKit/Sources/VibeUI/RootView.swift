@@ -60,6 +60,12 @@ public struct RootView: View {
         }
       }
     }
+    // Open Quickly, over the whole window (#37).
+    .overlay {
+      if case .loaded = model.state, model.quickOpen.isPresented {
+        QuickOpenPanel(model: model)
+      }
+    }
     // Narrower than the two sidebars plus a usable terminal on purpose: below the layout
     // thresholds the columns fold, and the window is still worth opening.
     .frame(minWidth: 640, minHeight: 480)

@@ -228,27 +228,30 @@ enum ActivityPresentation {
 
   /// What VoiceOver reads: "Pull request #62, hadrienl/vibe-manager, created".
   static func spokenLabel(_ resource: SessionResource) -> String {
+    [spokenName(resource), resource.context, involvement(resource)].compactMap { $0 }.joined(
+      separator: ", ")
+  }
+
+  /// A resource named with its kind: "Pull request #62", "Branch feat/36-journal".
+  static func spokenName(_ resource: SessionResource) -> String {
     let label = resource.label
-    let described: String
     switch resource.kind {
     case .issue:
-      described = String(
+      return String(
         localized: "Issue \(label)", bundle: .module, comment: "A ticket's short name: #36.")
     case .pullRequest where isMergeRequest(resource):
-      described = String(
+      return String(
         localized: "Merge request \(label)", bundle: .module, comment: "A request's short name.")
     case .pullRequest:
-      described = String(
+      return String(
         localized: "Pull request \(label)", bundle: .module, comment: "A request's short name.")
     case .branch:
-      described = String(
+      return String(
         localized: "Branch \(label)", bundle: .module, comment: "A branch's name.")
     case .worktree:
-      described = String(
+      return String(
         localized: "Worktree \(label)", bundle: .module, comment: "A worktree's folder name.")
     }
-    return [described, resource.context, involvement(resource)].compactMap { $0 }.joined(
-      separator: ", ")
   }
 
   /// `hadrienl/vibe-manager#36`, `group/project!12`: a reference a forge understands.

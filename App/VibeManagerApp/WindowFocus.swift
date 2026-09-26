@@ -41,6 +41,11 @@ final class WindowFocus {
     refresh()
   }
 
+  /// Brings the workspace window forward and gives it the keyboard: Open Quickly from Settings.
+  func showWorkspace() {
+    workspaceWindow?.makeKeyAndOrderFront(nil)
+  }
+
   /// Closes the window that holds the keyboard, whichever it is: what ⇧⌘W does everywhere, and
   /// what ⌘W does over a window that is not the workspace.
   func closeKeyWindow() {

@@ -48,6 +48,14 @@ public final class SessionJournalModel {
   @ObservationIgnored var showSettingsTab: (() -> Void)?
   /// The editor chosen in the settings, for Open in Editor.
   @ObservationIgnored var editor: EditorChoice?
+  /// Told of every journal that arrives, for Open Quickly's index (#37).
+  @ObservationIgnored var journalDidChange: ((SessionID, SessionJournal) -> Void)?
+
+  /// Reads the journal of any session, off the main thread: for the index of Open Quickly.
+  var reader: @Sendable (SessionID) async -> SessionJournal? {
+    let monitor = monitor
+    return { await monitor.journal(for: $0) }
+  }
 
   public convenience init(monitor: SessionJournalMonitor, preferences: any JournalPreferences) {
     self.init(monitor: monitor, preferences: preferences, opener: WorkspaceFileOpener())
@@ -71,6 +79,7 @@ public final class SessionJournalModel {
       for await update in stream {
         guard let self else { return }
         self.journals[update.sessionID] = update.journal
+        self.journalDidChange?(update.sessionID, update.journal)
         self.looked.insert(update.sessionID)
         if update.isSummarizing {
           self.summarizing.insert(update.sessionID)
