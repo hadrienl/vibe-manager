@@ -654,7 +654,9 @@ public struct RecentFolderOption: Identifiable, Equatable, Sendable {
 ///
 /// A probe cannot be interrupted — `stat` on a network volume that went away takes as long as it
 /// takes — so they run detached, and the ones still out when the budget ends are left to finish
-/// on their own while the sheet goes on without them.
+/// on their own while the sheet goes on without them. The budget is kept by a Dispatch timer, not
+/// a sleeping task: a cooperative pool busy elsewhere would wake that task late, and hold the sheet
+/// for as long as the slowest probe.
 enum RecentFolderProbe {
   /// - Parameter followingLinks: whether each folder's links are followed first, and the folder
   ///   left unread when one leads into a place macOS guards.
@@ -664,22 +666,26 @@ enum RecentFolderProbe {
     budget: Duration,
     followingLinks: Bool = false
   ) async -> [String: WorkingDirectoryStatus] {
+    guard !folders.isEmpty else { return [:] }
     let collector = Collector(expected: folders.count)
-    for folder in folders {
-      Task.detached {
-        guard !followingLinks || staysOutsideProtectedLocations(folder) else {
-          await collector.record(nil, for: folder.key)
-          return
+    return await withCheckedContinuation { continuation in
+      collector.wait(continuation)
+      for folder in folders {
+        Task.detached {
+          guard !followingLinks || staysOutsideProtectedLocations(folder) else {
+            collector.record(nil, for: folder.key)
+            return
+          }
+          let status = await probe.inspect(path: RecentFolder.lexicalKey(of: folder.path))
+          collector.record(status, for: folder.key)
         }
-        let status = await probe.inspect(path: RecentFolder.lexicalKey(of: folder.path))
-        await collector.record(status, for: folder.key)
+      }
+      let (seconds, attoseconds) = budget.components
+      let delay = Double(seconds) + Double(attoseconds) / 1e18
+      DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
+        collector.finish()
       }
     }
-    Task.detached {
-      try? await Task.sleep(for: budget)
-      await collector.finish()
-    }
-    return await collector.results()
   }
 
   /// Whether the folder's links, followed one component at a time, never lead into a place macOS
@@ -714,37 +720,49 @@ enum RecentFolderProbe {
     return true
   }
 
-  private actor Collector {
+  /// Locked rather than an actor: the timer that ends the budget must not wait for the pool.
+  private final class Collector: @unchecked Sendable {
+    typealias Waiter = CheckedContinuation<[String: WorkingDirectoryStatus], Never>
+
+    private let lock = NSLock()
     private let expected: Int
     private var answered = 0
     private var statuses: [String: WorkingDirectoryStatus] = [:]
     private var isFinished = false
-    private var waiter: CheckedContinuation<[String: WorkingDirectoryStatus], Never>?
+    private var waiter: Waiter?
 
     init(expected: Int) {
       self.expected = expected
     }
 
+    func wait(_ continuation: Waiter) {
+      lock.withLock { waiter = continuation }
+    }
+
     /// `nil`: the folder was left unread, and stays unverified.
     func record(_ status: WorkingDirectoryStatus?, for key: String) {
-      guard !isFinished else { return }
-      statuses[key] = status
-      answered += 1
-      if answered == expected {
+      let isComplete = lock.withLock {
+        guard !isFinished else { return false }
+        statuses[key] = status
+        answered += 1
+        return answered == expected
+      }
+      if isComplete {
         finish()
       }
     }
 
     func finish() {
-      guard !isFinished else { return }
-      isFinished = true
-      waiter?.resume(returning: statuses)
-      waiter = nil
-    }
-
-    func results() async -> [String: WorkingDirectoryStatus] {
-      if isFinished { return statuses }
-      return await withCheckedContinuation { waiter = $0 }
+      let answer = lock.withLock { () -> (Waiter, [String: WorkingDirectoryStatus])? in
+        guard !isFinished, let waiter else { return nil }
+        isFinished = true
+        self.waiter = nil
+        return (waiter, statuses)
+      }
+      // Resumed outside the lock: the sheet it wakes may record nothing more, but must not wait.
+      if let (waiter, statuses) = answer {
+        waiter.resume(returning: statuses)
+      }
     }
   }
 }

@@ -945,13 +945,15 @@ struct NewSessionRecentFolderTests {
 
   @Test("A folder too slow to answer is offered unverified, without holding the sheet")
   func slowFolderStaysUnverified() async {
-    let probe = MappedFolders(["/slow": .missing], delay: .seconds(5))
+    // Far longer than any busy runner could stretch the budget: the sheet not waiting for this
+    // answer is what the elapsed time shows, not a tight bound a parallel suite would break.
+    let probe = MappedFolders(["/slow": .missing], delay: .seconds(120))
     let model = makeModel(recentFolders: recent("/slow"), probe: probe, budget: .milliseconds(50))
     let clock = ContinuousClock()
 
     let elapsed = await clock.measure { await model.load() }
 
-    #expect(elapsed < .seconds(2))
+    #expect(elapsed < .seconds(60))
     #expect(model.recentFolders.first?.availability == .unverified)
     #expect(model.draft.workingDirectoryPath == "/slow")
   }
