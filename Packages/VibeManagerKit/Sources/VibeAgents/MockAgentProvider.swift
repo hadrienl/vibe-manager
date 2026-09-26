@@ -50,7 +50,7 @@ public struct MockAgentProvider: AgentProvider {
 
   private let simulatedState: AgentAvailabilityState
   private let scriptURL: URL?
-  private let environment: [String: String]
+  let environment: [String: String]
   private let now: @Sendable () -> Date
   private let catalog: [AgentModel]
   /// Passed to the script before anything else: `--hold`, `--flood 2048`, `--ignore-sigterm`…

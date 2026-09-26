@@ -50,44 +50,27 @@ public struct CommandLineSummarizer: SessionSummarizing {
   }
 
   public func summarize(_ request: SummaryRequest) async throws -> [SummaryEntry] {
-    let workspace = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "VibeManager-summary-\(UUID().uuidString)", isDirectory: true)
+    let run = OneShotAgentRun(
+      provider: provider, runner: runner, folderPrefix: "VibeManager-summary-",
+      timeout: Self.timeout)
     do {
-      try FileManager.default.createDirectory(
-        at: workspace, withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700])
-    } catch {
-      throw SummaryError.failed("no temporary folder")
+      return try await run.run { workspace, models in
+        OneShotAgentRun.Invocation(
+          arguments: try command.arguments(for: request, in: workspace, models: models),
+          environment: command.additionalEnvironment,
+          input: command.input(for: request))
+      } read: { result, workspace in
+        guard !result.didTimeOut else { throw SummaryError.failed("timed out") }
+        return try command.entries(from: result, in: workspace, request: request)
+      }
+    } catch let failure as OneShotAgentRun.Failure {
+      switch failure {
+      case .noWorkspace: throw SummaryError.failed("no temporary folder")
+      case .unavailable(let state): throw SummaryError.unavailable(Self.unavailability(state))
+      case .noLaunchPlan: throw SummaryError.failed("no launch plan")
+      case .couldNotStart: throw SummaryError.failed("could not start")
+      }
     }
-    defer { try? FileManager.default.removeItem(at: workspace) }
-
-    let plan: AgentLaunchPlan
-    do {
-      plan = try await provider.launchPlan(
-        for: AgentLaunchRequest(workingDirectoryPath: workspace.path))
-    } catch AgentLaunchError.unavailable(let state) {
-      throw SummaryError.unavailable(Self.unavailability(state))
-    } catch {
-      throw SummaryError.failed("no launch plan")
-    }
-    let arguments = try command.arguments(
-      for: request, in: workspace, models: await provider.models())
-    var environment = plan.environment
-    environment.merge(command.additionalEnvironment) { _, added in added }
-    let result: BoundedProcessResult
-    do {
-      result = try await runner.run(
-        BoundedProcessRequest(
-          executablePath: plan.executablePath, arguments: arguments, environment: environment,
-          workingDirectoryPath: workspace.path, timeout: Self.timeout,
-          standardInput: BoundedProcessInput(data: command.input(for: request))))
-    } catch BoundedProcessError.cancelled {
-      throw CancellationError()
-    } catch {
-      throw SummaryError.failed("could not start")
-    }
-    guard !result.didTimeOut else { throw SummaryError.failed("timed out") }
-    return try command.entries(from: result, in: workspace, request: request)
   }
 
   static func unavailability(_ state: AgentAvailabilityState) -> JournalSummaryUnavailability {
