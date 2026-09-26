@@ -35,7 +35,13 @@ public final class AppEnvironment {
     public var providers: ((any DiagnosticLog) -> [any AgentProvider])?
     /// The user defaults suite of an isolated copy. `nil` derives it from the environment.
     public var defaultsSuite: String?
+    /// What this process got at its launch.
     public var fullDiskAccessProbe: any FullDiskAccessProbe
+    /// What a process born now gets: a child of the application's binary answering for itself.
+    /// `nil` asks nobody, and the launch-time answer stands (#76).
+    public var currentFullDiskAccessProbe: (any CurrentFullDiskAccessProbe)?
+    /// What TCC keys the grants to, and so what the step's answer is remembered with.
+    public var codeIdentity: any CodeIdentityReading
     /// Where the system writes crash reports, read by an export.
     public var crashReports: URL
     /// The program the agents start as their web view's bridge (#69): this application's binary,
@@ -50,6 +56,9 @@ public final class AppEnvironment {
       providers: ((any DiagnosticLog) -> [any AgentProvider])? = nil,
       defaultsSuite: String? = nil,
       fullDiskAccessProbe: any FullDiskAccessProbe = TCCFullDiskAccessProbe(),
+      currentFullDiskAccessProbe: (any CurrentFullDiskAccessProbe)? =
+        SpawnedFullDiskAccessProbe.bundled(),
+      codeIdentity: any CodeIdentityReading = SecCodeIdentityReader(),
       crashReports: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true),
       browserBridgeExecutable: String? = AppEnvironment.bundledExecutable()
@@ -60,6 +69,8 @@ public final class AppEnvironment {
       self.providers = providers
       self.defaultsSuite = defaultsSuite
       self.fullDiskAccessProbe = fullDiskAccessProbe
+      self.currentFullDiskAccessProbe = currentFullDiskAccessProbe
+      self.codeIdentity = codeIdentity
       self.crashReports = crashReports
       self.browserBridgeExecutable = browserBridgeExecutable
     }
@@ -249,13 +260,20 @@ public final class AppEnvironment {
       recorder: recorder
     )
     // The only permission the application ever asks for, wired to the system that answers it:
-    // the TCC witness for the status, the user defaults for the answer already given.
+    // the TCC witness for this process, a process born now for the identity, the host for the
+    // agents (#76), and the user defaults for the answer already given, with who gave it.
     let permissions = PermissionsModel(
       gate: FullDiskAccessGate(
         probe: configuration.fullDiskAccessProbe,
         // An isolated copy keeps its answer apart, like its other preferences.
-        preferences: UserDefaultsPermissionPreferences(suiteName: data.defaultsSuite)
-      )
+        preferences: UserDefaultsPermissionPreferences(suiteName: data.defaultsSuite),
+        current: configuration.currentFullDiskAccessProbe,
+        identity: configuration.codeIdentity,
+        runner: supervisor
+      ),
+      control: supervisor,
+      restartHost: RestartAgentHost(
+        repository: repository, runtime: launcher, recorder: recorder, control: supervisor)
     )
     self.permissions = permissions
     let transcripts = AgentTranscriptReader()

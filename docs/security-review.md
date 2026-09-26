@@ -5,7 +5,7 @@ to date: a change that adds a way to start a process, reads a new secret-bearing
 environment updates this document in the same pull request.
 
 `ProcessLaunchInventoryTests` enforces the first table. It fails when `Process(`, `posix_spawn(`,
-`system(`, `popen(`, `fork(` or `exec*(` appears in a production source other than the three
+`system(`, `popen(`, `fork(` or `exec*(` appears in a production source other than the four
 launchers listed below.
 
 ## Process launch inventory
@@ -14,6 +14,7 @@ launchers listed below.
 |---|---|---|---|---|---|
 | `PseudoTerminal` (`VibeTerminal`) | An agent, or a login shell, in a terminal | `TerminalSpec.arguments`, an array; the provider puts `--` before the prompt | `TerminalSpec.environment`: `AgentEnvironmentPolicy` allowlist plus what the provider declares; never an `*_API_KEY` | None: a session lasts as long as the user wants it | `SIGTERM` to the session's group, 3 s, then `SIGKILL` to the group. `ChildProcessGroupGuard` kills the group from `atexit`. |
 | `ExecutableTerminalHostLauncher` (`TerminalHost.swift`) | The terminal host: the application's own binary with `--terminal-host <directory>` | Fixed | `HOME USER LOGNAME TMPDIR PATH LANG SHELL` | None: the host leaves by itself when it has no session and no client for 5 s | `stopAll`, then `goodbye(keepRunning: false)`. A client that vanishes without `goodbye` makes the host stop everything (ADR 0017). |
+| `SpawnedFullDiskAccessProbe` (`CurrentFullDiskAccess.swift`) | The application's own binary with `--probe-full-disk-access`, answering for itself to TCC: it opens the TCC database's path, reads nothing, and exits `0` or `1` (#76) | Fixed | `HOME USER LOGNAME TMPDIR PATH` | 10 s, then `SIGKILL` | Exits by itself at once; reaped with `waitpid` |
 | `BoundedProcess` (`VibeProcess`) | Everything else, below | An array | Explicit, required by the type | Required by the type | `SIGTERM` to the group, a grace period, then `SIGKILL` to the group; whatever the command left in its group once it has exited is stopped the same way |
 
 Every `BoundedProcess` command runs with `POSIX_SPAWN_SETPGROUP` (a group of its own, no new

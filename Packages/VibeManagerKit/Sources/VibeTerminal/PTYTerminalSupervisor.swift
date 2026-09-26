@@ -21,6 +21,11 @@ public actor PTYTerminalSupervisor: TerminalSupervisor {
     return session
   }
 
+  /// Terminals running here. A session is forgotten as soon as it has ended.
+  public func runningCount() -> Int {
+    sessions.count
+  }
+
   public func session(for id: SessionID) -> (any TerminalSession)? {
     sessions[id]
   }

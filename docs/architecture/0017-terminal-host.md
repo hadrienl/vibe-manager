@@ -88,6 +88,8 @@ third more bytes for nothing.
 | `input` (raw) | `output` (raw) |
 | `resize(session, size)`, `redraw(session)` | `state(session, state, endedAt)`, `truncated(session, bytes)` |
 | `stop(session, grace)`, `kill(session)` | `stopped(state)` |
+| `fullDiskAccess` (capability, #76) | `fullDiskAccess(granted)` |
+| `retire` (capability, #76) | `retiring(accepted)` — refused while an agent runs |
 | `release(session)`, `goodbye(keepRunning)` | `done` |
 
 - **The history comes before `attached`.** When the reply arrives, everything the host held for
@@ -185,11 +187,14 @@ Measured while building this:
   spawned without the disclaimer starts at once. The application's host is the binary already
   running, assessed before it ever opened a terminal. The launch timeout is ten seconds anyway,
   and the tests that spawn a freshly built fixture wait thirty.
-- **Still to measure by hand, with Full Disk Access granted and then revoked:** an agent reading
-  `~/Documents` after the application has quit, with
-  `log stream --predicate 'subsystem == "com.apple.TCC"'` running, to confirm the attribution
-  chain names Vibe Manager. If it did not, the fallback would be a minimal helper `.app` in
-  `Contents/Library/`, with its own usage descriptions, and #31's step asking for both.
+- **Measured for #76:** `tccd` names the host as the responsible process of an agent —
+  `responsible={identifier=eu.hadrien.VibeManager, pid=<host>}` — so the attribution chain is Vibe
+  Manager's, as intended.
+- **The host keeps the access it started with.** TCC settles Full Disk Access once for the process
+  responsible, and the host outlives the application on purpose: a host started before the grant
+  runs every agent without it, however often the application is reopened. It says what it has
+  through the `fullDiskAccess` capability, is let go when idle through `retire`, and is restarted
+  with its agents only on the user's word (ADR 0010, "Which process has the access").
 
 ### Who may talk to the host
 

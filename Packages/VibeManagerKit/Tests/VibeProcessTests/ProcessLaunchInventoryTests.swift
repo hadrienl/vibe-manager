@@ -15,6 +15,8 @@ struct ProcessLaunchInventoryTests {
     "Packages/VibeManagerKit/Sources/VibeTerminal/PseudoTerminal.swift",
     // The terminal host, the application's own binary in a session of its own.
     "Packages/VibeManagerKit/Sources/VibeTerminal/TerminalHost.swift",
+    // The same binary, asked whether a process born now has Full Disk Access (#76).
+    "Packages/VibeManagerKit/Sources/VibeTerminal/CurrentFullDiskAccess.swift",
   ]
 
   /// Each a whole identifier followed by its call: `reapProcess()` is not `Process()`.

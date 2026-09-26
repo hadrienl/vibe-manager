@@ -33,23 +33,70 @@ struct TCCFullDiskAccessProbeTests {
 struct UserDefaultsPermissionPreferencesTests {
   @Test("Nothing has been answered until something is")
   func startsUnanswered() async {
-    let preferences = makePreferences()
+    let (preferences, _) = makePreferences()
 
-    #expect(await preferences.isFullDiskAccessStepDismissed() == false)
+    #expect(await preferences.fullDiskAccessStepAnswer() == nil)
   }
 
-  @Test("An answer survives, so the step is not asked twice")
+  @Test("An answer survives, with the identity that gave it")
   func answerIsRemembered() async {
-    let preferences = makePreferences()
+    let (preferences, _) = makePreferences()
+    let identity = CodeIdentityFingerprint(
+      identifier: "eu.hadrien.VibeManager", team: "QMJKZ67Z3H", designatedRequirement: "anchor")
 
-    await preferences.dismissFullDiskAccessStep()
+    await preferences.recordFullDiskAccessStepAnswer(by: identity)
 
-    #expect(await preferences.isFullDiskAccessStepDismissed())
+    #expect(await preferences.fullDiskAccessStepAnswer() == identity)
   }
 
-  private func makePreferences() -> UserDefaultsPermissionPreferences {
+  @Test("The boolean of the first version is no answer: the step comes back once")
+  func firstVersionIsNotAnAnswer() async throws {
+    // It survived the change of bundle identifier that made TCC forget the access (#76), and kept
+    // the step away from the very users that change stranded.
+    let (preferences, suiteName) = makePreferences()
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.set(true, forKey: "permissions.fullDiskAccess.stepDismissed.v1")
+
+    #expect(await preferences.fullDiskAccessStepAnswer() == nil)
+    #expect(defaults.bool(forKey: "permissions.fullDiskAccess.stepDismissed.v1"))
+  }
+
+  private func makePreferences() -> (UserDefaultsPermissionPreferences, String) {
     let suiteName = "com.hadrienl.VibeManager.tests.\(UUID().uuidString)"
     UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
-    return UserDefaultsPermissionPreferences(suiteName: suiteName)
+    return (UserDefaultsPermissionPreferences(suiteName: suiteName), suiteName)
+  }
+}
+
+@Suite("Reading the code identity TCC holds grants against")
+struct SecCodeIdentityReaderTests {
+  @Test("The test binary, signed ad hoc or not at all, reads as one stable identity")
+  func testBinaryIsStable() {
+    let reader = SecCodeIdentityReader()
+
+    let first = reader.current()
+
+    #expect(first == reader.current())
+    #expect(first.rawValue.hasPrefix("adhoc|") || first == .unidentified)
+  }
+}
+
+@Suite("Suppressing the permission step for an automated run")
+struct PermissionStepSuppressionTests {
+  @Test("Only a value set from outside suppresses the step")
+  func suppressionIsReadFromTheDefaults() async throws {
+    let suiteName = "com.hadrienl.VibeManager.tests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    #expect(
+      await UserDefaultsPermissionPreferences(suiteName: suiteName)
+        .isFullDiskAccessStepSuppressed() == false)
+
+    defaults.set(true, forKey: "permissions.fullDiskAccess.stepSuppressed")
+    defaults.synchronize()
+
+    #expect(
+      await UserDefaultsPermissionPreferences(suiteName: suiteName)
+        .isFullDiskAccessStepSuppressed())
   }
 }

@@ -99,7 +99,8 @@ public enum TerminalHost {
   public static func runIfRequested(
     arguments: [String] = CommandLine.arguments,
     verifier: @autoclosure () -> any TerminalHostPeerVerifier = CodeSigningPeerVerifier(),
-    diagnostics: (URL) -> Diagnostics = { _ in .disabled }
+    diagnostics: (URL) -> Diagnostics = { _ in .disabled },
+    fullDiskAccess: @autoclosure () -> (any FullDiskAccessProbe)? = nil
   ) {
     guard let index = arguments.firstIndex(of: argument), index + 1 < arguments.count else {
       return
@@ -115,7 +116,8 @@ public enum TerminalHost {
     }
     run(
       at: location,
-      configuration: TerminalHostServer.Configuration(verifier: verifier(), diagnostics: log))
+      configuration: TerminalHostServer.Configuration(
+        verifier: verifier(), diagnostics: log, fullDiskAccess: fullDiskAccess()))
   }
 
   /// Followed by the folder the host writes `host.jsonl` in.
@@ -396,7 +398,7 @@ private enum HostReaper {
   }
 }
 
-private func withCStrings<Result>(
+func withCStrings<Result>(
   _ strings: [String],
   _ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?) -> Result
 ) -> Result {

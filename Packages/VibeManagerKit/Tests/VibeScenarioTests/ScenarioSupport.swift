@@ -128,6 +128,9 @@ final class Scenario {
         },
         defaultsSuite: suite,
         fullDiskAccessProbe: GrantedFullDiskAccess(),
+        // The test runner's binary knows nothing of `--probe-full-disk-access`.
+        currentFullDiskAccessProbe: nil,
+        codeIdentity: UnidentifiedCode(),
         crashReports: URL(fileURLWithPath: root).appendingPathComponent("NoCrashReports"),
         browserBridgeExecutable: try Self.fixtureURL().deletingLastPathComponent()
           .appendingPathComponent("VibeBrowserBridgeFixture").path
