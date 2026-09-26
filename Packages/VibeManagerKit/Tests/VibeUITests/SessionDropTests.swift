@@ -226,7 +226,7 @@ struct DropReaderTests {
     let tab = BrowserTabDrag.text(for: BrowserTabID())
     let (items, failed) = await DropReader.read([NSItemProvider(object: tab as NSString)])
     #expect(items.isEmpty)
-    #expect(failed == 1)
+    #expect(failed == 0)
     #expect(BrowserTabDrag.tabID(in: "hello") == nil)
   }
 

@@ -28,29 +28,46 @@ enum DropReader {
   static let acceptedTypes: [UTType] = [.item]
 
   /// The items of the drop, in the order of the drop. `failed` counts the elements that offered
-  /// something this reader could not load.
+  /// something this reader could not load; a tab of the web view is left out without counting.
   @MainActor
   static func read(_ providers: [NSItemProvider]) async -> (items: [DroppedItem], failed: Int) {
     // Loaded together, put back in order: each provider answers when it wants to, and the order
     // of the drop is the order the paths are typed in.
     let boxes = providers.map(UncheckedProvider.init)
-    let results = await withTaskGroup(of: (Int, DroppedItem?).self) { group in
+    let results = await withTaskGroup(of: (Int, Reading).self) { group in
       for (index, box) in boxes.enumerated() {
-        group.addTask { (index, await item(from: box.provider)) }
+        group.addTask { (index, await reading(from: box.provider)) }
       }
-      var results = [DroppedItem?](repeating: nil, count: boxes.count)
-      for await (index, item) in group { results[index] = item }
+      var results = [Reading](repeating: .ignored, count: boxes.count)
+      for await (index, reading) in group { results[index] = reading }
       return results
     }
-    return (results.compactMap { $0 }, results.filter { $0 == nil }.count)
+    var items: [DroppedItem] = []
+    var failed = 0
+    for result in results {
+      switch result {
+      case .item(let item): items.append(item)
+      case .unreadable: failed += 1
+      case .ignored: break
+      }
+    }
+    return (items, failed)
   }
 
-  private static func item(from provider: NSItemProvider) async -> DroppedItem? {
-    let item = await read(provider)
-    // A tab of the web view moved along its strip and let go here: nothing to type. Read as an
-    // address as well as text, since its prefix looks like a scheme.
-    if case .text(let text) = item, BrowserTabDrag.tabID(in: text) != nil { return nil }
-    return item
+  /// What one element of the drop turned out to be.
+  private enum Reading: Sendable {
+    case item(DroppedItem)
+    /// Nothing to type, and nothing that went wrong either.
+    case ignored
+    case unreadable
+  }
+
+  private static func reading(from provider: NSItemProvider) async -> Reading {
+    guard let item = await read(provider) else { return .unreadable }
+    // A tab of the web view moved along its strip and let go here: nothing to type, and nothing
+    // to warn about. Read as an address as well as text, since its prefix looks like a scheme.
+    if case .text(let text) = item, BrowserTabDrag.tabID(in: text) != nil { return .ignored }
+    return .item(item)
   }
 
   private static func read(_ provider: NSItemProvider) async -> DroppedItem? {
