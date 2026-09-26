@@ -25,6 +25,9 @@ public final class QuickOpenModel {
   @ObservationIgnored private var search: Task<Void, Never>?
   @ObservationIgnored private var announcement: Task<Void, Never>?
   @ObservationIgnored private var loading: Task<Void, Never>?
+  /// The last change handed to the index. Each one waits for the one before it: an older list
+  /// arriving after a newer one would bring back a session just archived or deleted.
+  @ObservationIgnored private var updating: Task<Void, Never>?
   /// The session on screen when the palette opened, left out of the recent ones.
   @ObservationIgnored private var excluded: SessionID?
   /// Where the keyboard was before the palette took it, given back when it closes unanswered.
@@ -51,11 +54,19 @@ public final class QuickOpenModel {
   // MARK: - Keeping the index current
 
   func sessionsChanged(_ sessions: [WorkSession]) {
-    Task { [index] in await index.update(sessions: sessions) }
+    enqueue { index in await index.update(sessions: sessions) }
   }
 
   func journalChanged(_ journal: SessionJournal, for id: SessionID) {
-    Task { [index] in await index.update(journal: journal, for: id) }
+    enqueue { index in await index.update(journal: journal, for: id) }
+  }
+
+  private func enqueue(_ change: @escaping @Sendable (SessionSearchIndex) async -> Void) {
+    let previous = updating
+    updating = Task { [index] in
+      await previous?.value
+      await change(index)
+    }
   }
 
   /// Reads every session's journal once, in the background.
@@ -141,6 +152,8 @@ public final class QuickOpenModel {
   }
 
   private func run(_ typed: String) async {
+    // A search sees every change handed to the index before it.
+    await updating?.value
     let answer = await index.search(typed, excluding: excluded)
     guard !Task.isCancelled, isPresented, typed == text else { return }
     // The same text searched again — the journals finished loading — keeps the row the user was on.

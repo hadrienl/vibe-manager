@@ -31,6 +31,11 @@ public final class AppModel {
       if case .loaded(let sessions) = state {
         journal?.track(sessions)
         quickOpen.sessionsChanged(sessions)
+        // Every journal, archived sessions' included, for Open Quickly, from the first list that
+        // holds sessions: a first load that failed or came back empty leaves it to the next one.
+        if readsJournalsForQuickOpen, let journal {
+          quickOpen.loadJournals(for: sessions.map(\.id), read: journal.reader)
+        }
       }
     }
   }
@@ -266,6 +271,9 @@ public final class AppModel {
   private var restoreTask: Task<Void, Never>?
   /// Whether the launch sequence has already been run, set before anything suspends.
   private var hasLoaded = false
+  /// Set by the launch, once the list can be drawn: from then on a loaded list starts reading the
+  /// journals for Open Quickly, if they have not been read yet.
+  private var readsJournalsForQuickOpen = false
 
   /// Where a restoration has got to.
   public struct Restoration: Equatable {
@@ -1946,16 +1954,13 @@ public final class AppModel {
     // the offer to resume after a crash — must not wait on it.
     connectConversations()
     Task { await conversations.prepare() }
+    // The journals are read in the background, once a list is on screen.
+    readsJournalsForQuickOpen = true
     await reload()
     // The choices of sessions that are gone are forgotten — never on an empty list, which may be
     // a store that could not be read rather than one without sessions.
     if !sessions.isEmpty { layout.keepPresentations(of: Set(sessions.map(\.id))) }
     Signposts.end("launch.firstList", firstList)
-    // Every journal, archived sessions' included, for Open Quickly: in the background, after the
-    // list is on screen.
-    if let journal {
-      quickOpen.loadJournals(for: sessions.map(\.id), read: journal.reader)
-    }
     // Which agents write a usage is part of their description, known without probing any of them.
     if let usage, let agents {
       usage.reportingProviderIDs = Set(
