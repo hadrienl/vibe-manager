@@ -85,6 +85,8 @@ the session.
 | Agent's request banner | the question, the value typed, the expiry | — | Deny, Always Allow for ‹site›, Allow Once; announced when it appears | — |
 | A session row whose web view waits | as above | "Waiting for your approval in the web view", "The agent opened a page" | — | `session-row` |
 | New Session: ticket | "Ticket" | — | — | `new-session-ticket` |
+| New Session: a recent folder, one element | its name and path ("api, ~/code/api"), then "Folder not found" when it has gone | selected | activate (not when it has gone), Remove from Recents | `new-session-recent-folder-0`, `-1`… |
+| New Session: Show More | "Show 7 more recent folders", "Show fewer recent folders" | — | activate | `new-session-recent-folders-more` |
 | Open Quickly | "Open Quickly", a modal group; the count said once the typing pauses ("3 results", "No results") | — | — | `quick-open` |
 | Open Quickly's field | "Open Quickly" | the text typed | editable; keeps the keyboard while the arrows move through the results | `quick-open-field` |
 | A result, one element | title, status, why it matches, "Archived", its place ("Refactor, In Progress, Pull request #62, o/r, created, 2 of 5"); said as the arrows reach it | selected | open | `quick-open-row` |
