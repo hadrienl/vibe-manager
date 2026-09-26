@@ -50,7 +50,7 @@ struct ActivityPane: View {
     .environment(
       \.openURL,
       OpenURLAction { url in
-        journal.openLink(url)
+        journal.openLink(url, from: session.id)
         return .handled
       }
     )
@@ -90,7 +90,7 @@ struct ActivityPane: View {
           .foregroundStyle(.secondary)
           .accessibilityAddTraits(.isHeader)
       case .entry(let entry):
-        EntryRow(entry: entry, resources: resources, open: journal.openLink)
+        EntryRow(entry: entry, resources: resources) { journal.openLink($0, from: session.id) }
           .tag(ActivityRowID.entry(entry.id))
       }
     }
@@ -182,7 +182,7 @@ struct ActivityPane: View {
         }
         ForEach(ActivityPresentation.links(in: entry.text), id: \.self) { url in
           Button {
-            journal.openLink(url)
+            journal.openLink(url, from: session.id)
           } label: {
             Text(
               "Open \(url.absoluteString)", bundle: .module,
@@ -283,7 +283,7 @@ private struct ResourceMenu: View {
     switch resource.target {
     case .web(let url):
       Button {
-        journal.openLink(url)
+        journal.openInBrowser(url)
       } label: {
         Text("Open in Browser", bundle: .module)
       }
@@ -300,7 +300,7 @@ private struct ResourceMenu: View {
     case .branch(let path, let url):
       if let url {
         Button {
-          journal.openLink(url)
+          journal.openInBrowser(url)
         } label: {
           Text("Open in Browser", bundle: .module)
         }

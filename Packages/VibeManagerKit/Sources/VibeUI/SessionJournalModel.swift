@@ -48,6 +48,9 @@ public final class SessionJournalModel {
   @ObservationIgnored var showSettingsTab: (() -> Void)?
   /// The editor chosen in the settings, for Open in Editor.
   @ObservationIgnored var editor: EditorChoice?
+  /// Shows a page in the session's web view; false when it has none, and the default browser
+  /// shows it instead.
+  @ObservationIgnored var openInWebView: ((URL, SessionID) -> Bool)?
   /// Told of every journal that arrives, for Open Quickly's index (#37).
   @ObservationIgnored var journalDidChange: ((SessionID, SessionJournal) -> Void)?
 
@@ -164,23 +167,23 @@ public final class SessionJournalModel {
     switch row {
     case .resource(let key):
       guard let resource = journals[id]?.resources.first(where: { $0.key == key }) else { return }
-      open(resource)
+      open(resource, from: id)
     case .entry(let entryID):
       guard let entry = journals[id]?.entries.first(where: { $0.id == entryID }),
         let url = ActivityPresentation.links(in: entry.text).first
       else { return }
-      openLink(url)
+      openLink(url, from: id)
     }
   }
 
-  func open(_ resource: SessionResource) {
+  func open(_ resource: SessionResource, from id: SessionID) {
     notice = nil
     switch resource.target {
     case .web(let url):
-      openLink(url)
+      openLink(url, from: id)
     case .branch(let repositoryPath, let url):
       if let url {
-        openLink(url)
+        openLink(url, from: id)
       } else {
         revealFolder(repositoryPath)
       }
@@ -189,12 +192,23 @@ public final class SessionJournalModel {
     }
   }
 
-  /// Only the web: a link of the summary is written by a model, and must not open anything else.
-  func openLink(_ url: URL) {
-    guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
-      return
-    }
+  /// In the session's web view, beside its terminal, when it has one.
+  func openLink(_ url: URL, from id: SessionID) {
+    guard Self.isWeb(url) else { return }
+    if openInWebView?(url, id) == true { return }
+    openInBrowser(url)
+  }
+
+  /// In the default browser, whatever the session has.
+  func openInBrowser(_ url: URL) {
+    guard Self.isWeb(url) else { return }
     Task { [opener] in _ = await opener.open(url, with: .defaultApplication) }
+  }
+
+  /// Only the web: a link of the summary is written by a model, and must not open anything else.
+  private static func isWeb(_ url: URL) -> Bool {
+    let scheme = url.scheme?.lowercased()
+    return scheme == "http" || scheme == "https"
   }
 
   /// The folder, or the closest one that still exists — and then it is said.

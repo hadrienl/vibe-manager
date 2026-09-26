@@ -13,7 +13,8 @@ extension AppModel {
   }
 
   /// Wires the web view to the workspace: what the layout shows follows the selected session's
-  /// view, a page an agent opens can bring it forward, and a link from a terminal lands in it.
+  /// view, a page an agent opens can bring it forward, and a link from a terminal or from the
+  /// summary lands in it.
   func connectBrowser() {
     guard let browser else { return }
     browser.selectedSessionID = { [weak self] in self?.selectedSessionID }
@@ -30,6 +31,9 @@ extension AppModel {
     }
     launcher?.openLink = { [weak self] id, url, alternate in
       self?.openTerminalLink(url, from: id, alternate: alternate)
+    }
+    journal?.openInWebView = { [weak self] url, id in
+      self?.openInWebView(url, from: id) ?? false
     }
   }
 
@@ -218,12 +222,19 @@ extension AppModel {
     }
     var inWebView = browser.preferences.terminalLinks == .webView
     if alternate { inWebView.toggle() }
-    guard inWebView else {
-      NSWorkspace.shared.open(url)
-      return
+    if inWebView, openInWebView(url, from: id) { return }
+    NSWorkspace.shared.open(url)
+  }
+
+  /// The page in the session's web view, brought forward; false when the session has none — no
+  /// web view, or archived.
+  func openInWebView(_ url: URL, from id: SessionID) -> Bool {
+    guard let browser, sessions.first(where: { $0.id == id })?.status != .archived else {
+      return false
     }
     browser.openLink(url, in: id)
     if id == selectedSessionID { layout.setShowsBrowserWhenAlternating(true) }
+    return true
   }
 
   // MARK: - Ticket
