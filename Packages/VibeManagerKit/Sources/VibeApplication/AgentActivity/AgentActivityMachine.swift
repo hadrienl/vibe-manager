@@ -201,7 +201,8 @@ public enum AgentActivityMachine {
       // as the one, and the dialog on screen is no longer known for sure.
       if next.requests.count > 1 {
         next.requests.removeFirst()
-        next.isFirstRequestUncertain = true
+        // Alone, the one left is the dialog on screen.
+        next.isFirstRequestUncertain = next.requests.count > 1
         next.activity = .awaitingUser(next.requests[0].kind)
       } else {
         next.clearRequests()
@@ -289,6 +290,12 @@ extension AgentActivityState {
     let id = notice.key.map { AgentRequestID(sessionID: base.sessionID, key: $0) } ?? base
     // The same report read twice — a log replayed after an adoption — is one request.
     guard !requests.contains(where: { $0.id == id }) else { return }
+    // Two hooks run side by side append their lines in no guaranteed order: two requests in the
+    // same second may be on screen in the other order, and neither is answered from outside
+    // until one is settled.
+    if let last = requests.last, abs(context.now.timeIntervalSince(last.receivedAt)) < 1 {
+      isFirstRequestUncertain = true
+    }
     requests.append(
       AgentRequest(
         id: id, receivedAt: context.now, kind: kind, content: notice.content,
@@ -299,8 +306,9 @@ extension AgentActivityState {
   mutating func settleFirstRequest() {
     guard !requests.isEmpty else { return }
     requests.removeFirst()
+    // Alone, the one left is the dialog on screen.
+    if requests.count <= 1 { isFirstRequestUncertain = false }
     if requests.isEmpty {
-      isFirstRequestUncertain = false
       activity = .working
     } else {
       activity = .awaitingUser(requests[0].kind)
@@ -315,10 +323,10 @@ extension AgentActivityState {
     } else if let index = requests.firstIndex(where: { $0.reference.match(reference) == .same }) {
       // Settled out of turn: the dialogs are not drawn in the order they were asked after all.
       requests.remove(at: index)
-      isFirstRequestUncertain = true
+      isFirstRequestUncertain = requests.count > 1
     } else if let first = requests.first, first.reference.match(reference) == .likely {
       settleFirstRequest()
-      if !requests.isEmpty { isFirstRequestUncertain = true }
+      if requests.count > 1 { isFirstRequestUncertain = true }
     }
   }
 }

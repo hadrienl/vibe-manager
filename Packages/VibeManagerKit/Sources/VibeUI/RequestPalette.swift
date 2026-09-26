@@ -493,6 +493,8 @@ struct RequestCard: View {
           } label: {
             Text("Reject", bundle: .module, comment: "Rejects an agent's plan.")
           }
+          .help(Text(Self.stopsTheTurn))
+          .accessibilityHint(Text(Self.stopsTheTurn))
         }
       case .questions, .elicitation:
         EmptyView()
@@ -504,12 +506,20 @@ struct RequestCard: View {
     .controlSize(.small)
   }
 
+  /// Refusing is Escape in both CLIs, which ends the agent's turn as well — and, for Claude Code,
+  /// drops the other requests its sub-agents were waiting on (#40).
+  static let stopsTheTurn = LocalizedStringResource(
+    "Also stops the agent's turn: it waits for your next message.", bundle: .module,
+    comment: "What refusing a request from the palette does besides refusing.")
+
   private var denyButton: some View {
     Button {
       send(.deny)
     } label: {
       Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
     }
+    .help(Text(Self.stopsTheTurn))
+    .accessibilityHint(Text(Self.stopsTheTurn))
   }
 
   @ViewBuilder private var openButton: some View {

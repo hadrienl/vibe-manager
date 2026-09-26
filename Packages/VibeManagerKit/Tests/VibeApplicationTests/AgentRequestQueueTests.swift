@@ -7,9 +7,11 @@ import VibeDomain
 private let session = SessionID()
 private let start = Date(timeIntervalSince1970: 3_000_000)
 
-private func context(_ key: String = "l1", visible: Bool = false) -> AgentActivityContext {
+private func context(
+  _ key: String = "l1", at seconds: TimeInterval = 0, visible: Bool = false
+) -> AgentActivityContext {
   AgentActivityContext(
-    now: start, isVisible: visible, approvalAnswerKeys: [[0x31]],
+    now: start.addingTimeInterval(seconds), isVisible: visible, approvalAnswerKeys: [[0x31]],
     requestID: AgentRequestID(sessionID: session, key: key))
 }
 
@@ -29,17 +31,21 @@ private func question(shown: Bool) -> AgentSignal {
   .questionAsked(
     .question, tool: "AskUserQuestion",
     notice: AgentRequestNotice(
-      content: .questions([AgentQuestion(header: nil, text: "Tea?", options: [.init(label: "Yes")])]),
+      content: .questions([AgentQuestion(header: nil, text: "Tea?", options: [.init(label: "Yes")])]
+      ),
       reference: AgentToolReference(tool: "AskUserQuestion"), isShown: shown))
 }
 
-/// Feeds signals one after the other, each carried by its own log line.
+/// Feeds signals one after the other, each carried by its own log line, five seconds apart.
 private func feed(_ signals: AgentSignal..., to state: AgentActivityState = working())
   -> AgentActivityState
 {
   var state = state
+  let offset = TimeInterval(state.requests.count * 100)
   for (index, signal) in signals.enumerated() {
-    state = AgentActivityMachine.reduce(state, .signal(signal), context: context("l\(index)"))
+    state = AgentActivityMachine.reduce(
+      state, .signal(signal),
+      context: context("l\(Int(offset) + index)", at: offset + TimeInterval(index) * 5))
   }
   return state
 }
@@ -67,6 +73,7 @@ struct AgentRequestQueueTests {
     #expect(state.activity == .awaitingUser(.approval))
     #expect(state.requests.map(\.reference.subject) == ["touch a", "touch b"])
     #expect(state.requests.map(\.id.key) == ["l0", "l1"])
+    #expect(!state.isFirstRequestUncertain)
   }
 
   @Test("Only the first request, once drawn and certain, is answered from outside")
@@ -106,21 +113,47 @@ struct AgentRequestQueueTests {
 
   @Test("A settlement out of turn, or one that cannot be told apart, leaves the first uncertain")
   func uncertain() {
-    let asked = feed(permission("touch a", agent: "A"), permission("touch b", agent: "B"))
+    let asked = feed(
+      permission("touch a", agent: "A"), permission("touch b", agent: "B"),
+      permission("touch c", agent: "C"))
     let outOfTurn = feed(.toolFinished("Bash", agentID: "B", subject: "touch b"), to: asked)
-    #expect(outOfTurn.requests.map(\.reference.subject) == ["touch a"])
+    #expect(outOfTurn.requests.map(\.reference.subject) == ["touch a", "touch c"])
     #expect(outOfTurn.isFirstRequestUncertain)
     #expect(
       outOfTurn.answering(outOfTurn.requests[0], keymap: AnyKeymap())
         == .inTerminalOnly(.uncertain))
 
     let likely = feed(.toolFinished("Bash", agentID: "A"), to: asked)
-    #expect(likely.requests.map(\.reference.subject) == ["touch b"])
+    #expect(likely.requests.map(\.reference.subject) == ["touch b", "touch c"])
     #expect(likely.isFirstRequestUncertain)
 
     let unnamed = feed(.questionResolved, to: asked)
-    #expect(unnamed.requests.map(\.reference.subject) == ["touch b"])
+    #expect(unnamed.requests.map(\.reference.subject) == ["touch b", "touch c"])
     #expect(unnamed.isFirstRequestUncertain)
+
+    // Alone, the one left is the dialog on screen: it is certain again.
+    let alone = feed(.toolFinished("Bash", agentID: "B", subject: "touch b"), to: likely)
+    #expect(alone.requests.map(\.reference.subject) == ["touch c"])
+    #expect(!alone.isFirstRequestUncertain)
+  }
+
+  @Test("Requests of one session arriving in the same second are answered in the terminal")
+  func sameSecond() {
+    var state = working()
+    for (index, command) in ["touch a", "touch b"].enumerated() {
+      state = AgentActivityMachine.reduce(
+        state, .signal(permission(command, agent: command)),
+        context: context("s\(index)", at: 0.4))
+    }
+    #expect(state.isFirstRequestUncertain)
+    #expect(state.answering(state.requests[0], keymap: AnyKeymap()) == .inTerminalOnly(.uncertain))
+    // One settled in the terminal: the other is alone, and answered from the palette again.
+    let settled = AgentActivityMachine.reduce(
+      state, .signal(.toolFinished("Bash", agentID: "touch b", subject: "touch b")),
+      context: context())
+    #expect(!settled.isFirstRequestUncertain)
+    #expect(
+      settled.answering(settled.requests[0], keymap: AnyKeymap()).answers.contains(.allowOnce))
   }
 
   @Test("A sub-agent's dialog outlives the main turn and a background task's prompt")
@@ -144,7 +177,7 @@ struct AgentRequestQueueTests {
   func answerSent() {
     let asked = feed(permission("touch a", agent: "A"), permission("touch b", agent: "B"))
     let wrong = AgentActivityMachine.reduce(
-      asked, .answerSent(asked.requests[1].id), context: context())
+      asked, .answerSent(asked.requests[1].id), context: context(at: 50))
     #expect(wrong.requests.count == 2)
     let right = AgentActivityMachine.reduce(
       asked, .answerSent(asked.requests[0].id), context: context())

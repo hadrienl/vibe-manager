@@ -34,7 +34,8 @@ digit sent within the millisecond answered it. Only `PermissionRequest` arms a r
 announced by `PreToolUse` is shown, its buttons waiting.
 
 Return never picks an option: a digit does. Refusing is Escape, whatever the options: the digit
-of "No" guessed one place off would allow.
+of "No" guessed one place off would allow. Escape also ends the agent's turn — and, for Claude
+Code, drops the other requests its sub-agents were waiting on — which the Refuse button says.
 
 | CLI | Permission | Always | Refuse | Questions | Plan |
 |---|---|---|---|---|---|
@@ -53,9 +54,11 @@ that order. Each session keeps a queue; only its first request is answered from 
 and a tool that finishes settles it only if it matches: same tool, same agent (`agent_id`), same
 command, file or address. The hook of a finishing tool now keeps those fields
 (`Payload.fields`), read from the first 16 KiB, where they sit before the tool's output. A tool that
-settles the second request, or one that cannot be told apart, puts the first in doubt: until the
-queue drains, the session is answered in its terminal. A sub-agent's dialog outlives the end of the
-main turn, and the prompt a background task sends.
+settles the second request, or one that cannot be told apart, puts the first in doubt, and so do
+two requests arriving in the same second: each hook is a shell of its own, and nothing orders their
+lines. In doubt, the session is answered in its terminal until a single request is left — that one
+is the dialog on screen. A sub-agent's dialog outlives the end of the main turn, and the prompt a
+background task sends.
 
 ### What would be allowed is what is shown
 

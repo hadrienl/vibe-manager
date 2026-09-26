@@ -2571,6 +2571,17 @@
         }
       }
     },
+    "Also stops the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request from the palette does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
     "Always" : {
       "comment" : "Allows what an agent asks, from now on.\nAn agent action allowed by Always Allow.",
       "localizations" : {

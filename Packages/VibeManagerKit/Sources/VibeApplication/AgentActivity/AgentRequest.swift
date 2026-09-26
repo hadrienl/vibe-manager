@@ -285,7 +285,8 @@ public enum AgentRequestTerminalReason: Hashable, Sendable {
   case notYetShown
   /// Another request of the session comes first.
   case queued
-  /// A tool settled that may have been this one's: which dialog is drawn is not known for sure.
+  /// Which of the session's dialogs is drawn is not known for sure: requests arrived together,
+  /// or a tool settled that may have been this one's.
   case uncertain
   /// What would be allowed was cut short.
   case truncated
