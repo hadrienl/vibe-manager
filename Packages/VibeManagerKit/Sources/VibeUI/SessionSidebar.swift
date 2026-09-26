@@ -146,7 +146,7 @@ struct SessionSidebar: View {
       if isSwiped, let swipe, swipe.offset > 0 {
         SwipeButtons(
           statuses: swipe.leading.reversed(),
-          width: reduceMotion ? swipe.leadingWidth : swipe.offset,
+          width: reduceMotion ? swipe.leadingButtonsWidth : swipe.revealedButtonsWidth,
           opacity: reduceMotion ? swipe.progress : 1,
           choose: { commit($0, for: session.id) }
         )
@@ -156,7 +156,7 @@ struct SessionSidebar: View {
       if isSwiped, let swipe, swipe.offset < 0 {
         SwipeButtons(
           statuses: swipe.trailing,
-          width: reduceMotion ? swipe.trailingWidth : -swipe.offset,
+          width: reduceMotion ? swipe.trailingButtonsWidth : swipe.revealedButtonsWidth,
           opacity: reduceMotion ? swipe.progress : 1,
           choose: { commit($0, for: session.id) }
         )
