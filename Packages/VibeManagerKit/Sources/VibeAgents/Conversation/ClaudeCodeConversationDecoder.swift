@@ -36,6 +36,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     case "assistant": readAssistant(object, uuid: uuid, date: date)
     case "user": readUser(object, uuid: uuid, date: date)
     case "system": readSystem(object, uuid: uuid, date: date)
+    case "attachment": readAttachment(object, uuid: uuid, date: date)
     default: return
     }
   }
@@ -90,6 +91,33 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       return
     }
     guard let content = message["content"] as? [[String: Any]] else { return }
+    readBlocks(content, uuid: uuid, date: date) { block in
+      apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
+    }
+  }
+
+  /// A prompt the user sent while the agent worked: Claude Code hands it to the turn under way
+  /// and writes it as an attachment of that turn, never as a user line. Background task notices
+  /// and other sessions' messages travel the same way; only what a person typed is a prompt.
+  private func readAttachment(_ object: [String: Any], uuid: String, date: Date?) {
+    guard let attachment = object["attachment"] as? [String: Any],
+      attachment["type"] as? String == "queued_command",
+      attachment["commandMode"] as? String == "prompt"
+    else { return }
+    let origin = (attachment["origin"] as? [String: Any])?["kind"] as? String
+    guard origin == nil || origin == "human" else { return }
+    if let text = attachment["prompt"] as? String {
+      readTypedText(text, uuid: uuid, date: date, attachments: 0)
+    } else if let content = attachment["prompt"] as? [[String: Any]] {
+      readBlocks(content, uuid: uuid, date: date) { _ in }
+    }
+  }
+
+  /// A prompt's blocks: its text, and the images that came with it.
+  private func readBlocks(
+    _ content: [[String: Any]], uuid: String, date: Date?,
+    result: ([String: Any]) -> Void
+  ) {
     var texts: [String] = []
     var images = 0
     // `[Image #1]` or `[Image: source: …]` alone in a block: the CLI's placeholder for a picture.
@@ -97,16 +125,20 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     for block in content {
       switch block["type"] as? String {
       case "tool_result":
-        apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
+        result(block)
       case "image":
         images += 1
       case "text":
         guard let text = block["text"] as? String else { continue }
         if Self.isImagePlaceholder(text) {
           placeholders += 1
-        } else {
-          texts.append(text)
+          continue
         }
+        // `[Image #1] [Image #2]Look at this`: the CLI writes its placeholders where the images
+        // were pasted, inside the text.
+        let (stripped, inline) = Self.strippingInlinePlaceholders(text)
+        placeholders += inline
+        if !stripped.isEmpty { texts.append(stripped) }
       default:
         continue
       }
@@ -173,6 +205,20 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   static func isImagePlaceholder(_ text: String) -> Bool {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.range(of: #"^\[Image[^\]\n]*\]$"#, options: .regularExpression) != nil
+  }
+
+  private static let inlinePlaceholder = try? NSRegularExpression(
+    pattern: #"\[Image #\d+\][ \t]*"#)
+
+  /// The text without the `[Image #N]` placeholders written in it, and how many there were.
+  static func strippingInlinePlaceholders(_ text: String) -> (text: String, count: Int) {
+    let range = NSRange(text.startIndex..., in: text)
+    guard let inlinePlaceholder else { return (text, 0) }
+    let count = inlinePlaceholder.numberOfMatches(in: text, range: range)
+    guard count > 0 else { return (text, 0) }
+    let stripped = inlinePlaceholder.stringByReplacingMatches(
+      in: text, range: range, withTemplate: "")
+    return (stripped.trimmingCharacters(in: .whitespacesAndNewlines), count)
   }
 
   private func readSystem(_ object: [String: Any], uuid: String, date: Date?) {

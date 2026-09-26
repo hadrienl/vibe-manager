@@ -293,12 +293,13 @@ public final class ConversationModel {
         id: UUID(), text: PromptEncoding.sanitized(submission.text),
         attachmentCount: attachments.count,
         sentAt: Date(), promptCountAtSend: promptCount, state: .sending))
+    let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
     attachments = []
     scroll.jumpedToBottom()
     scrollToBottomRequest += 1
     await write(keystrokes.paste)
-    try? await Task.sleep(for: promptFormat.submitDelay)
+    try? await Task.sleep(for: submitDelay)
     await write(keystrokes.submit)
     scheduleEchoCheck()
     return true

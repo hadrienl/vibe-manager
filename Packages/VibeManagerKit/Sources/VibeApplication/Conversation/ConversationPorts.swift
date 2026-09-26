@@ -51,19 +51,30 @@ public struct AgentPromptFormat: Hashable, Sendable {
   /// Between the paste and the key that sends it: a TUI that times keystrokes to tell a paste
   /// from typing must have seen the paste end.
   public var submitDelay: Duration
+  /// Added to that wait for each file joined to the prompt. Claude Code reads an image whose path
+  /// was pasted before it takes the next key: with two screenshots, a Return 80 ms after the
+  /// paste was lost and the prompt stayed in its input (#99).
+  public var attachmentDelay: Duration
 
   public init(
     usesBracketedPaste: Bool = true,
     submitKey: [UInt8] = [0x0D],
     queueKey: [UInt8] = [0x0D],
     interruptKey: [UInt8] = [0x1B],
-    submitDelay: Duration = .milliseconds(80)
+    submitDelay: Duration = .milliseconds(80),
+    attachmentDelay: Duration = .milliseconds(500)
   ) {
     self.usesBracketedPaste = usesBracketedPaste
     self.submitKey = submitKey
     self.queueKey = queueKey
     self.interruptKey = interruptKey
     self.submitDelay = submitDelay
+    self.attachmentDelay = attachmentDelay
+  }
+
+  /// How long to wait between the paste and the key that sends it: three seconds at most.
+  public func delayBeforeSubmit(attachmentCount: Int) -> Duration {
+    submitDelay + min(attachmentDelay * attachmentCount, .seconds(3))
   }
 }
 

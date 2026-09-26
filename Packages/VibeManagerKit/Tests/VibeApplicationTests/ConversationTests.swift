@@ -388,6 +388,14 @@ struct PromptEncodingTests {
     #expect(PromptSubmission(text: "  \n").isEmpty)
     #expect(!PromptSubmission(text: "", attachments: [URL(fileURLWithPath: "/a")]).isEmpty)
   }
+
+  @Test("Each joined file gives the agent more time before the key that sends the prompt")
+  func delayWithAttachments() {
+    let format = AgentPromptFormat()
+    #expect(format.delayBeforeSubmit(attachmentCount: 0) == .milliseconds(80))
+    #expect(format.delayBeforeSubmit(attachmentCount: 2) == .milliseconds(1_080))
+    #expect(format.delayBeforeSubmit(attachmentCount: 40) == .milliseconds(3_080))
+  }
 }
 
 // MARK: - Preferences

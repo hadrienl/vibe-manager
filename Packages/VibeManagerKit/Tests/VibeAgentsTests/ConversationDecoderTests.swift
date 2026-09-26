@@ -169,8 +169,32 @@ struct ClaudeCodeConversationDecoderTests {
     #expect(
       entries.map(\.content) == [
         .userPrompt("<Button> is cut off", attachments: 0),
-        .userPrompt("[Image #1] why is it cut?", attachments: 1),
+        .userPrompt("why is it cut?", attachments: 1),
         .userPrompt("", attachments: 1),
+      ])
+  }
+
+  @Test("A prompt sent during a turn is shown where the turn took it; no other queued message")
+  func promptsSentDuringATurn() {
+    let entries = decode([
+      #"{"type":"user","uuid":"u","message":{"content":"Look into it"}}"#,
+      #"{"type":"assistant","uuid":"a","message":{"content":[{"type":"text","text":"Looking."}]}}"#,
+      #"{"type":"attachment","uuid":"q1","attachment":{"type":"queued_command","prompt":"take B","commandMode":"prompt","origin":{"kind":"human"}}}"#,
+      #"{"type":"attachment","uuid":"q2","attachment":{"type":"queued_command","prompt":[{"type":"text","text":"[Image #3] [Image #4]here too"},{"type":"image","source":{"type":"base64","data":"AAAA"}},{"type":"image","source":{"type":"base64","data":"AAAA"}}],"commandMode":"prompt","origin":{"kind":"human"}}}"#,
+      #"{"type":"attachment","uuid":"q3","attachment":{"type":"queued_command","prompt":"older","commandMode":"prompt"}}"#,
+      #"{"type":"attachment","uuid":"n","attachment":{"type":"queued_command","prompt":"<task-notification>done</task-notification>","commandMode":"task-notification"}}"#,
+      #"{"type":"attachment","uuid":"p","attachment":{"type":"queued_command","prompt":"a report","commandMode":"prompt","origin":{"kind":"peer","from":"x"}}}"#,
+      #"{"type":"attachment","uuid":"h","attachment":{"type":"hook_success","hookName":"SessionStart:startup"}}"#,
+      #"{"type":"assistant","uuid":"b","message":{"content":[{"type":"text","text":"Taking B."}]}}"#,
+    ])
+    #expect(
+      entries.map(\.content) == [
+        .userPrompt("Look into it", attachments: 0),
+        .agentText("Looking."),
+        .userPrompt("take B", attachments: 0),
+        .userPrompt("here too", attachments: 2),
+        .userPrompt("older", attachments: 0),
+        .agentText("Taking B."),
       ])
   }
 
