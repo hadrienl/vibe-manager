@@ -29,6 +29,9 @@ public struct AgentActivityState: Hashable, Sendable {
   /// A tool settled that may, or may not, have been the first request's: which dialog is on
   /// screen is no longer known, and none is answered from outside until the queue drains.
   public var isFirstRequestUncertain = false
+  /// A request was taken away on a guess: the dialog on screen may be one the queue no longer
+  /// holds, however few are left in it. The doubt then lasts until the queue drains.
+  var isTrackLost = false
 
   public init(
     activity: AgentActivity = .idle,
@@ -138,11 +141,11 @@ public enum AgentActivityMachine {
       switch next.activity {
       case .awaitingUser(.approval) where context.approvalAnswerKeys.contains(bytes):
         // Provisional: the next thing the agent says confirms it or puts the question back. The
-        // key answered the dialog on screen, the first of the queue.
+        // key answered the dialog on screen — the first of the queue, when its order is known.
         if next.requests.isEmpty {
           next.activity = .working
         } else {
-          next.settleFirstRequest()
+          next.settleFirstRequest(isKnownAnswered: !next.isFirstRequestUncertain)
         }
       case .working where interruptKeys.contains(bytes):
         next.activity = .idle
@@ -152,7 +155,7 @@ public enum AgentActivityMachine {
 
     case .answerSent(let id):
       guard next.requests.first?.id == id else { break }
-      next.settleFirstRequest()
+      next.settleFirstRequest(isKnownAnswered: true)
 
     case .tick:
       if case .unconfirmed(let since) = next.source,
@@ -200,10 +203,7 @@ public enum AgentActivityMachine {
       // Nothing says which request was answered. Alone, it was; behind others, the first is taken
       // as the one, and the dialog on screen is no longer known for sure.
       if next.requests.count > 1 {
-        next.requests.removeFirst()
-        // Alone, the one left is the dialog on screen.
-        next.isFirstRequestUncertain = next.requests.count > 1
-        next.activity = .awaitingUser(next.requests[0].kind)
+        next.settleFirstRequest(isKnownAnswered: false)
       } else {
         next.clearRequests()
         next.activity = .working
@@ -219,7 +219,12 @@ public enum AgentActivityMachine {
       }
       next.settle(AgentToolReference(tool: tool, agentID: agentID, subject: subject))
     case .turnEnded:
-      // A sub-agent in the background can still be waiting on the user once the main turn ends.
+      // A sub-agent in the background can still be waiting on the user once the main turn ends —
+      // on a dialog it drew. One announced by its tool and never drawn may never be: a hook of
+      // the user's own can stop the tool before either. Should it be drawn after all, its
+      // `PermissionRequest` queues it again.
+      next.requests.removeAll { !$0.isShown }
+      if next.requests.isEmpty { next.clearRequests() }
       next.activity = next.requests.first.map { .awaitingUser($0.kind) } ?? .idle
       if !context.isVisible { next.unreadSince = next.unreadSince ?? context.now }
     case .interrupted, .agentEnded:
@@ -263,6 +268,7 @@ extension AgentActivityState {
   mutating func clearRequests() {
     requests = []
     isFirstRequestUncertain = false
+    isTrackLost = false
   }
 
   /// Queues what an agent asked. Its dialog drawn, a request already announced by its tool is
@@ -281,6 +287,10 @@ extension AgentActivityState {
     if let index = requests.firstIndex(where: {
       !$0.isShown && $0.reference.match(notice.reference) == .same
     }) {
+      // Drawn behind a dialog that was drawn before it: the queue's order is not the screen's.
+      if notice.isShown, requests[(index + 1)...].contains(where: \.isShown) {
+        isFirstRequestUncertain = true
+      }
       requests[index].isShown = requests[index].isShown || notice.isShown
       // The dialog's report may be cut short where the tool's was not.
       if !notice.content.isUnreadable { requests[index].content = notice.content }
@@ -292,8 +302,9 @@ extension AgentActivityState {
     guard !requests.contains(where: { $0.id == id }) else { return }
     // Two hooks run side by side append their lines in no guaranteed order: two requests in the
     // same second may be on screen in the other order, and neither is answered from outside
-    // until one is settled.
-    if let last = requests.last, abs(context.now.timeIntervalSince(last.receivedAt)) < 1 {
+    // until one is settled. The lines are stamped to the whole second, so two stamps one apart
+    // may be a moment apart.
+    if let last = requests.last, abs(context.now.timeIntervalSince(last.receivedAt)) <= 1 {
       isFirstRequestUncertain = true
     }
     requests.append(
@@ -302,12 +313,20 @@ extension AgentActivityState {
         reference: notice.reference, isShown: notice.isShown))
   }
 
-  /// The first request was answered: the next one's dialog takes its place.
-  mutating func settleFirstRequest() {
+  /// The first request was taken as answered: the next one's dialog takes its place.
+  /// `isKnownAnswered` says it was the one answered; otherwise it was a guess.
+  mutating func settleFirstRequest(isKnownAnswered: Bool) {
     guard !requests.isEmpty else { return }
     requests.removeFirst()
-    // Alone, the one left is the dialog on screen.
-    if requests.count <= 1 { isFirstRequestUncertain = false }
+    if requests.isEmpty {
+      clearRequests()
+    } else if !isKnownAnswered {
+      isFirstRequestUncertain = true
+      isTrackLost = true
+    } else if requests.count == 1, !isTrackLost {
+      // Alone, the one left is the dialog on screen.
+      isFirstRequestUncertain = false
+    }
     if requests.isEmpty {
       activity = .working
     } else {
@@ -319,14 +338,18 @@ extension AgentActivityState {
   /// without it being sure takes the first away and leaves the next in doubt.
   mutating func settle(_ reference: AgentToolReference) {
     if let first = requests.first, first.reference.match(reference) == .same {
-      settleFirstRequest()
+      settleFirstRequest(isKnownAnswered: true)
     } else if let index = requests.firstIndex(where: { $0.reference.match(reference) == .same }) {
       // Settled out of turn: the dialogs are not drawn in the order they were asked after all.
       requests.remove(at: index)
-      isFirstRequestUncertain = requests.count > 1
+      if requests.isEmpty {
+        clearRequests()
+      } else {
+        // Alone, the one left is the dialog on screen — unless a guess already lost track.
+        isFirstRequestUncertain = requests.count > 1 || isTrackLost
+      }
     } else if let first = requests.first, first.reference.match(reference) == .likely {
-      settleFirstRequest()
-      if requests.count > 1 { isFirstRequestUncertain = true }
+      settleFirstRequest(isKnownAnswered: false)
     }
   }
 }

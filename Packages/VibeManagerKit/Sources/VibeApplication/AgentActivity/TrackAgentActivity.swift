@@ -168,6 +168,8 @@ public actor TrackAgentActivity {
       confirmed ? .structured : hasLog ? .unconfirmed(since: now()) : .inferred
     tracked.state.requests = confirmed ? tracked.restoredRequests : []
     tracked.state.isFirstRequestUncertain = confirmed && tracked.restoredUncertainty
+    // Why it was in doubt is not kept: it lasts, as after a guess, until the queue drains.
+    tracked.state.isTrackLost = tracked.state.isFirstRequestUncertain
     tracked.restoredActivity = nil
     tracked.restoredRequests = []
     tracked.restoredUncertainty = false

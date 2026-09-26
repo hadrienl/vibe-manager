@@ -131,10 +131,18 @@ struct AgentRequestQueueTests {
     #expect(unnamed.requests.map(\.reference.subject) == ["touch b", "touch c"])
     #expect(unnamed.isFirstRequestUncertain)
 
-    // Alone, the one left is the dialog on screen: it is certain again.
+    // Alone after an out-of-turn settlement, the one left is the dialog on screen.
+    let certain = feed(.toolFinished("Bash", agentID: "A", subject: "touch a"), to: outOfTurn)
+    #expect(certain.requests.map(\.reference.subject) == ["touch c"])
+    #expect(!certain.isFirstRequestUncertain)
+
+    // After a guess, even alone: the dialog on screen may be the one guessed away.
     let alone = feed(.toolFinished("Bash", agentID: "B", subject: "touch b"), to: likely)
     #expect(alone.requests.map(\.reference.subject) == ["touch c"])
-    #expect(!alone.isFirstRequestUncertain)
+    #expect(alone.isFirstRequestUncertain)
+    let drained = feed(.toolFinished("Bash", agentID: "C", subject: "touch c"), to: alone)
+    #expect(drained.requests.isEmpty)
+    #expect(!drained.isFirstRequestUncertain)
   }
 
   @Test("Requests of one session arriving in the same second are answered in the terminal")
@@ -154,6 +162,51 @@ struct AgentRequestQueueTests {
     #expect(!settled.isFirstRequestUncertain)
     #expect(
       settled.answering(settled.requests[0], keymap: AnyKeymap()).answers.contains(.allowOnce))
+  }
+
+  @Test("Two stamps one second apart may be a moment apart: the order is in doubt")
+  func stampsOneSecondApart() {
+    var state = working()
+    for (index, command) in ["touch a", "touch b"].enumerated() {
+      state = AgentActivityMachine.reduce(
+        state, .signal(permission(command, agent: command)),
+        context: context("s\(index)", at: TimeInterval(10 + index)))
+    }
+    #expect(state.isFirstRequestUncertain)
+  }
+
+  @Test("A key typed while the order is in doubt answers a dialog nobody can name")
+  func keyTypedInDoubt() {
+    var state = working()
+    for (index, command) in ["touch a", "touch b"].enumerated() {
+      state = AgentActivityMachine.reduce(
+        state, .signal(permission(command, agent: command)), context: context("s\(index)"))
+    }
+    let typed = AgentActivityMachine.reduce(state, .userInput([0x31]), context: context(at: 5))
+    #expect(typed.requests.count == 1)
+    #expect(typed.isFirstRequestUncertain)
+    #expect(typed.answering(typed.requests[0], keymap: AnyKeymap()) == .inTerminalOnly(.uncertain))
+  }
+
+  @Test("A dialog drawn behind one drawn before it puts the order in doubt")
+  func drawnOutOfOrder() {
+    let announced = feed(question(shown: false), permission("touch b", agent: "B"))
+    #expect(!announced.isFirstRequestUncertain)
+    let drawn = feed(question(shown: true), to: announced)
+    #expect(drawn.requests.count == 2)
+    #expect(drawn.requests[0].isShown)
+    #expect(drawn.isFirstRequestUncertain)
+    #expect(drawn.answering(drawn.requests[0], keymap: AnyKeymap()) == .inTerminalOnly(.uncertain))
+  }
+
+  @Test("The end of a turn drops a request its tool announced and no dialog ever drew")
+  func announcedNeverDrawn() {
+    let state = feed(question(shown: false), .turnEnded)
+    #expect(state.requests.isEmpty)
+    #expect(state.activity == .idle)
+    let behind = feed(permission("touch a", agent: "A"), question(shown: false), .turnEnded)
+    #expect(behind.requests.map(\.reference.subject) == ["touch a"])
+    #expect(behind.activity == .awaitingUser(.approval))
   }
 
   @Test("A sub-agent's dialog outlives the main turn and a background task's prompt")
