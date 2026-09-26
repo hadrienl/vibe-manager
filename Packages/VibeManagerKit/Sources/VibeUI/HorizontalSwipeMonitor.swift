@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import VibeDomain
 
 /// Hands a two-finger horizontal swipe over the view it backs to SwiftUI (#80).
 ///
@@ -10,19 +11,23 @@ import SwiftUI
 /// and so does the end of a swipe, so that the list never waits for the end of a gesture it saw
 /// begin.
 ///
-/// The row is found where the fingers are, among the frames the rows are drawn at, rather than
-/// from the last row the pointer entered: a list scrolled under a still pointer does not say it
-/// moved.
+/// The row is found where the fingers are, by the `SwipeRowMarker` drawn behind it in the window,
+/// rather than from the last row the pointer entered — a list scrolled under a still pointer does
+/// not say it moved — or from the table's row numbers, which do not count the same rows from one
+/// SDK to the next.
 ///
 /// The inertia that follows a swipe is swallowed and not followed: the decision is taken when the
 /// fingers leave the trackpad.
 struct HorizontalSwipeMonitor: NSViewRepresentable {
-  /// Asked when a gesture turns out horizontal, with where the fingers are in the list's
-  /// coordinates. `false` leaves the gesture to the list.
-  var began: (_ point: CGPoint?) -> Bool
+  /// Asked when a gesture turns out horizontal, with the session of the row under the fingers.
+  /// `false` leaves the gesture to the list.
+  var began: (_ sessionID: SessionID?) -> Bool
   /// The distance the fingers moved since the last call, positive to the right.
   var changed: (CGFloat) -> Void
   var ended: () -> Void
+  /// A click in the list, with the session of the row it landed on: its content, not the buttons
+  /// a swipe uncovered beside it.
+  var clicked: (_ sessionID: SessionID?) -> Void
   /// A gesture that turned out to be a scroll, or a click outside this view.
   var interrupted: () -> Void
 
@@ -114,7 +119,9 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
 
     private func noteClick(windowNumber: Int, at location: CGPoint) {
       guard windowNumber == window?.windowNumber else { return }
-      if !bounds.contains(convert(location, from: nil)) {
+      if bounds.contains(convert(location, from: nil)) {
+        handlers?.clicked(sessionID(at: location))
+      } else {
         handlers?.interrupted()
       }
     }
@@ -152,7 +159,7 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
             tracking = .deciding(x: x, y: y)
             return false
           }
-          guard abs(x) > abs(y) * 1.2, handlers?.began(point(at: event.location)) == true else {
+          guard abs(x) > abs(y) * 1.2, handlers?.began(sessionID(at: event.location)) == true else {
             tracking = .declined
             handlers?.interrupted()
             return false
@@ -180,12 +187,47 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
       return false
     }
 
-    /// Where the fingers are, in the coordinates SwiftUI gives the list this view sits behind:
-    /// from its top-left corner.
-    private func point(at location: CGPoint) -> CGPoint? {
-      let local = convert(location, from: nil)
-      guard bounds.contains(local) else { return nil }
-      return CGPoint(x: local.x, y: isFlipped ? local.y : bounds.height - local.y)
+    /// The session of the row drawn under a point of the window, if the list draws one there.
+    private func sessionID(at location: CGPoint) -> SessionID? {
+      guard bounds.contains(convert(location, from: nil)), let content = window?.contentView
+      else { return nil }
+      return Self.marker(in: content, at: location)?.sessionID
     }
+
+    private static func marker(in view: NSView, at location: CGPoint) -> SwipeRowMarker.MarkerView?
+    {
+      let frame = view.convert(view.bounds, to: nil)
+      if let marker = view as? SwipeRowMarker.MarkerView {
+        return frame.contains(location) ? marker : nil
+      }
+      // A view with a size draws its rows inside it: the terminals and the web view are skipped.
+      if !frame.isEmpty, !frame.contains(location) { return nil }
+      for subview in view.subviews where !subview.isHidden {
+        if let marker = marker(in: subview, at: location) { return marker }
+      }
+      return nil
+    }
+  }
+}
+
+/// Behind a row of the list, says which session it draws, so that `HorizontalSwipeMonitor` can
+/// find the row under the fingers where it is really drawn.
+struct SwipeRowMarker: NSViewRepresentable {
+  let sessionID: SessionID
+
+  func makeNSView(context: Context) -> MarkerView {
+    let view = MarkerView()
+    view.sessionID = sessionID
+    return view
+  }
+
+  func updateNSView(_ view: MarkerView, context: Context) {
+    view.sessionID = sessionID
+  }
+
+  final class MarkerView: NSView {
+    var sessionID: SessionID?
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
   }
 }
