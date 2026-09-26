@@ -265,6 +265,23 @@ struct ConversationModelTests {
     #expect(await model.send())
   }
 
+  @Test("A prompt sent before the previous one's Return is refused: they would be one")
+  func sendWhileSubmitting() async {
+    let (model, terminal) = model()
+    model.promptFormat = AgentPromptFormat(submitDelay: .milliseconds(200))
+    model.draft = "first"
+    let first = Task { await model.send() }
+    while !model.isSubmitting { await Task.yield() }
+    model.draft = "second"
+    #expect(!model.canSend)
+    #expect(await model.send() == false)
+    #expect(await first.value)
+    #expect(!model.isSubmitting)
+    #expect(terminal.written == [Array("\u{1B}[200~first\u{1B}[201~".utf8), [0x0D]])
+    #expect(model.draft == "second")
+    #expect(model.canSend)
+  }
+
   @Test("An image produced while the session runs goes to the web view; the history's do not")
   func newImages() throws {
     let folder = FileManager.default.temporaryDirectory
