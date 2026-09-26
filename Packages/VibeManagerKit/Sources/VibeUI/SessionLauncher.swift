@@ -475,7 +475,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       let reporting = await agents.provider(id: AgentProviderID(providerID))
         as? any AgentActivityReporting
     {
-      decoder = reporting.activityDecoder()
+      decoder = reporting.activityDecoder(
+        workingDirectoryPath: RestartSession.workingDirectoryPath(of: session), environment: [:])
     }
     await activity?.processAdopted(session.id, decoder: decoder)
     followOutput(of: session.id, terminal: terminal)

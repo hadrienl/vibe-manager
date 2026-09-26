@@ -55,13 +55,15 @@ public enum AgentSignal: Hashable, Sendable {
   /// A turn started. `byUser` is false when the agent resumed on its own — a background task
   /// finishing hands Claude Code a message nobody typed — which must not count as a reading.
   case promptSubmitted(byUser: Bool)
-  /// `tool` names the tool the question holds up, when it is known.
-  case questionAsked(AgentQuestionKind, tool: String? = nil)
+  /// `tool` names the tool the question holds up, when it is known; `notice` is the question
+  /// itself, when the report could be read (#40).
+  case questionAsked(AgentQuestionKind, tool: String? = nil, notice: AgentRequestNotice? = nil)
   /// The question is behind it: a tool ran, a permission was refused, an answer came back.
   case questionResolved
   /// This tool ran, or was refused: the question it held up, if any, is behind it — but not one
-  /// another tool is still waiting on.
-  case toolFinished(String)
+  /// another tool is still waiting on. `agentID` and `subject` tell which call it was, when the
+  /// report says: sub-agents run the same tools side by side.
+  case toolFinished(String, agentID: String? = nil, subject: String? = nil)
   /// The agent finished its answer.
   case turnEnded
   /// The user stopped the turn. Nothing was answered, so nothing is left to read.

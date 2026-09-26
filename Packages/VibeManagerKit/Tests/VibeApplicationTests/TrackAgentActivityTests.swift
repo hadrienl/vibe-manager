@@ -5,7 +5,7 @@ import VibeDomain
 @testable import VibeApplication
 
 /// A log whose lines the test writes, and reads back as the tracker would.
-private actor ScriptedActivityLogs: AgentActivityLogStore {
+actor ScriptedActivityLogs: AgentActivityLogStore {
   private var continuations:
     [SessionID: AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>.Continuation] = [:]
   private(set) var requestedPositions: [SessionID: AgentActivityLogPosition?] = [:]
@@ -50,7 +50,7 @@ private actor ScriptedActivityLogs: AgentActivityLogStore {
   }
 }
 
-private actor MemoryActivityStore: AgentActivityStateStore {
+actor MemoryActivityStore: AgentActivityStateStore {
   var stored: [SessionID: PersistedAgentActivity]
 
   init(_ stored: [SessionID: PersistedAgentActivity] = [:]) {
@@ -66,7 +66,7 @@ private actor MemoryActivityStore: AgentActivityStateStore {
   }
 }
 
-private final class TestClock: @unchecked Sendable {
+final class TestClock: @unchecked Sendable {
   private let lock = NSLock()
   private var value: Date
 
@@ -145,7 +145,7 @@ private let t0 = Date(timeIntervalSince1970: 2_000_000)
 
 /// The tracker subscribes to a log on a task of its own: lines written before that are the test's
 /// mistake, not the tracker's.
-private func following(_ logs: ScriptedActivityLogs, _ id: SessionID) async -> Bool {
+func following(_ logs: ScriptedActivityLogs, _ id: SessionID) async -> Bool {
   for _ in 0..<200 {
     if await logs.isFollowing(id) { return true }
     try? await Task.sleep(for: .milliseconds(5))
@@ -153,7 +153,7 @@ private func following(_ logs: ScriptedActivityLogs, _ id: SessionID) async -> B
   return false
 }
 
-private func makeTracker(
+func makeTracker(
   logs: ScriptedActivityLogs, store: MemoryActivityStore, clock: TestClock
 ) -> TrackAgentActivity {
   TrackAgentActivity(
@@ -164,7 +164,7 @@ private func makeTracker(
 }
 
 /// Waits until the tracker reports `predicate`, or fails after a second.
-private func eventually(
+func eventually(
   _ tracker: TrackAgentActivity, _ id: SessionID,
   _ predicate: @Sendable (AgentActivityState?) -> Bool
 ) async -> Bool {

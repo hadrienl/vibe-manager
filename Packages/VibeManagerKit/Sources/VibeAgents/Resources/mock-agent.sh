@@ -18,7 +18,9 @@
 #
 # With VIBE_AGENT_ACTIVITY_LOG set, it reports its activity the way the hooks of a real CLI do
 # (#45): `SessionStart` when it starts, and, while holding, `UserPromptSubmit` then `Stop` for
-# every line typed — or exactly the event a line names, as `event:PermissionRequest`.
+# every line typed — or exactly the event a line names, as `event:PermissionRequest`, with the
+# JSON that follows a space as its payload (#40). An answer typed while holding — `y`, `a`, `n`,
+# `option <n>`, `options <n,m>`, `text <words>` — prints `answer: <line>` and reports `PostToolUse`.
 
 set -eu
 
@@ -29,7 +31,7 @@ export PATH
 
 report() {
   if [ -n "${VIBE_AGENT_ACTIVITY_LOG:-}" ]; then
-    printf '%s\t%s\t\n' "$1" "$(date +%s)" >>"$VIBE_AGENT_ACTIVITY_LOG"
+    printf '%s\t%s\t%s\n' "$1" "$(date +%s)" "${2:-}" >>"$VIBE_AGENT_ACTIVITY_LOG"
   fi
 }
 
@@ -174,7 +176,15 @@ if [ "$hold" -eq 1 ]; then
     count=$((count + 1))
     case "$line" in
       event:*)
-        report "${line#event:}"
+        event="${line#event:}"
+        case "$event" in
+          *" "*) report "${event%% *}" "${event#* }" ;;
+          *) report "$event" ;;
+        esac
+        ;;
+      y | a | n | "option "* | "options "* | "text "*)
+        printf 'answer: %s\n' "$line"
+        report PostToolUse
         ;;
       run:*)
         status=0

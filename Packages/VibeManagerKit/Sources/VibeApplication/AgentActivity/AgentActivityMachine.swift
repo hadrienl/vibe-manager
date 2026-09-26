@@ -23,6 +23,12 @@ public struct AgentActivityState: Hashable, Sendable {
   var lastUserInputAt: Date?
   /// The tool the pending question holds up, when the hooks named it.
   var pendingTool: String?
+  /// What the agent is waiting on, oldest first (#40). The CLIs draw one dialog at a time, in the
+  /// order they asked: the first is the one on screen.
+  public var requests: [AgentRequest] = []
+  /// A tool settled that may, or may not, have been the first request's: which dialog is on
+  /// screen is no longer known, and none is answered from outside until the queue drains.
+  public var isFirstRequestUncertain = false
 
   public init(
     activity: AgentActivity = .idle,
@@ -50,6 +56,8 @@ public enum AgentActivityInput: Hashable, Sendable {
   case output
   /// The user typed this into the session's terminal, in one write.
   case userInput([UInt8])
+  /// Vibe Manager typed the answer to this request into the terminal (#40).
+  case answerSent(AgentRequestID)
   /// Time passed: the deadlines the state is waiting on are checked.
   case tick
 }
@@ -62,11 +70,19 @@ public struct AgentActivityContext: Sendable {
   public let isVisible: Bool
   /// The single keystrokes that answer a permission in this agent's terminal interface.
   public let approvalAnswerKeys: Set<[UInt8]>
+  /// What a request the input brings is known by: its session and the line that carried it.
+  public let requestID: AgentRequestID?
 
-  public init(now: Date, isVisible: Bool, approvalAnswerKeys: Set<[UInt8]> = []) {
+  public init(
+    now: Date,
+    isVisible: Bool,
+    approvalAnswerKeys: Set<[UInt8]> = [],
+    requestID: AgentRequestID? = nil
+  ) {
     self.now = now
     self.isVisible = isVisible
     self.approvalAnswerKeys = approvalAnswerKeys
+    self.requestID = requestID
   }
 }
 
@@ -97,10 +113,12 @@ public enum AgentActivityMachine {
       next.source = structured ? .unconfirmed(since: context.now) : .inferred
       next.lastOutputAt = nil
       next.lastUserInputAt = nil
+      next.clearRequests()
 
     case .processEnded:
       next.activity = .idle
       next.lastOutputAt = nil
+      next.clearRequests()
 
     case .signal(let signal):
       next = apply(signal, to: next, context: context)
@@ -119,13 +137,22 @@ public enum AgentActivityMachine {
       guard next.isStructured else { break }
       switch next.activity {
       case .awaitingUser(.approval) where context.approvalAnswerKeys.contains(bytes):
-        // Provisional: the next thing the agent says confirms it or puts the question back.
-        next.activity = .working
+        // Provisional: the next thing the agent says confirms it or puts the question back. The
+        // key answered the dialog on screen, the first of the queue.
+        if next.requests.isEmpty {
+          next.activity = .working
+        } else {
+          next.settleFirstRequest()
+        }
       case .working where interruptKeys.contains(bytes):
         next.activity = .idle
       case .idle, .working, .awaitingUser:
         break
       }
+
+    case .answerSent(let id):
+      guard next.requests.first?.id == id else { break }
+      next.settleFirstRequest()
 
     case .tick:
       if case .unconfirmed(let since) = next.source,
@@ -160,25 +187,43 @@ public enum AgentActivityMachine {
       // just started waits for its prompt.
       if !state.isStructured { next.activity = .idle }
     case .promptSubmitted(let byUser):
-      next.activity = .working
+      // A background task finishing starts a turn of the main agent while a sub-agent's dialog
+      // is still up (seen in the spike of #40): what waits keeps waiting.
+      next.activity = next.requests.first.map { .awaitingUser($0.kind) } ?? .working
       // Writing to the agent is reading what it said last.
       if byUser { next.unreadSince = nil }
-    case .questionAsked(let kind, let tool):
-      next.activity = .awaitingUser(kind)
+    case .questionAsked(let kind, let tool, let notice):
       next.pendingTool = tool
+      next.enqueue(notice, kind: kind, tool: tool, context: context)
+      next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
     case .questionResolved:
-      next.activity = .working
-    case .toolFinished(let tool):
-      // Sub-agents run tools side by side: one finishing answers nothing another is waiting on.
-      if case .awaitingUser = next.activity, let pending = next.pendingTool, pending != tool {
+      // Nothing says which request was answered. Alone, it was; behind others, the first is taken
+      // as the one, and the dialog on screen is no longer known for sure.
+      if next.requests.count > 1 {
+        next.requests.removeFirst()
+        next.isFirstRequestUncertain = true
+        next.activity = .awaitingUser(next.requests[0].kind)
+      } else {
+        next.clearRequests()
+        next.activity = .working
+      }
+    case .toolFinished(let tool, let agentID, let subject):
+      guard !next.requests.isEmpty else {
+        // Sub-agents run tools side by side: one finishing answers nothing another is waiting on.
+        if case .awaitingUser = next.activity, let pending = next.pendingTool, pending != tool {
+          break
+        }
+        next.activity = .working
         break
       }
-      next.activity = .working
+      next.settle(AgentToolReference(tool: tool, agentID: agentID, subject: subject))
     case .turnEnded:
-      next.activity = .idle
+      // A sub-agent in the background can still be waiting on the user once the main turn ends.
+      next.activity = next.requests.first.map { .awaitingUser($0.kind) } ?? .idle
       if !context.isVisible { next.unreadSince = next.unreadSince ?? context.now }
     case .interrupted, .agentEnded:
       next.activity = .idle
+      next.clearRequests()
     case .waitingForInput:
       if next.activity == .working { next.activity = .idle }
     }
@@ -206,8 +251,74 @@ extension AgentActivityState {
   }
 
   /// Whether a row showing either state would look the same: the instants the fallback counts
-  /// from are nobody's to see.
+  /// from are nobody's to see. The requests are shown by the palette of #40.
   public func showsTheSame(as other: AgentActivityState) -> Bool {
     activity == other.activity && unreadSince == other.unreadSince && source == other.source
+      && requests == other.requests && isFirstRequestUncertain == other.isFirstRequestUncertain
+  }
+
+  // MARK: - Requests (#40)
+
+  mutating func clearRequests() {
+    requests = []
+    isFirstRequestUncertain = false
+  }
+
+  /// Queues what an agent asked. Its dialog drawn, a request already announced by its tool is
+  /// the same one, now shown.
+  mutating func enqueue(
+    _ notice: AgentRequestNotice?,
+    kind: AgentQuestionKind,
+    tool: String?,
+    context: AgentActivityContext
+  ) {
+    let notice =
+      notice
+      ?? AgentRequestNotice(
+        content: kind == .approval ? .unreadable(tool: tool) : .elicitation,
+        reference: AgentToolReference(tool: tool), isShown: false)
+    if let index = requests.firstIndex(where: {
+      !$0.isShown && $0.reference.match(notice.reference) == .same
+    }) {
+      requests[index].isShown = requests[index].isShown || notice.isShown
+      // The dialog's report may be cut short where the tool's was not.
+      if !notice.content.isUnreadable { requests[index].content = notice.content }
+      return
+    }
+    guard let base = context.requestID else { return }
+    let id = notice.key.map { AgentRequestID(sessionID: base.sessionID, key: $0) } ?? base
+    // The same report read twice — a log replayed after an adoption — is one request.
+    guard !requests.contains(where: { $0.id == id }) else { return }
+    requests.append(
+      AgentRequest(
+        id: id, receivedAt: context.now, kind: kind, content: notice.content,
+        reference: notice.reference, isShown: notice.isShown))
+  }
+
+  /// The first request was answered: the next one's dialog takes its place.
+  mutating func settleFirstRequest() {
+    guard !requests.isEmpty else { return }
+    requests.removeFirst()
+    if requests.isEmpty {
+      isFirstRequestUncertain = false
+      activity = .working
+    } else {
+      activity = .awaitingUser(requests[0].kind)
+    }
+  }
+
+  /// A tool ran or was refused. It settles the request it matches; one that might be the first
+  /// without it being sure takes the first away and leaves the next in doubt.
+  mutating func settle(_ reference: AgentToolReference) {
+    if let first = requests.first, first.reference.match(reference) == .same {
+      settleFirstRequest()
+    } else if let index = requests.firstIndex(where: { $0.reference.match(reference) == .same }) {
+      // Settled out of turn: the dialogs are not drawn in the order they were asked after all.
+      requests.remove(at: index)
+      isFirstRequestUncertain = true
+    } else if let first = requests.first, first.reference.match(reference) == .likely {
+      settleFirstRequest()
+      if !requests.isEmpty { isFirstRequestUncertain = true }
+    }
   }
 }

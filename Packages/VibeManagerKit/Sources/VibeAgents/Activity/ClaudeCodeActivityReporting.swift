@@ -27,9 +27,16 @@ public enum ClaudeCodeActivityHooks {
     Hook(event: "Notification", matcher: nil, payload: .keep),
     Hook(event: "Elicitation", matcher: nil, payload: .drop),
     Hook(event: "ElicitationResult", matcher: nil, payload: .drop),
-    Hook(event: "PostToolUse", matcher: nil, payload: .field("tool_name")),
-    Hook(event: "PostToolUseFailure", matcher: nil, payload: .field("tool_name")),
-    Hook(event: "PermissionDenied", matcher: nil, payload: .field("tool_name")),
+    // Which agent ran which tool on what: the request of #40 it settles, among several waiting.
+    Hook(
+      event: "PostToolUse", matcher: nil,
+      payload: .fields(AgentRequestReading.resolutionFields)),
+    Hook(
+      event: "PostToolUseFailure", matcher: nil,
+      payload: .fields(AgentRequestReading.resolutionFields)),
+    Hook(
+      event: "PermissionDenied", matcher: nil,
+      payload: .fields(AgentRequestReading.resolutionFields)),
     Hook(event: "Stop", matcher: nil, payload: .drop),
     Hook(event: "StopFailure", matcher: nil, payload: .drop),
     Hook(event: "SessionEnd", matcher: nil, payload: .drop),
@@ -64,6 +71,10 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
   /// ask again", "3. No".
   public let approvalAnswerKeys: Set<[UInt8]> = Set([[0x0D]] + (0x31...0x39).map { [$0] })
 
+  public var answerKeymap: (any AgentAnswerKeymap)? {
+    ClaudeCodeAnswerKeymap()
+  }
+
   private let makeInterruptionWatch: @Sendable (URL) -> AsyncStream<AgentSignal>
 
   public init(
@@ -85,12 +96,16 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       // `AskUserQuestion` also asks for permission to run: it is still a question. Any other
       // permission is an approval, even one whose tool cannot be read — the payload is cut short
       // past its byte limit, and a large `Write` leaves no JSON to read it from.
-      let tool = event.string("tool_name")
+      let reference = AgentRequestReading.reference(of: event)
+      let tool = event.string("tool_name") ?? reference.tool
+      // `PreToolUse` comes before the dialog is drawn, `PermissionRequest` once it is (#40).
+      let notice = event.requestNotice(isShown: event.name == "PermissionRequest")
       switch tool {
-      case "AskUserQuestion": return .questionAsked(.question, tool: tool)
-      case "ExitPlanMode": return .questionAsked(.approval, tool: tool)
+      case "AskUserQuestion": return .questionAsked(.question, tool: tool, notice: notice)
+      case "ExitPlanMode": return .questionAsked(.approval, tool: tool, notice: notice)
       default:
-        return event.name == "PermissionRequest" ? .questionAsked(.approval, tool: tool) : nil
+        return event.name == "PermissionRequest"
+          ? .questionAsked(.approval, tool: tool, notice: notice) : nil
       }
     case "Notification":
       // Only the idle reminder is read. `permission_prompt` and `elicitation_dialog` repeat what
@@ -98,11 +113,16 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       // answered — putting back a question that is gone.
       return event.string("notification_type") == "idle_prompt" ? .waitingForInput : nil
     case "Elicitation":
-      return .questionAsked(.question)
+      return .questionAsked(
+        .question,
+        notice: AgentRequestNotice(
+          content: .elicitation, reference: AgentToolReference(tool: nil), isShown: true))
     case "ElicitationResult":
       return .questionResolved
     case "PostToolUse", "PostToolUseFailure", "PermissionDenied":
-      return event.string("tool_name").map(AgentSignal.toolFinished) ?? .questionResolved
+      let reference = AgentRequestReading.reference(of: event)
+      guard let tool = reference.tool else { return .questionResolved }
+      return .toolFinished(tool, agentID: reference.agentID, subject: reference.subject)
     case "Stop", "StopFailure":
       return .turnEnded
     case "SessionEnd":
@@ -142,34 +162,11 @@ public struct ClaudeCodeInterruptionWatch: Sendable {
 
   /// Interruptions written from now on; what the transcript already holds belongs to the past.
   public func signals() -> AsyncStream<AgentSignal> {
-    let transcript = transcript
-    let pollInterval = pollInterval
+    let lines = AppendedLines(file: transcript, start: .end, pollInterval: pollInterval).lines()
     return AsyncStream { continuation in
       let task = Task {
-        var offset = Self.size(of: transcript)
-        var pending = Data()
-        while !Task.isCancelled {
-          if let handle = try? FileHandle(forReadingFrom: transcript) {
-            defer { try? handle.close() }
-            let size = Self.size(of: transcript)
-            // Smaller than what was read: the file was replaced, and is read again from the start.
-            if size < offset {
-              offset = 0
-              pending = Data()
-            }
-            if size > offset, (try? handle.seek(toOffset: offset)) != nil,
-              let data = try? handle.read(upToCount: Int(size - offset))
-            {
-              offset += UInt64(data.count)
-              pending.append(data)
-              while let newline = pending.firstIndex(of: 0x0A) {
-                let line = Data(pending[pending.startIndex..<newline])
-                pending = Data(pending[(newline + 1)...])
-                if Self.isInterruption(line) { continuation.yield(.interrupted) }
-              }
-            }
-          }
-          try? await Task.sleep(for: pollInterval)
+        for await line in lines where Self.isInterruption(line) {
+          continuation.yield(.interrupted)
         }
         continuation.finish()
       }
@@ -192,10 +189,6 @@ public struct ClaudeCodeInterruptionWatch: Sendable {
     }
   }
 
-  private static func size(of url: URL) -> UInt64 {
-    let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-    return (attributes?[.size] as? NSNumber)?.uint64Value ?? 0
-  }
 }
 
 extension ClaudeCodeAgentProvider: AgentActivityReporting {
