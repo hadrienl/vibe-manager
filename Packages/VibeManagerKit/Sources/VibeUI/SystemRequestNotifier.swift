@@ -24,7 +24,11 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
 
   private let center: UNUserNotificationCenter
   private weak var model: AppModel?
+  /// The system's question, while it is on screen: posts waiting on it share its answer.
   private var authorization: Task<Bool, Never>?
+  /// The notifications posted and not taken away since. One taken away while it was still on its
+  /// way — its request answered while the system asked about notifications — must not arrive.
+  private var wanted: Set<String> = []
 
   public init(model: AppModel, center: UNUserNotificationCenter = .current()) {
     self.model = model
@@ -62,8 +66,10 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   }
 
   public func post(_ notification: RequestNotification) {
+    let identifier = Self.identifier(of: notification.id)
+    wanted.insert(identifier)
     Task {
-      guard await authorized() else { return }
+      guard await authorized(), wanted.contains(identifier) else { return }
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
@@ -78,13 +84,17 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
         Self.requestKey: notification.id.key,
       ]
       try? await center.add(
-        UNNotificationRequest(
-          identifier: Self.identifier(of: notification.id), content: content, trigger: nil))
+        UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+      // Taken away while it was being added.
+      if !wanted.contains(identifier) {
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
+      }
     }
   }
 
   public func remove(_ ids: [AgentRequestID]) {
     let identifiers = ids.map(Self.identifier(of:))
+    wanted.subtract(identifiers)
     center.removeDeliveredNotifications(withIdentifiers: identifiers)
     center.removePendingNotificationRequests(withIdentifiers: identifiers)
   }
@@ -101,15 +111,23 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     }
   }
 
-  /// Asked once, with the first notification.
+  /// What the system allows now: notifications turned on in System Settings after a refusal
+  /// count from the next request, without a relaunch. The question itself is asked once.
   private func authorized() async -> Bool {
+    switch await center.notificationSettings().authorizationStatus {
+    case .denied: return false
+    case .notDetermined: break
+    default: return true
+    }
     if let authorization { return await authorization.value }
     let center = center
     let task = Task {
       (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
     authorization = task
-    return await task.value
+    let granted = await task.value
+    authorization = nil
+    return granted
   }
 
   static func identifier(of id: AgentRequestID) -> String {

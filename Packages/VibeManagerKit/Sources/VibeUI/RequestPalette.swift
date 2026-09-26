@@ -11,6 +11,8 @@ struct RequestPalette: View {
   /// The most height it takes, scrolling past it.
   let maxHeight: CGFloat
   @FocusState private var focusedRequest: AgentRequestID?
+  /// ⌥⌘P was pressed, and no card has taken the keyboard yet: the palette may still be unfolding.
+  @State private var wantsFocus = false
   @Namespace private var rotor
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -26,6 +28,24 @@ struct RequestPalette: View {
       }
     }
     .animation(reduceMotion ? nil : .snappy, value: requests.map(\.id))
+    .onChange(of: model.requestPaletteFocusRequest) {
+      wantsFocus = true
+      takeFocus(model.pendingRequests)
+      // Folded until now, its cards are only there once it has unfolded.
+      Task { @MainActor in
+        try? await Task.sleep(for: .milliseconds(50))
+        takeFocus(model.pendingRequests)
+      }
+    }
+  }
+
+  /// Gives the keyboard to the request a notification was clicked for, or to the oldest.
+  private func takeFocus(_ requests: [PendingRequest]) {
+    guard wantsFocus, !model.isRequestPaletteCollapsed, !requests.isEmpty else { return }
+    let revealed = model.consumeRevealedRequest()
+    let target = requests.first { $0.id == revealed } ?? requests[0]
+    wantsFocus = false
+    focusedRequest = target.id
   }
 
   private func collapsed(count: Int) -> some View {
@@ -87,9 +107,7 @@ struct RequestPalette: View {
       model.focusTerminal()
       return .handled
     }
-    .onChange(of: model.requestPaletteFocusRequest) {
-      focusedRequest = model.revealedRequestID ?? requests.first?.id
-    }
+    .onAppear { takeFocus(requests) }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(
       Text(
@@ -611,6 +629,5 @@ struct RequestPaletteToolbarButton: View {
         .frame(width: 340)
         .onAppear { model.setRequestPaletteCollapsed(false) }
     }
-    .onChange(of: model.requestPaletteFocusRequest) { isShowingPalette = true }
   }
 }

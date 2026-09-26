@@ -106,10 +106,22 @@ extension AppModel {
   static func announcement(
     of answer: AgentAnswer, outcome: AnswerAgentRequest.Outcome, sessionName: String
   ) -> LocalizedStringResource {
-    guard outcome == .sent else {
+    switch outcome {
+    case .sent:
+      break
+    case .requestGone, .notAnswerable:
       return LocalizedStringResource(
         "The request of \(sessionName) was no longer waiting: nothing was sent.", bundle: .module,
         comment: "Said when an answer from the palette could not be typed into its session.")
+    case .interrupted:
+      return LocalizedStringResource(
+        "The request of \(sessionName) changed while its answer was being typed: finish it in the session.",
+        bundle: .module,
+        comment: "Said when an answer from the palette was typed only in part into its session.")
+    case .terminalUnavailable:
+      return LocalizedStringResource(
+        "\(sessionName) is no longer running: nothing was sent.", bundle: .module,
+        comment: "Said when an answer from the palette found its session stopped.")
     }
     switch answer {
     case .allowOnce, .allowAlways, .approvePlan:
@@ -150,6 +162,12 @@ extension AppModel {
   public func revealRequest(_ id: AgentRequestID) {
     revealedRequestID = id
     focusRequestPalette()
+  }
+
+  /// The request a notification asked to show, once: a later ⌥⌘P goes to the oldest again.
+  func consumeRevealedRequest() -> AgentRequestID? {
+    defer { revealedRequestID = nil }
+    return revealedRequestID
   }
 
   // MARK: - Signalling

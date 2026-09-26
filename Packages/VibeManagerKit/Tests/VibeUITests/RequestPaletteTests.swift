@@ -241,6 +241,17 @@ struct RequestPaletteTests {
     #expect(!model.isRequestPaletteCollapsed)
   }
 
+  @Test("A clicked notification's request is shown once, and ⌥⌘P goes to the oldest again")
+  func revealed() async {
+    let first = session("First")
+    let model = await makeModel([first])
+    model.select(nil)
+    let id = ask("ls", in: first, at: 10, model: model)
+    model.revealRequest(id)
+    #expect(model.consumeRevealedRequest() == id)
+    #expect(model.consumeRevealedRequest() == nil)
+  }
+
   @Test("⌥⌘P unfolds the palette and asks it to take the keyboard")
   func focus() async {
     let model = await makeModel([session("First")])

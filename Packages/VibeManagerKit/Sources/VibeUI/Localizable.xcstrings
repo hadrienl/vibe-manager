@@ -216,6 +216,17 @@
         }
       }
     },
+    "%@ is no longer running: nothing was sent." : {
+      "comment" : "Said when an answer from the palette found its session stopped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » ne tourne plus : rien n’a été envoyé."
+          }
+        }
+      }
+    },
     "%@ is not a field — names use letters, digits, - and _ — so it stays as text." : {
       "comment" : "What the user wrote between double braces.",
       "localizations" : {
@@ -8397,6 +8408,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le fournisseur %@ n’est pas inclus dans cette version."
+          }
+        }
+      }
+    },
+    "The request of %@ changed while its answer was being typed: finish it in the session." : {
+      "comment" : "Said when an answer from the palette was typed only in part into its session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande de « %@ » a changé pendant la saisie de sa réponse : terminez-la dans la session."
           }
         }
       }

@@ -12,7 +12,8 @@ enum RequestPayloads {
   static let subAgentBash =
     #"{"session_id":"s","prompt_id":"p","permission_mode":"default","agent_id":"a89e4f8137e913354","agent_type":"general-purpose","hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"touch a.txt","description":"Create empty file a.txt"},"permission_suggestions":[{"type":"addDirectories","directories":["/Users/a/dev"],"destination":"session"}]}"#
   /// What the hook of a finishing tool keeps of it (`Payload.fields`).
-  static let subAgentDone = #"{"agent_id":"a89e4f8137e913354","tool_name":"Bash","command":"touch a.txt"}"#
+  static let subAgentDone =
+    #"{"agent_id":"a89e4f8137e913354","tool_name":"Bash","command":"touch a.txt"}"#
   static let question =
     #"{"session_id":"s","cwd":"/Users/a/dev","hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Tea or coffee?","header":"Beverage","options":[{"label":"Tea","description":"Hot or cold tea"},{"label":"Coffee","description":"Your daily brew"}],"multiSelect":false}]},"tool_use_id":"toolu_1"}"#
   static let twoQuestions =
@@ -64,7 +65,8 @@ struct AgentRequestReadingTests {
     #expect(permission.isComplete)
     #expect(
       permission.alwaysAllow
-        == AgentAlwaysAllow(rules: [.directories(["/Users/a/dev"]), .mode("acceptEdits")], scope: .session))
+        == AgentAlwaysAllow(
+          rules: [.directories(["/Users/a/dev"]), .mode("acceptEdits")], scope: .session))
     #expect(notice.reference == AgentToolReference(tool: "Bash", subject: "touch hello.txt"))
   }
 
@@ -76,7 +78,10 @@ struct AgentRequestReadingTests {
     let done = claude.signal(for: event("PostToolUse", RequestPayloads.subAgentDone))
     #expect(
       done == .toolFinished("Bash", agentID: "a89e4f8137e913354", subject: "touch a.txt"))
-    #expect(asked.reference.match(AgentToolReference(tool: "Bash", agentID: "a89e4f8137e913354", subject: "touch a.txt")) == .same)
+    #expect(
+      asked.reference.match(
+        AgentToolReference(tool: "Bash", agentID: "a89e4f8137e913354", subject: "touch a.txt"))
+        == .same)
   }
 
   @Test("A question is announced before its dialog is drawn, with its options")
@@ -109,7 +114,8 @@ struct AgentRequestReadingTests {
   func others() throws {
     let plan = try #require(
       notice(of: claude.signal(for: event("PermissionRequest", RequestPayloads.plan))))
-    #expect(plan.content == .plan(excerpt: "## Plan\n- Create plan.txt with Write.", isComplete: true))
+    #expect(
+      plan.content == .plan(excerpt: "## Plan\n- Create plan.txt with Write.", isComplete: true))
 
     let mcp = try #require(
       notice(of: claude.signal(for: event("PermissionRequest", RequestPayloads.mcp))))
@@ -220,14 +226,30 @@ struct CodexQuestionWatchTests {
     try Data(#"{"type":"session_meta","payload":{"cwd":"/elsewhere"}}"#.utf8).write(to: other)
     let rollout = folder.appendingPathComponent("rollout-mine.jsonl")
     let meta = #"{"type":"session_meta","payload":{"cwd":"\#(work)"}}"# + "\n"
-    try Data((meta + RequestPayloads.codexQuestionCall + "\n").utf8).write(to: rollout)
+    // One question answered long ago, one still waiting: only the second is said.
+    let waiting = RequestPayloads.codexQuestionCall.replacingOccurrences(
+      of: "call_1", with: "call_3")
+    let history = [
+      meta, RequestPayloads.codexQuestionCall, RequestPayloads.codexQuestionOutput, waiting,
+    ].joined(separator: "\n")
+    try Data((history + "\n").utf8).write(to: rollout)
 
     let watch = CodexQuestionWatch(
       sessionsDirectory: sessions, workingDirectoryPath: work, since: since,
       pollInterval: .milliseconds(20), discoveryTimeout: .seconds(2))
     var iterator = watch.signals().makeAsyncIterator()
     let first = await iterator.next()
-    #expect(notice(of: first)?.key == "codex:call_1")
+    #expect(notice(of: first)?.key == "codex:call_3")
+
+    // Then what the session writes next, as it comes.
+    let handle = try FileHandle(forWritingTo: rollout)
+    try handle.seekToEnd()
+    try handle.write(
+      contentsOf: Data(
+        (RequestPayloads.codexQuestionOutput.replacingOccurrences(
+          of: "call_1", with: "call_3") + "\n").utf8))
+    try handle.close()
+    #expect(await iterator.next() == .toolFinished("request_user_input", subject: "call_3"))
   }
 }
 

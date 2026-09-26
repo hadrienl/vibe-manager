@@ -8,6 +8,8 @@ struct AppendedLines: Sendable {
     /// What the file holds already belongs to the past.
     case end
     case beginning
+    /// From this offset, what was before having been read otherwise.
+    case offset(UInt64)
   }
 
   let file: URL
@@ -20,7 +22,12 @@ struct AppendedLines: Sendable {
     let pollInterval = pollInterval
     return AsyncStream { continuation in
       let task = Task {
-        var offset = start == .end ? Self.size(of: file) : 0
+        var offset: UInt64
+        switch start {
+        case .end: offset = Self.size(of: file)
+        case .beginning: offset = 0
+        case .offset(let value): offset = value
+        }
         var pending = Data()
         while !Task.isCancelled {
           if let handle = try? FileHandle(forReadingFrom: file) {
@@ -100,9 +107,13 @@ public struct CodexQuestionWatch: Sendable {
           continuation.finish()
           return
         }
-        var pending: Set<String> = []
+        // What the rollout holds already is the past: only the questions still unanswered in it
+        // are said, once — not every question the session ever asked, answered long ago.
+        let (unanswered, waiting, offset) = Self.unanswered(in: rollout)
+        var pending = unanswered
+        for signal in waiting { continuation.yield(signal) }
         let lines = AppendedLines(
-          file: rollout, start: .beginning, pollInterval: watch.pollInterval
+          file: rollout, start: .offset(offset), pollInterval: watch.pollInterval
         ).lines()
         for await line in lines {
           guard !Task.isCancelled else { break }
@@ -112,6 +123,28 @@ public struct CodexQuestionWatch: Sendable {
       }
       continuation.onTermination = { _ in task.cancel() }
     }
+  }
+
+  /// The questions the rollout holds that no output has answered yet, and where its whole lines
+  /// end: what follows is followed as it comes.
+  static func unanswered(in rollout: URL) -> (Set<String>, [AgentSignal], UInt64) {
+    guard let data = try? Data(contentsOf: rollout),
+      let last = data.lastIndex(of: 0x0A)
+    else { return ([], [], 0) }
+    var pending: Set<String> = []
+    var asked: [String: AgentSignal] = [:]
+    var order: [String] = []
+    for line in data[data.startIndex..<last].split(separator: 0x0A) {
+      for signal in signals(in: Data(line), pending: &pending) {
+        guard case .questionAsked(_, _, let notice) = signal,
+          let key = notice?.reference.subject
+        else { continue }
+        asked[key] = signal
+        order.append(key)
+      }
+    }
+    let waiting = order.filter(pending.contains).compactMap { asked[$0] }
+    return (pending, waiting, UInt64(last - data.startIndex + 1))
   }
 
   /// What one line of a rollout says about questions: one asked, or one of those answered.
