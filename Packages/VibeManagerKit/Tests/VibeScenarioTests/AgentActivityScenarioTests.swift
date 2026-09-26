@@ -23,6 +23,9 @@ struct AgentActivityScenarioTests {
     let first = try await scenario.create(in: environment, name: "First", folder: folder)
     let second = try await scenario.create(in: environment, name: "Second", folder: folder)
     model.select(second)
+    // What the window shows reaches the tracker on its own time: a turn that ends before would
+    // be taken as seen.
+    await model.visibleSessionUpdate?.value
     #expect(await eventually { model.activity(for: first)?.source == .structured })
 
     // A turn of the first session, while the second is on screen.
@@ -54,6 +57,7 @@ struct AgentActivityScenarioTests {
 
     // Unread again, then quit: the mark is on disk for the next launch.
     model.select(second)
+    await model.visibleSessionUpdate?.value
     await scenario.type("later\r", into: first, in: environment)
     #expect(await eventually { model.activity(for: first)?.unreadSince != nil })
     await environment.shutdown(keepingAgentsRunning: false)

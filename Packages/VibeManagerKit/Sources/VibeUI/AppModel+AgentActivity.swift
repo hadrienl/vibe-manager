@@ -44,7 +44,11 @@ extension AppModel {
   func updateVisibleSession() {
     guard let activityTracker else { return }
     let visible = isApplicationActive && isMainWindowVisible ? selectedSessionID : nil
-    Task { await activityTracker.setVisibleSession(visible) }
+    let previous = visibleSessionUpdate
+    visibleSessionUpdate = Task {
+      await previous?.value
+      await activityTracker.setVisibleSession(visible)
+    }
   }
 
   // MARK: - Consent
