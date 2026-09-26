@@ -13,6 +13,26 @@ public final class AccessibleTerminalView: TerminalView {
   /// "Terminal — <session> — <agent state>", set by the surface.
   public var accessibilityTitle = String(localized: "Terminal", bundle: .module)
 
+  /// The menu whose shortcuts come before the terminal's: the application's own, but in tests.
+  var menuProvider: () -> NSMenu? = { NSApp?.mainMenu }
+
+  /// A ⌘ shortcut of the menu belongs to the application, never to the agent (#65). The menu runs
+  /// it here, before SwiftTerm sees the key, and a disabled item beeps and swallows it: past this
+  /// point the key reaches `keyDown`, which under the kitty keyboard protocol that Claude Code and
+  /// Codex turn on can encode it for the agent. ⌘C, ⌘V and ⌘A are items of the Edit menu without a
+  /// target, which the menu sends to the first responder, this view, as it always did. The ⌘ keys
+  /// the menu does not have, ⌥⌘O among them, stay SwiftTerm's.
+  public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    guard window?.firstResponder === self, event.type == .keyDown,
+      event.modifierFlags.contains(.command), let menu = menuProvider(),
+      MenuKeyEquivalents.declares(event, in: menu)
+    else { return super.performKeyEquivalent(with: event) }
+    if !menu.performKeyEquivalent(with: event) {
+      NSSound.beep()
+    }
+    return true
+  }
+
   public override func isAccessibilityElement() -> Bool { true }
 
   public override func accessibilityRole() -> NSAccessibility.Role? { .textArea }
@@ -40,6 +60,34 @@ public final class AccessibleTerminalView: TerminalView {
 }
 
 /// Text out of a terminal, for people rather than for a terminal.
+/// Whether a key event is the shortcut of an item of a menu, enabled or not.
+enum MenuKeyEquivalents {
+  private static let modifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
+
+  static func declares(_ event: NSEvent, in menu: NSMenu) -> Bool {
+    guard let key = event.charactersIgnoringModifiers?.lowercased(), !key.isEmpty else {
+      return false
+    }
+    return contains(key: key, modifiers: event.modifierFlags.intersection(modifiers), in: menu)
+  }
+
+  private static func contains(
+    key: String, modifiers flags: NSEvent.ModifierFlags, in menu: NSMenu
+  ) -> Bool {
+    menu.items.contains { item in
+      if let submenu = item.submenu, contains(key: key, modifiers: flags, in: submenu) {
+        return true
+      }
+      guard !item.keyEquivalent.isEmpty else { return false }
+      // An upper-case equivalent means Shift, whether or not the mask says so.
+      var mask = item.keyEquivalentModifierMask.intersection(modifiers)
+      let equivalent = item.keyEquivalent.lowercased()
+      if equivalent != item.keyEquivalent { mask.insert(.shift) }
+      return equivalent == key && mask == flags
+    }
+  }
+}
+
 public enum TerminalText {
   /// The screen's lines, trailing blanks and trailing empty lines removed.
   public static func visibleScreen(of terminal: Terminal) -> String {
