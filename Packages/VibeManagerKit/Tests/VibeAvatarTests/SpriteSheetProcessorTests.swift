@@ -15,6 +15,7 @@ func fixture(_ name: String) throws -> Data {
 /// ellipse of `size` in a square cell of `cell` pixels.
 func drawnSheet(
   columns: Int, rows: Int, cell: Int = 300, background: (UInt8, UInt8, UInt8) = (255, 0, 255),
+  transparent: Bool = false, ink: (UInt8, UInt8, UInt8) = (40, 120, 220),
   size: (Int) -> Int = { _ in 180 }, offset: (Int) -> (Int, Int) = { _ in (0, 0) }
 ) throws -> Data {
   var image = RGBAImage(width: columns * cell, height: rows * cell)
@@ -22,7 +23,7 @@ func drawnSheet(
     image.pixels[index] = background.0
     image.pixels[index + 1] = background.1
     image.pixels[index + 2] = background.2
-    image.pixels[index + 3] = 255
+    image.pixels[index + 3] = transparent ? 0 : 255
   }
   for index in 0..<(columns * rows) {
     let side = size(index)
@@ -37,9 +38,10 @@ func drawnSheet(
         let ny = Double(y - centreY) / Double(side / 2)
         guard nx * nx + ny * ny <= 1 else { continue }
         let offset = image.offset(x, y)
-        image.pixels[offset] = 40
-        image.pixels[offset + 1] = 120
-        image.pixels[offset + 2] = 220
+        image.pixels[offset] = ink.0
+        image.pixels[offset + 1] = ink.1
+        image.pixels[offset + 2] = ink.2
+        image.pixels[offset + 3] = 255
       }
     }
   }
@@ -82,6 +84,17 @@ struct SpriteSheetProcessorTests {
       #expect(abs(box.x - boxes[0].x) <= 2 && abs(box.y - boxes[0].y) <= 2)
       #expect(abs(box.height - boxes[0].height) <= 2)
     }
+  }
+
+  @Test("A sheet already transparent keeps its dark lines: nothing is keyed out of it")
+  func alreadyTransparent() throws {
+    let sprites = try SpriteSheetProcessor.sprites(
+      fromSheet: try drawnSheet(columns: 5, rows: 2, transparent: true, ink: (0, 0, 0)),
+      expressions: AvatarExpression.allCases)
+    let neutral = try ImageCodec.decode(try #require(sprites[.neutral]))
+    let centre = neutral.offset(neutral.width / 2, neutral.height / 2)
+    #expect(neutral.pixels[centre + 3] == 255)
+    #expect(neutral.pixels[centre] < 10)
   }
 
   @Test("A sheet of the wrong proportions is refused, saying what was found")

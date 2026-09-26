@@ -32,9 +32,17 @@ enum SpriteSheetProcessor {
     guard cellWidth >= minimumCell, cellHeight >= minimumCell else {
       throw AvatarProblem.cellTooSmall
     }
-    // Keyed as a whole when its border is flat: every cell then loses exactly the same colour.
-    let keyedSheet: RGBAImage? = BackgroundRemoval.flatBorderColour(of: sheet).map {
-      BackgroundRemoval.keyed(sheet, background: $0)
+    // Already transparent — a generator may remove the background itself — it is kept as it is.
+    // Otherwise keyed as a whole when its border is flat: every cell loses the same colour.
+    let keyedSheet: RGBAImage?
+    if BackgroundRemoval.transparentShare(ofBorderOf: sheet)
+      >= BackgroundRemoval.transparentBorderShare
+    {
+      keyedSheet = sheet
+    } else {
+      keyedSheet = BackgroundRemoval.flatBorderColour(of: sheet).map {
+        BackgroundRemoval.keyed(sheet, background: $0)
+      }
     }
     var cells: [(AvatarExpression, RGBAImage, SpriteCellMeasurement)] = []
     for (index, expression) in expressions.enumerated() {
