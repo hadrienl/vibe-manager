@@ -185,6 +185,12 @@ struct FoldedText: Sendable {
     bytes = Array(Folding.fold(text).utf8)
   }
 
+  /// Bytes already folded, with no text to show.
+  init(folded bytes: [UInt8]) {
+    text = ""
+    self.bytes = bytes
+  }
+
   func contains(_ needle: [UInt8]) -> Bool {
     guard !needle.isEmpty else { return true }
     guard needle.count <= bytes.count else { return false }
@@ -281,7 +287,7 @@ struct IndexedFolder: Sendable {
   let folded: FoldedText
 }
 
-struct IndexedSession: Sendable {
+final class IndexedSession: Sendable {
   let id: SessionID
   let title: FoldedText
   let isArchived: Bool
@@ -290,6 +296,14 @@ struct IndexedSession: Sendable {
   let folders: [IndexedFolder]
   let entries: [FoldedText]
   let notes: FoldedText?
+  /// Every text above, folded, one after the other: a word absent from it rules the session out
+  /// in one pass, without looking at each field.
+  let everything: FoldedText
+  /// The keys and numbers of its resources, to rule a session out without walking them.
+  let resourceKeys: Set<String>
+  /// The resources' texts together: words absent from it skip them all at once.
+  let resourceText: FoldedText
+  let numbers: Set<Int>
 
   init(
     session: WorkSession, journal: JournalPart?, notes: FoldedText?,
@@ -333,14 +347,30 @@ struct IndexedSession: Sendable {
     }
     self.resources = resources
     self.folders = folders
+    resourceText = FoldedText(
+      folded: Array(resources.map(\.searchable.bytes).joined(separator: [0x0A])))
+    var bytes: [UInt8] = []
+    let fields =
+      [title] + resources.map(\.searchable) + folders.map(\.folded) + entries
+      + (notes.map { [$0] } ?? [])
+    bytes.reserveCapacity(fields.reduce(0) { $0 + $1.bytes.count + 1 })
+    for field in fields {
+      bytes.append(contentsOf: field.bytes)
+      bytes.append(0x0A)
+    }
+    everything = FoldedText(folded: bytes)
+    resourceKeys = Set(resources.compactMap(\.key))
+    numbers = Set(resources.compactMap(\.number))
   }
 
   /// Last worked in first, then by title, then by identifier: a total order, stable from one
   /// keystroke to the next.
   static func byActivity(_ lhs: IndexedSession, _ rhs: IndexedSession) -> Bool {
     if lhs.lastActivity != rhs.lastActivity { return lhs.lastActivity > rhs.lastActivity }
-    let comparison = lhs.title.text.localizedStandardCompare(rhs.title.text)
-    if comparison != .orderedSame { return comparison == .orderedAscending }
+    // Folded bytes rather than a localized comparison: this runs for every result of a keystroke.
+    if lhs.title.bytes != rhs.title.bytes {
+      return lhs.title.bytes.lexicographicallyPrecedes(rhs.title.bytes)
+    }
     return lhs.id.description < rhs.id.description
   }
 }
@@ -409,6 +439,10 @@ struct Matcher {
     for criterion in query.criteria {
       let match: Match?
       switch criterion {
+      case .resourceKey(let key) where !row.resourceKeys.contains(key):
+        match = nil
+      case .number(let number, _, _) where !row.numbers.contains(number):
+        match = nil
       case .resourceKey(let key):
         match = resourceMatch(in: row, rank: .exactResource) { $0.key == key }
       case .number(let number, let sign, let context):
@@ -505,6 +539,8 @@ struct Matcher {
   /// as its weakest word, and said by its strongest.
   private func textMatch(_ words: [String], in row: IndexedSession) -> Match? {
     let needles = words.map { Array($0.utf8) }
+    // Each word is somewhere in the session, or the session does not answer.
+    guard row.everything.containsAll(needles) else { return nil }
     if let match = fieldMatch(needles, words: words, in: row) { return match }
     guard words.count > 1 else { return nil }
     var matches: [Match] = []
@@ -525,7 +561,8 @@ struct Matcher {
     func consider(_ match: Match) {
       if match.isBetter(than: best) { best = match }
     }
-    for (index, resource) in row.resources.enumerated() {
+    let resources = row.resourceText.containsAll(needles) ? row.resources : []
+    for (index, resource) in resources.enumerated() {
       let rank: QuickOpenRank
       if needles.count == 1, resource.kind == .branch || resource.kind == .worktree,
         resource.name.bytes == needles[0]
