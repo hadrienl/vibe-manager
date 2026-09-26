@@ -44,8 +44,12 @@ public final class PermissionsModel {
   private let restartHost: RestartAgentHost?
   private let openURL: @MainActor (URL) -> Void
   private let revealApplication: @MainActor () -> Void
-  /// Set by a trip to System Settings: coming back to the application is when to look again.
-  private var awaitsGrant = false
+  /// Until when coming back to the application is a reason to look again: set by a trip to System
+  /// Settings, and bounded, since each look spawns a process and a user who chose not to turn the
+  /// switch on would otherwise pay for one at every return for the rest of the run.
+  private var awaitsGrantUntil: Date?
+  private let now: @MainActor () -> Date
+  static let grantWatchDuration: TimeInterval = 10 * 60
   private var restartWatch: Task<Void, Never>?
 
   public init(
@@ -55,8 +59,10 @@ public final class PermissionsModel {
     openURL: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
     revealApplication: @escaping @MainActor () -> Void = {
       NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
-    }
+    },
+    now: @escaping @MainActor () -> Date = Date.init
   ) {
+    self.now = now
     self.gate = gate
     self.control = control
     self.restartHost = restartHost
@@ -124,7 +130,7 @@ public final class PermissionsModel {
     if Self.lag(of: current.situation) != Self.lag(of: situation) {
       isRestartNoticeDismissed = false
     }
-    if current.identity == .granted { awaitsGrant = false }
+    if current.identity == .granted { awaitsGrantUntil = nil }
     report = current
     isRestartArmed = await control?.isHostRestartArmed() ?? false
   }
@@ -135,9 +141,11 @@ public final class PermissionsModel {
     await reevaluate(refreshingIdentity: true)
   }
 
-  /// Back in the application. A process born now is asked only after a trip to System Settings
-  /// that this window started: it costs a spawn.
+  /// Back in the application. A process born now is asked only within a while of a trip to System
+  /// Settings that this window started: it costs a spawn.
   public func applicationDidBecomeActive() async {
+    let awaitsGrant = awaitsGrantUntil.map { now() < $0 } ?? false
+    if !awaitsGrant { awaitsGrantUntil = nil }
     await reevaluate(refreshingIdentity: awaitsGrant)
   }
 
@@ -147,7 +155,7 @@ public final class PermissionsModel {
   /// and a user who opens it before the step has ever been shown would otherwise lose the step for
   /// good by clicking there and then changing their mind.
   public func openSystemSettings() {
-    awaitsGrant = true
+    awaitsGrantUntil = now().addingTimeInterval(Self.grantWatchDuration)
     openURL(Self.fullDiskAccessSettingsURL)
   }
 

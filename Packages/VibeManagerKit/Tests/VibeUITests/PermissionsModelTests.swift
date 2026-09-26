@@ -116,6 +116,26 @@ struct PermissionsModelTests {
     #expect(!model.isPresentingStep)
   }
 
+  @Test("Past a while after the trip to System Settings, coming back asks no process any more")
+  func comingBackLaterAsksNothing() async {
+    let current = MutableCurrentProbe()
+    let clock = MutableDate()
+    let model = PermissionsModel(
+      gate: FullDiskAccessGate(
+        probe: StubProbe(status: .notGranted), preferences: SpyPreferences(), current: current),
+      openURL: { _ in }, now: { clock.value })
+    model.openSystemSettings()
+
+    await model.applicationDidBecomeActive()
+    #expect(await current.probes == 1)
+
+    clock.value = clock.value.addingTimeInterval(PermissionsModel.grantWatchDuration + 1)
+    await model.applicationDidBecomeActive()
+    await model.applicationDidBecomeActive()
+
+    #expect(await current.probes == 1)
+  }
+
   @Test("An idle host born before the grant is restarted without a word")
   func idleHostIsRestartedSilently() async {
     let runner = SpyRunner(hostStatus: .notGranted, running: [])
@@ -177,6 +197,11 @@ struct PermissionsModelTests {
       openURL: { opened.urls.append($0) }
     )
   }
+}
+
+@MainActor
+private final class MutableDate {
+  var value = Date(timeIntervalSince1970: 1_790_000_000)
 }
 
 @MainActor
