@@ -128,7 +128,8 @@ struct SessionScenarioTests {
     let resumed = try #require(scenario.stored(id, in: second))
     #expect(resumed.agent?.providerID == "mock")
     #expect(resumed.agent?.resumeIdentifier == "resume-me")
-    #expect(await scenario.output(id, in: second).contains("cwd: \(folder)"))
+    // Printed after the line above: a busy runner reads the output in between.
+    #expect(await eventually { await scenario.output(id, in: second).contains("cwd: \(folder)") })
     await scenario.tearDown()
   }
 
