@@ -141,8 +141,24 @@ else
   fi
 fi
 commit="$(git rev-parse HEAD)"
-ci="$(gh run list --commit "$commit" --workflow CI --json conclusion,status \
-  --jq '[.[] | select(.status == "completed")][0].conclusion' 2>/dev/null || true)"
+# A tag pushed right after a merge finds the CI of that merge still running, or not yet created:
+# wait for the latest run to end rather than fail. Two minutes for it to appear, thirty to end.
+ci_waited=0
+while true; do
+  ci="$(gh run list --commit "$commit" --workflow CI --json conclusion,status \
+    --jq '.[0] | if . == null then "" elif .status == "completed" then .conclusion else "running" end' \
+    2>/dev/null || true)"
+  if [[ "$ci" == "running" ]]; then
+    (( ci_waited < 1800 )) || break
+  elif [[ -z "$ci" ]]; then
+    (( ci_waited < 120 )) || break
+  else
+    break
+  fi
+  (( ci_waited == 0 )) && print "Waiting for the CI of $commit to end"
+  sleep 20
+  (( ci_waited += 20 ))
+done
 [[ "$ci" == "success" ]] || fail "CI is not green on $commit (found: ${ci:-nothing})"
 readonly identity="$(security find-identity -v -p codesigning \
   | sed -n "s/.*\"\(Developer ID Application: .*($team)\)\"/\1/p" | head -1)"
