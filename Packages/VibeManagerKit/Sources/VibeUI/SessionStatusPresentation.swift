@@ -51,7 +51,8 @@ public struct SessionStatusPresentation: Equatable, Sendable {
       "Restoring…", bundle: .module, comment: "A session's state, in the sidebar."),
     symbolName: "arrow.clockwise", severity: .normal, isStarting: true)
 
-  /// Whether the symbol moves: only a working agent's does, and never with Reduce Motion on.
+  /// Whether a spinner stands for the symbol: only a working agent's does, and never with Reduce
+  /// Motion on.
   public var isAnimated: Bool {
     agentActivity == .working
   }
