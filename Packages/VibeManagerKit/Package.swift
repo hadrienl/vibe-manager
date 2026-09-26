@@ -19,6 +19,7 @@ let package = Package(
     .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
     .library(name: "VibeBrowser", targets: ["VibeBrowser"]),
     .library(name: "VibeConversationUI", targets: ["VibeConversationUI"]),
+    .library(name: "VibeAvatar", targets: ["VibeAvatar"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
     .library(name: "VibeComposition", targets: ["VibeComposition"]),
   ],
@@ -84,6 +85,14 @@ let package = Package(
       ],
       resources: [.process("Localizable.xcstrings")]
     ),
+    // The avatar of the floating panel (#41): images decoded with bounds, backgrounds removed,
+    // sheets cut, archives read and written, the avatar kept on disk. ImageIO, Core Graphics and
+    // Vision; no view, and no sentence of its own: its problems are said by VibeUI.
+    .target(
+      name: "VibeAvatar",
+      dependencies: ["VibeApplication", "VibePersistence"],
+      resources: [.copy("Resources/DefaultAvatar.zip")]
+    ),
     .target(
       name: "VibeUI",
       dependencies: [
@@ -95,7 +104,7 @@ let package = Package(
     .target(
       name: "VibeComposition",
       dependencies: [
-        "VibeAgents", "VibeApplication", "VibeBrowser", "VibeDomain", "VibeGit",
+        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeDomain", "VibeGit",
         "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeConversationUI",
         "VibeUI",
       ]
@@ -176,6 +185,11 @@ let package = Package(
       dependencies: [
         "VibeConversationUI", "VibeApplication", "VibeDomain", "VibeLocalizationTesting",
       ]
+    ),
+    .testTarget(
+      name: "VibeAvatarTests",
+      dependencies: ["VibeAvatar", "VibeApplication", "VibePersistence"],
+      resources: [.copy("Fixtures")]
     ),
     .testTarget(
       name: "VibeUITests",
