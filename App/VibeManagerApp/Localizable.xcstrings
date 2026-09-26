@@ -466,6 +466,16 @@
         }
       }
     },
+    "Open Quickly…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir rapidement…"
+          }
+        }
+      }
+    },
     "Previous Column" : {
       "localizations" : {
         "fr" : {

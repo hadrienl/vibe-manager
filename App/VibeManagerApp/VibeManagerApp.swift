@@ -71,6 +71,19 @@ struct VibeManagerApp: App {
         .disabled(windowFocus.front == .none || windowFocus.front == .sheet)
       }
 
+      // Open Quickly (#37), where Print was: there is nothing to print in the application. From
+      // Settings or Usage it brings the workspace forward first; over a sheet it does nothing.
+      CommandGroup(replacing: .printItem) {
+        Button("Open Quickly…") {
+          if windowFocus.front != .workspace { windowFocus.showWorkspace() }
+          environment.appModel.presentQuickOpen()
+        }
+        .keyboardShortcut("p", modifiers: .command)
+        .disabled(
+          windowFocus.front == .sheet || !windowFocus.hasWorkspace
+            || !environment.appModel.isLoaded)
+      }
+
       // In the menus rather than bound to the views: a shortcut that only works while a
       // particular view holds focus is a shortcut nobody can rely on, and the menu is also
       // where VoiceOver and the keyboard-only user find these actions at all.

@@ -121,7 +121,7 @@ struct WorkspaceSelectionTests {
 }
 
 /// A store that simply hands back what it was built with, ordered as the repository contract asks.
-private actor StubRepository: SessionRepository {
+actor StubRepository: SessionRepository {
   private var stored: [WorkSession]
 
   init(sessions: [WorkSession]) {

@@ -1339,6 +1339,17 @@
         }
       }
     },
+    "%lld of %lld" : {
+      "comment" : "A result's position in Open Quickly, then how many there are.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld"
+          }
+        }
+      }
+    },
     "%lld older actions" : {
       "comment" : "Stands for journal entries folded away; a count.",
       "localizations" : {
@@ -1483,6 +1494,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld problèmes à corriger"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld results" : {
+      "comment" : "Said by VoiceOver: how many sessions Open Quickly found.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld result"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld results"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résultats"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résultat"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résultats"
                 }
               }
             }
@@ -2406,7 +2464,7 @@
       }
     },
     "Archived" : {
-      "comment" : "A session's state in the sidebar; also labels the date it took that state.\nA task status: the session is archived.",
+      "comment" : "A session's state in the sidebar; also labels the date it took that state.\nA task status: the session is archived.\nA tag on a session of Open Quickly that is archived.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3573,6 +3631,17 @@
         }
       }
     },
+    "Folder %@" : {
+      "comment" : "Why a session is listed in Open Quickly: a folder's path.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossier %@"
+          }
+        }
+      }
+    },
     "Folder not found" : {
       "comment" : "The working folder of a group has been moved or deleted.",
       "localizations" : {
@@ -4579,6 +4648,17 @@
         }
       }
     },
+    "No results" : {
+      "comment" : "Said by VoiceOver when Open Quickly finds nothing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résultat"
+          }
+        }
+      }
+    },
     "No session in %@ matches this filter." : {
       "comment" : "A task status, the name of a column of the sidebar.",
       "localizations" : {
@@ -4590,12 +4670,34 @@
         }
       }
     },
+    "No session matches “%@”." : {
+      "comment" : "Open Quickly found nothing for what was typed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune session ne correspond à « %@ »."
+          }
+        }
+      }
+    },
     "No session selected" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune session sélectionnée"
+          }
+        }
+      }
+    },
+    "No session used %@." : {
+      "comment" : "Open Quickly understood a ticket or request URL: its short name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune session n’a utilisé %@."
           }
         }
       }
@@ -4938,6 +5040,17 @@
         }
       }
     },
+    "Notes: %@" : {
+      "comment" : "Why a session is listed in Open Quickly: a piece of its notes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes : %@"
+          }
+        }
+      }
+    },
     "Nothing done yet. Swipe a session to move it here." : {
       "localizations" : {
         "fr" : {
@@ -5144,6 +5257,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir les réglages de confidentialité"
+          }
+        }
+      }
+    },
+    "Open Quickly" : {
+      "comment" : "The name of the palette that finds a session, for VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir rapidement"
           }
         }
       }
@@ -5428,6 +5552,17 @@
         }
       }
     },
+    "Reading journals… (%lld of %lld)" : {
+      "comment" : "Open Quickly is still reading the sessions' journals at launch.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture des journaux… (%1$lld sur %2$lld)"
+          }
+        }
+      }
+    },
     "Reading the repositories…" : {
       "localizations" : {
         "fr" : {
@@ -5495,6 +5630,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rebase en cours"
+          }
+        }
+      }
+    },
+    "Recent" : {
+      "comment" : "The header of the latest sessions in Open Quickly.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récentes"
           }
         }
       }
@@ -6701,6 +6847,17 @@
         }
       }
     },
+    "Summary: %@" : {
+      "comment" : "Why a session is listed in Open Quickly: a piece of its summary.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumé : %@"
+          }
+        }
+      }
+    },
     "Switch" : {
       "comment" : "Button of the Switch Agent sheet.",
       "localizations" : {
@@ -7546,6 +7703,28 @@
         }
       }
     },
+    "Ticket, pull or merge request URL, branch, folder or title" : {
+      "comment" : "The placeholder of Open Quickly's field.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ticket, URL de pull ou merge request, branche, dossier ou titre"
+          }
+        }
+      }
+    },
+    "Title" : {
+      "comment" : "Why a session is listed in Open Quickly: its title matches.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre"
+          }
+        }
+      }
+    },
     "To Do" : {
       "comment" : "A task status: the session is planned, not started.",
       "localizations" : {
@@ -7783,6 +7962,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transforme le prompt en texte libre. La session ne fera plus référence au modèle."
+          }
+        }
+      }
+    },
+    "Type a ticket (#36, owner/repo#36), a pull or merge request URL, a branch, a folder or a title." : {
+      "comment" : "The help of Open Quickly. Keep the examples as they are.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tapez un ticket (#36, owner/repo#36), l’URL d’une pull ou merge request, une branche, un dossier ou un titre."
           }
         }
       }
