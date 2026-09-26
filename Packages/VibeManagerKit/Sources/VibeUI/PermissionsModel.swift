@@ -38,6 +38,14 @@ public final class PermissionsModel {
   /// Resumes the sessions "Restart Now" stopped, as a clean quit's next launch would. Given by the
   /// workspace, which owns the restoration and its banner.
   var resumeSessions: (@MainActor (SessionRestoreIntent) async -> Void)?
+  /// Whether the workspace is resuming sessions. "Restart Now" waits for it: its own resume would
+  /// call off that queue, and the sessions it had not reached yet would never come back.
+  var isRestoringSessions: (@MainActor () -> Bool)?
+
+  /// Whether "Restart Now" can be asked for now.
+  public var canRestartNow: Bool {
+    !isRestartingNow && !(isRestoringSessions?() ?? false)
+  }
 
   private let gate: FullDiskAccessGate
   private let control: (any AgentRunnerControl)?
@@ -199,7 +207,7 @@ public final class PermissionsModel {
 
   /// Names the sessions "Restart Now" would stop, and waits for the user to confirm.
   public func beginRestartNow(from origin: RestartNowRequest.Origin) async {
-    guard let restartHost else { return }
+    guard let restartHost, canRestartNow else { return }
     let sessions = await restartHost.sessions()
     guard !sessions.isEmpty else { return }
     pendingRestartNow = RestartNowRequest(origin: origin, sessions: sessions)
@@ -212,8 +220,8 @@ public final class PermissionsModel {
   /// Stops the agents named, lets the host go, and resumes them in the next one — which is born
   /// with the access. Only ever on the user's confirmation.
   public func confirmRestartNow(_ request: RestartNowRequest) async {
-    guard let restartHost, !isRestartingNow else { return }
     pendingRestartNow = nil
+    guard let restartHost, canRestartNow else { return }
     isRestartingNow = true
     defer { isRestartingNow = false }
     let intent = await restartHost(request.sessions)

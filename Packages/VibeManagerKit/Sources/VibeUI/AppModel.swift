@@ -1948,6 +1948,7 @@ public final class AppModel {
     // "Restart Now" stops agents to resume them in a host born with the access: resumed the way
     // this launch resumes a clean quit, with the same banner.
     permissions?.resumeSessions = { [weak self] intent in await self?.beginRestore(intent) }
+    permissions?.isRestoringSessions = { [weak self] in self?.restoration != nil }
     // Before the first list, because it is what makes that list true: a session the previous run
     // left `active` has nothing running behind it, and drawing it as running once — even for one
     // frame — is the lie this whole ticket is about.

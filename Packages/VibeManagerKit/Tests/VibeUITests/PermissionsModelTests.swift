@@ -167,6 +167,18 @@ struct PermissionsModelTests {
     #expect(await runner.stoppedAnything == false)
   }
 
+  @Test("Restart Now waits for the sessions being resumed")
+  func restartNowWaitsForARestoration() async {
+    let model = makeModel(status: .granted, preferences: SpyPreferences())
+    let restoring = MutableFlag(true)
+    model.isRestoringSessions = { restoring.value }
+
+    #expect(!model.canRestartNow)
+
+    restoring.value = false
+    #expect(model.canRestartNow)
+  }
+
   @Test("A closed notice stays closed for the same lag")
   func dismissedNoticeStaysClosed() async {
     let runner = SpyRunner(hostStatus: .notGranted, running: [SessionID(), SessionID()])
@@ -202,6 +214,15 @@ struct PermissionsModelTests {
 @MainActor
 private final class MutableDate {
   var value = Date(timeIntervalSince1970: 1_790_000_000)
+}
+
+@MainActor
+private final class MutableFlag {
+  var value: Bool
+
+  init(_ value: Bool) {
+    self.value = value
+  }
 }
 
 @MainActor

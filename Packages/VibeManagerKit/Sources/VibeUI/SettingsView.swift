@@ -374,7 +374,7 @@ struct RestartHostButtons: View {
       } label: {
         Text("Restart Now…", bundle: .module)
       }
-      .disabled(permissions.isRestartingNow)
+      .disabled(!permissions.canRestartNow)
     }
   }
 }
