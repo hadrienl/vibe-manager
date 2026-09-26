@@ -1750,14 +1750,21 @@ struct SessionRow: View {
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
-        Label(status.label, systemImage: status.symbolName)
-          .font(.caption)
-          // What waits for the user is the one state set apart from the others by more than its
-          // colour and its symbol.
-          .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
-          .foregroundStyle(isRestoring ? Color.secondary : tint)
-          .modifier(WorkingSymbolEffect(isActive: isWorkingAnimated))
-          .lineLimit(1)
+        Label {
+          Text(status.label)
+        } icon: {
+          Image(systemName: status.symbolName)
+            .opacity(isWorkingAnimated ? 0 : 1)
+            .overlay {
+              if isWorkingAnimated { WorkingSpinner() }
+            }
+        }
+        .font(.caption)
+        // What waits for the user is the one state set apart from the others by more than its
+        // colour and its symbol.
+        .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
+        .foregroundStyle(isRestoring ? Color.secondary : tint)
+        .lineLimit(1)
       }
       Spacer(minLength: 4)
       switch webView {
@@ -1834,8 +1841,8 @@ struct SessionRow: View {
     }
   }
 
-  /// A working agent's symbol moves; with Reduce Motion it stays still, and its shape and its
-  /// colour still set it apart.
+  /// A working agent's symbol gives way to a spinner; with Reduce Motion the symbol stays, and its
+  /// shape and its colour still set it apart.
   private var isWorkingAnimated: Bool {
     !isRestoring && status.isAnimated && !reduceMotion
   }
@@ -1850,16 +1857,17 @@ struct SessionRow: View {
   }
 }
 
-/// The symbol of a working agent turns; before macOS 15, which cannot turn a symbol, it pulses.
-private struct WorkingSymbolEffect: ViewModifier {
-  let isActive: Bool
-
-  func body(content: Content) -> some View {
-    if #available(macOS 15, *) {
-      content.symbolEffect(.rotate, options: .repeating, isActive: isActive)
-    } else {
-      content.symbolEffect(.pulse, options: .repeating, isActive: isActive)
-    }
+/// What turns in place of a working agent's symbol, in the space that symbol takes.
+///
+/// A native spinner, not a repeating symbol effect: SwiftUI drives a symbol effect frame by frame,
+/// and in a sidebar row every frame resized the row's hosting view and laid the whole window out
+/// again — most of a core for as long as an agent worked. AppKit animates this indicator on its
+/// own, outside the view graph.
+private struct WorkingSpinner: View {
+  var body: some View {
+    ProgressView()
+      .controlSize(.mini)
+      .accessibilityHidden(true)
   }
 }
 
