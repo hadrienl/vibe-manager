@@ -110,7 +110,7 @@ public final class AppEnvironment {
     // application's own are brought back to owner only before anything is read from them.
     let repaired = DataDirectoryPermissions.repair([
       data.store.deletingLastPathComponent(), data.notes, data.journal, data.usage, data.logs,
-      data.icons,
+      data.icons, data.drops,
     ])
     let diagnosticsLocation = DiagnosticsLocation(directory: data.logs)
     self.diagnosticsLocation = diagnosticsLocation
@@ -365,7 +365,8 @@ public final class AppEnvironment {
       journal: journal,
       folderLabels: FileFolderLabelStore(url: data.folders),
       projectIcons: FileSystemProjectIconFinder(),
-      iconStore: FileSessionIconStore(directory: data.icons)
+      iconStore: FileSessionIconStore(directory: data.icons),
+      dropStore: FileSessionDropStore(directory: data.drops)
     )
   }
 
@@ -567,6 +568,8 @@ public final class AppEnvironment {
     let folders: URL
     /// The project icons of the sessions (#27).
     let icons: URL
+    /// What drops bring without a file of their own, per session (#42).
+    let drops: URL
     let defaultsSuite: String?
   }
 
@@ -589,6 +592,7 @@ public final class AppEnvironment {
         logs: DiagnosticsLocation.standard().directory,
         folders: FileFolderLabelStore.defaultURL(),
         icons: FileSessionIconStore.defaultDirectory(),
+        drops: FileSessionDropStore.defaultDirectory(),
         defaultsSuite: defaultsSuite)
     }
     let folder = URL(fileURLWithPath: directory, isDirectory: true)
@@ -602,6 +606,7 @@ public final class AppEnvironment {
       logs: folder.appendingPathComponent("Logs", isDirectory: true),
       folders: folder.appendingPathComponent("folders.json"),
       icons: folder.appendingPathComponent("Icons", isDirectory: true),
+      drops: folder.appendingPathComponent("Drops", isDirectory: true),
       defaultsSuite: defaultsSuite ?? "com.hadrienl.VibeManager.isolated")
   }
 

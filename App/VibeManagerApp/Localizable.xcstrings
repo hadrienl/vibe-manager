@@ -113,6 +113,16 @@
         }
       }
     },
+    "Attach Files…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre des fichiers…"
+          }
+        }
+      }
+    },
     "Back" : {
       "localizations" : {
         "fr" : {

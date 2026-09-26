@@ -70,6 +70,7 @@ The requests of the sessions in the background (#40), over the foot of the sideb
 | Restart | ⌃⌘R | Session |
 | Restart in a new process, from anywhere in its sheet | ⌘↩ | — |
 | Switch Agent… | ⌃⌘M | Session |
+| Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
 | Close Session | ⌘W | Session |
 | Archive… / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
 | Move to Next / Previous Status, without a swipe | ⌥⌘→ / ⌥⌘← | Session › Status |
@@ -136,6 +137,15 @@ A request the agent waits on takes VoiceOver's focus when it appears. The compos
 the agent it writes to: Return sends, Shift-Return starts a line, Escape stops a turn under way.
 ⌥⌘T switches between the conversation and the terminal. Text follows the size chosen in
 Settings › Conversation, and unfolding does not animate with Reduce Motion on.
+
+### Dropping files
+
+A drop on a session (#42) is announced once it is done: "Dropped into the terminal of *name*",
+"Attached to your message to *name*", or, when the session cannot take it, "Nothing dropped: *name*
+is stopped". What was left out, and a folder the agent may not be allowed to read, are said in a
+bar at the foot of the session, which VoiceOver announces too. The veil shown while dragging is
+decoration and is hidden from VoiceOver; with Increase Contrast its outline is solid. Everything a
+drop does, Session › Attach Files… (⌘O) does from the keyboard.
 
 ### Colour
 

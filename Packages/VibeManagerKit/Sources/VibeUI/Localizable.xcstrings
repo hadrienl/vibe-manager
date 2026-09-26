@@ -2550,6 +2550,16 @@
         }
       }
     },
+    "Allow Full Disk Access…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser l’accès complet au disque…"
+          }
+        }
+      }
+    },
     "Allow Once" : {
       "localizations" : {
         "fr" : {
@@ -2877,6 +2887,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demander avant de fermer une session dont l’agent est en cours d’exécution"
+          }
+        }
+      }
+    },
+    "Attached to your message to %@." : {
+      "comment" : "VoiceOver, after a drop on a conversation. The argument is a session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joint à votre message pour %@."
           }
         }
       }
@@ -3794,6 +3815,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Double-cliquez sur un fichier de la liste Git, ou appuyez sur Retour, pour l’ouvrir."
+          }
+        }
+      }
+    },
+    "Drop to attach to your message" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez pour joindre à votre message"
+          }
+        }
+      }
+    },
+    "Drop to type the paths in the terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez pour saisir les chemins dans le terminal"
+          }
+        }
+      }
+    },
+    "Dropped into the terminal of %@." : {
+      "comment" : "VoiceOver, after a drop on a terminal. The argument is a session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposé dans le terminal de %@."
           }
         }
       }
@@ -5615,6 +5667,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien de terminé pour l’instant. Balayez une session pour la déplacer ici."
+          }
+        }
+      }
+    },
+    "Nothing dropped: %@ is archived." : {
+      "comment" : "VoiceOver, after a drop refused. The argument is a session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été déposé : %@ est archivée."
+          }
+        }
+      }
+    },
+    "Nothing dropped: %@ is stopped." : {
+      "comment" : "VoiceOver, after a drop refused. The argument is a session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été déposé : %@ est arrêtée."
           }
         }
       }
@@ -7636,6 +7710,16 @@
         }
       }
     },
+    "Some of what was dropped could not be read and was left out." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie du dépôt n’a pas pu être lue et a été écartée."
+          }
+        }
+      }
+    },
     "Sort By" : {
       "localizations" : {
         "fr" : {
@@ -8170,6 +8254,17 @@
         }
       }
     },
+    "The agent may have to ask for access to %@ to read “%@”." : {
+      "comment" : "After a drop. The arguments are a protected folder, then a file name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent devra peut-être demander l’accès à %1$@ pour lire « %2$@ »."
+          }
+        }
+      }
+    },
     "The agent opened a page" : {
       "localizations" : {
         "fr" : {
@@ -8536,6 +8631,16 @@
         }
       }
     },
+    "The session is archived" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session est archivée"
+          }
+        }
+      }
+    },
     "The session is back on %@." : {
       "comment" : "An agent's name.",
       "localizations" : {
@@ -8543,6 +8648,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La session est revenue à %@."
+          }
+        }
+      }
+    },
+    "The session is stopped" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session est arrêtée"
           }
         }
       }
@@ -8644,6 +8759,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le dialogue de cet agent ne se répond que dans la session."
+          }
+        }
+      }
+    },
+    "This conversation can’t be written to from here: the drop was typed into the terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’écrire dans cette conversation depuis ici : le dépôt a été saisi dans le terminal."
           }
         }
       }
@@ -10721,6 +10846,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "{{name}} est un champ, {{name?}} un champ facultatif, {{name|/regex/}} en garde une partie. Écrivez \\{{ pour garder les accolades comme du texte."
+          }
+        }
+      }
+    },
+    "“%@” can’t be sent: its name contains a control character." : {
+      "comment" : "The argument is a file name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » ne peut pas être transmis : son nom contient un caractère de contrôle."
           }
         }
       }

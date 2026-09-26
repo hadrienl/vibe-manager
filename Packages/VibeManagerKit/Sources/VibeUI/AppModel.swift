@@ -177,6 +177,13 @@ public final class AppModel {
   /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
   /// menu — can open them on the right one.
   public var settingsTab: SettingsTab = .general
+  /// Where a drop writes what has no file of its own (#42).
+  let dropStore: (any SessionDropStore)?
+  /// What the last drop on a session has to say: a file left out, a folder the agent may not
+  /// read, a fallback to the terminal (#42).
+  public internal(set) var dropNotice: SessionDropNotice?
+  /// Session › Attach Files… (⌘O) is choosing files.
+  public var isChoosingFilesToAttach = false
   /// A process the system would not let go of. Reported rather than swallowed: the promise that
   /// nothing stays attached to an archived session is only worth making if its failure is said.
   public private(set) var detachWarning: DetachWarning?
@@ -602,8 +609,11 @@ public final class AppModel {
     /// Looks for a project's icon when a session is created. Finds nothing by default.
     projectIcons: any ProjectIconFinding = NoProjectIcons(),
     /// Where the project icons of the sessions are copied.
-    iconStore: any SessionIconStore = InMemorySessionIconStore()
+    iconStore: any SessionIconStore = InMemorySessionIconStore(),
+    /// Where a drop writes what has no file of its own (#42). Absent, such a drop is refused.
+    dropStore: (any SessionDropStore)? = nil
   ) {
+    self.dropStore = dropStore
     self.journal = journal
     journal?.editor = fileOpeningPreferences.editor
     folderLabelStore = folderLabels
@@ -1061,6 +1071,8 @@ public final class AppModel {
       await activityTracker?.forget(id)
       browser?.release(id)
       conversations.release(id)
+      await dropStore?.remove(id)
+      if dropNotice?.sessionID == id { dropNotice = nil }
       diagnostics.record(
         .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
       report(archival.detachment, for: archival.session, action: .archived)
@@ -2030,6 +2042,12 @@ public final class AppModel {
     // a store that could not be read rather than one without sessions.
     if !sessions.isEmpty { layout.keepPresentations(of: Set(sessions.map(\.id))) }
     Signposts.end("launch.firstList", firstList)
+    // What drops left behind for sessions archived or gone — a crash between the archive and its
+    // cleanup — goes, with the same care: never against an empty list (#42).
+    if !sessions.isEmpty, let dropStore {
+      let kept = Set(sessions.filter { $0.status != .archived }.map(\.id))
+      Task { await dropStore.sweep(keeping: kept) }
+    }
     // After the first list, which is what an installation that never kept any seeds them from.
     await loadRecentFolders()
     // Which agents write a usage is part of their description, known without probing any of them.

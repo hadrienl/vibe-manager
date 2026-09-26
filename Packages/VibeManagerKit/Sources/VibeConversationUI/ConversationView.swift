@@ -12,7 +12,6 @@ public struct ConversationView: View {
   @Bindable var model: ConversationModel
   let theme: ConversationTheme
   let appearance: ConversationAppearance
-  @State private var isDropTargeted = false
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
   @AccessibilityFocusState private var bannerFocused: Bool
@@ -55,34 +54,6 @@ public struct ConversationView: View {
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)
-    .overlay {
-      if isDropTargeted {
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(theme.accent.color, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
-          .background(theme.accent.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-          .overlay {
-            Label {
-              Text("Drop to attach to your message", bundle: .module)
-            } icon: {
-              Image(systemName: "square.and.arrow.down")
-            }
-            .font(theme.interfaceFont(size: 15, weight: .semibold))
-            .foregroundStyle(theme.text.color)
-          }
-          .padding(14)
-          .allowsHitTesting(false)
-      }
-    }
-    .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-      guard model.composerState == .ready else { return false }
-      for provider in providers {
-        _ = provider.loadObject(ofClass: URL.self) { url, _ in
-          guard let url else { return }
-          Task { @MainActor in model.attach([url]) }
-        }
-      }
-      return true
-    }
     .onChange(of: model.pendingCall?.callID) { _, id in
       if id != nil { bannerFocused = true }
     }

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 import VibeApplication
 import VibeConversationUI
 import VibeDomain
@@ -77,6 +78,16 @@ public struct RootView: View {
         sidebar: model.layout.intent.sidebarWidth,
         inspector: model.layout.intent.inspectorWidth
       )
+    }
+    // Session › Attach Files… (⌘O): the keyboard's way to a drop (#42). Folders too, as from the
+    // Finder.
+    .fileImporter(
+      isPresented: Binding(
+        get: { model.isChoosingFilesToAttach }, set: { model.isChoosingFilesToAttach = $0 }),
+      allowedContentTypes: [.item, .folder], allowsMultipleSelection: true
+    ) { result in
+      guard case .success(let files) = result else { return }
+      Task { await model.attachChosenFiles(files) }
     }
     // Back from sleep, or from another application: an event may have been missed meanwhile.
     .onChange(of: scenePhase) { _, phase in
@@ -781,6 +792,23 @@ public struct RootView: View {
           }
         }
         .background(.background)
+      }
+    }
+    // One place to drop files on, whichever of the two is on screen (#42).
+    .modifier(SessionDropZone(model: model, sessionID: session.id))
+    // At the top: at the foot it would cover the line the paths were just typed on, or the
+    // composer.
+    .overlay(alignment: .top) {
+      if let notice = model.dropNotice, notice.sessionID == session.id {
+        DropNoticeBar(
+          notice: notice,
+          allowFullDiskAccess: {
+            model.dismissDropNotice()
+            model.settingsTab = .privacy
+            openSettings()
+          },
+          dismiss: { model.dismissDropNotice() }
+        )
       }
     }
     .task(id: ConversationShowKey(session: session, presentation: presentation)) {

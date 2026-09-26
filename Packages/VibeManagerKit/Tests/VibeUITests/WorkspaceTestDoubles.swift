@@ -92,7 +92,10 @@ actor WorkspaceTerminal: TerminalSession {
     TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
   }
 
-  func write(_ bytes: [UInt8]) {}
+  /// Everything typed into the terminal, write by write.
+  private(set) var written: [[UInt8]] = []
+
+  func write(_ bytes: [UInt8]) { written.append(bytes) }
 
   func resize(to size: TerminalSize) {}
 
