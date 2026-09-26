@@ -18,7 +18,6 @@ public struct NewSessionSheet: View {
     case templateField(String)
   }
 
-  private let defaultWorkingDirectoryPath: String?
   /// The session, and whether to launch it now or leave it in To Do (#80).
   private let created: (SessionCreation, Bool) -> Void
   private let cancelled: () -> Void
@@ -27,13 +26,11 @@ public struct NewSessionSheet: View {
 
   public init(
     model: NewSessionModel,
-    defaultWorkingDirectoryPath: String? = nil,
     created: @escaping (SessionCreation, Bool) -> Void,
     cancelled: @escaping () -> Void,
     manageTemplates: (() -> Void)? = nil
   ) {
     _model = Bindable(model)
-    self.defaultWorkingDirectoryPath = defaultWorkingDirectoryPath
     self.created = created
     self.cancelled = cancelled
     self.manageTemplates = manageTemplates
@@ -49,7 +46,7 @@ public struct NewSessionSheet: View {
     }
     .frame(width: 640, height: 760)
     .task {
-      await model.load(defaultWorkingDirectoryPath: defaultWorkingDirectoryPath)
+      await model.load()
       moveFocus(to: model.draft.templateFill.flatMap(firstEmptyField) ?? .draft(.name))
     }
   }
@@ -411,26 +408,79 @@ public struct NewSessionSheet: View {
   private var folderField: some View {
     LabeledField(
       Text("Working folder", bundle: .module),
-      help: model.protectedLocationNotice.map { Text($0) }
+      help: folderNotice.map { Text($0) }
         ?? (model.folderComesFromTemplate
           ? Text("Proposed by the template — change it if needed.", bundle: .module) : nil),
       issues: model.issues(for: .workingDirectory)
     ) {
-      HStack(spacing: 8) {
-        TextField(
-          String(localized: "Choose a folder", bundle: .module),
-          text: Binding(
-            get: { model.draft.workingDirectoryPath ?? "" },
-            set: { model.draft.workingDirectoryPath = $0.isEmpty ? nil : $0 }
-          )
-        )
-        .textFieldStyle(.roundedBorder)
-        .focused($focus, equals: .draft(.workingDirectory))
-        .accessibilityIdentifier("new-session-folder")
+      VStack(alignment: .leading, spacing: 8) {
+        recentFolderCards
+        folderPathField
+      }
+    }
+  }
 
-        Button(action: chooseFolder) {
-          Text("Choose…", bundle: .module, comment: "Opens a panel to choose the working folder.")
+  /// What is said under the folder: the last folder gone, and a folder macOS guards, both when
+  /// both apply — neither may hide the other.
+  private var folderNotice: String? {
+    let notices = [model.preselectionNotice, model.protectedLocationNotice].compactMap { $0 }
+    return notices.isEmpty ? nil : notices.joined(separator: " ")
+  }
+
+  /// The folders sessions were created in, in one column like the agents: three, then the rest
+  /// behind Show More (#39).
+  @ViewBuilder
+  private var recentFolderCards: some View {
+    ForEach(Array(model.shownRecentFolders.enumerated()), id: \.element.id) { index, option in
+      RecentFolderCard(
+        option: option,
+        isSelected: model.isSelected(option),
+        select: { Task { await model.chooseRecentFolder(option) } },
+        forget: { model.forget(option) }
+      )
+      .accessibilityIdentifier("new-session-recent-folder-\(index)")
+    }
+    if model.hiddenRecentFolderCount > 0 {
+      ChoiceCard(isSelected: false, select: { model.isShowingMoreFolders.toggle() }) {
+        Image(systemName: model.isShowingMoreFolders ? "chevron.up" : "ellipsis")
+          .frame(width: 18)
+        if model.isShowingMoreFolders {
+          Text("Show Fewer", bundle: .module, comment: "Folds the recent folders back to three.")
+        } else {
+          Text(
+            "Show \(model.hiddenRecentFolderCount) More", bundle: .module,
+            comment: "Shows the other recent folders. The number of them.")
         }
+        Spacer()
+      }
+      .accessibilityLabel(
+        model.isShowingMoreFolders
+          ? Text(
+            "Show fewer recent folders", bundle: .module,
+            comment: "VoiceOver: folds the recent folders back to three.")
+          : Text(
+            "Show \(model.hiddenRecentFolderCount) more recent folders", bundle: .module,
+            comment: "VoiceOver: shows the other recent folders. The number of them.")
+      )
+      .accessibilityIdentifier("new-session-recent-folders-more")
+    }
+  }
+
+  private var folderPathField: some View {
+    HStack(spacing: 8) {
+      TextField(
+        String(localized: "Choose a folder", bundle: .module),
+        text: Binding(
+          get: { model.draft.workingDirectoryPath ?? "" },
+          set: { model.draft.workingDirectoryPath = $0.isEmpty ? nil : $0 }
+        )
+      )
+      .textFieldStyle(.roundedBorder)
+      .focused($focus, equals: .draft(.workingDirectory))
+      .accessibilityIdentifier("new-session-folder")
+
+      Button(action: chooseFolder) {
+        Text("Choose…", bundle: .module, comment: "Opens a panel to choose the working folder.")
       }
     }
   }
@@ -636,31 +686,53 @@ struct AgentChoiceRow: View {
   let select: () -> Void
 
   var body: some View {
+    // Unusable agents stay visible and readable, but cannot be chosen.
+    ChoiceCard(isSelected: isSelected, isEnabled: agent.isUsable, select: select) {
+      Image(systemName: agent.descriptor.symbolName)
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(agent.name)
+          .fontWeight(.medium)
+        Text(agent.status)
+          .font(.caption)
+          .foregroundStyle(agent.isUsable ? .secondary : Color.red)
+          .fixedSize(horizontal: false, vertical: true)
+        if !agent.isUsable {
+          // The remedy travels with the diagnostic, here as much as in the validation list.
+          Text(agent.remedy)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      Spacer()
+      if agent.warnsBeforeLaunch {
+        Image(systemName: "lock")
+          .foregroundStyle(.orange)
+          .help(Text("The agent will ask you to sign in inside the terminal.", bundle: .module))
+      }
+    }
+    .accessibilityLabel(
+      Text(
+        verbatim: agent.isUsable
+          ? "\(agent.name). \(agent.status)"
+          : "\(agent.name). \(agent.status) \(agent.remedy)")
+    )
+  }
+}
+
+/// One choice in a list the user picks one item from — an agent, a recent folder: tinted and
+/// outlined once chosen, dimmed when it cannot be. One component, so every such list looks alike.
+struct ChoiceCard<Content: View>: View {
+  let isSelected: Bool
+  var isEnabled = true
+  let select: () -> Void
+  @ViewBuilder let content: Content
+
+  var body: some View {
     Button(action: select) {
       HStack(spacing: 10) {
-        Image(systemName: agent.descriptor.symbolName)
-          .frame(width: 18)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(agent.name)
-            .fontWeight(.medium)
-          Text(agent.status)
-            .font(.caption)
-            .foregroundStyle(agent.isUsable ? .secondary : Color.red)
-            .fixedSize(horizontal: false, vertical: true)
-          if !agent.isUsable {
-            // The remedy travels with the diagnostic, here as much as in the validation list.
-            Text(agent.remedy)
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        Spacer()
-        if agent.warnsBeforeLaunch {
-          Image(systemName: "lock")
-            .foregroundStyle(.orange)
-            .help(Text("The agent will ask you to sign in inside the terminal.", bundle: .module))
-        }
+        content
         if isSelected {
           Image(systemName: "checkmark")
             .foregroundStyle(.tint)
@@ -680,16 +752,71 @@ struct AgentChoiceRow: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    // Unusable agents stay visible and readable, but cannot be chosen.
-    .disabled(!agent.isUsable)
-    .opacity(agent.isUsable ? 1 : 0.6)
+    .disabled(!isEnabled)
+    .opacity(isEnabled ? 1 : 0.6)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    .accessibilityLabel(
-      Text(
-        verbatim: agent.isUsable
-          ? "\(agent.name). \(agent.status)"
-          : "\(agent.name). \(agent.status) \(agent.remedy)")
-    )
+  }
+}
+
+/// A folder a session was created in, offered again (#39).
+struct RecentFolderCard: View {
+  let option: RecentFolderOption
+  let isSelected: Bool
+  let select: () -> Void
+  let forget: () -> Void
+
+  private var isMissing: Bool { option.availability == .missing }
+
+  var body: some View {
+    // A folder that has gone stays listed — a volume unplugged for now comes back — but cannot
+    // be chosen.
+    ChoiceCard(isSelected: isSelected, isEnabled: !isMissing, select: select) {
+      Image(systemName: isMissing ? "questionmark.folder" : "folder")
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(verbatim: option.name)
+          .fontWeight(.medium)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        Group {
+          if isMissing {
+            Text("Folder not found", bundle: .module, comment: "A recent folder that has gone.")
+          } else {
+            Text(verbatim: option.location)
+          }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.head)
+      }
+      Spacer()
+    }
+    .help(Text(verbatim: option.displayPath))
+    .contextMenu {
+      Button(action: forget) {
+        Text("Remove from Recents", bundle: .module, comment: "Forgets a recent folder.")
+      }
+      Button {
+        NSWorkspace.shared.activateFileViewerSelecting([
+          URL(fileURLWithPath: RecentFolder.lexicalKey(of: option.folder.path))
+        ])
+      } label: {
+        Text("Show in Finder", bundle: .module)
+      }
+      .disabled(isMissing)
+    }
+    .accessibilityLabel(accessibilityLabel)
+    .accessibilityAction(
+      named: Text("Remove from Recents", bundle: .module, comment: "Forgets a recent folder."),
+      forget)
+  }
+
+  private var accessibilityLabel: Text {
+    guard isMissing else { return Text(verbatim: "\(option.name), \(option.displayPath)") }
+    return Text(
+      "\(option.name), \(option.displayPath). Folder not found", bundle: .module,
+      comment: "VoiceOver: a recent folder that has gone. Its name, then its path.")
   }
 }
 

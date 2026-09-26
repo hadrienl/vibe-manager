@@ -39,6 +39,19 @@ public final class NewSessionModel {
   private var presetAppearance: SessionAppearance?
   private var appearanceBeforePreset: SessionAppearance??
 
+  /// The folders sessions were created in, the most recent first, as the sheet offers them (#39).
+  public private(set) var recentFolders: [RecentFolderOption]
+  /// Whether the cards past the first three are shown. For the life of the sheet only.
+  public var isShowingMoreFolders = false
+  /// The recent folder the sheet put in the field itself. Like a template's folder it is a
+  /// default, not a choice: a template replaces it, and leaving the template gives it back.
+  public private(set) var preselectedFolder: String?
+  /// The folder that would have been preselected had it still been there.
+  private var skippedRecentFolder: RecentFolderOption?
+  private let folderProbe: any WorkingDirectoryProbe
+  private let recentFolderProbeBudget: Duration
+  private let forgetRecentFolder: (@MainActor (RecentFolder) -> Void)?
+
   private let create: CreateSession
   private let registry: any AgentProviderResolving
   private let revalidationDelay: Duration
@@ -63,11 +76,19 @@ public final class NewSessionModel {
     fullDiskAccess: FullDiskAccessStatus? = nil,
     templates: [PromptTemplate] = [],
     projectIcons: any ProjectIconFinding = NoProjectIcons(),
-    icons: SessionIconLibrary? = nil
+    icons: SessionIconLibrary? = nil,
+    recentFolders: [RecentFolder] = [],
+    folderProbe: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
+    recentFolderProbeBudget: Duration = .milliseconds(300),
+    forgetRecentFolder: (@MainActor (RecentFolder) -> Void)? = nil
   ) {
     self.projectIcons = projectIcons
     self.icons = icons
     self.templates = templates
+    self.recentFolders = RecentFolderOption.options(for: recentFolders)
+    self.folderProbe = folderProbe
+    self.recentFolderProbeBudget = recentFolderProbeBudget
+    self.forgetRecentFolder = forgetRecentFolder
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
@@ -172,11 +193,13 @@ public final class NewSessionModel {
   /// for a template that proposes none, gives back the folder a previous template replaced.
   private func applyFolderPreset(of template: PromptTemplate) {
     let current = draft.workingDirectoryPath
-    let isFree = current?.isEmpty ?? true
+    let isEmpty = current?.isEmpty ?? true
+    // A folder the sheet preselected is as free as an empty field: the user never chose it.
+    let isFree = isEmpty || (preselectedFolder != nil && current == preselectedFolder)
     guard isFree || folderComesFromTemplate else { return }
     if let folder = template.folder {
       if folderBeforePreset == nil {
-        folderBeforePreset = .some(isFree ? nil : current)
+        folderBeforePreset = .some(isEmpty ? nil : current)
       }
       draft.workingDirectoryPath = folder
       presetFolder = folder
@@ -240,11 +263,12 @@ public final class NewSessionModel {
     issues.filter { $0.field == field }
   }
 
-  public func load(defaultWorkingDirectoryPath: String?) async {
-    if draft.workingDirectoryPath == nil {
-      draft.workingDirectoryPath = defaultWorkingDirectoryPath
-    }
-    await refreshAgents(forceRefresh: false)
+  public func load() async {
+    // Side by side: the agents need not wait for the folders, nor the folders for the agents.
+    async let agents: Void = refreshAgents(forceRefresh: false)
+    await checkRecentFolders()
+    preselectRecentFolder()
+    await agents
   }
 
   public func refreshAgents(forceRefresh: Bool) async {
@@ -330,6 +354,8 @@ public final class NewSessionModel {
     // Recorded before the check runs, so the change notification this assignment causes knows
     // the new path is the one being looked at and leaves its verdict alone.
     checkedFolderPath = path
+    // Designated by the user now: no longer a default a template may replace.
+    preselectedFolder = nil
     draft.workingDirectoryPath = path
     lookForIcon()
     let checked = draft
@@ -447,6 +473,296 @@ public final class NewSessionModel {
         )
       ]
       return nil
+    }
+  }
+}
+
+// MARK: - Recent folders
+
+extension NewSessionModel {
+  /// How many recent folders are shown before Show More.
+  public static let visibleRecentFolderCount = 3
+
+  /// The cards on screen: the first three, or all of them once Show More was pressed.
+  public var shownRecentFolders: [RecentFolderOption] {
+    isShowingMoreFolders
+      ? recentFolders : Array(recentFolders.prefix(Self.visibleRecentFolderCount))
+  }
+
+  /// How many folders Show More would add. Zero: the card is not offered at all.
+  public var hiddenRecentFolderCount: Int {
+    max(recentFolders.count - Self.visibleRecentFolderCount, 0)
+  }
+
+  /// Whether the field names this folder. Compared by spelling: drawing a card never reads the
+  /// disk, and typing the path of a recent folder lights its card as much as clicking it.
+  public func isSelected(_ option: RecentFolderOption) -> Bool {
+    guard let path = draft.resolvedWorkingDirectoryPath else { return false }
+    return RecentFolder.lexicalKey(of: path) == RecentFolder.lexicalKey(of: option.folder.path)
+  }
+
+  /// A card clicked: the same gesture as a folder handed back by the open panel, and checked the
+  /// same way — except a folder macOS guards, without Full Disk Access. The open panel grants
+  /// access to what it hands back; a card does not, so looking at that folder now could raise the
+  /// consent alert in the middle of the form. It is checked at creation, like a typed path.
+  public func chooseRecentFolder(_ option: RecentFolderOption) async {
+    let folder = option.folder
+    var mayRead = mayProbe(folder)
+    if mayRead, fullDiskAccess != .granted {
+      mayRead = await Task.detached {
+        RecentFolderProbe.staysOutsideProtectedLocations(folder)
+      }.value
+    }
+    guard mayRead else {
+      preselectedFolder = nil
+      draft.workingDirectoryPath = option.folder.path
+      return
+    }
+    await folderChosen(option.folder.path)
+  }
+
+  /// Whether this folder may be looked at without a gesture through the system's own panel, as far
+  /// as its spellings tell. Its canonical key is asked too: a link to `~/Documents` is inside
+  /// `~/Documents`. A key seeded from the spelling alone says nothing of links, so without Full
+  /// Disk Access the folder's links are also followed, outside the guarded places, before anything
+  /// reads it — see `RecentFolderProbe.staysOutsideProtectedLocations`.
+  private func mayProbe(_ folder: RecentFolder) -> Bool {
+    fullDiskAccess == .granted
+      || (ProtectedFileLocation.covering(path: folder.path) == nil
+        && ProtectedFileLocation.covering(path: folder.key) == nil)
+  }
+
+  /// Remove from Recents: gone from the sheet now, and from the history kept for the next one.
+  public func forget(_ option: RecentFolderOption) {
+    recentFolders.removeAll { $0.id == option.id }
+    // The sheet's own default goes with its card: left in the field, Create would start the agent
+    // in the folder just dismissed, and put it back at the top of the history.
+    if let preselected = preselectedFolder, preselected == option.folder.path {
+      if draft.workingDirectoryPath == preselected {
+        draft.workingDirectoryPath = nil
+      }
+      if folderBeforePreset == .some(preselected) {
+        folderBeforePreset = .some(nil)
+      }
+      preselectedFolder = nil
+    }
+    if skippedRecentFolder?.id == option.id {
+      skippedRecentFolder = nil
+    }
+    if hiddenRecentFolderCount == 0 {
+      isShowingMoreFolders = false
+    }
+    forgetRecentFolder?(option.folder)
+  }
+
+  /// Said under the field when the last folder has gone and the next one was proposed in its
+  /// place: an agent must not start in another repository without the user seeing it.
+  public var preselectionNotice: String? {
+    guard let skipped = skippedRecentFolder, let preselectedFolder,
+      draft.workingDirectoryPath == preselectedFolder
+    else {
+      return nil
+    }
+    return String(
+      localized: "“\(skipped.name)” was not found — the next recent folder is proposed.",
+      bundle: .module,
+      comment: "Under the working folder: the last folder used has gone. The name of that folder.")
+  }
+
+  /// Puts the most recent folder still there in an empty field. A template that brought its own
+  /// folder already filled it, and wins.
+  private func preselectRecentFolder() {
+    guard draft.workingDirectoryPath?.isEmpty ?? true,
+      let index = recentFolders.firstIndex(where: { $0.availability != .missing })
+    else {
+      return
+    }
+    let option = recentFolders[index]
+    skippedRecentFolder = index > 0 ? recentFolders[0] : nil
+    preselectedFolder = option.folder.path
+    draft.workingDirectoryPath = option.folder.path
+  }
+
+  /// Looks at each recent folder once, within a budget, without raising a consent alert.
+  ///
+  /// A folder macOS guards is only looked at when Full Disk Access is known to be granted: a
+  /// `stat` inside `~/Documents` is enough to raise the alert ADR 0010 removed from this sheet.
+  /// Those, and the ones a slow volume has not answered in time, stay unverified — offered as
+  /// they are, and checked at creation like any folder.
+  private func checkRecentFolders() async {
+    let probed = recentFolders.map(\.folder).filter(mayProbe)
+    guard !probed.isEmpty else { return }
+    let statuses = await RecentFolderProbe.statuses(
+      of: probed, probe: folderProbe, budget: recentFolderProbeBudget,
+      followingLinks: fullDiskAccess != .granted)
+    recentFolders = recentFolders.map { option in
+      guard let status = statuses[option.id] else { return option }
+      return option.with(RecentFolderOption.Availability(status))
+    }
+  }
+}
+
+/// One recent folder as the sheet offers it.
+public struct RecentFolderOption: Identifiable, Equatable, Sendable {
+  public enum Availability: Equatable, Sendable {
+    case available
+    /// Not looked at: guarded by macOS, or too slow to answer. Offered, and checked at creation.
+    case unverified
+    /// Deleted or moved. Shown so a volume unplugged for now keeps its place, never preselected.
+    case missing
+
+    init(_ status: WorkingDirectoryStatus) {
+      switch status {
+      case .usable: self = .available
+      case .missing, .notADirectory: self = .missing
+      // It is there. What is wrong with it is said at creation, with its remedy.
+      case .unreadable: self = .unverified
+      }
+    }
+  }
+
+  public let folder: RecentFolder
+  /// The folder's name, told apart from a namesake by its parent: `api — client-a`.
+  public let name: String
+  /// Where it is: the enclosing folder, as `~/…`.
+  public let location: String
+  public let availability: Availability
+
+  public var id: String { folder.key }
+  /// The full path as `~/…`, for the help tag and VoiceOver.
+  public var displayPath: String {
+    (RecentFolder.lexicalKey(of: folder.path) as NSString).abbreviatingWithTildeInPath
+  }
+
+  func with(_ availability: Availability) -> RecentFolderOption {
+    RecentFolderOption(folder: folder, name: name, location: location, availability: availability)
+  }
+
+  static func options(for folders: [RecentFolder]) -> [RecentFolderOption] {
+    let names = RecentFolderNames.displayNames(for: folders.map(\.path))
+    return zip(folders, names).map { folder, name in
+      let parent = (RecentFolder.lexicalKey(of: folder.path) as NSString).deletingLastPathComponent
+      return RecentFolderOption(
+        folder: folder, name: name,
+        location: (parent as NSString).abbreviatingWithTildeInPath,
+        availability: .unverified)
+    }
+  }
+}
+
+/// Probes folders side by side and answers once all have, or once the budget is spent.
+///
+/// A probe cannot be interrupted — `stat` on a network volume that went away takes as long as it
+/// takes — so they run detached, and the ones still out when the budget ends are left to finish
+/// on their own while the sheet goes on without them. The budget is kept by a Dispatch timer, not
+/// a sleeping task: a cooperative pool busy elsewhere would wake that task late, and hold the sheet
+/// for as long as the slowest probe.
+enum RecentFolderProbe {
+  /// - Parameter followingLinks: whether each folder's links are followed first, and the folder
+  ///   left unread when one leads into a place macOS guards.
+  static func statuses(
+    of folders: [RecentFolder],
+    probe: any WorkingDirectoryProbe,
+    budget: Duration,
+    followingLinks: Bool = false
+  ) async -> [String: WorkingDirectoryStatus] {
+    guard !folders.isEmpty else { return [:] }
+    let collector = Collector(expected: folders.count)
+    return await withCheckedContinuation { continuation in
+      collector.wait(continuation)
+      for folder in folders {
+        Task.detached {
+          guard !followingLinks || staysOutsideProtectedLocations(folder) else {
+            collector.record(nil, for: folder.key)
+            return
+          }
+          let status = await probe.inspect(path: RecentFolder.lexicalKey(of: folder.path))
+          collector.record(status, for: folder.key)
+        }
+      }
+      let (seconds, attoseconds) = budget.components
+      let delay = Double(seconds) + Double(attoseconds) / 1e18
+      DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
+        collector.finish()
+      }
+    }
+  }
+
+  /// Whether the folder's links, followed one component at a time, never lead into a place macOS
+  /// guards.
+  ///
+  /// Only links are read, and only outside those places: `readlink` on `~/code` says where it
+  /// points without opening `~/Documents/code`, and a component that is itself guarded is judged
+  /// by its path and never read. This is what a key seeded from the spelling alone cannot say.
+  static func staysOutsideProtectedLocations(_ folder: RecentFolder) -> Bool {
+    var resolved = "/"
+    var pending = Array(
+      URL(fileURLWithPath: RecentFolder.lexicalKey(of: folder.path)).pathComponents.dropFirst())
+    var hops = 0
+    while !pending.isEmpty {
+      let candidate = (resolved as NSString).appendingPathComponent(pending.removeFirst())
+      guard ProtectedFileLocation.covering(path: candidate) == nil else { return false }
+      guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: candidate)
+      else {
+        resolved = candidate
+        continue
+      }
+      // A loop of links is not worth untangling: the folder is simply left unread.
+      hops += 1
+      guard hops <= 32 else { return false }
+      let absolute =
+        target.hasPrefix("/") ? target : (resolved as NSString).appendingPathComponent(target)
+      resolved = "/"
+      pending =
+        Array(URL(fileURLWithPath: absolute).standardizedFileURL.pathComponents.dropFirst())
+        + pending
+    }
+    return true
+  }
+
+  /// Locked rather than an actor: the timer that ends the budget must not wait for the pool.
+  private final class Collector: @unchecked Sendable {
+    typealias Waiter = CheckedContinuation<[String: WorkingDirectoryStatus], Never>
+
+    private let lock = NSLock()
+    private let expected: Int
+    private var answered = 0
+    private var statuses: [String: WorkingDirectoryStatus] = [:]
+    private var isFinished = false
+    private var waiter: Waiter?
+
+    init(expected: Int) {
+      self.expected = expected
+    }
+
+    func wait(_ continuation: Waiter) {
+      lock.withLock { waiter = continuation }
+    }
+
+    /// `nil`: the folder was left unread, and stays unverified.
+    func record(_ status: WorkingDirectoryStatus?, for key: String) {
+      let isComplete = lock.withLock {
+        guard !isFinished else { return false }
+        statuses[key] = status
+        answered += 1
+        return answered == expected
+      }
+      if isComplete {
+        finish()
+      }
+    }
+
+    func finish() {
+      let answer = lock.withLock { () -> (Waiter, [String: WorkingDirectoryStatus])? in
+        guard !isFinished, let waiter else { return nil }
+        isFinished = true
+        self.waiter = nil
+        return (waiter, statuses)
+      }
+      // Resumed outside the lock: the sheet it wakes may record nothing more, but must not wait.
+      if let (waiter, statuses) = answer {
+        waiter.resume(returning: statuses)
+      }
     }
   }
 }

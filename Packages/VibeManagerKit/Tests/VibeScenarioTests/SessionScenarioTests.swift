@@ -163,6 +163,30 @@ struct SessionScenarioTests {
     #expect(await eventually { ProcessTree.snapshot(under: scenario.root).isEmpty })
   }
 
+  @Test("Recent folders: the last folder is proposed again, and the others kept, after a relaunch")
+  func recentFolders() async throws {
+    let scenario = try Scenario()
+    let first = try scenario.compose(behaviour: ["--hold"])
+    await first.appModel.load()
+    let api = try scenario.folder("api")
+    let web = try scenario.folder("web")
+    try await scenario.create(in: first, name: "API", folder: api)
+    try await scenario.create(in: first, name: "Web", folder: web)
+    await first.shutdown(keepingAgentsRunning: false)
+
+    let second = try scenario.compose(behaviour: ["--hold"])
+    await second.appModel.load()
+    second.appModel.beginNewSession()
+    let sheet = try #require(second.appModel.newSessionModel)
+    await sheet.load()
+
+    #expect(sheet.draft.workingDirectoryPath == web)
+    #expect(sheet.recentFolders.map(\.folder.path) == [web, api])
+    #expect(sheet.recentFolders.allSatisfy { $0.availability == .available })
+    second.appModel.cancelNewSession()
+    await scenario.tearDown()
+  }
+
   @Test("A crash: the sessions are offered at the next launch, and nothing is relaunched unasked")
   func crash() async throws {
     let scenario = try Scenario()

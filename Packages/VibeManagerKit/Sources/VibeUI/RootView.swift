@@ -110,7 +110,6 @@ public struct RootView: View {
         if let sheetModel = model.newSessionModel {
           NewSessionSheet(
             model: sheetModel,
-            defaultWorkingDirectoryPath: model.newSessionDefaultWorkingDirectoryPath,
             created: { creation, launching in
               Task { await model.complete(creation, launching: launching) }
             },

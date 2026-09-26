@@ -286,11 +286,11 @@ public final class AppEnvironment {
       recovery: repository,
       agents: registry,
       launcher: launcher,
-      // No folder is proposed. The home directory used to be, and it is the one place that
-      // contains Desktop, Documents and Downloads without being guarded itself: accepting the
-      // default let an agent walk straight into them, with nothing said beforehand. Choosing is
-      // now always a gesture, and the open panel is what grants the access along the way.
-      defaultWorkingDirectoryPath: nil,
+      // Only folders the user already chose are proposed (#39). The home directory used to be,
+      // and it is the one place that contains Desktop, Documents and Downloads without being
+      // guarded itself: accepting that default let an agent walk straight into them, with nothing
+      // said beforehand. A folder a session was created in was designated by a gesture.
+      recentFolderStore: UserDefaultsRecentFolderStore(suiteName: data.defaultsSuite),
       layout: WorkspaceLayoutController(
         store: UserDefaultsWorkspaceLayoutStore(suiteName: data.defaultsSuite)),
       permissions: permissions,

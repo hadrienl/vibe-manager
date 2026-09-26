@@ -32,7 +32,7 @@ struct NewSessionModelTests {
   @Test("Create stays out of reach until a name and a folder are there")
   func submissionRequiresNameAndFolder() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     #expect(!model.canSubmit)
 
@@ -50,7 +50,7 @@ struct NewSessionModelTests {
       StubProvider(id: "claude-code", state: .available),
     ])
 
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     #expect(model.draft.providerID == "claude-code")
     #expect(model.agents.count == 2)
@@ -61,7 +61,7 @@ struct NewSessionModelTests {
   func unauthenticatedAgentIsOfferedWithAWarning() async throws {
     let model = makeModel(providers: [StubProvider(id: "gemini", state: .unauthenticated)])
 
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     let agent = try #require(model.agents.first)
     #expect(agent.isUsable)
@@ -73,7 +73,7 @@ struct NewSessionModelTests {
   func refusedSubmissionShowsProblems() async {
     let repository = SpyRepository()
     let model = makeModel(folder: .missing, repository: repository)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor the webhook"
     model.draft.workingDirectoryPath = "/gone"
 
@@ -88,7 +88,7 @@ struct NewSessionModelTests {
   @Test("Every problem carries the way out of it")
   func everyProblemCarriesARemedy() async {
     let model = makeModel(providers: [StubProvider(id: "codex", state: .notFound)])
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.providerID = "codex"
 
     _ = await model.submit()
@@ -100,7 +100,7 @@ struct NewSessionModelTests {
   @Test("Fixing a field clears its problem without pressing Create again")
   func fixingAFieldClearsItsProblem() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.workingDirectoryPath = "/workspace"
     _ = await model.submit()
     #expect(model.issues(for: .name) == [.nameMissing])
@@ -115,7 +115,7 @@ struct NewSessionModelTests {
   @Test("Before the first Create, editing a field reports nothing")
   func noNaggingBeforeTheFirstSubmission() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     model.draft.name = "R"
     await model.revalidateIfSubmitted()
@@ -130,7 +130,8 @@ struct NewSessionModelTests {
       providers: [StubProvider(id: "claude-code", state: .available, plans: plans)],
       revalidationDelay: .milliseconds(40)
     )
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     _ = await model.submit()
     let beforeTyping = await plans.count
 
@@ -150,7 +151,7 @@ struct NewSessionModelTests {
   func typingAPathDoesNotReadTheDisk() async throws {
     let folders = CountingFolders()
     let model = makeModel(folders: folders, revalidationDelay: .milliseconds(40))
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor the webhook"
     model.draft.workingDirectoryPath = "/workspace"
     _ = await model.submit()
@@ -169,7 +170,7 @@ struct NewSessionModelTests {
   func choosingAFolderChecksIt() async {
     let folders = CountingFolders()
     let model = makeModel(folders: folders)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     await model.folderChosen("/workspace")
 
@@ -180,7 +181,7 @@ struct NewSessionModelTests {
   @Test("A folder that cannot be read is said at once, and nothing else is")
   func chosenFolderReportsItsOwnProblem() async {
     let model = makeModel(folder: .missing)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     await model.folderChosen("/gone")
 
@@ -192,7 +193,7 @@ struct NewSessionModelTests {
   @Test("Editing the path afterwards drops a verdict that no longer judges it")
   func editingThePathClearsTheChosenFolderVerdict() async {
     let model = makeModel(folder: .missing)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     await model.folderChosen("/gone")
     #expect(!model.issues.isEmpty)
 
@@ -205,7 +206,7 @@ struct NewSessionModelTests {
   @Test("A folder macOS guards is remarked upon, and never blocks creation")
   func protectedFolderIsARemark() async {
     let model = makeModel()
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor the webhook"
     model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
 
@@ -219,7 +220,7 @@ struct NewSessionModelTests {
   @Test("With the access granted, there is nothing left to remark upon")
   func grantedAccessSaysNothing() async {
     let model = makeModel(fullDiskAccess: .granted)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
 
     #expect(model.protectedLocationNotice == nil)
@@ -230,7 +231,7 @@ struct NewSessionModelTests {
     // Warning someone who granted the access long ago would be worse than staying quiet: the
     // sheet only remarks on what the application positively knows.
     let model = makeModel(fullDiskAccess: nil)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.workingDirectoryPath = NSHomeDirectory() + "/Documents/notes"
 
     #expect(model.protectedLocationNotice == nil)
@@ -245,7 +246,8 @@ struct NewSessionModelTests {
     // instead made the problem vanish as soon as the name was edited, and come back at the next
     // Create — a form that contradicts itself.
     let model = makeModel(folder: .missing, revalidationDelay: .milliseconds(10))
-    await model.load(defaultWorkingDirectoryPath: "/gone")
+    model.draft.workingDirectoryPath = "/gone"
+    await model.load()
     _ = await model.submit()
     #expect(model.issues.contains(.workingDirectoryNotFound))
 
@@ -267,7 +269,7 @@ struct NewSessionModelTests {
     // asked about — the folder — is kept.
     let folders = GatedFolders()
     let model = makeModel(folders: folders, revalidationDelay: .milliseconds(10))
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     _ = await model.submit()
     #expect(model.issues.contains(.nameMissing))
 
@@ -288,7 +290,7 @@ struct NewSessionModelTests {
     // that arrives late must not contradict the form the user is looking at.
     let folders = GatedFolders(open: true)
     let model = makeModel(folders: folders)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     // Designated through the panel first, so the check that follows really reads the folder — and
     // really does wait at the gate, rather than counting on the scheduler to be slow enough.
     await model.folderChosen("/workspace")
@@ -306,7 +308,8 @@ struct NewSessionModelTests {
   @Test("A pending check never overwrites the verdict of a submission")
   func submissionSurvivesAPendingCheck() async throws {
     let model = makeModel(revalidationDelay: .milliseconds(40))
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     _ = await model.submit()
     #expect(model.issues == [.nameMissing])
 
@@ -324,7 +327,8 @@ struct NewSessionModelTests {
   func acceptedSubmissionReturnsThePlan() async {
     let repository = SpyRepository()
     let model = makeModel(repository: repository)
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     model.draft.name = "Refactor the webhook"
 
     let creation = await model.submit()
@@ -344,7 +348,8 @@ struct NewSessionModelTests {
         ]),
       StubProvider(id: "codex", state: .available),
     ])
-    await model.load(defaultWorkingDirectoryPath: "/workspace")
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.load()
     model.draft.modelID = "opus"
 
     await model.select(agent: "codex")
@@ -702,7 +707,7 @@ struct NewSessionProjectIconTests {
     let repository = SpyRepository()
     let store = InMemorySessionIconStore()
     let model = makeModel(icons: ["/work/api": icon], repository: repository, store: store)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
 
     await model.folderChosen("/work/api")
@@ -718,7 +723,7 @@ struct NewSessionProjectIconTests {
   @Test("A symbol picked by the user is never replaced, not even by another folder's icon")
   func explicitChoiceIsKept() async {
     let model = makeModel(icons: ["/work/api": projectIcon("a"), "/work/web": projectIcon("b")])
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     await model.folderChosen("/work/api")
     await waitUntil { model.draft.projectIcon != nil }
@@ -737,7 +742,7 @@ struct NewSessionProjectIconTests {
   @Test("Without an icon, the name decides, as it always has")
   func noIcon() async {
     let model = makeModel(icons: [:])
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
 
     await model.folderChosen("/work/api")
@@ -750,7 +755,7 @@ struct NewSessionProjectIconTests {
   @Test("An answer about a folder the field no longer names is dropped")
   func staleAnswerIsDropped() async throws {
     let model = makeModel(icons: ["/work/api": projectIcon("a")], delay: .milliseconds(100))
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
 
     await model.folderChosen("/work/api")
     model.draft.workingDirectoryPath = "/work/other"
@@ -767,7 +772,7 @@ struct NewSessionProjectIconTests {
     let model = makeModel(
       icons: ["/work/api": projectIcon("a")], repository: repository,
       store: InMemorySessionIconStore(failure: Full()))
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     await model.folderChosen("/work/api")
     await waitUntil { model.draft.projectIcon != nil }
@@ -782,7 +787,7 @@ struct NewSessionProjectIconTests {
   func comingBackToTheFolder() async throws {
     let repository = SpyRepository()
     let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     await model.folderChosen("/work/api")
     await waitUntil { model.draft.projectIcon != nil }
@@ -800,12 +805,346 @@ struct NewSessionProjectIconTests {
   func typedFolderAtCreation() async throws {
     let repository = SpyRepository()
     let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
-    await model.load(defaultWorkingDirectoryPath: nil)
+    await model.load()
     model.draft.name = "Refactor"
     model.draft.workingDirectoryPath = "/work/api"
 
     _ = try #require(await model.submit())
 
     #expect(await repository.savedSessions.first?.appearance.iconID == projectIcon("a").id)
+  }
+}
+
+/// Answers per path, remembers what it was asked, and can be made slow.
+private actor MappedFolders: WorkingDirectoryProbe {
+  private let statuses: [String: WorkingDirectoryStatus]
+  private let delay: Duration?
+  private(set) var inspected: [String] = []
+
+  init(_ statuses: [String: WorkingDirectoryStatus] = [:], delay: Duration? = nil) {
+    self.statuses = statuses
+    self.delay = delay
+  }
+
+  func inspect(path: String) async -> WorkingDirectoryStatus {
+    inspected.append(path)
+    if let delay {
+      try? await Task.sleep(for: delay)
+    }
+    return statuses[path] ?? .usable
+  }
+}
+
+private func recent(_ paths: String...) -> [RecentFolder] {
+  paths.map(RecentFolder.init(lexicalPath:))
+}
+
+@MainActor
+@Suite("The recent folders of the new session sheet")
+struct NewSessionRecentFolderTests {
+  private func makeModel(
+    recentFolders: [RecentFolder],
+    probe: MappedFolders = MappedFolders(),
+    budget: Duration = .seconds(5),
+    fullDiskAccess: FullDiskAccessStatus? = .notGranted,
+    templates: [PromptTemplate] = [],
+    forgotten: @escaping @MainActor (RecentFolder) -> Void = { _ in }
+  ) -> NewSessionModel {
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    return NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(), agents: registry, folders: StubFolders(status: .usable)),
+      registry: registry,
+      fullDiskAccess: fullDiskAccess,
+      templates: templates,
+      recentFolders: recentFolders,
+      folderProbe: probe,
+      recentFolderProbeBudget: budget,
+      forgetRecentFolder: forgotten
+    )
+  }
+
+  @Test("Without any history the sheet opens as it always did")
+  func noHistory() async {
+    let model = makeModel(recentFolders: [])
+
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == nil)
+    #expect(model.recentFolders.isEmpty)
+    #expect(model.hiddenRecentFolderCount == 0)
+    #expect(model.preselectionNotice == nil)
+  }
+
+  @Test("The folder used last is in the field, and its card is the selected one")
+  func lastFolderIsPreselected() async {
+    let model = makeModel(recentFolders: recent("/work/api", "/work/web"))
+
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == "/work/api")
+    #expect(model.preselectedFolder == "/work/api")
+    #expect(model.recentFolders.map { model.isSelected($0) } == [true, false])
+    #expect(model.preselectionNotice == nil)
+    // A default is not a problem to report before anything was asked for.
+    #expect(model.issues.isEmpty)
+  }
+
+  @Test("A folder that has gone is not preselected: the next one is, and the sheet says so")
+  func missingFolderIsSkipped() async {
+    let probe = MappedFolders(["/work/gone": .missing])
+    let model = makeModel(recentFolders: recent("/work/gone", "/work/web"), probe: probe)
+
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == "/work/web")
+    #expect(model.recentFolders.first?.availability == .missing)
+    #expect(model.recentFolders.first?.name == "gone")
+    #expect(model.preselectionNotice?.contains("gone") == true)
+
+    // The remark is about the default; once the user picks, it has nothing left to say.
+    await model.chooseRecentFolder(model.recentFolders[1])
+    #expect(model.preselectionNotice == nil)
+  }
+
+  @Test("When every folder has gone, nothing is preselected")
+  func everyFolderGone() async {
+    let probe = MappedFolders(["/a": .missing, "/b": .notADirectory])
+    let model = makeModel(recentFolders: recent("/a", "/b"), probe: probe)
+
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == nil)
+    #expect(model.recentFolders.allSatisfy { $0.availability == .missing })
+  }
+
+  @Test("A protected folder is never looked at without Full Disk Access, and still offered")
+  func protectedFolderIsNotProbed() async {
+    let documents = NSHomeDirectory() + "/Documents/api"
+    let probe = MappedFolders()
+    let model = makeModel(recentFolders: recent(documents, "/work/web"), probe: probe)
+
+    await model.load()
+
+    #expect(await probe.inspected == ["/work/web"])
+    #expect(model.recentFolders.first?.availability == .unverified)
+    #expect(model.draft.workingDirectoryPath == documents)
+  }
+
+  @Test("With Full Disk Access, a protected folder is looked at like any other")
+  func protectedFolderIsProbedWithAccess() async {
+    let documents = NSHomeDirectory() + "/Documents/api"
+    let probe = MappedFolders()
+    let model = makeModel(recentFolders: recent(documents), probe: probe, fullDiskAccess: .granted)
+
+    await model.load()
+
+    #expect(await probe.inspected == [documents])
+    #expect(model.recentFolders.first?.availability == .available)
+  }
+
+  @Test("A folder too slow to answer is offered unverified, without holding the sheet")
+  func slowFolderStaysUnverified() async {
+    // Far longer than any busy runner could stretch the budget: the sheet not waiting for this
+    // answer is what the elapsed time shows, not a tight bound a parallel suite would break.
+    let probe = MappedFolders(["/slow": .missing], delay: .seconds(120))
+    let model = makeModel(recentFolders: recent("/slow"), probe: probe, budget: .milliseconds(50))
+    let clock = ContinuousClock()
+
+    let elapsed = await clock.measure { await model.load() }
+
+    #expect(elapsed < .seconds(60))
+    #expect(model.recentFolders.first?.availability == .unverified)
+    #expect(model.draft.workingDirectoryPath == "/slow")
+  }
+
+  @Test("A template with a folder wins over the preselection")
+  func templateOpenedWithAFolder() async {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(recentFolders: recent("/work/web"), templates: [api])
+
+    model.selectTemplate(api.id)
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == "~/Projects/api")
+    #expect(model.preselectedFolder == nil)
+  }
+
+  @Test("A template picked later replaces the preselected folder, and gives it back")
+  func templatePickedAfterPreselection() async {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(recentFolders: recent("/work/web"), templates: [api, templateFeedback])
+    await model.load()
+
+    model.selectTemplate(api.id)
+    #expect(model.draft.workingDirectoryPath == "~/Projects/api")
+
+    // A template without a folder gives back the one that was there before.
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.workingDirectoryPath == "/work/web")
+  }
+
+  @Test("A folder the user picked is theirs: a template no longer replaces it")
+  func chosenFolderIsNotReplacedByATemplate() async {
+    var api = templateReview
+    api.workingDirectoryPath = "~/Projects/api"
+    let model = makeModel(recentFolders: recent("/work/web", "/work/app"), templates: [api])
+    await model.load()
+
+    await model.chooseRecentFolder(model.recentFolders[1])
+    model.selectTemplate(api.id)
+
+    #expect(model.draft.workingDirectoryPath == "/work/app")
+    #expect(model.recentFolders.map { model.isSelected($0) } == [false, true])
+  }
+
+  @Test("Without Full Disk Access, a card of a protected folder fills the field unread")
+  func protectedCardIsNotRead() async {
+    let documents = NSHomeDirectory() + "/Documents/api"
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let creationProbe = CountingFolders()
+    let model = NewSessionModel(
+      create: CreateSession(repository: SpyRepository(), agents: registry, folders: creationProbe),
+      registry: registry,
+      fullDiskAccess: .notGranted,
+      recentFolders: recent("/work/web", documents),
+      folderProbe: MappedFolders()
+    )
+    await model.load()
+
+    await model.chooseRecentFolder(model.recentFolders[1])
+
+    #expect(model.draft.workingDirectoryPath == documents)
+    #expect(await creationProbe.count == 0)
+    #expect(model.preselectedFolder == nil)
+  }
+
+  @Test("A card is checked like a folder handed back by the open panel")
+  func clickingACardChecksTheFolder() async {
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let model = NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(), agents: registry, folders: StubFolders(status: .missing)),
+      registry: registry,
+      recentFolders: recent("/work/web", "/work/app"),
+      folderProbe: MappedFolders()
+    )
+    await model.load()
+
+    await model.chooseRecentFolder(model.recentFolders[1])
+
+    #expect(model.draft.workingDirectoryPath == "/work/app")
+    #expect(model.issues(for: .workingDirectory) == [.workingDirectoryNotFound])
+  }
+
+  @Test("Typing the path of a recent folder lights its card")
+  func typedPathSelectsTheCard() async {
+    let model = makeModel(recentFolders: recent("/work/web", "/work/app"))
+    await model.load()
+
+    model.draft.workingDirectoryPath = "/work/app/"
+
+    #expect(model.recentFolders.map { model.isSelected($0) } == [false, true])
+    model.draft.workingDirectoryPath = "/elsewhere"
+    #expect(!model.recentFolders.contains { model.isSelected($0) })
+  }
+
+  @Test("Three cards, then Show More with the number of the others")
+  func showMore() async {
+    let model = makeModel(recentFolders: recent("/a", "/b", "/c", "/d", "/e"))
+    await model.load()
+
+    #expect(model.shownRecentFolders.map(\.folder.path) == ["/a", "/b", "/c"])
+    #expect(model.hiddenRecentFolderCount == 2)
+
+    model.isShowingMoreFolders = true
+    #expect(model.shownRecentFolders.count == 5)
+  }
+
+  @Test("Three folders or fewer: no Show More")
+  func noShowMoreForThree() async {
+    let model = makeModel(recentFolders: recent("/a", "/b", "/c"))
+    await model.load()
+
+    #expect(model.shownRecentFolders.count == 3)
+    #expect(model.hiddenRecentFolderCount == 0)
+  }
+
+  @Test("Remove from Recents takes the card away and tells the history")
+  func forgettingAFolder() async throws {
+    var forgotten: [RecentFolder] = []
+    let model = makeModel(
+      recentFolders: recent("/a", "/b", "/c", "/d"), forgotten: { forgotten.append($0) })
+    await model.load()
+    model.isShowingMoreFolders = true
+
+    model.forget(try #require(model.recentFolders.last))
+
+    #expect(model.recentFolders.map(\.folder.path) == ["/a", "/b", "/c"])
+    #expect(forgotten.map(\.path) == ["/d"])
+    #expect(!model.isShowingMoreFolders)
+  }
+
+  @Test("Removing the preselected folder empties the field rather than creating there")
+  func forgettingThePreselectedFolder() async {
+    let model = makeModel(recentFolders: recent("/work/api", "/work/web"))
+    await model.load()
+
+    model.forget(model.recentFolders[0])
+
+    #expect(model.draft.workingDirectoryPath == nil)
+    #expect(model.preselectedFolder == nil)
+    #expect(!model.canSubmit)
+  }
+
+  @Test("Removing the folder that had gone takes its remark away, not the proposed one")
+  func forgettingTheSkippedFolder() async {
+    let probe = MappedFolders(["/work/gone": .missing])
+    let model = makeModel(recentFolders: recent("/work/gone", "/work/web"), probe: probe)
+    await model.load()
+
+    model.forget(model.recentFolders[0])
+
+    #expect(model.preselectionNotice == nil)
+    #expect(model.draft.workingDirectoryPath == "/work/web")
+  }
+
+  @Test("A folder seeded by its spelling that links into Documents is never looked at")
+  func linkIntoAProtectedFolderIsNotRead() async throws {
+    let parent = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: parent) }
+    // Dangling on purpose: the test must not open the real Documents folder either.
+    let link = parent.appendingPathComponent("code").path
+    try FileManager.default.createSymbolicLink(
+      atPath: link, withDestinationPath: NSHomeDirectory() + "/Documents/\(UUID().uuidString)")
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let creationProbe = CountingFolders()
+    let probe = MappedFolders()
+    let model = NewSessionModel(
+      create: CreateSession(repository: SpyRepository(), agents: registry, folders: creationProbe),
+      registry: registry,
+      fullDiskAccess: .notGranted,
+      recentFolders: recent(link, "/work/web"),
+      folderProbe: probe
+    )
+
+    await model.load()
+    await model.chooseRecentFolder(model.recentFolders[0])
+
+    #expect(await probe.inspected == ["/work/web"])
+    #expect(model.recentFolders.first?.availability == .unverified)
+    #expect(model.draft.workingDirectoryPath == link)
+    #expect(await creationProbe.count == 0)
+  }
+
+  @Test("Two folders of one name are told apart on their cards")
+  func namesakesOnCards() {
+    let model = makeModel(recentFolders: recent("/work/client-a/api", "/work/client-b/api"))
+
+    #expect(model.recentFolders.map(\.name) == ["api — client-a", "api — client-b"])
+    #expect(model.recentFolders.map(\.location) == ["/work/client-a", "/work/client-b"])
   }
 }

@@ -86,15 +86,24 @@ final class SmokeTests: XCTestCase {
     XCTAssertEqual(found, expected, "Sessions in the four columns together")
   }
 
-  private func createSession(named name: String, in app: XCUIApplication) {
+  private func createSession(named name: String, isFirst: Bool, in app: XCUIApplication) {
     app.typeKey("n", modifierFlags: .command)
     let nameField = app.textFields["new-session-name"]
     XCTAssertTrue(nameField.waitForExistence(timeout: 10))
     nameField.click()
     nameField.typeText(name)
     let folder = app.textFields["new-session-folder"]
-    folder.click()
-    folder.typeText(workDirectory.path)
+    if isFirst {
+      folder.click()
+      folder.typeText(workDirectory.path)
+    } else {
+      // The folder of the previous session is proposed again, with its card (#39). The card is
+      // waited for: the field is only filled once the recent folders have been looked at.
+      XCTAssertTrue(app.buttons["new-session-recent-folder-0"].waitForExistence(timeout: 10))
+      let filled = NSPredicate(format: "value == %@", workDirectory.path)
+      let proposed = expectation(for: filled, evaluatedWith: folder)
+      wait(for: [proposed], timeout: 10)
+    }
     // ⌘↩ creates from anywhere in the form.
     app.typeKey(.return, modifierFlags: .command)
     XCTAssertTrue(
@@ -105,7 +114,7 @@ final class SmokeTests: XCTestCase {
     var app = launch()
 
     for index in 1...3 {
-      createSession(named: "Smoke \(index)", in: app)
+      createSession(named: "Smoke \(index)", isFirst: index == 1, in: app)
     }
     expectSessionRows(3, in: app)
     let terminal = app.descendants(matching: .any).matching(identifier: "terminal").firstMatch

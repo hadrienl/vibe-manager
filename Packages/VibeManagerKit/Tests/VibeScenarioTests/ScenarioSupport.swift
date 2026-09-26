@@ -144,7 +144,7 @@ final class Scenario {
     let model = environment.appModel
     model.beginNewSession()
     let sheet = try #require(model.newSessionModel)
-    await sheet.load(defaultWorkingDirectoryPath: nil)
+    await sheet.load()
     await sheet.refreshAgents(forceRefresh: false)
     await sheet.select(agent: provider)
     sheet.draft.name = name
