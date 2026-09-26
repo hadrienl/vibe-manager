@@ -32,7 +32,9 @@ final class SmokeTests: XCTestCase {
 
   /// In English unless told otherwise, whatever the language of the Mac that runs the test: the
   /// test finds its buttons and menus by their English titles.
-  private func launch(language: String = "en", locale: String = "en_US") -> XCUIApplication {
+  private func launch(
+    language: String = "en", locale: String = "en_US", environment: [String: String] = [:]
+  ) -> XCUIApplication {
     // `Scripts/clean-install-check.sh` points it at the notarized application it installed:
     // `TEST_RUNNER_VIBE_SMOKE_APP` reaches this process as `VIBE_SMOKE_APP`.
     let app =
@@ -43,7 +45,7 @@ final class SmokeTests: XCTestCase {
       "VIBE_DATA_DIRECTORY": dataDirectory.path,
       "VIBE_DEFAULTS_SUITE": suite,
       "VIBE_ENABLE_MOCK_AGENT": "only",
-    ]
+    ].merging(environment) { _, given in given }
     // The launch step about Full Disk Access is not shown, whatever the build is signed as, and no
     // window state is restored.
     app.launchArguments += [
@@ -203,6 +205,61 @@ final class SmokeTests: XCTestCase {
     XCTAssertTrue(create.waitForExistence(timeout: 10))
     XCTAssertEqual(create.label, "Créer et lancer")
     XCTAssertTrue(app.staticTexts["Dossier de travail"].exists)
+    app.typeKey(.escape, modifierFlags: [])
+    app.terminate()
+  }
+
+  /// The menu's shortcuts with the keyboard in the terminal, where it is while working (#65): ⌘W
+  /// asks before stopping the running agent, straight away and after Open Quickly handed the
+  /// keyboard back, and ⌘N opens the New Session sheet.
+  func testMenuShortcutsFromTheTerminal() throws {
+    let app = launch(environment: ["VIBE_MOCK_AGENT_BEHAVIOUR": "--hold"])
+    createSession(named: "Keys", isFirst: true, in: app)
+    let showTerminal = app.radioButtons["Terminal"]
+    if showTerminal.waitForExistence(timeout: 5), (showTerminal.value as? NSNumber)?.intValue != 1 {
+      app.typeKey("t", modifierFlags: [.command, .option])
+    }
+    let terminal = app.descendants(matching: .any).matching(identifier: "terminal").firstMatch
+    XCTAssertTrue(terminal.waitForExistence(timeout: 10))
+    terminal.click()
+
+    // What the menu offers with the keyboard there: which item ⌘W runs, and whether it can.
+    app.menuBars.menuBarItems["Session"].click()
+    let closeSession = app.menuBars.menuItems["Close Session"]
+    let closeTab = app.menuBars.menuItems["Close Tab"]
+    let menu = XCTAttachment(
+      string:
+        "Close Session exists: \(closeSession.exists), enabled: \(closeSession.exists && closeSession.isEnabled); "
+        + "Close Tab exists: \(closeTab.exists)")
+    menu.name = "Session menu with the keyboard in the terminal"
+    menu.lifetime = .keepAlways
+    add(menu)
+    app.typeKey(.escape, modifierFlags: [])
+    terminal.click()
+
+    let confirm = app.buttons["Close Session"].firstMatch
+    app.typeKey("w", modifierFlags: .command)
+    XCTAssertTrue(confirm.waitForExistence(timeout: 5), "⌘W from the terminal asked nothing")
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+
+    // Open Quickly gives the keyboard back to the terminal without the window becoming key again.
+    terminal.click()
+    app.typeKey("p", modifierFlags: .command)
+    let quickOpen = app.textFields["quick-open-field"]
+    XCTAssertTrue(quickOpen.waitForExistence(timeout: 5))
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(quickOpen.waitForNonExistence(timeout: 5))
+    app.typeKey("w", modifierFlags: .command)
+    XCTAssertTrue(
+      confirm.waitForExistence(timeout: 5), "⌘W from the terminal asked nothing after Open Quickly")
+    app.typeKey(.escape, modifierFlags: [])
+    XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+
+    terminal.click()
+    app.typeKey("n", modifierFlags: .command)
+    let nameField = app.textFields["new-session-name"]
+    XCTAssertTrue(nameField.waitForExistence(timeout: 5), "⌘N from the terminal opened nothing")
     app.typeKey(.escape, modifierFlags: [])
     app.terminate()
   }

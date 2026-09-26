@@ -607,11 +607,15 @@ public final class AppEnvironment {
 
   /// `VIBE_ENABLE_MOCK_AGENT=only` offers the mock alone, the way the interface smoke test runs:
   /// on a Mac with Claude Code or Codex installed, they would otherwise come first.
+  /// `VIBE_MOCK_AGENT_BEHAVIOUR` passes its words to the mock's script: `--hold` keeps the agent
+  /// running, for a test that needs a session with something to close.
   private static func providers(
     environment: [String: String], diagnostics: any DiagnosticLog
   ) -> [any AgentProvider] {
+    let behaviour = (environment["VIBE_MOCK_AGENT_BEHAVIOUR"] ?? "")
+      .split(separator: " ").map(String.init)
     if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
-      return [MockAgentProvider(environment: environment)]
+      return [MockAgentProvider(environment: environment, behaviour: behaviour)]
     }
     // One shell for both agents, asked as soon as the application starts: by the time the first
     // session is launched, its answer is usually there.
@@ -624,7 +628,7 @@ public final class AppEnvironment {
         environment: environment, diagnostics: diagnostics, shellEnvironment: shell),
     ]
     if MockAgentProvider.isEnabled(environment: environment) {
-      providers.append(MockAgentProvider(environment: environment))
+      providers.append(MockAgentProvider(environment: environment, behaviour: behaviour))
     }
     return providers
   }
