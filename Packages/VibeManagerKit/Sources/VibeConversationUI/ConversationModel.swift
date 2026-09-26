@@ -65,6 +65,10 @@ public final class ConversationModel {
   public var activity: AgentActivity? {
     didSet { if activity != oldValue { rebuild() } }
   }
+  /// Whether the agent has said it is ready for a prompt. Until its hooks speak, a CLI may still
+  /// show a screen of its own — an update offer, a folder to trust — where the Return that sends a
+  /// prompt would answer that screen instead: Codex installed an update and quit that way.
+  public var isAgentReady = true
   /// Whether the session's process runs. Read through the terminal's own observable state, so
   /// that a view showing the composer follows it.
   @ObservationIgnored public var processRunning: () -> Bool = { false }
@@ -215,6 +219,8 @@ public final class ConversationModel {
     case ready
     /// The agent waits for an answer in its terminal: a prompt typed now would be read as one.
     case awaitingAnswer
+    /// The agent is starting and has not said it is ready.
+    case starting
     case stopped
     /// A provider that cannot be written to from here.
     case unavailable
@@ -223,6 +229,7 @@ public final class ConversationModel {
   public var composerState: ComposerState {
     guard isReadable, write != nil else { return .unavailable }
     guard isProcessRunning else { return .stopped }
+    guard isAgentReady else { return .starting }
     if case .awaitingUser = activity { return .awaitingAnswer }
     return .ready
   }

@@ -57,6 +57,16 @@
         }
       }
     },
+    "%@ is starting. If it asks something first, answer in the terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ démarre. S’il pose une question d’abord, répondez dans le terminal."
+          }
+        }
+      }
+    },
     "%@ is writing…" : {
       "localizations" : {
         "fr" : {

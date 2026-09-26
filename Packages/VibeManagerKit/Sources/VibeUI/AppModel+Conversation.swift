@@ -58,6 +58,7 @@ extension AppModel {
         return self.canRestart(session)
       }
       model.activity = self?.activities[id]?.activity
+      model.isAgentReady = ConversationWorkspace.isReady(self?.activities[id])
     }
   }
 }

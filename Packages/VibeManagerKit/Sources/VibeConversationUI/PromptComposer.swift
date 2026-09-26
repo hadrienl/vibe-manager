@@ -128,6 +128,10 @@ struct PromptComposer: View {
     switch state {
     case .ready: Text("Write to \(model.agentName)…", bundle: .module)
     case .awaitingAnswer: Text("Answer the request in the terminal first", bundle: .module)
+    case .starting:
+      Text(
+        "\(model.agentName) is starting. If it asks something first, answer in the terminal.",
+        bundle: .module)
     case .stopped: Text("The session is stopped.", bundle: .module)
     case .unavailable: Text("Write to the agent in the terminal.", bundle: .module)
     }

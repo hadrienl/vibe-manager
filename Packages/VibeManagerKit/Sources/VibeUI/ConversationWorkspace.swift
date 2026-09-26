@@ -117,8 +117,17 @@ public final class ConversationWorkspace {
     models[id]
   }
 
-  public func activityChanged(_ id: SessionID, to activity: AgentActivity?) {
-    models[id]?.activity = activity
+  public func activityChanged(_ id: SessionID, to state: AgentActivityState?) {
+    models[id]?.activity = state?.activity
+    models[id]?.isAgentReady = Self.isReady(state)
+  }
+
+  /// Ready once the agent's hooks have spoken, or once the activity falls back on the terminal's
+  /// output for an agent whose hooks never do.
+  static func isReady(_ state: AgentActivityState?) -> Bool {
+    guard let state else { return true }
+    if case .unconfirmed = state.source { return false }
+    return true
   }
 
   /// A session was archived, closed for good or forgotten.

@@ -253,6 +253,18 @@ struct ConversationModelTests {
     #expect(!stopped.canSend)
   }
 
+  @Test("Nothing is sent while the agent is starting: its own screens would take the Return")
+  func starting() async {
+    let (model, terminal) = model()
+    model.isAgentReady = false
+    model.draft = "bonjour"
+    #expect(model.composerState == .starting)
+    #expect(await model.send() == false)
+    #expect(terminal.written.isEmpty)
+    model.isAgentReady = true
+    #expect(await model.send())
+  }
+
   @Test("The echo of a prompt goes once the transcript has it")
   func echo() async {
     let (model, _) = model()
