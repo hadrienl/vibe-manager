@@ -229,6 +229,30 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  /// One list, or one section per working folder (#27).
+  public var sidebarMode: SidebarMode {
+    settings.sidebarMode
+  }
+
+  public func setSidebarMode(_ mode: SidebarMode) {
+    updateIntent { $0.sidebarMode = mode }
+  }
+
+  /// The folders whose group the user folded.
+  public var collapsedFolders: Set<SessionFolderKey> {
+    settings.collapsedFolders
+  }
+
+  public func setCollapsed(_ isCollapsed: Bool, folders: Set<SessionFolderKey>) {
+    updateIntent {
+      if isCollapsed {
+        $0.collapsedFolders.formUnion(folders)
+      } else {
+        $0.collapsedFolders.subtract(folders)
+      }
+    }
+  }
+
   /// Whether the agent and the initial prompt are unfolded under the notes.
   public func setSessionDetailsExpanded(_ isExpanded: Bool) {
     guard settings.isSessionDetailsExpanded != isExpanded else { return }

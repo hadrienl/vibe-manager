@@ -19,6 +19,9 @@ public struct SessionDraft: Hashable, Sendable {
   public var templateFill: PromptTemplateFill?
   /// What was typed in the Ticket field (#69): an address, or `#12`. Empty for none.
   public var ticketText: String
+  /// The icon found in the working folder, already turned into the PNG that will be stored. Found
+  /// by the application, never typed: it is the identity a session gets when the user picks none.
+  public var projectIcon: ProjectIcon?
 
   public init(
     name: String = "",
@@ -28,7 +31,8 @@ public struct SessionDraft: Hashable, Sendable {
     appearance: SessionAppearance? = nil,
     workingDirectoryPath: String? = nil,
     templateFill: PromptTemplateFill? = nil,
-    ticketText: String = ""
+    ticketText: String = "",
+    projectIcon: ProjectIcon? = nil
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
@@ -38,6 +42,7 @@ public struct SessionDraft: Hashable, Sendable {
     self.workingDirectoryPath = workingDirectoryPath
     self.templateFill = templateFill
     self.ticketText = ticketText
+    self.projectIcon = projectIcon
   }
 
   /// The name of the template field that names the ticket, whatever its case.
@@ -72,8 +77,20 @@ public struct SessionDraft: Hashable, Sendable {
     effectivePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// A choice the user made wins, always; then the project's icon; then what the name gives.
+  ///
+  /// With the icon, the symbol and the colour are still those of the name: they are what the badge
+  /// falls back on if the icon's file ever goes missing.
   public var effectiveAppearance: SessionAppearance {
-    appearance ?? SessionAppearanceCatalog.derived(forName: name)
+    if let appearance { return appearance }
+    var derived = SessionAppearanceCatalog.derived(forName: name)
+    derived.iconID = projectIcon?.id
+    return derived
+  }
+
+  /// Whether the badge shows the project's icon because nothing else was chosen.
+  public var usesProjectIcon: Bool {
+    appearance == nil && projectIcon != nil
   }
 
   public var resolvedWorkingDirectoryPath: String? {

@@ -164,6 +164,26 @@
         }
       }
     },
+    "Collapse All Groups" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier tous les groupes"
+          }
+        }
+      }
+    },
+    "Collapse Group" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier le groupe"
+          }
+        }
+      }
+    },
     "Copy Notes and Quit" : {
       "localizations" : {
         "fr" : {
@@ -210,6 +230,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modifier les notes"
+          }
+        }
+      }
+    },
+    "Expand All Groups" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier tous les groupes"
+          }
+        }
+      }
+    },
+    "Expand Group" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier le groupe"
           }
         }
       }
@@ -280,6 +320,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Revenez-y pour les terminer, ou quittez sans elles."
+          }
+        }
+      }
+    },
+    "Group Sessions by Folder" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grouper les sessions par dossier"
           }
         }
       }

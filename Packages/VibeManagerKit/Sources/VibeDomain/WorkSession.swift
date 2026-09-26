@@ -179,11 +179,55 @@ public struct SessionAgentConfiguration: Hashable, Codable, Sendable {
 public struct SessionAppearance: Hashable, Codable, Sendable {
   public var symbolName: String
   public var colorHex: String
+  /// The project's own icon, copied into the data folder when the session was created (#27).
+  ///
+  /// The image comes first when there is one. The symbol and the colour are always filled in all
+  /// the same, with what the name would have given: a badge whose file has gone — a store copied
+  /// without its folder, a file removed by hand — falls back on them without a word.
+  public var iconID: SessionIconID?
 
-  public init(symbolName: String = "terminal", colorHex: String = "#5E5CE6") {
+  public init(
+    symbolName: String = "terminal",
+    colorHex: String = "#5E5CE6",
+    iconID: SessionIconID? = nil
+  ) {
     self.symbolName = symbolName
     self.colorHex = colorHex
+    self.iconID = iconID
   }
+}
+
+/// A project icon, named by the SHA-256 of the PNG it was turned into.
+///
+/// Named by its content, so that every session of a folder shares one file and importing the same
+/// icon twice writes nothing. The name becomes a file name: only the 64 lowercase hexadecimal
+/// digits of a digest are accepted, so a value read from the store can never point elsewhere.
+public struct SessionIconID: Hashable, Codable, Sendable, CustomStringConvertible {
+  public let sha256: String
+
+  public init?(sha256: String) {
+    guard sha256.utf8.count == 64,
+      sha256.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+    else { return nil }
+    self.sha256 = sha256
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let value = try decoder.singleValueContainer().decode(String.self)
+    guard let id = SessionIconID(sha256: value) else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath, debugDescription: "Not a SHA-256 digest"))
+    }
+    self = id
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(sha256)
+  }
+
+  public var description: String { sha256 }
 }
 
 public struct PromptTemplateReference: Hashable, Codable, Sendable {

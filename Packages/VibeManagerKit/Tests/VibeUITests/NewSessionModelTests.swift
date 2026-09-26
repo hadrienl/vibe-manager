@@ -658,3 +658,154 @@ struct NewSessionTemplateTests {
     #expect(model.draft.workingDirectoryPath == "/workspace/other")
   }
 }
+
+/// Finds, for each folder, the icon it was given.
+private struct StubIcons: ProjectIconFinding {
+  let icons: [String: ProjectIcon]
+  var delay: Duration = .zero
+
+  func icon(inFolder path: String) async -> ProjectIcon? {
+    try? await Task.sleep(for: delay)
+    return icons[path]
+  }
+}
+
+private func projectIcon(_ digit: Character) -> ProjectIcon {
+  // The digest is only a name here: the tests never read the bytes as an image.
+  guard let id = SessionIconID(sha256: String(repeating: digit, count: 64)) else {
+    preconditionFailure("Not a digest")
+  }
+  return ProjectIcon(id: id, pngData: Data([UInt8(digit.asciiValue ?? 0)]))
+}
+
+@MainActor
+@Suite("The project icon in the new session sheet")
+struct NewSessionProjectIconTests {
+  private func makeModel(
+    icons: [String: ProjectIcon],
+    delay: Duration = .zero,
+    repository: SpyRepository = SpyRepository(),
+    store: InMemorySessionIconStore = InMemorySessionIconStore()
+  ) -> NewSessionModel {
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    return NewSessionModel(
+      create: CreateSession(
+        repository: repository, agents: registry, folders: StubFolders(status: .usable),
+        icons: store),
+      registry: registry,
+      projectIcons: StubIcons(icons: icons, delay: delay))
+  }
+
+  @Test("A folder's icon is the default, in place of what the name gives")
+  func iconIsTheDefault() async throws {
+    let icon = projectIcon("a")
+    let repository = SpyRepository()
+    let store = InMemorySessionIconStore()
+    let model = makeModel(icons: ["/work/api": icon], repository: repository, store: store)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+
+    await model.folderChosen("/work/api")
+    await waitUntil { model.draft.projectIcon != nil }
+
+    #expect(model.usesProjectIcon)
+    #expect(model.draft.effectiveAppearance.iconID == icon.id)
+    _ = try #require(await model.submit())
+    #expect(await repository.savedSessions.first?.appearance.iconID == icon.id)
+    #expect(await store.pngData(for: icon.id) == icon.pngData)
+  }
+
+  @Test("A symbol picked by the user is never replaced, not even by another folder's icon")
+  func explicitChoiceIsKept() async {
+    let model = makeModel(icons: ["/work/api": projectIcon("a"), "/work/web": projectIcon("b")])
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+    await model.folderChosen("/work/api")
+    await waitUntil { model.draft.projectIcon != nil }
+
+    let chosen = SessionAppearance(symbolName: "bolt", colorHex: "#0B63E5")
+    model.draft.appearance = chosen
+    await model.folderChosen("/work/web")
+    await waitUntil { model.draft.projectIcon != nil }
+
+    #expect(model.draft.effectiveAppearance == chosen)
+    #expect(!model.usesProjectIcon)
+    model.useProjectIcon()
+    #expect(model.draft.effectiveAppearance.iconID == projectIcon("b").id)
+  }
+
+  @Test("Without an icon, the name decides, as it always has")
+  func noIcon() async {
+    let model = makeModel(icons: [:])
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+
+    await model.folderChosen("/work/api")
+
+    #expect(model.draft.projectIcon == nil)
+    #expect(
+      model.draft.effectiveAppearance == SessionAppearanceCatalog.derived(forName: "Refactor"))
+  }
+
+  @Test("An answer about a folder the field no longer names is dropped")
+  func staleAnswerIsDropped() async throws {
+    let model = makeModel(icons: ["/work/api": projectIcon("a")], delay: .milliseconds(100))
+    await model.load(defaultWorkingDirectoryPath: nil)
+
+    await model.folderChosen("/work/api")
+    model.draft.workingDirectoryPath = "/work/other"
+    model.draftChanged()
+    try await Task.sleep(for: .milliseconds(250))
+
+    #expect(model.draft.projectIcon == nil)
+  }
+
+  @Test("An icon that cannot be kept leaves the session created, wearing its name")
+  func failedWriteStillCreates() async throws {
+    struct Full: Error {}
+    let repository = SpyRepository()
+    let model = makeModel(
+      icons: ["/work/api": projectIcon("a")], repository: repository,
+      store: InMemorySessionIconStore(failure: Full()))
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+    await model.folderChosen("/work/api")
+    await waitUntil { model.draft.projectIcon != nil }
+
+    _ = try #require(await model.submit())
+
+    let saved = await repository.savedSessions.first?.appearance
+    #expect(saved == SessionAppearanceCatalog.derived(forName: "Refactor"))
+  }
+
+  @Test("Editing the folder and coming back to it finds its icon again")
+  func comingBackToTheFolder() async throws {
+    let repository = SpyRepository()
+    let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+    await model.folderChosen("/work/api")
+    await waitUntil { model.draft.projectIcon != nil }
+
+    model.draft.workingDirectoryPath = "/work/ap"
+    model.draftChanged()
+    model.draft.workingDirectoryPath = "/work/api"
+    model.draftChanged()
+    _ = try #require(await model.submit())
+
+    #expect(await repository.savedSessions.first?.appearance.iconID == projectIcon("a").id)
+  }
+
+  @Test("A typed folder gets its icon at creation")
+  func typedFolderAtCreation() async throws {
+    let repository = SpyRepository()
+    let model = makeModel(icons: ["/work/api": projectIcon("a")], repository: repository)
+    await model.load(defaultWorkingDirectoryPath: nil)
+    model.draft.name = "Refactor"
+    model.draft.workingDirectoryPath = "/work/api"
+
+    _ = try #require(await model.submit())
+
+    #expect(await repository.savedSessions.first?.appearance.iconID == projectIcon("a").id)
+  }
+}

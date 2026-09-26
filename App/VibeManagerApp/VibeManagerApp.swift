@@ -32,6 +32,15 @@ struct VibeManagerApp: App {
   @State private var windowFocus = WindowFocus()
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+  /// How long a help tag waits before showing, in milliseconds. The system's own delay is long
+  /// enough that the small buttons of the sidebar's foot read as unlabelled. Registered as a
+  /// default, so a value the user set with `defaults write` still wins.
+  private static let toolTipDelay = 400
+
+  init() {
+    UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": Self.toolTipDelay])
+  }
+
   var body: some Scene {
     WindowGroup {
       RootView(model: environment.appModel)
@@ -106,6 +115,10 @@ struct VibeManagerApp: App {
         .keyboardShortcut(.upArrow, modifiers: [.command, .option])
 
         SessionPositionCommands(model: environment.appModel)
+
+        Divider()
+
+        GroupCommands(model: environment.appModel)
 
         Divider()
 
@@ -233,18 +246,58 @@ private struct SessionPositionCommands: View {
         model.select(position: position)
       }
       .keyboardShortcut(KeyEquivalent(Character("\(position)")), modifiers: .command)
-      .disabled(model.sessions.count < position)
+      .disabled(model.displayedSessions.count < position)
     }
   }
 
+  /// The rows as the sidebar draws them, so the menu names the session the shortcut selects.
   private func label(for position: Int) -> String {
     let index = position - 1
-    guard model.sessions.indices.contains(index) else {
+    let displayed = model.displayedSessions
+    guard displayed.indices.contains(index) else {
       return String(
         localized: "Session \(position)",
         comment: "A menu item for the session at this position in the list, when there is none.")
     }
-    return model.sessions[index].name
+    return displayed[index].name
+  }
+}
+
+/// The sidebar by working folder (#27): the mode, and folding from the keyboard. ⌥⌘← and ⌥⌘→
+/// fold and unfold the group of the selected session, beside ⌥⌘↑ and ⌥⌘↓ that walk it.
+private struct GroupCommands: View {
+  let model: AppModel
+
+  var body: some View {
+    Toggle(
+      "Group Sessions by Folder",
+      isOn: Binding(
+        get: { model.sidebarMode == .byFolder },
+        set: { model.setSidebarMode($0 ? .byFolder : .flat) })
+    )
+    .keyboardShortcut("g", modifiers: [.command, .control])
+
+    Button("Collapse Group") {
+      model.collapseSelectedGroup()
+    }
+    .keyboardShortcut(.leftArrow, modifiers: [.command, .option, .control])
+    .disabled(model.selectedGroup == nil || !model.canFold)
+
+    Button("Expand Group") {
+      model.expandSelectedGroup()
+    }
+    .keyboardShortcut(.rightArrow, modifiers: [.command, .option, .control])
+    .disabled(model.selectedGroup == nil || !model.canFold)
+
+    Button("Collapse All Groups") {
+      model.setAllGroupsExpanded(false)
+    }
+    .disabled(model.groups.isEmpty || !model.canFold)
+
+    Button("Expand All Groups") {
+      model.setAllGroupsExpanded(true)
+    }
+    .disabled(model.groups.isEmpty || !model.canFold)
   }
 }
 

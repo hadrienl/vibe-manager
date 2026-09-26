@@ -84,7 +84,7 @@ struct SessionStoreMigrationTests {
 
     let rewritten = try JSONSerialization.jsonObject(with: try Data(contentsOf: storeURL))
     let object = try #require(rewritten as? [String: Any])
-    #expect(object["schemaVersion"] as? Int == 6)
+    #expect(object["schemaVersion"] as? Int == 7)
   }
 
   @Test("An empty v1 model becomes no model, never a model named nothing")

@@ -26,20 +26,30 @@ public struct SessionStatusPresentation: Equatable, Sendable {
   public let agentActivity: AgentActivity?
   /// The agent waits for the user — a question, a permission, an answer not read yet (#45).
   public let needsAttention: Bool
+  /// The process is starting, or being restored: something is under way, nothing to read yet.
+  public let isStarting: Bool
 
   public init(
     label: LocalizedStringResource,
     symbolName: String,
     severity: SessionStatusSeverity,
     agentActivity: AgentActivity? = nil,
-    needsAttention: Bool = false
+    needsAttention: Bool = false,
+    isStarting: Bool = false
   ) {
     self.label = label
     self.symbolName = symbolName
     self.severity = severity
     self.agentActivity = agentActivity
     self.needsAttention = needsAttention
+    self.isStarting = isStarting
   }
+
+  /// What a session being restored shows: said on its row, and counted in its group.
+  public static let restoring = SessionStatusPresentation(
+    label: LocalizedStringResource(
+      "Restoring…", bundle: .module, comment: "A session's state, in the sidebar."),
+    symbolName: "arrow.clockwise", severity: .normal, isStarting: true)
 
   /// Whether the symbol moves: only a working agent's does, and never with Reduce Motion on.
   public var isAnimated: Bool {
@@ -171,7 +181,7 @@ public struct SessionStatusPresentation: Equatable, Sendable {
       return SessionStatusPresentation(
         label: LocalizedStringResource(
           "Starting", bundle: .module, comment: "A session's state, in the sidebar."),
-        symbolName: "hourglass", severity: .normal)
+        symbolName: "hourglass", severity: .normal, isStarting: true)
     case .running:
       return agent(activity ?? AgentActivityState())
     case .exited(let code) where code == 0:

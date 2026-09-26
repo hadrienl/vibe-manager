@@ -468,6 +468,17 @@
         }
       }
     },
+    "%@ — Folder not found" : {
+      "comment" : "The help tag of a group whose working folder was moved or deleted.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — Dossier introuvable"
+          }
+        }
+      }
+    },
     "%@ — running" : {
       "comment" : "The session's current agent and model, which is running.",
       "localizations" : {
@@ -1159,6 +1170,53 @@
         }
       }
     },
+    "%lld need attention" : {
+      "comment" : "How many sessions of a group wait for the user.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld needs attention"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld need attention"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld actions requises"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld action requise"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld actions requises"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld new" : {
       "comment" : "How many agent actions were recorded since the trace was last opened.",
       "localizations" : {
@@ -1479,6 +1537,53 @@
         }
       }
     },
+    "%lld sessions" : {
+      "comment" : "How many sessions a group of the sidebar holds.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sessions came back." : {
       "localizations" : {
         "en" : {
@@ -1792,6 +1897,100 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld non suivis"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld with an error" : {
+      "comment" : "How many sessions of a group ended badly or lost their agent.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld with an error"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld with errors"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en erreur"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en erreur"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en erreur"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld working" : {
+      "comment" : "How many sessions of a group have an agent at work.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld working"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld working"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en cours"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en cours"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en cours"
                 }
               }
             }
@@ -2614,7 +2813,29 @@
         }
       }
     },
+    "Collapse" : {
+      "comment" : "Folds a group of the sidebar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier"
+          }
+        }
+      }
+    },
+    "Collapse Group" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier le groupe"
+          }
+        }
+      }
+    },
     "Collapsed" : {
+      "comment" : "A group of the sidebar.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2663,6 +2884,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conflits"
+          }
+        }
+      }
+    },
+    "Contains the selected session" : {
+      "comment" : "Read out by VoiceOver on a folded group.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contient la session sélectionnée"
           }
         }
       }
@@ -3156,7 +3388,29 @@
         }
       }
     },
+    "Expand" : {
+      "comment" : "Unfolds a group of the sidebar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier"
+          }
+        }
+      }
+    },
+    "Expand Group" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier le groupe"
+          }
+        }
+      }
+    },
     "Expanded" : {
+      "comment" : "A group of the sidebar.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3309,6 +3563,17 @@
         }
       }
     },
+    "Folder not found" : {
+      "comment" : "The working folder of a group has been moved or deleted.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossier introuvable"
+          }
+        }
+      }
+    },
     "Forward" : {
       "localizations" : {
         "fr" : {
@@ -3353,6 +3618,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À partir du prochain lancement d’un agent."
+          }
+        }
+      }
+    },
+    "From the project folder until you pick one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tirée du dossier du projet tant que vous n’en choisissez pas."
           }
         }
       }
@@ -3450,12 +3725,43 @@
         }
       }
     },
+    "Group Sessions by Folder" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grouper les sessions par dossier"
+          }
+        }
+      }
+    },
     "Group by" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grouper par"
+          }
+        }
+      }
+    },
+    "Group name" : {
+      "comment" : "The field that renames a group.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom du groupe"
+          }
+        }
+      }
+    },
+    "Group the sessions by working folder (⌃⌘G)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grouper les sessions par dossier de travail (⌃⌘G)"
           }
         }
       }
@@ -4080,6 +4386,16 @@
         }
       }
     },
+    "New Session in This Folder" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle session dans ce dossier"
+          }
+        }
+      }
+    },
     "New Tab" : {
       "localizations" : {
         "fr" : {
@@ -4107,6 +4423,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle réponse"
+          }
+        }
+      }
+    },
+    "No Folder" : {
+      "comment" : "The group of the sessions that have no working folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans dossier"
           }
         }
       }
@@ -4759,6 +5086,16 @@
         }
       }
     },
+    "OK" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
     "Only the first %lld changes are listed; the counts are exact." : {
       "localizations" : {
         "fr" : {
@@ -4971,6 +5308,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confidentialité"
+          }
+        }
+      }
+    },
+    "Project icon" : {
+      "comment" : "The icon found in the working folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icône du projet"
           }
         }
       }
@@ -5220,6 +5568,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer le dossier"
+          }
+        }
+      }
+    },
+    "Rename" : {
+      "comment" : "Renames a group.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        }
+      }
+    },
+    "Rename Group…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer le groupe…"
           }
         }
       }
@@ -6024,6 +6393,16 @@
         }
       }
     },
+    "Show the sessions as one list (⌃⌘G)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les sessions en une seule liste (⌃⌘G)"
+          }
+        }
+      }
+    },
     "Show the web view when an agent opens a page" : {
       "localizations" : {
         "fr" : {
@@ -6711,6 +7090,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La première correspondance, ou son premier groupe s’il y en a un."
+          }
+        }
+      }
+    },
+    "The group could not be renamed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le groupe n’a pas pu être renommé."
           }
         }
       }
@@ -7522,6 +7911,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le suivi de l’utilisation est désactivé."
+          }
+        }
+      }
+    },
+    "Use Folder Name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser le nom du dossier"
           }
         }
       }

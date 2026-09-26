@@ -3,7 +3,8 @@ import VibeApplication
 import VibeDomain
 
 /// The sidebar as a task board (#80): four columns behind four tabs, and a swipe on a row to move
-/// its session to another one.
+/// its session to another one. Grouped by folder (#27), the column on screen is cut into one
+/// foldable section per working folder; the swipe works the same in every section.
 ///
 /// Only the column on screen is a list. A swipe slides the row under the fingers aside, and
 /// uncovers the buttons of the statuses next to its own; the rest of the column does not move. A
@@ -64,10 +65,28 @@ struct SessionSidebar: View {
   }
 
   private func list(width: CGFloat) -> some View {
-    List(selection: Binding(get: { model.selectedSessionID }, set: { model.select($0) })) {
-      ForEach(Array(model.visibleSessions.enumerated()), id: \.element.id) { index, session in
-        row(for: session, index: index, width: width)
-          .tag(session.id)
+    // Only the rows a shortcut can reach claim one, numbered in the order they are drawn.
+    let positions = Dictionary(
+      uniqueKeysWithValues: model.displayedSessions.prefix(AppModel.shortcutPositionLimit)
+        .enumerated().map { ($0.element.id, $0.offset + 1) })
+    return List(
+      selection: Binding(get: { model.selectedSessionID }, set: { model.selectFromList($0) })
+    ) {
+      switch model.sidebarContent {
+      case .flat(let sessions):
+        rows(sessions, positions: positions, width: width)
+      case .grouped(let groups):
+        ForEach(groups) { group in
+          Section(
+            isExpanded: Binding(
+              get: { model.isExpanded(group) },
+              set: { model.setExpanded($0, group: group) })
+          ) {
+            rows(group.sessions, positions: positions, width: width)
+          } header: {
+            SessionGroupHeader(model: model, group: group)
+          }
+        }
       }
     }
     .listStyle(.sidebar)
@@ -82,6 +101,16 @@ struct SessionSidebar: View {
     }
     .accessibilityLabel(Text("Sessions", bundle: .module))
     .accessibilityIdentifier("session-list")
+    .alert(
+      Text("The group could not be renamed.", bundle: .module),
+      isPresented: Binding(
+        get: { model.folderLabelFailure != nil },
+        set: { if !$0 { model.dismissFolderLabelFailure() } })
+    ) {
+      Button(LocalizedStringResource("OK", bundle: .module)) { model.dismissFolderLabelFailure() }
+    } message: {
+      Text(verbatim: model.folderLabelFailure ?? "")
+    }
     .overlay {
       if model.visibleSessions.isEmpty {
         emptyState
@@ -89,16 +118,25 @@ struct SessionSidebar: View {
     }
   }
 
-  private func row(for session: WorkSession, index: Int, width: CGFloat) -> some View {
+  private func rows(
+    _ sessions: [WorkSession], positions: [SessionID: Int], width: CGFloat
+  ) -> some View {
+    ForEach(sessions) { session in
+      row(for: session, position: positions[session.id], width: width)
+        .tag(session.id)
+    }
+  }
+
+  private func row(for session: WorkSession, position: Int?, width: CGFloat) -> some View {
     let isSwiped = swipe?.sessionID == session.id
     let commands = SessionCommands(model: model, session: session)
     return SessionRow(
       session: session,
+      icon: model.icons.image(for: session.appearance.iconID),
       status: model.statusPresentation(for: session),
       isRestoring: model.isRestoring(session.id),
       webView: model.webViewAttention(for: session.id),
-      // Only the rows a shortcut can reach claim one.
-      shortcutPosition: index < AppModel.shortcutPositionLimit ? index + 1 : nil,
+      shortcutPosition: position,
       commands: commands
     )
     // Only the swiped row moves, out of the way of its buttons. With Reduce Motion it stays,
@@ -150,13 +188,15 @@ struct SessionSidebar: View {
     )
   }
 
-  /// - Parameter row: the row of the table under the fingers, which the list draws one per
-  ///   session, in order. The hover is only asked when the table could not say.
+  /// - Parameter row: the row of the table under the fingers, as `tableRows` numbers them. The
+  ///   hover is only asked when the table could not say.
   private func beginTrackpadSwipe(row: Int?, width: CGFloat) -> Bool {
     let visible = model.visibleSessions
     let session: WorkSession?
     if let row {
-      session = visible.indices.contains(row) ? visible[row] : nil
+      let rows = tableRows
+      let id = rows.indices.contains(row) ? rows[row] : nil
+      session = id.flatMap { id in visible.first { $0.id == id } }
     } else {
       session = hoveredSessionID.flatMap { id in visible.first { $0.id == id } }
     }
@@ -166,6 +206,19 @@ struct SessionSidebar: View {
       swipe = makeSwipe(for: session, width: width)
     }
     return true
+  }
+
+  /// The session each row of the table draws, in order: a group's header is a row of its own,
+  /// with no session to swipe, and the sessions of a folded group are no rows at all.
+  private var tableRows: [SessionID?] {
+    switch model.sidebarContent {
+    case .flat(let sessions):
+      return sessions.map(\.id)
+    case .grouped(let groups):
+      return groups.flatMap { group -> [SessionID?] in
+        [nil] + (model.isExpanded(group) ? group.sessions.map(\.id) : [])
+      }
+    }
   }
 
   /// The pointer's equivalent: a drag that starts out horizontal.

@@ -36,6 +36,12 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   public var browserWidth: Double
   /// Which pane is shown above the notes: the session's activity (#36) or Git.
   public var inspectorTopTab: InspectorTopTab
+  /// One list, or one section per working folder (#27). Flat until the user asks: grouping
+  /// rearranges the sidebar, and it is not the application's to do that unasked.
+  public var sidebarMode: SidebarMode
+  /// The folders whose group is folded. Never pruned: a group that went away because all of its
+  /// sessions were archived folds back the way it was if it returns.
+  public var collapsedFolders: Set<SessionFolderKey>
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -47,7 +53,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     inspectorSplit: Double = 0.6,
     isSessionDetailsExpanded: Bool = true,
     browserWidth: Double = 520,
-    inspectorTopTab: InspectorTopTab = .activity
+    inspectorTopTab: InspectorTopTab = .activity,
+    sidebarMode: SidebarMode = .flat,
+    collapsedFolders: Set<SessionFolderKey> = []
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -59,11 +67,14 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.isSessionDetailsExpanded = isSessionDetailsExpanded
     self.browserWidth = Self.bounded(browserWidth, in: Self.browserWidthRange, fallback: 520)
     self.inspectorTopTab = inspectorTopTab
+    self.sidebarMode = sidebarMode
+    self.collapsedFolders = collapsedFolders
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
     case sessionFilter, inspectorSplit, isSessionDetailsExpanded, browserWidth, inspectorTopTab
+    case sidebarMode, collapsedFolders
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -86,7 +97,13 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       // A tab written by a later version and unknown here falls back rather than failing the
       // whole layout.
       inspectorTopTab: (try? container.decodeIfPresent(
-        InspectorTopTab.self, forKey: .inspectorTopTab)) ?? .activity
+        InspectorTopTab.self, forKey: .inspectorTopTab)) ?? .activity,
+      // Each on its own terms, like the filter: a mode written by a later build costs the user
+      // the grouping at worst, never the rest of the layout.
+      sidebarMode: (try? container.decodeIfPresent(SidebarMode.self, forKey: .sidebarMode))
+        ?? .flat,
+      collapsedFolders: (try? container.decodeIfPresent(
+        Set<SessionFolderKey>.self, forKey: .collapsedFolders)) ?? []
     )
   }
 }

@@ -360,21 +360,35 @@ public struct NewSessionSheet: View {
   private var appearanceField: some View {
     LabeledField(
       Text("Appearance", bundle: .module, comment: "The symbol and colour of the session."),
-      help: model.draft.appearance == nil
-        ? Text("Derived from the name until you pick one.", bundle: .module)
-        : model.appearanceComesFromTemplate
-          ? Text("Given by the template — pick another if needed.", bundle: .module) : nil,
+      help: model.usesProjectIcon
+        ? Text("From the project folder until you pick one.", bundle: .module)
+        : model.draft.appearance == nil
+          ? Text("Derived from the name until you pick one.", bundle: .module)
+          : model.appearanceComesFromTemplate
+            ? Text("Given by the template — pick another if needed.", bundle: .module) : nil,
       issues: model.issues(for: .appearance)
     ) {
       HStack(alignment: .top, spacing: 14) {
-        SessionBadge(appearance: model.draft.effectiveAppearance, size: 46)
+        SessionBadge(
+          appearance: model.draft.effectiveAppearance,
+          icon: model.icons?.image(for: model.draft.effectiveAppearance.iconID), size: 46)
 
         VStack(alignment: .leading, spacing: 8) {
           HStack(spacing: 6) {
+            // Offered only when the folder has one, to come back to it after picking something
+            // else.
+            if let icon = model.draft.projectIcon {
+              ProjectIconChoice(
+                image: model.icons?.image(for: icon.id),
+                isSelected: model.usesProjectIcon,
+                select: { model.useProjectIcon() }
+              )
+            }
             ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
               SymbolChoice(
                 symbol: symbol,
-                isSelected: model.draft.effectiveAppearance.symbolName == symbol,
+                isSelected: !model.usesProjectIcon
+                  && model.draft.effectiveAppearance.symbolName == symbol,
                 select: { pickSymbol(symbol) }
               )
             }
@@ -383,7 +397,8 @@ public struct NewSessionSheet: View {
             ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
               ColorChoice(
                 hex: hex,
-                isSelected: model.draft.effectiveAppearance.colorHex == hex,
+                isSelected: !model.usesProjectIcon
+                  && model.draft.effectiveAppearance.colorHex == hex,
                 select: { pickColor(hex) }
               )
             }
@@ -698,6 +713,43 @@ struct SymbolChoice: View {
     }
     .buttonStyle(.plain)
     .accessibilityLabel(Text(symbol))
+    .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+  }
+}
+
+/// The project's own icon, among the symbols of the catalogue.
+struct ProjectIconChoice: View {
+  let image: NSImage?
+  let isSelected: Bool
+  let select: () -> Void
+
+  var body: some View {
+    Button(action: select) {
+      Group {
+        if let image {
+          Image(nsImage: image)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .padding(3)
+        } else {
+          Image(systemName: "photo")
+        }
+      }
+      .frame(width: 26, height: 26)
+      .overlay(
+        RoundedRectangle(cornerRadius: 7)
+          .strokeBorder(
+            isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
+            lineWidth: isSelected ? 2 : 1
+          )
+      )
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .help(Text("Project icon", bundle: .module, comment: "The icon found in the working folder."))
+    .accessibilityLabel(
+      Text("Project icon", bundle: .module, comment: "The icon found in the working folder.")
+    )
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
   }
 }
