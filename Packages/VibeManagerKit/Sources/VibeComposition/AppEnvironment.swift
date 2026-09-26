@@ -98,7 +98,7 @@ public final class AppEnvironment {
     // A folder made by an early build or restored from a backup keeps whatever mode it had; the
     // application's own are brought back to owner only before anything is read from them.
     let repaired = DataDirectoryPermissions.repair([
-      data.store.deletingLastPathComponent(), data.notes, data.usage, data.logs,
+      data.store.deletingLastPathComponent(), data.notes, data.journal, data.usage, data.logs,
     ])
     let diagnosticsLocation = DiagnosticsLocation(directory: data.logs)
     self.diagnosticsLocation = diagnosticsLocation
@@ -258,6 +258,20 @@ public final class AppEnvironment {
     )
     self.permissions = permissions
     let transcripts = AgentTranscriptReader()
+    // Each session's journal (#36): read from the transcripts of every active session, summarized
+    // by its own agent, kept in a file per session beside the notes.
+    let journalPreferences = UserDefaultsJournalPreferences(suiteName: data.defaultsSuite)
+    let journal = SessionJournalModel(
+      monitor: SessionJournalMonitor(
+        store: FileSessionJournalStore(directory: data.journal),
+        reader: SessionJournalReader(),
+        repositories: GitRepositoryIdentityResolver(
+          git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
+        summarizers: AgentSessionSummarizers(agents: registry),
+        events: FSEventsFileChangeObserver(),
+        repository: repository,
+        summariesEnabled: journalPreferences.summariesEnabled),
+      preferences: journalPreferences)
     appModel = AppModel(
       repository: repository,
       recovery: repository,
@@ -311,7 +325,8 @@ public final class AppEnvironment {
               environment: configuration.environment) != nil,
             crashReports: configuration.crashReports))
       },
-      archiveDiagnostics: { files, date in ZipArchiveWriter.archive(files, at: date) }
+      archiveDiagnostics: { files, date in ZipArchiveWriter.archive(files, at: date) },
+      journal: journal
     )
   }
 
@@ -505,6 +520,7 @@ public final class AppEnvironment {
     let store: URL
     let runtime: URL
     let notes: URL
+    let journal: URL
     let templates: URL
     let usage: URL
     let logs: URL
@@ -524,6 +540,7 @@ public final class AppEnvironment {
         store: FileSessionRepository.defaultStoreURL(),
         runtime: FileSessionRuntimeStateStore.defaultURL(),
         notes: FileSessionNotesStore.defaultDirectory(),
+        journal: FileSessionJournalStore.defaultDirectory(),
         templates: FilePromptTemplateRepository.defaultStoreURL(),
         usage: UsageStorage.defaultDirectory(),
         logs: DiagnosticsLocation.standard().directory,
@@ -534,6 +551,7 @@ public final class AppEnvironment {
       store: folder.appendingPathComponent("sessions.json"),
       runtime: folder.appendingPathComponent("runtime.json"),
       notes: folder.appendingPathComponent("Notes", isDirectory: true),
+      journal: folder.appendingPathComponent("Journal", isDirectory: true),
       templates: folder.appendingPathComponent("templates.json"),
       usage: folder.appendingPathComponent("Usage", isDirectory: true),
       logs: folder.appendingPathComponent("Logs", isDirectory: true),

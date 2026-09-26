@@ -236,6 +236,13 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  /// Activity or Git, above the notes.
+  public func setInspectorTopTab(_ tab: InspectorTopTab) {
+    guard settings.inspectorTopTab != tab else { return }
+    settings.inspectorTopTab = tab
+    scheduleSave()
+  }
+
   /// Writes whatever is pending right away. Called when the application is about to quit, where
   /// waiting out the delay would mean losing the last arrangement.
   public func flush() async {

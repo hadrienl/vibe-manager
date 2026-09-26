@@ -34,6 +34,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// The width of the web view, common to every session: whether it is shown is the session's own
   /// business (#69), how wide it is is this Mac's.
   public var browserWidth: Double
+  /// Which pane is shown above the notes: the session's activity (#36) or Git.
+  public var inspectorTopTab: InspectorTopTab
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -44,7 +46,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     sessionFilter: SessionFilter = SessionFilter(),
     inspectorSplit: Double = 0.6,
     isSessionDetailsExpanded: Bool = true,
-    browserWidth: Double = 520
+    browserWidth: Double = 520,
+    inspectorTopTab: InspectorTopTab = .activity
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -55,11 +58,12 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.inspectorSplit = Self.bounded(inspectorSplit, in: Self.inspectorSplitRange, fallback: 0.6)
     self.isSessionDetailsExpanded = isSessionDetailsExpanded
     self.browserWidth = Self.bounded(browserWidth, in: Self.browserWidthRange, fallback: 520)
+    self.inspectorTopTab = inspectorTopTab
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
-    case sessionFilter, inspectorSplit, isSessionDetailsExpanded, browserWidth
+    case sessionFilter, inspectorSplit, isSessionDetailsExpanded, browserWidth, inspectorTopTab
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -78,9 +82,19 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       inspectorSplit: try container.decodeIfPresent(Double.self, forKey: .inspectorSplit) ?? 0.6,
       isSessionDetailsExpanded: try container.decodeIfPresent(
         Bool.self, forKey: .isSessionDetailsExpanded) ?? true,
-      browserWidth: (try? container.decodeIfPresent(Double.self, forKey: .browserWidth)) ?? 520
+      browserWidth: (try? container.decodeIfPresent(Double.self, forKey: .browserWidth)) ?? 520,
+      // A tab written by a later version and unknown here falls back rather than failing the
+      // whole layout.
+      inspectorTopTab: (try? container.decodeIfPresent(
+        InspectorTopTab.self, forKey: .inspectorTopTab)) ?? .activity
     )
   }
+}
+
+/// The panes the top of the inspector switches between.
+public enum InspectorTopTab: String, Hashable, Codable, Sendable, CaseIterable {
+  case activity
+  case git
 }
 
 extension WorkspaceLayout {

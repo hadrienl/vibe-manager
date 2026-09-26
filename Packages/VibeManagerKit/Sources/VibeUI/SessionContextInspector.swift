@@ -28,6 +28,9 @@ struct SessionContextInspector: View {
   private let usage: UsageModel?
   private let isDetailsExpanded: Bool
   private let detailsExpandedChanged: (Bool) -> Void
+  private let journal: SessionJournalModel?
+  private let topTab: InspectorTopTab
+  private let topTabChanged: (InspectorTopTab) -> Void
 
   init(
     session: WorkSession,
@@ -46,9 +49,15 @@ struct SessionContextInspector: View {
     leaveNotes: @escaping () -> Void = {},
     usage: UsageModel? = nil,
     isDetailsExpanded: Bool = true,
-    detailsExpandedChanged: @escaping (Bool) -> Void = { _ in }
+    detailsExpandedChanged: @escaping (Bool) -> Void = { _ in },
+    journal: SessionJournalModel? = nil,
+    topTab: InspectorTopTab = .activity,
+    topTabChanged: @escaping (InspectorTopTab) -> Void = { _ in }
   ) {
     self.session = session
+    self.journal = journal
+    self.topTab = topTab
+    self.topTabChanged = topTabChanged
     self.notes = notes
     self.leaveNotes = leaveNotes
     self.usage = usage
@@ -73,21 +82,55 @@ struct SessionContextInspector: View {
 
   var body: some View {
     InspectorSplit(fraction: split, onChange: splitChanged) {
-      GitPane(
-        session: session,
-        branchReport: branchReport,
-        statuses: repositoryStatuses,
-        sessionNames: sessionNames,
-        refresh: refreshBranches,
-        openPrivacySettings: openPrivacySettings,
-        git: git
-      )
+      if let journal {
+        VStack(spacing: 0) {
+          Picker(
+            selection: Binding(get: { topTab }, set: { topTabChanged($0) })
+          ) {
+            Text("Activity", bundle: .module, comment: "A tab of the inspector.")
+              .tag(InspectorTopTab.activity)
+            Text(verbatim: "Git").tag(InspectorTopTab.git)
+          } label: {
+            Text("Show", bundle: .module, comment: "Chooses the pane above the notes.")
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+          .padding(.horizontal, 12)
+          .padding(.vertical, 6)
+          switch topTab {
+          case .activity:
+            ActivityPane(
+              session: session,
+              agentName: session.agent.flatMap { agentNames[$0.providerID] }
+                ?? session.agent?.providerID ?? "",
+              journal: journal)
+          case .git:
+            gitPane
+          }
+        }
+      } else {
+        gitPane
+      }
     } bottom: {
       SessionPane(
         session: session, resolution: resolution, agentNames: agentNames,
         switchAgent: switchAgent, notes: notes, leaveNotes: leaveNotes, usage: usage,
         isDetailsExpanded: isDetailsExpanded, detailsExpandedChanged: detailsExpandedChanged)
     }
+  }
+}
+
+extension SessionContextInspector {
+  fileprivate var gitPane: some View {
+    GitPane(
+      session: session,
+      branchReport: branchReport,
+      statuses: repositoryStatuses,
+      sessionNames: sessionNames,
+      refresh: refreshBranches,
+      openPrivacySettings: openPrivacySettings,
+      git: git
+    )
   }
 }
 

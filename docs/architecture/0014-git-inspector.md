@@ -25,6 +25,10 @@ The inspector is split in two, each pane scrolling on its own: **Git** above, th
 the notes out of reach; two panes keep them a glance away, and the editor of #16 will take their
 place without moving anything.
 
+Since ADR 0023 (#36), the top pane switches between the session's **Activity** and **Git**, by a
+segmented control kept in `WorkspaceLayout.inspectorTopTab`; everything below still holds for the
+Git tab.
+
 - The divider is the application's own, not a `VSplitView`, whose position cannot be set or read
   back. Its share goes to `WorkspaceLayout.inspectorSplit` (0.25–0.85, 0.6 by default), written
   once a drag ends. A layout stored before it existed decodes with the default.

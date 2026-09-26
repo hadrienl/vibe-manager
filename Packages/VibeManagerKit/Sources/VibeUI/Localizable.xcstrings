@@ -111,6 +111,50 @@
         }
       }
     },
+    "%@ cannot summarize this session: it is not signed in." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne peut pas résumer cette session : il n’est pas connecté."
+          }
+        }
+      }
+    },
+    "%@ cannot summarize this session: it offers no way to." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne peut pas résumer cette session : il n’en offre pas le moyen."
+          }
+        }
+      }
+    },
+    "%@ cannot summarize this session: its command-line tool cannot be run." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne peut pas résumer cette session : son outil en ligne de commande ne peut pas être lancé."
+          }
+        }
+      }
+    },
+    "%@ cannot summarize this session: its command-line tool is too old." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne peut pas résumer cette session : son outil en ligne de commande est trop ancien."
+          }
+        }
+      }
+    },
     "%@ changed" : {
       "comment" : "The name of an imported template that differs from the library's.",
       "localizations" : {
@@ -201,6 +245,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ est en cours d’exécution et sera arrêté. Ce qu’il est en train de faire sera interrompu."
+          }
+        }
+      }
+    },
+    "%@ no longer exists; its closest folder was revealed." : {
+      "comment" : "A folder's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’existe plus ; le dossier le plus proche a été affiché."
           }
         }
       }
@@ -899,6 +954,53 @@
         }
       }
     },
+    "%lld more resources were not kept." : {
+      "comment" : "Resources past the journal's bound; a count.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more resource was not kept."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more resources were not kept."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ressources de plus n’ont pas été gardées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ressource de plus n’a pas été gardée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ressources de plus n’ont pas été gardées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld more were left closed when you cancelled." : {
       "comment" : "Sessions the restoration did not reach, because the user cancelled it.",
       "localizations" : {
@@ -1061,6 +1163,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld absents du transcript de cette session"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld older actions" : {
+      "comment" : "Stands for journal entries folded away; a count.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld older action"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld older actions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld actions plus anciennes"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld action plus ancienne"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld actions plus anciennes"
                 }
               }
             }
@@ -1632,6 +1781,17 @@
         }
       }
     },
+    "Activity" : {
+      "comment" : "A tab of the Settings window.\nA tab of the inspector.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité"
+          }
+        }
+      }
+    },
     "Add Examples" : {
       "localizations" : {
         "fr" : {
@@ -1648,6 +1808,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adresse"
+          }
+        }
+      }
+    },
+    "After each turn, the session's agent writes a short summary of what it did, with the same account, the lightest model it offers and at most one summary every five minutes. The tickets, requests, branches and worktrees used are listed either way." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Après chaque tour, l’agent de la session écrit un court résumé de ce qu’il a fait, avec le même compte, son modèle le plus léger et au plus un résumé toutes les cinq minutes. Les tickets, requêtes, branches et worktrees utilisés sont listés dans tous les cas."
           }
         }
       }
@@ -1977,6 +2147,16 @@
         }
       }
     },
+    "Automatic summary is turned off." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le résumé automatique est désactivé."
+          }
+        }
+      }
+    },
     "Back" : {
       "localizations" : {
         "fr" : {
@@ -1993,6 +2173,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bisect en cours"
+          }
+        }
+      }
+    },
+    "Branch %@" : {
+      "comment" : "A branch's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branche %@"
+          }
+        }
+      }
+    },
+    "Branches" : {
+      "comment" : "A group of resources.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branches"
           }
         }
       }
@@ -2361,6 +2563,17 @@
         }
       }
     },
+    "Copy Name" : {
+      "comment" : "Copies a branch's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier le nom"
+          }
+        }
+      }
+    },
     "Copy Notes" : {
       "localizations" : {
         "fr" : {
@@ -2381,12 +2594,33 @@
         }
       }
     },
+    "Copy Reference" : {
+      "comment" : "Copies “owner/repo#36”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier la référence"
+          }
+        }
+      }
+    },
     "Copy Relative Path" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copier le chemin relatif"
+          }
+        }
+      }
+    },
+    "Copy URL" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier l’URL"
           }
         }
       }
@@ -3309,6 +3543,28 @@
         }
       }
     },
+    "Issue %@" : {
+      "comment" : "A ticket's short name: #36.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ticket %@"
+          }
+        }
+      }
+    },
+    "Issues" : {
+      "comment" : "A group of resources.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tickets"
+          }
+        }
+      }
+    },
     "Its running agent will be stopped." : {
       "localizations" : {
         "fr" : {
@@ -3481,6 +3737,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fusion en cours"
+          }
+        }
+      }
+    },
+    "Merge request %@" : {
+      "comment" : "A request's short name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge request %@"
           }
         }
       }
@@ -3734,6 +4001,16 @@
         }
       }
     },
+    "No journal for this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun journal pour cette session."
+          }
+        }
+      }
+    },
     "No matching session" : {
       "localizations" : {
         "fr" : {
@@ -3851,6 +4128,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun terminal n’est sélectionné."
+          }
+        }
+      }
+    },
+    "No ticket, request, branch or worktree yet." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun ticket, requête, branche ni worktree pour l’instant."
           }
         }
       }
@@ -4270,6 +4557,17 @@
         }
       }
     },
+    "Open %@" : {
+      "comment" : "Opens a link of the summary; the URL or its short name.\nOpens a link of the summary; the URL.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir %@"
+          }
+        }
+      }
+    },
     "Open Privacy & Security → Full Disk Access." : {
       "comment" : "The names of the pane and the setting in System Settings.",
       "localizations" : {
@@ -4287,6 +4585,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir les réglages de confidentialité"
+          }
+        }
+      }
+    },
+    "Open Settings…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les Réglages…"
           }
         }
       }
@@ -4312,7 +4620,7 @@
       }
     },
     "Open in %@" : {
-      "comment" : "An editor's name: Xcode.",
+      "comment" : "An editor's name.\nAn editor's name: Xcode.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4505,6 +4813,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Proposé par le modèle — modifiez-le si besoin."
+          }
+        }
+      }
+    },
+    "Pull & Merge Requests" : {
+      "comment" : "A group of resources.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pull et merge requests"
+          }
+        }
+      }
+    },
+    "Pull request %@" : {
+      "comment" : "A request's short name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pull request %@"
           }
         }
       }
@@ -4747,6 +5077,17 @@
         }
       }
     },
+    "Resources" : {
+      "comment" : "The heading of the resources a session used.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ressources"
+          }
+        }
+      }
+    },
     "Responses" : {
       "comment" : "A column of the Usage window: how many answers the agents gave.\nA session's usage: how many answers the agent wrote.",
       "localizations" : {
@@ -4887,6 +5228,7 @@
       }
     },
     "Retry" : {
+      "comment" : "Tries the summary again.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4942,6 +5284,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher le dossier parent"
+          }
+        }
+      }
+    },
+    "Reveal Repository in Finder" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le dépôt dans le Finder"
           }
         }
       }
@@ -5351,6 +5703,64 @@
         }
       }
     },
+    "Show" : {
+      "comment" : "Chooses the pane above the notes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher"
+          }
+        }
+      }
+    },
+    "Show %lld Earlier" : {
+      "comment" : "Shows older entries of the summary; a count.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show %lld Earlier"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show %lld Earlier"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Afficher %lld de plus"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Afficher %lld de plus"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Afficher %lld de plus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Show %lld More" : {
       "localizations" : {
         "fr" : {
@@ -5601,6 +6011,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les arrêter"
+          }
+        }
+      }
+    },
+    "Summarize sessions automatically" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumer automatiquement les sessions"
+          }
+        }
+      }
+    },
+    "Summarizing…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumé en cours…"
+          }
+        }
+      }
+    },
+    "Summary" : {
+      "comment" : "The heading of a session's summary.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumé"
           }
         }
       }
@@ -6072,6 +6513,17 @@
         }
       }
     },
+    "The last summary could not be written, at %@." : {
+      "comment" : "A time of day.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier résumé n’a pas pu être écrit, à %@."
+          }
+        }
+      }
+    },
     "The notes are saved." : {
       "localizations" : {
         "fr" : {
@@ -6178,6 +6630,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le fichier des sessions a refusé de remettre cette session en service."
+          }
+        }
+      }
+    },
+    "The summary will start when the agent finishes its first turn." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le résumé commencera à la fin du premier tour de l’agent."
           }
         }
       }
@@ -7081,6 +7543,28 @@
         }
       }
     },
+    "Worktree %@" : {
+      "comment" : "A worktree's folder name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Worktree %@"
+          }
+        }
+      }
+    },
+    "Worktrees" : {
+      "comment" : "A group of resources.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Worktrees"
+          }
+        }
+      }
+    },
     "Worth trying when the previous model is what the agent refused, rather than the conversation itself." : {
       "localizations" : {
         "fr" : {
@@ -7466,6 +7950,198 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ par rapport à %2$@"
+          }
+        }
+      }
+    },
+    "involvement.branch.changed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "changed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifiée"
+          }
+        }
+      }
+    },
+    "involvement.branch.created" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "created"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "créée"
+          }
+        }
+      }
+    },
+    "involvement.branch.viewed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "checked out"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "extraite"
+          }
+        }
+      }
+    },
+    "involvement.issue.changed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "changed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifié"
+          }
+        }
+      }
+    },
+    "involvement.issue.created" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "created"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "créé"
+          }
+        }
+      }
+    },
+    "involvement.issue.viewed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "viewed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "consulté"
+          }
+        }
+      }
+    },
+    "involvement.request.changed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "changed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifiée"
+          }
+        }
+      }
+    },
+    "involvement.request.created" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "created"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "créée"
+          }
+        }
+      }
+    },
+    "involvement.request.viewed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "viewed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "consultée"
+          }
+        }
+      }
+    },
+    "involvement.worktree.changed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "worked in"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "utilisé"
+          }
+        }
+      }
+    },
+    "involvement.worktree.created" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "created"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "créé"
+          }
+        }
+      }
+    },
+    "involvement.worktree.viewed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "visited"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "visité"
           }
         }
       }

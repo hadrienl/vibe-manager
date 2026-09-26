@@ -24,7 +24,13 @@ public final class AppModel {
     public let canRestoreBackup: Bool
   }
 
-  public private(set) var state: State = .idle
+  public private(set) var state: State = .idle {
+    // Every list the workspace holds — a reload, a session just created — is the journal's too:
+    // it follows the active sessions, and gives one that stopped its last pass.
+    didSet {
+      if case .loaded(let sessions) = state { journal?.track(sessions) }
+    }
+  }
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   /// The name of each detected agent, by provider identifier, for the places that name one.
@@ -100,12 +106,16 @@ public final class AppModel {
     didSet {
       fileOpeningPreferences.editor = fileEditor
       gitInspector.editor = fileEditor
+      journal?.editor = fileEditor
     }
   }
   /// The screen state of the inspector's Git pane, kept per session for the length of the run.
   let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
+  /// Every session's journal: its summary and its resources (#36). Absent in a workspace
+  /// assembled without it.
+  public let journal: SessionJournalModel?
   /// The prompt templates, shared by their settings tab and the New Session sheet.
   public let templates: PromptTemplateLibraryModel
   /// The usage figures (#18). Absent in a workspace assembled without them.
@@ -487,8 +497,12 @@ public final class AppModel {
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
     collectDiagnostics: (@MainActor (AppModel) async -> DiagnosticSnapshot)? = nil,
     /// Writes the archive of an export.
-    archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() }
+    archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() },
+    /// Keeps each session's journal. Absent, the inspector shows Git alone.
+    journal: SessionJournalModel? = nil
   ) {
+    self.journal = journal
+    journal?.editor = fileOpeningPreferences.editor
     self.activityTracker = activityTracker
     self.hookConsents = hookConsents
     self.browser = browser
@@ -567,6 +581,8 @@ public final class AppModel {
     }
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
+
+    journal?.showSettingsTab = { [weak self] in self?.settingsTab = .activity }
 
     launcher?.askHookConsent = { [weak self] name, commands in
       guard let self else { return .undecided }
@@ -1683,6 +1699,7 @@ public final class AppModel {
     // Before any process is started or adopted: what the last launch left unread comes back with
     // the first list.
     await startFollowingActivity()
+    await journal?.start()
     await reload()
     Signposts.end("launch.firstList", firstList)
     // Which agents write a usage is part of their description, known without probing any of them.
@@ -2100,6 +2117,9 @@ extension AppModel {
     isApplicationActive = true
     updateVisibleSession()
     if let id = selectedSessionID { refreshTicket(of: id) }
+    if let journal {
+      Task { await journal.refresh() }
+    }
     guard observedSessionID != nil else { return }
     Task { await refreshBranchReport() }
   }
@@ -2141,7 +2161,11 @@ extension AppModel {
     if !layout.columns.isInspectorVisible {
       layout.setInspectorVisible(true)
     }
-    gitInspector.requestFocus()
+    if let journal, layout.intent.inspectorTopTab == .activity {
+      journal.requestFocus()
+    } else {
+      gitInspector.requestFocus()
+    }
   }
 
   /// Read Last Output, ⌃⌥⌘O: VoiceOver says the last lines the selected session's terminal
@@ -2164,6 +2188,8 @@ extension AppModel {
   public func stopWatchingRepositories() async {
     statusUpdates?.cancel()
     await repositoryStatus?.stop()
+    // Summaries under way are called off; the turns they covered wait for the next launch.
+    await journal?.stop()
   }
 
   func readBranches(of id: SessionID) async {

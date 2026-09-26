@@ -50,6 +50,17 @@ public struct SettingsView: View {
             }
             .tag(SettingsTab.webView)
         }
+        if let journal = model.journal {
+          ActivitySettings(journal: journal)
+            .tabItem {
+              Label {
+                Text("Activity", bundle: .module, comment: "A tab of the Settings window.")
+              } icon: {
+                Image(systemName: "list.bullet.rectangle")
+              }
+            }
+            .tag(SettingsTab.activity)
+        }
       }
     } else {
       general
@@ -138,6 +149,8 @@ public enum SettingsTab: String, Hashable, Sendable {
   case templates
   /// The session's web view (#69): what agents may do there, and where links go.
   case webView
+  /// What each session's journal does: the summary its agent writes (#36).
+  case activity
 }
 
 private struct FullDiskAccessRow: View {
@@ -221,6 +234,43 @@ private struct AgentActivityRow: View {
         bundle: .module,
         comment:
           "Under the setting that tracks an agent's activity; the argument is the agent's name.")
+    }
+  }
+}
+
+/// The settings of the sessions' journal (#36), in a tab of their own.
+private struct ActivitySettings: View {
+  let journal: SessionJournalModel
+
+  var body: some View {
+    Form {
+      Section {
+        SummaryRow(journal: journal)
+      } header: {
+        Text("Summary", bundle: .module, comment: "The heading of a session's summary.")
+      }
+    }
+    .formStyle(.grouped)
+    .scrollDisabled(true)
+    .fixedSize(horizontal: false, vertical: true)
+    .frame(width: 500)
+  }
+}
+
+/// Whether each session's agent writes the summary of what it did (#36).
+private struct SummaryRow: View {
+  @Bindable var journal: SessionJournalModel
+
+  var body: some View {
+    Toggle(isOn: $journal.summariesEnabled) {
+      Text("Summarize sessions automatically", bundle: .module)
+      Text(
+        """
+        After each turn, the session's agent writes a short summary of what it did, with the same \
+        account, the lightest model it offers and at most one summary every five minutes. The \
+        tickets, requests, branches and worktrees used are listed either way.
+        """,
+        bundle: .module)
     }
   }
 }
