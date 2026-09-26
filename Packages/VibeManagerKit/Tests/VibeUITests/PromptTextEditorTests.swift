@@ -23,6 +23,10 @@ struct PromptTextEditorTests {
       window.contentView = nil
       window.close()
     }
+    // As on a Mac set to always show scroll bars, which the CI runner is: the style the system
+    // hands every scroll view when that preference changes.
+    host.layoutSubtreeIfNeeded()
+    Self.scrollView(in: host)?.scrollerStyle = .legacy
     // The editor publishes its height after the layout pass that measured it, and SwiftUI applies
     // it on a later one — later still on a busy runner. It is read once the view is as tall as its
     // text view asks, with no deadline of its own: the suite's time limit stops one that never is.
@@ -38,6 +42,11 @@ struct PromptTextEditorTests {
       }
       try await Task.sleep(for: .milliseconds(20))
     }
+  }
+
+  private static func scrollView(in view: NSView) -> NSScrollView? {
+    if let scrollView = view as? NSScrollView { return scrollView }
+    return view.subviews.lazy.compactMap(scrollView(in:)).first
   }
 
   private static func textView(in view: NSView) -> NSTextView? {

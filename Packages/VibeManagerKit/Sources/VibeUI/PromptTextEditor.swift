@@ -100,6 +100,17 @@ enum PromptTextStyle {
   }
 }
 
+/// A scroll view whose scroller never takes width from the text, whatever the system prefers. A
+/// legacy scroller, shown once the text overflows, narrows the column: more lines wrap, the editor
+/// grows until nothing overflows, the scroller goes, the lines unwrap, and it shrinks again — for
+/// ever, on a Mac set to always show scroll bars.
+private final class OverlayScrollView: NSScrollView {
+  override var scrollerStyle: NSScroller.Style {
+    get { .overlay }
+    set { super.scrollerStyle = .overlay }
+  }
+}
+
 private struct GrowingTextView: NSViewRepresentable {
   @Binding var text: String
   @Binding var height: CGFloat?
@@ -130,7 +141,7 @@ private struct GrowingTextView: NSViewRepresentable {
     textView.string = text
     textView.postsFrameChangedNotifications = true
 
-    let scrollView = NSScrollView()
+    let scrollView = OverlayScrollView()
     scrollView.hasVerticalScroller = true
     scrollView.autohidesScrollers = true
     scrollView.drawsBackground = false
