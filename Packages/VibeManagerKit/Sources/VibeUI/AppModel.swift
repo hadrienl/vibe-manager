@@ -1894,8 +1894,10 @@ public final class AppModel {
     // the first list.
     await startFollowingActivity()
     await journal?.start()
-    await conversations.prepare()
+    // Not awaited: which agents write a readable transcript asks the registry, and the list — and
+    // the offer to resume after a crash — must not wait on it.
     connectConversations()
+    Task { await conversations.prepare() }
     await reload()
     // The choices of sessions that are gone are forgotten — never on an empty list, which may be
     // a store that could not be read rather than one without sessions.

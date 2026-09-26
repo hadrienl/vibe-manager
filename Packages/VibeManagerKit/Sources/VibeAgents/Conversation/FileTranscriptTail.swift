@@ -119,9 +119,13 @@ final class WakeSignal: @unchecked Sendable {
   }
 
   func wait(timeout: Duration) async {
+    // A timer cancelled because the disk woke the reader first must not fire as well: it would
+    // leave a wake pending, the next wait would return at once, and the reader would spin.
     let timer = Task {
-      try? await Task.sleep(for: timeout)
-      self.fire()
+      do {
+        try await Task.sleep(for: timeout)
+        self.fire()
+      } catch {}
     }
     await withTaskCancellationHandler {
       await withCheckedContinuation { continuation in
