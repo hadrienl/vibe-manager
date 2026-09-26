@@ -86,6 +86,29 @@ enum PromptTextStyle {
   static func height(forLines lines: Int) -> CGFloat {
     CGFloat(lines) * lineHeight + inset.height * 2
   }
+
+  /// The height of the lines on screen, held between the minimum and the maximum: what the editor
+  /// asks for, with the text view as it is laid out now.
+  static func height(of textView: NSTextView, minimumLines: Int, maximumLines: Int) -> CGFloat? {
+    guard let layoutManager = textView.layoutManager, let container = textView.textContainer
+    else { return nil }
+    layoutManager.ensureLayout(for: container)
+    let used = layoutManager.usedRect(for: container).height
+    let content = min(
+      max(used, CGFloat(minimumLines) * lineHeight), CGFloat(maximumLines) * lineHeight)
+    return (content + inset.height * 2).rounded(.up)
+  }
+}
+
+/// A scroll view whose scroller never takes width from the text, whatever the system prefers. A
+/// legacy scroller, shown once the text overflows, narrows the column: more lines wrap, the editor
+/// grows until nothing overflows, the scroller goes, the lines unwrap, and it shrinks again — for
+/// ever, on a Mac set to always show scroll bars.
+private final class OverlayScrollView: NSScrollView {
+  override var scrollerStyle: NSScroller.Style {
+    get { .overlay }
+    set { super.scrollerStyle = .overlay }
+  }
 }
 
 private struct GrowingTextView: NSViewRepresentable {
@@ -118,7 +141,7 @@ private struct GrowingTextView: NSViewRepresentable {
     textView.string = text
     textView.postsFrameChangedNotifications = true
 
-    let scrollView = NSScrollView()
+    let scrollView = OverlayScrollView()
     scrollView.hasVerticalScroller = true
     scrollView.autohidesScrollers = true
     scrollView.drawsBackground = false
@@ -192,18 +215,12 @@ private struct GrowingTextView: NSViewRepresentable {
       textView.scrollRangeToVisible(textView.selectedRange())
     }
 
-    /// The height of the lines on screen, held between the minimum and the maximum.
+    /// Asks for the height of the lines on screen, when it changed.
     func remeasure() {
-      guard let parent, let textView, let layoutManager = textView.layoutManager,
-        let container = textView.textContainer
+      guard let parent, let textView,
+        let height = PromptTextStyle.height(
+          of: textView, minimumLines: parent.minimumLines, maximumLines: parent.maximumLines)
       else { return }
-      layoutManager.ensureLayout(for: container)
-      let lineHeight = PromptTextStyle.lineHeight
-      let used = layoutManager.usedRect(for: container).height
-      let content = min(
-        max(used, CGFloat(parent.minimumLines) * lineHeight),
-        CGFloat(parent.maximumLines) * lineHeight)
-      let height = (content + PromptTextStyle.inset.height * 2).rounded(.up)
       guard parent.height != height else { return }
       // Published after the pass that asked for it: SwiftUI must not be changed while it draws.
       DispatchQueue.main.async { [weak self] in

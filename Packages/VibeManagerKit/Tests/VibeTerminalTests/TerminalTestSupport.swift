@@ -138,19 +138,19 @@ actor TerminalObserver {
     occurrences: Int = 1,
     timeout: Duration = .seconds(10)
   ) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
+    var waited = Duration.zero
+    while waited < timeout {
       if text.components(separatedBy: needle).count > occurrences { return true }
-      try? await Task.sleep(for: .milliseconds(20))
+      waited += await sleepCountingRunTime()
     }
     return text.components(separatedBy: needle).count > occurrences
   }
 
   func waitForCompletion(timeout: Duration = .seconds(10)) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
+    var waited = Duration.zero
+    while waited < timeout {
       if isFinished { return true }
-      try? await Task.sleep(for: .milliseconds(20))
+      waited += await sleepCountingRunTime()
     }
     return isFinished
   }
@@ -158,6 +158,14 @@ actor TerminalObserver {
   func cancel() {
     consumer?.cancel()
   }
+}
+
+/// Sleeps a poll's interval, and says how much of the wait to count: a runner that stalled the
+/// process wakes it much later than asked, and that time is not the condition's.
+func sleepCountingRunTime(_ interval: Duration = .milliseconds(20)) async -> Duration {
+  let asleep = ContinuousClock.now
+  try? await Task.sleep(for: interval)
+  return min(ContinuousClock.now - asleep, interval * 5)
 }
 
 func isProcessAlive(_ processIdentifier: pid_t) -> Bool {

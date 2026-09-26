@@ -48,16 +48,20 @@ enum ProcessTree {
   }
 }
 
-/// Waits on a condition, never on the clock alone: the deadline only bounds a failure.
+/// Waits on a condition, never on the clock alone: the deadline only bounds a failure, and counts
+/// only the time the wait ran — a runner that stalls the process wakes it much later than asked.
 @MainActor
 func eventually(
   timeout: Duration = .seconds(20),
   _ condition: @MainActor () async -> Bool
 ) async -> Bool {
-  let deadline = ContinuousClock.now + timeout
-  while ContinuousClock.now < deadline {
+  let poll = Duration.milliseconds(25)
+  var waited = Duration.zero
+  while waited < timeout {
     if await condition() { return true }
-    try? await Task.sleep(for: .milliseconds(25))
+    let asleep = ContinuousClock.now
+    try? await Task.sleep(for: poll)
+    waited += min(ContinuousClock.now - asleep, poll * 5)
   }
   return await condition()
 }

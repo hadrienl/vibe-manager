@@ -181,7 +181,10 @@ struct SessionRestorationTests {
     #expect(workspace.model.sessions.first?.status == .closed)
   }
 
-  @Test("The offer is on screen before the agents have answered their probes")
+  @Test(
+    "The offer is on screen before the agents have answered their probes",
+    .timeLimit(.minutes(2))
+  )
   func offersWithoutWaitingForTheDetections() async {
     let path = folder()
     let subject = session(status: .active, path: path)
@@ -193,9 +196,10 @@ struct SessionRestorationTests {
     )
 
     let launch = Task { await workspace.model.load() }
-    // The detections are held until the end: the offer can only come before them.
-    let deadline = ContinuousClock.now + .seconds(10)
-    while workspace.model.restoreOffer == nil, ContinuousClock.now < deadline {
+    // The detections are held until the end: the offer can only come before them. What is waited
+    // for is the detections starting, not a length of time — a loaded runner can hold the main
+    // actor, and the load with it, for longer than any deadline the test could pick.
+    while !workspace.model.isRefreshingAgents, !Task.isCancelled {
       try? await Task.sleep(for: .milliseconds(10))
     }
 

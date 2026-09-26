@@ -151,12 +151,14 @@ func stopsGracefully() async throws {
   let session = try TerminalTestSupport.makeSession(
     script: """
       trap 'exit 42' TERM
+      echo trap-set
       i=0
       while [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
       """
   )
   let observer = await TerminalObserver.attach(to: session)
-  try await Task.sleep(for: .milliseconds(200))
+  // Stopped once the trap is set: a shell slow to start would otherwise die of the signal.
+  #expect(await observer.waitForText("trap-set"))
 
   await session.stop(gracePeriod: .seconds(5))
 
@@ -169,20 +171,19 @@ func forcesStopAfterGracePeriod() async throws {
   let session = try TerminalTestSupport.makeSession(
     script: """
       trap '' TERM
+      echo trap-set
       i=0
-      while [ $i -lt 200 ]; do sleep 0.1; i=$((i + 1)); done
+      while [ $i -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
       """
   )
   let observer = await TerminalObserver.attach(to: session)
-  try await Task.sleep(for: .milliseconds(200))
+  #expect(await observer.waitForText("trap-set"))
 
-  let start = ContinuousClock.now
   await session.stop(gracePeriod: .milliseconds(300))
-  let elapsed = ContinuousClock.now - start
 
+  // Killed, not ended by its minute-long loop, which would have exited with 0: that is what the
+  // time the stop took could only approximate.
   #expect(await session.state() == .terminated(signal: SIGKILL))
-  // Under the 20 seconds the script runs for: a tighter bound measures the runner's load.
-  #expect(elapsed < .seconds(15))
   await observer.cancel()
 }
 

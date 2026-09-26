@@ -69,6 +69,9 @@ public final class AppModel {
   /// Every launch waiting on the consent sheet. One answer settles them all.
   var hookConsentWaiters: [UUID: CheckedContinuation<AgentHookConsent, Never>] = [:]
   var activityUpdates: Task<Void, Never>?
+  /// The last session in front of the user told to the tracker: each waits for the one before, so
+  /// that they reach it in order.
+  var visibleSessionUpdate: Task<Void, Never>?
   var isApplicationActive = true
   var isMainWindowVisible = true
   /// What the agent did to the branches of each session, as last read. Only the session on

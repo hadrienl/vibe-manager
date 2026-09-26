@@ -57,6 +57,47 @@ private final class Taken: @unchecked Sendable {
   }
 }
 
+/// Two hooks around a rotation: one that opened the log before it was moved aside and writes to
+/// it afterwards, then the next one, whose append creates the log again. They run on a thread of
+/// their own — not on the cooperative pool, which a busy runner can hold for many seconds — once
+/// the log has been moved aside.
+private final class RotationHooks: @unchecked Sendable {
+  private let url: URL
+  private let lateHook: FileHandle
+  private let lock = NSLock()
+  private var rotated = false
+
+  init(log url: URL) throws {
+    self.url = url
+    lateHook = try FileHandle(forWritingTo: url)
+  }
+
+  /// Whether the log was seen moved aside, and both hooks wrote.
+  var sawRotation: Bool { lock.withLock { rotated } }
+
+  func start() {
+    Thread { self.run() }.start()
+  }
+
+  private func run() {
+    // Ten seconds of looking, however long the machine takes to give the thread its turns.
+    var attempts = 0
+    while FileManager.default.fileExists(atPath: url.path), attempts < 5_000 {
+      attempts += 1
+      usleep(2_000)
+    }
+    defer { try? lateHook.close() }
+    guard !FileManager.default.fileExists(atPath: url.path) else { return }
+    do {
+      try lateHook.seekToEnd()
+      try lateHook.write(contentsOf: Data("Late\t2\t\n".utf8))
+    } catch { return }
+    FileManager.default.createFile(
+      atPath: url.path, contents: Data("Next\t3\t\n".utf8), attributes: [.posixPermissions: 0o644])
+    lock.withLock { rotated = true }
+  }
+}
+
 @Suite("The agent activity log")
 struct FileAgentActivityLogTests {
   @Test("A prepared log is empty, private, and emptied again for the next process")
@@ -119,30 +160,18 @@ struct FileAgentActivityLogTests {
   @Test("A log past its size is moved aside, and the next one is followed from its start")
   func rotates() async throws {
     let directory = try temporaryDirectory()
-    // A grace long enough for a loaded machine — the whole suite runs at once — to write within
-    // it: the late line is lost otherwise, as it would be from a hook that slow.
+    // The hooks below write on a thread of their own, as they would from their own processes: the
+    // grace only has to outlast that thread being scheduled, not the test's task.
     let logs = FileAgentActivityLog(
       directory: directory, rotationThreshold: 16, rotationGrace: .seconds(10))
     let id = SessionID()
     let url = try await logs.prepareLog(for: id)
-    // A hook that opened the log before it is moved aside, and writes to it afterwards.
-    let lateHook = try FileHandle(forWritingTo: url)
+    let hooks = try RotationHooks(log: url)
     try append("Long\t1\t0123456789\n", to: url)
+    hooks.start()
     let stream = await logs.events(for: id, from: nil)
-    // Read in one pass, as the application does: an iteration that ends may end the stream with it.
-    let reading = Task { await take(3, from: stream, within: .seconds(30)) }
-
-    // The rotation happened — once `Long` was read: the hook's next append creates the log again.
-    for _ in 0..<250 where FileManager.default.fileExists(atPath: url.path) {
-      try await Task.sleep(for: .milliseconds(20))
-    }
-    #expect(!FileManager.default.fileExists(atPath: url.path))
-    try lateHook.seekToEnd()
-    try lateHook.write(contentsOf: Data("Late\t2\t\n".utf8))
-    try lateHook.close()
-    FileManager.default.createFile(
-      atPath: url.path, contents: Data("Next\t3\t\n".utf8), attributes: [.posixPermissions: 0o644])
-    let read = await reading.value
+    let read = await take(3, from: stream, within: .seconds(30))
+    #expect(hooks.sawRotation)
     #expect(read.map(\.0.name) == ["Long", "Late", "Next"])
     let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
     #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)

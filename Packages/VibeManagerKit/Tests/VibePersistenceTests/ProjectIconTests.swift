@@ -165,19 +165,27 @@ struct ProjectIconFinderTests {
     #expect(await find() == nil)
   }
 
-  @Test("A cancelled search answers at once")
+  @Test("A cancelled search answers at once", .timeLimit(.minutes(2)))
   func cancellationAnswers() async throws {
     defer { cleanUp() }
-    try write(try png(side: 32), at: "favicon.png")
-    let finder = FileSystemProjectIconFinder(timeLimit: .seconds(600))
+    // A walk stuck on the disk until the test ends, and a time limit nobody will reach: only the
+    // cancellation can bring the answer back, however slow the runner. No duration is measured.
+    let walk = StuckWalk()
+    defer { walk.release() }
+    let finder = FileSystemProjectIconFinder(timeLimit: .seconds(600)) { _, _, _ in
+      walk.hold()
+      return nil
+    }
     let search = Task { [root] in await finder.icon(inFolder: root.path) }
+    while !walk.isHeld {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
     search.cancel()
 
-    let started = ContinuousClock.now
-    _ = await search.value
-    // Far from the time limit rather than close to zero: a loaded CI runner can stall every test
-    // for seconds, and what matters is that the cancellation, not the limit, ended the wait.
-    #expect(ContinuousClock.now - started < .seconds(60))
+    #expect(await search.value == nil)
+    // The answer did not wait for the walk: it is still stuck.
+    #expect(!walk.hasEnded)
   }
 
   @Test("A file too large to be an icon is ignored")
@@ -379,5 +387,31 @@ struct SessionStoreIconTests {
 
     #expect(decoded.sessions.first?.appearance.iconID == nil)
     #expect(decoded.sessions.first?.name == "Stored in v4")
+  }
+}
+
+/// A walk that blocks its thread until released, as a listing stuck on a volume that went away.
+private final class StuckWalk: @unchecked Sendable {
+  private let lock = NSLock()
+  private let semaphore = DispatchSemaphore(value: 0)
+  private var held = false
+  private var ended = false
+
+  var isHeld: Bool {
+    lock.withLock { held }
+  }
+
+  var hasEnded: Bool {
+    lock.withLock { ended }
+  }
+
+  func hold() {
+    lock.withLock { held = true }
+    semaphore.wait()
+    lock.withLock { ended = true }
+  }
+
+  func release() {
+    semaphore.signal()
   }
 }

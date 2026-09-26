@@ -36,10 +36,24 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
   static let faviconNames = ["favicon.svg", "favicon.png", "favicon.ico"]
   static let genericNames = ["icon.png", "icon.svg", "logo.svg", "logo.png"]
 
+  /// The search itself, run on the icon queue: the folder, the time limit, and whether the search
+  /// has been called off.
+  typealias Search = @Sendable (String, Duration, () -> Bool) -> ProjectIcon?
+
   private let timeLimit: Duration
+  private let find: Search
 
   public init(timeLimit: Duration = .milliseconds(300)) {
+    self.init(timeLimit: timeLimit) { path, timeLimit, isCancelled in
+      Self.find(in: path, timeLimit: timeLimit, isCancelled: isCancelled)
+    }
+  }
+
+  /// - Parameter find: replaces the walk, so a test can hold a search that never ends and check
+  ///   that the answer does not wait for it.
+  init(timeLimit: Duration, find: @escaping Search) {
     self.timeLimit = timeLimit
+    self.find = find
   }
 
   /// Answers within the time limit whatever the disk does: a listing stuck on a slow volume is
@@ -70,14 +84,13 @@ public struct FileSystemProjectIconFinder: ProjectIconFinding {
 
   private func search(_ path: String) -> Task<ProjectIcon?, Never> {
     let timeLimit = timeLimit
+    let find = find
     return Task.detached(priority: .userInitiated) {
       let cancellation = CancellationFlag()
       return await withTaskCancellationHandler {
         await withCheckedContinuation { continuation in
           Self.queue.async {
-            continuation.resume(
-              returning: Self.find(
-                in: path, timeLimit: timeLimit, isCancelled: cancellation.isRaised))
+            continuation.resume(returning: find(path, timeLimit, cancellation.isRaised))
           }
         }
       } onCancel: {

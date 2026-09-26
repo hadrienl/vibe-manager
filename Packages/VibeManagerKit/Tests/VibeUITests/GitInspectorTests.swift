@@ -642,17 +642,20 @@ struct GitInspectorModelTests {
     }
     git.select(row(.unstaged, "Sources/Module7/File4007.swift"), in: session)
     var worst: Duration = .zero
-    let clock = ContinuousClock()
     for round in 0..<10 {
-      let started = clock.now
+      let started = threadProcessorTime()
       let current = state(Array(entries.dropFirst(round)), session: session)
       git.statesChanged([current])
       _ = git.group(for: report(), state: current, sessionNames: [:])
-      worst = max(worst, clock.now - started)
+      worst = max(worst, threadProcessorTime() - started)
     }
+    // The processor time the main thread spends, rather than the time on the wall: each round is
+    // synchronous, so it is what the main actor is held for, and a runner whose other threads or
+    // processes take the cores — or freeze the process — adds nothing to it.
     // The 50 ms hold on a Mac. The CI runner, virtualised and older in its compiler, runs this
-    // about 25 times slower: there the bound only catches a presentation no longer cached. A
-    // second was too close — a busy runner has reached 1.06 s — so it is given three.
+    // about 25 times slower: there the bound only catches a presentation no longer cached. It is
+    // given three seconds, as its processor time still counts what the host takes from the virtual
+    // machine — a busy runner has reached 1.06 s.
     let budget: Duration =
       ProcessInfo.processInfo.environment["CI"] == "true" ? .seconds(3) : .milliseconds(50)
     #expect(worst < budget)
@@ -709,6 +712,11 @@ private actor ListingGate {
 private actor ReadCounter {
   private(set) var value = 0
   func increment() { value += 1 }
+}
+
+/// The processor time the calling thread has used so far.
+private func threadProcessorTime() -> Duration {
+  .nanoseconds(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID))
 }
 
 @MainActor

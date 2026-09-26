@@ -251,6 +251,32 @@ public final class BrowserTabModel: NSObject, Identifiable {
     while clock.now < deadline, isLoading || (webView?.isLoading ?? false) {
       try? await Task.sleep(for: .milliseconds(50))
     }
+    await readTitle(before: deadline)
+  }
+
+  /// Asks the loaded page for its title. WebKit reports it after saying the load finished, and a
+  /// busy Mac lets whatever waited on that read the tab in between, with the previous title or
+  /// none. Given up on at `deadline`, for a page too busy to answer.
+  private func readTitle(before deadline: ContinuousClock.Instant) async {
+    guard let webView, !isLoading, !webView.isLoading, failure == nil, !hasCrashed else { return }
+    let reading = TitleReading()
+    let title = await withCheckedContinuation { continuation in
+      reading.continuation = continuation
+      reading.tasks = [
+        Task {
+          let title = try? await webView.evaluateJavaScript(
+            "document.title", in: nil, contentWorld: .defaultClient)
+          reading.finish(title as? String)
+        },
+        Task {
+          try? await Task.sleep(until: deadline)
+          reading.finish(nil)
+        },
+      ]
+    }
+    guard let title, !title.isEmpty, title != self.title else { return }
+    self.title = title
+    didChange?()
   }
 
   private func observe(_ webView: WKWebView) {
@@ -344,6 +370,19 @@ public final class BrowserTabModel: NSObject, Identifiable {
       guard let webView = self.webView else { return }
       webView.load(URLRequest(url: self.url))
     }
+  }
+}
+
+/// Whichever answers first of the page and the deadline.
+@MainActor
+private final class TitleReading {
+  var continuation: CheckedContinuation<String?, Never>?
+  var tasks: [Task<Void, Never>] = []
+
+  func finish(_ title: String?) {
+    continuation?.resume(returning: title)
+    continuation = nil
+    for task in tasks { task.cancel() }
   }
 }
 

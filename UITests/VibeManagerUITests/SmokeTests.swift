@@ -117,6 +117,14 @@ final class SmokeTests: XCTestCase {
       createSession(named: "Smoke \(index)", isFirst: index == 1, in: app)
     }
     expectSessionRows(3, in: app)
+    // The mock agent writes a transcript: its session opens as a conversation (#38), once the
+    // application has learnt that it can, which the picker's appearing says. ⌥⌘T shows the
+    // terminal.
+    let showTerminal = app.radioButtons["Terminal"]
+    XCTAssertTrue(showTerminal.waitForExistence(timeout: 10))
+    if (showTerminal.value as? NSNumber)?.intValue != 1 {
+      app.typeKey("t", modifierFlags: [.command, .option])
+    }
     let terminal = app.descendants(matching: .any).matching(identifier: "terminal").firstMatch
     XCTAssertTrue(terminal.waitForExistence(timeout: 10))
 

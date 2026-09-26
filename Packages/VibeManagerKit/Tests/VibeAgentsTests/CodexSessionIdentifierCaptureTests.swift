@@ -89,7 +89,7 @@ struct CodexTerminalIdentifierAccumulatorTests {
   }
 }
 
-@Suite("Codex session identifier capture")
+@Suite("Codex session identifier capture", .timeLimit(.minutes(2)))
 struct CodexSessionIdentifierCaptureTests {
   private let identifier = "019ee0a1-06d9-7e52-957b-d61a982d6b43"
 
@@ -214,7 +214,9 @@ struct CodexSessionIdentifierCaptureTests {
       discovery: StubDiscovery(identifier: identifier),
       record: RecordAgentResumeIdentifier(repository: repository),
       timeout: .milliseconds(200),
-      persistenceWindow: .seconds(2),
+      // Far longer than the test: what is checked is the retry, not the window closing on a
+      // runner slow enough to spend it before the session is ready.
+      persistenceWindow: .seconds(60),
       retryInterval: .milliseconds(10)
     )
 
@@ -305,14 +307,12 @@ private actor Gate {
 
 /// Polls a condition instead of sleeping for a fixed time, so the suite stays fast and does
 /// not depend on how quickly a watcher task is scheduled.
-private func waitUntil(
-  timeout: Duration = .seconds(10),
-  _ condition: @Sendable () async -> Bool
-) async throws {
-  let deadline = ContinuousClock.now.advanced(by: timeout)
-  while ContinuousClock.now < deadline {
-    if await condition() { return }
+///
+/// No deadline of its own: a loaded runner can delay a watcher task by more than any deadline
+/// worth picking. A condition that never becomes true is caught by the suite's time limit, which
+/// cancels the sleep.
+private func waitUntil(_ condition: @Sendable () async -> Bool) async throws {
+  while await !condition() {
     try await Task.sleep(for: .milliseconds(10))
   }
-  Issue.record("The condition never became true")
 }

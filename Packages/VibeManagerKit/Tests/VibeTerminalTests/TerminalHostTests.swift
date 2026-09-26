@@ -126,10 +126,10 @@ func eventually(
   timeout: Duration = .seconds(10),
   _ condition: () async -> Bool
 ) async -> Bool {
-  let deadline = ContinuousClock.now + timeout
-  while ContinuousClock.now < deadline {
+  var waited = Duration.zero
+  while waited < timeout {
     if await condition() { return true }
-    try? await Task.sleep(for: .milliseconds(20))
+    waited += await sleepCountingRunTime()
   }
   return await condition()
 }
