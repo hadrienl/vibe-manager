@@ -62,9 +62,10 @@ be the decision. Archive is offered only from Done. The swipe is taken from a lo
 a swipe from a scroll; its inertia is swallowed. Its arithmetic lives in `SessionSwipe`, a value
 the tests exercise without an event.
 
-During the gesture only the swiped row moves, aside, to uncover its buttons; the rest of the
-column stays still. After a change the column on screen stays, and the selection passes to the row
-that took the session's place: sorting a column is going down it. A first design slid the columns
-around a still row; tried in the application, it read as noise, and was dropped.
+During the gesture only the swiped row moves, aside, to uncover its buttons; the rest of the column
+stays still, and a gap of a few points keeps the row apart from its buttons. After a change the
+column on screen stays, and the selection passes to the row that took the session's place: sorting a
+column is going down it. A first design slid the columns around a still row; tried in the
+application, it read as noise, and was dropped.
 
 This amends ADR 0009's "Two scopes": the tabs are no longer split on the process.

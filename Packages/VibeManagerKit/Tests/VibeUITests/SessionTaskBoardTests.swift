@@ -318,12 +318,30 @@ struct SessionSwipeTests {
       translation: translation)
   }
 
-  @Test("The columns follow the gesture up to the buttons, then give way")
+  @Test("The row follows the gesture up to the buttons and their gap, then gives way")
   func elasticPastTheButtons() {
     #expect(swipe(translation: 50).offset == 50)
-    #expect(swipe(translation: 76).offset == 76)
-    #expect(swipe(translation: 176).offset == 76 + 100 * 0.3)
-    #expect(swipe(translation: -152).offset == -152)
+    #expect(swipe(translation: 84).offset == 84)
+    #expect(swipe(translation: 184).offset == 84 + 100 * 0.3)
+    #expect(swipe(translation: -160).offset == -160)
+  }
+
+  @Test("A side opens on its buttons and a gap between them and the row")
+  func gapBeforeTheButtons() {
+    let open = swipe(translation: 0)
+    #expect(open.leadingButtonsWidth == 76)
+    #expect(open.leadingWidth == 76 + SessionSwipe.gap)
+    #expect(open.trailingButtonsWidth == 152)
+    #expect(open.trailingWidth == 152 + SessionSwipe.gap)
+    #expect(swipe(leading: [], translation: 0).leadingWidth == 0)
+  }
+
+  @Test("The gap stays the same while the buttons are uncovered")
+  func buttonsKeepTheirDistance() {
+    #expect(swipe(translation: 4).revealedButtonsWidth == 0)
+    #expect(swipe(translation: 50).revealedButtonsWidth == 50 - SessionSwipe.gap)
+    #expect(swipe(translation: 84).revealedButtonsWidth == 76)
+    #expect(swipe(translation: -160).revealedButtonsWidth == 152)
   }
 
   @Test("A side with nothing to offer barely moves")
@@ -333,18 +351,28 @@ struct SessionSwipeTests {
     #expect(atTheStart.settledTranslation == 0)
   }
 
-  @Test("Let go past 40 % of the buttons, they stay open; short of it, they close")
+  @Test("Let go past 40 % of the buttons and their gap, they stay open; short of it, they close")
   func settling() {
-    #expect(swipe(translation: 31).settledTranslation == 76)
-    #expect(swipe(translation: 30).settledTranslation == 0)
-    #expect(swipe(translation: -61).settledTranslation == -152)
-    #expect(swipe(translation: -60).settledTranslation == 0)
+    #expect(swipe(translation: 34).settledTranslation == 84)
+    #expect(swipe(translation: 33).settledTranslation == 0)
+    #expect(swipe(translation: -64).settledTranslation == -160)
+    #expect(swipe(translation: -63).settledTranslation == 0)
   }
 
-  @Test("The buttons never take the whole row")
+  @Test("Opening from the keyboard uncovers the gap too")
+  func openingAtOnce() {
+    var closed = swipe(translation: 0)
+    closed.open(towardsNext: true)
+    #expect(closed.translation == -160)
+    closed.open(towardsNext: false)
+    #expect(closed.translation == 84)
+  }
+
+  @Test("The buttons and their gap never take the whole row")
   func widthIsCapped() {
     let many = swipe(trailing: [.doing, .waiting, .done], width: 200, translation: -500)
     #expect(many.trailingWidth == 200 - SessionSwipe.reservedWidth)
+    #expect(many.trailingButtonsWidth == 200 - SessionSwipe.reservedWidth - SessionSwipe.gap)
   }
 
   @Test("Each side reveals its own statuses")

@@ -9,11 +9,13 @@ import VibeDomain
 ///
 /// `translation` is how far the fingers or the pointer went, positive to the right. A swipe to the
 /// right reveals, on the left of the row, the statuses before the current one; a swipe to the left
-/// reveals the ones after it on the right. `offset` is what the columns are moved by: it follows
-/// the translation up to the buttons, and gives way past them.
+/// reveals the ones after it on the right. `offset` is what the row is moved by: it follows the
+/// translation up to the buttons and the gap before them (#88), and gives way past them.
 struct SessionSwipe: Equatable {
   /// One button's width at rest.
   static let buttonWidth: CGFloat = 76
+  /// The space kept between the moved row and its buttons, so that the two don't read as one block.
+  static let gap: CGFloat = 8
   /// What is always left of the row, however many buttons there are, so that it stays readable.
   static let reservedWidth: CGFloat = 72
   /// How far a side with no button still follows the gesture, to say there is nothing there.
@@ -43,10 +45,19 @@ struct SessionSwipe: Equatable {
     self.translation = translation
   }
 
+  /// How far a side opens: its buttons, and the gap between them and the row.
   var leadingWidth: CGFloat { width(for: leading.count) }
   var trailingWidth: CGFloat { width(for: trailing.count) }
 
-  /// How far the columns are moved: the translation, elastic past the buttons.
+  /// A side's buttons alone, as they are drawn once open.
+  var leadingButtonsWidth: CGFloat { buttonsWidth(for: leading.count) }
+  var trailingButtonsWidth: CGFloat { buttonsWidth(for: trailing.count) }
+
+  /// How wide the buttons are drawn during the gesture: what the row uncovered, less the gap,
+  /// which stays the same however far it goes.
+  var revealedButtonsWidth: CGFloat { max(0, abs(offset) - Self.gap) }
+
+  /// How far the row is moved: the translation, elastic past the buttons.
   var offset: CGFloat {
     let limit = translation > 0 ? leadingWidth : trailingWidth
     let distance = abs(translation)
@@ -92,7 +103,14 @@ struct SessionSwipe: Equatable {
   }
 
   private func width(for count: Int) -> CGFloat {
+    let buttons = buttonsWidth(for: count)
+    return buttons > 0 ? buttons + Self.gap : 0
+  }
+
+  private func buttonsWidth(for count: Int) -> CGFloat {
     guard count > 0 else { return 0 }
-    return min(CGFloat(count) * Self.buttonWidth, max(0, availableWidth - Self.reservedWidth))
+    return min(
+      CGFloat(count) * Self.buttonWidth,
+      max(0, availableWidth - Self.reservedWidth - Self.gap))
   }
 }
