@@ -84,6 +84,12 @@ public actor TrackAgentActivity {
     sessions.mapValues(\.state)
   }
 
+  /// The event that named the session's transcript — Claude Code's `SessionStart` — for the
+  /// conversation view to read the same file (#38). `nil` until the agent's hooks reported one.
+  public func sourceEvent(for id: SessionID) -> AgentActivityEvent? {
+    sessions[id]?.sourceEvent
+  }
+
   /// Reads back what the previous launch left: the unread marks, and how far each log was read.
   /// Nothing is running yet, so every session starts idle until its process is started or adopted.
   public func load() async {

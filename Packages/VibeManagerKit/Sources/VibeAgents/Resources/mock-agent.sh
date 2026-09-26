@@ -10,6 +10,8 @@
 #   --ignore-sighup      survive the hang-up of its terminal
 #   --spawn-child        start a child that ignores SIGTERM and SIGHUP, and print its pid
 #   --session-id <id>    the resume identifier to print, instead of one made from the clock
+#   --transcript-dir <d> write the conversation to <d>/<identifier>.jsonl, the way Claude Code
+#                        writes its transcript, for the conversation view (#38)
 #
 # While holding, a line `run:<command>` runs that command through `sh`, as a CLI's shell tool does,
 # and prints its output then `run-exit: <status>` — how the scenarios of #69 reach `vibe`.
@@ -19,6 +21,11 @@
 # every line typed — or exactly the event a line names, as `event:PermissionRequest`.
 
 set -eu
+
+# An agent may be started with a narrow PATH — `/usr/bin` alone leaves out `date` — and the
+# tools below must still be found.
+PATH="${PATH:+$PATH:}/usr/bin:/bin"
+export PATH
 
 report() {
   if [ -n "${VIBE_AGENT_ACTIVITY_LOG:-}" ]; then
@@ -34,6 +41,8 @@ exit_code=0
 hold=0
 flood=""
 spawn_child=0
+transcript_dir=""
+transcript=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -85,6 +94,10 @@ while [ $# -gt 0 ]; do
       session_id="${2:-}"
       shift 2
       ;;
+    --transcript-dir)
+      transcript_dir="${2:-}"
+      shift 2
+      ;;
     *)
       shift
       ;;
@@ -92,15 +105,38 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -n "$resume" ]; then
+  identifier="$resume"
   echo "mock-session-id: $resume"
   echo "Resuming mock session."
 elif [ -n "$session_id" ]; then
+  identifier="$session_id"
   echo "mock-session-id: $session_id"
   echo "Starting mock session."
 else
-  echo "mock-session-id: mock-$(date +%s)-$$"
+  identifier="mock-$(date +%s)-$$"
+  echo "mock-session-id: $identifier"
   echo "Starting mock session."
 fi
+
+if [ -n "$transcript_dir" ]; then
+  mkdir -p "$transcript_dir"
+  transcript="$transcript_dir/$identifier.jsonl"
+fi
+
+# One line of a Claude Code transcript: `user` or `assistant`, and its text.
+converse() {
+  if [ -z "$transcript" ]; then return; fi
+  text="$(printf '%s' "$2" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  line_id="$(date +%s)-$$-$3"
+  if [ "$1" = "user" ]; then
+    printf '{"type":"user","uuid":"u-%s","timestamp":"%s","message":{"role":"user","content":"%s"}}\n' \
+      "$line_id" "$stamp" "$text" >>"$transcript"
+  else
+    printf '{"type":"assistant","uuid":"a-%s","timestamp":"%s","message":{"role":"assistant","content":[{"type":"text","text":"%s"}]}}\n' \
+      "$line_id" "$stamp" "$text" >>"$transcript"
+  fi
+}
 
 report SessionStart
 echo "model: $model"
@@ -108,6 +144,8 @@ echo "cwd: $(pwd)"
 
 if [ -n "$prompt" ]; then
   printf 'prompt: %s\n' "$prompt"
+  converse user "$prompt" 0
+  converse assistant "Mock received: $prompt" 0
 fi
 
 if [ "$spawn_child" -eq 1 ]; then
@@ -129,7 +167,11 @@ fi
 
 if [ "$hold" -eq 1 ]; then
   echo "Holding."
+  count=0
   while IFS= read -r line; do
+    # A prompt pasted by the conversation view arrives between the brackets of a paste.
+    line="$(printf '%s' "$line" | sed -e "s/$(printf '\033')\[20[01]~//g")"
+    count=$((count + 1))
     case "$line" in
       event:*)
         report "${line#event:}"
@@ -142,6 +184,8 @@ if [ "$hold" -eq 1 ]; then
       *)
         report UserPromptSubmit
         printf 'echo: %s\n' "$line"
+        converse user "$line" "$count"
+        converse assistant "echo: $line" "$count"
         report Stop
         ;;
     esac

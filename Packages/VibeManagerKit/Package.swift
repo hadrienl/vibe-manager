@@ -18,13 +18,17 @@ let package = Package(
     .library(name: "VibeGit", targets: ["VibeGit"]),
     .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
     .library(name: "VibeBrowser", targets: ["VibeBrowser"]),
+    .library(name: "VibeConversationUI", targets: ["VibeConversationUI"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
     .library(name: "VibeComposition", targets: ["VibeComposition"]),
   ],
   dependencies: [
     // Pinned exactly: the emulator parses untrusted output, so its version is a deliberate
     // choice rather than whatever a range resolves to.
-    .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.20.0")
+    .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.20.0"),
+    // Pinned exactly for the same reason: it parses what an agent wrote. 0.6.0 is the last release
+    // whose manifest the Swift 6.1 of CI's Xcode 16.4 can read; later ones ask for tools 6.2.
+    .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.6.0"),
   ],
   targets: [
     // Every target whose text reaches the user carries its own string catalog.
@@ -71,9 +75,20 @@ let package = Package(
       name: "VibeBrowser",
       dependencies: ["VibeApplication", "VibeDomain", "VibeProcess", "VibeTerminal"]
     ),
+    // The conversation view of #38: Markdown, code and diffs drawn from a transcript. Its own
+    // module, so that the Markdown parser stays out of everything else, as SwiftTerm does.
+    .target(
+      name: "VibeConversationUI",
+      dependencies: [
+        "VibeApplication", "VibeDomain", .product(name: "Markdown", package: "swift-markdown"),
+      ],
+      resources: [.process("Localizable.xcstrings")]
+    ),
     .target(
       name: "VibeUI",
-      dependencies: ["VibeApplication", "VibeBrowser", "VibeDomain", "VibeTerminalUI"],
+      dependencies: [
+        "VibeApplication", "VibeBrowser", "VibeDomain", "VibeTerminalUI", "VibeConversationUI",
+      ],
       resources: [.process("Localizable.xcstrings")]
     ),
     // The application, composed. Out of the application target so that a test can compose it.
@@ -81,7 +96,8 @@ let package = Package(
       name: "VibeComposition",
       dependencies: [
         "VibeAgents", "VibeApplication", "VibeBrowser", "VibeDomain", "VibeGit",
-        "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeUI",
+        "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeConversationUI",
+        "VibeUI",
       ]
     ),
     // The terminal host in a process of its own, for the tests that need one to outlive their
@@ -153,6 +169,12 @@ let package = Package(
       dependencies: [
         "VibeBrowser", "VibeApplication", "VibeDomain", "VibeProcess", "VibeTerminal",
         "VibeBrowserBridgeFixture",
+      ]
+    ),
+    .testTarget(
+      name: "VibeConversationUITests",
+      dependencies: [
+        "VibeConversationUI", "VibeApplication", "VibeDomain", "VibeLocalizationTesting",
       ]
     ),
     .testTarget(

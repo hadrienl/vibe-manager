@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 import VibeTerminalUI
 
@@ -17,6 +18,8 @@ public struct RootView: View {
   @State private var hostWindow = HostWindow()
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
+  @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
   public init(model: AppModel) {
     self.model = model
@@ -333,6 +336,14 @@ public struct RootView: View {
             TaskStatusMenu(commands: SessionCommands(model: model, session: session))
           }
         }
+        ToolbarItem(placement: .principal) {
+          if let session = model.selectedSession, model.conversations.canShowConversation(session) {
+            PresentationPicker(
+              selection: Binding(
+                get: { model.presentation(of: session) },
+                set: { model.setPresentation($0, of: session.id) }))
+          }
+        }
         ToolbarItem(placement: .primaryAction) {
           Button {
             model.beginNewSession()
@@ -567,6 +578,12 @@ public struct RootView: View {
       VStack(spacing: 0) {
         // A closed session keeps its terminal on screen, so the way back to work has to be on
         // screen too — next to what the agent said last, not only in a menu.
+        // The archive card is what the terminal side shows; over a conversation, the same way
+        // back sits above it.
+        if session.status == .archived, model.presentation(of: session) == .conversation {
+          ArchivedConversationBar { Task { await model.restore(session.id) } }
+          Divider()
+        }
         if session.status == .closed {
           ClosedSessionBar(
             title: model.restartTitle(for: session),
@@ -667,12 +684,20 @@ public struct RootView: View {
       comment: "What VoiceOver calls a terminal: the session's name, then its state.")
   }
 
+  /// The theme of the conversation views, for the system's appearance of the moment.
+  private var conversationTheme: ConversationTheme {
+    ConversationTheme.resolve(
+      ConversationFonts.installedOnly(model.conversations.appearance),
+      isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
+  }
+
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
+    let presentation = model.presentation(of: session)
     ZStack {
       ForEach(model.sessions) { listed in
         if let pane = model.pane(for: listed.id) {
-          let isActive = listed.id == session.id
+          let isActive = listed.id == session.id && model.presentation(of: listed) == .terminal
           // Started by the launcher, so switching sessions never restarts an agent.
           TerminalPaneView(
             model: pane, autoStart: false, isActive: isActive,
@@ -685,10 +710,32 @@ public struct RootView: View {
         }
       }
 
+      // Mounted like the terminals, so that going back and forth keeps each one's place. Only
+      // the few sessions last shown in conversation keep one.
+      ForEach(model.conversations.mountedSessionIDs, id: \.self) { id in
+        if let conversation = model.conversations.existingModel(for: id),
+          let listed = model.sessions.first(where: { $0.id == id })
+        {
+          let isActive = id == session.id && model.presentation(of: listed) == .conversation
+          ConversationView(
+            model: conversation, theme: conversationTheme,
+            appearance: model.conversations.appearance
+          )
+          .opacity(isActive ? 1 : 0)
+          .allowsHitTesting(isActive)
+          .accessibilityHidden(!isActive)
+          // A hidden composer must lose the keyboard: typed into, it would send to a session
+          // nobody is looking at.
+          .disabled(!isActive)
+        }
+      }
+
       // An archived session has no pane by construction — archiving released it — so its own
       // card is what the column shows, rather than the "no terminal" message of a session
       // that simply has not been started.
-      if session.status == .archived {
+      if presentation == .conversation {
+        EmptyView()
+      } else if session.status == .archived {
         ArchivedSessionDetail(session: session) {
           Task { await model.restore(session.id) }
         }
@@ -711,6 +758,9 @@ public struct RootView: View {
         }
         .background(.background)
       }
+    }
+    .task(id: ConversationShowKey(session: session, presentation: presentation)) {
+      if presentation == .conversation { model.conversations.show(session) }
     }
     // Takes the whole column even with nothing mounted in it. A terminal fills it on its own,
     // but a window where no session has a pane yet — every one of them closed, straight after a
@@ -1773,5 +1823,60 @@ extension View {
   /// Says `text` to VoiceOver when the view appears.
   func announcedOnAppear(_ text: String) -> some View {
     onAppear { Announcer.announce(text) }
+  }
+}
+
+/// Over the conversation of an archived session: what it is, and the way back.
+private struct ArchivedConversationBar: View {
+  let unarchive: () -> Void
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "archivebox.fill")
+        .foregroundStyle(.secondary)
+      Text(
+        "This session is archived: nothing was deleted, and it cannot be reopened.",
+        bundle: .module
+      )
+      .font(.callout)
+      Spacer(minLength: 8)
+      Button(LocalizedStringResource("Unarchive", bundle: .module), action: unarchive)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+  }
+}
+
+/// What makes the conversation of a session worth readying again.
+private struct ConversationShowKey: Hashable {
+  let session: SessionID
+  let conversations: [SessionAgentConfiguration]
+  let presentation: SessionPresentation
+
+  init(session: WorkSession, presentation: SessionPresentation) {
+    self.session = session.id
+    conversations = session.conversationAgents
+    self.presentation = presentation
+  }
+}
+
+/// Conversation or Terminal, for the session on screen (#38).
+private struct PresentationPicker: View {
+  @Binding var selection: SessionPresentation
+
+  var body: some View {
+    Picker(selection: $selection) {
+      Text("Conversation", bundle: .module).tag(SessionPresentation.conversation)
+      Text("Terminal", bundle: .module, comment: "The raw terminal of a session, as a view.")
+        .tag(SessionPresentation.terminal)
+    } label: {
+      Text("Show the session as", bundle: .module)
+    }
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .fixedSize()
+    .help(Text("Switch between the conversation and the terminal (⌥⌘T)", bundle: .module))
   }
 }

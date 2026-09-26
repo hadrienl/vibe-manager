@@ -3,8 +3,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
 import VibeBrowser
+import VibeConversationUI
 
-/// The application's settings, in tabs: General, and the prompt templates.
+/// The application's settings, in tabs: General, the prompt templates, and the conversation view.
 ///
 /// Both lines are ways back to a question asked once. The Full Disk Access step at launch is never
 /// asked again, and neither is the close confirmation once "Don't ask again" was ticked: refusing
@@ -61,6 +62,15 @@ public struct SettingsView: View {
             }
             .tag(SettingsTab.activity)
         }
+        ConversationSettingsView(appearance: Bindable(model.conversations).appearance)
+          .tabItem {
+            Label {
+              Text("Conversation", bundle: .module, comment: "A tab of the Settings window.")
+            } icon: {
+              Image(systemName: "bubble.left.and.text.bubble.right")
+            }
+          }
+          .tag(SettingsTab.conversation)
       }
     } else {
       general
@@ -151,6 +161,8 @@ public enum SettingsTab: String, Hashable, Sendable {
   case webView
   /// What each session's journal does: the summary its agent writes (#36).
   case activity
+  /// The conversation view of #38: its theme, its fonts, what it unfolds.
+  case conversation
 }
 
 private struct FullDiskAccessRow: View {

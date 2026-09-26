@@ -120,6 +120,9 @@ the bundle: build a second time before testing a translation.
 | inspector, sidebar | inspecteur, barre latérale |
 | terminal host | hôte des terminaux |
 | transcript | transcript (kept) |
+| conversation view, composer | vue conversation, zone de saisie |
+| reasoning, sub-agent | raisonnement, sous-agent |
+| attach (files) | joindre |
 | usage, tokens, running time, runs | utilisation, jetons, temps d’exécution, exécutions |
 | dismiss (a banner) | masquer |
 | session store | fichier des sessions |
