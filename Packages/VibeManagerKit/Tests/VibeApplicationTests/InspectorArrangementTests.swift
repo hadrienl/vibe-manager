@@ -84,17 +84,33 @@ struct InspectorArrangementTests {
     #expect(six.filter { !arrangement.isCollapsed($0) } == [.notes])
   }
 
-  @Test("Resizing rewrites the weights it is given, and only those")
+  @Test("Resizing rewrites the weights it is given, and scales the others to the same unit")
   func resizing() {
     var arrangement = InspectorArrangement.default
 
-    arrangement.resize(to: [.git: 300, .notes: 100, .agent: .nan, .usage: -4])
+    arrangement.resize(to: [.git: 280, .notes: 200, .agent: .nan, .usage: -4])
 
-    #expect(arrangement.weight(.git) == 300)
-    #expect(arrangement.weight(.notes) == 100)
-    #expect(arrangement.weight(.activity) == 1)
-    #expect(arrangement.weight(.agent) == 1)
-    #expect(arrangement.weight(.usage) == 1)
+    #expect(arrangement.weight(.git) == 280)
+    #expect(arrangement.weight(.notes) == 200)
+    #expect(arrangement.weight(.activity) == 200)
+    #expect(arrangement.weight(.agent) == 200)
+    #expect(arrangement.weight(.usage) == 200)
+  }
+
+  @Test("A section unfolded after a resize gets its share, not its minimum")
+  func unfoldingAfterResize() {
+    var arrangement = InspectorArrangement.default
+    arrangement.resize(to: [.activity: 150, .git: 250, .notes: 150])
+    arrangement.setCollapsed(.agent, false)
+
+    let heights = InspectorHeights.distribute(
+      600,
+      among: [.activity, .git, .notes, .agent].map {
+        InspectorHeights.Demand(id: $0, weight: arrangement.weight($0), minimum: 60)
+      })
+
+    // Its default weight of 1, out of 1 + 1.4 + 1, becomes 550 / 3.4 points.
+    #expect(abs((heights[.agent] ?? 0) - 600 * (550 / 3.4) / (550 + 550 / 3.4)) < 0.001)
   }
 
   @Test("A section new in this build goes after the one declared before it")

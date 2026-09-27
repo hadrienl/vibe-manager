@@ -201,7 +201,15 @@ public struct InspectorArrangement: Equatable, Codable, Sendable {
   /// A handle dragged between two sections: their new heights become their weights, and every
   /// other unfolded section keeps the height it had, its weight rewritten in the same unit.
   public mutating func resize(to heights: [InspectorSectionID: Double]) {
-    for (id, height) in heights where height.isFinite && height > 0 {
+    let heights = heights.filter { $0.value.isFinite && $0.value > 0 }
+    guard !heights.isEmpty else { return }
+    // The other sections, folded or hidden, are brought to the same unit, so that one unfolded
+    // later still gets the share it had before the resize.
+    let scale = heights.values.reduce(0, +) / heights.keys.reduce(0) { $0 + weight($1) }
+    for index in entries.indices where heights[entries[index].id] == nil {
+      entries[index].weight = Self.valid(entries[index].weight * scale)
+    }
+    for (id, height) in heights {
       update(id) { $0.weight = height }
     }
   }

@@ -83,10 +83,10 @@ struct InspectorSectionStack: View {
       .onPreferenceChange(SectionFrames.self) { frames = $0 }
       // Only when the minimums do not fit: otherwise each section scrolls on its own, and the
       // column itself never does.
-      if needed > Double(proxy.size.height) + 0.5 {
-        ScrollView { stack }
-      } else {
-        stack.frame(height: proxy.size.height, alignment: .top)
+      // One container either way: swapping it would rebuild every section, and lose the notes'
+      // focus and the lists' scroll positions.
+      ScrollView(needed > Double(proxy.size.height) + 0.5 ? .vertical : []) {
+        stack.frame(minHeight: proxy.size.height, alignment: .top)
       }
     }
   }
