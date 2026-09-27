@@ -237,6 +237,28 @@ struct MarkdownProseTests {
     view.setSelectedRange(NSRange(location: 0, length: view.string.count))
     #expect(view.selectedRanges.first?.rangeValue.length == view.string.count)
   }
+
+  @Test("The Edit menu copies the message whose text holds the keyboard, and only while it does")
+  func focusedMarkdown() {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.titled],
+      backing: .buffered, defer: false)
+    let view = ProseTextView()
+    view.frame = NSRect(x: 0, y: 0, width: 300, height: 100)
+    view.markdown = "**One**"
+    let other = NSTextField()
+    window.contentView?.addSubview(view)
+    window.contentView?.addSubview(other)
+    #expect(window.makeFirstResponder(view))
+    #expect(FocusedMarkdown.shared.markdown == "**One**")
+    view.markdown = "**One** and more"
+    #expect(FocusedMarkdown.shared.markdown == "**One** and more")
+    #expect(window.makeFirstResponder(other))
+    #expect(FocusedMarkdown.shared.markdown == nil)
+    #expect(window.makeFirstResponder(view))
+    view.removeFromSuperview()
+    #expect(FocusedMarkdown.shared.markdown == nil)
+  }
 }
 
 @Suite("Colouring code by its words")

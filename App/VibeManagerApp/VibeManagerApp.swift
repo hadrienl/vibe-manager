@@ -285,6 +285,8 @@ struct VibeManagerApp: App {
 
       WebCommands(model: environment.appModel)
 
+      ConversationCopyCommands()
+
       // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
       CommandGroup(after: .help) {
         // Known limits, and how to recover from each thing that can go wrong.

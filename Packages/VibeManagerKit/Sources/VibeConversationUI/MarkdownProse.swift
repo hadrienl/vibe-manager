@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 import SwiftUI
 import VibeApplication
 
@@ -356,7 +357,9 @@ final class ProseTextView: NSTextView {
   nonisolated static let quoteBarWidth: CGFloat = 3
 
   /// The message's Markdown, for Copy as Markdown.
-  var markdown: String?
+  var markdown: String? {
+    didSet { if FocusedMarkdown.shared.holder == ObjectIdentifier(self) { claimFocus() } }
+  }
   var quoteBarColor = NSColor.separatorColor
 
   convenience init() {
@@ -450,6 +453,27 @@ final class ProseTextView: NSTextView {
     }
   }
 
+  override func becomeFirstResponder() -> Bool {
+    let became = super.becomeFirstResponder()
+    if became { claimFocus() }
+    return became
+  }
+
+  override func resignFirstResponder() -> Bool {
+    let resigned = super.resignFirstResponder()
+    if resigned { FocusedMarkdown.shared.release(ObjectIdentifier(self)) }
+    return resigned
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    if window == nil { FocusedMarkdown.shared.release(ObjectIdentifier(self)) }
+  }
+
+  private func claimFocus() {
+    FocusedMarkdown.shared.hold(markdown, by: ObjectIdentifier(self))
+  }
+
   override func menu(for event: NSEvent) -> NSMenu? {
     let menu = super.menu(for: event) ?? NSMenu()
     guard let markdown else { return menu }
@@ -467,5 +491,34 @@ final class ProseTextView: NSTextView {
     guard let markdown = sender.representedObject as? String else { return }
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(markdown, forType: .string)
+  }
+}
+
+/// The message whose text holds the keyboard — clicked into, or selected — for the Edit menu's
+/// Copy as Markdown: a menu command reaches no view, so the view says what it would copy.
+@MainActor
+@Observable
+public final class FocusedMarkdown {
+  public static let shared = FocusedMarkdown()
+
+  /// The Markdown of the message in focus, `nil` when no message text has the keyboard.
+  public private(set) var markdown: String?
+  @ObservationIgnored fileprivate var holder: ObjectIdentifier?
+
+  public func copy() {
+    guard let markdown else { return }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(markdown, forType: .string)
+  }
+
+  func hold(_ markdown: String?, by view: ObjectIdentifier) {
+    holder = view
+    if self.markdown != markdown { self.markdown = markdown }
+  }
+
+  func release(_ view: ObjectIdentifier) {
+    guard holder == view else { return }
+    holder = nil
+    markdown = nil
   }
 }
