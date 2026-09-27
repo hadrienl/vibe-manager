@@ -1,7 +1,7 @@
 # ADR 0004: Terminal pseudo terminals and process supervision
 
 - Status: Accepted; partly superseded by [0017](0017-terminal-host.md), where the sessions now run
-  in a terminal host that can outlive the application; amended by [0027](0027-side-terminals.md),
+  in a terminal host that can outlive the application; amended by [0030](0030-side-terminals.md),
   which keys terminals by `TerminalID` and writes the history of side terminals to disk
 - Date: 2026-09-21
 - Decision owners: Vibe Manager maintainers

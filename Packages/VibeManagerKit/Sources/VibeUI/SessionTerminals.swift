@@ -768,7 +768,7 @@ public final class SessionTerminals: SessionSideTerminals {
   /// changing observed state is not allowed. Each drawer is observable on its own.
   @ObservationIgnored private var drawers: [SessionID: SessionTerminalDrawer] = [:]
   @ObservationIgnored private let dependencies: DrawerDependencies
-  /// Whether the side terminals' history is kept on disk (ADR 0027).
+  /// Whether the side terminals' history is kept on disk (ADR 0030).
   public private(set) var keepsScrollback: Bool
 
   public init(

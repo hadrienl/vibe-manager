@@ -1,6 +1,6 @@
 # 0017 — A terminal host, so the agents can outlive the application
 
-- Status: accepted; amended by [0027](0027-side-terminals.md): terminals are keyed by `TerminalID`
+- Status: accepted; amended by [0030](0030-side-terminals.md): terminals are keyed by `TerminalID`
   (the agent's keeps its session's UUID, so the protocol is unchanged), and side terminals run in the
   same host
 - Date: 2026-09-24

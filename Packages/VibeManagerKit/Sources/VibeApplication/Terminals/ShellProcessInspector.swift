@@ -31,7 +31,7 @@ public struct NoShellInspection: ShellProcessInspector {
   public func inspect(processIdentifier: Int32) async -> ShellProcessSnapshot? { nil }
 }
 
-/// Whether the side terminals' history is kept on disk (ADR 0027). On unless turned off.
+/// Whether the side terminals' history is kept on disk (ADR 0030). On unless turned off.
 @MainActor
 public protocol TerminalPreferences: AnyObject {
   var keepsScrollback: Bool { get set }

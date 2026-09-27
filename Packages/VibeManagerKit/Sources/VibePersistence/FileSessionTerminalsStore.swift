@@ -7,7 +7,7 @@ import VibeDomain
 ///
 /// Written like the notes: a temporary file in the same folder, synchronized, then moved over,
 /// `0600` in `0700` folders. The whole folder is kept out of backups — a history can hold a token
-/// a command printed, and has no business in Time Machine (ADR 0027). A document that cannot be
+/// a command printed, and has no business in Time Machine (ADR 0030). A document that cannot be
 /// read is set aside rather than overwritten, so that nothing is lost to a bug of this build.
 public actor FileSessionTerminalsStore: SessionTerminalsStore {
   private let directory: URL

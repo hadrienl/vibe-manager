@@ -1,4 +1,4 @@
-# 0027 — Side terminals, in a drawer of each session
+# 0030 — Side terminals, in a drawer of each session
 
 - Status: accepted
 - Date: 2026-09-26

@@ -177,7 +177,7 @@ come back when it reopens, or when the application relaunches — same tabs, sam
 what each one showed — as new shells under a dated line, with nothing run again; with Keep Running,
 they stay in the terminal host with their agent. Their history is the one terminal output written to
 disk, out of backups, and Settings › Terminals turns it off. The decisions are documented in
-[`docs/architecture/0027-side-terminals.md`](docs/architecture/0027-side-terminals.md).
+[`docs/architecture/0030-side-terminals.md`](docs/architecture/0030-side-terminals.md).
 
 The application never creates a branch or a worktree: the agent makes those it needs. The
 inspector's Git section reports what it did — each branch the session worked on, the repositories

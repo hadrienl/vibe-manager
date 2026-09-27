@@ -129,7 +129,7 @@ public struct SessionTerminalsDocument: Hashable, Codable, Sendable {
 }
 
 /// Where each session's drawer is kept: its document, and the history each of its terminals
-/// showed (ADR 0027).
+/// showed (ADR 0030).
 ///
 /// The history is the one piece of terminal output the application ever writes to disk, and only
 /// for the side terminals: bounded as it is in memory, private to the user, kept out of backups

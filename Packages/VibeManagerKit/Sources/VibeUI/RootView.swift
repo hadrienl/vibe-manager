@@ -776,7 +776,8 @@ public struct RootView: View {
             label: Text("Divider between the session and its side terminals", bundle: .module),
             value: Text(
               "\(Int(height)) points tall", bundle: .module,
-              comment: "The height of the drawer of side terminals, read by VoiceOver on its divider."
+              comment:
+                "The height of the drawer of side terminals, read by VoiceOver on its divider."
             ),
             sizesPaneBelow: true,
             onChange: { drawer.setHeight($0) })
