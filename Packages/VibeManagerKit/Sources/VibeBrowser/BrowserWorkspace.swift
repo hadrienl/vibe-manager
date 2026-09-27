@@ -63,6 +63,11 @@ public final class BrowserWorkspace {
   @ObservationIgnored private var logSaveTasks: [SessionID: Task<Void, Never>] = [:]
   @ObservationIgnored private var answers: [UUID: CheckedContinuation<AnswerOutcome, Never>] = [:]
   @ObservationIgnored private var lastUse: [BrowserTabID: Date] = [:]
+  /// The tab each ticket of a session is read in (#89): found again by it once a sign-in page has
+  /// taken it elsewhere.
+  @ObservationIgnored var ticketTabIDs: [TicketTabKey: BrowserTabID] = [:]
+  /// The tabs waiting on a sign-in page, and the ticket address each goes back to.
+  @ObservationIgnored var signInWaits: [BrowserTabID: URL] = [:]
   @ObservationIgnored private let stateStore: any BrowserStateStore
   @ObservationIgnored private let logStore: any BrowserActionLogStore
   @ObservationIgnored private let saveDelay: Duration
@@ -111,6 +116,19 @@ public final class BrowserWorkspace {
     let browser = browser(for: id)
     await restoreTasks[id]?.value
     return browser
+  }
+
+  /// A tab of any session.
+  func tabAnywhere(_ id: BrowserTabID) -> BrowserTabModel? {
+    for browser in browsers.values {
+      if let tab = browser.tab(id) { return tab }
+    }
+    return nil
+  }
+
+  /// The session's web view if it has one already: never makes one for a session that is gone.
+  func existingBrowser(for id: SessionID) -> SessionBrowser? {
+    browsers[id]
   }
 
   public func isVisible(_ id: SessionID) -> Bool {
@@ -247,7 +265,7 @@ public final class BrowserWorkspace {
     grants = permissions.grants
   }
 
-  private func makeTab(
+  func makeTab(
     _ url: URL, id tabID: BrowserTabID = BrowserTabID(), title: String = "",
     openedBy: BrowserTab.Opener, isPinnedTicket: Bool = false, in id: SessionID
   ) -> BrowserTabModel {
@@ -277,7 +295,7 @@ public final class BrowserWorkspace {
     return tab
   }
 
-  private func touch(_ tab: BrowserTabModel) {
+  func touch(_ tab: BrowserTabModel) {
     lastUse[tab.id] = Date()
   }
 
