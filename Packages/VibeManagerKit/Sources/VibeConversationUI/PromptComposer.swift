@@ -14,7 +14,6 @@ struct PromptComposer: View {
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
   @FocusState private var isFocused: Bool
-  @State private var isChoosingFiles = false
 
   var body: some View {
     let size = appearance.textSize.pointSize
@@ -62,7 +61,7 @@ struct PromptComposer: View {
       HStack(spacing: 8) {
         Menu {
           Button {
-            isChoosingFiles = true
+            model.chooseFiles?()
           } label: {
             Label {
               Text("Attach Files…", bundle: .module)
@@ -109,11 +108,6 @@ struct PromptComposer: View {
     .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 14))
     .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.border.color))
     .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
-    .fileImporter(
-      isPresented: $isChoosingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true
-    ) { result in
-      if case .success(let files) = result { model.attach(files) }
-    }
     .onChange(of: model.focusComposerRequest) { isFocused = true }
   }
 

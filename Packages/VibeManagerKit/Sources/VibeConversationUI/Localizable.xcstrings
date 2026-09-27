@@ -506,16 +506,6 @@
         }
       }
     },
-    "Drop to attach to your message" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déposez pour joindre à votre message"
-          }
-        }
-      }
-    },
     "Each session can then be switched with ⌥⌘T, and keeps its choice." : {
       "localizations" : {
         "fr" : {

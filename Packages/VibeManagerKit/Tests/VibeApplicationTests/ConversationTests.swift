@@ -375,7 +375,7 @@ struct PromptEncodingTests {
       for: PromptSubmission(text: "look", attachments: [trap]), format: AgentPromptFormat(),
       whileWorking: false)
     #expect(keys.paste == Array("\u{1B}[200~look\u{1B}[201~".utf8))
-    #expect(!PromptEncoding.isWritablePath(trap.path))
+    #expect(!PathInsertion.isWritablePath(trap.path))
   }
 
   @Test("Joined files follow the text, escaped as Terminal.app drops them")

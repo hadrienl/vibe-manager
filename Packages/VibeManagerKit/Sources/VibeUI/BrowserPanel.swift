@@ -88,9 +88,10 @@ private struct BrowserTabStrip: View {
               close: { workspace.close(tab.id, in: browser.sessionID) },
               model: model, browser: browser
             )
-            .draggable(tab.id.rawValue.uuidString)
+            // Marked, so that a tab let go over the session is not typed into its agent (#42).
+            .draggable(BrowserTabDrag.text(for: tab.id))
             .dropDestination(for: String.self) { items, _ in
-              guard let raw = items.first, let uuid = UUID(uuidString: raw),
+              guard let raw = items.first, let uuid = BrowserTabDrag.tabID(in: raw),
                 let destination = browser.tabs.firstIndex(where: { $0.id == tab.id })
               else { return false }
               browser.move(BrowserTabID(rawValue: uuid), to: destination)
@@ -978,5 +979,20 @@ private struct BrowserTraceRow: View {
     case .expired:
       return Text("Expired", bundle: .module, comment: "An agent request nobody answered in time.")
     }
+  }
+}
+
+/// What a tab carries while it is dragged to another place of the strip: its identifier, behind a
+/// prefix no drop on a session takes for text (#42).
+enum BrowserTabDrag {
+  static let prefix = "vibe-manager-browser-tab:"
+
+  static func text(for id: BrowserTabID) -> String {
+    prefix + id.rawValue.uuidString
+  }
+
+  static func tabID(in text: String) -> UUID? {
+    guard text.hasPrefix(prefix) else { return nil }
+    return UUID(uuidString: String(text.dropFirst(prefix.count)))
   }
 }

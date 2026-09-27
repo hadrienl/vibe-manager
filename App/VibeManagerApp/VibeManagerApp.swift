@@ -421,6 +421,13 @@ private struct SessionHistoryCommands: Commands {
       .keyboardShortcut("m", modifiers: [.command, .control])
       .disabled(!(model.selectedSession.map(model.canSwitchAgent) ?? false))
 
+      // The keyboard's way to a drop (#42): chips in a conversation, paths in a terminal.
+      Button("Attach Files…") {
+        model.beginAttachingFiles()
+      }
+      .keyboardShortcut("o", modifiers: .command)
+      .disabled(!model.canAttachFiles)
+
       Divider()
 
       // The swipe's keyboard equivalent (#80): the shortcut is the decision, so it asks nothing.

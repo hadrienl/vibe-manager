@@ -48,6 +48,11 @@ extension AppModel {
       model.showTerminal = { [weak self] in
         self?.setPresentation(.terminal, of: id)
       }
+      model.chooseFiles = { [weak self] in
+        guard let self else { return }
+        if self.selectedSessionID != id { self.select(id) }
+        self.beginAttachingFiles()
+      }
       model.openInWebView = { [weak self] url, automatically in
         guard let self, let browser = self.browser,
           self.sessions.first(where: { $0.id == id })?.status != .archived

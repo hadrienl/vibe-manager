@@ -114,6 +114,16 @@ struct AgentActivityStructuredTests {
     #expect(reduce(asked, .userInput([0x32])).activity == .awaitingUser(.approval))
   }
 
+  @Test("A drop typed into the terminal is no answer to a permission (#42)")
+  func dropIsNoAnswer() {
+    let asked = structured(.awaitingUser(.approval))
+    let drop = PathInsertion.terminalBytes(
+      for: [.file(URL(fileURLWithPath: "/tmp/1"))], bracketed: true)
+    #expect(reduce(asked, .userInput(drop)).activity == .awaitingUser(.approval))
+    let plain = PathInsertion.terminalBytes(for: [.text("1")], bracketed: false)
+    #expect(reduce(asked, .userInput(plain)).activity == .awaitingUser(.approval))
+  }
+
   @Test("No key answers a question: a free answer is typed one letter at a time")
   func questionIgnoresKeys() {
     let asked = structured(.awaitingUser(.question))

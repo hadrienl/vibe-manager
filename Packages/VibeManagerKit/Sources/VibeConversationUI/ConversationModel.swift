@@ -113,6 +113,9 @@ public final class ConversationModel {
   public private(set) var isSubmitting = false
   /// Writes into the session's terminal, as a keyboard would.
   @ObservationIgnored public var write: (([UInt8]) async -> Void)?
+  /// Opens the file panel of Session › Attach Files…, whose choice comes back through `attach`:
+  /// one panel for the whole window, since two file importers in one hierarchy do not both show.
+  @ObservationIgnored public var chooseFiles: (() -> Void)?
   /// Brings the terminal forward and gives it the keyboard.
   @ObservationIgnored public var showTerminal: (() -> Void)?
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
@@ -293,8 +296,7 @@ public final class ConversationModel {
   public var isAgentWorking: Bool { activity == .working && isProcessRunning }
 
   public func attach(_ files: [URL]) {
-    for file in files where !attachments.contains(file) && PromptEncoding.isWritablePath(file.path)
-    {
+    for file in files where !attachments.contains(file) && PathInsertion.isWritablePath(file.path) {
       attachments.append(file)
     }
     focusComposerRequest += 1

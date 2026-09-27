@@ -23,6 +23,9 @@ struct SessionSidebar: View {
   /// The group whose header is being dragged, and the one it is over (#44).
   @State private var draggedGroup: SessionFolderKey?
   @State private var targetedGroup: SessionFolderKey?
+  /// A drag over a row: taken or refused (#42).
+  @State private var rowDropHover: [SessionID: DropHover] = [:]
+  @State private var springLoading = SpringLoading()
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -248,6 +251,21 @@ struct SessionSidebar: View {
         hoveredSessionID = nil
       }
     }
+    // A drop, not a gesture: the row keeps its click (#96).
+    .overlay {
+      if let hover = rowDropHover[session.id] {
+        RoundedRectangle(cornerRadius: 6)
+          .stroke(hover.isRefusing ? Color.red : Color.accentColor, lineWidth: 2)
+          .allowsHitTesting(false)
+      }
+    }
+    .onDrop(
+      of: DropReader.acceptedTypes,
+      delegate: SessionRowDropDelegate(
+        model: model, sessionID: session.id, springLoading: springLoading,
+        hovered: Binding(
+          get: { rowDropHover[session.id] },
+          set: { rowDropHover[session.id] = $0 })))
   }
 
   // MARK: - Swipe
