@@ -229,7 +229,8 @@ public enum ZipArchiveWriter {
   }
 }
 
-enum CRC32 {
+/// The checksum of a zip entry: written by `ZipArchiveWriter`, checked by the avatar archives' reader.
+public enum CRC32 {
   private static let table: [UInt32] = (0..<256).map { index in
     var value = UInt32(index)
     for _ in 0..<8 {
@@ -238,7 +239,7 @@ enum CRC32 {
     return value
   }
 
-  static func checksum(_ data: Data) -> UInt32 {
+  public static func checksum(_ data: Data) -> UInt32 {
     var crc: UInt32 = 0xFFFF_FFFF
     for byte in data {
       crc = table[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8)

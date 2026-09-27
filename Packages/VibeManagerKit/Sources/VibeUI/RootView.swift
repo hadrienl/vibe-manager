@@ -74,6 +74,9 @@ public struct RootView: View {
     .frame(minWidth: 640, minHeight: 480)
     .task {
       await model.load()
+      // Launched behind another application — at login, with `open -g` — it never resigned: it
+      // must not believe it is in front, or the floating panel of #41 would wait for nothing.
+      if !NSApp.isActive { model.applicationWillResignActive() }
       idealWidths = IdealColumnWidths(
         sidebar: model.layout.intent.sidebarWidth,
         inspector: model.layout.intent.inspectorWidth

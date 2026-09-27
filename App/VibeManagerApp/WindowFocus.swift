@@ -70,7 +70,9 @@ final class WindowFocus {
     } else if workspaceWindow == nil {
       hasWorkspace = false
     }
-    guard let key = NSApp.keyWindow else {
+    // The floating panel (#41) takes the keyboard only while another application is in front:
+    // ⌘W has nothing to close there.
+    guard let key = NSApp.keyWindow, !((key as? NSPanel)?.isFloatingPanel ?? false) else {
       front = .none
       return
     }

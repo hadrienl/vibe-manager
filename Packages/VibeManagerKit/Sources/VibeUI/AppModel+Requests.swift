@@ -143,6 +143,8 @@ extension AppModel {
   /// the one gesture of the palette that changes the session on screen.
   public func openSession(for id: AgentRequestID) {
     guard let session = sessions.first(where: { $0.id == id.sessionID }) else { return }
+    // From the floating panel, another application is in front (#41).
+    if !isApplicationActive { activateApplication() }
     if session.taskStatus != .archived, filter.column != session.taskStatus {
       setColumn(session.taskStatus)
     }
@@ -201,7 +203,12 @@ extension AppModel {
     knownRequestIDs.formUnion(unknown.map(\.id))
     // Only what arrives while the application is in the background is notified: what arrived
     // while it was in front has been seen in the palette.
-    guard !isApplicationActive, notifiesRequests, let notifier = requestNotifier else { return }
+    // The floating panel shows them where the user is (#41): a notification would say the same
+    // request twice.
+    let floats = floatingPanel?.isEnabled ?? false
+    guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {
+      return
+    }
     for pending in unknown {
       notifier.post(notification(for: pending))
       postedRequestIDs.insert(pending.id)
