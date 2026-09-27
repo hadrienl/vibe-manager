@@ -84,8 +84,9 @@ struct SessionSidebar: View {
     let positions = Dictionary(
       uniqueKeysWithValues: model.displayedSessions.prefix(AppModel.shortcutPositionLimit)
         .enumerated().map { ($0.element.id, $0.offset + 1) })
+    // A set: ⌘-click, ⇧-click and ⌘A select several sessions (#77). The one on screen stays one.
     return List(
-      selection: Binding(get: { model.selectedSessionID }, set: { model.selectFromList($0) })
+      selection: Binding(get: { model.selectedSessionIDs }, set: { model.selectFromList($0) })
     ) {
       switch model.sidebarContent {
       case .flat(let sessions):
@@ -109,11 +110,25 @@ struct SessionSidebar: View {
     // No implicit animation on the list: linked against the macOS 15 SDK, the table it stands on
     // left rows of an animated update behind, drawn over the others and deaf to clicks. The
     // table animates its own insertions and removals.
+    // The menu of the rows clicked: the whole selection when the click is in it, the row alone
+    // otherwise, as in the Finder (#77). A group's header keeps its own.
+    .contextMenu(forSelectionType: SessionID.self) { ids in
+      SessionSelectionMenu(model: model, ids: ids)
+    }
     .focused($isListFocused)
     .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
+    // The keyboard gone elsewhere, ⌘W and the Session menu act on the session on screen alone:
+    // a selection nobody is looking at must not be what a shortcut typed in a terminal closes.
+    .onChange(of: isListFocused) { _, isFocused in
+      if !isFocused { model.collapseSelection() }
+    }
     .onKeyPress(.escape) {
-      guard swipe != nil else { return .ignored }
-      closeSwipe(animated: true)
+      if swipe != nil {
+        closeSwipe(animated: true)
+        return .handled
+      }
+      guard model.hasMultipleSelection else { return .ignored }
+      model.collapseSelection()
       return .handled
     }
     .accessibilityLabel(Text("Sessions", bundle: .module))
@@ -242,6 +257,13 @@ struct SessionSidebar: View {
           opacity: reduceMotion ? swipe.progress : 1,
           choose: { commit($0, for: session.id) }
         )
+      }
+    }
+    // A row of a selection of several also reaches the commands on the whole selection, the
+    // way its menu does, for VoiceOver (#77).
+    .accessibilityActions {
+      if model.hasMultipleSelection, model.selectedSessionIDs.contains(session.id) {
+        SessionBatchCommandButtons(model: model, ids: model.commandTargets, includesStatus: false)
       }
     }
     .onHover { isHovering in
@@ -589,6 +611,8 @@ private struct ArchivedSessionsBar: View {
 
 private struct ArchivedSessionsList: View {
   let model: AppModel
+  /// Several archived sessions can be unarchived at once (#77). A click on one alone shows it.
+  @State private var selection: Set<SessionID> = []
 
   var body: some View {
     let archived = model.archivedSessions
@@ -603,33 +627,66 @@ private struct ArchivedSessionsList: View {
             "Sessions archived from Done land here. Nothing is ever deleted.", bundle: .module)
         }
       } else {
-        List(archived) { session in
-          HStack(spacing: 8) {
-            SessionBadge(appearance: session.appearance)
-            VStack(alignment: .leading, spacing: 1) {
-              Text(session.name)
-                .lineLimit(1)
-              if let archivedAt = session.archivedAt {
-                Text(archivedAt, style: .date)
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+          // No gesture on the rows: it would keep the clicks the list needs to select (#96).
+          List(archived, selection: $selection) { session in
+            HStack(spacing: 8) {
+              SessionBadge(appearance: session.appearance)
+              VStack(alignment: .leading, spacing: 1) {
+                Text(session.name)
+                  .lineLimit(1)
+                if let archivedAt = session.archivedAt {
+                  Text(archivedAt, style: .date)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              Spacer(minLength: 6)
+              Button(LocalizedStringResource("Unarchive", bundle: .module)) {
+                Task { await model.restore(session.id) }
+              }
+              .controlSize(.small)
+            }
+            .contentShape(Rectangle())
+            .accessibilityAction(named: Text("Show", bundle: .module)) {
+              model.showArchived(session.id)
+            }
+          }
+          .listStyle(.plain)
+          .contextMenu(forSelectionType: SessionID.self) { ids in
+            let plan = model.batchPlan(.unarchive, for: ordered(ids, in: archived))
+            if ids.count > 1, !plan.isEmpty {
+              Button(model.batchTitle(for: plan)) { Task { await model.requestBatch(plan) } }
+            } else if let id = ids.first {
+              Button(LocalizedStringResource("Unarchive", bundle: .module)) {
+                Task { await model.restore(id) }
               }
             }
-            Spacer(minLength: 6)
-            Button(LocalizedStringResource("Unarchive", bundle: .module)) {
-              Task { await model.restore(session.id) }
-            }
-            .controlSize(.small)
           }
-          .contentShape(Rectangle())
-          .onTapGesture { model.showArchived(session.id) }
-          .accessibilityAction(named: Text("Show", bundle: .module)) {
-            model.showArchived(session.id)
+          .onChange(of: selection) { _, ids in
+            if ids.count == 1, let id = ids.first { model.showArchived(id) }
+          }
+          let plan = model.batchPlan(.unarchive, for: ordered(selection, in: archived))
+          if selection.count > 1, !plan.isEmpty {
+            Divider()
+            HStack {
+              Spacer()
+              Button(model.batchTitle(for: plan)) {
+                Task { await model.requestBatch(plan) }
+                selection = []
+              }
+              .controlSize(.small)
+              .accessibilityIdentifier("unarchive-selection")
+            }
+            .padding(8)
           }
         }
-        .listStyle(.plain)
       }
     }
     .frame(width: 320, height: 300)
+  }
+
+  private func ordered(_ ids: Set<SessionID>, in archived: [WorkSession]) -> [SessionID] {
+    archived.map(\.id).filter { ids.contains($0) }
   }
 }

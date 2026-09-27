@@ -911,6 +911,335 @@
         }
       }
     },
+    "%lld are already archived." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is already archived."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are already archived."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà archivées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld est déjà archivée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà archivées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld are already being closed or restarted." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is already being closed or restarted."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are already being closed or restarted."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà en cours de fermeture ou de redémarrage."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld est déjà en cours de fermeture ou de redémarrage."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà en cours de fermeture ou de redémarrage."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld are already closed." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is already closed."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are already closed."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà fermées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld est déjà fermée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà fermées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld are already in %@." : {
+      "comment" : "Sessions of the selection a command leaves out, then a task status.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is already in %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are already in %@."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà dans %@."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld est déjà dans %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sont déjà dans %@."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld are left as they are." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is left as it is."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are left as they are."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld restent telles quelles."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld reste telle quelle."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld restent telles quelles."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld are not archived." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is not archived."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are not archived."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ne sont pas archivées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld n’est pas archivée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ne sont pas archivées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld are still running and are left as they are." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld is still running and is left as it is."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld are still running and are left as they are."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tournent encore et restent telles quelles."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tourne encore et reste telle quelle."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tournent encore et restent telles quelles."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld behind" : {
       "comment" : "A number of commits the upstream has and the branch has not.",
       "localizations" : {
@@ -1225,6 +1554,53 @@
         }
       }
     },
+    "%lld have no agent that can run." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld has no agent that can run."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld have no agent that can run."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld n’ont pas d’agent utilisable."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld n’a pas d’agent utilisable."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld n’ont pas d’agent utilisable."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld more resources were not kept." : {
       "comment" : "Resources past the journal's bound; a count.",
       "localizations" : {
@@ -1359,6 +1735,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld actions requises"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld need their summary read first: restart them one at a time." : {
+      "comment" : "Sessions of the selection a command leaves out.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld needs its summary read first: restart it on its own."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld need their summary read first: restart them one at a time."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Le résumé de %lld sessions doit d’abord être relu : redémarrez-les une par une."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Le résumé de %lld session doit d’abord être relu : redémarrez-la seule."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Le résumé de %lld sessions doit d’abord être relu : redémarrez-les une par une."
                 }
               }
             }
@@ -1656,6 +2079,52 @@
         }
       }
     },
+    "%lld processes did not answer the stop and may still be running." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld process did not answer the stop and may still be running."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld processes did not answer the stop and may still be running."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld processus n’ont pas répondu à l’arrêt et tournent peut-être encore."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld processus n’a pas répondu à l’arrêt et tourne peut-être encore."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld processus n’ont pas répondu à l’arrêt et tournent peut-être encore."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld questions" : {
       "comment" : "The title of a request of an agent: several questions at once.",
       "localizations" : {
@@ -1879,6 +2348,52 @@
         }
       }
     },
+    "%lld running agents will be stopped. The sessions can be restarted later." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld running agent will be stopped. The sessions can be restarted later."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld running agents will be stopped. The sessions can be restarted later."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agents en cours seront arrêtés. Les sessions pourront être redémarrées plus tard."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agent en cours sera arrêté. Les sessions pourront être redémarrées plus tard."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld agents en cours seront arrêtés. Les sessions pourront être redémarrées plus tard."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sessions" : {
       "comment" : "How many sessions a group of the sidebar holds.",
       "localizations" : {
@@ -2011,6 +2526,423 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sessions n’ont pas été rétablies."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions moved to %@." : {
+      "comment" : "How many sessions, then a task status.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session moved to %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions moved to %@."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions déplacées vers %@."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session déplacée vers %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions déplacées vers %@."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions selected" : {
+      "comment" : "Said by VoiceOver when the sidebar's selection grows or shrinks.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session selected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions selected"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions sélectionnées"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session sélectionnée"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions sélectionnées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions that never ran will start their agent with their prompt." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session that never ran will start its agent with its prompt."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions that never ran will start their agent with their prompt."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les agents de %lld sessions jamais lancées vont démarrer avec leur prompt."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’agent de %lld session jamais lancée va démarrer avec son prompt."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les agents de %lld sessions jamais lancées vont démarrer avec leur prompt."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions were moved, but their agent did not start." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was moved, but its agent did not start."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were moved, but their agent did not start."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions ont été déplacées, mais leur agent n’a pas démarré."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session a été déplacée, mais son agent n’a pas démarré."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions ont été déplacées, mais leur agent n’a pas démarré."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions were not archived." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was not archived."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were not archived."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été archivées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session n’a pas été archivée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été archivées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions were not closed." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was not closed."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were not closed."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été fermées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session n’a pas été fermée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été fermées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions were not moved to %@." : {
+      "comment" : "How many sessions, then a task status.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was not moved to %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were not moved to %@."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été déplacées vers %@."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session n’a pas été déplacée vers %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été déplacées vers %@."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions were not restarted." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was not restarted."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were not restarted."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été redémarrées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session n’a pas été redémarrée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été redémarrées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions were not unarchived." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was not unarchived."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were not unarchived."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été désarchivées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session n’a pas été désarchivée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions n’ont pas été désarchivées."
                 }
               }
             }
@@ -2894,6 +3826,99 @@
         }
       }
     },
+    "Archive %lld Sessions?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld Session?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld Sessions?"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archiver %lld sessions ?"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archiver %lld session ?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archiver %lld sessions ?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Archive %lld Sessions…" : {
+      "comment" : "A command on several selected sessions.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld Session…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld Sessions…"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archiver %lld sessions…"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archiver %lld session…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archiver %lld sessions…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Archive this session?" : {
       "localizations" : {
         "fr" : {
@@ -3308,6 +4333,99 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer…"
+          }
+        }
+      }
+    },
+    "Close %lld Sessions" : {
+      "comment" : "A command on several selected sessions.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close %lld Session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close %lld Sessions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Fermer %lld sessions"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Fermer %lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Fermer %lld sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Close %lld Sessions?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close %lld Session?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Close %lld Sessions?"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Fermer %lld sessions ?"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Fermer %lld session ?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Fermer %lld sessions ?"
+                }
+              }
+            }
           }
         }
       }
@@ -3962,6 +5080,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dupliquer"
+          }
+        }
+      }
+    },
+    "Each agent resumes its conversation where it can. A session whose summary has to be read first is left for you to restart on its own." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque agent reprend sa conversation quand c’est possible. Une session dont le résumé doit d’abord être relu vous est laissée, pour la redémarrer seule."
           }
         }
       }
@@ -4797,6 +5925,16 @@
         }
       }
     },
+    "Its summary has to be read first: restart it on its own." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son résumé doit d’abord être relu : redémarrez-la seule."
+          }
+        }
+      }
+    },
     "Its web content process stopped. Other tabs and the terminal were not affected." : {
       "localizations" : {
         "fr" : {
@@ -5027,6 +6165,100 @@
         }
       }
     },
+    "Move %lld Sessions to %@?" : {
+      "comment" : "How many sessions, then a task status.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Move %lld Session to %@?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Move %lld Sessions to %@?"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Déplacer %lld sessions vers %@ ?"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Déplacer %lld session vers %@ ?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Déplacer %lld sessions vers %@ ?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Move %lld Sessions to %@…" : {
+      "comment" : "A command on several selected sessions: how many, a task status.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Move %lld Session to %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Move %lld Sessions to %@…"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Déplacer %lld sessions vers %@…"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Déplacer %lld session vers %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Déplacer %lld sessions vers %@…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Move Down" : {
       "localizations" : {
         "fr" : {
@@ -5053,6 +6285,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Monter le groupe"
+          }
+        }
+      }
+    },
+    "Move Sessions" : {
+      "comment" : "Moves several sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer"
           }
         }
       }
@@ -5849,6 +7092,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et la session reste consultable dans Archivées. Elle ne pourra plus être rouverte tant qu’elle n’aura pas été désarchivée."
+          }
+        }
+      }
+    },
+    "Nothing is deleted: notes, repositories and Git metadata are kept, and the sessions stay readable under Archived. They can no longer be reopened until they are unarchived." : {
+      "comment" : "Archived is the line at the foot of the sidebar that lists archived sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et les sessions restent consultables dans Archivées. Elles ne pourront plus être rouvertes avant d’avoir été désarchivées."
           }
         }
       }
@@ -6832,6 +8086,99 @@
         }
       }
     },
+    "Restart %lld Sessions?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restart %lld Session?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restart %lld Sessions?"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Redémarrer %lld sessions ?"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Redémarrer %lld session ?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Redémarrer %lld sessions ?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Restart %lld Sessions…" : {
+      "comment" : "A command on several selected sessions.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restart %lld Session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Restart %lld Sessions…"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Redémarrer %lld sessions…"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Redémarrer %lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Redémarrer %lld sessions…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Restart Now" : {
       "localizations" : {
         "fr" : {
@@ -6881,6 +8228,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relancer la session, en reprenant sa conversation %@"
+          }
+        }
+      }
+    },
+    "Restart Sessions" : {
+      "comment" : "Restarts several sessions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrer"
           }
         }
       }
@@ -8496,6 +9854,52 @@
         }
       }
     },
+    "The agents of %lld sessions will be stopped." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The agent of %lld session will be stopped."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The agents of %lld sessions will be stopped."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les agents de %lld sessions seront arrêtés."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’agent de %lld session sera arrêté."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les agents de %lld sessions seront arrêtés."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "The agent’s action downloads “%@”." : {
       "localizations" : {
         "fr" : {
@@ -9465,6 +10869,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désarchiver"
+          }
+        }
+      }
+    },
+    "Unarchive %lld Sessions" : {
+      "comment" : "A command on several selected sessions.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unarchive %lld Session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unarchive %lld Sessions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Désarchiver %lld sessions"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Désarchiver %lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Désarchiver %lld sessions"
+                }
+              }
+            }
           }
         }
       }

@@ -142,6 +142,12 @@ public final class AppModel {
   /// Closes under way, from the command to the reload that shows the session closed. Until then
   /// the session still reads as running, and a second ⌘W would stop it a second time.
   public private(set) var closingSessionIDs: Set<SessionID> = []
+  /// The sessions selected in the sidebar, the one on screen among them (#77).
+  var selection = SessionSelection()
+  /// A command on several sessions, held until the user answers its one question (#77).
+  public internal(set) var pendingBatch: SessionBatchConfirmation?
+  /// What a command on several sessions could not do. `nil` when everything went through.
+  public internal(set) var batchReport: SessionBatchReport?
   /// Whether closing a session whose agent runs asks first. Mirrored here so that the settings
   /// window and the dialog's "Don't ask again" read and change the same answer.
   public var confirmsStoppingRunningAgent: Bool {
@@ -455,7 +461,7 @@ public final class AppModel {
   }
 
   /// The selection restored from the layout, kept until a load can tell whether it still exists.
-  private var preferredSelection: SessionID?
+  var preferredSelection: SessionID?
   /// An archived session opened from the list at the foot of the sidebar. It is in no column, and
   /// stays on screen until the user picks something else rather than being replaced at the next
   /// reload by the first row of the column.
@@ -838,6 +844,8 @@ public final class AppModel {
   }
 
   public func update(filter change: (inout SessionFilter) -> Void) {
+    // A row the filter hides leaves the selection (#77).
+    defer { pruneSelection() }
     var updated = filter
     change(&updated)
     guard updated != filter else { return }
@@ -955,7 +963,8 @@ public final class AppModel {
     }
   }
 
-  private func reconcileSelection() {
+  func reconcileSelection() {
+    pruneSelection()
     let visible = visibleSessions
     if let selectedSessionID, visible.contains(where: { $0.id == selectedSessionID }) { return }
     if let shownArchivedSessionID, shownArchivedSessionID == selectedSessionID,
@@ -1030,13 +1039,9 @@ public final class AppModel {
     guard !closingSessionIDs.contains(id) else { return }
     closingSessionIDs.insert(id)
     defer { closingSessionIDs.remove(id) }
-    diagnostics.record(
-      .lifecycle, .info, "session.closeRequested", ["session": diagnostics.pseudonym(id)])
     do {
-      let closure = try await closeSession(id: id)
+      let closure = try await stopSession(id)
       report(closure.detachment, for: closure.session, action: .closed)
-      // Closing a session is reading it.
-      await activityTracker?.forget(id)
     } catch {
       await report(error)
     }
@@ -1044,6 +1049,100 @@ public final class AppModel {
     await reload()
     // A search can hide the row; the session the user was on stays in front of them.
     if isStillSelected, selectedSessionID != id { select(id) }
+  }
+
+  private func stopSession(_ id: SessionID) async throws -> SessionClosure {
+    diagnostics.record(
+      .lifecycle, .info, "session.closeRequested", ["session": diagnostics.pseudonym(id)])
+    let closure = try await closeSession(id: id)
+    // Closing a session is reading it.
+    await activityTracker?.forget(id)
+    return closure
+  }
+
+  /// One session of a batch close (#77): what `close(_:)` does, told rather than shown.
+  func closeInBatch(_ id: SessionID) async -> SessionBatchItemResult {
+    guard closingSessionIDs.insert(id).inserted else { return .skipped(.busy) }
+    defer { closingSessionIDs.remove(id) }
+    do {
+      let closure = try await stopSession(id)
+      return Self.result(of: closure.detachment, for: closure.session, action: .closed)
+    } catch {
+      return .failed(message: Self.message(for: error), suggestion: nil)
+    }
+  }
+
+  /// One session of a batch archive (#77).
+  func archiveInBatch(_ id: SessionID) async -> SessionBatchItemResult {
+    do {
+      let archival = try await archiveProcess(id)
+      return Self.result(of: archival.detachment, for: archival.session, action: .archived)
+    } catch {
+      return .failed(message: Self.message(for: error), suggestion: nil)
+    }
+  }
+
+  /// One session of a batch unarchive (#77).
+  func restoreInBatch(_ id: SessionID) async -> SessionBatchItemResult {
+    do {
+      _ = try await restoreSession(id: id)
+      diagnostics.record(
+        .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(id)])
+      return .done
+    } catch {
+      return .failed(message: Self.message(for: error), suggestion: nil)
+    }
+  }
+
+  /// One session of a batch move (#77): the status is written, and a session that never ran and
+  /// goes In Progress starts its agent, as it does on its own.
+  func moveInBatch(_ id: SessionID, to status: SessionTaskStatus) async -> SessionBatchItemResult {
+    guard let session = sessions.first(where: { $0.id == id }) else {
+      return .failed(
+        message: Self.message(for: ChangeSessionStatusError.sessionNotFound(id)), suggestion: nil)
+    }
+    guard session.taskStatus != status else { return .skipped(.alreadyInStatus) }
+    do {
+      try await changeTaskStatus(id: id, to: status)
+      diagnostics.record(
+        .session, .info, "session.taskStatusChanged",
+        ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
+    } catch {
+      return .failed(message: Self.message(for: error), suggestion: nil)
+    }
+    guard Self.startsWhenMoved(session, to: status), canRestart(session) else { return .done }
+    // The status is written whatever the start does: the session is in its new column, and a
+    // failed start is told as such rather than as a move that did not happen.
+    switch await performRestart(id: id, follows: false, inBatch: true) {
+    case .failed(let message, let suggestion):
+      return .movedWithoutStart(message: message, suggestion: suggestion)
+    default:
+      return .done
+    }
+  }
+
+  /// A session created and never started goes to work when it is moved In Progress.
+  static func startsWhenMoved(_ session: WorkSession, to status: SessionTaskStatus) -> Bool {
+    status == .doing && !session.hasEverStarted && session.status == .closed
+  }
+
+  /// One session of a batch restart (#77). A restart that would send a summary is left out
+  /// rather than asked about: the summary is read on its own, never as one of several.
+  func restartInBatch(_ id: SessionID) async -> SessionBatchItemResult {
+    await performRestart(id: id, follows: false, inBatch: true)
+  }
+
+  private static func result(
+    of detachment: SessionDetachOutcome, for session: WorkSession, action: DetachWarning.Action
+  ) -> SessionBatchItemResult {
+    guard case .unreachable(let processIdentifier) = detachment else { return .done }
+    let warning = DetachWarning(
+      action: action, sessionName: session.name, processIdentifier: processIdentifier)
+    return .doneWithWarning(message: warning.message, suggestion: warning.suggestion)
+  }
+
+  static func message(for error: Error) -> String {
+    (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
   }
 
   /// Opens the confirmation rather than archiving. The command is reversible, but it takes a
@@ -1067,14 +1166,7 @@ public final class AppModel {
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
     do {
-      let archival = try await archiveSession(id: id)
-      await activityTracker?.forget(id)
-      browser?.release(id)
-      conversations.release(id)
-      await dropStore?.remove(id)
-      if dropNotice?.sessionID == id { dropNotice = nil }
-      diagnostics.record(
-        .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
+      let archival = try await archiveProcess(id)
       report(archival.detachment, for: archival.session, action: .archived)
       prepareHandOff(from: id, listedBefore: visible)
     } catch {
@@ -1085,6 +1177,18 @@ public final class AppModel {
     await reload()
     handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
     reconcileSelection()
+  }
+
+  private func archiveProcess(_ id: SessionID) async throws -> SessionArchival {
+    let archival = try await archiveSession(id: id)
+    await activityTracker?.forget(id)
+    browser?.release(id)
+    conversations.release(id)
+    await dropStore?.remove(id)
+    if dropNotice?.sessionID == id { dropNotice = nil }
+    diagnostics.record(
+      .session, .info, "session.archived", ["session": diagnostics.pseudonym(id)])
+    return archival
   }
 
   /// Brings a session back among the current ones, and starts nothing: it comes back closed,
@@ -1158,9 +1262,7 @@ public final class AppModel {
     await reload()
     handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
 
-    if status == .doing, !session.hasEverStarted, session.status == .closed,
-      canRestart(session)
-    {
+    if Self.startsWhenMoved(session, to: status), canRestart(session) {
       // Started from the store rather than from the value above: the status was just written.
       await performRestart(id: id, follows: false)
     }
@@ -1331,6 +1433,7 @@ public final class AppModel {
     restartFailure = nil
   }
 
+  @discardableResult
   private func performRestart(
     id: SessionID,
     contextOverride: String? = nil,
@@ -1338,19 +1441,23 @@ public final class AppModel {
     confirmed: Bool = false,
     /// `false` when the start comes from a status the user set by hand, and the column they are
     /// sorting stays on screen (#80).
-    follows: Bool = true
-  ) async {
-    guard let launcher, let restartSession else { return }
+    follows: Bool = true,
+    /// One session of several (#77): nothing is asked, nothing is shown, the outcome is returned
+    /// to the batch, and the batch reloads once for all of them.
+    inBatch: Bool = false
+  ) async -> SessionBatchItemResult {
+    guard let launcher, let restartSession else { return .skipped(.agentUnavailable) }
     // A question already asked about this session is not asked twice; answering it is what moves
     // it forward. `restartingSessionIDs` cannot carry this on its own, because the wait for an
     // answer is not work in flight and would hold the lock for as long as the sheet is open.
-    guard confirmed || pendingRestart?.sessionID != id else { return }
+    guard confirmed || pendingRestart?.sessionID != id else { return .skipped(.busy) }
     // The lock is taken before the first await, and it is what makes a second command — a second
     // click, a shortcut pressed twice — a no-op rather than a second agent.
-    guard restartingSessionIDs.insert(id).inserted else { return }
+    guard restartingSessionIDs.insert(id).inserted else { return .skipped(.busy) }
     defer { restartingSessionIDs.remove(id) }
 
-    restartFailure = nil
+    if !inBatch { restartFailure = nil }
+    var result = SessionBatchItemResult.done
     // The summary is written from the notes on disk: what was just typed has to be there first.
     // When it cannot be written, the summary takes what the editor holds rather than an older
     // copy the user can no longer see — and the sheet then judges the same text it shows.
@@ -1369,6 +1476,7 @@ public final class AppModel {
         notesOverride: notesOverride
       )
       guard !restart.needsConfirmation || confirmed else {
+        if inBatch { return .skipped(.needsSummary) }
         pendingRestart = PendingRestart(
           sessionID: id,
           sessionName: restart.session.name,
@@ -1379,7 +1487,7 @@ public final class AppModel {
           leftOutNotes: NotesInSummary.leftOut(
             notes: notes.text(for: id), brief: restart.mode.brief)
         )
-        return
+        return .skipped(.needsSummary)
       }
 
       if case .native = restart.mode {
@@ -1415,25 +1523,32 @@ public final class AppModel {
         // The launcher's own reason first — it knows about a store that refused, which the pane
         // cannot say — and the pane's next, for a terminal that would not open.
         let failure = launcher.failure(for: id)
-        restartFailure = RestartFailure(
-          sessionName: restart.session.name,
-          message: reason ?? failure?.message
-            ?? String(localized: "This session could not be restarted.", bundle: .module),
-          suggestion: reason == nil ? failure?.suggestion : nil,
-          sessionID: id
-        )
+        let message =
+          reason ?? failure?.message
+          ?? String(localized: "This session could not be restarted.", bundle: .module)
+        let suggestion = reason == nil ? failure?.suggestion : nil
+        result = .failed(message: message, suggestion: suggestion)
+        if !inBatch {
+          restartFailure = RestartFailure(
+            sessionName: restart.session.name, message: message, suggestion: suggestion,
+            sessionID: id)
+        }
       }
     } catch let refusal as SessionRestartRefusal {
-      restartFailure = RestartFailure(
-        sessionName: sessions.first { $0.id == id }?.name ?? Self.unnamedSession,
-        message: refusal.errorDescription
-          ?? String(localized: "This session could not be restarted.", bundle: .module),
-        suggestion: refusal.recoverySuggestion,
-        sessionID: id
-      )
+      let message =
+        refusal.errorDescription
+        ?? String(localized: "This session could not be restarted.", bundle: .module)
+      result = .failed(message: message, suggestion: refusal.recoverySuggestion)
+      if !inBatch {
+        restartFailure = RestartFailure(
+          sessionName: sessions.first { $0.id == id }?.name ?? Self.unnamedSession,
+          message: message, suggestion: refusal.recoverySuggestion, sessionID: id)
+      }
     } catch {
-      await report(error)
+      result = .failed(message: Self.message(for: error), suggestion: nil)
+      if !inBatch { await report(error) }
     }
+    guard !inBatch else { return result }
     await reload()
     // Whether it started or not: a restart that succeeded moved the session In Progress, and one
     // that failed left it where it was, which this simply confirms.
@@ -1442,6 +1557,7 @@ public final class AppModel {
     } else {
       reconcileSelection()
     }
+    return result
   }
 
   /// Tells a resumed conversation the agent refused from an ordinary end of work.
@@ -2124,6 +2240,8 @@ public final class AppModel {
   /// A session a folded group hides is shown: its group unfolds. The quick switcher, a new session
   /// or a banner can all land on one, and a selection nobody can see is a lost one.
   public func select(_ id: SessionID?) {
+    // Going to a session is choosing it alone (#77).
+    selection.collapse(to: id)
     preferredSelection = nil
     if id != shownArchivedSessionID { shownArchivedSessionID = nil }
     if let id { reveal(id) }
@@ -2138,7 +2256,15 @@ public final class AppModel {
     select(id)
   }
 
+  /// The multi-selection's own way in: it shows a session without undoing the selection (#77).
+  func showFromSelection(_ id: SessionID?) {
+    preferredSelection = nil
+    if id != shownArchivedSessionID { shownArchivedSessionID = nil }
+    apply(selection: id)
+  }
+
   private func apply(selection id: SessionID?) {
+    selection.show(id)
     // Leaving a session is when the user considers its notes done: they are written now.
     if let previous = selectedSessionID, previous != id {
       Task { [notes] in await notes.flush(previous) }

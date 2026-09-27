@@ -83,6 +83,8 @@ extension AppModel {
   public func setExpanded(_ isExpanded: Bool, group: SessionGroup) {
     guard canFold else { return }
     layout.setCollapsed(!isExpanded, folders: [group.foldKey])
+    // The rows it folds away leave the selection (#77).
+    pruneSelection()
   }
 
   /// The group of the selected session, in the grouped view.
@@ -109,6 +111,7 @@ extension AppModel {
   public func setAllGroupsExpanded(_ isExpanded: Bool) {
     guard canFold else { return }
     layout.setCollapsed(!isExpanded, folders: Set(groups.map(\.foldKey)))
+    pruneSelection()
   }
 
   /// What the list asks for. The outline view under a sidebar list drops the selection of a row it
