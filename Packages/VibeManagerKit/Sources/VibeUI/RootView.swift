@@ -894,7 +894,7 @@ public struct RootView: View {
             accessibilityTitle: terminalTitle(for: listed, pane: pane),
             statusAccessory: statusAccessory(for: listed),
             claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
-            restart: sessionRestart(for: listed.id)
+            restart: sessionRestart(for: listed.id), canRestart: model.canRestart(listed)
           )
           .id(listed.id)
           .opacity(isActive ? 1 : 0)
@@ -923,7 +923,7 @@ public struct RootView: View {
               Divider()
               TerminalStatusBar(
                 pane: pane, accessory: statusAccessory(for: listed),
-                restart: sessionRestart(for: id))
+                restart: sessionRestart(for: id), canRestart: model.canRestart(listed))
             }
           }
           .opacity(isActive ? 1 : 0)

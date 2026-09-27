@@ -22,12 +22,14 @@ public struct TerminalPaneView: View {
   private let claimsKeyboardOnActivation: Bool
   /// See `TerminalStatusBar.restart`.
   private let restart: (() -> Void)?
+  /// See `TerminalStatusBar.canRestart`.
+  private let canRestart: Bool
 
   public init(
     model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
     accessibilityTitle: String? = nil, showsStatusBar: Bool = true,
     statusAccessory: AnyView? = nil, claimsKeyboardOnActivation: Bool = true,
-    restart: (() -> Void)? = nil
+    restart: (() -> Void)? = nil, canRestart: Bool = true
   ) {
     self.model = model
     self.autoStart = autoStart
@@ -37,6 +39,7 @@ public struct TerminalPaneView: View {
     self.statusAccessory = statusAccessory
     self.claimsKeyboardOnActivation = claimsKeyboardOnActivation
     self.restart = restart
+    self.canRestart = canRestart
   }
 
   public var body: some View {
@@ -76,7 +79,8 @@ public struct TerminalPaneView: View {
 
       if showsStatusBar {
         Divider()
-        TerminalStatusBar(pane: model, accessory: statusAccessory, restart: restart)
+        TerminalStatusBar(
+          pane: model, accessory: statusAccessory, restart: restart, canRestart: canRestart)
       }
     }
     .task {
@@ -96,13 +100,18 @@ public struct TerminalStatusBar: View {
   /// now — `claude --session-id` then refuses it as already in use — and nothing the app watches
   /// a launch with would be armed. It is given the session's own restart instead.
   private let restartAction: (() -> Void)?
+  /// False while Restart would be refused — the session's agent unavailable, a restart or a
+  /// switch of agent under way: the button is shown disabled, as the menu's command is.
+  private let canRestart: Bool
 
   public init(
-    pane: TerminalPaneModel, accessory: AnyView? = nil, restart: (() -> Void)? = nil
+    pane: TerminalPaneModel, accessory: AnyView? = nil, restart: (() -> Void)? = nil,
+    canRestart: Bool = true
   ) {
     self.pane = pane
     self.accessory = accessory
     self.restartAction = restart
+    self.canRestart = canRestart
   }
 
   private var status: TerminalPaneModel.Status { pane.status }
@@ -138,6 +147,7 @@ public struct TerminalStatusBar: View {
           Text("Restart", bundle: .module, comment: "Starts the terminal's process again.")
         }
         .controlSize(.small)
+        .disabled(!canRestart)
       }
     }
     .padding(.horizontal, 12)
