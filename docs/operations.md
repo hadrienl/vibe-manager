@@ -18,6 +18,7 @@ saved, and it holds no prompt, note, session name, folder name or terminal conte
 | Names given to groups of the sidebar | `…/com.hadrienl.VibeManager/folders.json` |
 | Project icons of the sessions | `…/com.hadrienl.VibeManager/Icons/<sha256>.png` |
 | Prompt templates | `…/com.hadrienl.VibeManager/templates.json` |
+| Ticket resolvers (#89) | `…/com.hadrienl.VibeManager/ticket-resolvers.json` |
 | Usage figures | `…/com.hadrienl.VibeManager/Usage/` |
 | Diagnostics log | `~/Library/Logs/Vibe Manager/app.jsonl`, `host.jsonl`, and the salt of the session pseudonyms, `.salt` |
 | Preferences | `~/Library/Preferences/eu.hadrien.VibeManager.plist` |
