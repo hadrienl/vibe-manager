@@ -77,35 +77,61 @@ struct SessionUsageLayoutTests {
     }
   }
 
-  /// Draws the section in a window never shown, and writes it as a PNG in the folder
-  /// `VIBE_USAGE_SNAPSHOTS` names, when it names one, to be looked at.
-  @Test(
-    "The section is drawn no wider than the column",
-    arguments: [("en", narrowWidth), ("fr", narrowWidth), ("en", wideWidth), ("fr", wideWidth)])
-  func draw(language: String, width: Double) throws {
+  /// What the lines of the section say about their texts, once drawn.
+  @MainActor
+  final class Probe {
+    var widths: [DrawnWidth] = []
+  }
+
+  /// Draws the section in a column `column` points wide, in a window never shown, until its lines
+  /// have said how wide their texts were drawn: no deadline of its own, the suite's time limit
+  /// stops one that never does. Writes it as a PNG in the folder `VIBE_USAGE_SNAPSHOTS` names,
+  /// when it names one, to be looked at.
+  private func draw(language: String, column: Double) async throws -> [DrawnWidth] {
     _ = NSApplication.shared
+    let width = column - 24
+    let probe = Probe()
     let host = NSHostingView(
       rootView: Self.section(language: language)
+        .environment(\.measuresDrawnWidths, true)
+        .onPreferenceChange(DrawnWidths.self) { widths in
+          MainActor.assumeIsolated { probe.widths = widths }
+        }
         .frame(width: width, alignment: .leading)
         .padding(12)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor)))
-    let size = host.fittingSize
-    #expect(size.width <= width + 24 + 0.5)
-    host.frame = NSRect(origin: .zero, size: size)
+    host.frame = NSRect(origin: .zero, size: host.fittingSize)
     let window = NSWindow(
       contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     window.contentView = host
     defer { window.close() }
-    host.layoutSubtreeIfNeeded()
+    // Every line has a label and a value.
+    while probe.widths.count < 2 * 7 {
+      host.layoutSubtreeIfNeeded()
+      await Task.yield()
+    }
 
-    guard let folder = ProcessInfo.processInfo.environment["VIBE_USAGE_SNAPSHOTS"] else { return }
-    let image = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
-    host.cacheDisplay(in: host.bounds, to: image)
-    let data = try #require(image.representation(using: .png, properties: [:]))
-    try data.write(
-      to: URL(fileURLWithPath: folder).appendingPathComponent("usage-\(language)-\(Int(width)).png")
-    )
+    if let folder = ProcessInfo.processInfo.environment["VIBE_USAGE_SNAPSHOTS"] {
+      let image = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      host.cacheDisplay(in: host.bounds, to: image)
+      let data = try #require(image.representation(using: .png, properties: [:]))
+      try data.write(
+        to: URL(fileURLWithPath: folder).appendingPathComponent(
+          "usage-\(language)-\(Int(column)).png"))
+    }
+    return probe.widths
+  }
+
+  @Test(
+    "No label and no value is cut, from the narrowest column to the widest",
+    arguments: ["en", "fr"], [WorkspaceLayout.inspectorWidthRange.lowerBound, 300, 420])
+  func nothingIsCut(language: String, column: Double) async throws {
+    let widths = try await draw(language: language, column: column)
+    #expect(widths.count == 2 * 7)
+    for width in widths {
+      #expect(width.drawn >= width.minimum - 0.5, "\(width.name)")
+    }
   }
 }

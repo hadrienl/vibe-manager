@@ -190,8 +190,13 @@ private struct InspectorLine: View {
   private func beside(_ text: String) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       label
+        .measuringDrawnWidth(name: "label beside “\(value)”", minimum: label)
       Spacer(minLength: 0)
+      // Chosen only when label and value fit side by side; a selectable text would otherwise be
+      // offered less than it needs by the stack, and cut.
       valueText(text)
+        .layoutPriority(1)
+        .measuringDrawnWidth(name: "value beside “\(value)”", minimum: valueText(text))
     }
   }
 
@@ -199,9 +204,25 @@ private struct InspectorLine: View {
     VStack(alignment: .leading, spacing: 2) {
       label
         .fixedSize(horizontal: false, vertical: true)
+        .measuringDrawnWidth(name: "label above “\(value)”", minimum: label)
       valueText(text)
         .fixedSize(horizontal: false, vertical: true)
+        .measuringDrawnWidth(name: "value under “\(value)”", minimum: widestUnbrokenLine)
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+  }
+
+  /// The narrowest the value can be drawn under its label without cutting anything: its widest
+  /// line, or its widest part when it wraps between them.
+  private var widestUnbrokenLine: some View {
+    VStack {
+      if let parts, !partPerLine {
+        ForEach(Array(parts.enumerated()), id: \.offset) { part in
+          valueText(part.element.replacingOccurrences(of: " ", with: "\u{00A0}"))
+        }
+      } else {
+        valueText(underValue)
+      }
     }
   }
 
@@ -210,5 +231,60 @@ private struct InspectorLine: View {
       .multilineTextAlignment(.trailing)
       .monospacedDigit()
       .textSelection(.enabled)
+  }
+}
+
+/// How wide a text was drawn, and the narrowest it can be drawn without being cut: what a test
+/// compares to find a truncated label or value (#130). Measured only when
+/// `measuresDrawnWidths` is set, never in the application.
+struct DrawnWidth: Equatable {
+  let name: String
+  let drawn: Double
+  let minimum: Double
+}
+
+struct DrawnWidths: PreferenceKey {
+  static let defaultValue: [DrawnWidth] = []
+
+  static func reduce(value: inout [DrawnWidth], nextValue: () -> [DrawnWidth]) {
+    value += nextValue()
+  }
+}
+
+extension EnvironmentValues {
+  @Entry var measuresDrawnWidths = false
+}
+
+extension View {
+  fileprivate func measuringDrawnWidth(name: String, minimum: some View) -> some View {
+    modifier(DrawnWidthMeasure(name: name, minimum: minimum))
+  }
+}
+
+private struct DrawnWidthMeasure<Minimum: View>: ViewModifier {
+  let name: String
+  let minimum: Minimum
+  @Environment(\.measuresDrawnWidths) private var measures
+
+  func body(content: Content) -> some View {
+    if measures {
+      content.overlay {
+        GeometryReader { drawn in
+          minimum.fixedSize().hidden().overlay {
+            GeometryReader { narrowest in
+              Color.clear.preference(
+                key: DrawnWidths.self,
+                value: [
+                  DrawnWidth(
+                    name: name, drawn: Double(drawn.size.width),
+                    minimum: Double(narrowest.size.width))
+                ])
+            }
+          }
+        }
+      }
+    } else {
+      content
+    }
   }
 }
