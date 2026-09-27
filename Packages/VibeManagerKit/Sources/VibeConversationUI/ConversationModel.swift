@@ -131,6 +131,10 @@ public final class ConversationModel {
   @ObservationIgnored public var canRestart: () -> Bool = { true }
   @ObservationIgnored private var toggles: [String: Bool] = [:]
   @ObservationIgnored private var followTask: Task<Void, Never>?
+  /// A conversation already read stays on screen while its transcripts are read again: what that
+  /// reading holds before it ends is only part of it, and showing it would empty the view for as
+  /// long as it takes.
+  @ObservationIgnored private var isRereading = false
   @ObservationIgnored private var echoTimer: Task<Void, Never>?
   public private(set) var toggleRevision = 0
   public var focusComposerRequest = 0
@@ -142,11 +146,27 @@ public final class ConversationModel {
   /// Reads the stream of a `FollowConversation` until it ends or the model is released.
   public func follow(_ snapshots: AsyncStream<ConversationSnapshot>) {
     followTask?.cancel()
+    isRereading = snapshot.availability != .loading
     followTask = Task { [weak self] in
       for await snapshot in snapshots {
-        self?.apply(snapshot)
+        self?.received(snapshot)
       }
     }
+  }
+
+  func received(_ snapshot: ConversationSnapshot) {
+    if isRereading {
+      guard snapshot.availability != .loading else { return }
+      isRereading = false
+    }
+    apply(snapshot)
+  }
+
+  /// Stops reading the transcripts, and keeps what was read: shown at once when the session comes
+  /// back, while `follow` reads them again.
+  public func pause() {
+    followTask?.cancel()
+    followTask = nil
   }
 
   public func stop() {

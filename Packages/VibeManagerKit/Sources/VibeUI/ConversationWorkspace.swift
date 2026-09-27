@@ -7,14 +7,18 @@ import VibeDomain
 /// The conversation views of the workspace (#38): the settings they share, and one model per
 /// session recently shown.
 ///
-/// Only the last few sessions shown in conversation keep a model — and read their transcripts —
+/// Only the last few sessions shown in conversation keep a view mounted and read their transcripts,
 /// so that going back and forth between two of them is instant, while a hundred sessions never
-/// mean a hundred readers. A model let go of gives its memory back; it is rebuilt when shown again.
+/// mean a hundred readers. A few more keep what was read, and nothing else: coming back to one
+/// shows its conversation at once while its transcripts are read again, instead of a placeholder
+/// for as long as that takes. Past those, a model is let go of and gives its memory back.
 @MainActor
 @Observable
 public final class ConversationWorkspace {
   /// How many sessions keep their conversation read and laid out.
   static let keptModelCount = 5
+  /// How many more keep what was read, no longer read nor laid out.
+  static let dormantModelCount = 20
 
   public struct Agent: Sendable {
     public let name: String
@@ -38,6 +42,11 @@ public final class ConversationWorkspace {
   private var models: [SessionID: ConversationModel] = [:]
   /// Most recent last.
   public private(set) var mountedSessionIDs: [SessionID] = []
+  /// Sessions whose model is kept without a view nor a reader, most recent last.
+  @ObservationIgnored private var dormantSessionIDs: [SessionID] = []
+  /// The last activity of a dormant session, handed to its model when it is shown again rather
+  /// than rebuilding a conversation nobody sees at every change.
+  @ObservationIgnored private var dormantActivities: [SessionID: AgentActivityState?] = [:]
   @ObservationIgnored private var followed: [SessionID: [SessionAgentConfiguration]] = [:]
   /// Which follow is the current one for a session: a stream that arrives after its model was
   /// let go of, or after a newer one was asked for, is dropped — and stops its reader with it.
@@ -90,6 +99,10 @@ public final class ConversationWorkspace {
       models[session.id] = model
       connect?(model, session)
     }
+    if let state = dormantActivities.removeValue(forKey: session.id) {
+      apply(state, to: model)
+    }
+    dormantSessionIDs.removeAll { $0 == session.id }
     let agent = session.conversationAgents.last.flatMap { readableAgents[$0.providerID] }
     model.agentName = agent?.name ?? ""
     model.promptFormat = agent?.format ?? AgentPromptFormat()
@@ -118,8 +131,17 @@ public final class ConversationWorkspace {
   }
 
   public func activityChanged(_ id: SessionID, to state: AgentActivityState?) {
-    models[id]?.activity = state?.activity
-    models[id]?.isAgentReady = Self.isReady(state)
+    guard let model = models[id] else { return }
+    if dormantSessionIDs.contains(id) {
+      dormantActivities[id] = .some(state)
+    } else {
+      apply(state, to: model)
+    }
+  }
+
+  private func apply(_ state: AgentActivityState?, to model: ConversationModel) {
+    model.activity = state?.activity
+    model.isAgentReady = Self.isReady(state)
   }
 
   /// Ready once the agent's hooks have spoken, or once the activity falls back on the terminal's
@@ -135,14 +157,24 @@ public final class ConversationWorkspace {
     models.removeValue(forKey: id)?.stop()
     followed[id] = nil
     generations[id] = nil
-    // What was said lives only as long as a view shows it (ADR 0025).
+    dormantSessionIDs.removeAll { $0 == id }
+    dormantActivities[id] = nil
+    // What was said lives only as long as a model holds it (ADR 0025).
     MarkdownCache.shared.removeAll()
     mountedSessionIDs.removeAll { $0 == id }
   }
 
   private func evict() {
     while mountedSessionIDs.count > Self.keptModelCount {
-      release(mountedSessionIDs.removeFirst())
+      let id = mountedSessionIDs.removeFirst()
+      models[id]?.pause()
+      // Read again from the start when shown: a follow still being set up is dropped.
+      followed[id] = nil
+      generations[id] = (generations[id] ?? 0) + 1
+      dormantSessionIDs.append(id)
+    }
+    while dormantSessionIDs.count > Self.dormantModelCount {
+      release(dormantSessionIDs.removeFirst())
     }
   }
 }

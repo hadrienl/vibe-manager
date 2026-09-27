@@ -76,9 +76,12 @@ agent did. A conversation rewound with `/rewind` therefore still shows what was 
 shorter or changed inode again from the start after a `.reset`. A `vnode` source wakes it, a
 one-second poll underneath covers a file that does not exist yet or was replaced. A snapshot is
 published only when lines arrived, and the folders are looked at again every two seconds while a
-file is awaited, every ten after. Only the five sessions last shown in conversation keep a model
-and a reader; a hidden conversation view is disabled, so that its composer never keeps the
-keyboard.
+file is awaited, every ten after. Only the five sessions last shown in conversation keep a mounted
+view and a reader; a hidden conversation view is disabled, so that its composer never keeps the
+keyboard. The twenty shown before them keep their model — what was read, in memory only — without
+a reader: coming back to one shows its conversation at once, and it is read again from the start
+behind it, the partial reading never replacing what is on screen until it is complete. Past those,
+the model is let go of, and the placeholder shows while the transcript is read.
 
 ### Titles, groups, and the state that shows folded
 
