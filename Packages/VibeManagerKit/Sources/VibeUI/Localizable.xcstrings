@@ -2673,6 +2673,52 @@
         }
       }
     },
+    "%lld sessions were moved, but their agent did not start." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was moved, but its agent did not start."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were moved, but their agent did not start."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions ont été déplacées, mais leur agent n’a pas démarré."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session a été déplacée, mais son agent n’a pas démarré."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions ont été déplacées, mais leur agent n’a pas démarré."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sessions were not archived." : {
       "localizations" : {
         "en" : {

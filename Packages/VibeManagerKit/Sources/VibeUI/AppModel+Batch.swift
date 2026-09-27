@@ -259,6 +259,14 @@ extension AppModel {
       if let neighbour { preferredSelection = neighbour }
     }
     await reload()
+    // A restart puts its sessions In Progress. The column follows the one on screen, as it does
+    // for a restart on its own, rather than falling to the first row of the column it left.
+    if plan.action == .restart, let shown, left.contains(shown),
+      let session = sessions.first(where: { $0.id == shown }),
+      session.taskStatus != filter.column, session.taskStatus != .archived
+    {
+      update { $0.column = session.taskStatus }
+    }
     reconcileSelection()
 
     if case .move(let status) = plan.action, !left.isEmpty {
@@ -294,6 +302,7 @@ extension AppModel {
   ) -> SessionBatchReport? {
     var notDone: [SessionBatchReport.Line] = []
     var warnings: [SessionBatchReport.Line] = []
+    var notStarted: [SessionBatchReport.Line] = []
     var skipped: [SessionBatchSkip: Int] = [:]
     for id in order {
       guard let result = results[id] else { continue }
@@ -304,6 +313,8 @@ extension AppModel {
         continue
       case .doneWithWarning(let message, let suggestion):
         warnings.append(.init(id: id, text: message, suggestion: suggestion))
+      case .movedWithoutStart(let message, let suggestion):
+        notStarted.append(.init(id: id, text: Self.line(name, message), suggestion: suggestion))
       case .failed(let message, let suggestion):
         notDone.append(.init(id: id, text: Self.line(name, message), suggestion: suggestion))
       case .skipped(.needsSummary):
@@ -326,6 +337,12 @@ extension AppModel {
       SessionBatchSkip.reportOrderForUI.compactMap { reason in
         skipped[reason].map { (reason, $0) }
       }, action: action)
+    if !notStarted.isEmpty {
+      sentences.append(
+        String(
+          localized: "\(notStarted.count) sessions were moved, but their agent did not start.",
+          bundle: .module))
+    }
     if !warnings.isEmpty {
       sentences.append(
         String(
@@ -334,7 +351,8 @@ extension AppModel {
           bundle: .module))
     }
     guard !sentences.isEmpty else { return nil }
-    return SessionBatchReport(message: sentences.joined(separator: " "), lines: notDone + warnings)
+    return SessionBatchReport(
+      message: sentences.joined(separator: " "), lines: notDone + notStarted + warnings)
   }
 
   private static func line(_ name: String, _ sentence: String) -> String {
@@ -411,7 +429,7 @@ extension AppModel {
 extension SessionBatchItemResult {
   var isDone: Bool {
     switch self {
-    case .done, .doneWithWarning: return true
+    case .done, .doneWithWarning, .movedWithoutStart: return true
     case .skipped, .failed: return false
     }
   }

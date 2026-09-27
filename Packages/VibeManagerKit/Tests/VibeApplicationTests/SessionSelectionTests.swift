@@ -43,7 +43,7 @@ struct SessionSelectionTests {
     #expect(selection.ids == [rows[0], rows[4]])
   }
 
-  @Test("A ⌘-click that takes out the session on screen shows the one added last before it")
+  @Test("A ⌘-click that takes out the session on screen shows the nearest row still selected")
   func commandClickRemovesTheDisplayedOne() {
     var selection = selection(showing: 0)
     selection.applyList([rows[0], rows[2]], displayOrder: rows)
@@ -51,6 +51,20 @@ struct SessionSelectionTests {
     selection.applyList([rows[0], rows[2]], displayOrder: rows)
 
     #expect(selection.displayed == rows[2])
+  }
+
+  @Test("A ⇧-click that shrinks a range shows the row clicked, not the one added last")
+  func shiftClickShrinksTheRange() {
+    var selection = selection(showing: 4)
+    selection.applyList(Set(rows[1...4]), displayOrder: rows)
+    #expect(selection.displayed == rows[1])
+
+    selection.applyList(Set(rows[2...4]), displayOrder: rows)
+    #expect(selection.displayed == rows[2])
+    #expect(selection.members.last == rows[2])
+
+    selection.applyList(Set(rows[3...4]), displayOrder: rows)
+    #expect(selection.displayed == rows[3])
   }
 
   @Test("A ⇧-click range shows the row clicked, its far end, in both directions")

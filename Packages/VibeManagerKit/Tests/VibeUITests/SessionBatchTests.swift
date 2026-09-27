@@ -224,6 +224,26 @@ struct SessionBatchTests {
     #expect(model.batchReport?.lines.map(\.id) == [summary.id])
   }
 
+  @Test("Restarting a selection in Done follows the session on screen to In Progress")
+  func restartingFollowsTheSessionOnScreen() async throws {
+    let finished = (1...3).map {
+      session("D\($0)", in: .done, updatedAt: TimeInterval(400 - $0))
+    }
+    let (model, launcher, _) = makeWorkspace(finished)
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+    selectAll(finished, in: model)
+    #expect(model.selectedSessionID == finished[2].id)
+
+    await model.requestBatch(model.batchPlan(.restart, for: model.commandTargets))
+    await model.confirmBatch(try #require(model.pendingBatch))
+
+    for session in finished { #expect(launcher.isRunning(session.id)) }
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == finished[2].id)
+  }
+
   // MARK: - Status
 
   @Test("Moving a selection asks once, and says which agents will start")
@@ -252,6 +272,22 @@ struct SessionBatchTests {
     }
     // The column being sorted stays on screen.
     #expect(model.filter.column == .todo)
+  }
+
+  @Test("A move whose agent does not start is told as moved, not as left where it was")
+  func movedWithoutStart() async {
+    let moved = session("Moved", in: .todo)
+    let (model, _, _) = makeWorkspace([moved])
+    await model.load()
+
+    let report = model.report(
+      .move(to: .doing),
+      results: [moved.id: .movedWithoutStart(message: "No terminal.", suggestion: nil)],
+      order: [moved.id])
+
+    #expect(report?.message == "1 session was moved, but its agent did not start.")
+    #expect(report?.lines.map(\.id) == [moved.id])
+    #expect(SessionBatchItemResult.movedWithoutStart(message: "", suggestion: nil).isDone)
   }
 
   @Test("⌥⌘→ on a selection moves it to the next column")

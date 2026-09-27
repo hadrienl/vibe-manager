@@ -60,8 +60,15 @@ public struct SessionSelection: Equatable, Sendable {
       let anchor = displayed.flatMap { position[$0] } ?? 0
       shown = addedInOrder.max { distance(position[$0], anchor) < distance(position[$1], anchor) }
     } else {
-      // The row on screen was taken out: the one added last before it takes its place.
-      shown = kept.last
+      // The row on screen was taken out: by a ⌘-click, or by a ⇧-click that shrank the range
+      // toward its anchor. Either way the nearest row still selected takes its place — for a
+      // shrunk range, the row clicked. Between two as near, the one added last.
+      let origin = displayed.flatMap { position[$0] }
+      // A row the sidebar does not draw is never the nearest.
+      let nearness = { (id: SessionID) in
+        origin.flatMap { origin in position[id].map { abs($0 - origin) } } ?? .max
+      }
+      shown = kept.reversed().min { nearness($0) < nearness($1) }
     }
     if let shown, let index = kept.firstIndex(of: shown) {
       kept.remove(at: index)

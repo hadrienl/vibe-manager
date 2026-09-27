@@ -1111,7 +1111,14 @@ public final class AppModel {
       return .failed(message: Self.message(for: error), suggestion: nil)
     }
     guard Self.startsWhenMoved(session, to: status), canRestart(session) else { return .done }
-    return await performRestart(id: id, follows: false, inBatch: true)
+    // The status is written whatever the start does: the session is in its new column, and a
+    // failed start is told as such rather than as a move that did not happen.
+    switch await performRestart(id: id, follows: false, inBatch: true) {
+    case .failed(let message, let suggestion):
+      return .movedWithoutStart(message: message, suggestion: suggestion)
+    default:
+      return .done
+    }
   }
 
   /// A session created and never started goes to work when it is moved In Progress.
