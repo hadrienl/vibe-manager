@@ -270,11 +270,16 @@ struct SessionRowDropDelegate: DropDelegate {
   }
 
   /// Outlines the row and, for a drop it takes, arms its spring — once: arming it again for the
-  /// same row leaves the delay running.
+  /// same row leaves the delay running. Without a hover, the spring is put away.
   private func track(_ route: SessionDropRoute) {
     let hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
     if hovered != hover { hovered = hover }
-    guard hover != nil, !route.isRefused else { return }
+    guard hover != nil, !route.isRefused else {
+      // Called once the button is up, or over a refused row: nothing may open it any more. The
+      // sidebar's watch would not do it — the outline cleared here is what stops that watch.
+      springLoading.exit(sessionID)
+      return
+    }
     let model = model
     let id = sessionID
     springLoading.enter(id) {
