@@ -405,7 +405,7 @@ struct RequestCard: View {
         .tint(choices[index] == .option(option) ? .accentColor : nil)
         .disabled(!answers.contains(.chooseOption) || isSending)
       }
-      if answers.contains(.writeText), question.allowsFreeText {
+      if answers.contains(.writeText), question.allowsFreeText, !question.allowsMultipleChoices {
         if writingFor == index {
           HStack {
             TextField(text: $draft, prompt: Text("Your answer", bundle: .module)) {

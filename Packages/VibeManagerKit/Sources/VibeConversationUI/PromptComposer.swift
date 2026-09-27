@@ -43,8 +43,11 @@ struct PromptComposer: View {
           .frame(minHeight: size * 1.6, maxHeight: size * 1.5 * 8)
           .fixedSize(horizontal: false, vertical: true)
           .focused($isFocused)
-          .disabled(state != .ready)
-          .accessibilityLabel(Text("Message to \(model.agentName)", bundle: .module))
+          .disabled(state != .ready && state != .answeringQuestion)
+          .accessibilityLabel(
+            state == .answeringQuestion
+              ? Text("Other answer to \(model.agentName)", bundle: .module)
+              : Text("Message to \(model.agentName)", bundle: .module))
           .onKeyPress(.return, phases: .down) { press in
             guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option),
               !Self.isComposingText
@@ -83,10 +86,14 @@ struct PromptComposer: View {
         .foregroundStyle(theme.text.color)
         .disabled(state != .ready)
         .accessibilityLabel(Text("Add", bundle: .module))
-        hint(state)
-          .font(theme.interfaceFont(size: 11.5))
-          .foregroundStyle(theme.secondaryText.color)
-          .lineLimit(1)
+        if state == .awaitingAnswer || state == .answeringQuestion {
+          RequestHint(model: model)
+        } else {
+          hint(state)
+            .font(theme.interfaceFont(size: 11.5))
+            .foregroundStyle(theme.secondaryText.color)
+            .lineLimit(1)
+        }
         Spacer()
         Button {
           Task { await model.send() }
@@ -121,7 +128,9 @@ struct PromptComposer: View {
   private func placeholder(_ state: ConversationModel.ComposerState) -> some View {
     switch state {
     case .ready: Text("Write to \(model.agentName)…", bundle: .module)
-    case .awaitingAnswer: Text("Answer the request in the terminal first", bundle: .module)
+    case .answeringQuestion:
+      Text("Another answer…", bundle: .module, comment: "The composer, as a question's Other.")
+    case .awaitingAnswer: Text("Answer the request first", bundle: .module)
     case .starting:
       Text(
         "\(model.agentName) is starting. If it asks something first, answer in the terminal.",
@@ -245,48 +254,39 @@ struct ActivityLine: View {
 }
 
 /// The agent waits for the user in its terminal: said in orange, with the way there.
-struct PendingRequestBanner: View {
+/// What the agent waits on, said quietly beside the composer — the request itself is the block
+/// above — with the way to its terminal, where every request can be answered.
+struct RequestHint: View {
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
 
   var body: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(theme.warning.color)
-        .font(.system(size: 16))
-      VStack(alignment: .leading, spacing: 2) {
-        if model.activity == .awaitingUser(.question) {
-          Text("\(model.agentName) is asking you a question", bundle: .module)
-            .font(theme.interfaceFont(size: 13, weight: .semibold))
-        } else {
-          Text("\(model.agentName) asks for your permission", bundle: .module)
-            .font(theme.interfaceFont(size: 13, weight: .semibold))
-        }
-        if let call = model.pendingCall {
-          let title = ToolCallSummary.title(for: call)
-          Text(verbatim: call.parameter(.command) ?? call.parameter(.question) ?? title.title)
-            .font(theme.codeFont(size: 12))
-            .lineLimit(2)
-            .truncationMode(.middle)
-        }
-      }
-      .foregroundStyle(theme.text.color)
-      Spacer()
+    HStack(spacing: 6) {
       Button {
         model.showTerminal?()
       } label: {
-        Text("Answer in the Terminal", bundle: .module)
-          .font(theme.interfaceFont(size: 12, weight: .semibold))
-          .padding(.horizontal, 10)
-          .padding(.vertical, 5)
-          .foregroundStyle(theme.isDark ? Color.black : Color.white)
-          .background(theme.warning.color, in: RoundedRectangle(cornerRadius: 7))
+        Image(systemName: "apple.terminal")
+          .font(.system(size: 12, weight: .medium))
+          .frame(width: 22, height: 22)
+          .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      .foregroundStyle(theme.secondaryText.color)
+      .help(Text("Answer in the Terminal", bundle: .module))
+      .accessibilityLabel(Text("Answer in the Terminal", bundle: .module))
+      Group {
+        if model.composerState == .answeringQuestion {
+          Text("↩ sends this answer · ⇧↩ new line", bundle: .module)
+        } else if model.activity == .awaitingUser(.question) {
+          Text("\(model.agentName) is asking you a question", bundle: .module)
+        } else {
+          Text("\(model.agentName) asks for your permission", bundle: .module)
+        }
+      }
+      .font(theme.interfaceFont(size: 11.5))
+      .foregroundStyle(theme.secondaryText.color)
+      .lineLimit(1)
     }
-    .padding(12)
-    .background(theme.warningBackground.color, in: RoundedRectangle(cornerRadius: 10))
-    .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.warning.color.opacity(0.6)))
     .accessibilityElement(children: .contain)
   }
 }

@@ -72,6 +72,18 @@ extension AppModel {
         }
         return self.canRestart(session)
       }
+      // The session's own requests, answered in its conversation as the palette answers those
+      // of the others: the same arming rules, the same keystrokes.
+      model.pendingRequest = { [weak self] in
+        guard let self, let request = self.activities[id]?.requests.first else { return nil }
+        return ConversationRequest(
+          request: request,
+          answers: (self.requestAnswering[request.id] ?? .inTerminalOnly(.notSupported)).answers,
+          isSending: self.answeringRequestIDs.contains(request.id))
+      }
+      model.answerRequest = { [weak self] answer, requestID in
+        await self?.answer(answer, to: requestID)
+      }
       model.activity = self?.activities[id]?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activities[id])
     }

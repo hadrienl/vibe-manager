@@ -14,7 +14,6 @@ public struct ConversationView: View {
   let appearance: ConversationAppearance
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
-  @AccessibilityFocusState private var bannerFocused: Bool
 
   private static let bottomID = "conversation.bottom"
 
@@ -55,7 +54,12 @@ public struct ConversationView: View {
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)
     .onChange(of: model.pendingCall?.callID) { _, id in
-      if id != nil { bannerFocused = true }
+      guard id != nil else { return }
+      let said =
+        model.activity == .awaitingUser(.question)
+        ? String(localized: "\(model.agentName) is asking you a question", bundle: .module)
+        : String(localized: "\(model.agentName) asks for your permission", bundle: .module)
+      AccessibilityNotification.Announcement(said).post()
     }
   }
 
@@ -140,10 +144,7 @@ public struct ConversationView: View {
 
   private var footer: some View {
     VStack(alignment: .leading, spacing: 8) {
-      if model.pendingCall != nil || model.composerState == .awaitingAnswer {
-        PendingRequestBanner(model: model)
-          .accessibilityFocused($bannerFocused)
-      } else if model.isAgentWorking {
+      if model.isAgentWorking {
         ActivityLine(model: model)
       }
       if model.composerState == .stopped, model.canRestart(), let restart = model.restart {

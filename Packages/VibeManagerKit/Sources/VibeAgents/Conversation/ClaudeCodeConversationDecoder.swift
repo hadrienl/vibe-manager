@@ -297,6 +297,14 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
         details["numFiles"] as? Int ?? details["numLines"] as? Int
         ?? (details["filenames"] as? [Any])?.count
       call.output = ToolOutput.bounded(text, isError: isError)
+    case .question:
+      // The answers, by question, beside what the agent was told: shown on the options.
+      guard !isError, let answers = details["answers"] as? [String: String], !answers.isEmpty
+      else {
+        call.output = text.isEmpty ? nil : ToolOutput.bounded(text, isError: isError)
+        return
+      }
+      call.parameters = Self.answering(call.parameters, with: answers)
     case .subagent:
       if let agent = details["agentId"] as? String, let subagents {
         call.subTranscript = subagents.appendingPathComponent("agent-\(agent).jsonl")
@@ -305,6 +313,26 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     default:
       call.output = text.isEmpty ? nil : ToolOutput.bounded(text, isError: isError)
     }
+  }
+
+  /// Each question's parameters followed by its answer, when it has one.
+  static func answering(_ parameters: [ToolParameter], with answers: [String: String])
+    -> [ToolParameter]
+  {
+    var result: [ToolParameter] = []
+    var question: String?
+    func close() {
+      if let question, let answer = answers[question] { result.append(ToolParameter(.answer, answer)) }
+    }
+    for parameter in parameters where parameter.key != .answer {
+      if parameter.key == .question {
+        close()
+        question = parameter.value
+      }
+      result.append(parameter)
+    }
+    close()
+    return result
   }
 
   private func interruptRunningCalls() {
@@ -391,6 +419,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       kind = .question
       for question in input["questions"] as? [[String: Any]] ?? [] {
         add(.question, question["question"] as? String)
+        if question["multiSelect"] as? Bool == true { add(.multipleChoices, "true") }
         for option in question["options"] as? [[String: Any]] ?? [] {
           add(.arguments, option["label"] as? String)
         }

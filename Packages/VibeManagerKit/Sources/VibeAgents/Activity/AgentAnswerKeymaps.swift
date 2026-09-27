@@ -7,8 +7,9 @@ import VibeApplication
 ///   `permission_suggestions` — / `3. No`. Escape refuses whatever the options are: a digit for
 ///   "No" guessed one place off would allow instead.
 /// - Questions: a digit picks its option and moves on; the one after the options is "Type
-///   something.", which takes pasted text and Return. Several questions end on a review, whose
-///   `1` submits.
+///   something.", which takes pasted text and Return. A question of several choices is a list of
+///   boxes, as drawn by 2.1.283: a digit ticks its option and stays, the right arrow moves on.
+///   Several questions, or one of several choices, end on a review, whose `1` submits.
 /// - A plan: `1` accepts it with edits accepted, `2` with each edit asking first; Escape rejects.
 ///
 /// Return is never pressed to pick an option: it takes the highlighted one, whatever that is.
@@ -21,14 +22,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       return permission.alwaysAllow == nil
         ? [.allowOnce, .deny] : [.allowOnce, .allowAlways, .deny]
     case .questions(let questions):
-      // Several choices toggle, and are sent from a tab of their own: left to the terminal.
       // Past nine options, the free answer has no digit.
-      guard
-        questions.allSatisfy({
-          !$0.allowsMultipleChoices && TerminalKeys.digit(forOption: $0.options.count) != nil
-        })
+      guard questions.allSatisfy({ TerminalKeys.digit(forOption: $0.options.count) != nil })
       else { return [] }
-      return [.chooseOption, .writeText]
+      return questions.contains(where: \.allowsMultipleChoices)
+        ? [.chooseOption, .chooseOptions, .writeText] : [.chooseOption, .writeText]
     case .plan:
       return [.approvePlan, .rejectPlan]
     case .unreadable:
@@ -55,8 +53,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
         guard let keys = Self.keystrokes(for: answer, to: question) else { return nil }
         steps += keys
       }
-      // Several questions end on a review of the answers: its first option submits them.
-      if questions.count > 1 { steps.append(Array("1".utf8)) }
+      // Several questions, or one of several choices, end on a review of the answers: its first
+      // option submits them.
+      if questions.count > 1 || questions.contains(where: \.allowsMultipleChoices) {
+        steps.append(Array("1".utf8))
+      }
       return steps
     default:
       return nil
@@ -66,6 +67,21 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   static func keystrokes(for answer: AgentQuestionAnswer, to question: AgentQuestion)
     -> [[UInt8]]?
   {
+    if question.allowsMultipleChoices {
+      // Each digit ticks a box; the right arrow leaves the question.
+      let indices: Set<Int>
+      switch answer {
+      case .option(let index): indices = [index]
+      case .options(let chosen): indices = chosen
+      case .text: return nil
+      }
+      guard !indices.isEmpty, indices.allSatisfy(question.options.indices.contains) else {
+        return nil
+      }
+      let ticks = indices.sorted().compactMap { TerminalKeys.digit(forOption: $0) }
+      guard ticks.count == indices.count else { return nil }
+      return ticks + [TerminalKeys.rightArrow]
+    }
     switch answer {
     case .option(let index):
       guard question.options.indices.contains(index) else { return nil }
