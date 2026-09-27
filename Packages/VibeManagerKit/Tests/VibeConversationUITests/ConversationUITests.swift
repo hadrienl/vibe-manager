@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import VibeApplication
@@ -151,6 +152,90 @@ struct MarkdownDocumentTests {
     let links = runs.compactMap(\.link).map(\.absoluteString)
     #expect(links == ["https://example.com", "https://tracker.example/p.gif"])
     #expect(runs.contains { $0.text == "pixel" })
+  }
+}
+
+@Suite("Prose, selectable from one paragraph to the next")
+@MainActor
+struct MarkdownProseTests {
+  private let message = """
+    # Title
+    First paragraph, with a [link](https://example.com).
+
+    - one
+    - [x] done
+
+    > quoted
+
+    ```swift
+    let a = 1
+    ```
+
+    Last paragraph.
+    """
+
+  @Test("Prose that follows prose is one segment; code, tables and rules cut it")
+  func segments() {
+    let segments = MarkdownProse.segments(MarkdownDocument.blocks(from: message))
+    guard segments.count == 3, case .prose(let first) = segments[0],
+      case .block(.code) = segments[1], case .prose(let last) = segments[2]
+    else {
+      Issue.record("\(segments)")
+      return
+    }
+    #expect(first.count == 4)
+    #expect(last.count == 1)
+    // A list holding code is not prose: its code block needs its own view.
+    let list = MarkdownDocument.blocks(from: "- item\n\n  ```\n  code\n  ```")
+    #expect(MarkdownProse.segments(list) == list.map { .block($0) })
+  }
+
+  @Test("One string holds every paragraph of the run, a line each, markers included")
+  func text() throws {
+    let blocks = MarkdownDocument.blocks(from: message)
+    guard case .prose(let prose) = MarkdownProse.segments(blocks).first else {
+      Issue.record("no prose")
+      return
+    }
+    let string = MarkdownProse.attributedString(
+      prose, theme: .systemLight, size: 14, spacing: 10)
+    #expect(
+      string.string
+        == "Title\nFirst paragraph, with a link.\n•\tone\n☑\tdone\nquoted")
+    let link = (string.string as NSString).range(of: "link")
+    #expect(
+      string.attribute(.link, at: link.location, effectiveRange: nil) as? URL
+        == URL(string: "https://example.com"))
+    let quote = (string.string as NSString).range(of: "quoted")
+    let style = try #require(
+      string.attribute(.paragraphStyle, at: quote.location, effectiveRange: nil)
+        as? NSParagraphStyle)
+    #expect(
+      string.attribute(.quoteBars, at: quote.location, effectiveRange: nil) as? [CGFloat] == [0])
+    #expect(style.headIndent > 0)
+    // The stack spaces what follows the run, not the run itself.
+    #expect(style.paragraphSpacing == 0)
+    let item = (string.string as NSString).range(of: "one")
+    let itemStyle = try #require(
+      string.attribute(.paragraphStyle, at: item.location, effectiveRange: nil)
+        as? NSParagraphStyle)
+    #expect(itemStyle.headIndent > 0)
+    #expect(itemStyle.firstLineHeadIndent == 0)
+  }
+
+  @Test("The text view is as tall as its text at the width it is given")
+  func height() {
+    let view = ProseTextView()
+    view.show(
+      MarkdownProse.attributedString(
+        MarkdownDocument.blocks(from: "One.\n\nTwo.\n\nThree."), theme: .systemLight, size: 14,
+        spacing: 10))
+    let wide = view.height(forWidth: 600)
+    let narrow = view.height(forWidth: 20)
+    #expect(wide > 40)
+    #expect(narrow > wide)
+    view.setSelectedRange(NSRange(location: 0, length: view.string.count))
+    #expect(view.selectedRanges.first?.rangeValue.length == view.string.count)
   }
 }
 
