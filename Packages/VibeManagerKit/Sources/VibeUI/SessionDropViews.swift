@@ -258,24 +258,29 @@ struct SessionRowDropDelegate: DropDelegate {
   @Binding var hovered: DropHover?
 
   func dropEntered(info: DropInfo) {
+    track(model.dropRoute(for: sessionID))
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
     let route = model.dropRoute(for: sessionID)
-    hovered = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
-    guard hovered != nil, !route.isRefused else { return }
+    // On every move too: the watch on the button may have cleared the outline, and put the row's
+    // spring away, under a drag that was still going on.
+    track(route)
+    return DropProposal(operation: route.isRefused ? .forbidden : .copy)
+  }
+
+  /// Outlines the row and, for a drop it takes, arms its spring — once: arming it again for the
+  /// same row leaves the delay running.
+  private func track(_ route: SessionDropRoute) {
+    let hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
+    if hovered != hover { hovered = hover }
+    guard hover != nil, !route.isRefused else { return }
     let model = model
     let id = sessionID
     springLoading.enter(id) {
       guard model.selectedSessionID != id else { return }
       model.select(id)
     }
-  }
-
-  func dropUpdated(info: DropInfo) -> DropProposal? {
-    let route = model.dropRoute(for: sessionID)
-    // Set again on every move: the watch on the button may have cleared it under a drag that
-    // was still going on.
-    let hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
-    if hovered != hover { hovered = hover }
-    return DropProposal(operation: route.isRefused ? .forbidden : .copy)
   }
 
   func dropExited(info: DropInfo) {
