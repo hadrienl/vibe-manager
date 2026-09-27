@@ -87,7 +87,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
     for sessionID: SessionID,
     repository: any SessionRepository,
     transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
-    transcriptTimeout: Duration = ClaudeCodeSessionIdentifierCapture.defaultTranscriptTimeout,
+    transcriptWatchWindow: Duration =
+      ClaudeCodeSessionIdentifierCapture.defaultTranscriptWatchWindow,
     persistenceWindow: Duration = ClaudeCodeSessionIdentifierCapture.defaultPersistenceWindow
   ) -> ClaudeCodeSessionIdentifierCapture {
     ClaudeCodeSessionIdentifierCapture(
@@ -95,7 +96,7 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
       record: RecordAgentResumeIdentifier(
         repository: repository, providerID: Self.id.rawValue, launchedAt: Date()),
       transcripts: transcripts,
-      transcriptTimeout: transcriptTimeout,
+      transcriptWatchWindow: transcriptWatchWindow,
       persistenceWindow: persistenceWindow
     )
   }

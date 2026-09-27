@@ -69,9 +69,44 @@ private struct WrittenTranscript: ClaudeCodeTranscriptWatching {
   func awaitTranscript(identifier: String, timeout: Duration) async -> Bool { true }
 }
 
-/// A launch that never reached a first exchange.
+/// A launch that never reached a first exchange: every look lasts its whole window.
 private struct NoTranscript: ClaudeCodeTranscriptWatching {
-  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool { false }
+  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool {
+    try? await Task.sleep(for: timeout)
+    return false
+  }
+}
+
+/// A conversation the CLI only writes down with its first message, after several looks came
+/// back empty: the way a session started without a prompt waits for the user (#138).
+private actor LateTranscript: ClaudeCodeTranscriptWatching {
+  private let appearsAfter: Int
+  private(set) var looks = 0
+
+  init(appearsAfter: Int) {
+    self.appearsAfter = appearsAfter
+  }
+
+  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool {
+    looks += 1
+    return looks > appearsAfter
+  }
+}
+
+/// A transcript on disk from the moment the test says so, and not before.
+private actor TranscriptOnDisk: ClaudeCodeTranscriptWatching {
+  private var isWritten = false
+
+  func write() {
+    isWritten = true
+  }
+
+  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool {
+    if isWritten || timeout == .zero { return isWritten }
+    // Asleep for the whole look, so the watch cannot see the file before the process ends.
+    try? await Task.sleep(for: timeout)
+    return false
+  }
 }
 
 private func claudeSession() -> WorkSession {
@@ -194,12 +229,53 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     )
 
     let assigned = await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+    // The process ends without a first message: the watch stops with it.
+    await capture.finish()
 
     #expect(assigned == identifier)
     #expect(await capture.settled() == nil)
     #expect(await capture.unstoredIdentifier == nil)
     #expect(await repository.saveCount == 0)
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == nil)
+  }
+
+  @Test("A conversation written long after the launch is still stored (#138)")
+  func waitsAsLongAsTheProcessLives() async {
+    let session = claudeSession()
+    let repository = ClaudeCaptureRepository(stored: session)
+    let transcripts = LateTranscript(appearsAfter: 3)
+    let capture = ClaudeCodeSessionIdentifierCapture(
+      sessionID: session.id,
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: transcripts
+    )
+
+    await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+
+    // Every look that came back empty was followed by another one, until the file was there.
+    #expect(await capture.settled() == identifier)
+    #expect(await transcripts.looks == 4)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+  }
+
+  @Test("A conversation written just before the process ended is stored when it ends")
+  func looksOnceMoreWhenTheProcessEnds() async {
+    let session = claudeSession()
+    let repository = ClaudeCaptureRepository(stored: session)
+    let transcripts = TranscriptOnDisk()
+    let capture = ClaudeCodeSessionIdentifierCapture(
+      sessionID: session.id,
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: transcripts,
+      transcriptWatchWindow: .seconds(3600)
+    )
+
+    await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+    await transcripts.write()
+    await capture.finish()
+
+    #expect(await capture.identifier == identifier)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
   }
 
   @Test("An identifier that could never be stored is surfaced, not dropped")

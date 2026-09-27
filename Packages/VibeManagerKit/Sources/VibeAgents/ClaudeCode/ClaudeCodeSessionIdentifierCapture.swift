@@ -11,15 +11,21 @@ import VibeDomain
 /// at the trust prompt — and the next launch would then ask the CLI to resume a conversation
 /// it has never heard of. So, as for Codex, nothing is written until the transcript proves the
 /// conversation is real.
+///
+/// The CLI creates that transcript with the first message, not at launch (checked with 2.1.283):
+/// a session started without a prompt has none for as long as the user takes to write to it. So
+/// the watch lasts as long as the process does, and never gives up on a timer (#138).
 public actor ClaudeCodeSessionIdentifierCapture {
   public static let defaultPersistenceWindow: Duration = .seconds(10)
-  public static let defaultTranscriptTimeout: Duration = .seconds(30)
+  /// How long one look for the transcript lasts before the next one starts. Not a deadline: the
+  /// watch goes on until the process ends.
+  public static let defaultTranscriptWatchWindow: Duration = .seconds(30)
   static let retryInterval: Duration = .milliseconds(200)
 
   private let sessionID: SessionID
   private let record: RecordAgentResumeIdentifier
   private let transcripts: any ClaudeCodeTranscriptWatching
-  private let transcriptTimeout: Duration
+  private let transcriptWatchWindow: Duration
   private let persistenceWindow: Duration
 
   private var assigned: String?
@@ -32,13 +38,14 @@ public actor ClaudeCodeSessionIdentifierCapture {
     sessionID: SessionID,
     record: RecordAgentResumeIdentifier,
     transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
-    transcriptTimeout: Duration = ClaudeCodeSessionIdentifierCapture.defaultTranscriptTimeout,
+    transcriptWatchWindow: Duration =
+      ClaudeCodeSessionIdentifierCapture.defaultTranscriptWatchWindow,
     persistenceWindow: Duration = ClaudeCodeSessionIdentifierCapture.defaultPersistenceWindow
   ) {
     self.sessionID = sessionID
     self.record = record
     self.transcripts = transcripts
-    self.transcriptTimeout = transcriptTimeout
+    self.transcriptWatchWindow = transcriptWatchWindow
     self.persistenceWindow = persistenceWindow
   }
 
@@ -86,16 +93,30 @@ public actor ClaudeCodeSessionIdentifierCapture {
     persister = nil
   }
 
+  /// The process ended: the watch stops, after one last look. A first message sent just before
+  /// the agent quit leaves a transcript the watch has not seen yet, and it is a conversation to
+  /// resume all the same.
+  public func finish() async {
+    let wasWatching = watcher != nil
+    stop()
+    guard wasWatching, let identifier = assigned, captured == nil else { return }
+    guard await transcripts.awaitTranscript(identifier: identifier, timeout: .zero) else { return }
+    guard assigned == identifier, captured == nil else { return }
+    _ = await persist(identifier)
+  }
+
   /// Waits for the conversation to exist, then writes its identifier down.
   ///
-  /// A conversation that never appears is a conversation there is nothing to resume, so the
-  /// identifier is dropped rather than surfaced: unlike a write that failed, nothing was lost.
+  /// The wait ends with the process (`stop`, `finish`), not with a timer: a conversation that
+  /// never appears is one there is nothing to resume, so the identifier is dropped rather than
+  /// surfaced — unlike a write that failed, nothing was lost.
   private func storeOnceWritten(_ identifier: String) async {
-    let exists = await transcripts.awaitTranscript(
-      identifier: identifier,
-      timeout: transcriptTimeout
-    )
-    guard !Task.isCancelled, exists, assigned == identifier else { return }
+    while !Task.isCancelled, assigned == identifier {
+      if await transcripts.awaitTranscript(identifier: identifier, timeout: transcriptWatchWindow) {
+        break
+      }
+    }
+    guard !Task.isCancelled, assigned == identifier else { return }
 
     switch await persist(identifier) {
     case .kept, .rejected:
