@@ -1859,6 +1859,26 @@
         }
       }
     },
+    "Ticket resolvers couldn't be read: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les résolveurs de tickets n’ont pas pu être lus : %@"
+          }
+        }
+      }
+    },
+    "Ticket resolvers couldn't be saved: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les résolveurs de tickets n’ont pas pu être enregistrés : %@"
+          }
+        }
+      }
+    },
     "To-do list" : {
       "localizations" : {
         "fr" : {
