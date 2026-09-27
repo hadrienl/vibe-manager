@@ -109,7 +109,7 @@ struct SessionBatchTests {
   // MARK: - Archive
 
   @Test("Archiving a selection asks once, then archives every session")
-  func archivingAsksOnce() async {
+  func archivingAsksOnce() async throws {
     let sessions = (1...4).map { session("S\($0)", updatedAt: TimeInterval(400 - $0)) }
     let extra = session("Stays", updatedAt: 10)
     let (model, _, repository) = makeWorkspace(sessions + [extra])
@@ -120,11 +120,11 @@ struct SessionBatchTests {
     #expect(model.batchTitle(for: plan) == "Archive 4 Sessions…")
     await model.requestBatch(plan)
 
-    let confirmation = try? #require(model.pendingBatch)
-    #expect(confirmation?.plan.eligible.count == 4)
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.plan.eligible.count == 4)
     #expect(await repository.archivedCount == 0)
 
-    if let confirmation { await model.confirmBatch(confirmation) }
+    await model.confirmBatch(confirmation)
 
     #expect(model.pendingBatch == nil)
     #expect(await repository.archivedCount == 4)
@@ -135,7 +135,7 @@ struct SessionBatchTests {
   }
 
   @Test("A failure on one session does not stop the others, and the report names it")
-  func partialFailure() async {
+  func partialFailure() async throws {
     let sessions = (1...3).map { session("S\($0)", updatedAt: TimeInterval(400 - $0)) }
     let (model, _, repository) = makeWorkspace(sessions, failing: [sessions[1].id])
     await model.load()
@@ -145,9 +145,9 @@ struct SessionBatchTests {
     if let confirmation = model.pendingBatch { await model.confirmBatch(confirmation) }
 
     #expect(await repository.archivedCount == 2)
-    let report = try? #require(model.batchReport)
-    #expect(report?.message.contains("1 session was not archived.") == true)
-    #expect(report?.lines.map(\.id) == [sessions[1].id])
+    let report = try #require(model.batchReport)
+    #expect(report.message.contains("1 session was not archived.") == true)
+    #expect(report.lines.map(\.id) == [sessions[1].id])
   }
 
   // MARK: - Close
@@ -175,7 +175,7 @@ struct SessionBatchTests {
   }
 
   @Test("Closing sessions whose agents run asks #51's question once")
-  func closingRunningAgentsAsksOnce() async {
+  func closingRunningAgentsAsksOnce() async throws {
     let running = (1...2).map {
       session("Running\($0)", status: .active, updatedAt: TimeInterval(400 - $0))
     }
@@ -188,11 +188,11 @@ struct SessionBatchTests {
 
     await model.requestBatch(model.batchPlan(.close, for: model.commandTargets))
 
-    let confirmation = try? #require(model.pendingBatch)
-    #expect(confirmation?.isClose == true)
-    #expect(confirmation?.message.hasPrefix("2 running agents will be stopped.") == true)
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.isClose == true)
+    #expect(confirmation.message.hasPrefix("2 running agents will be stopped.") == true)
 
-    if let confirmation { await model.confirmBatch(confirmation, askAgain: false) }
+    await model.confirmBatch(confirmation, askAgain: false)
 
     #expect(!model.confirmsStoppingRunningAgent)
     for session in running + [idle] {
@@ -204,7 +204,7 @@ struct SessionBatchTests {
   // MARK: - Restart
 
   @Test("Restarting a selection asks once; a session whose summary must be read is left out")
-  func restartingSeveral() async {
+  func restartingSeveral() async throws {
     let resumable = (1...2).map { session("R\($0)", updatedAt: TimeInterval(400 - $0)) }
     let summary = session("Summary", updatedAt: 100, resumable: false)
     let (model, launcher, _) = makeWorkspace(resumable + [summary])
@@ -213,9 +213,9 @@ struct SessionBatchTests {
     selectAll(resumable + [summary], in: model)
 
     await model.requestBatch(model.batchPlan(.restart, for: model.commandTargets))
-    let confirmation = try? #require(model.pendingBatch)
-    #expect(confirmation?.plan.eligible.count == 3)
-    if let confirmation { await model.confirmBatch(confirmation) }
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.plan.eligible.count == 3)
+    await model.confirmBatch(confirmation)
 
     for session in resumable { #expect(launcher.isRunning(session.id)) }
     #expect(!launcher.isRunning(summary.id))
@@ -227,7 +227,7 @@ struct SessionBatchTests {
   // MARK: - Status
 
   @Test("Moving a selection asks once, and says which agents will start")
-  func movingSeveral() async {
+  func movingSeveral() async throws {
     let planned = (1...2).map {
       SessionDraft(
         name: "P\($0)", initialPrompt: "Plan \($0).", providerID: "stub",
@@ -242,9 +242,9 @@ struct SessionBatchTests {
 
     let plan = model.batchPlan(.move(to: .doing), for: model.commandTargets)
     await model.requestBatch(plan)
-    let confirmation = try? #require(model.pendingBatch)
-    #expect(confirmation?.message.contains("2 sessions that never ran") == true)
-    if let confirmation { await model.confirmBatch(confirmation) }
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.message.contains("2 sessions that never ran") == true)
+    await model.confirmBatch(confirmation)
 
     for session in planned {
       #expect(await repository.session(id: session.id)?.taskStatus == .doing)
@@ -255,15 +255,15 @@ struct SessionBatchTests {
   }
 
   @Test("⌥⌘→ on a selection moves it to the next column")
-  func movingToTheNextColumn() async {
+  func movingToTheNextColumn() async throws {
     let sessions = (1...3).map { session("S\($0)", updatedAt: TimeInterval(400 - $0)) }
     let (model, _, repository) = makeWorkspace(sessions)
     await model.load()
     selectAll(sessions, in: model)
 
-    let plan = try? #require(model.batchMovePlan(forward: true))
-    #expect(plan?.action == .move(to: .waiting))
-    if let plan { await model.requestBatch(plan) }
+    let plan = try #require(model.batchMovePlan(forward: true))
+    #expect(plan.action == .move(to: .waiting))
+    await model.requestBatch(plan)
     if let confirmation = model.pendingBatch { await model.confirmBatch(confirmation) }
 
     for session in sessions {
