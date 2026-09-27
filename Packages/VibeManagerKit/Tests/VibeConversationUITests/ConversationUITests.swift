@@ -246,6 +246,31 @@ struct ConversationScrollStateTests {
   }
 }
 
+@Suite("A question answered, read back from its call")
+struct AskedQuestionTests {
+  private func call(_ parameters: [ToolParameter]) -> ToolCall {
+    ToolCall(callID: "t", kind: .question, parameters: parameters)
+  }
+
+  @Test("An option, several, or the user's own words")
+  func chosen() {
+    let questions = AskedQuestion.all(
+      in: call([
+        ToolParameter(.question, "Tea?"), ToolParameter(.arguments, "Tea"),
+        ToolParameter(.arguments, "Coffee"), ToolParameter(.answer, "Coffee"),
+        ToolParameter(.question, "Extras?"), ToolParameter(.multipleChoices, "true"),
+        ToolParameter(.arguments, "Milk"), ToolParameter(.arguments, "Sugar"),
+        ToolParameter(.answer, "Milk, Sugar"),
+        ToolParameter(.question, "Cup?"), ToolParameter(.arguments, "Small"),
+        ToolParameter(.answer, "A mug"),
+        ToolParameter(.question, "Later?"), ToolParameter(.arguments, "Yes"),
+      ]))
+    #expect(questions.map(\.chosen) == [["Coffee"], ["Milk", "Sugar"], [], []])
+    #expect(questions.map(\.otherAnswer) == [nil, nil, "A mug", nil])
+    #expect(questions[1].allowsMultipleChoices)
+  }
+}
+
 @MainActor
 @Suite("The conversation model and its composer")
 struct ConversationModelTests {
@@ -289,6 +314,166 @@ struct ConversationModelTests {
     #expect(stopped.composerState == .stopped)
     stopped.draft = "hello"
     #expect(!stopped.canSend)
+  }
+
+  private final class Answers: @unchecked Sendable {
+    var given: [(AgentAnswer, AgentRequestID)] = []
+    var sends = true
+  }
+
+  private func asking(
+    _ questions: [AgentQuestion], answers kinds: Set<AgentAnswerKind>
+  ) -> (ConversationModel, Terminal, Answers, AgentRequestID) {
+    let (model, terminal) = model()
+    let id = AgentRequestID(sessionID: model.sessionID, key: "q")
+    let request = AgentRequest(
+      id: id, receivedAt: Date(), kind: .question, content: .questions(questions),
+      reference: AgentToolReference(tool: "AskUserQuestion"), isShown: true)
+    let answers = Answers()
+    model.pendingRequest = { ConversationRequest(request: request, answers: kinds, isSending: false) }
+    model.answerRequest = { answer, id in
+      answers.given.append((answer, id))
+      return answers.sends
+    }
+    model.activity = .awaitingUser(.question)
+    return (model, terminal, answers, id)
+  }
+
+  private static let colour = AgentQuestion(
+    header: "Colour", text: "Which colour?", options: [.init(label: "Red"), .init(label: "Blue")])
+
+  @Test("A single question is answered by its option, at once, as the palette would")
+  func chooseOption() async throws {
+    let (model, _, answers, id) = asking([Self.colour], answers: [.chooseOption, .writeText])
+    model.choose(option: 1, ofQuestion: 0)
+    while answers.given.isEmpty { await Task.yield() }
+    #expect(answers.given.first?.0 == .answers([.option(1)]))
+    #expect(answers.given.first?.1 == id)
+  }
+
+  @Test("Several questions are answered together, once each has its option")
+  func chooseSeveral() async {
+    let size = AgentQuestion(
+      header: "Size", text: "Which size?", options: [.init(label: "S"), .init(label: "L")])
+    let (model, _, answers, _) = asking([Self.colour, size], answers: [.chooseOption])
+    model.choose(option: 0, ofQuestion: 0)
+    #expect(!model.canSendChoices)
+    #expect(model.isChosen(option: 0, ofQuestion: 0))
+    model.choose(option: 1, ofQuestion: 1)
+    #expect(model.canSendChoices)
+    model.sendChoices()
+    while answers.given.isEmpty { await Task.yield() }
+    #expect(answers.given.first?.0 == .answers([.option(0), .option(1)]))
+    // Of several questions, the composer writes none of them.
+    #expect(model.composerState == .awaitingAnswer)
+  }
+
+  @Test("A question of several choices ticks and unticks its boxes, then goes with the others")
+  func chooseMultiple() async {
+    let features = AgentQuestion(
+      header: "Features", text: "Which ones?",
+      options: [.init(label: "A"), .init(label: "B"), .init(label: "C")],
+      allowsMultipleChoices: true)
+    let (model, _, answers, _) = asking(
+      [Self.colour, features], answers: [.chooseOption, .chooseOptions, .writeText])
+    model.choose(option: 1, ofQuestion: 0)
+    model.choose(option: 0, ofQuestion: 1)
+    model.choose(option: 2, ofQuestion: 1)
+    model.choose(option: 0, ofQuestion: 1)
+    #expect(!model.isChosen(option: 0, ofQuestion: 1))
+    #expect(model.isChosen(option: 2, ofQuestion: 1))
+    #expect(model.canSendChoices)
+    model.choose(option: 2, ofQuestion: 1)
+    #expect(!model.canSendChoices)
+    model.choose(option: 1, ofQuestion: 1)
+    model.sendChoices()
+    while answers.given.isEmpty { await Task.yield() }
+    #expect(answers.given.first?.0 == .answers([.option(1), .options([1])]))
+  }
+
+  @Test("The first choice redraws its option: what the view read of the choices is observed")
+  func firstChoiceObserved() {
+    let (model, _, _, _) = asking(
+      [Self.colour, Self.colour], answers: [.chooseOption, .writeText])
+    final class Flag: @unchecked Sendable { var changed = false }
+    let flag = Flag()
+    withObservationTracking {
+      _ = model.isChosen(option: 1, ofQuestion: 0)
+    } onChange: {
+      flag.changed = true
+    }
+    model.choose(option: 1, ofQuestion: 0)
+    #expect(flag.changed)
+  }
+
+  @Test("Alone, a question of several choices waits for its Send, and the composer stays closed")
+  func singleMultiple() {
+    let features = AgentQuestion(
+      header: nil, text: "Which ones?", options: [.init(label: "A"), .init(label: "B")],
+      allowsMultipleChoices: true)
+    let (model, _, _, _) = asking([features], answers: [.chooseOption, .chooseOptions, .writeText])
+    #expect(model.composerState == .awaitingAnswer)
+    model.choose(option: 0, ofQuestion: 0)
+    #expect(model.isChosen(option: 0, ofQuestion: 0))
+    #expect(model.canSendChoices)
+  }
+
+  @Test("The composer writes a question's free answer, never a prompt, while it is asked")
+  func freeAnswer() async {
+    let (model, terminal, answers, _) = asking([Self.colour], answers: [.chooseOption, .writeText])
+    #expect(model.composerState == .answeringQuestion)
+    model.draft = "  Green  "
+    #expect(model.canSend)
+    #expect(await model.send())
+    #expect(answers.given.first?.0 == .answers([.text("Green")]))
+    #expect(terminal.written.isEmpty)
+    #expect(model.draft.isEmpty)
+  }
+
+  @Test("A free answer that could not be typed stays in the composer")
+  func freeAnswerKept() async {
+    let (model, _, answers, _) = asking([Self.colour], answers: [.chooseOption, .writeText])
+    answers.sends = false
+    model.draft = "Green"
+    #expect(await model.send() == false)
+    #expect(model.draft == "Green")
+  }
+
+  @Test("A permission's buttons go under the call it names, not the last one waiting")
+  func permissionUnderItsCall() {
+    let (model, _) = model()
+    let first = ToolCall(callID: "t1", kind: .shell, parameters: [ToolParameter(.command, "rm -r build")])
+    let last = ToolCall(callID: "t2", kind: .shell, parameters: [ToolParameter(.command, "ls")])
+    model.apply(
+      ConversationSnapshot(
+        entries: [
+          ConversationEntry(id: "e1", content: .tool(first)),
+          ConversationEntry(id: "e2", content: .tool(last)),
+        ], availability: .available))
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: model.sessionID, key: "p"), receivedAt: Date(),
+      kind: .approval,
+      content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "rm -r build")),
+      reference: AgentToolReference(tool: "Bash"), isShown: true)
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: [.allowOnce, .deny], isSending: false)
+    }
+    model.answerRequest = { _, _ in true }
+    model.activity = .awaitingUser(.approval)
+    #expect(model.pendingCall?.callID == "t2")
+    #expect(model.request(for: first) != nil)
+    #expect(model.request(for: last) == nil)
+  }
+
+  @Test("A question only its terminal can answer leaves the options and the composer closed")
+  func terminalOnly() async {
+    let (model, _, answers, _) = asking([Self.colour], answers: [])
+    #expect(model.composerState == .awaitingAnswer)
+    model.choose(option: 0, ofQuestion: 0)
+    model.draft = "Green"
+    #expect(await model.send() == false)
+    await Task.yield()
+    #expect(answers.given.isEmpty)
   }
 
   @Test("Nothing is sent while the agent is starting: its own screens would take the Return")

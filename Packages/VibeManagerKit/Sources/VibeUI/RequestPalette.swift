@@ -403,9 +403,14 @@ struct RequestCard: View {
         }
         .buttonStyle(.bordered)
         .tint(choices[index] == .option(option) ? .accentColor : nil)
-        .disabled(!answers.contains(.chooseOption) || isSending)
+        .disabled(!answers.contains(.chooseOption) || isSending || question.allowsMultipleChoices)
       }
-      if answers.contains(.writeText), question.allowsFreeText {
+      if question.allowsMultipleChoices {
+        // The palette ticks nothing: one click would be sent as the whole answer.
+        Text("Several choices: answer in the session.", bundle: .module)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      } else if answers.contains(.writeText), question.allowsFreeText {
         if writingFor == index {
           HStack {
             TextField(text: $draft, prompt: Text("Your answer", bundle: .module)) {

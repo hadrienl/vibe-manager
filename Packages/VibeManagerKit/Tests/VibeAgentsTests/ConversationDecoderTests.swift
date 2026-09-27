@@ -47,6 +47,29 @@ struct ClaudeCodeConversationDecoderTests {
     #expect(call?.output?.text.contains("Executed 12 tests") == true)
   }
 
+  @Test("Questions keep what was answered to each: an option, several, or the user's words")
+  func answeredQuestions() {
+    let entries = decode([
+      #"{"type":"assistant","uuid":"a1","message":{"content":[{"type":"tool_use","id":"t1","name":"AskUserQuestion","input":{"questions":[{"question":"Tea?","header":"Drink","options":[{"label":"Tea"},{"label":"Coffee"}],"multiSelect":false},{"question":"Extras?","header":"Extras","options":[{"label":"Milk"},{"label":"Sugar"}],"multiSelect":true},{"question":"Cup?","header":"Cup","options":[{"label":"Small"}],"multiSelect":false}]}}]}}"#,
+      #"{"type":"user","uuid":"u2","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"Your questions have been answered: ...","is_error":false}]},"toolUseResult":{"answers":{"Tea?":"Coffee","Extras?":"Milk, Sugar","Cup?":"A mug"}}}"#,
+    ])
+    guard case .tool(let call) = entries.first?.content else {
+      Issue.record("no call")
+      return
+    }
+    #expect(call.output == nil)
+    #expect(
+      call.parameters == [
+        ToolParameter(.question, "Tea?"), ToolParameter(.arguments, "Tea"),
+        ToolParameter(.arguments, "Coffee"), ToolParameter(.answer, "Coffee"),
+        ToolParameter(.question, "Extras?"), ToolParameter(.multipleChoices, "true"),
+        ToolParameter(.arguments, "Milk"), ToolParameter(.arguments, "Sugar"),
+        ToolParameter(.answer, "Milk, Sugar"),
+        ToolParameter(.question, "Cup?"), ToolParameter(.arguments, "Small"),
+        ToolParameter(.answer, "A mug"),
+      ])
+  }
+
   @Test("A call runs until its result, fails with its exit code, or is refused")
   func states() {
     let use = { (id: String) in

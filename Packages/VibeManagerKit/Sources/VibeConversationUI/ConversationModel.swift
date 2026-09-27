@@ -51,6 +51,43 @@ public struct ConversationScrollState: Hashable, Sendable {
 }
 
 /// A prompt sent from the composer, shown until the agent's transcript has it.
+/// The request the agent waits on, as the palette of #40 sees it: what may be answered from here.
+public struct ConversationRequest: Equatable, Sendable {
+  public let request: AgentRequest
+  public let answers: Set<AgentAnswerKind>
+  public let isSending: Bool
+
+  public init(request: AgentRequest, answers: Set<AgentAnswerKind>, isSending: Bool) {
+    self.request = request
+    self.answers = answers
+    self.isSending = isSending
+  }
+
+  public var questions: [AgentQuestion]? {
+    if case .questions(let questions) = request.content { return questions }
+    return nil
+  }
+
+  /// A single question of one choice that takes a free answer: the composer writes it, as its
+  /// "Other".
+  var takesComposerText: Bool {
+    guard let questions, questions.count == 1 else { return false }
+    return questions[0].allowsFreeText && !questions[0].allowsMultipleChoices
+      && answers.contains(.writeText)
+  }
+
+  /// Answered at a click: one question of one choice. Otherwise the choices go together.
+  public var answersAtOnce: Bool {
+    guard let questions, questions.count == 1 else { return false }
+    return !questions[0].allowsMultipleChoices
+  }
+
+  func canChoose(in question: AgentQuestion) -> Bool {
+    !isSending
+      && answers.contains(question.allowsMultipleChoices ? .chooseOptions : .chooseOption)
+  }
+}
+
 public struct PendingEcho: Identifiable, Hashable, Sendable {
   public enum State: Hashable, Sendable {
     case sending
@@ -129,6 +166,16 @@ public final class ConversationModel {
   @ObservationIgnored public var restart: (() -> Void)?
   /// Whether the session can be restarted now: an archived one cannot.
   @ObservationIgnored public var canRestart: () -> Bool = { true }
+  /// The first request of the session and how it may be answered, read from the application's
+  /// state each time, so that the views follow it.
+  @ObservationIgnored public var pendingRequest: () -> ConversationRequest? = { nil }
+  /// Types an answer into the session's terminal, as the palette does (#40).
+  /// Types an answer into the session's terminal, as the palette does (#40); `true` once it is
+  /// typed in full.
+  @ObservationIgnored public var answerRequest: ((AgentAnswer, AgentRequestID) async -> Bool)?
+  /// The options chosen so far, for a request of several questions answered together.
+  public private(set) var questionChoices: [Int: AgentQuestionAnswer] = [:]
+  private var choicesRequestID: AgentRequestID?
   @ObservationIgnored private var toggles: [String: Bool] = [:]
   @ObservationIgnored private var followTask: Task<Void, Never>?
   /// A conversation already read stays on screen while its transcripts are read again: what that
@@ -291,6 +338,8 @@ public final class ConversationModel {
 
   public enum ComposerState: Hashable, Sendable {
     case ready
+    /// The agent asks a question: what is written is its free answer, the "Other" of its options.
+    case answeringQuestion
     /// The agent waits for an answer in its terminal: a prompt typed now would be read as one.
     case awaitingAnswer
     /// The agent is starting and has not said it is ready.
@@ -304,13 +353,110 @@ public final class ConversationModel {
     guard isReadable, write != nil else { return .unavailable }
     guard isProcessRunning else { return .stopped }
     guard isAgentReady else { return .starting }
-    if case .awaitingUser = activity { return .awaitingAnswer }
+    if case .awaitingUser = activity {
+      return request?.takesComposerText == true ? .answeringQuestion : .awaitingAnswer
+    }
     return .ready
   }
 
   public var canSend: Bool {
-    composerState == .ready && !isSubmitting
-      && !PromptSubmission(text: draft, attachments: attachments).isEmpty
+    switch composerState {
+    case .ready:
+      return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
+    case .answeringQuestion:
+      return request?.isSending == false && !freeAnswer.isEmpty
+    default:
+      return false
+    }
+  }
+
+  private var freeAnswer: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+  // MARK: - Answering
+
+  /// The request, while the agent waits on it and it can be answered from here.
+  public var request: ConversationRequest? {
+    guard answerRequest != nil, case .awaitingUser = activity else { return nil }
+    return pendingRequest()
+  }
+
+  /// The request, under the block of the call it is about. A permission names what it would run:
+  /// several calls may wait at once, and the one marked as waiting is only the last of them.
+  public func request(for call: ToolCall) -> ConversationRequest? {
+    guard let request, requestCall(of: request)?.callID == call.callID else { return nil }
+    return request
+  }
+
+  private func requestCall(of request: ConversationRequest) -> ToolCall? {
+    guard case .permission(let permission) = request.request.content,
+      let subject = permission.subject
+    else { return pendingCall }
+    let unfinished = blocks.flatMap { block -> [ToolCall] in
+      switch block {
+      case .entry(let entry): return entry.toolCall.map { [$0] } ?? []
+      case .toolGroup(_, let entries): return entries.compactMap(\.toolCall)
+      }
+    }.filter { !$0.state.isFinished || $0.state == .awaitingPermission }
+    return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
+  }
+
+  /// Whether a permission's subject is what `call` shows.
+  static func isAbout(_ call: ToolCall, _ subject: String) -> Bool {
+    call.parameter(.command) == subject || call.parameter(.path) == subject
+  }
+
+  /// Chooses an option of a question: one question of one choice is answered at once; otherwise
+  /// the option is chosen — ticked or unticked, for a question of several choices — and the
+  /// answers go together once each question has one.
+  public func choose(option: Int, ofQuestion index: Int) {
+    guard let request, let questions = request.questions, questions.indices.contains(index),
+      request.canChoose(in: questions[index]),
+      questions[index].options.indices.contains(option)
+    else { return }
+    if request.answersAtOnce {
+      answer(.answers([.option(option)]))
+      return
+    }
+    if choicesRequestID != request.request.id {
+      choicesRequestID = request.request.id
+      questionChoices = [:]
+    }
+    guard questions[index].allowsMultipleChoices else {
+      questionChoices[index] = .option(option)
+      return
+    }
+    var ticked: Set<Int> = []
+    if case .options(let chosen) = questionChoices[index] { ticked = chosen }
+    if ticked.remove(option) == nil { ticked.insert(option) }
+    questionChoices[index] = ticked.isEmpty ? nil : .options(ticked)
+  }
+
+  public func isChosen(option: Int, ofQuestion index: Int) -> Bool {
+    guard choicesRequestID == request?.request.id else { return false }
+    switch questionChoices[index] {
+    case .option(let chosen): return chosen == option
+    case .options(let chosen): return chosen.contains(option)
+    case .text, nil: return false
+    }
+  }
+
+  /// Whether every question has its answer, when they go together.
+  public var canSendChoices: Bool {
+    guard let request, !request.isSending, !request.answersAtOnce,
+      let questions = request.questions, questions.allSatisfy(request.canChoose(in:))
+    else { return false }
+    return choicesRequestID == request.request.id && questionChoices.count == questions.count
+  }
+
+  public func sendChoices() {
+    guard canSendChoices, let questions = request?.questions else { return }
+    answer(.answers(questions.indices.compactMap { questionChoices[$0] }))
+  }
+
+  public func answer(_ answer: AgentAnswer) {
+    guard let request, !request.isSending, let answerRequest else { return }
+    let id = request.request.id
+    Task { _ = await answerRequest(answer, id) }
   }
 
   public var isAgentWorking: Bool { activity == .working && isProcessRunning }
@@ -329,6 +475,14 @@ public final class ConversationModel {
   /// Sends the draft through the terminal. Returns whether it was sent.
   @discardableResult
   public func send() async -> Bool {
+    if composerState == .answeringQuestion {
+      guard canSend, let request, let answerRequest else { return false }
+      // The draft stays until the answer is typed: a request gone meanwhile loses nothing.
+      let text = freeAnswer
+      guard await answerRequest(.answers([.text(text)]), request.request.id) else { return false }
+      if freeAnswer == text { draft = "" }
+      return true
+    }
     guard canSend, let write else { return false }
     isSubmitting = true
     defer { isSubmitting = false }

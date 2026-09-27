@@ -210,6 +210,11 @@ public struct ToolParameter: Hashable, Sendable {
   public enum Key: String, Hashable, Sendable {
     case command, path, pattern, query, url, server, tool, arguments, description, prompt
     case workingDirectory, lines, plan, question, todo
+    /// Follows a question of several choices, before its options.
+    case multipleChoices
+    /// What the user answered a question, after its options: an option's label, several joined
+    /// by ", ", or their own words.
+    case answer
   }
 
   public let key: Key

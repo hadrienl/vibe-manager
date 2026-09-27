@@ -256,6 +256,60 @@
         }
       }
     },
+    "Allow" : {
+      "comment" : "Allows what an agent asks, this once.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser"
+          }
+        }
+      }
+    },
+    "Also stops the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
+    "Always" : {
+      "comment" : "Allows what an agent asks, from now on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours"
+          }
+        }
+      }
+    },
+    "Another answer…" : {
+      "comment" : "The composer, as a question's Other.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre réponse…"
+          }
+        }
+      }
+    },
+    "Answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse"
+          }
+        }
+      }
+    },
     "Answer in the Terminal" : {
       "localizations" : {
         "fr" : {
@@ -266,12 +320,43 @@
         }
       }
     },
-    "Answer the request in the terminal first" : {
+    "Answer the request first" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Répondez d’abord à la demande dans le terminal"
+            "value" : "Répondez d’abord à la demande"
+          }
+        }
+      }
+    },
+    "Approve" : {
+      "comment" : "Approves an agent's plan.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider"
+          }
+        }
+      }
+    },
+    "Approve, Accepting Edits" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider, modifications acceptées d’office"
+          }
+        }
+      }
+    },
+    "Approve, Reviewing Each Edit" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider, chaque modification à approuver"
           }
         }
       }
@@ -783,6 +868,16 @@
         }
       }
     },
+    "Other answer to %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre réponse à %@"
+          }
+        }
+      }
+    },
     "Paper" : {
       "localizations" : {
         "fr" : {
@@ -913,6 +1008,28 @@
         }
       }
     },
+    "Refuse" : {
+      "comment" : "Refuses what an agent asks.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser"
+          }
+        }
+      }
+    },
+    "Reject" : {
+      "comment" : "Rejects an agent's plan.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rejeter"
+          }
+        }
+      }
+    },
     "Remove %@" : {
       "localizations" : {
         "fr" : {
@@ -983,6 +1100,16 @@
         }
       }
     },
+    "Send Answers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer les réponses"
+          }
+        }
+      }
+    },
     "Sending…" : {
       "localizations" : {
         "fr" : {
@@ -999,6 +1126,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serveur"
+          }
+        }
+      }
+    },
+    "Several Choices" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs choix"
           }
         }
       }
@@ -1189,6 +1326,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thème"
+          }
+        }
+      }
+    },
+    "This request can only be answered in the terminal." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seul le terminal permet de répondre à cette demande."
           }
         }
       }
@@ -1436,6 +1583,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "↩ envoyer · ⇧↩ nouvelle ligne · envoyé à la fin du tour"
+          }
+        }
+      }
+    },
+    "↩ sends this answer · ⇧↩ new line" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↩ envoie cette réponse · ⇧↩ nouvelle ligne"
           }
         }
       }

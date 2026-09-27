@@ -131,8 +131,13 @@ struct ToolBlockView: View {
     switch block {
     case .entry(let entry):
       if let call = entry.toolCall {
-        ToolCallDetails(call: call, model: model)
-          .padding(12)
+        VStack(alignment: .leading, spacing: 12) {
+          ToolCallDetails(call: call, model: model)
+          if let request = model.request(for: call) {
+            RequestActions(model: model, request: request, call: call)
+          }
+        }
+        .padding(12)
       }
     case .toolGroup(_, let entries):
       VStack(alignment: .leading, spacing: 6) {
@@ -316,20 +321,46 @@ struct ToolCallDetails: View {
     }
   }
 
+  @ViewBuilder
   private func question(size: Double) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      ForEach(Array(call.parameters.enumerated()), id: \.offset) { _, parameter in
-        if parameter.key == .question {
-          Text(verbatim: parameter.value)
+    if let model, let request = model.request(for: call), let questions = request.questions {
+      AnswerableQuestions(model: model, request: request, questions: questions, size: size)
+    } else {
+      askedQuestion(size: size)
+    }
+  }
+
+  /// A question as the transcript tells it: its options, and once answered, the ones chosen —
+  /// or the user's own words.
+  private func askedQuestion(size: Double) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(Array(AskedQuestion.all(in: call).enumerated()), id: \.offset) { _, question in
+        VStack(alignment: .leading, spacing: 6) {
+          Text(verbatim: question.text)
             .font(theme.messageFont(size: size / 0.86).weight(.semibold))
             .foregroundStyle(theme.text.color)
-        } else {
-          Label {
-            Text(verbatim: parameter.value).foregroundStyle(theme.text.color)
-          } icon: {
-            Image(systemName: "circle").foregroundStyle(theme.secondaryText.color)
+          ForEach(Array(question.options.enumerated()), id: \.offset) { _, option in
+            let isChosen = question.chosen.contains(option)
+            Label {
+              Text(verbatim: option)
+                .foregroundStyle(isChosen ? theme.text.color : theme.secondaryText.color)
+                .fontWeight(isChosen ? .semibold : nil)
+            } icon: {
+              Image(systemName: question.symbol(chosen: isChosen))
+                .foregroundStyle(isChosen ? theme.accent.color : theme.secondaryText.color)
+            }
+            .font(theme.messageFont(size: size / 0.86))
+            .accessibilityAddTraits(isChosen ? .isSelected : [])
           }
-          .font(theme.messageFont(size: size / 0.86))
+          if let other = question.otherAnswer {
+            Label {
+              Text(verbatim: other).foregroundStyle(theme.text.color).fontWeight(.semibold)
+            } icon: {
+              Image(systemName: "text.bubble.fill").foregroundStyle(theme.accent.color)
+            }
+            .font(theme.messageFont(size: size / 0.86))
+            .textSelection(.enabled)
+          }
         }
       }
     }
@@ -350,6 +381,9 @@ struct ToolCallDetails: View {
     case .workingDirectory: return LocalizedStringResource("Folder", bundle: .module)
     case .lines: return LocalizedStringResource("Lines", bundle: .module)
     case .plan: return LocalizedStringResource("Plan", bundle: .module)
+    case .answer: return LocalizedStringResource("Answer", bundle: .module)
+    case .multipleChoices:
+      return LocalizedStringResource("Several Choices", bundle: .module)
     case .question: return LocalizedStringResource("Question", bundle: .module)
     case .todo: return LocalizedStringResource("Task", bundle: .module)
     }
@@ -520,5 +554,254 @@ struct ProducedImageView: View {
           .foregroundStyle(theme.secondaryText.color)
       }
     }
+  }
+}
+
+/// The questions the agent waits on, answered where they are asked: an option is a click, a free
+/// answer is the composer's (#40, #41).
+struct AnswerableQuestions: View {
+  let model: ConversationModel
+  let request: ConversationRequest
+  let questions: [AgentQuestion]
+  let size: Double
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
+        VStack(alignment: .leading, spacing: 4) {
+          if let header = question.header, questions.count > 1 {
+            Text(verbatim: DisplaySafeText.visible(header))
+              .font(theme.interfaceFont(size: size * 0.9, weight: .semibold))
+              .foregroundStyle(theme.secondaryText.color)
+          }
+          Text(verbatim: DisplaySafeText.visible(question.text))
+            .font(theme.messageFont(size: size / 0.86).weight(.semibold))
+            .foregroundStyle(theme.text.color)
+            .fixedSize(horizontal: false, vertical: true)
+          ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
+            optionButton(
+              choice, option: option, question: index,
+              isMultiple: question.allowsMultipleChoices,
+              isEnabled: request.canChoose(in: question))
+          }
+        }
+      }
+      if !request.answersAtOnce {
+        Button {
+          model.sendChoices()
+        } label: {
+          Text("Send Answers", bundle: .module)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(theme.accent.color)
+        .disabled(!model.canSendChoices)
+      }
+    }
+  }
+
+  private func optionButton(
+    _ choice: AgentQuestion.Option, option: Int, question: Int, isMultiple: Bool, isEnabled: Bool
+  ) -> some View {
+    let isChosen = model.isChosen(option: option, ofQuestion: question)
+    let symbol =
+      isMultiple
+      ? (isChosen ? "checkmark.square.fill" : "square")
+      : (isChosen ? "largecircle.fill.circle" : "circle")
+    return Button {
+      model.choose(option: option, ofQuestion: question)
+    } label: {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Image(systemName: symbol)
+          .foregroundStyle(isChosen ? theme.accent.color : theme.secondaryText.color)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(verbatim: DisplaySafeText.visible(choice.label))
+            .font(theme.messageFont(size: size / 0.86))
+            .foregroundStyle(theme.text.color)
+          if let description = choice.description {
+            Text(verbatim: DisplaySafeText.visible(description))
+              .font(theme.interfaceFont(size: size * 0.95))
+              .foregroundStyle(theme.secondaryText.color)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 8)
+      .padding(.vertical, 5)
+      .contentShape(RoundedRectangle(cornerRadius: 7))
+    }
+    .buttonStyle(OptionButtonStyle())
+    .disabled(!isEnabled)
+    .accessibilityAddTraits(isChosen ? .isSelected : [])
+  }
+}
+
+private struct OptionButtonStyle: ButtonStyle {
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.isEnabled) private var isEnabled
+  @State private var isHovered = false
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .background(
+        RoundedRectangle(cornerRadius: 7)
+          .fill(theme.border.color.opacity(configuration.isPressed ? 0.8 : isHovered ? 0.45 : 0))
+      )
+      .opacity(isEnabled ? 1 : 0.55)
+      .onHover { isHovered = isEnabled && $0 }
+  }
+}
+
+/// The answers to a permission or a plan the agent waits on, given from the conversation as from
+/// the palette (#40).
+struct RequestActions: View {
+  let model: ConversationModel
+  let request: ConversationRequest
+  let call: ToolCall
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      // What would be allowed, unless the block above shows exactly that.
+      if case .permission(let permission) = request.request.content, let subject = permission.subject,
+        !ConversationModel.isAbout(call, subject)
+      {
+        Text(verbatim: DisplaySafeText.visible(subject))
+          .font(theme.codeFont(size: 12))
+          .foregroundStyle(theme.text.color)
+          .textSelection(.enabled)
+          .lineLimit(6)
+          .padding(8)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(theme.codeBackground.color, in: RoundedRectangle(cornerRadius: 6))
+      }
+      buttons
+    }
+  }
+
+  private var buttons: some View {
+    let answers = request.answers
+    return HStack(spacing: 8) {
+      switch request.request.content {
+      case .permission(let permission):
+        if answers.contains(.allowOnce) {
+          Button {
+            model.answer(.allowOnce)
+          } label: {
+            Text("Allow", bundle: .module, comment: "Allows what an agent asks, this once.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+        }
+        if answers.contains(.allowAlways), permission.alwaysAllow != nil {
+          Button {
+            model.answer(.allowAlways)
+          } label: {
+            Text("Always", bundle: .module, comment: "Allows what an agent asks, from now on.")
+          }
+        }
+        if answers.contains(.deny) { denyButton }
+      case .unreadable:
+        if answers.contains(.deny) { denyButton }
+      case .plan:
+        if answers.contains(.approvePlan) {
+          Menu {
+            Button {
+              model.answer(.approvePlan(.acceptEdits))
+            } label: {
+              Text("Approve, Accepting Edits", bundle: .module)
+            }
+            Button {
+              model.answer(.approvePlan(.reviewEdits))
+            } label: {
+              Text("Approve, Reviewing Each Edit", bundle: .module)
+            }
+          } label: {
+            Text("Approve", bundle: .module, comment: "Approves an agent's plan.")
+          }
+          .fixedSize()
+        }
+        if answers.contains(.rejectPlan) {
+          Button {
+            model.answer(.rejectPlan)
+          } label: {
+            Text("Reject", bundle: .module, comment: "Rejects an agent's plan.")
+          }
+          .help(Text(Self.stopsTheTurn))
+        }
+      case .questions, .elicitation:
+        EmptyView()
+      }
+      if request.isSending {
+        ProgressView().controlSize(.small)
+      }
+      if answers.isEmpty {
+        Text("This request can only be answered in the terminal.", bundle: .module)
+          .font(theme.interfaceFont(size: 11.5))
+          .foregroundStyle(theme.secondaryText.color)
+      }
+    }
+    .controlSize(.small)
+    .disabled(request.isSending)
+  }
+
+  static let stopsTheTurn = LocalizedStringResource(
+    "Also stops the agent's turn: it waits for your next message.", bundle: .module,
+    comment: "What refusing a request does besides refusing.")
+
+  private var denyButton: some View {
+    Button {
+      model.answer(.deny)
+    } label: {
+      Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
+    }
+    .help(Text(Self.stopsTheTurn))
+    .accessibilityHint(Text(Self.stopsTheTurn))
+  }
+}
+
+/// A question of a call, read back from its parameters.
+struct AskedQuestion: Equatable {
+  var text: String
+  var options: [String] = []
+  var allowsMultipleChoices = false
+  var answer: String?
+
+  static func all(in call: ToolCall) -> [AskedQuestion] {
+    var questions: [AskedQuestion] = []
+    for parameter in call.parameters {
+      switch parameter.key {
+      case .question: questions.append(AskedQuestion(text: parameter.value))
+      case .multipleChoices where !questions.isEmpty:
+        questions[questions.count - 1].allowsMultipleChoices = true
+      case .arguments where !questions.isEmpty:
+        questions[questions.count - 1].options.append(parameter.value)
+      case .answer where !questions.isEmpty: questions[questions.count - 1].answer = parameter.value
+      default: break
+      }
+    }
+    return questions
+  }
+
+  /// The options the answer names: one label, or for several choices, labels joined by ", ".
+  var chosen: Set<String> {
+    guard let answer else { return [] }
+    if options.contains(answer) { return [answer] }
+    guard allowsMultipleChoices else { return [] }
+    let parts = Set(answer.components(separatedBy: ", "))
+    return parts.isSubset(of: options) ? parts : []
+  }
+
+  /// The user's own words, when the answer names no option.
+  var otherAnswer: String? {
+    guard let answer, !answer.isEmpty, chosen.isEmpty else { return nil }
+    return answer
+  }
+
+  func symbol(chosen: Bool) -> String {
+    allowsMultipleChoices
+      ? (chosen ? "checkmark.square.fill" : "square")
+      : (chosen ? "largecircle.fill.circle" : "circle")
   }
 }
