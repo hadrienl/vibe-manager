@@ -170,6 +170,17 @@ struct DragEndWatchTests {
     #expect(checks == 3)
   }
 
+  @Test("A delegate called once the button is up shows no hover")
+  func noHoverAfterRelease() {
+    #expect(SessionDropDelegate.hover(for: .conversation, isButtonDown: false) == nil)
+    #expect(
+      SessionDropDelegate.hover(for: .conversation, isButtonDown: true)
+        == .accepting(.conversation))
+    #expect(
+      SessionDropDelegate.hover(for: .refused(.stopped), isButtonDown: true)
+        == .refusing(.stopped))
+  }
+
   @Test("Cancelled, it throws rather than clear the hover of the next drag")
   func cancelled() async {
     let task = Task { @MainActor in

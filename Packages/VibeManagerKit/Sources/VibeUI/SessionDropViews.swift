@@ -49,10 +49,12 @@ struct SessionDropZone: ViewModifier {
 enum DragEndWatch {
   static let interval: Duration = .milliseconds(250)
 
+  static func isButtonDown() -> Bool { NSEvent.pressedMouseButtons & 1 != 0 }
+
   /// Returns once the button is released, or throws when cancelled.
   static func waitForRelease(
     interval: Duration = DragEndWatch.interval,
-    isButtonDown: () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 },
+    isButtonDown: () -> Bool = { DragEndWatch.isButtonDown() },
     sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
   ) async throws {
     repeat {
@@ -78,12 +80,13 @@ struct SessionDropDelegate: DropDelegate {
   @Binding var hover: DropHover?
 
   func dropEntered(info: DropInfo) {
-    hover = Self.hover(for: model.dropRoute(for: sessionID))
+    hover = Self.hover(
+      for: model.dropRoute(for: sessionID), isButtonDown: DragEndWatch.isButtonDown())
   }
 
   func dropUpdated(info: DropInfo) -> DropProposal? {
     let route = model.dropRoute(for: sessionID)
-    hover = Self.hover(for: route)
+    hover = Self.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
     // No "+" on the pointer: the refusal is seen before letting go.
     return DropProposal(operation: route.isRefused ? .forbidden : .copy)
   }
@@ -105,6 +108,13 @@ struct SessionDropDelegate: DropDelegate {
   static func hover(for route: SessionDropRoute) -> DropHover {
     if case .refused(let refusal) = route { return .refusing(refusal) }
     return .accepting(route)
+  }
+
+  /// No hover once the button is up. SwiftUI calls the delegate again after the drop, while the
+  /// file just attached moves the views under the dragged image: the zone came back on screen
+  /// after being cleared, and nothing cleared it a second time.
+  static func hover(for route: SessionDropRoute, isButtonDown: Bool) -> DropHover? {
+    isButtonDown ? hover(for: route) : nil
   }
 }
 
@@ -249,8 +259,8 @@ struct SessionRowDropDelegate: DropDelegate {
 
   func dropEntered(info: DropInfo) {
     let route = model.dropRoute(for: sessionID)
-    hovered = SessionDropDelegate.hover(for: route)
-    guard !route.isRefused else { return }
+    hovered = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
+    guard hovered != nil, !route.isRefused else { return }
     let model = model
     let id = sessionID
     springLoading.enter(id) {
@@ -263,7 +273,7 @@ struct SessionRowDropDelegate: DropDelegate {
     let route = model.dropRoute(for: sessionID)
     // Set again on every move: the watch on the button may have cleared it under a drag that
     // was still going on.
-    let hover = SessionDropDelegate.hover(for: route)
+    let hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
     if hovered != hover { hovered = hover }
     return DropProposal(operation: route.isRefused ? .forbidden : .copy)
   }
