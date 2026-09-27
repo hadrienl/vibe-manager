@@ -56,9 +56,18 @@ extension AppModel {
 
   /// Whether the composer on screen takes the keyboard when its session comes on screen (#105).
   /// Not while the user walks the sidebar with the arrow keys: the list would lose them at the
-  /// first row. The terminal takes it either way, as it always has.
+  /// first row. Nor while several sessions are selected: see `terminalClaimsKeyboardOnActivation`.
   public var composerClaimsKeyboardOnActivation: Bool {
-    !keepsKeyboardInSidebar && canClaimKeyboard
+    !keepsKeyboardInSidebar && canClaimKeyboard && !hasMultipleSelection
+  }
+
+  /// Whether the terminal on screen takes the keyboard when its session comes on screen. It
+  /// does, as it always has — except for a session a ⌘-click or a ⇧-click just added to a
+  /// selection of several (#128). The keyboard stays in the sidebar then, where the selection is
+  /// made and used; it is the keyboard leaving the sidebar that brings the selection back to
+  /// the session on screen, so that ⌘W never closes sessions nobody is looking at.
+  public var terminalClaimsKeyboardOnActivation: Bool {
+    !hasMultipleSelection
   }
 
   /// View › Show Conversation / Show Terminal (⌥⌘T), for the selected session.

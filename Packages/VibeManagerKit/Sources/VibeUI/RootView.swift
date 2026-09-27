@@ -886,7 +886,8 @@ public struct RootView: View {
           TerminalPaneView(
             model: pane, autoStart: false, isActive: isActive,
             accessibilityTitle: terminalTitle(for: listed, pane: pane),
-            statusAccessory: statusAccessory(for: listed)
+            statusAccessory: statusAccessory(for: listed),
+            claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation
           )
           .id(listed.id)
           .opacity(isActive ? 1 : 0)
