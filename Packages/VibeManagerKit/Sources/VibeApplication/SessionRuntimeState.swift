@@ -82,12 +82,6 @@ public struct AuxiliaryRuntimeRecord: Hashable, Codable, Sendable {
     try container.encodeIfPresent(processGroup, forKey: .processGroup)
     try container.encodeIfPresent(processStartedAt, forKey: .processStartedAt)
   }
-
-  /// The same terminal, seen as a leftover: what the check for leftovers reads.
-  var asLeftover: SessionRuntimeRecord {
-    SessionRuntimeRecord(
-      sessionID: sessionID, processGroup: processGroup, processStartedAt: processStartedAt)
-  }
 }
 
 /// What the application was running, and whether it was still running when it last wrote this.
@@ -213,6 +207,10 @@ public protocol ProcessLivenessProbe: Sendable {
   /// Sends `SIGKILL` to the whole group. Answers whether the kernel accepted the signal.
   @discardableResult
   func terminate(processGroup: Int32) -> Bool
+  /// The process groups of the terminal session `leader` started, other than its own, whose
+  /// processes all started since `date`: the jobs a shell with job control ran, each in a group of
+  /// its own (#43). They keep the session after its leader and its terminal are gone.
+  func jobGroups(inSessionOf leader: Int32, startedSince date: Date) -> Set<Int32>
   /// When the Mac last started. A host missing after a restart is not a crash: nothing survives a
   /// restart, and quitting with the agents left running was an intention to carry on.
   func bootTime() -> Date?
@@ -234,6 +232,18 @@ extension ProcessLivenessProbe {
   /// Unknown unless a probe says otherwise: without it, a missing host always reads as a crash,
   /// which is the answer that asks before resuming anything.
   public func bootTime() -> Date? { nil }
+
+  public func jobGroups(inSessionOf leader: Int32, startedSince date: Date) -> Set<Int32> { [] }
+
+  /// Stops what a side terminal's shell left running (#43) — a dev server, in the foreground or
+  /// with `&` — once the shell's group is shown to be the one recorded, or gone. A group whose
+  /// number now names another process's is left alone, as its jobs are: they are not ours.
+  public func terminateJobs(ofShell group: Int32, startedAt: Date?, identity: ProcessIdentity) {
+    guard let startedAt, identity == .matches || identity == .gone else { return }
+    for job in jobGroups(inSessionOf: group, startedSince: startedAt) {
+      terminate(processGroup: job)
+    }
+  }
 }
 
 public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
@@ -266,6 +276,32 @@ public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
   public func terminate(processGroup: Int32) -> Bool {
     guard processGroup > 0 else { return false }
     return kill(-processGroup, SIGKILL) == 0
+  }
+
+  public func jobGroups(inSessionOf leader: Int32, startedSince date: Date) -> Set<Int32> {
+    guard leader > 0 else { return [] }
+    var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+    var size = 0
+    guard sysctl(&name, 3, nil, &size, nil, 0) == 0, size > 0 else { return [] }
+    // Room for a few more, started between the two calls.
+    var processes = [kinfo_proc](
+      repeating: kinfo_proc(), count: size / MemoryLayout<kinfo_proc>.stride + 16)
+    size = processes.count * MemoryLayout<kinfo_proc>.stride
+    guard sysctl(&name, 3, &processes, &size, nil, 0) == 0 else { return [] }
+    // A second's tolerance, as for a group's identity: the two clocks are not the same one.
+    let earliest = date.timeIntervalSince1970 - 1
+    var groups = Set<Int32>()
+    var foreign = Set<Int32>()
+    for process in processes.prefix(size / MemoryLayout<kinfo_proc>.stride) {
+      let pid = process.kp_proc.p_pid
+      let group = process.kp_eproc.e_pgid
+      guard pid > 0, group > 0, group != leader, getsid(pid) == leader else { continue }
+      let started = process.kp_proc.p_starttime
+      let startedAt = Double(started.tv_sec) + Double(started.tv_usec) / 1_000_000
+      if startedAt >= earliest { groups.insert(group) } else { foreign.insert(group) }
+    }
+    // A group with one member older than the shell is not one of its jobs.
+    return groups.subtracting(foreign)
   }
 
   public func bootTime() -> Date? {

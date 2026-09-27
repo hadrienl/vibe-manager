@@ -113,6 +113,50 @@ struct HostFullDiskAccessTests {
     await host.shutDown()
   }
 
+  @Test("A side terminal does not hold a restart back: it is stopped, and the host goes")
+  func sideTerminalDoesNotHoldTheRestart() async throws {
+    // A host runs side terminals only with the trampoline that gives them their terminal.
+    ControllingTerminal.useTrampoline(at: try TerminalHostProcessTests.fixtureURL().path)
+    let host = try InProcessTerminalHost(idleGracePeriod: .seconds(60))
+    let supervisor = host.supervisor()
+    let go = GoFile()
+    let agent = try await supervisor.start(
+      TerminalTestSupport.spec(script: "exit 0"), for: TerminalID())
+    #expect(await Transcript.follow(agent).waitForEnd())
+    var shell = TerminalTestSupport.spec(script: go.script)
+    shell.role = .auxiliary
+    let side = try await supervisor.start(shell, for: TerminalID())
+    let transcript = await Transcript.follow(side)
+
+    #expect(await supervisor.restartHostWhenIdle() == .restarted)
+
+    #expect(await eventually { host.becameIdle })
+    #expect(await transcript.waitForEnd())
+    await host.shutDown()
+  }
+
+  @Test("Left running with no agent to come back for, a side terminal does not keep the host")
+  func sideTerminalAloneDoesNotKeepTheHost() async throws {
+    // A host runs side terminals only with the trampoline that gives them their terminal.
+    ControllingTerminal.useTrampoline(at: try TerminalHostProcessTests.fixtureURL().path)
+    let host = try InProcessTerminalHost(idleGracePeriod: .milliseconds(200))
+    let supervisor = host.supervisor()
+    let go = GoFile()
+    var shell = TerminalTestSupport.spec(script: go.script)
+    shell.role = .auxiliary
+    let side = try await supervisor.start(shell, for: TerminalID())
+    guard case .running(let processIdentifier) = await side.state() else {
+      Issue.record("The shell did not start")
+      return
+    }
+
+    await supervisor.relinquish(keepRunning: true)
+
+    #expect(await eventually { host.becameIdle })
+    #expect(await eventually { !isProcessAlive(processIdentifier) })
+    await host.shutDown()
+  }
+
   @Test("A restart called off leaves the host alone")
   func cancelledRestartLeavesTheHost() async throws {
     let host = try InProcessTerminalHost(idleGracePeriod: .seconds(60))

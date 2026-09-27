@@ -313,8 +313,7 @@ public struct DetectPreviousShutdown: Sendable {
     // Identified, they are stopped here, as after a crash; one that cannot be identified is left
     // alone, and a reattach has no offer on screen to carry that warning.
     _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID.agentTerminal] == nil })
-    _ = leftovers(
-      of: (previous.auxiliary ?? []).filter { byID[$0.terminalID] == nil }.map(\.asLeftover))
+    stopAuxiliaryLeftovers((previous.auxiliary ?? []).filter { byID[$0.terminalID] == nil })
     await recorder.claim()
 
     let storedByID = Dictionary(
@@ -384,8 +383,20 @@ public struct DetectPreviousShutdown: Sendable {
   private func leftovers(of previous: SessionRuntimeState?) -> [SessionRuntimeRecord] {
     // A side terminal's shell (#43) is stopped like an agent once identified, and never reported:
     // the banner speaks of sessions, and the one it belongs to is reported, or resumed, anyway.
-    _ = leftovers(of: (previous?.auxiliary ?? []).map(\.asLeftover))
+    stopAuxiliaryLeftovers(previous?.auxiliary ?? [])
     return leftovers(of: previous?.sessions ?? [])
+  }
+
+  /// Side terminals' shells, and the jobs each ran in a group of its own (#43): a dev server left
+  /// by a crash holds its port, and the restored tab's new shell would start beside it.
+  private func stopAuxiliaryLeftovers(_ records: [AuxiliaryRuntimeRecord]) {
+    for record in records {
+      guard let group = record.processGroup else { continue }
+      let identity = processes.identify(processGroup: group, startedAt: record.processStartedAt)
+      processes.terminateJobs(
+        ofShell: group, startedAt: record.processStartedAt, identity: identity)
+      if identity == .matches { processes.terminate(processGroup: group) }
+    }
   }
 
   private func leftovers(of records: [SessionRuntimeRecord]) -> [SessionRuntimeRecord] {

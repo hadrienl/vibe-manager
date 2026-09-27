@@ -279,10 +279,14 @@ public actor TerminalHostServer {
 
   /// Agrees to leave once idle when no agent runs, and forgets the sessions that ended: the
   /// client asking has read them. Refuses, having changed nothing, when an agent still runs.
+  ///
+  /// A side terminal (#43) does not hold it back: its shell never ends on its own, and would keep
+  /// a restart from ever happening. It is stopped with whatever it runs, and its tab says so.
   private func retire() async -> Bool {
-    for hosted in sessions.values where await !hosted.session.state().isFinished {
-      return false
+    for hosted in sessions.values where hosted.role == .agent {
+      guard await hosted.session.state().isFinished else { return false }
     }
+    await stopAuxiliarySessions()
     for id in Array(sessions.keys) {
       await release(id)
     }
@@ -441,6 +445,28 @@ public actor TerminalHostServer {
     updateIdleState()
   }
 
+  /// Stops the side terminals still running, and waits until their clients have read their end.
+  private func stopAuxiliarySessions() async {
+    let running = sessions.filter { $0.value.role == .auxiliary && $0.value.endedAt == nil }
+    guard !running.isEmpty else { return }
+    configuration.diagnostics.record(
+      .host, .info, "host.auxiliaryStopped", ["sessions": .count(running.count)])
+    await withTaskGroup(of: Void.self) { group in
+      for hosted in running.values {
+        group.addTask { await hosted.session.stop(gracePeriod: .seconds(1)) }
+      }
+    }
+    for id in running.keys {
+      await forwards[id]?.value
+    }
+  }
+
+  /// Whether an agent is kept here, running or ended and not read yet: a side terminal alone is
+  /// no reason for the host to stay, since nobody will take it back without its agent.
+  private var keepsAgent: Bool {
+    sessions.values.contains { $0.role == .agent }
+  }
+
   private func stopAll() async {
     let running = sessions.values.map(\.session)
     sessions.removeAll()
@@ -500,7 +526,7 @@ public actor TerminalHostServer {
 
   private func updateIdleState() {
     Task { await self.refreshActivity() }
-    guard sessions.isEmpty, owner == nil else {
+    guard !keepsAgent, owner == nil else {
       idleTask?.cancel()
       idleTask = nil
       return
@@ -514,8 +540,12 @@ public actor TerminalHostServer {
     }
   }
 
-  private func endIfStillIdle() {
-    guard sessions.isEmpty, owner == nil else { return }
+  private func endIfStillIdle() async {
+    guard !keepsAgent, owner == nil else { return }
+    // Left running with an agent that has ended and been forgotten since: nobody will come back
+    // for them.
+    await stopAuxiliarySessions()
+    guard !keepsAgent, owner == nil else { return }
     configuration.diagnostics.record(.host, .info, "host.idleExit")
     configuration.diagnostics.flush()
     onIdle()
@@ -523,7 +553,8 @@ public actor TerminalHostServer {
 
   private func refreshActivity() async {
     var isRunning = false
-    for hosted in sessions.values where hosted.endedAt == nil {
+    // Agents only: a side terminal's shell always runs, and is no work the Mac must keep up with.
+    for hosted in sessions.values where hosted.role == .agent && hosted.endedAt == nil {
       isRunning = true
       break
     }

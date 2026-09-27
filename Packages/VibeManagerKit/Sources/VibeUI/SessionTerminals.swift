@@ -46,6 +46,9 @@ public final class DrawerTerminal: Identifiable {
   public internal(set) var hasUnseenExit = false
   /// The title written down last time, until the new shell has said anything.
   var lastSeenTitle: String?
+  /// What the tab shows above its shell's own output: the history of the shells before it, and
+  /// the separator. Part of what is written down, so that a second restoration keeps the first.
+  var prelude: [UInt8] = []
 
   @ObservationIgnored var watch: Task<Void, Never>?
   @ObservationIgnored var inspection: Task<Void, Never>?
@@ -268,7 +271,7 @@ public final class SessionTerminalDrawer {
     requestFocus()
     saveSoon()
     if let fallback {
-      terminal.pane.post(notice: DrawerRestoration.fallbackNotice(fallback))
+      setPrelude(DrawerRestoration.fallbackNotice(fallback), of: terminal)
     }
     await start(terminal, in: directory, size: nil, generation: generation)
     dependencies.diagnostics.record(
@@ -354,15 +357,18 @@ public final class SessionTerminalDrawer {
     }
     let generation = generation
     terminal.hasUnseenExit = false
+    // Everything the tab showed goes above the new shell: on screen, and in what is written down.
+    let shown = await shownHistory(of: terminal) ?? terminal.prelude
     let folder = await dependencies.sessionFolder(sessionID)
     let (directory, fallback) = await DrawerRestoration.directory(
       remembered: terminal.currentDirectory, sessionFolder: folder, probe: dependencies.probe)
     terminal.currentDirectory = directory
-    terminal.pane.post(
-      notice: DrawerRestoration.notice(
-        scrollback: nil, resumption: .relaunched, at: dependencies.clock.now(),
-        fallback: fallback))
     guard isStillOpen(terminal, generation: generation) else { return }
+    setPrelude(
+      DrawerRestoration.notice(
+        scrollback: shown, resumption: .relaunched, at: dependencies.clock.now(),
+        fallback: fallback),
+      of: terminal)
     await start(terminal, in: directory, size: terminal.pane.viewportSize, generation: generation)
   }
 
@@ -430,8 +436,11 @@ public final class SessionTerminalDrawer {
     var scrollback: [UInt8]?
     if let kept = await dependencies.supervisor.session(for: terminal.id) {
       let state = await kept.state()
+      // The host kept the shell's own output only: what was shown above it is read from disk.
+      let prelude = await recordedPrelude(of: record)
       if !state.isFinished {
         // Left running with its session's agent: taken back as it is, nothing started or typed.
+        setPrelude(prelude, of: terminal)
         await terminal.pane.adopt(kept)
         guard isStillOpen(terminal, generation: generation) else {
           await terminal.pane.stop(gracePeriod: Self.stopGracePeriod)
@@ -441,7 +450,7 @@ public final class SessionTerminalDrawer {
         return
       }
       // Ended while the application was closed: what the host kept of it is fresher than disk.
-      scrollback = await kept.history().bytes
+      scrollback = prelude + (await kept.history().bytes)
     }
     if scrollback == nil, dependencies.preferences.keepsScrollback {
       scrollback = await dependencies.store.loadScrollback(of: terminal.id, in: sessionID)
@@ -450,10 +459,34 @@ public final class SessionTerminalDrawer {
       remembered: record.directory, sessionFolder: folder, probe: dependencies.probe)
     terminal.currentDirectory = directory
     guard isStillOpen(terminal, generation: generation) else { return }
-    terminal.pane.post(
-      notice: DrawerRestoration.notice(
-        scrollback: scrollback, resumption: .resumed, at: date, fallback: fallback))
+    setPrelude(
+      DrawerRestoration.notice(
+        scrollback: scrollback, resumption: .resumed, at: date, fallback: fallback),
+      of: terminal)
     await start(terminal, in: directory, size: record.size, generation: generation)
+  }
+
+  /// The first bytes of a tab's history file, which were shown above the shell it had then.
+  private func recordedPrelude(of record: DrawerTerminalRecord) async -> [UInt8] {
+    guard let count = record.preludeByteCount, count > 0, dependencies.preferences.keepsScrollback,
+      let bytes = await dependencies.store.loadScrollback(of: record.id, in: sessionID)
+    else { return [] }
+    return Array(bytes.prefix(count))
+  }
+
+  /// What the next shell of a tab is shown under. Bounded like a terminal's own history: each
+  /// restoration adds the previous shell's history to it, and it must not grow without end.
+  private func setPrelude(_ bytes: [UInt8], of terminal: DrawerTerminal) {
+    let limit = TerminalScrollbackLimits.default.maximumByteCount
+    terminal.prelude = bytes.count > limit ? Array(bytes.suffix(limit)) : bytes
+    terminal.pane.post(prelude: terminal.prelude)
+    saveSoon()
+  }
+
+  /// Everything the tab shows of its current shell: what is above it, then its own output.
+  private func shownHistory(of terminal: DrawerTerminal) async -> [UInt8]? {
+    guard let session = terminal.pane.session else { return nil }
+    return terminal.pane.prelude(above: session) + (await session.history().bytes)
   }
 
   /// Writes down what each tab shows, then stops them all: the session is closing. The drawer
@@ -523,7 +556,8 @@ public final class SessionTerminalDrawer {
           // The folder's name, never the command: a command line can hold a password, and this
           // document is written whether histories are kept or not.
           lastSeenTitle: terminal.customTitle
-            ?? terminal.currentDirectory.map(DrawerTerminal.displayName(of:)))
+            ?? terminal.currentDirectory.map(DrawerTerminal.displayName(of:)),
+          preludeByteCount: terminal.prelude.isEmpty ? nil : terminal.prelude.count)
       })
   }
 
@@ -554,10 +588,9 @@ public final class SessionTerminalDrawer {
   }
 
   private func snapshot(_ terminal: DrawerTerminal) async {
-    guard dependencies.preferences.keepsScrollback, let session = terminal.pane.session else {
-      return
-    }
-    let bytes = await session.history().bytes
+    guard dependencies.preferences.keepsScrollback,
+      let bytes = await shownHistory(of: terminal)
+    else { return }
     await dependencies.store.saveScrollback(bytes, of: terminal.id, in: sessionID)
     terminal.lastSnapshotAt = .now
   }
@@ -608,6 +641,8 @@ public final class SessionTerminalDrawer {
     }
     follow(terminal, session: session)
     scheduleInspection(of: terminal, after: .zero)
+    // Written soon, prelude included: the length the document gives it must match the file.
+    if !terminal.prelude.isEmpty { scheduleSnapshot(of: terminal) }
   }
 
   private func follow(_ terminal: DrawerTerminal, session: any TerminalSession) {

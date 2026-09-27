@@ -107,6 +107,40 @@ struct ShellProcessInspectorTests {
     #expect(kill(shell, 0) != 0)
   }
 
+  @Test("A shell's jobs are found by its terminal session, older processes left out")
+  func findsTheJobsOfAShell() async throws {
+    ControllingTerminal.useTrampoline(at: try TerminalHostProcessTests.fixtureURL().path)
+    let supervisor = PTYTerminalSupervisor()
+    let startedAt = Date()
+    let session = try await supervisor.start(
+      interactiveShell(in: FileManager.default.temporaryDirectory), for: TerminalID())
+    defer { Task { await supervisor.stopAll(gracePeriod: .milliseconds(200)) } }
+    var pid: Int32?
+    _ = await eventually {
+      if case .running(let identifier) = await session.state() { pid = identifier }
+      return pid != nil
+    }
+    let shell = try #require(pid)
+    let probe = SystemProcessLivenessProbe()
+
+    await session.write("sleep 303 &\r")
+    var jobs: [pid_t] = []
+    #expect(
+      await eventually {
+        jobs = Self.children(of: shell)
+        return jobs.count == 1
+      })
+    let job = try #require(jobs.first)
+
+    #expect(
+      await eventually {
+        probe.jobGroups(inSessionOf: shell, startedSince: startedAt) == [getpgid(job)]
+      })
+    // Everything in it is newer than that: none of it is taken for the shell's.
+    #expect(
+      probe.jobGroups(inSessionOf: shell, startedSince: Date().addingTimeInterval(60)).isEmpty)
+  }
+
   private static func foregroundGroup(of pid: pid_t) -> pid_t {
     var info = proc_bsdinfo()
     let size = Int32(MemoryLayout<proc_bsdinfo>.size)

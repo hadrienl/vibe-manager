@@ -370,7 +370,7 @@ struct SessionTerminalsTests {
     #expect(spec.workingDirectoryURL.path == "/work/app/web")
     #expect(spec.initialInput == nil)
     #expect(await second.shells.shells[ids[0]]?.written.isEmpty == true)
-    let notice = restored.terminals[0].pane.takePendingNotice()
+    let notice = restored.terminals[0].pane.prelude
     let history = Array("$ npm run dev\r\nready\r\n".utf8)
     #expect(notice.starts(with: history))
     #expect(Array(notice.dropFirst(history.count)).starts(with: DrawerRestoration.softReset))
@@ -395,9 +395,87 @@ struct SessionTerminalsTests {
 
     let spec = try #require(await harness.shells.specs[terminal])
     #expect(spec.workingDirectoryURL.path == "/work/app")
-    let notice = String(decoding: drawer.terminals[0].pane.takePendingNotice(), as: UTF8.self)
+    let notice = String(decoding: drawer.terminals[0].pane.prelude, as: UTF8.self)
     #expect(
       notice.contains("/work/app/feature-x no longer exists: opened in the session's folder."))
+  }
+
+  @Test("What a restored tab shows stays above its new shell, on screen and in what is written")
+  func restoredHistoryIsKept() async throws {
+    let session = SessionID()
+    let terminal = TerminalID()
+    let harness = Harness()
+    await harness.store.save(
+      SessionTerminalsDocument(
+        isVisible: true, activeTerminal: terminal,
+        terminals: [DrawerTerminalRecord(id: terminal, directory: "/work/app")]),
+      for: session)
+    await harness.store.saveScrollback(Array("before\r\n".utf8), of: terminal, in: session)
+
+    await harness.terminals.sessionStarted(session)
+    let drawer = harness.terminals.drawer(for: session)
+    let pane = drawer.terminals[0].pane
+    let prelude = pane.prelude
+    #expect(prelude.starts(with: Array("before\r\n".utf8)))
+    // Not handed over once: a view rebuilt later replays it too.
+    #expect(pane.prelude == prelude)
+
+    await harness.shells.shells[terminal]?.emit("after\r\n")
+    await harness.terminals.shutDown(session)
+
+    #expect(
+      await harness.store.loadScrollback(of: terminal, in: session)
+        == prelude + Array("after\r\n".utf8))
+    let document = try #require(await harness.store.load(session))
+    #expect(document.terminals[0].preludeByteCount == prelude.count)
+  }
+
+  @Test("Restarted, a tab keeps everything it showed above the new shell")
+  func relaunchKeepsTheHistory() async throws {
+    let harness = Harness()
+    let session = SessionID()
+    let drawer = harness.terminals.drawer(for: session)
+    await drawer.show()
+    let terminal = try #require(drawer.terminals.first)
+    let shell = try #require(await harness.shells.shells[terminal.id])
+    await shell.emit("failed build\r\n")
+    await shell.finish(.exited(code: 1))
+    #expect(await eventually { terminal.exitStatus != nil })
+
+    await drawer.relaunch(terminal.id)
+
+    #expect(terminal.isRunning)
+    #expect(terminal.pane.prelude.starts(with: Array("failed build\r\n".utf8)))
+    await harness.terminals.shutDown(session)
+    let written = try #require(await harness.store.loadScrollback(of: terminal.id, in: session))
+    #expect(written.starts(with: Array("failed build\r\n".utf8)))
+  }
+
+  @Test("A shell the host kept is taken back under what was shown above it")
+  func adoptedShellKeepsItsPrelude() async throws {
+    let session = SessionID()
+    let terminal = TerminalID()
+    let harness = Harness()
+    let prelude = Array("older\r\n── Resumed ──\r\n".utf8)
+    await harness.store.save(
+      SessionTerminalsDocument(
+        isVisible: true, activeTerminal: terminal,
+        terminals: [
+          DrawerTerminalRecord(
+            id: terminal, directory: "/work/app", preludeByteCount: prelude.count)
+        ]),
+      for: session)
+    await harness.store.saveScrollback(
+      prelude + Array("$ ls\r\n".utf8), of: terminal, in: session)
+    let kept = FakeShell(
+      id: terminal, state: .running(processIdentifier: 42), history: Array("$ ls\r\n".utf8))
+    await harness.shells.keep(kept)
+
+    await harness.terminals.sessionAdopted(session)
+    let drawer = harness.terminals.drawer(for: session)
+
+    #expect(await harness.shells.startCount == 0)
+    #expect(drawer.terminals[0].pane.prelude == prelude)
   }
 
   @Test("A hidden drawer is not restored before it is shown")

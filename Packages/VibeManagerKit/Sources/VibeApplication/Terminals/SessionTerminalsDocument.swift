@@ -14,23 +14,29 @@ public struct DrawerTerminalRecord: Hashable, Codable, Sendable {
   public var size: TerminalSize?
   /// The title the tab showed last, so that it reads the same before its new shell has answered.
   public var lastSeenTitle: String?
+  /// How many of the first bytes of its history file were shown above its current shell — the
+  /// history of the shells before it. A shell the terminal host kept running is taken back with
+  /// its own history only, and this is what is put back above it.
+  public var preludeByteCount: Int?
 
   public init(
     id: TerminalID,
     title: String? = nil,
     directory: String? = nil,
     size: TerminalSize? = nil,
-    lastSeenTitle: String? = nil
+    lastSeenTitle: String? = nil,
+    preludeByteCount: Int? = nil
   ) {
     self.id = id
     self.title = title
     self.directory = directory
     self.size = size
     self.lastSeenTitle = lastSeenTitle
+    self.preludeByteCount = preludeByteCount
   }
 
   private enum CodingKeys: String, CodingKey {
-    case id, title, directory, size, lastSeenTitle
+    case id, title, directory, size, lastSeenTitle, preludeByteCount
   }
 
   /// The identifier is written as the plain UUID string it is, like the runtime document's: a
@@ -43,7 +49,8 @@ public struct DrawerTerminalRecord: Hashable, Codable, Sendable {
       title: try container.decodeIfPresent(String.self, forKey: .title),
       directory: try container.decodeIfPresent(String.self, forKey: .directory),
       size: try container.decodeIfPresent(TerminalSize.self, forKey: .size),
-      lastSeenTitle: try container.decodeIfPresent(String.self, forKey: .lastSeenTitle)
+      lastSeenTitle: try container.decodeIfPresent(String.self, forKey: .lastSeenTitle),
+      preludeByteCount: try container.decodeIfPresent(Int.self, forKey: .preludeByteCount)
     )
   }
 
@@ -54,6 +61,7 @@ public struct DrawerTerminalRecord: Hashable, Codable, Sendable {
     try container.encodeIfPresent(directory, forKey: .directory)
     try container.encodeIfPresent(size, forKey: .size)
     try container.encodeIfPresent(lastSeenTitle, forKey: .lastSeenTitle)
+    try container.encodeIfPresent(preludeByteCount, forKey: .preludeByteCount)
   }
 }
 

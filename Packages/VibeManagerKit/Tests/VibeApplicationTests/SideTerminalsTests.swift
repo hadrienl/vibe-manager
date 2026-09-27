@@ -289,6 +289,55 @@ struct AuxiliaryRuntimeTests {
 
     #expect(processes.terminated.contains(901))
   }
+
+  @Test(
+    "The jobs a crashed shell ran in groups of their own are stopped with it, or after it",
+    arguments: [true, false])
+  func stopsLeftoverJobs(shellAlive: Bool) async {
+    let session = activeSession()
+    let startedAt = Date(timeIntervalSince1970: 1_700_000_100)
+    let document = SessionRuntimeState(
+      phase: .detached, processIdentifier: 1_001, launchedAt: launch, updatedAt: quitAt,
+      stoppedAt: quitAt, sessions: [SessionRuntimeRecord(sessionID: session.id)], host: identity,
+      auxiliary: [
+        AuxiliaryRuntimeRecord(
+          terminalID: TerminalID(), sessionID: session.id, processGroup: 901,
+          processStartedAt: startedAt)
+      ])
+    // The shell may have died of its terminal's hang-up; a job started with `&` did not.
+    let processes = RestorationProcesses(
+      alive: shellAlive ? [901] : [], startTimes: [901: startedAt], jobs: [901: [950, 960]])
+
+    _ = await detect(
+      stored: [session], document: document, host: SideTerminalHost(.absent),
+      processes: processes)
+
+    #expect(Set(processes.terminated).isSuperset(of: [950, 960]))
+    #expect(processes.terminated.contains(901) == shellAlive)
+  }
+
+  @Test("A shell group whose number now names another process is left alone, and its jobs too")
+  func leavesRecycledShellsAlone() async {
+    let session = activeSession()
+    let startedAt = Date(timeIntervalSince1970: 1_700_000_100)
+    let document = SessionRuntimeState(
+      phase: .detached, processIdentifier: 1_001, launchedAt: launch, updatedAt: quitAt,
+      stoppedAt: quitAt, sessions: [SessionRuntimeRecord(sessionID: session.id)], host: identity,
+      auxiliary: [
+        AuxiliaryRuntimeRecord(
+          terminalID: TerminalID(), sessionID: session.id, processGroup: 901,
+          processStartedAt: startedAt)
+      ])
+    let processes = RestorationProcesses(
+      alive: [901], startTimes: [901: startedAt.addingTimeInterval(3_600)],
+      jobs: [901: [950]])
+
+    _ = await detect(
+      stored: [session], document: document, host: SideTerminalHost(.absent),
+      processes: processes)
+
+    #expect(processes.terminated.isEmpty)
+  }
 }
 
 /// A terminal host that says which terminals it was asked to let go of.

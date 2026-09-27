@@ -740,6 +740,11 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
   /// is still ours while it has members: the kernel gives no process a pid that names a live group.
   private func stopGroup(_ group: Int32, startedAt: Date?, for id: TerminalID) -> GroupOutcome {
     let identity = configuration.processes.identify(processGroup: group, startedAt: startedAt)
+    // A side terminal's jobs (#43) run in groups of their own, and outlive the host's terminal.
+    if auxiliary.contains(id) {
+      configuration.processes.terminateJobs(
+        ofShell: group, startedAt: startedAt, identity: identity)
+    }
     let outcome: GroupOutcome
     switch identity {
     case .matches:

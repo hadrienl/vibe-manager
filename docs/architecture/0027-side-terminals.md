@@ -34,9 +34,11 @@ would have been taken for one by every later piece of code — restoration, jour
 list of sessions (additively: a host that predates it lists agents, the only kind it knew). A side
 terminal's shell is always "running" — an idle prompt — so it is not counted as an agent: not in
 the question asked when quitting, not among the agents a restart of the host for Full Disk Access
-waits for (ADR 0010). The host itself still refuses to retire while any terminal runs; it never has
-to wait for a side terminal, which stops with its session's agent — and that restart closes those
-sessions first.
+waits for (ADR 0010), not in the activity the host holds while agents run. The host refuses to
+retire only while an agent runs: a side terminal still open then — one opened on a session whose
+agent had ended — is stopped with what it runs, and its tab says so. Nor does a side terminal keep
+a host nobody is attached to: once no agent is held there, running or ended and unread, the shells
+left with them are stopped and the host leaves, as it would with nothing at all.
 
 A host left running by an earlier build (Keep Running across an update) knows neither the role nor
 the trampoline below: it would start the shell without job control and list it as an agent after a
@@ -124,12 +126,17 @@ command running, else the folder.
 | Quit, **Stop All** | Written, then stopped with the rest | Kept |
 | Quit, **Keep Running** | Left in the host with their session's agent, and listed in `runtime.json` | Kept |
 | Relaunch after **Keep Running** | Taken back as they are, with the agent; one that ended meanwhile is restarted under the history the host kept | — |
-| A crash, a restart of the Mac, a host lost | Restarted from the last history written; a shell that outlived its host is found and stopped like an agent | Kept |
+| A crash, a restart of the Mac, a host lost | Restarted from the last history written; a shell that outlived its host is found and stopped like an agent, and so are the jobs it ran in groups of their own — found by its terminal session, which they keep after the shell and its terminal are gone | Kept |
 
 A restored tab is a **new** shell, in the folder it was in, under its history and a dated line:
 `── Resumed · 26 Sep 2026 at 09:12 · new shell ──`. Nothing is typed into it: no command is ever run
 again on the user's behalf. A folder that is gone falls back on the session's, and a session folder
-that is gone — a worktree removed — on the home folder, with a line saying which.
+that is gone — a worktree removed — on the home folder, with a line saying which. What a tab shows
+above its shell — the history of the shells before it, the separator, that line — is kept with the
+tab for as long as the shell lives: replayed by every view rebuilt over it (the drawer hidden and
+shown, the session left and come back to), and written with the shell's own output, so that a
+second restoration keeps the first. `drawer.json` says how many of the history file's first bytes
+it is, for a shell the host kept, whose own history holds only its output.
 
 `exit` at a prompt closes its tab, as Terminal.app does by default; a shell that ends any other way
 keeps its tab, with its status, **Restart** and **Close**. A hidden terminal that writes something,

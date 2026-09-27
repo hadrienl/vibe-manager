@@ -74,11 +74,16 @@ final class RestorationProcesses: ProcessLivenessProbe, @unchecked Sendable {
   private let lock = NSLock()
   private let alive: Set<Int32>
   private let startTimes: [Int32: Date]
+  /// The job groups a shell's terminal session holds, by the shell's group.
+  private let jobs: [Int32: Set<Int32>]
   private var killed: [Int32] = []
 
-  init(alive: Set<Int32> = [], startTimes: [Int32: Date] = [:]) {
+  init(
+    alive: Set<Int32> = [], startTimes: [Int32: Date] = [:], jobs: [Int32: Set<Int32>] = [:]
+  ) {
     self.alive = alive
     self.startTimes = startTimes
+    self.jobs = jobs
   }
 
   var terminated: [Int32] {
@@ -97,6 +102,10 @@ final class RestorationProcesses: ProcessLivenessProbe, @unchecked Sendable {
   func terminate(processGroup: Int32) -> Bool {
     lock.withLock { killed.append(processGroup) }
     return true
+  }
+
+  func jobGroups(inSessionOf leader: Int32, startedSince date: Date) -> Set<Int32> {
+    jobs[leader] ?? []
   }
 }
 

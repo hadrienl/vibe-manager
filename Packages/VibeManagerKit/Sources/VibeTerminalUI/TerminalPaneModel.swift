@@ -63,6 +63,10 @@ public final class TerminalPaneModel {
   private var isStarting = false
   private var viewportWaiters: [ViewportWaiter] = []
   private var pendingNotice: [UInt8] = []
+  /// What the next process is shown under, until it starts.
+  private var queuedPrelude: [UInt8]?
+  /// What the current process is shown under, and which process that is.
+  private var boundPrelude: (session: ObjectIdentifier, bytes: [UInt8])?
 
   public init(
     terminalID: TerminalID,
@@ -149,6 +153,7 @@ public final class TerminalPaneModel {
 
     do {
       let session = try await supervisor.start(launchSpec, for: terminalID)
+      bindPrelude(to: session)
       self.session = session
       observe(session)
     } catch let error as TerminalError {
@@ -174,6 +179,7 @@ public final class TerminalPaneModel {
   public func adopt(_ session: any TerminalSession) async {
     stateTask?.cancel()
     stateTask = nil
+    bindPrelude(to: session)
     self.session = session
     failure = nil
     wasStoppedOnPurpose = false
@@ -202,6 +208,32 @@ public final class TerminalPaneModel {
   public func takePendingNotice() -> [UInt8] {
     defer { pendingNotice = [] }
     return pendingNotice
+  }
+
+  /// Holds what the next process is shown under for as long as it lives: a side terminal's
+  /// restored history and its separator (#43).
+  ///
+  /// Unlike a notice, it is not handed over once. A drawer's view is rebuilt whenever it is hidden
+  /// and shown again, or its session is left and come back to, and each new view replays it above
+  /// the process's own history — or the tab would show a bare prompt where its past was.
+  public func post(prelude bytes: [UInt8]) {
+    queuedPrelude = bytes
+  }
+
+  /// What `session` is shown under, if it is the process the prelude was posted for.
+  public func prelude(above session: any TerminalSession) -> [UInt8] {
+    guard let boundPrelude, boundPrelude.session == ObjectIdentifier(session) else { return [] }
+    return boundPrelude.bytes
+  }
+
+  /// What the current process is shown under.
+  public var prelude: [UInt8] {
+    session.map { prelude(above: $0) } ?? []
+  }
+
+  private func bindPrelude(to session: any TerminalSession) {
+    boundPrelude = (ObjectIdentifier(session), queuedPrelude ?? [])
+    queuedPrelude = nil
   }
 
   /// Called by the surface whenever it has measured itself, before and after the process exists.

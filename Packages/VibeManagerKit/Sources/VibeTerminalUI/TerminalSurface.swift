@@ -101,6 +101,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   // Object identity, not `session.id`: the id belongs to the work session and is reused by every
   // process started for it, so it cannot tell a restarted session from the one already attached.
   private var attachedSession: ObjectIdentifier?
+  /// Whether the view shows anything yet: a prelude fed over what it shows starts it over.
+  private var hasFed = false
   private var wasActive: Bool?
   private var lastFocusRequest: Int?
   private var focusObservation: NSKeyValueObservation?
@@ -145,6 +147,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   }
 
   func bind(to view: TerminalView) {
+    if self.view !== view { hasFed = false }
     self.view = view
     connectPasteMode()
   }
@@ -254,8 +257,16 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       let attachment = await session.attach()
       // Before the history of the new session, and in the same task, so a restart's separator
       // cannot race the first bytes of the process it announces.
+      let prelude = pane.prelude(above: session)
+      // The prelude holds all this view showed of the previous process — its own prelude and
+      // history — so the screen starts over rather than showing it twice.
+      if !prelude.isEmpty, hasFed {
+        view?.getTerminal().resetToInitialState()
+        view?.getTerminal().clearScrollback()
+      }
       replay.isOn = true
       feed(pane.takePendingNotice())
+      feed(prelude)
       replay.isOn = false
       feed(attachment.history.bytes)
       for await event in attachment.events {
@@ -279,6 +290,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   private func feed(_ bytes: [UInt8]) {
     guard !bytes.isEmpty else { return }
+    hasFed = true
     view?.feed(byteArray: bytes[...])
   }
 
