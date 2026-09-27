@@ -189,6 +189,8 @@ public final class AppModel {
   let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
+  /// The titles of the tickets a new session names, read in its web view for its notes (#89).
+  public let ticketTitles: TicketTitlesModel
   /// Every session's journal: its summary and its resources (#36). Absent in a workspace
   /// assembled without it.
   public let journal: SessionJournalModel?
@@ -624,6 +626,9 @@ public final class AppModel {
     terminals: SessionTerminals? = nil,
     /// Reads a session's branch and forge, for the ticket it deduces. Absent without Git.
     ticketContext: ReadTicketContext? = nil,
+    /// Where the ticket resolvers are kept (#89). In memory, with the presets, by default.
+    ticketResolvers: any TicketResolverRepository = InMemoryTicketResolverRepository(),
+    ticketTitlePreferences: any TicketTitlePreferences = InMemoryTicketTitlePreferences(),
     /// The diagnostics log. Nothing the user typed ever reaches it: see `DiagnosticEvent`.
     diagnostics: Diagnostics = .disabled,
     /// Gathers what an export holds. Absent, Export Diagnostics is not offered.
@@ -672,6 +677,9 @@ public final class AppModel {
     notes = NotesModel(
       store: notesStore, fileLocation: notesFileLocation, opener: WorkspaceFileOpener())
     importLegacyNotes = ImportLegacyNotes(repository: repository, notes: notesStore)
+    ticketTitles = TicketTitlesModel(
+      repository: ticketResolvers, preferences: ticketTitlePreferences, notes: notes,
+      reader: browser)
     self.closePreferences = closePreferences
     self.quitPreferences = quitPreferences
     quitBehavior = quitPreferences.behavior
@@ -1210,6 +1218,7 @@ public final class AppModel {
   private func archiveProcess(_ id: SessionID) async throws -> SessionArchival {
     let archival = try await archiveSession(id: id)
     await activityTracker?.forget(id)
+    ticketTitles.forget(id)
     browser?.release(id)
     conversations.release(id)
     await dropStore?.remove(id)
@@ -2422,7 +2431,9 @@ public final class AppModel {
     let model = NewSessionModel(
       create: CreateSession(
         repository: repository, agents: agents, ticketContext: readTicketContext,
-        icons: iconStore, diagnostics: diagnostics),
+        icons: iconStore,
+        ticketResolvers: { [ticketTitles] in await ticketTitles.activeResolvers() },
+        diagnostics: diagnostics),
       registry: agents,
       fullDiskAccess: permissions?.agentAccess,
       templates: templates.all,
@@ -2479,6 +2490,8 @@ public final class AppModel {
     if isFollowed() {
       select(id)
     }
+    // In the background, never waited for: the agent starts whatever the pages do (#89).
+    ticketTitles.start(creation.tickets, for: id)
     diagnostics.record(
       .session, .info, "session.created",
       [

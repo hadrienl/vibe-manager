@@ -366,6 +366,8 @@ public final class AppEnvironment {
       terminals: terminals,
       ticketContext: ReadTicketContext(
         git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
+      ticketResolvers: FileTicketResolverRepository(storeURL: data.ticketResolvers),
+      ticketTitlePreferences: UserDefaultsTicketTitlePreferences(suiteName: data.defaultsSuite),
       diagnostics: diagnostics,
       collectDiagnostics: { model in
         await Self.snapshot(
@@ -607,6 +609,8 @@ public final class AppEnvironment {
     let notes: URL
     let journal: URL
     let templates: URL
+    /// The ticket resolvers (#89).
+    let ticketResolvers: URL
     let usage: URL
     let logs: URL
     /// The names given to groups (#27).
@@ -633,6 +637,7 @@ public final class AppEnvironment {
         notes: FileSessionNotesStore.defaultDirectory(),
         journal: FileSessionJournalStore.defaultDirectory(),
         templates: FilePromptTemplateRepository.defaultStoreURL(),
+        ticketResolvers: FileTicketResolverRepository.defaultStoreURL(),
         usage: UsageStorage.defaultDirectory(),
         logs: DiagnosticsLocation.standard().directory,
         folders: FileFolderLabelStore.defaultURL(),
@@ -647,6 +652,7 @@ public final class AppEnvironment {
       notes: folder.appendingPathComponent("Notes", isDirectory: true),
       journal: folder.appendingPathComponent("Journal", isDirectory: true),
       templates: folder.appendingPathComponent("templates.json"),
+      ticketResolvers: folder.appendingPathComponent("ticket-resolvers.json"),
       usage: folder.appendingPathComponent("Usage", isDirectory: true),
       logs: folder.appendingPathComponent("Logs", isDirectory: true),
       folders: folder.appendingPathComponent("folders.json"),

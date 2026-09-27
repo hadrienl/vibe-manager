@@ -23,6 +23,7 @@ struct SessionContextInspector: View {
   private let agentNames: [String: String]
   private let switchAgent: (() -> Void)?
   private let notes: NotesModel?
+  private let ticketTitles: TicketTitlesModel?
   private let leaveNotes: () -> Void
   private let usage: UsageModel?
   private let journal: SessionJournalModel?
@@ -40,6 +41,7 @@ struct SessionContextInspector: View {
     agentNames: [String: String] = [:],
     switchAgent: (() -> Void)? = nil,
     notes: NotesModel? = nil,
+    ticketTitles: TicketTitlesModel? = nil,
     leaveNotes: @escaping () -> Void = {},
     usage: UsageModel? = nil,
     journal: SessionJournalModel? = nil
@@ -47,6 +49,7 @@ struct SessionContextInspector: View {
     self.session = session
     self.journal = journal
     self.notes = notes
+    self.ticketTitles = ticketTitles
     self.leaveNotes = leaveNotes
     self.usage = usage
     self.resolution = resolution
@@ -148,7 +151,9 @@ extension SessionContextInspector {
       summary: AnyView(NotesSummary(document: document)),
       accessory: AnyView(NotesStateLabel(document: document)),
       content: AnyView(
-        SessionNotesSection(session: session, document: document, notes: notes, leave: leaveNotes)),
+        SessionNotesSection(
+          session: session, document: document, notes: notes, ticketTitles: ticketTitles,
+          leave: leaveNotes)),
       accessibilityIdentifier: "inspector-notes-section"
     )
   }
