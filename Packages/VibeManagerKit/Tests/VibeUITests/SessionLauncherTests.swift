@@ -122,6 +122,25 @@ struct SessionLauncherTests {
     #expect(spec.environment["TERM_PROGRAM"] == "VibeManager")
   }
 
+  @Test("An agent's terminal has a UTF-8 locale when the application inherited none")
+  func agentTerminalHasALocale() {
+    func spec(_ environment: [String: String]) -> TerminalSpec {
+      TerminalSpec.agent(
+        plan: AgentLaunchPlan(
+          providerID: AgentProviderID("stub"),
+          executablePath: "/usr/bin/true",
+          arguments: [],
+          environment: environment,
+          workingDirectoryPath: "/workspace",
+          promptDelivery: .none
+        )
+      )
+    }
+
+    #expect(spec([:]).environment["LANG"] == "en_US.UTF-8")
+    #expect(spec(["LANG": "fr_FR.UTF-8"]).environment["LANG"] == "fr_FR.UTF-8")
+  }
+
   @Test("A created session is published and selected even when its launch fails")
   func creationSurvivesAFailedLaunch() async {
     let session = storedSession()

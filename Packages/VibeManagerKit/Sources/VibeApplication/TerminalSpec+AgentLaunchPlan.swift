@@ -26,9 +26,9 @@ extension TerminalSpec {
     return TerminalSpec(
       executableURL: plan.executableURL,
       arguments: plan.arguments,
-      environment: plan.environment.merging(TerminalEnvironment.capabilities) { _, capability in
-        capability
-      },
+      environment: TerminalEnvironment.withLocale(
+        plan.environment.merging(TerminalEnvironment.capabilities) { _, capability in capability }
+      ),
       workingDirectoryURL: plan.workingDirectoryURL,
       initialSize: size,
       initialInput: initialInput,
