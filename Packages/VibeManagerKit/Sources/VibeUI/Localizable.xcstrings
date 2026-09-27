@@ -5009,6 +5009,16 @@
         }
       }
     },
+    "Copy as Markdown" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier en Markdown"
+          }
+        }
+      }
+    },
     "Cost" : {
       "comment" : "A session's usage: what it cost.",
       "localizations" : {

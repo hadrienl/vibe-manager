@@ -4,27 +4,46 @@ import VibeApplication
 
 /// A message's Markdown, block by block (#38).
 ///
-/// Each block is its own view, so that a long answer is laid out lazily with the rest of the
-/// conversation, and its text is selectable. Selection does not cross blocks — SwiftUI cannot on
-/// macOS 14 — which the message's Copy command makes up for.
+/// Its prose — headings, paragraphs, lists and quotes that follow one another — is one text view,
+/// selectable from one paragraph to the next (`MarkdownProse`); code blocks, tables and rules are
+/// views of their own between them. A selection does not cross those, nor go from one message to
+/// the next: the message's Copy as Markdown makes up for it.
 struct MarkdownView: View {
   let text: String
-  @Environment(\.conversationTheme) private var theme
-  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
-    let blocks = MarkdownCache.shared.blocks(for: text)
-    VStack(alignment: .leading, spacing: appearance.density == .compact ? 6 : 10) {
-      ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-        MarkdownBlockView(block: block)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    MarkdownBlocksView(blocks: MarkdownCache.shared.blocks(for: text), markdown: text)
+      .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
+/// Blocks, their prose gathered into text views.
+struct MarkdownBlocksView: View {
+  let blocks: [MarkdownBlock]
+  let markdown: String
+  var spacing: Double?
+  var secondary = false
+  @Environment(\.conversationAppearance) private var appearance
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: spacing ?? (appearance.density == .compact ? 6 : 10)) {
+      ForEach(Array(MarkdownProse.segments(blocks).enumerated()), id: \.offset) { _, segment in
+        switch segment {
+        case .prose(let blocks):
+          MarkdownTextView(blocks: blocks, markdown: markdown, secondary: secondary)
+        case .block(let block):
+          MarkdownBlockView(block: block, markdown: markdown, secondary: secondary)
+        }
+      }
+    }
+  }
+}
+
+/// A block that is not only prose: a code block, a table, a rule, or a list or a quote holding one.
 struct MarkdownBlockView: View {
   let block: MarkdownBlock
+  let markdown: String
+  var secondary = false
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -32,29 +51,15 @@ struct MarkdownBlockView: View {
 
   var body: some View {
     switch block {
-    case .heading(let level, let runs):
-      let scale = level == 1 ? 1.35 : level == 2 ? 1.2 : 1.08
-      Text(MarkdownDocument.attributed(runs, theme: theme, size: size * scale, weight: .bold))
-        .foregroundStyle(theme.text.color)
-        .textSelection(.enabled)
-        .padding(.top, 4)
-        .accessibilityAddTraits(.isHeader)
-    case .paragraph(let runs):
-      Text(MarkdownDocument.attributed(runs, theme: theme, size: size))
-        .foregroundStyle(theme.text.color)
-        .lineSpacing(size * 0.25)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
+    case .heading, .paragraph:
+      MarkdownTextView(blocks: [block], markdown: markdown, secondary: secondary)
     case .list(let ordered, let start, let items):
       VStack(alignment: .leading, spacing: 4) {
         ForEach(Array(items.enumerated()), id: \.offset) { index, item in
           HStack(alignment: .firstTextBaseline, spacing: 8) {
             marker(ordered: ordered, number: start + index, checkbox: item.checkbox)
-            VStack(alignment: .leading, spacing: 4) {
-              ForEach(Array(item.blocks.enumerated()), id: \.offset) { _, child in
-                MarkdownBlockView(block: child)
-              }
-            }
+            MarkdownBlocksView(
+              blocks: item.blocks, markdown: markdown, spacing: 4, secondary: secondary)
           }
         }
       }
@@ -63,12 +68,7 @@ struct MarkdownBlockView: View {
         RoundedRectangle(cornerRadius: 1.5)
           .fill(theme.border.color)
           .frame(width: 3)
-        VStack(alignment: .leading, spacing: 6) {
-          ForEach(Array(blocks.enumerated()), id: \.offset) { _, child in
-            MarkdownBlockView(block: child)
-          }
-        }
-        .foregroundStyle(theme.secondaryText.color)
+        MarkdownBlocksView(blocks: blocks, markdown: markdown, spacing: 6, secondary: true)
       }
     case .code(let language, let code):
       CodeBlockView(language: language, code: code)
