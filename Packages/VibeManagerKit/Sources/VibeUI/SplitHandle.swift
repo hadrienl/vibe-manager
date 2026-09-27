@@ -26,7 +26,9 @@ struct SplitHandle: View {
   let onChange: (Double) -> Void
   /// Once the drag, or a step, is over: where a handle that only shows its length while it moves
   /// writes it for good.
-  var onEnded: () -> Void = {}
+  var onEnded: () -> Void = {
+    // Nothing by default: the web view's width is written as it changes.
+  }
   var onDoubleClick: (() -> Void)?
 
   @State private var dragged: Double?
@@ -42,12 +44,13 @@ struct SplitHandle: View {
 
   var body: some View {
     let isActive = isHovering || dragged != nil || isFocused
+    let line: CGFloat = isActive ? 3 : 1
     ZStack {
       Color.clear
       Rectangle()
         .fill(isActive ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor))
-        .frame(width: axis == .horizontal ? (isActive ? 3 : 1) : nil)
-        .frame(height: axis == .vertical ? (isActive ? 3 : 1) : nil)
+        .frame(width: axis == .horizontal ? line : nil)
+        .frame(height: axis == .vertical ? line : nil)
     }
     .frame(width: axis == .horizontal ? Self.thickness : nil)
     .frame(height: axis == .vertical ? Self.thickness : nil)
