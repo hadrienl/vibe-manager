@@ -2450,6 +2450,10 @@ public final class AppModel {
     if let folder {
       Task { await model.folderChosen(folder) }
     }
+    // Loaded from here, as the Switch Agent sheet is, and not only from the sheet's `.task`: the
+    // agents the launch detected are offered whether or not SwiftUI runs it (#132). The sheet
+    // still awaits the same load before placing the caret.
+    Task { await model.load() }
     newSessionModel = model
     isPresentingNewSession = true
   }
