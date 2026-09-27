@@ -20,11 +20,14 @@ public struct TerminalPaneView: View {
   private let statusAccessory: AnyView?
   /// See `TerminalSurface.claimsKeyboardOnActivation`.
   private let claimsKeyboardOnActivation: Bool
+  /// See `TerminalStatusBar.restart`.
+  private let restart: (() -> Void)?
 
   public init(
     model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
     accessibilityTitle: String? = nil, showsStatusBar: Bool = true,
-    statusAccessory: AnyView? = nil, claimsKeyboardOnActivation: Bool = true
+    statusAccessory: AnyView? = nil, claimsKeyboardOnActivation: Bool = true,
+    restart: (() -> Void)? = nil
   ) {
     self.model = model
     self.autoStart = autoStart
@@ -33,6 +36,7 @@ public struct TerminalPaneView: View {
     self.showsStatusBar = showsStatusBar
     self.statusAccessory = statusAccessory
     self.claimsKeyboardOnActivation = claimsKeyboardOnActivation
+    self.restart = restart
   }
 
   public var body: some View {
@@ -72,7 +76,7 @@ public struct TerminalPaneView: View {
 
       if showsStatusBar {
         Divider()
-        TerminalStatusBar(pane: model, accessory: statusAccessory)
+        TerminalStatusBar(pane: model, accessory: statusAccessory, restart: restart)
       }
     }
     .task {
@@ -87,17 +91,31 @@ public struct TerminalPaneView: View {
 public struct TerminalStatusBar: View {
   private let pane: TerminalPaneModel
   private let accessory: AnyView?
+  /// What Restart does. Left out, the pane starts its process again exactly as it was launched.
+  /// An agent's terminal must not (#138): its command line names a conversation that exists by
+  /// now — `claude --session-id` then refuses it as already in use — and nothing the app watches
+  /// a launch with would be armed. It is given the session's own restart instead.
+  private let restartAction: (() -> Void)?
 
-  public init(pane: TerminalPaneModel, accessory: AnyView? = nil) {
+  public init(
+    pane: TerminalPaneModel, accessory: AnyView? = nil, restart: (() -> Void)? = nil
+  ) {
     self.pane = pane
     self.accessory = accessory
+    self.restartAction = restart
   }
 
   private var status: TerminalPaneModel.Status { pane.status }
 
   private func stop() { Task { await pane.stop() } }
 
-  private func restart() { Task { await pane.start() } }
+  private func restart() {
+    if let restartAction {
+      restartAction()
+    } else {
+      Task { await pane.start() }
+    }
+  }
 
   public var body: some View {
     HStack(spacing: 8) {
