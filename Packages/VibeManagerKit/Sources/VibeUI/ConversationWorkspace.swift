@@ -38,7 +38,7 @@ public final class ConversationWorkspace {
   }
 
   /// The providers whose transcripts can be read, by provider identifier.
-  public private(set) var readableAgents: [String: Agent] = [:]
+  public internal(set) var readableAgents: [String: Agent] = [:]
   private var models: [SessionID: ConversationModel] = [:]
   /// Most recent last.
   public private(set) var mountedSessionIDs: [SessionID] = []
@@ -51,6 +51,10 @@ public final class ConversationWorkspace {
   /// Which follow is the current one for a session: a stream that arrives after its model was
   /// let go of, or after a newer one was asked for, is dropped — and stops its reader with it.
   @ObservationIgnored private var generations: [SessionID: Int] = [:]
+
+  /// A session whose composer was asked for the keyboard before its model existed (#105): the
+  /// model is only made once the view that shows it asks, after the switch that asked.
+  @ObservationIgnored private var pendingComposerFocus: SessionID?
 
   /// Hooks the models up to the session's terminal: writing to it, reading whether it runs,
   /// bringing it forward.
@@ -98,6 +102,10 @@ public final class ConversationWorkspace {
       model.appearance = appearance
       models[session.id] = model
       connect?(model, session)
+      if pendingComposerFocus == session.id {
+        pendingComposerFocus = nil
+        model.requestComposerFocus()
+      }
     }
     if let state = dormantActivities.removeValue(forKey: session.id) {
       apply(state, to: model)
@@ -123,6 +131,25 @@ public final class ConversationWorkspace {
     mountedSessionIDs.append(session.id)
     evict()
     return model
+  }
+
+  /// Asks for the session's composer to take the keyboard, now or as soon as its model exists.
+  /// False when the composer is known to be closed: nothing would take the keyboard.
+  @discardableResult
+  public func requestComposerFocus(for id: SessionID) -> Bool {
+    guard let model = models[id] else {
+      pendingComposerFocus = id
+      return true
+    }
+    pendingComposerFocus = nil
+    guard model.acceptsInput else { return false }
+    model.requestComposerFocus()
+    return true
+  }
+
+  /// A request still waiting for a model is dropped once the user is elsewhere.
+  func cancelPendingComposerFocus(unless id: SessionID?) {
+    if pendingComposerFocus != id { pendingComposerFocus = nil }
   }
 
   /// The model if one is kept, without creating it.
@@ -159,6 +186,7 @@ public final class ConversationWorkspace {
     generations[id] = nil
     dormantSessionIDs.removeAll { $0 == id }
     dormantActivities[id] = nil
+    if pendingComposerFocus == id { pendingComposerFocus = nil }
     // What was said lives only as long as a model holds it (ADR 0025).
     MarkdownCache.shared.removeAll()
     mountedSessionIDs.removeAll { $0 == id }

@@ -25,8 +25,10 @@ extension AppModel {
     return drawn + missing
   }
 
-  /// What the list asks for after a click, a ⇧-click, a ⌘-click or ⌘A.
-  public func selectFromList(_ ids: Set<SessionID>) {
+  /// What the list asks for after a click, a ⇧-click, a ⌘-click or ⌘A — or an arrow key,
+  /// `byKeyboard`: the session reached then leaves the keyboard in the list (#105).
+  public func selectFromList(_ ids: Set<SessionID>, byKeyboard: Bool = false) {
+    defer { if byKeyboard { keepsKeyboardInSidebar = true } }
     var ids = ids
     // The outline view drops the selection of a row it folds away: folding the group of the
     // session on screen must keep it, as `selectFromList(_: SessionID?)` does.

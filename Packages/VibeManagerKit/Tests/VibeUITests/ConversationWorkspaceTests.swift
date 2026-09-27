@@ -3,6 +3,7 @@ import Testing
 import VibeApplication
 import VibeDomain
 
+@testable import VibeConversationUI
 @testable import VibeUI
 
 @MainActor
@@ -34,6 +35,35 @@ struct ConversationWorkspaceTests {
     for session in listed { workspace.show(session) }
     #expect(workspace.existingModel(for: listed[0].id) == nil)
     #expect(workspace.existingModel(for: listed[1].id) != nil)
+  }
+
+  @Test("A request for the composer made before its model exists is handed to it (#105)")
+  func pendingFocus() {
+    let workspace = ConversationWorkspace()
+    let listed = sessions(2)
+    #expect(workspace.requestComposerFocus(for: listed[0].id))
+    #expect(workspace.existingModel(for: listed[0].id) == nil)
+    let other = workspace.show(listed[1])
+    #expect(other.focusComposerRequest == 0)
+    let model = workspace.show(listed[0])
+    #expect(model.focusComposerRequest == 1)
+    #expect(model.takePendingFocusRequest())
+    // Handed over once: shown again, it asks for nothing.
+    workspace.show(listed[0])
+    #expect(model.focusComposerRequest == 1)
+  }
+
+  @Test("A request still waiting is dropped once the user is elsewhere, or the session gone")
+  func pendingFocusDropped() {
+    let workspace = ConversationWorkspace()
+    let listed = sessions(2)
+    workspace.requestComposerFocus(for: listed[0].id)
+    workspace.cancelPendingComposerFocus(unless: listed[1].id)
+    #expect(workspace.show(listed[0]).focusComposerRequest == 0)
+
+    workspace.requestComposerFocus(for: listed[1].id)
+    workspace.release(listed[1].id)
+    #expect(workspace.show(listed[1]).focusComposerRequest == 0)
   }
 
   @Test("A dormant conversation takes the last activity when it is shown again")

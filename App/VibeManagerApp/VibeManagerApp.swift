@@ -243,8 +243,9 @@ struct VibeManagerApp: App {
         .keyboardShortcut("a", modifiers: [.command, .option])
         .disabled(!environment.appModel.isLoaded)
 
-        Button("Focus Terminal") {
-          environment.appModel.focusTerminal()
+        // The session in the form it is shown in: its terminal, or its composer (#105).
+        Button("Focus Session") {
+          environment.appModel.focusSession()
         }
         .keyboardShortcut("2", modifiers: [.command, .option])
         .disabled(environment.appModel.selectedSessionID == nil)

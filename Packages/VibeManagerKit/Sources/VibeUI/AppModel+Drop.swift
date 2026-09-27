@@ -183,7 +183,7 @@ extension AppModel {
       if !files.isEmpty {
         conversation.attach(files)
       } else {
-        conversation.focusComposerRequest += 1
+        conversation.requestComposerFocus()
       }
       Announcer.announce(
         String(

@@ -201,6 +201,8 @@ public struct RootView: View {
   /// floor: stacked, a ⌘N pressed while the launch step is up left the model believing the New
   /// Session sheet was open and the user looking at nothing. Ordered rather than exclusive, so
   /// that ⌘N is not lost either — the step is answered first, and the sheet it delayed opens next.
+  ///
+  /// `AppModel.isPresentingSheet` asks the same questions: a new one goes in both.
   private var presentedSheet: RootSheet? {
     if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
     if model.isPresentingNewSession { return .newSession }
@@ -407,7 +409,7 @@ public struct RootView: View {
                   get: { model.layout.showsBrowserWhenAlternating },
                   set: { showsBrowser in
                     model.layout.setShowsBrowserWhenAlternating(showsBrowser)
-                    if !showsBrowser { model.focusTerminal() }
+                    if !showsBrowser { model.focusSession() }
                   })
               ) {
                 Text("Terminal", bundle: .module).tag(false)
@@ -484,7 +486,7 @@ public struct RootView: View {
                 ? { model.beginAgentSwitch(session.id) } : nil,
               notes: model.notes,
               ticketTitles: model.ticketTitles,
-              leaveNotes: { model.focusTerminal() },
+              leaveNotes: { model.focusSession() },
               usage: model.usage,
               journal: model.journal
             )
@@ -904,7 +906,8 @@ public struct RootView: View {
           VStack(spacing: 0) {
             ConversationView(
               model: conversation, theme: conversationTheme,
-              appearance: model.conversations.appearance
+              appearance: model.conversations.appearance, isActive: isActive,
+              claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation
             )
             // The terminal's bar, and its button of the drawer, whichever form the session is
             // shown in.

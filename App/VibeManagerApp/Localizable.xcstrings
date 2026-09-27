@@ -315,22 +315,22 @@
         }
       }
     },
+    "Focus Session" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aller à la session"
+          }
+        }
+      }
+    },
     "Focus Sidebar" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aller à la barre latérale"
-          }
-        }
-      }
-    },
-    "Focus Terminal" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aller au terminal"
           }
         }
       }

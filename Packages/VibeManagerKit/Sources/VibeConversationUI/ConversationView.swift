@@ -12,17 +12,24 @@ public struct ConversationView: View {
   @Bindable var model: ConversationModel
   let theme: ConversationTheme
   let appearance: ConversationAppearance
+  /// Whether this is the session on screen: every conversation shown lately stays mounted.
+  let isActive: Bool
+  /// Whether the composer takes the keyboard when its session comes on screen (#105).
+  let claimsKeyboardOnActivation: Bool
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
 
   private static let bottomID = "conversation.bottom"
 
   public init(
-    model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance
+    model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance,
+    isActive: Bool = true, claimsKeyboardOnActivation: Bool = true
   ) {
     self.model = model
     self.theme = theme
     self.appearance = appearance
+    self.isActive = isActive
+    self.claimsKeyboardOnActivation = claimsKeyboardOnActivation
   }
 
   public var body: some View {
@@ -39,20 +46,35 @@ public struct ConversationView: View {
             .font(.system(size: 28))
           Text("\(name) has not written anything yet.", bundle: .module)
         }
-        footer
       case .unsupported, .noAgent:
         placeholder {
           Text("This session has no readable conversation.", bundle: .module)
         }
       default:
         conversation
-        footer
       }
+      // Outside the switch: the first prompt sent turns the empty conversation into a list, and a
+      // composer drawn in each case would be a new one then, the keyboard dropped with the old
+      // one (#105).
+      if showsComposer { footer }
     }
     .background(theme.background.color)
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)
+    // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
+    // then, never for a message that arrives or a state that changes. Asked of the model rather
+    // than of the composer, which is drawn again whenever the conversation changes shape.
+    .onAppear { if isActive { claimKeyboardOnActivation() } }
+    .onChange(of: isActive) { _, isActive in
+      if isActive {
+        claimKeyboardOnActivation()
+      } else {
+        // Put away before its composer could take it — the conversation still being read — a
+        // request is dropped: shown again later, the session must not act on it.
+        _ = model.takePendingFocusRequest()
+      }
+    }
     .onChange(of: model.pendingCall?.callID) { _, id in
       guard id != nil else { return }
       let said =
@@ -61,6 +83,18 @@ public struct ConversationView: View {
         : String(localized: "\(model.agentName) asks for your permission", bundle: .module)
       AccessibilityNotification.Announcement(said).post()
     }
+  }
+
+  /// Everywhere but while a conversation not read yet is loading, or one that cannot be read.
+  private var showsComposer: Bool {
+    switch model.snapshot.availability {
+    case .loading where model.blocks.isEmpty, .unsupported, .noAgent: false
+    default: true
+    }
+  }
+
+  private func claimKeyboardOnActivation() {
+    if claimsKeyboardOnActivation { model.requestComposerFocus() }
   }
 
   private var spacing: Double { appearance.density == .compact ? 10 : 18 }
@@ -162,7 +196,7 @@ public struct ConversationView: View {
           }
         }
       }
-      PromptComposer(model: model)
+      PromptComposer(model: model, isActive: isActive)
     }
     .frame(maxWidth: 820)
     .padding(.horizontal, 32)
