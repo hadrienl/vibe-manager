@@ -30,12 +30,17 @@ A page's title is read — `og:title`, then `twitter:title`, then `<title>` — 
 
 - the page answered with a 2xx status (`BrowserTabModel.mainFrameStatus`, taken from the main
   frame's response);
-- the address the page ended on is recognised again, by the same resolver, as the same ticket.
+- the address of the document — `location.href`, read by the same script as the titles, since a
+  single-page application moves without a navigation — is recognised again, by the same resolver,
+  as the same ticket.
 
 A sign-in page, a 401 or 403, or a redirection to another ticket is therefore never read as the
 ticket. The reading waits there instead, without a time limit, and the notes say « Sign in to … in
 the web view », with Show Tab. Once the user signs in and the site sends them back, the title is
-read. A 404 or 410 says the ticket is missing, or not visible to the account signed in.
+read; the other tabs of that site waiting on a sign-in page go back to their ticket. A 404 or 410
+is waited out the same way — GitHub answers 404 to a visitor of a private repository — and says
+the ticket is missing, or visible only once signed in, with Show Tab. Each ticket's tab is
+remembered, so that Show Tab and Try Again find it wherever a sign-in page took it.
 
 A single-page application writes its title after loading: a title is taken once it has not changed
 for 0.8 s, and a title that is empty, or only the resolver's name once cleaned (« Linear »), is not
