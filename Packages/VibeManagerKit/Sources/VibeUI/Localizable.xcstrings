@@ -4923,6 +4923,16 @@
         }
       }
     },
+    "Creating the session…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Création de la session…"
+          }
+        }
+      }
+    },
     "Day" : {
       "localizations" : {
         "fr" : {
@@ -10070,6 +10080,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Démarrage"
+          }
+        }
+      }
+    },
+    "Starting the agent…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage de l’agent…"
           }
         }
       }

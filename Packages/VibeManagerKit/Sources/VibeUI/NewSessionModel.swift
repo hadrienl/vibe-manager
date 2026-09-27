@@ -441,6 +441,18 @@ public final class NewSessionModel {
     issues = found
   }
 
+  /// Whether the draft fails the checks it can answer alone, which are then shown. Those cost
+  /// nothing, so they are asked with the sheet still open; the rest waits for `submit()`.
+  public func refusesBeforeCreating() async -> Bool {
+    guard !isSubmitting else { return true }
+    guard !draft.validate().isEmpty else { return false }
+    revalidation?.cancel()
+    revalidation = nil
+    hasSubmitted = true
+    await revalidate()
+    return true
+  }
+
   /// Returns the created session and the plan to launch, or `nil` when the draft was refused.
   public func submit() async -> SessionCreation? {
     guard !isSubmitting else { return nil }

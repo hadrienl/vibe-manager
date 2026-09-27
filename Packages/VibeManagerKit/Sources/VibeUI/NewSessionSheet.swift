@@ -18,20 +18,22 @@ public struct NewSessionSheet: View {
     case templateField(String)
   }
 
-  /// The session, and whether to launch it now or leave it in To Do (#80).
-  private let created: (SessionCreation, Bool) -> Void
+  /// Create was pressed on a draft that passes its own checks: whether to launch the session now
+  /// or leave it in To Do (#80). The rest — the folder, the agent, the store — is checked with the
+  /// sheet closed, and a refusal brings it back.
+  private let submitted: (Bool) -> Void
   private let cancelled: () -> Void
   /// Opens the templates in the settings. `nil`: the sheet offers no way there.
   private let manageTemplates: (() -> Void)?
 
   public init(
     model: NewSessionModel,
-    created: @escaping (SessionCreation, Bool) -> Void,
+    submitted: @escaping (Bool) -> Void,
     cancelled: @escaping () -> Void,
     manageTemplates: (() -> Void)? = nil
   ) {
     _model = Bindable(model)
-    self.created = created
+    self.submitted = submitted
     self.cancelled = cancelled
     self.manageTemplates = manageTemplates
   }
@@ -47,7 +49,10 @@ public struct NewSessionSheet: View {
     .frame(width: 640, height: 760)
     .task {
       await model.load()
-      moveFocus(to: model.draft.templateFill.flatMap(firstEmptyField) ?? .draft(.name))
+      // Back from a creation that was refused: the caret goes to what stopped it.
+      moveFocus(
+        to: firstIssueTarget ?? model.draft.templateFill.flatMap(firstEmptyField)
+          ?? .draft(.name))
     }
   }
 
@@ -572,19 +577,21 @@ public struct NewSessionSheet: View {
 
   private func submit(launching: Bool) {
     Task {
-      guard let creation = await model.submit() else {
-        let target =
-          model.issues.lazy.compactMap { issue -> FocusTarget? in
-            if issue.field == .templateField, let key = issue.fieldKey {
-              return .templateField(key)
-            }
-            return Self.focusableFields.contains(issue.field) ? .draft(issue.field) : nil
-          }.first
-        moveFocus(to: target)
+      guard await model.refusesBeforeCreating() else {
+        submitted(launching)
         return
       }
-      created(creation, launching)
+      moveFocus(to: firstIssueTarget)
     }
+  }
+
+  private var firstIssueTarget: FocusTarget? {
+    model.issues.lazy.compactMap { issue -> FocusTarget? in
+      if issue.field == .templateField, let key = issue.fieldKey {
+        return .templateField(key)
+      }
+      return Self.focusableFields.contains(issue.field) ? .draft(issue.field) : nil
+    }.first
   }
 
   private func pickSymbol(_ symbol: String) {
