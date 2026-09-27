@@ -57,88 +57,114 @@ enum UsagePresentation {
   }
 
   /// "2 starts · 5 resumes (2 after relaunch) · 1 new process · 1 switch".
-  static func runs(_ counts: UsageRunCounts) -> String {
+  static func runs(_ counts: UsageRunCounts, locale: Locale = .current) -> String {
+    runParts(counts, locale: locale).joined(separator: " · ")
+  }
+
+  /// The runs said in parts, each short enough for a line of its own in a narrow column.
+  static func runParts(_ counts: UsageRunCounts, locale: Locale = .current) -> [String] {
     guard counts.total > 0 else {
-      return String(
-        localized: "None recorded", bundle: .module, comment: "No run of an agent was recorded.")
+      return [
+        String(
+          localized: LocalizedStringResource(
+            "None recorded", locale: locale, bundle: .module,
+            comment: "No run of an agent was recorded."))
+      ]
     }
     var parts: [String] = []
     if counts.starts > 0 {
       parts.append(
         String(
-          localized: "\(counts.starts) starts", bundle: .module,
-          comment: "How many times an agent was started for the first time."))
+          localized: LocalizedStringResource(
+            "\(counts.starts) starts", locale: locale, bundle: .module,
+            comment: "How many times an agent was started for the first time.")))
     }
     if counts.resumes > 0 {
       parts.append(
         String(
-          localized: "\(counts.resumes) resumes", bundle: .module,
-          comment: "How many times an agent resumed its conversation."))
+          localized: LocalizedStringResource(
+            "\(counts.resumes) resumes", locale: locale, bundle: .module,
+            comment: "How many times an agent resumed its conversation.")))
     }
     if counts.restarts > 0 {
       parts.append(
         String(
-          localized: "\(counts.restarts) new processes", bundle: .module,
-          comment: "How many times an agent was restarted without resuming its conversation."))
+          localized: LocalizedStringResource(
+            "\(counts.restarts) new processes", locale: locale, bundle: .module,
+            comment: "How many times an agent was restarted without resuming its conversation.")))
     }
-    var sentence = parts.joined(separator: " · ")
-    if counts.afterRelaunch > 0 {
-      sentence += String(
-        localized: " (\(counts.afterRelaunch) after relaunch)", bundle: .module,
-        comment:
-          "How many of the resumes followed a relaunch of Vibe Manager. Keep the leading space.")
+    if counts.afterRelaunch > 0, let last = parts.indices.last {
+      parts[last] += String(
+        localized: LocalizedStringResource(
+          " (\(counts.afterRelaunch) after relaunch)", locale: locale, bundle: .module,
+          comment:
+            "How many of the resumes followed a relaunch of Vibe Manager. Keep the leading space."))
     }
     if counts.afterSwitch > 0 {
-      sentence +=
-        " · "
-        + String(
-          localized: "\(counts.afterSwitch) switches", bundle: .module,
-          comment: "How many times the session's agent was switched.")
+      parts.append(
+        String(
+          localized: LocalizedStringResource(
+            "\(counts.afterSwitch) switches", locale: locale, bundle: .module,
+            comment: "How many times the session's agent was switched.")))
     }
-    return sentence
+    return parts
   }
 
-  static func tokenSummary(_ tokens: TokenCounts) -> String {
+  static func tokenSummary(_ tokens: TokenCounts, locale: Locale = .current) -> String {
+    tokenParts(tokens, locale: locale).joined(separator: " · ")
+  }
+
+  /// The tokens said in parts, each short enough for a line of its own in a narrow column.
+  static func tokenParts(_ tokens: TokenCounts, locale: Locale = .current) -> [String] {
     var parts = [
       String(
-        localized: "\(Self.tokens(tokens.input)) in", bundle: .module,
-        comment: "Input tokens, abbreviated: “12.3 k in”."),
+        localized: LocalizedStringResource(
+          "\(Self.tokens(tokens.input)) in", locale: locale, bundle: .module,
+          comment: "Input tokens, abbreviated: “12.3 k in”.")),
       String(
-        localized: "\(Self.tokens(tokens.output)) out", bundle: .module,
-        comment: "Output tokens, abbreviated: “4.5 k out”."),
+        localized: LocalizedStringResource(
+          "\(Self.tokens(tokens.output)) out", locale: locale, bundle: .module,
+          comment: "Output tokens, abbreviated: “4.5 k out”.")),
     ]
     if tokens.cacheRead > 0 {
       parts.append(
         String(
-          localized: "\(Self.tokens(tokens.cacheRead)) cache read", bundle: .module,
-          comment: "Tokens read from the cache, abbreviated: “1.2 M cache read”."))
+          localized: LocalizedStringResource(
+            "\(Self.tokens(tokens.cacheRead)) cache read", locale: locale, bundle: .module,
+            comment: "Tokens read from the cache, abbreviated: “1.2 M cache read”.")))
     }
     if tokens.cacheWrite > 0 {
       parts.append(
         String(
-          localized: "\(Self.tokens(tokens.cacheWrite)) cache write", bundle: .module,
-          comment: "Tokens written to the cache, abbreviated: “80.0 k cache write”."))
+          localized: LocalizedStringResource(
+            "\(Self.tokens(tokens.cacheWrite)) cache write", locale: locale, bundle: .module,
+            comment: "Tokens written to the cache, abbreviated: “80.0 k cache write”.")))
     }
-    return parts.joined(separator: " · ")
+    return parts
   }
 
-  static func unavailable(_ reason: UsageUnavailability) -> String {
+  static func unavailable(_ reason: UsageUnavailability, locale: Locale = .current) -> String {
     switch reason {
     case .notReportedByAgent:
       return String(
-        localized: "Not reported by this agent", bundle: .module,
-        comment: "Why a usage figure is missing.")
+        localized: LocalizedStringResource(
+          "Not reported by this agent", locale: locale, bundle: .module,
+          comment: "Why a usage figure is missing."))
     case .noTranscript:
       return String(
-        localized: "No transcript found", bundle: .module, comment: "Why a usage figure is missing."
-      )
+        localized: LocalizedStringResource(
+          "No transcript found", locale: locale, bundle: .module,
+          comment: "Why a usage figure is missing."))
     case .notReliable:
       return String(
-        localized: "Not available", bundle: .module, comment: "Why a usage figure is missing.")
+        localized: LocalizedStringResource(
+          "Not available", locale: locale, bundle: .module,
+          comment: "Why a usage figure is missing."))
     case .trackingOff:
       return String(
-        localized: "Usage tracking is off", bundle: .module,
-        comment: "Why a usage figure is missing.")
+        localized: LocalizedStringResource(
+          "Usage tracking is off", locale: locale, bundle: .module,
+          comment: "Why a usage figure is missing."))
     }
   }
 
