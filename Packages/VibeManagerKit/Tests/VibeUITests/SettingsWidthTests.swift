@@ -70,7 +70,6 @@ struct SettingsWidthTests {
   private static func visibleTabs(in window: NSWindow, width: CGFloat) -> Int {
     window.setContentSize(NSSize(width: width, height: 200))
     window.layoutIfNeeded()
-    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
     return window.toolbar?.visibleItems?.count ?? 0
   }
 }
