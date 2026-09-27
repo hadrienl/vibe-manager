@@ -32,7 +32,45 @@ struct SessionDropZone: ViewModifier {
       }
       .onDrop(
         of: DropReader.acceptedTypes,
-        delegate: SessionDropDelegate(model: model, sessionID: sessionID, hover: $hover))
+        delegate: SessionDropDelegate(model: model, sessionID: sessionID, hover: $hover)
+      )
+      .clearsWhenDragEnds(hover != nil) { hover = nil }
+      // The zone wraps every session's pane and keeps its identity from one to the next: a hover
+      // left over must not follow to the session shown next.
+      .onChange(of: sessionID) { hover = nil }
+  }
+}
+
+/// A drag in progress is a mouse button held down. SwiftUI does not always tell a drop delegate
+/// that the drag left or ended — a text view under the pointer takes it over, the views change
+/// under it — and an overlay drawn for the hover then stays on screen for good. Once the button
+/// is up, no drag can still be hovering, whatever the delegate was told.
+@MainActor
+enum DragEndWatch {
+  static let interval: Duration = .milliseconds(250)
+
+  static func isButtonDown() -> Bool { NSEvent.pressedMouseButtons & 1 != 0 }
+
+  /// Returns once the button is released, or throws when cancelled.
+  static func waitForRelease(
+    interval: Duration = DragEndWatch.interval,
+    isButtonDown: () -> Bool = { DragEndWatch.isButtonDown() },
+    sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+  ) async throws {
+    repeat {
+      try await sleep(interval)
+    } while isButtonDown()
+  }
+}
+
+extension View {
+  /// Calls `clear` when the drag behind a hover ends without its delegate hearing of it.
+  func clearsWhenDragEnds(_ isHovering: Bool, clear: @escaping @MainActor () -> Void) -> some View {
+    task(id: isHovering) {
+      guard isHovering else { return }
+      do { try await DragEndWatch.waitForRelease() } catch { return }
+      clear()
+    }
   }
 }
 
@@ -42,12 +80,13 @@ struct SessionDropDelegate: DropDelegate {
   @Binding var hover: DropHover?
 
   func dropEntered(info: DropInfo) {
-    hover = Self.hover(for: model.dropRoute(for: sessionID))
+    hover = Self.hover(
+      for: model.dropRoute(for: sessionID), isButtonDown: DragEndWatch.isButtonDown())
   }
 
   func dropUpdated(info: DropInfo) -> DropProposal? {
     let route = model.dropRoute(for: sessionID)
-    hover = Self.hover(for: route)
+    hover = Self.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
     // No "+" on the pointer: the refusal is seen before letting go.
     return DropProposal(operation: route.isRefused ? .forbidden : .copy)
   }
@@ -69,6 +108,13 @@ struct SessionDropDelegate: DropDelegate {
   static func hover(for route: SessionDropRoute) -> DropHover {
     if case .refused(let refusal) = route { return .refusing(refusal) }
     return .accepting(route)
+  }
+
+  /// No hover once the button is up. SwiftUI calls the delegate again after the drop, while the
+  /// file just attached moves the views under the dragged image: the zone came back on screen
+  /// after being cleared, and nothing cleared it a second time.
+  static func hover(for route: SessionDropRoute, isButtonDown: Bool) -> DropHover? {
+    isButtonDown ? hover(for: route) : nil
   }
 }
 
@@ -195,6 +241,12 @@ final class SpringLoading {
     pending?.task.cancel()
     pending = nil
   }
+
+  /// Whatever row the drag was over: the drag is over.
+  func cancel() {
+    pending?.task.cancel()
+    pending = nil
+  }
 }
 
 /// A drop on a row of the sidebar: the session is selected, then receives it. A drag that rests
@@ -206,19 +258,34 @@ struct SessionRowDropDelegate: DropDelegate {
   @Binding var hovered: DropHover?
 
   func dropEntered(info: DropInfo) {
+    track(model.dropRoute(for: sessionID))
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
     let route = model.dropRoute(for: sessionID)
-    hovered = SessionDropDelegate.hover(for: route)
-    guard !route.isRefused else { return }
+    // On every move too: the watch on the button may have cleared the outline, and put the row's
+    // spring away, under a drag that was still going on.
+    track(route)
+    return DropProposal(operation: route.isRefused ? .forbidden : .copy)
+  }
+
+  /// Outlines the row and, for a drop it takes, arms its spring — once: arming it again for the
+  /// same row leaves the delay running. Without a hover, the spring is put away.
+  private func track(_ route: SessionDropRoute) {
+    let hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
+    if hovered != hover { hovered = hover }
+    guard hover != nil, !route.isRefused else {
+      // Called once the button is up, or over a refused row: nothing may open it any more. The
+      // sidebar's watch would not do it — the outline cleared here is what stops that watch.
+      springLoading.exit(sessionID)
+      return
+    }
     let model = model
     let id = sessionID
     springLoading.enter(id) {
       guard model.selectedSessionID != id else { return }
       model.select(id)
     }
-  }
-
-  func dropUpdated(info: DropInfo) -> DropProposal? {
-    DropProposal(operation: model.dropRoute(for: sessionID).isRefused ? .forbidden : .copy)
   }
 
   func dropExited(info: DropInfo) {
