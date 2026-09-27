@@ -864,6 +864,11 @@ public struct RootView: View {
       isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
   }
 
+  /// The drawer's button, beside the state of the session's terminal (#43).
+  private func statusAccessory(for session: WorkSession) -> AnyView? {
+    model.terminals == nil ? nil : AnyView(DrawerStatusButton(model: model, session: session))
+  }
+
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
     let presentation = model.presentation(of: session)
@@ -879,8 +884,7 @@ public struct RootView: View {
           TerminalPaneView(
             model: pane, autoStart: false, isActive: isActive,
             accessibilityTitle: terminalTitle(for: listed, pane: pane),
-            statusAccessory: model.terminals == nil
-              ? nil : AnyView(DrawerStatusButton(model: model, session: listed))
+            statusAccessory: statusAccessory(for: listed)
           )
           .id(listed.id)
           .opacity(isActive ? 1 : 0)
@@ -897,10 +901,18 @@ public struct RootView: View {
         {
           let isActive =
             !isCovered && id == session.id && model.presentation(of: listed) == .conversation
-          ConversationView(
-            model: conversation, theme: conversationTheme,
-            appearance: model.conversations.appearance
-          )
+          VStack(spacing: 0) {
+            ConversationView(
+              model: conversation, theme: conversationTheme,
+              appearance: model.conversations.appearance
+            )
+            // The terminal's bar, and its button of the drawer, whichever form the session is
+            // shown in.
+            if let pane = model.pane(for: id) {
+              Divider()
+              TerminalStatusBar(pane: pane, accessory: statusAccessory(for: listed))
+            }
+          }
           .opacity(isActive ? 1 : 0)
           .allowsHitTesting(isActive)
           .accessibilityHidden(!isActive)

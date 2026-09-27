@@ -72,12 +72,7 @@ public struct TerminalPaneView: View {
 
       if showsStatusBar {
         Divider()
-        TerminalStatusBar(
-          status: model.status,
-          accessory: statusAccessory,
-          stop: { Task { await model.stop() } },
-          restart: { Task { await model.start() } }
-        )
+        TerminalStatusBar(pane: model, accessory: statusAccessory)
       }
     }
     .task {
@@ -87,13 +82,24 @@ public struct TerminalPaneView: View {
   }
 }
 
-private struct TerminalStatusBar: View {
-  let status: TerminalPaneModel.Status
-  let accessory: AnyView?
-  let stop: () -> Void
-  let restart: () -> Void
+/// The foot of a session's terminal: its process's state, Stop or Restart, and what the app puts
+/// beside them. Also under the conversation view, which shows the same session in another form.
+public struct TerminalStatusBar: View {
+  private let pane: TerminalPaneModel
+  private let accessory: AnyView?
 
-  var body: some View {
+  public init(pane: TerminalPaneModel, accessory: AnyView? = nil) {
+    self.pane = pane
+    self.accessory = accessory
+  }
+
+  private var status: TerminalPaneModel.Status { pane.status }
+
+  private func stop() { Task { await pane.stop() } }
+
+  private func restart() { Task { await pane.start() } }
+
+  public var body: some View {
     HStack(spacing: 8) {
       Image(systemName: status.symbolName)
         .foregroundStyle(status.tint)

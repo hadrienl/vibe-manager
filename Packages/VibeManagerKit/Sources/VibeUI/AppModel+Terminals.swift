@@ -40,8 +40,9 @@ extension AppModel {
     let wasShown = isDrawerShown
     Task {
       await drawer.toggle()
-      // The keyboard leaves a drawer put away for the agent's terminal, not for nothing.
-      if wasShown { focusTerminal() }
+      // The keyboard leaves a drawer put away for the agent — its terminal, or the composer of
+      // its conversation — not for nothing.
+      if wasShown { focusSessionContent() }
     }
   }
 

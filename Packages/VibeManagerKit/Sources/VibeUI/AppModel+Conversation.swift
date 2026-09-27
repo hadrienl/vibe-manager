@@ -22,6 +22,17 @@ extension AppModel {
     }
   }
 
+  /// Gives the keyboard to the selected session in the form it is shown in: its terminal, or the
+  /// composer of its conversation.
+  public func focusSessionContent() {
+    guard let session = selectedSession else { return }
+    if presentation(of: session) == .conversation {
+      conversations.existingModel(for: session.id)?.focusComposerRequest += 1
+    } else {
+      focusTerminal()
+    }
+  }
+
   /// View › Show Conversation / Show Terminal (⌥⌘T), for the selected session.
   public func togglePresentation() {
     guard let session = selectedSession, conversations.canShowConversation(session) else { return }
