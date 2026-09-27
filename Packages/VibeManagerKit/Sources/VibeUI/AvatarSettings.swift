@@ -79,7 +79,7 @@ struct AvatarSettings: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: 580)
+    .frame(width: SettingsView.formWidth)
     .frame(minHeight: 520)
     .task {
       await studio.refreshOptions()
