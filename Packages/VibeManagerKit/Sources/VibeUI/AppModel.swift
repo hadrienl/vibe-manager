@@ -50,8 +50,10 @@ public final class AppModel {
   }
   public private(set) var isRefreshingAgents = false
   public private(set) var selectedSessionID: SessionID?
-  public private(set) var isPresentingNewSession = false
-  public private(set) var newSessionModel: NewSessionModel?
+  public internal(set) var isPresentingNewSession = false
+  public internal(set) var newSessionModel: NewSessionModel?
+  /// The session between Create and its terminal, shown in its place meanwhile.
+  public internal(set) var sessionInCreation: SessionInCreation?
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
@@ -2269,6 +2271,7 @@ public final class AppModel {
   /// A session a folded group hides is shown: its group unfolds. The quick switcher, a new session
   /// or a banner can all land on one, and a selection nobody can see is a lost one.
   public func select(_ id: SessionID?) {
+    creationWasLeft(for: id)
     // Going to a session is choosing it alone (#77).
     selection.collapse(to: id)
     preferredSelection = nil
@@ -2287,6 +2290,7 @@ public final class AppModel {
 
   /// The multi-selection's own way in: it shows a session without undoing the selection (#77).
   func showFromSelection(_ id: SessionID?) {
+    creationWasLeft(for: id)
     preferredSelection = nil
     if id != shownArchivedSessionID { shownArchivedSessionID = nil }
     apply(selection: id)
@@ -2456,25 +2460,45 @@ public final class AppModel {
   public func complete(_ creation: SessionCreation, launching: Bool = true) async {
     isPresentingNewSession = false
     newSessionModel = nil
+    await publish(creation, launching: launching, tracked: false)
+  }
+
+  /// A session created optimistically keeps its placeholder until its terminal is there: shown
+  /// stored but not started, it would read as a closed session with nothing running in it.
+  ///
+  /// - Parameter tracked: whether this is the session `sessionInCreation` stands for.
+  func publish(_ creation: SessionCreation, launching: Bool, tracked: Bool) async {
+    let id = creation.session.id
     insert(creation.session)
-    select(creation.session.id)
+    if tracked {
+      sessionInCreation?.sessionID = id
+      sessionInCreation?.phase = .starting
+    }
+    // Unless the user went elsewhere meanwhile.
+    let isFollowed = { [weak self] in !tracked || self?.sessionInCreation?.isFollowed != false }
+    if isFollowed() {
+      select(id)
+    }
     diagnostics.record(
       .session, .info, "session.created",
       [
-        "session": diagnostics.pseudonym(creation.session.id),
+        "session": diagnostics.pseudonym(id),
         "provider": .token(AgentProviderID(creation.plan.providerID.rawValue).diagnosticToken),
       ])
-    await rememberFolder(of: creation.session)
-    guard launching, let launcher else {
-      // Shown in To Do, where it was put: the column follows what the user just made.
-      follow(creation.session.id)
-      return
+    if launching, let launcher {
+      await launcher.launch(session: creation.session, plan: creation.plan)
+      await reload()
     }
-    await launcher.launch(session: creation.session, plan: creation.plan)
-    await reload()
-    // A session created while the sidebar was on another column is In Progress by now, and it is
-    // the one the user is looking at: the column follows it rather than hiding what they made.
-    follow(creation.session.id)
+    // Shown in To Do when it was only planned; otherwise it is In Progress by now, and the column
+    // follows it rather than hiding what the user made.
+    if isFollowed() {
+      follow(id)
+    }
+    if tracked {
+      sessionInCreation = nil
+    }
+    // After the launch: the terminal does not wait for a list of folders to be written.
+    await rememberFolder(of: creation.session)
   }
 
   /// Reloads, after any reload already under way rather than instead of it.

@@ -125,9 +125,7 @@ public struct RootView: View {
         if let sheetModel = model.newSessionModel {
           NewSessionSheet(
             model: sheetModel,
-            created: { creation, launching in
-              Task { await model.complete(creation, launching: launching) }
-            },
+            submitted: { launching in model.submitNewSession(launching: launching) },
             cancelled: { model.cancelNewSession() },
             manageTemplates: {
               model.settingsTab = .templates
@@ -359,6 +357,11 @@ public struct RootView: View {
           Divider()
         }
         detail
+          .overlay {
+            if let creation = model.shownCreation {
+              SessionCreationPlaceholder(creation: creation)
+            }
+          }
       }
       .restartNowConfirmation(
         permissions: model.permissions, origin: .workspace, sessionName: model.sessionName(for:)
@@ -863,10 +866,14 @@ public struct RootView: View {
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
     let presentation = model.presentation(of: session)
+    // Under the placeholder of a session being made, nothing keeps the keyboard: typed into, the
+    // session left would take what was meant for the new one.
+    let isCovered = model.shownCreation != nil
     ZStack {
       ForEach(model.sessions) { listed in
         if let pane = model.pane(for: listed.id) {
-          let isActive = listed.id == session.id && model.presentation(of: listed) == .terminal
+          let isActive =
+            !isCovered && listed.id == session.id && model.presentation(of: listed) == .terminal
           // Started by the launcher, so switching sessions never restarts an agent.
           TerminalPaneView(
             model: pane, autoStart: false, isActive: isActive,
@@ -887,7 +894,8 @@ public struct RootView: View {
         if let conversation = model.conversations.existingModel(for: id),
           let listed = model.sessions.first(where: { $0.id == id })
         {
-          let isActive = id == session.id && model.presentation(of: listed) == .conversation
+          let isActive =
+            !isCovered && id == session.id && model.presentation(of: listed) == .conversation
           ConversationView(
             model: conversation, theme: conversationTheme,
             appearance: model.conversations.appearance

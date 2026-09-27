@@ -88,6 +88,10 @@ struct SessionSidebar: View {
     return List(
       selection: Binding(get: { model.selectedSessionIDs }, set: { model.selectFromList($0) })
     ) {
+      // At the top, where the user looks after pressing Create, whatever the order below.
+      if let creation = model.creationRow {
+        SessionCreationRow(creation: creation)
+      }
       switch model.sidebarContent {
       case .flat(let sessions):
         rows(sessions, positions: positions, width: width)
@@ -144,7 +148,7 @@ struct SessionSidebar: View {
       Text(verbatim: model.folderLabelFailure ?? "")
     }
     .overlay {
-      if model.visibleSessions.isEmpty {
+      if model.visibleSessions.isEmpty, model.creationRow == nil {
         emptyState
       }
     }
