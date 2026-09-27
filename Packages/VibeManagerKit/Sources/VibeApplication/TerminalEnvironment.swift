@@ -36,9 +36,7 @@ public enum TerminalEnvironment {
     var environment = inherited.filter { inheritedKeys.contains($0.key) }
 
     environment.merge(capabilities) { _, capability in capability }
-    if environment["LANG"] == nil, environment["LC_ALL"] == nil {
-      environment["LANG"] = "en_US.UTF-8"
-    }
+    environment = withLocale(environment)
     if environment["PATH"]?.isEmpty ?? true {
       environment["PATH"] = fallbackPath
     }
@@ -46,6 +44,17 @@ public enum TerminalEnvironment {
     for (key, value) in additions {
       environment[key] = value
     }
+    return environment
+  }
+
+  /// Gives a UTF-8 locale to an environment that names none. An application opened from the Finder
+  /// inherits no `LANG`: left so, the shell and the agent run in the `C` locale, and `pbcopy`
+  /// reads what they copy as Mac Roman — « été » lands on the clipboard as « √©t√© ».
+  public static func withLocale(_ environment: [String: String]) -> [String: String] {
+    let named = ["LANG", "LC_ALL", "LC_CTYPE"].contains { !(environment[$0] ?? "").isEmpty }
+    guard !named else { return environment }
+    var environment = environment
+    environment["LANG"] = "en_US.UTF-8"
     return environment
   }
 }

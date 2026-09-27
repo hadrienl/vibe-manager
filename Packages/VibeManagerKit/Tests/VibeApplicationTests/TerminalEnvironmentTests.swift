@@ -38,6 +38,14 @@ func environmentPreservesInheritedLocale() {
   #expect(environment["LANG"] == "fr_FR.UTF-8")
 }
 
+@Test("An empty locale counts as none, a character type alone as one")
+func environmentLocaleFallback() {
+  #expect(TerminalEnvironment.withLocale(["LANG": ""])["LANG"] == "en_US.UTF-8")
+  let characterType = TerminalEnvironment.withLocale(["LC_CTYPE": "fr_FR.UTF-8"])
+  #expect(characterType["LANG"] == nil)
+  #expect(characterType["LC_CTYPE"] == "fr_FR.UTF-8")
+}
+
 @Test("Additions override the inherited environment")
 func environmentAdditionsWin() {
   let environment = TerminalEnvironment.make(
