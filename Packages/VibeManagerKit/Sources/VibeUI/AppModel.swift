@@ -2579,12 +2579,14 @@ extension AppModel {
         comment: "Stands for a session whose name is unknown.")
   }
 
-  /// Edit Notes: the inspector is shown if it was hidden, and its editor takes the keyboard.
+  /// Edit Notes: the inspector is shown if it was hidden, the notes unfolded if they were folded,
+  /// and their editor takes the keyboard.
   public func focusNotes() {
     guard selectedSessionID != nil else { return }
     if !layout.columns.isInspectorVisible {
       layout.setInspectorVisible(true)
     }
+    layout.setSectionCollapsed(.notes, false)
     notes.requestFocus()
   }
 
@@ -2626,7 +2628,13 @@ extension AppModel {
     if !layout.columns.isInspectorVisible {
       layout.setInspectorVisible(true)
     }
-    if let journal, layout.intent.inspectorTopTab == .activity {
+    // The first of the two lists the user left unfolded; Git, unfolded, when neither is.
+    let lists: [InspectorSectionID] = journal == nil ? [.git] : [.activity, .git]
+    let arrangement = layout.inspectorSections
+    let target =
+      arrangement.order(of: lists).first { !arrangement.isCollapsed($0) } ?? .git
+    layout.setSectionCollapsed(target, false)
+    if target == .activity, let journal {
       journal.requestFocus()
     } else {
       gitInspector.requestFocus()

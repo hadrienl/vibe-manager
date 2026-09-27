@@ -2,13 +2,13 @@ import SwiftUI
 import VibeApplication
 import VibeDomain
 
-/// The right column: what this session works on, and with what.
+/// The right column: what this session works on, and with what (#66).
 ///
-/// Two panes, each scrolling on its own: Git above — one group per repository the session works
-/// in, with its branch and its changed files — and the session below, its notes first. A list of
-/// five thousand files in one scroll with the notes would push the notes out of reach.
+/// A stack of sections — the activity, Git, the notes, the agent, its usage, the prompt it started
+/// from — that the user folds, orders and sizes; `InspectorSectionStack` does all of that. This
+/// view only declares them: adding one is adding a descriptor, never touching the layout.
 ///
-/// Everything in the Git pane is what Git and the agent's transcript say, in Git's order: the
+/// Everything in the Git section is what Git and the agent's transcript say, in Git's order: the
 /// application reveals and opens files, and never acts on Git.
 struct SessionContextInspector: View {
   private let session: WorkSession
@@ -18,19 +18,14 @@ struct SessionContextInspector: View {
   private let sessionNames: [SessionID: String]
   private let refreshBranches: (() -> Void)?
   private let git: GitInspectorModel
-  private let split: Double
-  private let splitChanged: (Double) -> Void
+  private let layout: WorkspaceLayoutController
   private let openPrivacySettings: (() -> Void)?
   private let agentNames: [String: String]
   private let switchAgent: (() -> Void)?
   private let notes: NotesModel?
   private let leaveNotes: () -> Void
   private let usage: UsageModel?
-  private let isDetailsExpanded: Bool
-  private let detailsExpandedChanged: (Bool) -> Void
   private let journal: SessionJournalModel?
-  private let topTab: InspectorTopTab
-  private let topTabChanged: (InspectorTopTab) -> Void
 
   init(
     session: WorkSession,
@@ -40,29 +35,20 @@ struct SessionContextInspector: View {
     sessionNames: [SessionID: String] = [:],
     refreshBranches: (() -> Void)? = nil,
     git: GitInspectorModel,
-    split: Double = 0.6,
-    splitChanged: @escaping (Double) -> Void = { _ in },
+    layout: WorkspaceLayoutController,
     openPrivacySettings: (() -> Void)? = nil,
     agentNames: [String: String] = [:],
     switchAgent: (() -> Void)? = nil,
     notes: NotesModel? = nil,
     leaveNotes: @escaping () -> Void = {},
     usage: UsageModel? = nil,
-    isDetailsExpanded: Bool = true,
-    detailsExpandedChanged: @escaping (Bool) -> Void = { _ in },
-    journal: SessionJournalModel? = nil,
-    topTab: InspectorTopTab = .activity,
-    topTabChanged: @escaping (InspectorTopTab) -> Void = { _ in }
+    journal: SessionJournalModel? = nil
   ) {
     self.session = session
     self.journal = journal
-    self.topTab = topTab
-    self.topTabChanged = topTabChanged
     self.notes = notes
     self.leaveNotes = leaveNotes
     self.usage = usage
-    self.isDetailsExpanded = isDetailsExpanded
-    self.detailsExpandedChanged = detailsExpandedChanged
     self.resolution = resolution
     self.branchReport = branchReport
     var byPath: [String: RepositoryStatusState] = [:]
@@ -73,298 +59,334 @@ struct SessionContextInspector: View {
     self.sessionNames = sessionNames
     self.refreshBranches = refreshBranches
     self.git = git
-    self.split = split
-    self.splitChanged = splitChanged
+    self.layout = layout
     self.openPrivacySettings = openPrivacySettings
     self.agentNames = agentNames
     self.switchAgent = switchAgent
   }
 
   var body: some View {
-    InspectorSplit(fraction: split, onChange: splitChanged) {
-      if let journal {
-        VStack(spacing: 0) {
-          Picker(
-            selection: Binding(get: { topTab }, set: { topTabChanged($0) })
-          ) {
-            Text("Activity", bundle: .module, comment: "A tab of the inspector.")
-              .tag(InspectorTopTab.activity)
-            Text(verbatim: "Git").tag(InspectorTopTab.git)
-          } label: {
-            Text("Show", bundle: .module, comment: "Chooses the pane above the notes.")
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-          .padding(.horizontal, 12)
-          .padding(.vertical, 6)
-          switch topTab {
-          case .activity:
-            ActivityPane(
-              session: session,
-              agentName: session.agent.flatMap { agentNames[$0.providerID] }
-                ?? session.agent?.providerID ?? "",
-              journal: journal)
-          case .git:
-            gitPane
-          }
-        }
-      } else {
-        gitPane
-      }
-    } bottom: {
-      SessionPane(
-        session: session, resolution: resolution, agentNames: agentNames,
-        switchAgent: switchAgent, notes: notes, leaveNotes: leaveNotes, usage: usage,
-        isDetailsExpanded: isDetailsExpanded, detailsExpandedChanged: detailsExpandedChanged)
+    InspectorSectionStack(sections: sections, layout: layout)
+  }
+
+  /// In their default order. A section with nothing to show in this window — no journal, no
+  /// usage — is left out, and keeps its place in the arrangement for when it comes back.
+  private var sections: [InspectorSectionDescriptor] {
+    var sections: [InspectorSectionDescriptor] = []
+    if let journal {
+      sections.append(activitySection(journal))
     }
+    sections.append(gitSection)
+    if let notes {
+      sections.append(notesSection(notes))
+    }
+    sections.append(agentSection)
+    if let usage {
+      sections.append(usageSection(usage))
+    }
+    sections.append(promptSection)
+    return sections
   }
 }
+
+// MARK: - The sections
 
 extension SessionContextInspector {
-  fileprivate var gitPane: some View {
-    GitPane(
-      session: session,
-      branchReport: branchReport,
-      statuses: repositoryStatuses,
-      sessionNames: sessionNames,
-      refresh: refreshBranches,
-      openPrivacySettings: openPrivacySettings,
-      git: git
+  fileprivate func activitySection(_ journal: SessionJournalModel) -> InspectorSectionDescriptor {
+    InspectorSectionDescriptor(
+      id: .activity,
+      title: String(localized: "Activity", bundle: .module, comment: "A section of the inspector."),
+      systemImage: "waveform.path.ecg",
+      sizing: .fill(minimum: 90),
+      summary: AnyView(ActivitySummary(session: session.id, journal: journal)),
+      content: AnyView(
+        ActivityPane(
+          session: session,
+          agentName: session.agent.flatMap { agentNames[$0.providerID] }
+            ?? session.agent?.providerID ?? "",
+          journal: journal)),
+      accessibilityIdentifier: "inspector-activity-section"
     )
+  }
+
+  fileprivate var gitSection: InspectorSectionDescriptor {
+    InspectorSectionDescriptor(
+      id: .git,
+      title: "Git",
+      systemImage: "arrow.triangle.branch",
+      sizing: .fill(minimum: 120),
+      summary: AnyView(
+        GitSummary(
+          session: session, branchReport: branchReport, statuses: repositoryStatuses,
+          sessionNames: sessionNames, git: git)),
+      accessory: AnyView(
+        GitAccessory(
+          branchReport: branchReport, statuses: repositoryStatuses, refresh: refreshBranches)
+      ),
+      content: AnyView(
+        GitPane(
+          session: session,
+          branchReport: branchReport,
+          statuses: repositoryStatuses,
+          sessionNames: sessionNames,
+          refresh: refreshBranches,
+          openPrivacySettings: openPrivacySettings,
+          git: git
+        )),
+      accessibilityIdentifier: "inspector-git-section"
+    )
+  }
+
+  fileprivate func notesSection(_ notes: NotesModel) -> InspectorSectionDescriptor {
+    let document = notes.document(for: session.id)
+    return InspectorSectionDescriptor(
+      id: .notes,
+      title: String(
+        localized: "Notes", bundle: .module, comment: "The heading of a session's notes."),
+      systemImage: "note.text",
+      sizing: .fill(minimum: 90),
+      summary: AnyView(NotesSummary(document: document)),
+      accessory: AnyView(NotesStateLabel(document: document)),
+      content: AnyView(
+        SessionNotesSection(session: session, document: document, notes: notes, leave: leaveNotes)),
+      accessibilityIdentifier: "inspector-notes-section"
+    )
+  }
+
+  fileprivate var agentSection: InspectorSectionDescriptor {
+    InspectorSectionDescriptor(
+      id: .agent,
+      title: String(
+        localized: "Agent", bundle: .module, comment: "The heading of the session's agent."),
+      systemImage: "cpu",
+      sizing: .fitting(minimum: 60),
+      summary: AnyView(
+        Text(
+          session.agent.map { AgentHistoryList.label($0, names: agentNames) }
+            ?? String(localized: "No agent recorded", bundle: .module))),
+      accessory: switchAgent.map { switchAgent in
+        AnyView(
+          Button(action: switchAgent) {
+            Text("Switch…", bundle: .module, comment: "Opens the sheet that switches the agent.")
+          }
+          .buttonStyle(.borderless)
+          .controlSize(.small)
+          .accessibilityLabel(
+            Text(
+              "Switch the agent of \(session.name)", bundle: .module,
+              comment: "The session's name.")))
+      },
+      content: AnyView(
+        VStack(alignment: .leading, spacing: 8) {
+          AgentRow(agent: session.agent, resolution: resolution, names: agentNames)
+          if !session.agentHistory.isEmpty {
+            AgentHistoryList(session: session, names: agentNames)
+          }
+        })
+    )
+  }
+
+  fileprivate func usageSection(_ usage: UsageModel) -> InspectorSectionDescriptor {
+    InspectorSectionDescriptor(
+      id: .usage,
+      title: String(localized: "Usage", bundle: .module, comment: "A session's usage, heading."),
+      systemImage: "chart.bar",
+      sizing: .fitting(minimum: 60),
+      summary: AnyView(UsageSummary(session: session.id, usage: usage)),
+      // Always in the header, folded or not: the figures of the summary need watching too.
+      accessory: AnyView(UsageWatcher(session: session.id, usage: usage)),
+      content: AnyView(SessionUsageSection(session: session, usage: usage, agentNames: agentNames))
+    )
+  }
+
+  fileprivate var promptSection: InspectorSectionDescriptor {
+    InspectorSectionDescriptor(
+      id: .prompt,
+      title: String(localized: "Initial prompt", bundle: .module),
+      systemImage: "text.bubble",
+      sizing: .fitting(minimum: 60),
+      summary: AnyView(Text(Self.promptSummary(session))),
+      content: AnyView(InitialPromptView(session: session))
+    )
+  }
+
+  static func promptSummary(_ session: WorkSession) -> String {
+    if let template = session.template {
+      return template.name
+    }
+    if let line = session.initialPrompt.split(whereSeparator: \.isNewline).first {
+      return String(line)
+    }
+    return String(
+      localized: "No prompt", bundle: .module, comment: "A session was started without a prompt.")
   }
 }
 
-// MARK: - The two panes
-
-/// Two panes and the divider between them, which the user drags. The share given to the top one
-/// is the layout's, and is written back once the drag ends — not at every point of it.
-private struct InspectorSplit<Top: View, Bottom: View>: View {
-  let fraction: Double
-  let onChange: (Double) -> Void
-  @ViewBuilder let top: Top
-  @ViewBuilder let bottom: Bottom
-
-  @State private var dragged: Double?
-  @State private var isHovering = false
-  /// Whether this handle pushed the resize cursor, so that it pops exactly what it pushed — also
-  /// when it disappears under the pointer, and not while a drag carries the pointer off it.
-  @State private var cursorPushed = false
-
-  private static var minimumHeight: Double { 120 }
-  private static var handleHeight: Double { 7 }
-
-  var body: some View {
-    GeometryReader { proxy in
-      let total = max(Double(proxy.size.height) - Self.handleHeight, 1)
-      let height = Self.topHeight(for: dragged ?? fraction, in: total)
-      VStack(spacing: 0) {
-        top.frame(height: height)
-        handle(total: total)
-        bottom.frame(maxHeight: .infinity)
-      }
-    }
-  }
-
-  private func handle(total: Double) -> some View {
-    ZStack {
-      Color.clear
-      Divider()
-    }
-    .frame(height: Self.handleHeight)
-    .contentShape(Rectangle())
-    .onHover { inside in
-      isHovering = inside
-      updateCursor()
-    }
-    .onDisappear {
-      if cursorPushed { NSCursor.pop() }
-      cursorPushed = false
-    }
-    .gesture(
-      DragGesture(minimumDistance: 1, coordinateSpace: .global)
-        .onChanged { value in
-          let start = Self.topHeight(for: fraction, in: total)
-          dragged = Self.bounded((start + Double(value.translation.height)) / total)
-        }
-        .onEnded { _ in
-          if let dragged { onChange(dragged) }
-          dragged = nil
-          updateCursor()
-        }
-    )
-    .accessibilityElement()
-    .accessibilityLabel(Text("Divider between Git and the session", bundle: .module))
-    .accessibilityValue(
-      Text(
-        "\(Int((dragged ?? fraction) * 100)) percent for Git", bundle: .module,
-        comment: "The share of the inspector's height given to the Git list.")
-    )
-    .accessibilityAdjustableAction { direction in
-      let step = direction == .increment ? 0.05 : -0.05
-      onChange(Self.bounded(fraction + step))
-    }
-  }
-
-  private func updateCursor() {
-    let wanted = isHovering || dragged != nil
-    if wanted, !cursorPushed {
-      NSCursor.resizeUpDown.push()
-      cursorPushed = true
-    } else if !wanted, cursorPushed {
-      NSCursor.pop()
-      cursorPushed = false
-    }
-  }
-
-  private static func bounded(_ value: Double) -> Double {
-    WorkspaceLayout.bounded(value, in: WorkspaceLayout.inspectorSplitRange, fallback: 0.6)
-  }
-
-  /// Neither pane under its minimum, as long as the column is tall enough for both.
-  private static func topHeight(for fraction: Double, in total: Double) -> Double {
-    let wanted = total * fraction
-    guard total >= minimumHeight * 2 else { return wanted }
-    return min(max(wanted, minimumHeight), total - minimumHeight)
-  }
-}
-
-/// The session's own context: its notes first, taking the room there is, then its agent and the
-/// prompt it started from, which fold away.
-///
-/// Not one `List`: an editor inside a list fights it for the scrolling, and the notes are what
-/// this pane is looked at for.
-private struct SessionPane: View {
+/// The prompt the session started from, whole: the section folds, the prompt does not.
+private struct InitialPromptView: View {
   let session: WorkSession
-  let resolution: SessionAgentResolution?
-  let agentNames: [String: String]
-  let switchAgent: (() -> Void)?
-  let notes: NotesModel?
-  let leaveNotes: () -> Void
-  let usage: UsageModel?
-  let isDetailsExpanded: Bool
-  let detailsExpandedChanged: (Bool) -> Void
 
   var body: some View {
-    GeometryReader { proxy in
-      VStack(spacing: 0) {
-        if let notes {
-          SessionNotesSection(
-            session: session, document: notes.document(for: session.id), notes: notes,
-            leave: leaveNotes)
-        }
-        Divider()
-        detailsHeader
-        if isDetailsExpanded {
-          details
-            .frame(height: notes == nil ? nil : max(proxy.size.height * 0.45, 60))
-            .frame(maxHeight: notes == nil ? .infinity : nil)
-        }
-      }
-    }
-  }
-
-  private var detailsHeader: some View {
-    Button {
-      detailsExpandedChanged(!isDetailsExpanded)
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: "chevron.right")
-          .rotationEffect(.degrees(isDetailsExpanded ? 90 : 0))
-          .font(.caption2.weight(.semibold))
+    VStack(alignment: .leading, spacing: 6) {
+      // The name and revision the session was created with: the template may since have been
+      // renamed, changed or deleted, and none of that changes what this session was sent.
+      if let template = session.template {
         Group {
-          if usage == nil {
-            Text("Agent & initial prompt", bundle: .module)
+          if let revision = template.revision {
+            Text(
+              "From template “\(template.name)”, revision \(String(revision))",
+              bundle: .module, comment: "A prompt template's name, then its revision number.")
           } else {
-            Text("Agent, usage & initial prompt", bundle: .module)
+            Text(
+              "From template “\(template.name)”", bundle: .module,
+              comment: "A prompt template's name.")
           }
         }
-        .font(.subheadline.weight(.semibold))
-        Spacer()
+        .font(.callout)
+        .foregroundStyle(.secondary)
       }
-      .foregroundStyle(.secondary)
-      .contentShape(Rectangle())
+      if session.initialPrompt.isEmpty {
+        InspectorPlaceholder(
+          LocalizedStringResource("This session was started without a prompt.", bundle: .module))
+      } else {
+        Text(session.initialPrompt)
+          .font(.callout)
+          .textSelection(.enabled)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
-    .buttonStyle(.plain)
-    .padding(.horizontal, 12)
-    .padding(.vertical, 6)
-    .accessibilityLabel(
-      usage == nil
-        ? Text("Agent and initial prompt", bundle: .module)
-        : Text("Agent, usage and initial prompt", bundle: .module)
-    )
-    .accessibilityValue(
-      isDetailsExpanded
-        ? Text("Expanded", bundle: .module) : Text("Collapsed", bundle: .module))
+  }
+}
+
+/// What the activity holds, said once the section is folded.
+private struct ActivitySummary: View {
+  let session: SessionID
+  let journal: SessionJournalModel
+
+  var body: some View {
+    let count = journal.journal(for: session)?.resources.count ?? 0
+    if count > 0 {
+      Text(
+        "\(count) resources", bundle: .module, comment: "How many links a session's activity holds."
+      )
+    }
+  }
+}
+
+/// Repositories and changed files, said once the Git section is folded.
+private struct GitSummary: View {
+  let session: WorkSession
+  let branchReport: SessionBranchReport?
+  let statuses: [String: RepositoryStatusState]
+  let sessionNames: [SessionID: String]
+  let git: GitInspectorModel
+
+  var body: some View {
+    if let repositories = branchReport?.repositories, !repositories.isEmpty {
+      let changes = repositories.reduce(0) { total, repository in
+        total
+          + git.group(for: repository, state: statuses[repository.path], sessionNames: sessionNames)
+          .changeCount
+      }
+      let repositoryCount = String(
+        localized: "\(repositories.count) repositories", bundle: .module,
+        comment: "What the Git section holds once folded: how many repositories.")
+      let changeCount = String(
+        localized: "\(changes) changes", bundle: .module,
+        comment: "What the Git section holds once folded: how many changed files.")
+      Text(verbatim: "\(repositoryCount) · \(changeCount)")
+    }
+  }
+}
+
+/// Whether the Git list is live or how old it is, and the button that reads it again.
+private struct GitAccessory: View {
+  let branchReport: SessionBranchReport?
+  let statuses: [String: RepositoryStatusState]
+  let refresh: (() -> Void)?
+
+  var body: some View {
+    HStack(spacing: 6) {
+      if isLive {
+        // Said only when it is true: every repository is watched and its last reading held.
+        Text(
+          "live", bundle: .module,
+          comment: "Said of a Git list that follows the disk as it changes."
+        )
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+      } else if let branchReport {
+        // The age is said, never implied: this is what was read, not a live view.
+        TimelineView(.periodic(from: .now, by: 10)) { context in
+          Text(age(of: branchReport.readAt, at: context.date))
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+        }
+      }
+      if let refresh {
+        Button(action: refresh) { Image(systemName: "arrow.clockwise") }
+          .buttonStyle(.borderless)
+          .help(Text("Read the repositories again", bundle: .module))
+          .accessibilityLabel(Text("Read the repositories again", bundle: .module))
+      }
+    }
   }
 
-  private var details: some View {
-    List {
-      Section {
-        AgentRow(agent: session.agent, resolution: resolution, names: agentNames)
-        if !session.agentHistory.isEmpty {
-          AgentHistoryList(session: session, names: agentNames)
-        }
-      } header: {
-        HStack {
-          Text("Agent", bundle: .module, comment: "The heading of the session's agent.")
-          Spacer()
-          if let switchAgent {
-            Button(action: switchAgent) {
-              Text("Switch…", bundle: .module, comment: "Opens the sheet that switches the agent.")
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
-            .accessibilityLabel(
-              Text(
-                "Switch the agent of \(session.name)", bundle: .module,
-                comment: "The session's name."))
-          }
-        }
-      }
+  /// Every repository of the report watched, and read without failing since.
+  private var isLive: Bool {
+    guard let branchReport, !branchReport.repositories.isEmpty else { return false }
+    return branchReport.repositories.allSatisfy { statuses[$0.path]?.phase == .fresh }
+  }
+}
 
-      if let usage {
-        SessionUsageSection(session: session, usage: usage, agentNames: agentNames)
-      }
+/// The first line of the notes, or that there are none.
+private struct NotesSummary: View {
+  let document: NotesDocument
 
-      Section {
-        // The name and revision the session was created with: the template may since have been
-        // renamed, changed or deleted, and none of that changes what this session was sent.
-        if let template = session.template {
-          Group {
-            if let revision = template.revision {
-              Text(
-                "From template “\(template.name)”, revision \(String(revision))",
-                bundle: .module, comment: "A prompt template's name, then its revision number.")
-            } else {
-              Text(
-                "From template “\(template.name)”", bundle: .module,
-                comment: "A prompt template's name.")
-            }
-          }
-          .font(.callout)
-          .foregroundStyle(.secondary)
-        }
-        if session.initialPrompt.isEmpty {
-          InspectorPlaceholder(
-            LocalizedStringResource(
-              "This session was started without a prompt.", bundle: .module))
-        } else {
-          // Folded by default: a prompt can be long, and the context of the session is what the
-          // column is for. Unfolding it is one click, scrolling past it every time is not.
-          DisclosureGroup {
-            Text(session.initialPrompt)
-              .font(.callout)
-              .textSelection(.enabled)
-              .padding(.top, 4)
-          } label: {
-            Text("Show prompt", bundle: .module)
-          }
-        }
-      } header: {
-        Text("Initial prompt", bundle: .module)
+  var body: some View {
+    if let line = document.text.split(whereSeparator: \.isNewline).first {
+      Text(verbatim: String(line))
+    } else if document.isLoaded {
+      Text("Empty", bundle: .module, comment: "Said of a session's notes that hold nothing.")
+    }
+  }
+}
+
+/// What the agent ran for, said once the usage is folded.
+private struct UsageSummary: View {
+  let session: SessionID
+  let usage: UsageModel
+
+  var body: some View {
+    if let figures = usage.sessionUsage[session] {
+      Text(UsagePresentation.duration(figures.total.runningTime))
+    }
+  }
+}
+
+/// Keeps the usage of the session read while its section is shown, folded or not, and says when
+/// it is being read.
+private struct UsageWatcher: View {
+  let session: SessionID
+  let usage: UsageModel
+
+  var body: some View {
+    Group {
+      if usage.isReading {
+        ProgressView().controlSize(.mini)
+          .accessibilityLabel(Text("Reading transcripts", bundle: .module))
+      } else {
+        Color.clear.frame(width: 0, height: 0)
       }
     }
-    .listStyle(.sidebar)
+    .onAppear { usage.startWatching(session) }
+    .onDisappear { usage.stopWatching(session) }
+    // The inspector keeps this view when another session is selected.
+    .onChange(of: session) { previous, next in
+      usage.stopWatching(previous)
+      usage.startWatching(next)
+    }
   }
 }
 
@@ -431,13 +453,13 @@ private struct GitPane: View {
           .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
         }
-      } header: {
-        header(groups)
       }
     }
     .listStyle(.sidebar)
     .focused($isListFocused)
-    .onChange(of: git.focusRequest) { isListFocused = true }
+    .onChange(of: git.focusRequest) { takeFocus() }
+    // A turn later: a list that has just appeared does not take the keyboard yet.
+    .onAppear { if git.isFocusPending { Task { @MainActor in takeFocus() } } }
     .accessibilityIdentifier("inspector-git")
     .contextMenu(forSelectionType: GitInspectorRowID.self) { ids in
       if let id = ids.first {
@@ -462,6 +484,11 @@ private struct GitPane: View {
         .accessibilityHidden(true)
       }
     }
+  }
+
+  private func takeFocus() {
+    isListFocused = true
+    git.focusTaken()
   }
 
   private var selection: Binding<GitInspectorRowID?> {
@@ -524,40 +551,6 @@ private struct GitPane: View {
     }
   }
 
-  private func header(_ groups: [RepositoryGroupPresentation]) -> some View {
-    HStack(spacing: 6) {
-      Text(verbatim: "Git")
-      Spacer()
-      if isLive(groups) {
-        // Said only when it is true: every repository is watched and its last reading held.
-        Text(
-          "live", bundle: .module,
-          comment: "Said of a Git list that follows the disk as it changes."
-        )
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-      } else if let branchReport {
-        // The age is said, never implied: this is what was read, not a live view.
-        TimelineView(.periodic(from: .now, by: 10)) { context in
-          Text(age(of: branchReport.readAt, at: context.date))
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-        }
-      }
-      if let refresh {
-        Button(action: refresh) { Image(systemName: "arrow.clockwise") }
-          .buttonStyle(.borderless)
-          .help(Text("Read the repositories again", bundle: .module))
-          .accessibilityLabel(Text("Read the repositories again", bundle: .module))
-      }
-    }
-  }
-
-  /// Every repository of the report watched, and read without failing since.
-  private func isLive(_ groups: [RepositoryGroupPresentation]) -> Bool {
-    guard let branchReport, !branchReport.repositories.isEmpty else { return false }
-    return branchReport.repositories.allSatisfy { statuses[$0.path]?.phase == .fresh }
-  }
 }
 
 private func age(of date: Date, at now: Date) -> String {

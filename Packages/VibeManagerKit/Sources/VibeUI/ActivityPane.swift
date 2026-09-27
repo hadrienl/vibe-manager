@@ -34,7 +34,9 @@ struct ActivityPane: View {
     }
     .listStyle(.sidebar)
     .focused($isListFocused)
-    .onChange(of: journal.focusRequest) { isListFocused = true }
+    .onChange(of: journal.focusRequest) { takeFocus() }
+    // A turn later: a list that has just appeared does not take the keyboard yet.
+    .onAppear { if journal.isFocusPending { Task { @MainActor in takeFocus() } } }
     .accessibilityIdentifier("inspector-activity")
     .contextMenu(forSelectionType: ActivityRowID.self) { ids in
       if let id = ids.first { menu(for: id, current: current) }
@@ -55,6 +57,11 @@ struct ActivityPane: View {
       }
     )
     .task(id: session.id) { journal.load(session.id) }
+  }
+
+  private func takeFocus() {
+    isListFocused = true
+    journal.focusTaken()
   }
 
   private var selection: Binding<ActivityRowID?> {

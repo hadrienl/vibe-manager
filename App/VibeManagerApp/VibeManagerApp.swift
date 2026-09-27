@@ -108,6 +108,12 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("i", modifiers: [.command, .option])
 
+        // The sections of the context column back in their first order, sizes and folds (#66).
+        Button("Reset Column Layout") {
+          environment.appModel.layout.resetInspectorSections()
+        }
+        .disabled(environment.appModel.layout.isInspectorArrangementDefault)
+
         Button(
           environment.appModel.isWebViewOpen
             ? String(localized: "Hide Web View", comment: "Hides the session's web view.")

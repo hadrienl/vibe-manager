@@ -1,7 +1,7 @@
 import SwiftUI
 import VibeDomain
 
-/// The usage of the selected session, in the inspector's Session pane.
+/// The usage of the selected session: the content of the inspector's Usage section (#66).
 ///
 /// What the application measured — running time, runs — is shown as is. What the CLI reported —
 /// tokens — carries `≈` and its source. What nobody knows says why, and is never a zero.
@@ -11,7 +11,7 @@ struct SessionUsageSection: View {
   let agentNames: [String: String]
 
   var body: some View {
-    Section {
+    VStack(alignment: .leading, spacing: 4) {
       if !usage.isTrackingEnabled {
         InspectorLine(label: Self.usageTitle, value: UsagePresentation.unavailable(.trackingOff))
       }
@@ -41,22 +41,6 @@ struct SessionUsageSection: View {
         value: String(
           localized: "Not available", bundle: .module, comment: "A session's cost is unknown."),
         help: UsagePresentation.costExplanation)
-    } header: {
-      HStack {
-        Text(Self.usageTitle)
-        Spacer()
-        if usage.isReading {
-          ProgressView().controlSize(.mini)
-            .accessibilityLabel(Text("Reading transcripts", bundle: .module))
-        }
-      }
-    }
-    .onAppear { usage.startWatching(session.id) }
-    .onDisappear { usage.stopWatching(session.id) }
-    // The inspector keeps this view when another session is selected.
-    .onChange(of: session.id) { previous, next in
-      usage.stopWatching(previous)
-      usage.startWatching(next)
     }
   }
 

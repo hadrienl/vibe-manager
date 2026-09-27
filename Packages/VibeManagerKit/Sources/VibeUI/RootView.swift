@@ -465,8 +465,7 @@ public struct RootView: View {
               refreshBranches: model.reportsBranches
                 ? { Task { await model.refreshBranchReport() } } : nil,
               git: model.gitInspector,
-              split: model.layout.intent.inspectorSplit,
-              splitChanged: { model.layout.inspectorSplitChanged(to: $0) },
+              layout: model.layout,
               openPrivacySettings: model.permissions.map { permissions in
                 { permissions.openSystemSettings() }
               },
@@ -476,11 +475,7 @@ public struct RootView: View {
               notes: model.notes,
               leaveNotes: { model.focusTerminal() },
               usage: model.usage,
-              isDetailsExpanded: model.layout.intent.isSessionDetailsExpanded,
-              detailsExpandedChanged: { model.layout.setSessionDetailsExpanded($0) },
-              journal: model.journal,
-              topTab: model.layout.intent.inspectorTopTab,
-              topTabChanged: { model.layout.setInspectorTopTab($0) }
+              journal: model.journal
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
@@ -683,7 +678,7 @@ public struct RootView: View {
           HStack(spacing: 0) {
             terminalStack(for: session)
             SplitHandle(
-              width: width,
+              length: width,
               range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
               label: Text("Divider between the terminal and the web view", bundle: .module),
               onChange: { model.layout.browserWidthChanged(to: $0) })

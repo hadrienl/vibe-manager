@@ -1,35 +1,59 @@
 import AppKit
 import SwiftUI
 
-/// The handle between two panes that share a width: seen, easy to grab, and driven from the
-/// keyboard and VoiceOver (#69). One component, so that every divider of the window reads the same
-/// way — #66 takes it for the context column's sections.
+/// The handle between two panes that share a length: seen, easy to grab, and driven from the
+/// keyboard and VoiceOver. One component, so that every divider of the window reads the same way:
+/// the web view's beside the terminal (#69), the context column's between its sections (#66).
 struct SplitHandle: View {
-  /// The width of the pane after the handle, as it is now.
-  let width: Double
+  enum Axis {
+    /// Panes side by side; the length is the width of the pane after the handle, which grows as
+    /// the handle moves left.
+    case horizontal
+    /// Panes stacked; the length is the height of the pane above the handle, which grows as the
+    /// handle moves down.
+    case vertical
+  }
+
+  var axis: Axis = .horizontal
+  /// The length of the pane the handle sizes, as it is now.
+  let length: Double
   let range: ClosedRange<Double>
   let label: Text
+  /// What VoiceOver reads as the handle's value; the width in points when not given.
+  var value: Text?
+  /// How far one step of the keyboard or VoiceOver moves the handle.
+  var step: Double = 40
   let onChange: (Double) -> Void
+  /// Once the drag, or a step, is over: where a handle that only shows its length while it moves
+  /// writes it for good.
+  var onEnded: () -> Void = {
+    // Nothing by default: the web view's width is written as it changes.
+  }
+  var onDoubleClick: (() -> Void)?
 
   @State private var dragged: Double?
-  /// The width when the drag began: the drag's translation is counted from it, however often the
+  /// The length when the drag began: the drag's translation is counted from it, however often the
   /// view is redrawn meanwhile.
-  @State private var startWidth: Double?
+  @State private var startLength: Double?
   @State private var isHovering = false
   @State private var cursorPushed = false
+  @FocusState private var isFocused: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   static let thickness: CGFloat = 9
 
   var body: some View {
-    let isActive = isHovering || dragged != nil
+    let isActive = isHovering || dragged != nil || isFocused
+    let line: CGFloat = isActive ? 3 : 1
     ZStack {
       Color.clear
       Rectangle()
         .fill(isActive ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor))
-        .frame(width: isActive ? 3 : 1)
+        .frame(width: axis == .horizontal ? line : nil)
+        .frame(height: axis == .vertical ? line : nil)
     }
-    .frame(width: Self.thickness)
+    .frame(width: axis == .horizontal ? Self.thickness : nil)
+    .frame(height: axis == .vertical ? Self.thickness : nil)
     .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isActive)
     .contentShape(Rectangle())
     .onHover { inside in
@@ -43,29 +67,48 @@ struct SplitHandle: View {
     .gesture(
       DragGesture(minimumDistance: 1, coordinateSpace: .global)
         .onChanged { value in
-          let start = startWidth ?? width
-          startWidth = start
-          // The pane after the handle grows as the handle moves left.
-          let next = bounded(start - Double(value.translation.width))
+          let start = startLength ?? length
+          startLength = start
+          let next = bounded(
+            axis == .horizontal
+              ? start - Double(value.translation.width)
+              : start + Double(value.translation.height))
           dragged = next
           onChange(next)
         }
         .onEnded { _ in
           dragged = nil
-          startWidth = nil
+          startLength = nil
+          onEnded()
           updateCursor()
         }
     )
+    .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleClick?() })
+    // Reached with Tab when Full Keyboard Access is on; the arrows then move it.
+    .focusable(axis == .vertical)
+    .focused($isFocused)
+    .focusEffectDisabled()
+    .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+      guard axis == .vertical else { return .ignored }
+      adjust(press.key == .downArrow ? step : -step)
+      return .handled
+    }
     .accessibilityElement()
     .accessibilityLabel(label)
     .accessibilityValue(
-      Text(
-        "\(Int(width)) points wide", bundle: .module,
-        comment: "The width of the web view, read by VoiceOver on its divider.")
+      value
+        ?? Text(
+          "\(Int(length)) points wide", bundle: .module,
+          comment: "The width of the web view, read by VoiceOver on its divider.")
     )
     .accessibilityAdjustableAction { direction in
-      onChange(bounded(width + (direction == .increment ? 40 : -40)))
+      adjust(direction == .increment ? step : -step)
     }
+  }
+
+  private func adjust(_ delta: Double) {
+    onChange(bounded(length + delta))
+    onEnded()
   }
 
   private func bounded(_ value: Double) -> Double {
@@ -75,7 +118,7 @@ struct SplitHandle: View {
   private func updateCursor() {
     let wanted = isHovering || dragged != nil
     if wanted, !cursorPushed {
-      NSCursor.resizeLeftRight.push()
+      (axis == .horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
       cursorPushed = true
     } else if !wanted, cursorPushed {
       NSCursor.pop()

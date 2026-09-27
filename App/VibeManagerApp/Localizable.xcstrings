@@ -586,6 +586,16 @@
         }
       }
     },
+    "Reset Column Layout" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir la disposition de la colonne"
+          }
+        }
+      }
+    },
     "Restart Session" : {
       "localizations" : {
         "fr" : {

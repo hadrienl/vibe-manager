@@ -213,7 +213,8 @@ struct SessionNotesEditor: NSViewRepresentable {
   }
 }
 
-/// The notes section: its header and state, the editor, and what it has to say about the size.
+/// The notes section's content: the editor, and what it has to say about the size. Its title and
+/// its state are in the section's header (#66).
 struct SessionNotesSection: View {
   let session: WorkSession
   let document: NotesDocument
@@ -222,17 +223,6 @@ struct SessionNotesSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      HStack(alignment: .firstTextBaseline) {
-        Text("Notes", bundle: .module, comment: "The heading of a session's notes.")
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.secondary)
-          .accessibilityAddTraits(.isHeader)
-        Spacer()
-        NotesStateLabel(document: document)
-      }
-      .padding(.horizontal, 12)
-      .padding(.top, 8)
-
       ZStack(alignment: .topLeading) {
         SessionNotesEditor(
           document: document,
@@ -262,9 +252,10 @@ struct SessionNotesSection: View {
             reason: reason, text: document.text, sessionID: session.id, notes: notes)
         }
       }
-      .frame(minHeight: 80, maxHeight: .infinity)
+      .frame(minHeight: 40, maxHeight: .infinity)
       .background(.background.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
       .padding(.horizontal, 8)
+      .padding(.top, 6)
 
       if let footer = NotesFooter.text(refusal: document.refusal, byteCount: document.byteCount) {
         Text(footer)
