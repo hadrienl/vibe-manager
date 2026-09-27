@@ -77,6 +77,11 @@ enum DropReader {
     {
       return .file(url, isTemporary: isTemporary(url))
     }
+    // Asked for `.item`, SwiftUI hands a file of the disk over under its own type, opened in
+    // place, and no longer as a file URL (#131).
+    if let url = await loadFileInPlace(provider) {
+      return .file(url, isTemporary: isTemporary(url))
+    }
     if let image = types.first(where: { $0.conforms(to: .image) }),
       let data = await loadData(provider, type: image)
     {
@@ -130,6 +135,16 @@ enum DropReader {
   private static func loadURL(_ provider: NSItemProvider) async -> URL? {
     await withCheckedContinuation { continuation in
       _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
+    }
+  }
+
+  private static func loadFileInPlace(_ provider: NSItemProvider) async -> URL? {
+    guard let type = provider.registeredContentTypesForOpenInPlace.first else { return nil }
+    return await withCheckedContinuation { continuation in
+      _ = provider.loadInPlaceFileRepresentation(forTypeIdentifier: type.identifier) {
+        url, isInPlace, _ in
+        continuation.resume(returning: isInPlace ? url : nil)
+      }
     }
   }
 

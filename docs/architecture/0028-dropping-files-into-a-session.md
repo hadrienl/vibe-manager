@@ -37,6 +37,11 @@ image, a web address, text, and last a file the source promises (Mail, Photos). 
 of a page carries both its bytes and its address; the bytes are kept, because an agent reads an image
 from a file. The elements load concurrently and are put back in the order of the drop.
 
+Asked for any item, SwiftUI does not hand a file of the disk over as a file URL but under the file's
+own type — plain text, a folder, a PNG — to be opened in place. Read as that type, a text file gave
+its content and a folder or an image a copy (#131). A file is therefore also what a provider opens in
+place, and only when the URL it gives is the original: a copy made for the reading is not one.
+
 Where the drop goes is decided by `SessionDropRoute`, a pure function of the session's presentation,
 its process and its composer:
 
