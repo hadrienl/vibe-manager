@@ -10,7 +10,7 @@ func startsTheLoginShell() async throws {
   let spec = TerminalSpec.loginShell(
     workingDirectoryURL: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
   )
-  let session = try PTYTerminalSession.start(id: SessionID(), spec: spec)
+  let session = try PTYTerminalSession.start(id: TerminalID(), spec: spec)
   let observer = await TerminalObserver.attach(to: session)
 
   await session.write("printf 'SHELL_READY\\n'\n")

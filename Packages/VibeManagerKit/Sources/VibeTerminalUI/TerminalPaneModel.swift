@@ -39,11 +39,21 @@ public final class TerminalPaneModel {
   /// An agent that refused the conversation it was handed exits before a key is pressed. One the
   /// user actually worked in did not refuse anything, whatever it exits with afterwards.
   public private(set) var hasReceivedInput = false
+  /// Whether this terminal's view holds the keyboard: ⌘W and ⌃⇥ act on the drawer's tabs while
+  /// one of its terminals does (#43).
+  public private(set) var hasKeyboardFocus = false
+
+  func setKeyboardFocus(_ focused: Bool) {
+    guard hasKeyboardFocus != focused else { return }
+    hasKeyboardFocus = focused
+  }
+
   /// Bumped to hand the keyboard back to this terminal — from the notes, on Escape. A counter
   /// rather than a flag: the same request twice in a row must still move the focus twice.
   public private(set) var focusRequest = 0
 
-  private let sessionID: SessionID
+  /// The terminal this pane shows: its session's agent, or one of its side terminals (#43).
+  public let terminalID: TerminalID
   private let supervisor: any TerminalSupervisor
   /// What `start()` launches. `nil` for a pane that took over a process it never started — one the
   /// terminal host kept running while the application was closed — until a restart hands it one.
@@ -53,22 +63,49 @@ public final class TerminalPaneModel {
   private var isStarting = false
   private var viewportWaiters: [ViewportWaiter] = []
   private var pendingNotice: [UInt8] = []
+  /// What the next process is shown under, until it starts.
+  private var queuedPrelude: [UInt8]?
+  /// What the current process is shown under, and which process that is.
+  private var boundPrelude: (session: ObjectIdentifier, bytes: [UInt8])?
 
   public init(
-    sessionID: SessionID,
+    terminalID: TerminalID,
     supervisor: any TerminalSupervisor,
     spec: TerminalSpec?,
     viewportTimeout: Duration = .milliseconds(500)
   ) {
-    self.sessionID = sessionID
+    self.terminalID = terminalID
     self.supervisor = supervisor
     self.spec = spec
     self.viewportTimeout = viewportTimeout
   }
 
+  /// The pane of a session's agent.
+  public convenience init(
+    sessionID: SessionID,
+    supervisor: any TerminalSupervisor,
+    spec: TerminalSpec?,
+    viewportTimeout: Duration = .milliseconds(500)
+  ) {
+    self.init(
+      terminalID: sessionID.agentTerminal, supervisor: supervisor, spec: spec,
+      viewportTimeout: viewportTimeout)
+  }
+
   /// Asks the surface to take the keyboard, if it is the terminal on screen.
   public func requestFocus() {
     focusRequest += 1
+    hasPendingFocusRequest = true
+  }
+
+  /// A request made while the view was not there to take it, consumed once. A side terminal
+  /// (#43) takes the keyboard on a request only: shown again with its session, it must not take
+  /// it from the agent's terminal.
+  @ObservationIgnored private var hasPendingFocusRequest = false
+
+  func takePendingFocusRequest() -> Bool {
+    defer { hasPendingFocusRequest = false }
+    return hasPendingFocusRequest
   }
 
   /// Starts the process, once the pane knows how big it is.
@@ -115,7 +152,8 @@ public final class TerminalPaneModel {
     }
 
     do {
-      let session = try await supervisor.start(launchSpec, for: sessionID)
+      let session = try await supervisor.start(launchSpec, for: terminalID)
+      bindPrelude(to: session)
       self.session = session
       observe(session)
     } catch let error as TerminalError {
@@ -141,6 +179,7 @@ public final class TerminalPaneModel {
   public func adopt(_ session: any TerminalSession) async {
     stateTask?.cancel()
     stateTask = nil
+    bindPrelude(to: session)
     self.session = session
     failure = nil
     wasStoppedOnPurpose = false
@@ -159,10 +198,42 @@ public final class TerminalPaneModel {
     pendingNotice.append(contentsOf: Array(text.utf8))
   }
 
+  /// The same, as bytes: a side terminal's restored history (#43) is written as it was read, since
+  /// decoding it as text would break a sequence its buffer cut in two.
+  public func post(notice bytes: [UInt8]) {
+    pendingNotice.append(contentsOf: bytes)
+  }
+
   /// The pending notice, handed over once.
   public func takePendingNotice() -> [UInt8] {
     defer { pendingNotice = [] }
     return pendingNotice
+  }
+
+  /// Holds what the next process is shown under for as long as it lives: a side terminal's
+  /// restored history and its separator (#43).
+  ///
+  /// Unlike a notice, it is not handed over once. A drawer's view is rebuilt whenever it is hidden
+  /// and shown again, or its session is left and come back to, and each new view replays it above
+  /// the process's own history — or the tab would show a bare prompt where its past was.
+  public func post(prelude bytes: [UInt8]) {
+    queuedPrelude = bytes
+  }
+
+  /// What `session` is shown under, if it is the process the prelude was posted for.
+  public func prelude(above session: any TerminalSession) -> [UInt8] {
+    guard let boundPrelude, boundPrelude.session == ObjectIdentifier(session) else { return [] }
+    return boundPrelude.bytes
+  }
+
+  /// What the current process is shown under.
+  public var prelude: [UInt8] {
+    session.map { prelude(above: $0) } ?? []
+  }
+
+  private func bindPrelude(to session: any TerminalSession) {
+    boundPrelude = (ObjectIdentifier(session), queuedPrelude ?? [])
+    queuedPrelude = nil
   }
 
   /// Called by the surface whenever it has measured itself, before and after the process exists.
@@ -182,6 +253,22 @@ public final class TerminalPaneModel {
   /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
   /// agent's question is how its state is known to have moved before the agent says so (#45).
   @ObservationIgnored public var onUserInput: (([UInt8]) -> Void)?
+
+  /// Told of the folder the shell says it is in (OSC 7), for a side terminal's title (#43). Most
+  /// shells say nothing unless configured to, so the folder is also read from the kernel.
+  @ObservationIgnored public var onReportedDirectory: ((String) -> Void)?
+
+  func reportDirectory(_ directory: String?) {
+    guard let directory, let path = Self.path(fromReportedDirectory: directory) else { return }
+    onReportedDirectory?(path)
+  }
+
+  /// OSC 7 names a `file://host/path` URL; some shells send a bare path.
+  static func path(fromReportedDirectory text: String) -> String? {
+    if text.hasPrefix("/") { return text }
+    guard let url = URL(string: text), url.isFileURL, !url.path.isEmpty else { return nil }
+    return url.path
+  }
 
   /// Told of an address clicked in the terminal, with whether it was ⌥⌘-clicked (#69). Unset, the
   /// address opens in the default browser, as it would from any terminal.
@@ -222,9 +309,9 @@ public final class TerminalPaneModel {
     await session?.write(bytes)
   }
 
-  public func stop() async {
+  public func stop(gracePeriod: Duration = .seconds(3)) async {
     wasStoppedOnPurpose = true
-    await supervisor.stop(id: sessionID, gracePeriod: .seconds(3))
+    await supervisor.stop(id: terminalID, gracePeriod: gracePeriod)
     if let session {
       apply(await session.state())
     }

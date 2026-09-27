@@ -50,7 +50,7 @@ struct TerminalHostFrame: Equatable, Sendable {
   /// connection — which the host reads as its client crashing.
   static func terminalChunks(
     _ kind: TerminalHostFrameKind,
-    session: SessionID,
+    session: TerminalID,
     bytes: [UInt8]
   ) -> [TerminalHostFrame] {
     let limit = TerminalHostWire.maximumPayloadLength - 16
@@ -63,7 +63,7 @@ struct TerminalHostFrame: Equatable, Sendable {
   /// Terminal bytes for one session: its identifier, then the bytes as they were.
   static func terminal(
     _ kind: TerminalHostFrameKind,
-    session: SessionID,
+    session: TerminalID,
     bytes: [UInt8]
   ) -> TerminalHostFrame {
     var payload = [UInt8]()
@@ -74,12 +74,12 @@ struct TerminalHostFrame: Equatable, Sendable {
   }
 
   /// The session and the bytes of an `input` or `output` frame, `nil` when it is too short.
-  var terminalBytes: (session: SessionID, bytes: [UInt8])? {
+  var terminalBytes: (session: TerminalID, bytes: [UInt8])? {
     guard kind != .control, payload.count >= 16 else { return nil }
     let uuid = payload.withUnsafeBytes { raw in
       raw.loadUnaligned(fromByteOffset: 0, as: uuid_t.self)
     }
-    return (SessionID(rawValue: UUID(uuid: uuid)), Array(payload[16...]))
+    return (TerminalID(rawValue: UUID(uuid: uuid)), Array(payload[16...]))
   }
 
   /// These messages are plain values, and encoding them does not fail; if it ever did, the empty
@@ -142,15 +142,15 @@ struct TerminalHostRequest: Codable, Equatable, Sendable {
     /// `capabilities` names what this end speaks beyond the frozen core.
     case hello(protocolVersion: Int, build: String, capabilities: [String])
     case list
-    case start(session: SessionID, spec: TerminalSpec)
-    case attach(session: SessionID)
-    case resize(session: SessionID, size: TerminalSize)
+    case start(session: TerminalID, spec: TerminalSpec)
+    case attach(session: TerminalID)
+    case resize(session: TerminalID, size: TerminalSize)
     /// Makes a full-screen program draw itself again, once a reattached view knows its size.
-    case redraw(session: SessionID)
-    case stop(session: SessionID, gracePeriodMilliseconds: Int)
-    case kill(session: SessionID)
+    case redraw(session: TerminalID)
+    case stop(session: TerminalID, gracePeriodMilliseconds: Int)
+    case kill(session: TerminalID)
     /// Forgets a session that has ended and whose last output has been read.
-    case release(session: SessionID)
+    case release(session: TerminalID)
     case goodbye(keepRunning: Bool)
     /// What the host costs. Only sent to a host whose `welcome` listed `stats`.
     case stats
@@ -174,9 +174,11 @@ enum TerminalHostRefusal: String, Codable, Equatable, Sendable {
 }
 
 struct HostedSessionRecord: Codable, Equatable, Sendable {
-  let session: SessionID
+  let session: TerminalID
   let state: TerminalProcessState
   let endedAt: Date?
+  /// Absent from a host that predates side terminals (#43): every session it holds is an agent.
+  var role: TerminalRole?
 }
 
 /// What the host says: a reply to a request, or news about a session nobody asked for.
@@ -195,12 +197,12 @@ struct TerminalHostMessage: Codable, Equatable, Sendable {
     case started(processIdentifier: Int32)
     case startFailed(TerminalError)
     /// Sent once the history has been, so that "attached" means "everything before now is here".
-    case attached(session: SessionID, state: TerminalProcessState, droppedByteCount: Int)
+    case attached(session: TerminalID, state: TerminalProcessState, droppedByteCount: Int)
     case stopped(state: TerminalProcessState)
     case done
     case unknownSession
-    case state(session: SessionID, state: TerminalProcessState, endedAt: Date?)
-    case truncated(session: SessionID, droppedByteCount: Int)
+    case state(session: TerminalID, state: TerminalProcessState, endedAt: Date?)
+    case truncated(session: TerminalID, droppedByteCount: Int)
     /// The host's physical footprint, and the sessions it holds.
     case stats(footprintBytes: Int, sessions: Int)
     /// Whether the host has Full Disk Access.
@@ -217,5 +219,9 @@ enum TerminalHostCapability {
   static let stats = "stats"
   static let fullDiskAccess = "fullDiskAccess"
   static let retire = "retire"
-  static let all = [stats, fullDiskAccess, retire]
+  /// Starts a side terminal's shell through the trampoline, and says which of its sessions are
+  /// side terminals (#43). A host without it runs them as agents: without job control, and
+  /// counted as agents after a relaunch.
+  static let sideTerminals = "sideTerminals"
+  static let all = [stats, fullDiskAccess, retire, sideTerminals]
 }

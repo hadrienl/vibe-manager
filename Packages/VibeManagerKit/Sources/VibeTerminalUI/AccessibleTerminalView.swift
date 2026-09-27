@@ -23,6 +23,15 @@ public final class AccessibleTerminalView: TerminalView {
 
   public override func accessibilityLabel() -> String? { accessibilityTitle }
 
+  /// Told when the view joins a window, or leaves one: what follows the keyboard is installed on
+  /// the window, and SwiftUI may update the view before it has one.
+  var onWindowChange: (() -> Void)?
+
+  public override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    onWindowChange?()
+  }
+
   public override func accessibilityValue() -> Any? {
     TerminalText.visibleScreen(of: getTerminal())
   }

@@ -1,6 +1,41 @@
 import Foundation
 import VibeDomain
 
+/// One terminal: the agent's own, or one of the side terminals a session keeps in its drawer
+/// (#43).
+///
+/// A session used to have exactly one terminal, and every port below was keyed by its
+/// `SessionID`. The agent's terminal keeps that very UUID (`SessionID.agentTerminal`), so the
+/// terminal host's frozen protocol — sixteen bytes of identifier — and everything recorded under
+/// it are unchanged; a side terminal has a UUID of its own. `Codable` exactly as `SessionID` is,
+/// so the two encode to the same JSON on the wire.
+public struct TerminalID: Hashable, Codable, Sendable, CustomStringConvertible {
+  public let rawValue: UUID
+
+  public init(rawValue: UUID = UUID()) {
+    self.rawValue = rawValue
+  }
+
+  public var description: String {
+    rawValue.uuidString
+  }
+}
+
+extension SessionID {
+  /// The terminal the session's agent runs in, which carries the session's own UUID.
+  public var agentTerminal: TerminalID {
+    TerminalID(rawValue: rawValue)
+  }
+}
+
+extension TerminalID {
+  /// The session whose agent runs in this terminal, if it is one — read from the UUID alone. A
+  /// side terminal answers a session that does not exist.
+  public var agentSession: SessionID {
+    SessionID(rawValue: rawValue)
+  }
+}
+
 public struct TerminalSize: Hashable, Codable, Sendable {
   public let columns: Int
   public let rows: Int
@@ -35,6 +70,17 @@ public struct TerminalScrollbackLimits: Hashable, Codable, Sendable {
   )
 }
 
+/// What a terminal is for.
+///
+/// Told apart because they are not counted alike: an agent is what quitting asks about and what a
+/// restart of the host waits for, while a shell in a session's drawer (#43) is always "running" —
+/// an idle prompt — and counting it would keep the host from ever being idle.
+public enum TerminalRole: String, Hashable, Codable, Sendable {
+  case agent
+  /// A shell in a session's drawer of side terminals (#43).
+  case auxiliary
+}
+
 /// `Codable`, like the values around it, because it crosses to the terminal host as it is
 /// (ADR 0017): the agent is started there with exactly the environment computed here.
 public struct TerminalSpec: Hashable, Codable, Sendable {
@@ -45,6 +91,7 @@ public struct TerminalSpec: Hashable, Codable, Sendable {
   public var initialSize: TerminalSize
   public var initialInput: String?
   public var scrollback: TerminalScrollbackLimits
+  public var role: TerminalRole
 
   public init(
     executableURL: URL,
@@ -53,7 +100,8 @@ public struct TerminalSpec: Hashable, Codable, Sendable {
     workingDirectoryURL: URL,
     initialSize: TerminalSize = .default,
     initialInput: String? = nil,
-    scrollback: TerminalScrollbackLimits = .default
+    scrollback: TerminalScrollbackLimits = .default,
+    role: TerminalRole = .agent
   ) {
     self.executableURL = executableURL
     self.arguments = arguments
@@ -62,6 +110,21 @@ public struct TerminalSpec: Hashable, Codable, Sendable {
     self.initialSize = initialSize
     self.initialInput = initialInput
     self.scrollback = scrollback
+    self.role = role
+  }
+
+  /// `role` is read when present: a spec written by a build that predates it is an agent's, the
+  /// only kind of terminal there was.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    executableURL = try container.decode(URL.self, forKey: .executableURL)
+    arguments = try container.decode([String].self, forKey: .arguments)
+    environment = try container.decode([String: String].self, forKey: .environment)
+    workingDirectoryURL = try container.decode(URL.self, forKey: .workingDirectoryURL)
+    initialSize = try container.decode(TerminalSize.self, forKey: .initialSize)
+    initialInput = try container.decodeIfPresent(String.self, forKey: .initialInput)
+    scrollback = try container.decode(TerminalScrollbackLimits.self, forKey: .scrollback)
+    role = try container.decodeIfPresent(TerminalRole.self, forKey: .role) ?? .agent
   }
 }
 
@@ -106,7 +169,7 @@ public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
   case pseudoTerminalUnavailable(code: Int32)
   case resourceLimitReached(code: Int32)
   case spawnFailed(code: Int32)
-  case sessionAlreadyRunning(SessionID)
+  case sessionAlreadyRunning(TerminalID)
   case processOutcomeUnknown(processIdentifier: Int32)
   /// The terminal host already runs as many sessions as it accepts.
   case tooManySessions(limit: Int)
@@ -222,7 +285,7 @@ public struct TerminalAttachment: Sendable {
 /// which outlives the process, so a restart hands out a new session object under the same id.
 /// Anything that caches an attachment has to tell those apart by object identity.
 public protocol TerminalSession: AnyObject, Sendable {
-  var id: SessionID { get }
+  var id: TerminalID { get }
 
   // A view needs the backlog and the live stream as one consistent value: reading them
   // separately would lose whatever arrives between the two calls.
@@ -246,8 +309,24 @@ extension TerminalSession {
 }
 
 public protocol TerminalSupervisor: Sendable {
-  func start(_ spec: TerminalSpec, for id: SessionID) async throws -> any TerminalSession
-  func session(for id: SessionID) async -> (any TerminalSession)?
-  func stop(id: SessionID, gracePeriod: Duration) async
+  func start(_ spec: TerminalSpec, for id: TerminalID) async throws -> any TerminalSession
+  func session(for id: TerminalID) async -> (any TerminalSession)?
+  func stop(id: TerminalID, gracePeriod: Duration) async
   func stopAll(gracePeriod: Duration) async
+}
+
+/// The agent's terminal of a session, named by the session: what every caller that predates the
+/// side terminals speaks.
+extension TerminalSupervisor {
+  public func start(_ spec: TerminalSpec, for id: SessionID) async throws -> any TerminalSession {
+    try await start(spec, for: id.agentTerminal)
+  }
+
+  public func session(for id: SessionID) async -> (any TerminalSession)? {
+    await session(for: id.agentTerminal)
+  }
+
+  public func stop(id: SessionID, gracePeriod: Duration) async {
+    await stop(id: id.agentTerminal, gracePeriod: gracePeriod)
+  }
 }

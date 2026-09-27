@@ -168,6 +168,17 @@ fifth verdict and who TCC holds responsible are documented in
 [`docs/architecture/0017-terminal-host.md`](docs/architecture/0017-terminal-host.md). Set
 `VIBE_TERMINAL_HOST=off` to keep every terminal inside the application, as a debugger expects.
 
+Each session also has a drawer of side terminals under it, for a server, a log or a `git` command
+(⌘J, or the terminal button of its status bar; ⌘T for a new tab). Each tab is a login shell in the
+session's folder, the same terminal component as the agent's, titled by the command it runs or the
+folder it is in. Hiding the drawer stops nothing, and a hidden terminal that writes or ends is
+signalled on the button. The side terminals belong to their session: they stop when it closes and
+come back when it reopens, or when the application relaunches — same tabs, same order, same folder,
+what each one showed — as new shells under a dated line, with nothing run again; with Keep Running,
+they stay in the terminal host with their agent. Their history is the one terminal output written to
+disk, out of backups, and Settings › Terminals turns it off. The decisions are documented in
+[`docs/architecture/0030-side-terminals.md`](docs/architecture/0030-side-terminals.md).
+
 The application never creates a branch or a worktree: the agent makes those it needs. The
 inspector's Git section reports what it did — each branch the session worked on, the repositories
 it is checked out in (worktrees the agent made for itself included), and whether it was created,

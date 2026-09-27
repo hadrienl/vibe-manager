@@ -14,15 +14,25 @@ public struct TerminalPaneView: View {
   /// False for a pane that stays mounted behind the one being shown.
   private let isActive: Bool
   private let accessibilityTitle: String?
+  /// False for a side terminal of the drawer (#43): its tab carries its state.
+  private let showsStatusBar: Bool
+  /// Shown in the status bar before its own button: the drawer's button, for the agent's terminal.
+  private let statusAccessory: AnyView?
+  /// See `TerminalSurface.claimsKeyboardOnActivation`.
+  private let claimsKeyboardOnActivation: Bool
 
   public init(
     model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
-    accessibilityTitle: String? = nil
+    accessibilityTitle: String? = nil, showsStatusBar: Bool = true,
+    statusAccessory: AnyView? = nil, claimsKeyboardOnActivation: Bool = true
   ) {
     self.model = model
     self.autoStart = autoStart
     self.isActive = isActive
     self.accessibilityTitle = accessibilityTitle
+    self.showsStatusBar = showsStatusBar
+    self.statusAccessory = statusAccessory
+    self.claimsKeyboardOnActivation = claimsKeyboardOnActivation
   }
 
   public var body: some View {
@@ -31,7 +41,8 @@ public struct TerminalPaneView: View {
       // launched with, so it has to exist before there is a process to show.
       TerminalSurface(
         pane: model, session: model.session, isActive: isActive, focusRequest: model.focusRequest,
-        accessibilityTitle: accessibilityTitle
+        accessibilityTitle: accessibilityTitle,
+        claimsKeyboardOnActivation: claimsKeyboardOnActivation
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .overlay {
@@ -59,12 +70,15 @@ public struct TerminalPaneView: View {
         }
       }
 
-      Divider()
-      TerminalStatusBar(
-        status: model.status,
-        stop: { Task { await model.stop() } },
-        restart: { Task { await model.start() } }
-      )
+      if showsStatusBar {
+        Divider()
+        TerminalStatusBar(
+          status: model.status,
+          accessory: statusAccessory,
+          stop: { Task { await model.stop() } },
+          restart: { Task { await model.start() } }
+        )
+      }
     }
     .task {
       guard autoStart else { return }
@@ -75,6 +89,7 @@ public struct TerminalPaneView: View {
 
 private struct TerminalStatusBar: View {
   let status: TerminalPaneModel.Status
+  let accessory: AnyView?
   let stop: () -> Void
   let restart: () -> Void
 
@@ -86,6 +101,9 @@ private struct TerminalStatusBar: View {
         .font(.callout)
         .foregroundStyle(.secondary)
       Spacer()
+      if let accessory {
+        accessory
+      }
       if status.isRunning {
         Button(action: stop) {
           Text("Stop", bundle: .module, comment: "Stops the terminal's process.")

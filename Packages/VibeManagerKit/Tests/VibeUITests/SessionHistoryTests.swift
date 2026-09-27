@@ -730,7 +730,7 @@ private actor EmptyingRepository: SessionRepository {
 private actor SpySupervisor: TerminalSupervisor {
   private(set) var startCount = 0
   private(set) var stopped: [SessionID] = []
-  private var sessions: [SessionID: FakeTerminalSession] = [:]
+  private var sessions: [TerminalID: FakeTerminalSession] = [:]
   private let outcome: SessionDetachOutcome
   private let startsFinished: Bool
   /// Holds every stop until `releaseStop()`, the way an agent slow to quit keeps a close waiting.
@@ -753,7 +753,7 @@ private actor SpySupervisor: TerminalSupervisor {
     heldStop = nil
   }
 
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
+  func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
     startCount += 1
     let session = FakeTerminalSession(
       id: id,
@@ -764,10 +764,10 @@ private actor SpySupervisor: TerminalSupervisor {
     return session
   }
 
-  func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
+  func session(for id: TerminalID) -> (any TerminalSession)? { sessions[id] }
 
-  func stop(id: SessionID, gracePeriod: Duration) async {
-    stopped.append(id)
+  func stop(id: TerminalID, gracePeriod: Duration) async {
+    stopped.append(id.agentSession)
     if holdsStop, !isStopReleased {
       await withCheckedContinuation { heldStop = $0 }
     }
@@ -787,19 +787,19 @@ private actor SpySupervisor: TerminalSupervisor {
 
   /// Ends a process the way a `/quit` would: from the outside, without anybody asking.
   func finish(id: SessionID, with state: TerminalProcessState) async {
-    await sessions[id]?.finish(with: state)
+    await sessions[id.agentTerminal]?.finish(with: state)
   }
 }
 
 private actor FakeTerminalSession: TerminalSession {
-  nonisolated let id: SessionID
+  nonisolated let id: TerminalID
 
   private var currentState: TerminalProcessState
   private var subscribers: [UUID: AsyncStream<TerminalEvent>.Continuation] = [:]
   private let stopOutcome: SessionDetachOutcome
 
   init(
-    id: SessionID,
+    id: TerminalID,
     stopOutcome: SessionDetachOutcome = .stopped,
     initialState: TerminalProcessState = .running(processIdentifier: 4242)
   ) {

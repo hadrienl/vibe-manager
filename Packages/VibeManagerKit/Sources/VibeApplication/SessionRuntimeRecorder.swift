@@ -109,6 +109,31 @@ public actor SessionRuntimeRecorder {
     state.sessions
   }
 
+  /// Records a side terminal's shell (#43), like a session's agent.
+  public func auxiliaryStarted(
+    _ terminal: TerminalID, of session: SessionID, processGroup: Int32?
+  ) async {
+    let startedAt = processGroup.flatMap { probe.startTime(of: $0) }
+    var records = (state.auxiliary ?? []).filter { $0.terminalID != terminal }
+    records.append(
+      AuxiliaryRuntimeRecord(
+        terminalID: terminal, sessionID: session, processGroup: processGroup,
+        processStartedAt: startedAt))
+    state.auxiliary = records
+    await write()
+  }
+
+  public func auxiliaryStopped(_ terminal: TerminalID) async {
+    let records = (state.auxiliary ?? []).filter { $0.terminalID != terminal }
+    guard records.count != (state.auxiliary ?? []).count else { return }
+    state.auxiliary = records.isEmpty ? nil : records
+    await write()
+  }
+
+  public func auxiliaryRecords() -> [AuxiliaryRuntimeRecord] {
+    state.auxiliary ?? []
+  }
+
   /// Writes the intention to resume, and says this instance stopped on purpose.
   ///
   /// The groups are dropped: those processes have just been stopped, and a group recorded here
@@ -122,6 +147,8 @@ public actor SessionRuntimeRecorder {
     state.sessions = ids.map { SessionRuntimeRecord(sessionID: $0) }
     state.resuming = nil
     state.host = nil
+    // Stopped with everything else: nothing of them is left to look for.
+    state.auxiliary = nil
     await store.write(state)
   }
 
@@ -145,11 +172,19 @@ public actor SessionRuntimeRecorder {
     state.sessions = kept.map { recorded[$0] ?? SessionRuntimeRecord(sessionID: $0) }
     state.resuming = closed.map { SessionRuntimeRecord(sessionID: $0) }
     state.host = host
+    // A session's side terminals stay in the host with its agent, and only with it.
+    let keptSet = Set(kept)
+    let auxiliary = (state.auxiliary ?? []).filter { keptSet.contains($0.sessionID) }
+    state.auxiliary = auxiliary.isEmpty ? nil : auxiliary
     await store.write(state)
   }
 
   private func update(sessions: [SessionRuntimeRecord]) async {
     state.sessions = sessions
+    await write()
+  }
+
+  private func write() async {
     guard !isSealed else { return }
     state.updatedAt = clock.now().storageRounded
     await store.write(state)

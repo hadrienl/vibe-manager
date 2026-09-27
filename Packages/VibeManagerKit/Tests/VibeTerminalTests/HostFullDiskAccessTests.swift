@@ -16,7 +16,7 @@ struct HostFullDiskAccessTests {
     let host = try InProcessTerminalHost(fullDiskAccess: FixedProbe(.granted))
     let supervisor = host.supervisor()
     let go = GoFile()
-    _ = try await supervisor.start(TerminalTestSupport.spec(script: go.script), for: SessionID())
+    _ = try await supervisor.start(TerminalTestSupport.spec(script: go.script), for: TerminalID())
 
     let access = await supervisor.agentRunnerAccess()
 
@@ -31,7 +31,7 @@ struct HostFullDiskAccessTests {
     let host = try InProcessTerminalHost(fullDiskAccess: nil)
     let supervisor = host.supervisor()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: "exit 0"), for: SessionID())
+      TerminalTestSupport.spec(script: "exit 0"), for: TerminalID())
     #expect(await Transcript.follow(session).waitForEnd())
 
     let access = await supervisor.agentRunnerAccess()
@@ -48,7 +48,7 @@ struct HostFullDiskAccessTests {
     let host = try InProcessTerminalHost(fullDiskAccess: FixedProbe(.granted))
     let first = host.supervisor()
     let go = GoFile()
-    _ = try await first.start(TerminalTestSupport.spec(script: go.script), for: SessionID())
+    _ = try await first.start(TerminalTestSupport.spec(script: go.script), for: TerminalID())
     await first.relinquish(keepRunning: true)
     let other = host.supervisor()
     guard case .connected = await other.reconnect() else {
@@ -77,7 +77,7 @@ struct HostFullDiskAccessTests {
       idleGracePeriod: .seconds(60), fullDiskAccess: FixedProbe(.notGranted))
     let supervisor = host.supervisor()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: "printf 'last words'; exit 0"), for: SessionID())
+      TerminalTestSupport.spec(script: "printf 'last words'; exit 0"), for: TerminalID())
     let transcript = await Transcript.follow(session)
     #expect(await transcript.waitForEnd())
 
@@ -97,7 +97,7 @@ struct HostFullDiskAccessTests {
     let supervisor = host.supervisor()
     let go = GoFile()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: go.script), for: SessionID())
+      TerminalTestSupport.spec(script: go.script), for: TerminalID())
     let transcript = await Transcript.follow(session)
 
     #expect(await supervisor.restartHostWhenIdle() == .armed)
@@ -113,13 +113,57 @@ struct HostFullDiskAccessTests {
     await host.shutDown()
   }
 
+  @Test("A side terminal does not hold a restart back: it is stopped, and the host goes")
+  func sideTerminalDoesNotHoldTheRestart() async throws {
+    // A host runs side terminals only with the trampoline that gives them their terminal.
+    ControllingTerminal.useTrampoline(at: try TerminalHostProcessTests.fixtureURL().path)
+    let host = try InProcessTerminalHost(idleGracePeriod: .seconds(60))
+    let supervisor = host.supervisor()
+    let go = GoFile()
+    let agent = try await supervisor.start(
+      TerminalTestSupport.spec(script: "exit 0"), for: TerminalID())
+    #expect(await Transcript.follow(agent).waitForEnd())
+    var shell = TerminalTestSupport.spec(script: go.script)
+    shell.role = .auxiliary
+    let side = try await supervisor.start(shell, for: TerminalID())
+    let transcript = await Transcript.follow(side)
+
+    #expect(await supervisor.restartHostWhenIdle() == .restarted)
+
+    #expect(await eventually { host.becameIdle })
+    #expect(await transcript.waitForEnd())
+    await host.shutDown()
+  }
+
+  @Test("Left running with no agent to come back for, a side terminal does not keep the host")
+  func sideTerminalAloneDoesNotKeepTheHost() async throws {
+    // A host runs side terminals only with the trampoline that gives them their terminal.
+    ControllingTerminal.useTrampoline(at: try TerminalHostProcessTests.fixtureURL().path)
+    let host = try InProcessTerminalHost(idleGracePeriod: .milliseconds(200))
+    let supervisor = host.supervisor()
+    let go = GoFile()
+    var shell = TerminalTestSupport.spec(script: go.script)
+    shell.role = .auxiliary
+    let side = try await supervisor.start(shell, for: TerminalID())
+    guard case .running(let processIdentifier) = await side.state() else {
+      Issue.record("The shell did not start")
+      return
+    }
+
+    await supervisor.relinquish(keepRunning: true)
+
+    #expect(await eventually { host.becameIdle })
+    #expect(await eventually { !isProcessAlive(processIdentifier) })
+    await host.shutDown()
+  }
+
   @Test("A restart called off leaves the host alone")
   func cancelledRestartLeavesTheHost() async throws {
     let host = try InProcessTerminalHost(idleGracePeriod: .seconds(60))
     let supervisor = host.supervisor()
     let go = GoFile()
     let session = try await supervisor.start(
-      TerminalTestSupport.spec(script: go.script), for: SessionID())
+      TerminalTestSupport.spec(script: go.script), for: TerminalID())
     let transcript = await Transcript.follow(session)
     #expect(await supervisor.restartHostWhenIdle() == .armed)
 
@@ -152,7 +196,7 @@ struct HostFullDiskAccessProcessTests {
         launchTimeout: TerminalHostProcessTests.launchTimeout, replyTimeout: .seconds(30)))
 
     let first = try await supervisor.start(
-      TerminalTestSupport.spec(script: "exit 0"), for: SessionID())
+      TerminalTestSupport.spec(script: "exit 0"), for: TerminalID())
     #expect(await Transcript.follow(first).waitForEnd())
     // No witness beside the socket: this host was born without the access.
     #expect(await supervisor.agentRunnerAccess().hostStatus == .notGranted)
@@ -164,7 +208,7 @@ struct HostFullDiskAccessProcessTests {
     FileManager.default.createFile(
       atPath: location.directory.appendingPathComponent("fda-witness").path, contents: nil)
     let second = try await supervisor.start(
-      TerminalTestSupport.spec(script: "exit 0"), for: SessionID())
+      TerminalTestSupport.spec(script: "exit 0"), for: TerminalID())
     #expect(second is HostedTerminalSession)
     let after = try #require(await supervisor.hostIdentity())
 

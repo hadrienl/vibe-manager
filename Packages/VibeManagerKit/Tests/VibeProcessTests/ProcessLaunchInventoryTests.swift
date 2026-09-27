@@ -17,6 +17,9 @@ struct ProcessLaunchInventoryTests {
     "Packages/VibeManagerKit/Sources/VibeTerminal/TerminalHost.swift",
     // The same binary, asked whether a process born now has Full Disk Access (#76).
     "Packages/VibeManagerKit/Sources/VibeTerminal/CurrentFullDiskAccess.swift",
+    // The same binary, started by `PseudoTerminal` for a side terminal (#43): it takes the terminal
+    // as its controlling one and `exec`s the shell, in the process the launcher already made.
+    "Packages/VibeManagerKit/Sources/VibeTerminal/ControllingTerminal.swift",
   ]
 
   /// Each a whole identifier followed by its call: `reapProcess()` is not `Process()`.

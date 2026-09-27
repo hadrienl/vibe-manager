@@ -91,6 +91,12 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// host — so that what it is can be read before its number could be given to another (#69).
   public var processDidStart: (@MainActor (SessionID, Int32) -> Void)?
 
+  /// The side terminals of each session's drawer (#43), which follow what happens to its agent.
+  public weak var sideTerminals: (any SessionSideTerminals)?
+  /// Sessions whose next stop must leave their side terminals running: an agent switch stops the
+  /// agent and starts another, and the dev server in the drawer has nothing to do with that.
+  private var preservingSideTerminals: Set<SessionID> = []
+
   /// How long a launch waits for the pane to measure itself before falling back to the spec's
   /// own size. Long enough for one layout pass, short enough never to feel like a delay.
   private let viewportTimeout: Duration
@@ -265,6 +271,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       processDidStart?(session.id, processIdentifier)
     }
     startedAt[session.id] = launchedAt
+    // Not waited for: a drawer left open comes back with its session, and its shells take their
+    // own time to start.
+    let startedID = session.id
+    Task { [weak self] in await self?.sideTerminals?.sessionStarted(startedID) }
     diagnostics.record(
       .session, .info, "session.launched",
       [
@@ -485,6 +495,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     followOutput(of: session.id, terminal: terminal)
     await recorder?.started(session.id, processGroup: processIdentifier)
     processDidStart?(session.id, processIdentifier)
+    // The side terminals it kept running are taken back with it.
+    await sideTerminals?.sessionAdopted(session.id)
     return true
   }
 
@@ -529,6 +541,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // The run goes on without the application: the next launch says how it ended.
     await usage?.detached(id)
     startedAt[id] = nil
+    await sideTerminals?.handOff(id)
     diagnostics.record(.session, .info, "session.handedOff", ["session": diagnostics.pseudonym(id)])
     return true
   }
@@ -607,6 +620,26 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// would not let go of leaves the session in `processOutcomeUnknown`, and saying "stopped"
   /// there would be exactly the lie the archive is not allowed to tell.
   public func detach(_ id: SessionID) async -> SessionDetachOutcome {
+    // The session's side terminals are written down and stopped alongside its agent, not after
+    // it: both wait out a grace period, and a quit has a deadline.
+    let sideStop: Task<Void, Never>? =
+      preservingSideTerminals.contains(id)
+      ? nil : Task { [weak self] in await self?.sideTerminals?.shutDown(id) }
+    let outcome = await detachAgent(id)
+    await sideStop?.value
+    return outcome
+  }
+
+  /// Leaves the side terminals of this session running through its next stop: an agent switch.
+  public func preserveSideTerminals(of id: SessionID) {
+    preservingSideTerminals.insert(id)
+  }
+
+  public func stopPreservingSideTerminals(of id: SessionID) {
+    preservingSideTerminals.remove(id)
+  }
+
+  private func detachAgent(_ id: SessionID) async -> SessionDetachOutcome {
     exitTasks.removeValue(forKey: id)?.cancel()
     // Retires the watch as well as cancelling it: one already on its way to the main actor is
     // past the point where cancellation can stop it.
@@ -730,6 +763,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       await observer.finished()
     }
     await activity?.processEnded(id)
+    guard exitGenerations[id] == generation else { return }
+    // The agent ended on its own, which closes the session: its side terminals close with it.
+    await sideTerminals?.shutDown(id)
     guard exitGenerations[id] == generation else { return }
     // A session that was never marked active — a launch that failed — has nothing to close, and
     // `close` says so by refusing the transition rather than by inventing a second rule here.

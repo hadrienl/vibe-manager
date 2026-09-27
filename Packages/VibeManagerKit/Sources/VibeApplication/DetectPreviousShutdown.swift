@@ -312,7 +312,8 @@ public struct DetectPreviousShutdown: Sendable {
     // Only a session the host lost can have left a process nobody holds.
     // Identified, they are stopped here, as after a crash; one that cannot be identified is left
     // alone, and a reattach has no offer on screen to carry that warning.
-    _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID] == nil })
+    _ = leftovers(of: previous.sessions.filter { byID[$0.sessionID.agentTerminal] == nil })
+    stopAuxiliaryLeftovers((previous.auxiliary ?? []).filter { byID[$0.terminalID] == nil })
     await recorder.claim()
 
     let storedByID = Dictionary(
@@ -323,7 +324,7 @@ public struct DetectPreviousShutdown: Sendable {
     var ended: [SessionID] = []
     var stale: [WorkSession] = []
     for session in active {
-      guard let summary = byID[session.id] else {
+      guard let summary = byID[session.id.agentTerminal] else {
         stale.append(session)
         continue
       }
@@ -335,8 +336,22 @@ public struct DetectPreviousShutdown: Sendable {
     }
     // What the host holds for a session the store no longer calls active — archived, deleted by
     // hand, closed by a copy that could not reach the host — has nobody left to show it to.
-    for summary in hosted where storedByID[summary.id]?.status != .active {
-      await host?.discard(summary.id)
+    //
+    // A side terminal (#43) is kept only with its session's agent, the one thing it was left
+    // running with; one the document does not name — written before it existed, or by a quit that
+    // did not keep it — is let go like any terminal nobody will show.
+    let auxiliaryOwners = Dictionary(
+      (previous.auxiliary ?? []).map { ($0.terminalID, $0.sessionID) },
+      uniquingKeysWith: { first, _ in first })
+    let adopted = Set(running)
+    for summary in hosted {
+      if let owner = auxiliaryOwners[summary.id] {
+        if !adopted.contains(owner) { await host?.discard(summary.id) }
+        continue
+      }
+      if storedByID[summary.id.agentSession]?.status != .active {
+        await host?.discard(summary.id)
+      }
     }
 
     let reconciled = await reconcileStaleSessions(stale, lastSeenAt: previous.lastSeenAt)
@@ -366,7 +381,22 @@ public struct DetectPreviousShutdown: Sendable {
   /// but cannot be identified is **reported and left alone** — pids are recycled, and tidying up
   /// on the strength of a number would kill somebody else's program.
   private func leftovers(of previous: SessionRuntimeState?) -> [SessionRuntimeRecord] {
-    leftovers(of: previous?.sessions ?? [])
+    // A side terminal's shell (#43) is stopped like an agent once identified, and never reported:
+    // the banner speaks of sessions, and the one it belongs to is reported, or resumed, anyway.
+    stopAuxiliaryLeftovers(previous?.auxiliary ?? [])
+    return leftovers(of: previous?.sessions ?? [])
+  }
+
+  /// Side terminals' shells, and the jobs each ran in a group of its own (#43): a dev server left
+  /// by a crash holds its port, and the restored tab's new shell would start beside it.
+  private func stopAuxiliaryLeftovers(_ records: [AuxiliaryRuntimeRecord]) {
+    for record in records {
+      guard let group = record.processGroup else { continue }
+      let identity = processes.identify(processGroup: group, startedAt: record.processStartedAt)
+      processes.terminateJobs(
+        ofShell: group, startedAt: record.processStartedAt, identity: identity)
+      if identity == .matches { processes.terminate(processGroup: group) }
+    }
   }
 
   private func leftovers(of records: [SessionRuntimeRecord]) -> [SessionRuntimeRecord] {

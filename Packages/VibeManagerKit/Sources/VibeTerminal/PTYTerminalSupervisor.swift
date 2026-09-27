@@ -3,11 +3,12 @@ import VibeApplication
 import VibeDomain
 
 public actor PTYTerminalSupervisor: TerminalSupervisor {
-  private var sessions: [SessionID: PTYTerminalSession] = [:]
+  private var sessions: [TerminalID: PTYTerminalSession] = [:]
+  private var auxiliary: Set<TerminalID> = []
 
   public init() {}
 
-  public func start(_ spec: TerminalSpec, for id: SessionID) async throws -> any TerminalSession {
+  public func start(_ spec: TerminalSpec, for id: TerminalID) async throws -> any TerminalSession {
     if let existing = sessions[id] {
       guard await existing.state().isFinished else {
         throw TerminalError.sessionAlreadyRunning(id)
@@ -17,20 +18,26 @@ public actor PTYTerminalSupervisor: TerminalSupervisor {
 
     let session = try PTYTerminalSession.start(id: id, spec: spec)
     sessions[id] = session
+    if spec.role == .auxiliary {
+      auxiliary.insert(id)
+    } else {
+      auxiliary.remove(id)
+    }
     Task { await self.releaseWhenFinished(session) }
     return session
   }
 
-  /// Terminals running here. A session is forgotten as soon as it has ended.
+  /// Agents running here. A session is forgotten as soon as it has ended, and a side terminal
+  /// (#43) is not an agent.
   public func runningCount() -> Int {
-    sessions.count
+    sessions.keys.filter { !auxiliary.contains($0) }.count
   }
 
-  public func session(for id: SessionID) -> (any TerminalSession)? {
+  public func session(for id: TerminalID) -> (any TerminalSession)? {
     sessions[id]
   }
 
-  public func stop(id: SessionID, gracePeriod: Duration) async {
+  public func stop(id: TerminalID, gracePeriod: Duration) async {
     guard let session = sessions[id] else { return }
     await session.stop(gracePeriod: gracePeriod)
     // The grace period is long enough for a replacement session to have been registered under the

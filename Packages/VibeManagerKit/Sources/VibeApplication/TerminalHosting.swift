@@ -23,12 +23,12 @@ public struct TerminalHostIdentity: Hashable, Codable, Sendable {
 
 /// One session the host holds, as it describes it.
 public struct HostedSessionSummary: Equatable, Sendable {
-  public let id: SessionID
+  public let id: TerminalID
   public let state: TerminalProcessState
   /// When the process ended, if it has. The host saw it; nobody else was there to.
   public let endedAt: Date?
 
-  public init(id: SessionID, state: TerminalProcessState, endedAt: Date? = nil) {
+  public init(id: TerminalID, state: TerminalProcessState, endedAt: Date? = nil) {
     self.id = id
     self.state = state
     self.endedAt = endedAt
@@ -61,7 +61,7 @@ public protocol TerminalHosting: Sendable {
   /// The host this application is talking to, if any.
   func hostIdentity() async -> TerminalHostIdentity?
   /// Stops a session the host holds and forgets it: something the store no longer wants.
-  func discard(_ id: SessionID) async
+  func discard(_ id: TerminalID) async
   /// Says goodbye. `keepRunning` is the one way a session outlives the application: a host that
   /// loses its client without it stops everything, as a crash always has.
   func relinquish(keepRunning: Bool) async

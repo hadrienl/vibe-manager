@@ -532,8 +532,32 @@ public struct RootView: View {
       Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
         model.cancelClose()
       }
-    } message: { _ in
-      Text("The agent will be stopped. The session can be restarted later.", bundle: .module)
+    } message: { session in
+      Text(closeConfirmationMessage(for: session))
+    }
+    // A side terminal is closed at once, unless a command runs in its foreground (#43).
+    .confirmationDialog(
+      Text("Close this terminal?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingTerminalClose != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelCloseDrawerTerminal()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingTerminalClose
+    ) { pending in
+      Button(LocalizedStringResource("Close Terminal", bundle: .module), role: .destructive) {
+        model.confirmCloseDrawerTerminal(pending)
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelCloseDrawerTerminal()
+      }
+    } message: { pending in
+      Text(
+        "“\(pending.command)” is still running in this terminal and will be stopped.",
+        bundle: .module, comment: "The argument is the command running in a side terminal.")
     }
     // Closing several sessions asks #51's question once, with its "Don't ask again" (#77).
     .confirmationDialog(
@@ -620,6 +644,23 @@ public struct RootView: View {
     )
   }
 
+  private func closeConfirmationMessage(for session: WorkSession) -> String {
+    let consequence = String(
+      localized: "The agent will be stopped. The session can be restarted later.", bundle: .module)
+    guard let drawer = drawerCommandsSentence(for: session) else { return consequence }
+    return consequence + " " + drawer
+  }
+
+  /// The commands a close or an archive stops in the session's side terminals (#43), named.
+  private func drawerCommandsSentence(for session: WorkSession) -> String? {
+    let commands = model.runningDrawerCommands(of: session.id)
+    guard !commands.isEmpty else { return nil }
+    let list = commands.map { "“\($0)”" }.formatted(.list(type: .and))
+    return String(
+      localized: "What runs in its side terminals will be stopped: \(list).", bundle: .module,
+      comment: "The argument lists the commands running in the session's side terminals.")
+  }
+
   private func archiveConfirmationMessage(for session: WorkSession) -> String {
     let isRunning = model.pane(for: session.id)?.status == .running
     let consequence = String(
@@ -629,9 +670,10 @@ public struct RootView: View {
         """,
       bundle: .module,
       comment: "Archived is the line at the foot of the sidebar that lists archived sessions.")
-    guard isRunning else { return consequence }
+    let drawer = drawerCommandsSentence(for: session).map { " " + $0 } ?? ""
+    guard isRunning else { return consequence + drawer }
     return String(localized: "Its running agent will be stopped.", bundle: .module) + " "
-      + consequence
+      + consequence + drawer
   }
 
   /// `.detailOnly` is the only hidden state worth recording; the others all show the sidebar.
@@ -687,7 +729,7 @@ public struct RootView: View {
           InProcessAgentBar()
           Divider()
         }
-        sessionContent(for: session)
+        sessionWithDrawer(for: session)
       }
     } else {
       ContentUnavailableView {
@@ -708,6 +750,49 @@ public struct RootView: View {
 
   /// About eighty columns at the terminal's default font: the web view never takes more.
   private static let terminalMinimumWidth: Double = 560
+  /// About eight lines and the status bar: the drawer of side terminals gives way before the
+  /// session's own terminal gets any shorter.
+  private static let sessionMinimumHeight: Double = 160
+
+  /// The session's content, and its drawer of side terminals under it, the whole width (#43).
+  ///
+  /// One structure whatever the session, the drawer alone being conditional: the terminal stack
+  /// holds every session's terminal, and a branch that swapped it for another would remount them
+  /// all — a replayed history and a lost scroll position for each — at every change between a
+  /// session that has a drawer and one that has not.
+  private func sessionWithDrawer(for session: WorkSession) -> some View {
+    let drawer = model.canUseDrawer(session) ? model.terminals?.drawer(for: session.id) : nil
+    return GeometryReader { proxy in
+      let total = Double(proxy.size.height)
+      let lower = SessionTerminalsDocument.heightRange.lowerBound
+      let upper = max(lower, min(total * 0.7, total - Self.sessionMinimumHeight))
+      VStack(spacing: 0) {
+        sessionContent(for: session)
+        if let drawer, drawer.isVisible, !drawer.terminals.isEmpty {
+          let height = min(max(drawer.height, lower), upper)
+          SplitHandle(
+            axis: .vertical,
+            length: height, range: lower...upper,
+            label: Text("Divider between the session and its side terminals", bundle: .module),
+            value: Text(
+              "\(Int(height)) points tall", bundle: .module,
+              comment:
+                "The height of the drawer of side terminals, read by VoiceOver on its divider."
+            ),
+            sizesPaneBelow: true,
+            onChange: { drawer.setHeight($0) })
+          TerminalDrawerView(model: model, drawer: drawer, sessionName: session.name)
+            .frame(height: height)
+            .id(session.id)
+        }
+      }
+    }
+    // Asked again when the session becomes active: a drawer left open comes back with it.
+    .task(id: DrawerPreparationKey(session: session.id, isActive: drawer != nil)) {
+      guard drawer != nil else { return }
+      await model.terminals?.prepare(session.id)
+    }
+  }
 
   /// The terminal, and the web view beside it or in turns with it (#69).
   ///
@@ -785,7 +870,9 @@ public struct RootView: View {
           // Started by the launcher, so switching sessions never restarts an agent.
           TerminalPaneView(
             model: pane, autoStart: false, isActive: isActive,
-            accessibilityTitle: terminalTitle(for: listed, pane: pane)
+            accessibilityTitle: terminalTitle(for: listed, pane: pane),
+            statusAccessory: model.terminals == nil
+              ? nil : AnyView(DrawerStatusButton(model: model, session: listed))
           )
           .id(listed.id)
           .opacity(isActive ? 1 : 0)
@@ -869,6 +956,12 @@ public struct RootView: View {
     // then centred in the column instead of sitting under the toolbar.
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
+}
+
+/// What the drawer of the session on screen is prepared for: that session, once it is active.
+private struct DrawerPreparationKey: Hashable {
+  let session: SessionID
+  let isActive: Bool
 }
 
 /// The status of the session on screen, in the toolbar, as a menu of the four columns.

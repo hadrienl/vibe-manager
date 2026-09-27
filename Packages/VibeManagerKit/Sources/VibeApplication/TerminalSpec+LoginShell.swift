@@ -7,7 +7,8 @@ extension TerminalSpec {
   public static func loginShell(
     workingDirectoryURL: URL,
     size: TerminalSize = .default,
-    scrollback: TerminalScrollbackLimits = .default
+    scrollback: TerminalScrollbackLimits = .default,
+    role: TerminalRole = .agent
   ) -> TerminalSpec {
     let environment = TerminalEnvironment.make()
     let shellPath = environment["SHELL"].map { $0.isEmpty ? "/bin/zsh" : $0 } ?? "/bin/zsh"
@@ -17,7 +18,8 @@ extension TerminalSpec {
       environment: environment,
       workingDirectoryURL: workingDirectoryURL,
       initialSize: size,
-      scrollback: scrollback
+      scrollback: scrollback,
+      role: role
     )
   }
 }

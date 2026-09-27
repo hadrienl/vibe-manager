@@ -106,11 +106,14 @@ public struct DiagnosticSnapshot: Sendable {
     public var corruptCopies: Int
     public var noteFiles: Int
     public var noteBytes: Int
+    /// What the side terminals' histories weigh on disk (#43). Their size only: never a byte of
+    /// what they hold.
+    public var terminalHistoryBytes: Int
 
     public init(
       schemaVersion: Int?, sessionsByStatus: [SessionStatus: Int], storeBytes: Int?,
       backupBytes: Int?, backupModifiedAt: Date?, corruptCopies: Int, noteFiles: Int,
-      noteBytes: Int
+      noteBytes: Int, terminalHistoryBytes: Int = 0
     ) {
       self.schemaVersion = schemaVersion
       self.sessionsByStatus = sessionsByStatus
@@ -120,6 +123,7 @@ public struct DiagnosticSnapshot: Sendable {
       self.corruptCopies = corruptCopies
       self.noteFiles = noteFiles
       self.noteBytes = noteBytes
+      self.terminalHistoryBytes = terminalHistoryBytes
     }
   }
 
@@ -325,6 +329,7 @@ public enum DiagnosticArchive {
       Backup: \(store.backupBytes.map { "\($0) bytes, \(date(store.backupModifiedAt))" } ?? "absent")
       Damaged copies kept: \(store.corruptCopies)
       Note files: \(store.noteFiles), \(store.noteBytes) bytes
+      Side terminal histories: \(store.terminalHistoryBytes) bytes
 
       """
   }

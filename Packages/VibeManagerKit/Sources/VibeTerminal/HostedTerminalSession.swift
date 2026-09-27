@@ -11,7 +11,7 @@ import VibeDomain
 public actor HostedTerminalSession: HostedTerminal {
   private static let subscriberBufferLimit = 512
 
-  public nonisolated let id: SessionID
+  public nonisolated let id: TerminalID
   private let supervisor: HostedTerminalSupervisor
 
   private var historyBuffer: TerminalHistory
@@ -23,7 +23,7 @@ public actor HostedTerminalSession: HostedTerminal {
   private var needsRedraw: Bool
 
   init(
-    id: SessionID,
+    id: TerminalID,
     supervisor: HostedTerminalSupervisor,
     state: TerminalProcessState,
     scrollback: TerminalScrollbackLimits,

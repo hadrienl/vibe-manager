@@ -84,6 +84,12 @@ public struct SessionPseudonymizer: Sendable {
   public func callAsFunction(_ id: SessionID) -> DiagnosticValue {
     .session(SessionPseudonym(id, salt: salt))
   }
+
+  /// A terminal under the pseudonym of the UUID it carries: the agent's terminal reads as its
+  /// session, as it always did, and a side terminal (#43) gets one of its own.
+  public func callAsFunction(_ id: TerminalID) -> DiagnosticValue {
+    callAsFunction(id.agentSession)
+  }
 }
 
 /// A diagnostic log and the pseudonymizer that goes with it: what a component is given.

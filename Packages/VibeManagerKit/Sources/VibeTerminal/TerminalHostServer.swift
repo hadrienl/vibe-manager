@@ -64,6 +64,7 @@ public actor TerminalHostServer {
 
   private struct Hosted {
     let session: PTYTerminalSession
+    let role: TerminalRole
     var endedAt: Date?
   }
 
@@ -78,10 +79,10 @@ public actor TerminalHostServer {
 
   private let configuration: Configuration
   private let onIdle: @Sendable () -> Void
-  private var sessions: [SessionID: Hosted] = [:]
+  private var sessions: [TerminalID: Hosted] = [:]
   private var owner: Client?
   private var keepsRunning = false
-  private var forwards: [SessionID: Task<Void, Never>] = [:]
+  private var forwards: [TerminalID: Task<Void, Never>] = [:]
   private var idleTask: Task<Void, Never>?
   /// Set by `retire`: the host leaves as soon as it is idle, without its grace period.
   private var isRetiring = false
@@ -196,10 +197,14 @@ public actor TerminalHostServer {
   }
 
   /// What this host speaks beyond the core. It cannot say whether it has Full Disk Access
-  /// without a probe to ask.
+  /// without a probe to ask, nor start side terminals properly without the trampoline.
   private var capabilities: [String] {
     TerminalHostCapability.all.filter {
-      $0 != TerminalHostCapability.fullDiskAccess || configuration.fullDiskAccess != nil
+      switch $0 {
+      case TerminalHostCapability.fullDiskAccess: return configuration.fullDiskAccess != nil
+      case TerminalHostCapability.sideTerminals: return ControllingTerminal.trampolinePath != nil
+      default: return true
+      }
     }
   }
 
@@ -274,10 +279,14 @@ public actor TerminalHostServer {
 
   /// Agrees to leave once idle when no agent runs, and forgets the sessions that ended: the
   /// client asking has read them. Refuses, having changed nothing, when an agent still runs.
+  ///
+  /// A side terminal (#43) does not hold it back: its shell never ends on its own, and would keep
+  /// a restart from ever happening. It is stopped with whatever it runs, and its tab says so.
   private func retire() async -> Bool {
-    for hosted in sessions.values where await !hosted.session.state().isFinished {
-      return false
+    for hosted in sessions.values where hosted.role == .agent {
+      guard await hosted.session.state().isFinished else { return false }
     }
+    await stopAuxiliarySessions()
     for id in Array(sessions.keys) {
       await release(id)
     }
@@ -303,12 +312,13 @@ public actor TerminalHostServer {
     for (id, hosted) in sessions {
       records.append(
         HostedSessionRecord(
-          session: id, state: await hosted.session.state(), endedAt: hosted.endedAt))
+          session: id, state: await hosted.session.state(), endedAt: hosted.endedAt,
+          role: hosted.role))
     }
     return records
   }
 
-  private func start(_ spec: TerminalSpec, for id: SessionID) async -> TerminalHostMessage.Body {
+  private func start(_ spec: TerminalSpec, for id: TerminalID) async -> TerminalHostMessage.Body {
     // On its way out, with the goodbye that follows stopping everything: an agent started now
     // would be stopped with it. The client waits for the next host instead of asking this one.
     guard !isRetiring else { return .startFailed(.spawnFailed(code: EAGAIN)) }
@@ -333,7 +343,7 @@ public actor TerminalHostServer {
       configuration.diagnostics.record(
         .session, .info, "host.sessionStarted",
         ["session": configuration.diagnostics.pseudonym(id), "running": .count(running + 1)])
-      sessions[id] = Hosted(session: session)
+      sessions[id] = Hosted(session: session, role: spec.role)
       watch(session)
       updateIdleState()
       guard case .running(let processIdentifier) = await session.state() else {
@@ -356,7 +366,7 @@ public actor TerminalHostServer {
 
   /// History first, then `attached`, then the live stream — one consistent value, as
   /// `TerminalSession.attach()` promises, cut into frames.
-  private func attach(_ id: SessionID, request: UInt64, client: Client) async {
+  private func attach(_ id: TerminalID, request: UInt64, client: Client) async {
     guard let hosted = sessions[id] else {
       return await reply(request, .unknownSession, to: client)
     }
@@ -408,11 +418,11 @@ public actor TerminalHostServer {
     }
   }
 
-  private func endedAt(of id: SessionID) -> Date? {
+  private func endedAt(of id: TerminalID) -> Date? {
     sessions[id]?.endedAt
   }
 
-  private func release(_ id: SessionID) async {
+  private func release(_ id: TerminalID) async {
     guard let hosted = sessions[id], await hosted.session.state().isFinished else { return }
     sessions[id] = nil
     forwards.removeValue(forKey: id)?.cancel()
@@ -433,6 +443,28 @@ public actor TerminalHostServer {
       await stopAll()
     }
     updateIdleState()
+  }
+
+  /// Stops the side terminals still running, and waits until their clients have read their end.
+  private func stopAuxiliarySessions() async {
+    let running = sessions.filter { $0.value.role == .auxiliary && $0.value.endedAt == nil }
+    guard !running.isEmpty else { return }
+    configuration.diagnostics.record(
+      .host, .info, "host.auxiliaryStopped", ["sessions": .count(running.count)])
+    await withTaskGroup(of: Void.self) { group in
+      for hosted in running.values {
+        group.addTask { await hosted.session.stop(gracePeriod: .seconds(1)) }
+      }
+    }
+    for id in running.keys {
+      await forwards[id]?.value
+    }
+  }
+
+  /// Whether an agent is kept here, running or ended and not read yet: a side terminal alone is
+  /// no reason for the host to stay, since nobody will take it back without its agent.
+  private var keepsAgent: Bool {
+    sessions.values.contains { $0.role == .agent }
   }
 
   private func stopAll() async {
@@ -494,7 +526,7 @@ public actor TerminalHostServer {
 
   private func updateIdleState() {
     Task { await self.refreshActivity() }
-    guard sessions.isEmpty, owner == nil else {
+    guard !keepsAgent, owner == nil else {
       idleTask?.cancel()
       idleTask = nil
       return
@@ -508,8 +540,12 @@ public actor TerminalHostServer {
     }
   }
 
-  private func endIfStillIdle() {
-    guard sessions.isEmpty, owner == nil else { return }
+  private func endIfStillIdle() async {
+    guard !keepsAgent, owner == nil else { return }
+    // Left running with an agent that has ended and been forgotten since: nobody will come back
+    // for them.
+    await stopAuxiliarySessions()
+    guard !keepsAgent, owner == nil else { return }
     configuration.diagnostics.record(.host, .info, "host.idleExit")
     configuration.diagnostics.flush()
     onIdle()
@@ -517,7 +553,8 @@ public actor TerminalHostServer {
 
   private func refreshActivity() async {
     var isRunning = false
-    for hosted in sessions.values where hosted.endedAt == nil {
+    // Agents only: a side terminal's shell always runs, and is no work the Mac must keep up with.
+    for hosted in sessions.values where hosted.role == .agent && hosted.endedAt == nil {
       isRunning = true
       break
     }

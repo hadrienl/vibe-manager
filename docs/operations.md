@@ -13,6 +13,7 @@ saved, and it holds no prompt, note, session name, folder name or terminal conte
 | Damaged stores kept for inspection | `…/com.hadrienl.VibeManager/sessions.corrupt-<uuid>.json` |
 | What the last run was running | `…/com.hadrienl.VibeManager/runtime.json` |
 | Notes | `…/com.hadrienl.VibeManager/Notes/<session>.txt` |
+| Side terminals of each session: tabs, and what each showed (#43) | `…/com.hadrienl.VibeManager/Terminals/<session>/drawer.json`, `<terminal>.scrollback` — out of backups; Settings › Terminals turns the histories off and erases them |
 | Session journals: summary, resources, transcript cursors | `…/com.hadrienl.VibeManager/Journal/<session>.json` |
 | Names given to groups of the sidebar | `…/com.hadrienl.VibeManager/folders.json` |
 | Project icons of the sessions | `…/com.hadrienl.VibeManager/Icons/<sha256>.png` |
@@ -149,4 +150,12 @@ The agents' own files — `~/.claude`, `~/.codex` — belong to them and are lef
 - **The agents' permissions are theirs.** What Claude Code or Codex may do inside a session is
   their own configuration; Vibe Manager neither widens nor narrows it.
 - **Each terminal keeps 5,000 lines** on screen and in its history (about 17 MB for a full one of
-  120 columns): many long-running sessions add up.
+  120 columns): many long-running sessions add up. Only the drawer of the session on screen is
+  drawn; the side terminals of the others keep their history in the terminal host.
+- **A side terminal comes back as a new shell.** Reopening a session, or relaunching after a plain
+  quit or a crash, restarts each of its side terminals in the folder it was in, under what it
+  showed: what was running in it is not running any more, and nothing is run again. Only Keep
+  Running leaves them working, with their session's agent.
+- **Closing a session stops its side terminals**, a dev server started in one included; switching
+  its agent does not.
+- **At most eight side terminals per session.**

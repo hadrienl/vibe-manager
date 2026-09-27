@@ -194,6 +194,17 @@
         }
       }
     },
+    "%@ ended" : {
+      "comment" : "Said of a hidden side terminal whose shell ended. The argument is its title.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ s’est terminé"
+          }
+        }
+      }
+    },
     "%@ in" : {
       "comment" : "Input tokens, abbreviated: “12.3 k in”.",
       "localizations" : {
@@ -1992,6 +2003,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld %% pour %2$@"
+          }
+        }
+      }
+    },
+    "%lld points tall" : {
+      "comment" : "The height of the drawer of side terminals, read by VoiceOver on its divider.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld point tall"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points tall"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points de haut"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld point de haut"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points de haut"
+                }
+              }
+            }
           }
         }
       }
@@ -4378,6 +4436,28 @@
         }
       }
     },
+    "Close" : {
+      "comment" : "Closes a side terminal.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        }
+      }
+    },
+    "Close %@" : {
+      "comment" : "Closes a side terminal. The argument is its title.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer %@"
+          }
+        }
+      }
+    },
     "Close %lld Sessions" : {
       "comment" : "A command on several selected sessions.",
       "localizations" : {
@@ -4491,12 +4571,42 @@
         }
       }
     },
+    "Close Terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer le terminal"
+          }
+        }
+      }
+    },
+    "Close Terminal (⌘W)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer le terminal (⌘W)"
+          }
+        }
+      }
+    },
     "Close this session?" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fermer cette session ?"
+          }
+        }
+      }
+    },
+    "Close this terminal?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer ce terminal ?"
           }
         }
       }
@@ -5065,6 +5175,16 @@
         }
       }
     },
+    "Divider between the session and its side terminals" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Séparateur entre la session et ses terminaux annexes"
+          }
+        }
+      }
+    },
     "Divider between the terminal and the web view" : {
       "localizations" : {
         "fr" : {
@@ -5122,6 +5242,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Double-cliquez sur un fichier de la liste Git, ou appuyez sur Retour, pour l’ouvrir."
+          }
+        }
+      }
+    },
+    "Double-click to rename" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double-cliquez pour renommer"
           }
         }
       }
@@ -5913,7 +6043,7 @@
       }
     },
     "Hidden" : {
-      "comment" : "The inspector is hidden.\nThe web view is hidden.",
+      "comment" : "The drawer of side terminals is hidden.\nThe inspector is hidden.\nThe web view is hidden.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -5940,6 +6070,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer les détails"
+          }
+        }
+      }
+    },
+    "Hide Terminals" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les terminaux"
+          }
+        }
+      }
+    },
+    "Hide Terminals (⌘J)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les terminaux (⌘J)"
+          }
+        }
+      }
+    },
+    "Hide Terminals (⌘J): their processes keep running" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les terminaux (⌘J) : leurs processus continuent de tourner"
           }
         }
       }
@@ -6254,6 +6414,16 @@
         }
       }
     },
+    "Keep the history of side terminals" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conserver l’historique des terminaux annexes"
+          }
+        }
+      }
+    },
     "Keep them running" : {
       "comment" : "What to do when quitting with agents running.",
       "localizations" : {
@@ -6315,6 +6485,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "7 derniers jours"
+          }
+        }
+      }
+    },
+    "Leave empty to follow the shell's folder or command." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laissez vide pour suivre le dossier ou la commande du shell."
           }
         }
       }
@@ -6621,6 +6801,26 @@
         }
       }
     },
+    "Move Left" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer à gauche"
+          }
+        }
+      }
+    },
+    "Move Right" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer à droite"
+          }
+        }
+      }
+    },
     "Move Sessions" : {
       "comment" : "Moves several sessions.",
       "localizations" : {
@@ -6798,6 +6998,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau modèle"
+          }
+        }
+      }
+    },
+    "New Terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau terminal"
+          }
+        }
+      }
+    },
+    "New Terminal (⌘T)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau terminal (⌘T)"
           }
         }
       }
@@ -8393,6 +8613,26 @@
         }
       }
     },
+    "Rename…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer…"
+          }
+        }
+      }
+    },
+    "Reopen the session to find its terminals again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rouvrez la session pour retrouver ses terminaux"
+          }
+        }
+      }
+    },
     "Replace" : {
       "comment" : "Replace the template of the library.",
       "localizations" : {
@@ -8492,6 +8732,7 @@
       }
     },
     "Restart" : {
+      "comment" : "Starts a new shell in a side terminal.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -9506,6 +9747,16 @@
         }
       }
     },
+    "Show Terminals (⌘J)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les terminaux (⌘J)"
+          }
+        }
+      }
+    },
     "Show Web View" : {
       "comment" : "Shows the session's web view beside its terminal.",
       "localizations" : {
@@ -9630,7 +9881,7 @@
       }
     },
     "Shown" : {
-      "comment" : "The inspector is shown.\nThe web view is shown.",
+      "comment" : "The drawer of side terminals is shown.\nThe inspector is shown.\nThe web view is shown.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -9647,6 +9898,81 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Indique dans la barre latérale quand il travaille, pose une question ou a terminé. Nécessite des hooks que %@ vous demande d’approuver une fois."
+          }
+        }
+      }
+    },
+    "Side Terminals" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminaux annexes"
+          }
+        }
+      }
+    },
+    "Side terminal — %@ — %@" : {
+      "comment" : "What VoiceOver calls a side terminal: its title, then its session's name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Side terminal — %1$@ — %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal annexe — %@ — %@"
+          }
+        }
+      }
+    },
+    "Side terminals, %lld open" : {
+      "comment" : "The status bar's button of the drawer of side terminals, for VoiceOver.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Side terminals, %lld open"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Side terminals, %lld open"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Terminaux annexes, %lld ouverts"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Terminaux annexes, %lld ouvert"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Terminaux annexes, %lld ouverts"
+                }
+              }
+            }
           }
         }
       }
@@ -10092,12 +10418,22 @@
       }
     },
     "Terminal" : {
-      "comment" : "The raw terminal of a session, as a view.",
+      "comment" : "A side terminal's title.\nThe raw terminal of a session, as a view.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminal"
+          }
+        }
+      }
+    },
+    "Terminal tabs" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onglets des terminaux"
           }
         }
       }
@@ -10115,6 +10451,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminal — %1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "Terminals" : {
+      "comment" : "A tab of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminaux"
           }
         }
       }
@@ -10939,6 +11286,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La planche reçue n’est pas une grille de %1$lld × %2$lld expressions (%3$lld × %4$lld pixels). Réessayez."
+          }
+        }
+      }
+    },
+    "The shell ended with code %@." : {
+      "comment" : "Over a side terminal whose shell ended. The argument is its exit status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le shell s’est terminé avec le code %@."
+          }
+        }
+      }
+    },
+    "The shell was stopped by signal %@." : {
+      "comment" : "Over a side terminal whose shell was killed. The argument is a signal number.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le shell a été arrêté par le signal %@."
           }
         }
       }
@@ -12093,12 +12462,33 @@
         }
       }
     },
+    "What each side terminal showed is written to disk, so that it is still there when its session is reopened or Vibe Manager relaunched. It stays on this Mac, readable by you alone and out of backups. Turned off, the histories already kept are erased." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que montre chaque terminal annexe est écrit sur le disque, pour le retrouver quand sa session est rouverte ou Vibe Manager relancé. Il reste sur ce Mac, lisible par vous seul et hors des sauvegardes. Désactivé, les historiques déjà conservés sont effacés."
+          }
+        }
+      }
+    },
     "What is it for?" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "À quoi sert-il ?"
+          }
+        }
+      }
+    },
+    "What runs in its side terminals will be stopped: %@." : {
+      "comment" : "The argument lists the commands running in the session's side terminals.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui tourne dans ses terminaux annexes sera arrêté : %@."
           }
         }
       }
@@ -12982,6 +13372,28 @@
         }
       }
     },
+    "new output" : {
+      "comment" : "Said of a side terminal that wrote something since it was last seen.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nouvelle sortie"
+          }
+        }
+      }
+    },
+    "new output in %@" : {
+      "comment" : "Said of a hidden side terminal that wrote something. The argument is its title.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nouvelle sortie dans %@"
+          }
+        }
+      }
+    },
     "new process" : {
       "comment" : "In the line a terminal shows above an agent: how it was started.",
       "localizations" : {
@@ -13157,6 +13569,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "réécrite"
+          }
+        }
+      }
+    },
+    "running a command" : {
+      "comment" : "A side terminal's state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "commande en cours"
           }
         }
       }
@@ -13339,6 +13762,17 @@
         }
       }
     },
+    "waiting at its prompt" : {
+      "comment" : "A side terminal's state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en attente à l’invite"
+          }
+        }
+      }
+    },
     "{{name}} is a field, {{name?}} an optional one, {{name|/regex/}} keeps part of it. Write \\{{ to keep the braces as text." : {
       "comment" : "Keep {{name}}, {{name?}}, {{name|/regex/}} and \\{{ as they are.",
       "localizations" : {
@@ -13357,6 +13791,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » ne peut pas être transmis : son nom contient un caractère de contrôle."
+          }
+        }
+      }
+    },
+    "“%@” is still running in this terminal and will be stopped." : {
+      "comment" : "The argument is the command running in a side terminal.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » tourne encore dans ce terminal et sera arrêté."
           }
         }
       }

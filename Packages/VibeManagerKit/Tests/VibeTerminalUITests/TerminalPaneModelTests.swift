@@ -6,11 +6,11 @@ import VibeDomain
 @testable import VibeTerminalUI
 
 private actor FakeTerminalSession: TerminalSession {
-  nonisolated let id: SessionID
+  nonisolated let id: TerminalID
   private var currentState: TerminalProcessState = .starting
   private var continuations: [UUID: AsyncStream<TerminalEvent>.Continuation] = [:]
 
-  init(id: SessionID) {
+  init(id: TerminalID) {
     self.id = id
   }
 
@@ -47,7 +47,7 @@ private actor FakeTerminalSession: TerminalSession {
 
 private actor FakeSupervisor: TerminalSupervisor {
   private let failure: TerminalError?
-  private var sessions: [SessionID: FakeTerminalSession] = [:]
+  private var sessions: [TerminalID: FakeTerminalSession] = [:]
   private(set) var startCount = 0
   private(set) var startedSpecs: [TerminalSpec] = []
 
@@ -55,7 +55,7 @@ private actor FakeSupervisor: TerminalSupervisor {
     self.failure = failure
   }
 
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
+  func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
     if let failure { throw failure }
     startCount += 1
     startedSpecs.append(spec)
@@ -64,9 +64,9 @@ private actor FakeSupervisor: TerminalSupervisor {
     return session
   }
 
-  func session(for id: SessionID) -> (any TerminalSession)? { sessions[id] }
+  func session(for id: TerminalID) -> (any TerminalSession)? { sessions[id] }
 
-  func stop(id: SessionID, gracePeriod: Duration) async {
+  func stop(id: TerminalID, gracePeriod: Duration) async {
     await sessions[id]?.stop(gracePeriod: gracePeriod)
   }
 
@@ -76,7 +76,7 @@ private actor FakeSupervisor: TerminalSupervisor {
     }
   }
 
-  func emit(_ state: TerminalProcessState, for id: SessionID) async {
+  func emit(_ state: TerminalProcessState, for id: TerminalID) async {
     await sessions[id]?.emit(state)
   }
 }
@@ -91,10 +91,10 @@ private func makeSpec() -> TerminalSpec {
 @MainActor
 @Test("The pane reports the lifecycle of its session")
 func paneFollowsSessionLifecycle() async throws {
-  let id = SessionID()
+  let id = TerminalID()
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   #expect(model.session != nil)
@@ -111,7 +111,7 @@ func paneFollowsSessionLifecycle() async throws {
 func paneReportsLaunchFailure() async {
   let supervisor = FakeSupervisor(failure: .executableNotFound(path: "/bin/nope"))
   let model = TerminalPaneModel(
-    sessionID: SessionID(),
+    terminalID: TerminalID(),
     supervisor: supervisor,
     spec: makeSpec(),
     viewportTimeout: .zero
@@ -128,10 +128,10 @@ func paneReportsLaunchFailure() async {
 @MainActor
 @Test("A pane whose process has finished can be started again")
 func paneRestartsAfterItsProcessFinished() async throws {
-  let id = SessionID()
+  let id = TerminalID()
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   #expect(model.session != nil)
@@ -148,10 +148,10 @@ func paneRestartsAfterItsProcessFinished() async throws {
 @MainActor
 @Test("A restart carries the plan it was given, not the one the pane was built with")
 func paneRestartsWithTheGivenSpec() async throws {
-  let id = SessionID()
+  let id = TerminalID()
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   await supervisor.emit(.exited(code: 0), for: id)
@@ -167,10 +167,10 @@ func paneRestartsWithTheGivenSpec() async throws {
 @MainActor
 @Test("Starting a pane that is already running changes nothing")
 func paneIgnoresRedundantStart() async throws {
-  let id = SessionID()
+  let id = TerminalID()
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
 
   await model.start()
   await supervisor.emit(.running(processIdentifier: 42), for: id)
@@ -185,10 +185,10 @@ func paneIgnoresRedundantStart() async throws {
 @MainActor
 @Test("The process is started at the size the surface measured, not at a placeholder")
 func paneStartsAtTheMeasuredSize() async throws {
-  let id = SessionID()
+  let id = TerminalID()
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: id,
+    terminalID: id,
     supervisor: supervisor,
     spec: makeSpec(),
     viewportTimeout: .seconds(5)
@@ -208,7 +208,7 @@ func paneStartsAtTheMeasuredSize() async throws {
 func paneStartsWithoutAMeasurement() async throws {
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: SessionID(),
+    terminalID: TerminalID(),
     supervisor: supervisor,
     spec: makeSpec(),
     viewportTimeout: .zero
@@ -224,10 +224,10 @@ func paneStartsWithoutAMeasurement() async throws {
 @MainActor
 @Test("A size measured once the process runs is forwarded to it")
 func laterMeasurementsResizeTheProcess() async throws {
-  let id = SessionID()
+  let id = TerminalID()
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: id,
+    terminalID: id,
     supervisor: supervisor,
     spec: makeSpec(),
     viewportTimeout: .zero
@@ -245,7 +245,7 @@ func laterMeasurementsResizeTheProcess() async throws {
 func emptyMeasurementsAreIgnored() async throws {
   let supervisor = FakeSupervisor()
   let model = TerminalPaneModel(
-    sessionID: SessionID(),
+    terminalID: TerminalID(),
     supervisor: supervisor,
     spec: makeSpec(),
     viewportTimeout: .zero

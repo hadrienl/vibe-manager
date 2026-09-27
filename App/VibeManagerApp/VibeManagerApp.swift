@@ -8,15 +8,20 @@ import VibePersistence
 import VibeTerminal
 import VibeUI
 
-/// The one binary is five programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
+/// The one binary is six programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
 /// given `--browser-bridge` or `--browser-cli`, the web view's bridge an agent starts or the `vibe`
 /// command (ADR 0023); given `--probe-full-disk-access`, it says whether a process born now has Full
-/// Disk Access, and exits (#76). Those never return: no `NSApplication` is created, so they have no
-/// Dock icon, no menu bar and no window. Being the same signed binary is the point: TCC and the peer
-/// checks all see Vibe Manager.
+/// Disk Access, and exits (#76); given `--terminal-exec`, it takes its terminal as its controlling
+/// one and becomes a side terminal's shell (#43). Those never return: no `NSApplication` is created,
+/// so they have no Dock icon, no menu bar and no window. Being the same signed binary is the point:
+/// TCC and the peer checks all see Vibe Manager.
 @main
 enum Entry {
   static func main() {
+    // First: the shell it becomes should inherit as little of this process as possible.
+    ControllingTerminal.runIfRequested()
+    // The application and the terminal host both start side terminals through this very binary.
+    ControllingTerminal.useTrampoline(at: Bundle.main.executablePath)
     FullDiskAccessProbeCommand.runIfRequested(probe: TCCFullDiskAccessProbe())
     BrowserBridge.runIfRequested()
     TerminalHost.runIfRequested(
@@ -150,6 +155,27 @@ struct VibeManagerApp: App {
         .keyboardShortcut("t", modifiers: [.command, .option])
         .disabled(!environment.appModel.canTogglePresentation)
 
+        // The session's drawer of side terminals (#43). Hiding it stops nothing.
+        Button(
+          environment.appModel.isDrawerShown
+            ? String(
+              localized: "Hide Terminals",
+              comment: "Hides the drawer of the session's side terminals.")
+            : String(
+              localized: "Show Terminals",
+              comment: "Shows the drawer of the session's side terminals.")
+        ) {
+          environment.appModel.toggleDrawer()
+        }
+        .keyboardShortcut("j", modifiers: .command)
+        .disabled(!environment.appModel.canToggleDrawer)
+
+        Button("New Terminal") {
+          environment.appModel.newDrawerTerminal()
+        }
+        .keyboardShortcut("t", modifiers: .command)
+        .disabled(!environment.appModel.canAddDrawerTerminal)
+
         Divider()
 
         Button("Next Session") {
@@ -234,6 +260,12 @@ struct VibeManagerApp: App {
         }
         .keyboardShortcut("4", modifiers: [.command, .option])
         .disabled(!environment.appModel.isWebViewAvailable)
+
+        Button("Focus Side Terminals") {
+          environment.appModel.focusDrawer()
+        }
+        .keyboardShortcut("5", modifiers: [.command, .option])
+        .disabled(!environment.appModel.canToggleDrawer)
 
         // The requests of the sessions in the background (#40).
         Button("Focus Pending Requests") {
@@ -514,11 +546,16 @@ private struct SessionHistoryCommands: Commands {
   @ViewBuilder
   private var closeButton: some View {
     // With the keyboard in the web view, ⌘W closes its tab, and the item says so: the menu is
-    // where the user reads which of the two it will do (ADR 0023).
+    // where the user reads which of the two it will do (ADR 0023). In a side terminal, it closes
+    // that terminal (#43).
     Button(closeTitle) {
       // Over Settings or any other window, ⌘W keeps closing that window.
       guard focus.front == .workspace else {
         focus.closeKeyWindow()
+        return
+      }
+      if closesDrawerTerminal {
+        model.requestCloseDrawerTerminal()
         return
       }
       if closesWebTab {
@@ -577,6 +614,9 @@ private struct SessionHistoryCommands: Commands {
   }
 
   private var closeTitle: String {
+    if closesDrawerTerminal {
+      return String(localized: "Close Terminal", comment: "Closes the side terminal in front.")
+    }
     if closesWebTab {
       return String(localized: "Close Tab", comment: "Closes the web view's tab in front.")
     }
@@ -588,13 +628,17 @@ private struct SessionHistoryCommands: Commands {
     focus.front == .workspace && model.closesWebTab
   }
 
+  private var closesDrawerTerminal: Bool {
+    focus.front == .workspace && model.closesDrawerTerminal
+  }
+
   /// A sheet over the workspace keeps ⌘W to itself, so the session behind it is never closed.
   private var isCloseEnabled: Bool {
     switch focus.front {
     case .other: return true
     case .workspace:
       // On the ticket's pinned tab, ⌘W is enabled and beeps: it never falls back on the session.
-      if closesWebTab { return true }
+      if closesDrawerTerminal || closesWebTab { return true }
       if let plan = batchPlan(.close) { return !plan.isEmpty }
       return model.selectedSession.map(model.canClose) ?? false
     case .sheet, .none: return false
@@ -634,17 +678,26 @@ private struct WebCommands: Commands {
 
       Divider()
 
+      // With the keyboard in a side terminal, these move through the drawer's tabs instead (#43).
       Button("Show Next Tab") {
-        model.selectNextWebTab()
+        if model.movesThroughDrawerTabs {
+          model.selectNextDrawerTerminal()
+        } else {
+          model.selectNextWebTab()
+        }
       }
       .keyboardShortcut(.tab, modifiers: .control)
-      .disabled((model.selectedBrowser?.allTabs.count ?? 0) < 2)
+      .disabled(!model.movesThroughDrawerTabs && (model.selectedBrowser?.allTabs.count ?? 0) < 2)
 
       Button("Show Previous Tab") {
-        model.selectPreviousWebTab()
+        if model.movesThroughDrawerTabs {
+          model.selectPreviousDrawerTerminal()
+        } else {
+          model.selectPreviousWebTab()
+        }
       }
       .keyboardShortcut(.tab, modifiers: [.control, .shift])
-      .disabled((model.selectedBrowser?.allTabs.count ?? 0) < 2)
+      .disabled(!model.movesThroughDrawerTabs && (model.selectedBrowser?.allTabs.count ?? 0) < 2)
 
       Divider()
 
@@ -853,6 +906,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
           localized: """
             They still won't have Full Disk Access when you reopen Vibe Manager: stop them to \
             restart them with it.
+            """)
+    }
+    // Their side terminals follow them either way (#43): a dev server in one is part of the answer.
+    if environment.terminals.runningTerminalCount > 0 {
+      information +=
+        "\n\n"
+        + String(
+          localized: """
+            Their side terminals follow them: left running with them, or stopped with them.
             """)
     }
     let inProcess = environment.inProcessRunningCount

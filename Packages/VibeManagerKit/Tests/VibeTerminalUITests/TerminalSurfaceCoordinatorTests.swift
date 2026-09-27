@@ -9,10 +9,10 @@ import VibeDomain
 
 /// A session that records how many views asked it for its history and its stream.
 private actor CountingSession: TerminalSession {
-  nonisolated let id: SessionID
+  nonisolated let id: TerminalID
   private(set) var attachCount = 0
 
-  init(id: SessionID) {
+  init(id: TerminalID) {
     self.id = id
   }
 
@@ -38,24 +38,24 @@ private actor CountingSession: TerminalSession {
 }
 
 private actor IdleSupervisor: TerminalSupervisor {
-  func start(_ spec: TerminalSpec, for id: SessionID) throws -> any TerminalSession {
+  func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
     CountingSession(id: id)
   }
 
-  func session(for id: SessionID) -> (any TerminalSession)? { nil }
-  func stop(id: SessionID, gracePeriod: Duration) {}
+  func session(for id: TerminalID) -> (any TerminalSession)? { nil }
+  func stop(id: TerminalID, gracePeriod: Duration) {}
   func stopAll(gracePeriod: Duration) {}
 }
 
 @MainActor
-private func makeCoordinator(sessionID: SessionID) -> TerminalSurfaceCoordinator {
-  TerminalSurfaceCoordinator(pane: makePaneModel(sessionID: sessionID))
+private func makeCoordinator(terminalID: TerminalID) -> TerminalSurfaceCoordinator {
+  TerminalSurfaceCoordinator(pane: makePaneModel(terminalID: terminalID))
 }
 
 @MainActor
-private func makePaneModel(sessionID: SessionID) -> TerminalPaneModel {
+private func makePaneModel(terminalID: TerminalID) -> TerminalPaneModel {
   TerminalPaneModel(
-    sessionID: sessionID,
+    terminalID: terminalID,
     supervisor: IdleSupervisor(),
     spec: TerminalSpec(
       executableURL: URL(fileURLWithPath: "/bin/sh"),
@@ -87,8 +87,8 @@ func restartedSessionIsAttachedAgain() async {
   // `TerminalSession.id` identifies the work session, not the process: a restart hands out a new
   // session object under the same id, and a surface that compared ids would stay attached to the
   // process that is gone — a terminal frozen over a live agent.
-  let id = SessionID()
-  let coordinator = makeCoordinator(sessionID: id)
+  let id = TerminalID()
+  let coordinator = makeCoordinator(terminalID: id)
   let first = CountingSession(id: id)
   let restarted = CountingSession(id: id)
 
@@ -106,8 +106,8 @@ func restartedSessionIsAttachedAgain() async {
   .timeLimit(.minutes(1))
 )
 func repeatedAttachIsIgnored() async {
-  let id = SessionID()
-  let coordinator = makeCoordinator(sessionID: id)
+  let id = TerminalID()
+  let coordinator = makeCoordinator(terminalID: id)
   let session = CountingSession(id: id)
 
   coordinator.attachIfNeeded(to: session)
@@ -126,13 +126,13 @@ func repeatedAttachIsIgnored() async {
 )
 func adoptedPaneIsAttached() async {
   // A relaunch replaces the pane while SwiftUI keeps the same view identity.
-  let id = SessionID()
-  let coordinator = makeCoordinator(sessionID: id)
+  let id = TerminalID()
+  let coordinator = makeCoordinator(terminalID: id)
   let session = CountingSession(id: id)
   coordinator.attachIfNeeded(to: session)
   #expect(await attachCount(of: session) == 1)
 
-  coordinator.adopt(pane: makePaneModel(sessionID: id))
+  coordinator.adopt(pane: makePaneModel(terminalID: id))
   let restarted = CountingSession(id: id)
   coordinator.attachIfNeeded(to: restarted)
 
@@ -144,7 +144,7 @@ func adoptedPaneIsAttached() async {
 func inactivePaneIsHidden() {
   // Every pane stays mounted: at zero opacity alone, each busy agent behind the visible one kept
   // repainting on the main thread, and typing in the visible terminal lagged behind them.
-  let coordinator = makeCoordinator(sessionID: SessionID())
+  let coordinator = makeCoordinator(terminalID: TerminalID())
   let view = TerminalView()
 
   coordinator.followActivation(false, in: view)
@@ -157,7 +157,7 @@ func inactivePaneIsHidden() {
 @MainActor
 @Test("A pane put away gives the keyboard back to no one, not to the next control in the window")
 func hiddenPaneDoesNotPassTheKeyboardOn() {
-  let coordinator = makeCoordinator(sessionID: SessionID())
+  let coordinator = makeCoordinator(terminalID: TerminalID())
   let window = NSWindow(
     contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
     styleMask: [.titled],
