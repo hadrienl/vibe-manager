@@ -320,6 +320,28 @@ struct ConversationModelTests {
     #expect(model.canSend)
   }
 
+  @Test("Read again, a conversation stays on screen until the new reading holds all of it")
+  func rereading() {
+    let model = ConversationModel(sessionID: SessionID())
+    let said = ["one", "two", "three"].map {
+      ConversationEntry(id: $0, content: .agentText($0))
+    }
+    let (first, _) = AsyncStream<ConversationSnapshot>.makeStream()
+    model.follow(first)
+    // Read for the first time, what arrives is shown as it arrives.
+    model.received(ConversationSnapshot(entries: [said[0]], availability: .loading))
+    #expect(model.blocks.map(\.id) == ["one"])
+    model.received(ConversationSnapshot(entries: Array(said[..<2]), availability: .available))
+
+    let (again, _) = AsyncStream<ConversationSnapshot>.makeStream()
+    model.follow(again)
+    model.received(ConversationSnapshot(entries: [said[0]], availability: .loading))
+    #expect(model.blocks.map(\.id) == ["one", "two"])
+    #expect(model.snapshot.availability == .available)
+    model.received(ConversationSnapshot(entries: said, availability: .available))
+    #expect(model.blocks.map(\.id) == ["one", "two", "three"])
+  }
+
   @Test("An image produced while the session runs goes to the web view; the history's do not")
   func newImages() throws {
     let folder = FileManager.default.temporaryDirectory
