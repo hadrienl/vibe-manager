@@ -71,7 +71,7 @@ extension AppModel {
     guard let browser, let id = selectedSessionID, isWebViewAvailable else { return }
     if layout.columns.browser == .alternating {
       layout.setShowsBrowserWhenAlternating(!layout.showsBrowserWhenAlternating)
-      if !layout.showsBrowserWhenAlternating { focusTerminal() }
+      if !layout.showsBrowserWhenAlternating { focusSession() }
       return
     }
     browser.setVisible(!browser.isVisible(id), for: id)
@@ -86,7 +86,7 @@ extension AppModel {
   public func hideWebView() {
     guard let browser, let id = selectedSessionID else { return }
     browser.setVisible(false, for: id)
-    focusTerminal()
+    focusSession()
   }
 
   /// Focus Web View, ⌥⌘4: the page takes the keyboard.

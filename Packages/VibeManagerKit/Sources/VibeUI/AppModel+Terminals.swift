@@ -42,7 +42,7 @@ extension AppModel {
       await drawer.toggle()
       // The keyboard leaves a drawer put away for the agent — its terminal, or the composer of
       // its conversation — not for nothing.
-      if wasShown { focusSessionContent() }
+      if wasShown { focusSession() }
     }
   }
 

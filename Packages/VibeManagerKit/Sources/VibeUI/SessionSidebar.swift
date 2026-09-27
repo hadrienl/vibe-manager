@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import VibeApplication
 import VibeDomain
@@ -56,6 +57,13 @@ struct SessionSidebar: View {
     }
   }
 
+  /// The list is moving its selection for a key typed in it — an arrow, Home, a letter — rather
+  /// than for a click. A shortcut with ⌘, ⌥ or ⌃ goes through the menus, not the list.
+  @MainActor private static var isBrowsingKeyPress: Bool {
+    guard let event = NSApp.currentEvent, event.type == .keyDown else { return false }
+    return event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+  }
+
   // MARK: - Columns
 
   private var columns: some View {
@@ -91,7 +99,9 @@ struct SessionSidebar: View {
         .enumerated().map { ($0.element.id, $0.offset + 1) })
     // A set: ⌘-click, ⇧-click and ⌘A select several sessions (#77). The one on screen stays one.
     return List(
-      selection: Binding(get: { model.selectedSessionIDs }, set: { model.selectFromList($0) })
+      selection: Binding(
+        get: { model.selectedSessionIDs },
+        set: { model.selectFromList($0, byKeyboard: isListFocused && Self.isBrowsingKeyPress) })
     ) {
       // At the top, where the user looks after pressing Create, whatever the order below.
       if let creation = model.creationRow {
@@ -130,6 +140,13 @@ struct SessionSidebar: View {
     // a selection nobody is looking at must not be what a shortcut typed in a terminal closes.
     .onChange(of: isListFocused) { _, isFocused in
       if !isFocused { model.collapseSelection() }
+    }
+    // Walked with the arrows, the list keeps the keyboard (#105); Return or → hands it to the
+    // session on the row. A session that cannot take it — its agent stopped — leaves it here.
+    .onKeyPress(keys: [.return, .rightArrow], phases: .down) { press in
+      guard press.modifiers.isEmpty, !model.hasMultipleSelection, model.selectedSessionID != nil
+      else { return .ignored }
+      return model.focusSession() ? .handled : .ignored
     }
     .onKeyPress(.escape) {
       if swipe != nil {

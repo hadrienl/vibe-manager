@@ -104,7 +104,7 @@ struct RequestPalette: View {
     .onKeyPress(.escape) {
       guard focusedRequest != nil else { return .ignored }
       focusedRequest = nil
-      model.focusTerminal()
+      model.focusSession()
       return .handled
     }
     .onAppear { takeFocus(requests) }
@@ -421,7 +421,7 @@ struct RequestCard: View {
             .onSubmit { submitDraft(for: index, of: all) }
             .onKeyPress(.escape) {
               writingFor = nil
-              model.focusTerminal()
+              model.focusSession()
               return .handled
             }
             Button {
@@ -586,7 +586,7 @@ struct RequestCard: View {
     writingFor = nil
     choose(.text(text), for: index, of: all)
     // The keyboard goes back where it was: the session on screen.
-    model.focusTerminal()
+    model.focusSession()
   }
 
   private func send(_ answer: AgentAnswer) {

@@ -11,6 +11,8 @@ import VibeApplication
 /// text typed into a permission prompt would be read as the answer.
 struct PromptComposer: View {
   @Bindable var model: ConversationModel
+  /// Whether its session is the one on screen: a hidden composer never takes the keyboard.
+  var isActive = true
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
   @FocusState private var isFocused: Bool
@@ -115,7 +117,35 @@ struct PromptComposer: View {
     .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 14))
     .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.border.color))
     .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
-    .onChange(of: model.focusComposerRequest) { isFocused = true }
+    // A request waits for the composer to be on screen, and is spent once: made before the view
+    // existed, it is honoured when it appears (#105).
+    .onAppear { takePendingFocusRequest() }
+    .onChange(of: model.focusComposerRequest) { takePendingFocusRequest() }
+    .onChange(of: isActive) { takePendingFocusRequest() }
+  }
+
+  /// Takes the keyboard if it was asked for and can be typed into; a request the composer cannot
+  /// honour — its agent stopped, a permission awaited — is dropped, and the keyboard stays put.
+  /// Put away, a request is dropped as well: coming back later must not act on it.
+  private func takePendingFocusRequest() {
+    guard model.takePendingFocusRequest(), isActive, model.acceptsInput else { return }
+    // On the next turn: the view that comes on screen is enabled in the same update, and a
+    // disabled field does not take the focus.
+    Task { @MainActor in
+      guard isActive, model.acceptsInput else { return }
+      isFocused = true
+      Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+    }
+  }
+
+  /// Back in a draft, the user carries on where it ends — not at its first letter.
+  @MainActor static func placeCursorAtEnd(of draft: String) {
+    guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+      textView.string == draft
+    else { return }
+    let end = NSRange(location: (textView.string as NSString).length, length: 0)
+    textView.setSelectedRange(end)
+    textView.scrollRangeToVisible(end)
   }
 
   /// An input method — Japanese, Chinese — is still composing: Return confirms its text, and

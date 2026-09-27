@@ -18,19 +18,47 @@ extension AppModel {
     if presentation == .terminal {
       pane(for: id)?.requestFocus()
     } else {
-      conversations.existingModel(for: id)?.focusComposerRequest += 1
+      conversations.requestComposerFocus(for: id)
     }
   }
 
-  /// Gives the keyboard to the selected session in the form it is shown in: its terminal, or the
-  /// composer of its conversation.
-  public func focusSessionContent() {
-    guard let session = selectedSession else { return }
+  /// Gives the keyboard to the selected session in the form it is shown in (#105): the composer
+  /// of its conversation, or its terminal. The one rule behind every gesture that hands the
+  /// keyboard back to the session — Escape in the notes, the web view put away, an answer sent
+  /// from the palette, ⌘P.
+  ///
+  /// False when nothing took the request: no terminal, or a composer that cannot be typed into —
+  /// its agent stopped, or waiting for an answer in the terminal. The keyboard then stays where
+  /// it is. A stopped terminal still takes it, as it always has: its last output can be read.
+  @discardableResult
+  public func focusSession() -> Bool {
+    keepsKeyboardInSidebar = false
+    guard let session = selectedSession, canClaimKeyboard else { return false }
     if presentation(of: session) == .conversation {
-      conversations.existingModel(for: session.id)?.focusComposerRequest += 1
-    } else {
-      focusTerminal()
+      guard launcher?.isRunning(session.id) == true else { return false }
+      return conversations.requestComposerFocus(for: session.id)
     }
+    guard let pane = pane(for: session.id) else { return false }
+    pane.requestFocus()
+    return true
+  }
+
+  /// Nothing over the window holds the keyboard: Open Quickly, drawn inside it, or a sheet.
+  public var canClaimKeyboard: Bool {
+    !quickOpen.isPresented && !isPresentingSheet
+  }
+
+  /// Whether one of the window's sheets asks to be shown — the ones `RootView` presents.
+  public var isPresentingSheet: Bool {
+    permissions?.isPresentingStep == true || isPresentingNewSession || pendingRestart != nil
+      || pendingSwitch != nil || diagnosticsExport != nil || hookConsentRequest != nil
+  }
+
+  /// Whether the composer on screen takes the keyboard when its session comes on screen (#105).
+  /// Not while the user walks the sidebar with the arrow keys: the list would lose them at the
+  /// first row. The terminal takes it either way, as it always has.
+  public var composerClaimsKeyboardOnActivation: Bool {
+    !keepsKeyboardInSidebar && canClaimKeyboard
   }
 
   /// View › Show Conversation / Show Terminal (⌥⌘T), for the selected session.

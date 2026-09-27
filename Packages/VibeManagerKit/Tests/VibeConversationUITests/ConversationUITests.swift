@@ -409,6 +409,29 @@ struct ConversationModelTests {
     #expect(terminal.written.last == [0x09])
   }
 
+  @Test("A request for the keyboard waits for the composer, and is spent once (#105)")
+  func focusRequest() {
+    let (model, _) = model()
+    #expect(!model.takePendingFocusRequest())
+    model.requestComposerFocus()
+    model.requestComposerFocus()
+    #expect(model.focusComposerRequest == 2)
+    #expect(model.takePendingFocusRequest())
+    #expect(!model.takePendingFocusRequest())
+    model.attach([URL(fileURLWithPath: "/Users/me/a.png")])
+    #expect(model.takePendingFocusRequest())
+  }
+
+  @Test("Only a composer that can be typed into accepts the keyboard (#105)")
+  func acceptsInput() {
+    let (ready, _) = model()
+    #expect(ready.acceptsInput)
+    ready.activity = .awaitingUser(.approval)
+    #expect(!ready.acceptsInput)
+    let (stopped, _) = model(running: false)
+    #expect(!stopped.acceptsInput)
+  }
+
   @Test("Nothing is sent while the agent waits for an answer, nor to a stopped session")
   func closed() async {
     let (waiting, terminal) = model()

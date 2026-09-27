@@ -142,7 +142,8 @@ extension AppModel {
     }
   }
 
-  /// Opens the session a request comes from, in its column, with the keyboard in its terminal:
+  /// Opens the session a request comes from, in its column, with the keyboard in its terminal or
+  /// its composer:
   /// the one gesture of the palette that changes the session on screen.
   public func openSession(for id: AgentRequestID) {
     guard let session = sessions.first(where: { $0.id == id.sessionID }) else { return }
@@ -152,7 +153,7 @@ extension AppModel {
       setColumn(session.taskStatus)
     }
     select(session.id)
-    focusTerminal()
+    focusSession()
   }
 
   /// ⌥⌘P: unfolds the palette and gives it the keyboard.

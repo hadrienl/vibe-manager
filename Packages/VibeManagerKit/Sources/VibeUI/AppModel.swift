@@ -530,6 +530,9 @@ public final class AppModel {
   private let archiveDiagnostics: @Sendable ([DiagnosticFile], Date) -> Data
   /// Bumped to give the keyboard to the session list: Focus Sidebar, ⌥⌘1.
   public private(set) var sidebarFocusRequest = 0
+  /// The session on screen was reached with the arrow keys in the sidebar (#105): its composer
+  /// leaves the keyboard in the list, until Return or → hands it over, or another way in is used.
+  public internal(set) var keepsKeyboardInSidebar = false
   /// Whether the list of the archived sessions is open at the foot of the sidebar. Here rather
   /// than in the view, so that the menu can open it.
   public var isArchiveListPresented = false
@@ -981,8 +984,8 @@ public final class AppModel {
 
   /// Brings a session on screen wherever it is, the way a click in the sidebar would: its column,
   /// or the archive. A search or a facet of the sidebar that hides it is cleared, or the next
-  /// reload would take the selection away from it. The keyboard then goes to its terminal when
-  /// its agent runs, and to its row otherwise.
+  /// reload would take the selection away from it. The keyboard then goes to the session — its
+  /// terminal or its composer (#105) — when its agent runs, and to its row otherwise.
   public func goToSession(_ id: SessionID) {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
     if !filter.matchesNarrowing(session, notes: notes.searchIndex[id]) { clearNarrowing() }
@@ -992,11 +995,8 @@ public final class AppModel {
       return
     }
     follow(id)
-    if launcher?.isRunning(id) == true {
-      focusTerminal()
-    } else {
-      focusSidebar()
-    }
+    // One request or the other, never both: a stopped agent's row takes the keyboard.
+    if launcher?.isRunning(id) != true || !focusSession() { focusSidebar() }
   }
 
   func reconcileSelection() {
@@ -2280,6 +2280,7 @@ public final class AppModel {
   /// A session a folded group hides is shown: its group unfolds. The quick switcher, a new session
   /// or a banner can all land on one, and a selection nobody can see is a lost one.
   public func select(_ id: SessionID?) {
+    keepsKeyboardInSidebar = false
     creationWasLeft(for: id)
     // Going to a session is choosing it alone (#77).
     selection.collapse(to: id)
@@ -2312,6 +2313,7 @@ public final class AppModel {
       Task { [notes] in await notes.flush(previous) }
     }
     selectedSessionID = id
+    conversations.cancelPendingComposerFocus(unless: id)
     layout.select(id)
     watchBranches()
     updateVisibleSession()
@@ -2780,12 +2782,6 @@ extension AppModel {
     }
     layout.setSectionCollapsed(.notes, false)
     notes.requestFocus()
-  }
-
-  /// Escape in the notes: the keyboard goes back to the session's terminal.
-  public func focusTerminal() {
-    guard let id = selectedSessionID else { return }
-    launcher?.pane(for: id)?.requestFocus()
   }
 
   public func focusSidebar() {

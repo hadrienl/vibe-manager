@@ -16,7 +16,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 |---|---|---|
 | ⌘P | Open Quickly: find a session by ticket, request URL, branch, folder or title; arrows, ⌃N / ⌃P and Page Up / Down move, Return opens, Escape closes | File |
 | ⌥⌘1 | Focus Sidebar: the session list takes the keyboard | View |
-| ⌥⌘2 | Focus Terminal: the selected session's terminal | View |
+| ⌥⌘2 | Focus Session: the selected session's terminal, or its composer in the conversation view | View |
 | ⌥⌘3 | Focus Inspector: the Git list, the inspector shown if it was hidden | View |
 | ⌥⌘4 | Focus Web View: the page in front, the web view shown if it was hidden | View |
 | ⌥⌘5 | Focus Side Terminals: the terminal in front of the drawer, the drawer shown if it was hidden | View |
@@ -24,7 +24,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌘T | New Terminal: a new tab in the drawer, a shell in the session's folder | View |
 | ⌥⌘P | Focus Pending Requests: the palette unfolds and its oldest request takes the keyboard | View |
 | ⌥⌘B | Show / Hide Web View; in a window where the two take turns, swaps terminal and web view | View |
-| ⌥⌘N | Edit Notes; Escape gives the keyboard back to the terminal | View |
+| ⌥⌘N | Edit Notes; Escape gives the keyboard back to the session: its terminal, or its composer | View |
 | ⌥⌘↓ / ⌥⌘↑ | Next / Previous Session | View |
 | ⌘1…⌘9 | The session at that position in the list, as drawn: folded groups are skipped | View |
 | ⌃⌘→ / ⌃⌘← | Next / Previous Column (To Do, In Progress, Waiting, Done) | View |
@@ -177,7 +177,10 @@ symbol of its own, never a colour alone. The Messages rotor goes from one prompt
 next, the Failures rotor from one failed call to the next, and a prompt is announced as a heading.
 A request the agent waits on takes VoiceOver's focus when it appears. The composer is labelled with
 the agent it writes to: Return sends, Shift-Return starts a line, Escape stops a turn under way.
-⌥⌘T switches between the conversation and the terminal. Text follows the size chosen in
+⌥⌘T switches between the conversation and the terminal. Going to a session shown as a conversation
+— a click in the sidebar, ⌘1…⌘9, ⌥⌘↓ / ⌥⌘↑, ⌘P, the palette — puts the keyboard in its composer,
+after the draft left there (#105). Walking the sidebar with ↑ / ↓ keeps the keyboard in the list;
+Return or → on the row then hands it to the composer. Text follows the size chosen in
 Settings › Conversation, and unfolding does not animate with Reduce Motion on.
 
 ### Dropping files

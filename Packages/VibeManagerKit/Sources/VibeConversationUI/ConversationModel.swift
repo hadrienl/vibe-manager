@@ -184,7 +184,12 @@ public final class ConversationModel {
   @ObservationIgnored private var isRereading = false
   @ObservationIgnored private var echoTimer: Task<Void, Never>?
   public private(set) var toggleRevision = 0
-  public var focusComposerRequest = 0
+  /// Bumped to give the composer the keyboard (#105). A counter rather than a flag: the same
+  /// request twice in a row must still move the focus twice.
+  public private(set) var focusComposerRequest = 0
+  /// A request made while the composer was not on screen to take it, consumed once: shown later,
+  /// it takes the keyboard then, and never again for having been asked once long ago.
+  @ObservationIgnored private var hasPendingFocusRequest = false
 
   public init(sessionID: SessionID) {
     self.sessionID = sessionID
@@ -359,6 +364,11 @@ public final class ConversationModel {
     return .ready
   }
 
+  /// Whether the composer can be typed into: a closed one does not take the keyboard.
+  public var acceptsInput: Bool {
+    composerState == .ready || composerState == .answeringQuestion
+  }
+
   public var canSend: Bool {
     switch composerState {
     case .ready:
@@ -465,7 +475,18 @@ public final class ConversationModel {
     for file in files where !attachments.contains(file) && PathInsertion.isWritablePath(file.path) {
       attachments.append(file)
     }
+    requestComposerFocus()
+  }
+
+  /// Asks the composer to take the keyboard, now if it is on screen, or as soon as it is.
+  public func requestComposerFocus() {
     focusComposerRequest += 1
+    hasPendingFocusRequest = true
+  }
+
+  func takePendingFocusRequest() -> Bool {
+    defer { hasPendingFocusRequest = false }
+    return hasPendingFocusRequest
   }
 
   public func removeAttachment(_ file: URL) {
