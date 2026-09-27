@@ -65,6 +65,8 @@ public final class NewSessionModel {
   /// The folder the project icon was last looked for in, and the search under way.
   private var iconFolderPath: String?
   private var iconSearch: Task<Void, Never>?
+  /// The load under way, which a second caller joins rather than starts again.
+  private var loading: Task<Void, Never>?
 
   /// `fullDiskAccess` decides whether the sheet remarks on a protected folder, and `nil` — not
   /// probed yet — stays silent. The remark is only worth making when the application positively
@@ -263,7 +265,25 @@ public final class NewSessionModel {
     issues.filter { $0.field == field }
   }
 
+  /// Lists the agents and looks at the recent folders. Started by whoever opens the sheet, and
+  /// awaited again by the sheet itself, which then places the caret: a call made while a load is
+  /// under way joins it.
+  ///
+  /// It must not hang on the sheet's `.task` alone (#132): in one launch, every sheet opened
+  /// without its load ever running — no agent listed, no folder proposed, nothing being looked
+  /// for — while its buttons worked, and only Detect Again filled the list.
   public func load() async {
+    if let loading {
+      await loading.value
+      return
+    }
+    let task = Task { await loadAgentsAndFolders() }
+    loading = task
+    await task.value
+    loading = nil
+  }
+
+  private func loadAgentsAndFolders() async {
     // Side by side: the agents need not wait for the folders, nor the folders for the agents.
     async let agents: Void = refreshAgents(forceRefresh: false)
     await checkRecentFolders()
