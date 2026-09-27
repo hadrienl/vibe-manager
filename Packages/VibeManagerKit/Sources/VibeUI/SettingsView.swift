@@ -17,6 +17,11 @@ public struct SettingsView: View {
   private let permissions: PermissionsModel?
   private let model: AppModel?
 
+  /// The width of the tabs that are a single form. The window takes each tab's size, and its
+  /// toolbar holds the tabs: at 500 points, the last ones fell into an overflow menu, where
+  /// Requests went unseen. Wide enough for every tab's label, in French as well.
+  static let formWidth: CGFloat = 780
+
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
     self.permissions = permissions
     self.model = model
@@ -206,7 +211,7 @@ public struct SettingsView: View {
     // scrolls gives none, which left General in a window as tall as Templates.
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: 500)
+    .frame(width: SettingsView.formWidth)
     .task {
       guard model == nil else { return }
       await permissions?.recheck()
@@ -301,7 +306,7 @@ private struct RequestSettings: View {
     .formStyle(.grouped)
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: 500)
+    .frame(width: SettingsView.formWidth)
     .task { isAuthorized = await model.requestNotifier?.isAuthorized() }
   }
 
@@ -358,7 +363,7 @@ struct PrivacySettingsView: View {
     .formStyle(.grouped)
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: 500)
+    .frame(width: SettingsView.formWidth)
     .restartNowConfirmation(permissions: permissions, origin: .settings, sessionName: sessionName)
     .task { await permissions.recheck() }
   }
@@ -702,7 +707,7 @@ private struct TerminalSettings: View {
     .formStyle(.grouped)
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: 500)
+    .frame(width: SettingsView.formWidth)
   }
 }
 
@@ -720,7 +725,7 @@ private struct ActivitySettings: View {
     .formStyle(.grouped)
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: 500)
+    .frame(width: SettingsView.formWidth)
   }
 }
 
@@ -1022,7 +1027,7 @@ private struct WebViewSettings: View {
     .formStyle(.grouped)
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: 500)
+    .frame(width: SettingsView.formWidth)
     .onAppear {
       givesAgents = browser.preferences.givesAgentsWebView
       showsOnAgentPage = browser.preferences.showsWebViewWhenAgentOpensPage

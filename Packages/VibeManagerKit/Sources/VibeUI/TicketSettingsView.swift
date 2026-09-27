@@ -32,7 +32,8 @@ struct TicketSettingsView: View {
       tester
     }
     .padding(16)
-    .frame(minWidth: 760, idealWidth: 860, minHeight: 620, idealHeight: 680)
+    .frame(
+      minWidth: SettingsView.formWidth, idealWidth: 860, minHeight: 620, idealHeight: 680)
     .task {
       await model.load()
       formatText = model.lineFormat.template
