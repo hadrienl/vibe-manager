@@ -6,6 +6,8 @@ import Foundation
 final class TestPageServer: @unchecked Sendable {
   private let lock = NSLock()
   private var pages: [String: String]
+  private var redirects: [String: String] = [:]
+  private var statuses: [String: Int] = [:]
   private var descriptor: Int32 = -1
   private(set) var port: UInt16 = 0
 
@@ -50,6 +52,26 @@ final class TestPageServer: @unchecked Sendable {
     lock.withLock { pages[path] = body }
   }
 
+  /// `path` answers `302 Found` towards `location`, until it is given a page again.
+  func setRedirect(_ path: String, to location: String) {
+    lock.withLock {
+      redirects[path] = location
+      pages[path] = nil
+    }
+  }
+
+  /// `path` answers its page with `status` rather than `200`.
+  func setStatus(_ path: String, _ status: Int) {
+    lock.withLock { statuses[path] = status }
+  }
+
+  func setPageClearingRedirect(_ path: String, _ body: String) {
+    lock.withLock {
+      redirects[path] = nil
+      pages[path] = body
+    }
+  }
+
   func stop() {
     close(descriptor)
   }
@@ -63,8 +85,15 @@ final class TestPageServer: @unchecked Sendable {
     let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
     // A page that takes its time: a navigation still under way.
     if path == "/slow" { Thread.sleep(forTimeInterval: 3) }
-    let body = lock.withLock { pages[path] }
-    let status = body == nil ? "404 Not Found" : "200 OK"
+    let (body, redirect, code) = lock.withLock { (pages[path], redirects[path], statuses[path]) }
+    if let redirect {
+      let header =
+        "HTTP/1.1 302 Found\r\nLocation: \(redirect)\r\nContent-Length: 0\r\n"
+        + "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+      Data(header.utf8).withUnsafeBytes { _ = write(client, $0.baseAddress, $0.count) }
+      return
+    }
+    let status = body == nil ? "404 Not Found" : code.map { "\($0) Status" } ?? "200 OK"
     let payload = Data((body ?? "<h1>Not found</h1>").utf8)
     let header =
       "HTTP/1.1 \(status)\r\nContent-Type: text/html; charset=utf-8\r\n"

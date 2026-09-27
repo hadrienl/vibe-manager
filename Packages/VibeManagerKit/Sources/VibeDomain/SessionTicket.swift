@@ -2,13 +2,16 @@ import Foundation
 
 /// The ticket a session works on, when someone said which one (#69).
 ///
-/// Only what a person decided is stored: typed in, or brought by a template. A ticket deduced from
-/// the branch is computed each time from the branch the repository is on now, so it follows a
-/// checkout and is never written anywhere.
+/// Only what a person decided is stored: typed in, brought by a template, or found in what they
+/// wrote when the session was created (#89). A ticket deduced from the branch is computed each
+/// time from the branch the repository is on now, so it follows a checkout and is never written
+/// anywhere.
 public struct SessionTicket: Hashable, Codable, Sendable {
   public enum Source: String, Codable, Sendable {
     case manual
     case template
+    /// The first ticket address found in the prompt or the name, when nothing else named one.
+    case detected
   }
 
   /// `nil` when the ticket was removed on purpose: the branch must not bring it back.
@@ -240,6 +243,7 @@ public enum TicketResolution {
   public enum Origin: String, Hashable, Sendable {
     case manual
     case template
+    case detected
     case branch
   }
 
@@ -258,7 +262,7 @@ public enum TicketResolution {
     }
   }
 
-  /// Manual first, then the template's, then the branch's. A ticket removed on purpose hides the
+  /// Manual first, then the template's or the one found in the prompt, then the branch's. A ticket removed on purpose hides the
   /// branch's.
   public static func resolve(
     stored: SessionTicket?,
@@ -267,7 +271,13 @@ public enum TicketResolution {
   ) -> Resolved? {
     if let stored {
       guard let url = stored.url else { return nil }
-      return Resolved(url: url, origin: stored.source == .manual ? .manual : .template)
+      let origin: Origin
+      switch stored.source {
+      case .manual: origin = .manual
+      case .template: origin = .template
+      case .detected: origin = .detected
+      }
+      return Resolved(url: url, origin: origin)
     }
     guard let branch, let repository,
       let number = BranchTicketInference.issueNumber(branch: branch)

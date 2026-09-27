@@ -6,10 +6,14 @@ public struct SessionCreation: Sendable {
   /// The plan the caller must launch — the very one whose problems were just checked, and, for
   /// Claude Code, the one carrying the session identifier the conversation will be named with.
   public let plan: AgentLaunchPlan
+  /// The tickets named in what the user wrote, in order, whose titles go to the notes (#89).
+  /// Empty when the feature is off.
+  public let tickets: [TicketRecognition]
 
-  public init(session: WorkSession, plan: AgentLaunchPlan) {
+  public init(session: WorkSession, plan: AgentLaunchPlan, tickets: [TicketRecognition] = []) {
     self.session = session
     self.plan = plan
+    self.tickets = tickets
   }
 }
 
@@ -34,6 +38,8 @@ public struct CreateSession: Sendable {
   /// Turns a ticket typed as `#12` into its address, from the working folder's repository (#69).
   private let ticketContext: ReadTicketContext?
   private let icons: (any SessionIconStore)?
+  /// The resolvers in use when Create is pressed, or `nil` when ticket titles are off (#89).
+  private let ticketResolvers: (@Sendable () async -> TicketResolverSet?)?
   private let diagnostics: Diagnostics
 
   /// - Parameter icons: where the project icon a draft wears is copied. Without it, a session is
@@ -45,6 +51,7 @@ public struct CreateSession: Sendable {
     clock: any SessionClock = SystemSessionClock(),
     ticketContext: ReadTicketContext? = nil,
     icons: (any SessionIconStore)? = nil,
+    ticketResolvers: (@Sendable () async -> TicketResolverSet?)? = nil,
     diagnostics: Diagnostics = .disabled
   ) {
     self.repository = repository
@@ -53,6 +60,7 @@ public struct CreateSession: Sendable {
     self.clock = clock
     self.ticketContext = ticketContext
     self.icons = icons
+    self.ticketResolvers = ticketResolvers
     self.diagnostics = diagnostics
   }
 
@@ -82,9 +90,27 @@ public struct CreateSession: Sendable {
     if let ticketContext, let path = draft.resolvedWorkingDirectoryPath {
       forge = await ticketContext(path: path).repository
     }
-    let session = await keepingIcon(of: draft).session(createdAt: clock.now(), repository: forge)
+    var session = await keepingIcon(of: draft).session(createdAt: clock.now(), repository: forge)
+    let tickets = await recognizeTickets(in: draft, session: session)
+    // Recognising an address reads nothing from the network: the link is known before the
+    // session is stored, and its web view opens on it (#69).
+    if session.ticket == nil, let url = tickets.first?.url {
+      session.ticket = SessionTicket(url: url, source: .detected)
+    }
     try await repository.save(session)
-    return SessionCreation(session: session, plan: plan)
+    return SessionCreation(session: session, plan: plan, tickets: tickets)
+  }
+
+  /// The tickets the session's fields name: its ticket, its name, then its prompt — which holds a
+  /// template's values where the template puts them.
+  private func recognizeTickets(in draft: SessionDraft, session: WorkSession) async
+    -> [TicketRecognition]
+  {
+    guard let ticketResolvers, let resolvers = await ticketResolvers(), !resolvers.isEmpty else {
+      return []
+    }
+    let texts = [session.ticket?.url?.absoluteString ?? "", draft.name, session.initialPrompt]
+    return resolvers.tickets(in: texts)
   }
 
   /// The draft, once the project icon it wears has been copied into the data folder.

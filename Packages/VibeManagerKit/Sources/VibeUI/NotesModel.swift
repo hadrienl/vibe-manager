@@ -64,6 +64,11 @@ public final class NotesDocument {
   @ObservationIgnored var selection = NSRange(location: 0, length: 0)
   /// Told of every change, with the new text: the search index keeps up with the typing.
   @ObservationIgnored var onChange: ((String) -> Void)?
+  /// Set by the editor showing the notes: ends the typing its undo action is gathering, before a
+  /// change made from elsewhere, which must be an undo action of its own.
+  @ObservationIgnored var breakTypingCoalescing: (() -> Void)?
+  /// The ticket lines inserted at the top, as they are there now (#89).
+  @ObservationIgnored var ticketLines: TicketLineBlock?
 
   @ObservationIgnored private let store: any SessionNotesStore
   @ObservationIgnored private let timing: NotesSaveTiming

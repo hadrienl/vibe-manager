@@ -76,6 +76,17 @@ public struct SettingsView: View {
             }
             .tag(SettingsTab.terminals)
         }
+        if model.ticketTitles.canReadPages {
+          TicketSettingsView(model: model.ticketTitles)
+            .tabItem {
+              Label {
+                Text("Tickets", bundle: .module, comment: "A tab of the Settings window.")
+              } icon: {
+                Image(systemName: "ticket")
+              }
+            }
+            .tag(SettingsTab.tickets)
+        }
         if let journal = model.journal {
           ActivitySettings(journal: journal)
             .tabItem {
@@ -215,6 +226,8 @@ public enum SettingsTab: String, Hashable, Sendable {
   case webView
   /// Each session's drawer of side terminals (#43): whether their history is kept.
   case terminals
+  /// The titles of the tickets a new session names, and the resolvers that recognise them (#89).
+  case tickets
   /// What each session's journal does: the summary its agent writes (#36).
   case activity
   /// The conversation view of #38: its theme, its fonts, what it unfolds.

@@ -35,6 +35,61 @@ struct CreateSessionTests {
     return (create, repository)
   }
 
+  @Test("The tickets the fields name are recognised, and the first one becomes the ticket (#89)")
+  func ticketsAreRecognised() async throws {
+    let repository = SpyRepository()
+    let create = CreateSession(
+      repository: repository, agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable), clock: FixedClock(),
+      ticketResolvers: { TicketResolverSet(TicketResolverPresets.all) })
+    var template = PromptTemplate(name: "Review", body: "Review {{url}}, see {{other}}.")
+    template.revision = 1
+    var draft = draft(name: "PROJ-1 https://acme.atlassian.net/browse/PROJ-1", prompt: "")
+    draft.templateFill = PromptTemplateFill(
+      template: template,
+      values: [
+        "url": "https://github.com/acme/app/pull/12", "other": "https://example.com/not-a-ticket",
+      ])
+
+    let creation = try await create(draft)
+
+    #expect(creation.tickets.map(\.shortID) == ["PROJ-1", "acme/app#12"])
+    let stored = await repository.savedSessions.first?.ticket
+    #expect(
+      stored
+        == SessionTicket(
+          url: URL(string: "https://acme.atlassian.net/browse/PROJ-1")!, source: .detected))
+  }
+
+  @Test("A ticket typed in its field is kept, and still read first")
+  func typedTicketIsKept() async throws {
+    let repository = SpyRepository()
+    let create = CreateSession(
+      repository: repository, agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable), clock: FixedClock(),
+      ticketResolvers: { TicketResolverSet(TicketResolverPresets.all) })
+    var draft = draft(prompt: "Also https://github.com/acme/app/issues/2")
+    draft.ticketText = "https://github.com/acme/app/issues/1"
+
+    let creation = try await create(draft)
+
+    #expect(creation.tickets.map(\.shortID) == ["acme/app#1", "acme/app#2"])
+    #expect(creation.session.ticket?.source == .manual)
+  }
+
+  @Test("Titles off: nothing is recognised and no ticket is deduced")
+  func titlesOff() async throws {
+    let repository = SpyRepository()
+    let create = CreateSession(
+      repository: repository, agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable), clock: FixedClock(), ticketResolvers: { nil })
+
+    let creation = try await create(draft(prompt: "https://github.com/acme/app/issues/1"))
+
+    #expect(creation.tickets.isEmpty)
+    #expect(creation.session.ticket == nil)
+  }
+
   @Test("A valid draft is stored once, with the plan that will be launched")
   func validDraftIsStored() async throws {
     let (create, repository) = makeSubject()

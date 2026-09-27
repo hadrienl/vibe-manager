@@ -89,6 +89,17 @@
         }
       }
     },
+    "%@ asks to sign in: sign in in a session's web view, then test again." : {
+      "comment" : "A site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ demande de se connecter : connectez-vous dans la vue web d’une session, puis testez à nouveau."
+          }
+        }
+      }
+    },
     "%@ cache read" : {
       "comment" : "Tokens read from the cache, abbreviated: “1.2 M cache read”.",
       "localizations" : {
@@ -486,6 +497,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ a été fermée, mais son processus (pid %2$@) n’a pas répondu à l’arrêt et tourne peut-être encore."
+          }
+        }
+      }
+    },
+    "%@ was not found, or is visible only once signed in: sign in in its tab." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est introuvable, ou visible seulement une fois connecté : connectez-vous dans son onglet."
           }
         }
       }
@@ -2281,6 +2303,100 @@
         }
       }
     },
+    "%lld resolvers imported." : {
+      "comment" : "How many ticket resolvers an import added or replaced.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resolver imported."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resolvers imported."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résolveurs importés."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résolveur importé."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résolveurs importés."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld resolvers left out: they are not valid." : {
+      "comment" : "How many ticket resolvers of a file could not be imported.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resolver left out: it is not valid."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld resolvers left out: they are not valid."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résolveurs ignorés : ils ne sont pas valides."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résolveur ignoré : il n’est pas valide."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld résolveurs ignorés : ils ne sont pas valides."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld resources" : {
       "comment" : "How many links a session's activity holds.",
       "localizations" : {
@@ -3438,6 +3554,16 @@
         }
       }
     },
+    "A regular expression, with named captures such as (?<number>[0-9]+)." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une expression régulière, avec des captures nommées comme (?<number>[0-9]+)."
+          }
+        }
+      }
+    },
     "A template is a prompt with fields to fill in — “Review {{url}}” — ready to start a session from." : {
       "localizations" : {
         "fr" : {
@@ -3511,6 +3637,26 @@
         }
       }
     },
+    "Add a Rule" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une règle"
+          }
+        }
+      }
+    },
+    "Add a resolver" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un résolveur"
+          }
+        }
+      }
+    },
     "Add to To Do" : {
       "comment" : "Creates a session without launching it.",
       "localizations" : {
@@ -3528,6 +3674,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adresse"
+          }
+        }
+      }
+    },
+    "Address pattern" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motif d’adresse"
           }
         }
       }
@@ -3665,6 +3821,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autoriser une fois"
+          }
+        }
+      }
+    },
+    "Allow exporting as CSV" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permettre l’export CSV"
           }
         }
       }
@@ -5016,6 +5182,16 @@
         }
       }
     },
+    "Delete the resolver" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le résolveur"
+          }
+        }
+      }
+    },
     "Delete “%@”?" : {
       "comment" : "The name of the prompt template to delete.",
       "localizations" : {
@@ -5317,6 +5493,16 @@
         }
       }
     },
+    "Duplicate the resolver" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dupliquer le résolveur"
+          }
+        }
+      }
+    },
     "Each agent resumes its conversation where it can. A session whose summary has to be read first is left for you to restart on its own." : {
       "localizations" : {
         "fr" : {
@@ -5385,6 +5571,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Saisissez une adresse ou un #ticket"
+          }
+        }
+      }
+    },
+    "Example: %@" : {
+      "comment" : "A line as it would be written in the notes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemple : %@"
           }
         }
       }
@@ -5938,6 +6135,16 @@
         }
       }
     },
+    "Give the resolver a name." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donnez un nom au résolveur."
+          }
+        }
+      }
+    },
     "Given by the template — pick another if needed." : {
       "localizations" : {
         "fr" : {
@@ -6218,6 +6425,16 @@
         }
       }
     },
+    "Identifier" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiant"
+          }
+        }
+      }
+    },
     "Idle" : {
       "comment" : "A session's state: its agent waits for an instruction, with nothing to read.",
       "localizations" : {
@@ -6327,6 +6544,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prompt initial"
+          }
+        }
+      }
+    },
+    "Insert Ticket Title" : {
+      "comment" : "The undo action that takes back a ticket's line added to the notes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insérer le titre du ticket"
+          }
+        }
+      }
+    },
+    "Insert ticket titles in the notes" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insérer le titre des tickets dans les notes"
           }
         }
       }
@@ -6515,6 +6753,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Laisser les agents lire vos dossiers"
+          }
+        }
+      }
+    },
+    "Line format" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format de la ligne"
           }
         }
       }
@@ -6971,6 +7219,16 @@
         }
       }
     },
+    "New Resolver" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau résolveur"
+          }
+        }
+      }
+    },
     "New Session" : {
       "comment" : "Title of the New Session sheet.",
       "localizations" : {
@@ -7219,6 +7477,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun dépôt utilisé pour l’instant."
+          }
+        }
+      }
+    },
+    "No resolver recognises this address: nothing would be loaded." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résolveur ne reconnaît cette adresse : rien ne serait chargé."
+          }
+        }
+      }
+    },
+    "No resolver selected" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résolveur sélectionné"
           }
         }
       }
@@ -8403,6 +8681,17 @@
         }
       }
     },
+    "Reading the title of %@…" : {
+      "comment" : "A ticket's identifier: “acme/app#42”, “PROJ-123”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture du titre de %@…"
+          }
+        }
+      }
+    },
     "Reading transcripts" : {
       "localizations" : {
         "fr" : {
@@ -8475,6 +8764,23 @@
         }
       }
     },
+    "Recognised by %@: %@" : {
+      "comment" : "A resolver's name, then the ticket's identifier.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recognised by %1$@: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnu par %1$@ : %2$@"
+          }
+        }
+      }
+    },
     "Recorded since %@." : {
       "comment" : "The day runs started to be recorded.",
       "localizations" : {
@@ -8539,6 +8845,16 @@
         }
       }
     },
+    "Regular expressions whose matches are removed from the page's title, in this order." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expressions régulières dont les correspondances sont retirées du titre de la page, dans cet ordre."
+          }
+        }
+      }
+    },
     "Reject" : {
       "comment" : "Rejects an agent's plan.",
       "localizations" : {
@@ -8598,6 +8914,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer le dossier"
+          }
+        }
+      }
+    },
+    "Remove the rule" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la règle"
           }
         }
       }
@@ -8959,6 +9285,16 @@
         }
       }
     },
+    "Restore the Shipped Version" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir la version livrée"
+          }
+        }
+      }
+    },
     "Restoring" : {
       "localizations" : {
         "fr" : {
@@ -9143,6 +9479,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Révision %@"
+          }
+        }
+      }
+    },
+    "Rule %lld" : {
+      "comment" : "A rule's position.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règle %lld"
+          }
+        }
+      }
+    },
+    "Rule %lld is not a valid regular expression." : {
+      "comment" : "A rule's position.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La règle %lld n’est pas une expression régulière valide."
           }
         }
       }
@@ -9757,6 +10115,17 @@
         }
       }
     },
+    "Show Tab" : {
+      "comment" : "Shows the web view's tab of a ticket.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’onglet"
+          }
+        }
+      }
+    },
     "Show Terminals (⌘J)" : {
       "localizations" : {
         "fr" : {
@@ -9901,6 +10270,16 @@
         }
       }
     },
+    "Shown before the title: the captures in braces, and {host}." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiché devant le titre : les captures entre accolades, et {host}."
+          }
+        }
+      }
+    },
     "Shows in the sidebar when it works, asks a question or has finished. Needs hooks %@ asks you to approve once." : {
       "comment" : "Under the setting that tracks an agent's activity; the argument is the agent's name.",
       "localizations" : {
@@ -9983,6 +10362,23 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Sign in to %@ in the web view to read the title of %@." : {
+      "comment" : "A site, then a ticket's identifier.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sign in to %1$@ in the web view to read the title of %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à %1$@ dans la vue web pour lire le titre de %2$@."
           }
         }
       }
@@ -10493,6 +10889,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Interrompue par le signal %@"
+          }
+        }
+      }
+    },
+    "Test" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tester"
+          }
+        }
+      }
+    },
+    "Test with an address" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tester avec une adresse"
           }
         }
       }
@@ -11041,6 +11457,16 @@
         }
       }
     },
+    "The format must hold {title}, and may hold {id} and {url}." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le format doit contenir {title}, et peut contenir {id} et {url}."
+          }
+        }
+      }
+    },
     "The generation uses the account and the quota of this agent." : {
       "localizations" : {
         "fr" : {
@@ -11158,6 +11584,17 @@
         }
       }
     },
+    "The page answered %@: the ticket was not found, or is not visible to the account signed in." : {
+      "comment" : "An HTTP status: “404”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page a répondu %@ : le ticket est introuvable, ou n’est pas visible par le compte connecté."
+          }
+        }
+      }
+    },
     "The page could not be loaded" : {
       "localizations" : {
         "fr" : {
@@ -11168,12 +11605,71 @@
         }
       }
     },
+    "The page of %@ answered with the error %@." : {
+      "comment" : "A ticket's identifier, then an HTTP status: “500”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The page of %1$@ answered with the error %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page de %1$@ a répondu par l’erreur %2$@."
+          }
+        }
+      }
+    },
+    "The page of %@ did not load in time." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page de %@ ne s’est pas chargée à temps."
+          }
+        }
+      }
+    },
+    "The page of %@ gave no title." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page de %@ n’a donné aucun titre."
+          }
+        }
+      }
+    },
     "The page was not loaded." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "La page n’a pas été chargée."
+          }
+        }
+      }
+    },
+    "The pattern is not a valid regular expression." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le motif n’est pas une expression régulière valide."
+          }
+        }
+      }
+    },
+    "The pattern needs at least one named capture, such as (?<number>[0-9]+)." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le motif doit contenir au moins une capture nommée, comme (?<number>[0-9]+)."
           }
         }
       }
@@ -11382,6 +11878,112 @@
         }
       }
     },
+    "The title of %@ does not fit in the notes." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %@ ne tient pas dans les notes."
+          }
+        }
+      }
+    },
+    "The title of %@ is in the notes." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %@ est dans les notes."
+          }
+        }
+      }
+    },
+    "The title of %@ was not added: the notes could not be read." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %@ n’a pas été ajouté : les notes n’ont pas pu être lues."
+          }
+        }
+      }
+    },
+    "The title of %@ was not read: %@" : {
+      "comment" : "A ticket's identifier, then the reason WebKit gave.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The title of %1$@ was not read: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %1$@ n’a pas été lu : %2$@"
+          }
+        }
+      }
+    },
+    "The title of %@ was not read: %@ cannot be reached." : {
+      "comment" : "A ticket's identifier, then a site.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The title of %1$@ was not read: %2$@ cannot be reached."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %1$@ n’a pas été lu : %2$@ est injoignable."
+          }
+        }
+      }
+    },
+    "The title of %@ was not read: its tab was closed." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %@ n’a pas été lu : son onglet a été fermé."
+          }
+        }
+      }
+    },
+    "The title of %@ was not read: the Mac is offline." : {
+      "comment" : "A ticket's identifier.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %@ n’a pas été lu : le Mac n’est pas connecté."
+          }
+        }
+      }
+    },
+    "The title of %@ was not read: the certificate of %@ is not trusted." : {
+      "comment" : "A ticket's identifier, then a site.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The title of %1$@ was not read: the certificate of %2$@ is not trusted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre de %1$@ n’a pas été lu : le certificat de %2$@ n’est pas fiable."
+          }
+        }
+      }
+    },
     "These notes could not be read" : {
       "localizations" : {
         "fr" : {
@@ -11483,6 +12085,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet éditeur n’est plus installé : les fichiers sont affichés dans le Finder à la place."
+          }
+        }
+      }
+    },
+    "This file is not a file of ticket resolvers that Vibe Manager can read." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier n’est pas un fichier de résolveurs de tickets que Vibe Manager sait lire."
           }
         }
       }
@@ -11720,6 +12332,17 @@
         }
       }
     },
+    "Tickets" : {
+      "comment" : "A tab of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tickets"
+          }
+        }
+      }
+    },
     "Title" : {
       "comment" : "Why a session is listed in Open Quickly: its title matches.",
       "localizations" : {
@@ -11727,6 +12350,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Titre"
+          }
+        }
+      }
+    },
+    "Title cleanup" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nettoyage du titre"
+          }
+        }
+      }
+    },
+    "Title of the page: “%@”" : {
+      "comment" : "The raw title of a page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre de la page : « %@ »"
           }
         }
       }
@@ -12533,6 +13177,16 @@
         }
       }
     },
+    "When a new session names a ticket's address, its page opens in the session's web view, where you are signed in, and its title goes to the top of the notes. Only addresses a resolver below recognises are opened." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand une nouvelle session cite l’adresse d’un ticket, sa page s’ouvre dans la vue web de la session, là où vous êtes connecté, et son titre s’ajoute en tête des notes. Seules les adresses reconnues par un résolveur ci-dessous sont ouvertes."
+          }
+        }
+      }
+    },
     "When an agent in the background asks for something while Vibe Manager is not in front." : {
       "localizations" : {
         "fr" : {
@@ -12644,6 +13298,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utile quand l’agent a refusé le modèle précédent, plutôt que la conversation elle-même."
+          }
+        }
+      }
+    },
+    "Write the identifier shown before the title." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrivez l’identifiant affiché devant le titre."
+          }
+        }
+      }
+    },
+    "Write the pattern of the addresses it recognises." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrivez le motif des adresses qu’il reconnaît."
           }
         }
       }
@@ -13789,6 +14463,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente à l’invite"
+          }
+        }
+      }
+    },
+    "{%@} is not a capture of the pattern." : {
+      "comment" : "The name of a placeholder written in braces.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "{%@} n’est pas une capture du motif."
           }
         }
       }

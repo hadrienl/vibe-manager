@@ -55,6 +55,9 @@ public final class BrowserTabModel: NSObject, Identifiable {
   /// then. What an agent may do is decided on it — `url` already names where a navigation is
   /// heading, while the page, its script and its cookies are still the previous site's.
   public private(set) var committedURL: URL?
+  /// The HTTP status of the last response the page's own document came with; `nil` before one, and
+  /// for what is not HTTP. How a ticket's page tells a missing ticket from a found one (#89).
+  public private(set) var mainFrameStatus: Int?
   public private(set) var title: String
   public private(set) var isLoading = false
   public private(set) var progress: Double = 0
@@ -238,6 +241,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     webView?.removeFromSuperview()
     webView = nil
     committedURL = nil
+    mainFrameStatus = nil
     isLoading = false
   }
 
@@ -277,6 +281,28 @@ public final class BrowserTabModel: NSObject, Identifiable {
     guard let title, !title.isEmpty, title != self.title else { return }
     self.title = title
     didChange?()
+  }
+
+  /// Where the document is now — which a single-page application changes without a navigation —
+  /// and the titles it gives itself, in the order a ticket's title is looked for: `og:title`,
+  /// `twitter:title`, then the document's title. Read together, from the same document. `nil`
+  /// when the page cannot be asked.
+  func readTitleMetadata() async -> (address: URL?, titles: [String])? {
+    guard let webView, !hasCrashed else { return nil }
+    let script = """
+      (() => {
+        const meta = (selector) => {
+          const element = document.querySelector(selector);
+          return element ? (element.getAttribute('content') || '') : '';
+        };
+        return [location.href, meta('meta[property="og:title"]'),
+          meta('meta[name="twitter:title"]'), document.title || ''];
+      })()
+      """
+    let value = try? await webView.evaluateJavaScript(script, in: nil, contentWorld: .defaultClient)
+    guard let strings = (value as? [Any])?.map({ ($0 as? String) ?? "" }), !strings.isEmpty
+    else { return nil }
+    return (URL(string: strings[0]), Array(strings.dropFirst()))
   }
 
   private func observe(_ webView: WKWebView) {
@@ -459,6 +485,9 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
   public func webView(
     _ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse
   ) async -> WKNavigationResponsePolicy {
+    if navigationResponse.isForMainFrame {
+      mainFrameStatus = (navigationResponse.response as? HTTPURLResponse)?.statusCode
+    }
     guard navigationResponse.canShowMIMEType else {
       if isAgentDriven {
         let name = navigationResponse.response.suggestedFilename ?? "download"

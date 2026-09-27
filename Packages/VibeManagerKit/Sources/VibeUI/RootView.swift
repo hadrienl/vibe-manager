@@ -483,6 +483,7 @@ public struct RootView: View {
               switchAgent: model.canSwitchAgent(session)
                 ? { model.beginAgentSwitch(session.id) } : nil,
               notes: model.notes,
+              ticketTitles: model.ticketTitles,
               leaveNotes: { model.focusTerminal() },
               usage: model.usage,
               journal: model.journal
