@@ -75,13 +75,42 @@ struct NewSessionLoadingTests {
     let sheet = try #require(model.newSessionModel)
     try await waitUntil("the detection under way") { sheet.isLoadingAgents }
 
-    // What the sheet's `.task` does once it runs.
-    let fromTheView = Task { await sheet.load() }
+    // What the sheet's `.task` does once it runs: it places the caret once `load()` is back, so
+    // coming back before the agents are there is exactly what must not happen.
+    let view = ViewLoad()
+    let fromTheView = Task {
+      view.hasEntered = true
+      await sheet.load()
+      view.agentsOnReturn = sheet.agents.map(\.id.rawValue)
+    }
+    try await waitUntil("the view's load entered") { view.hasEntered }
+    // The detection is held: a load that joins stays inside. One that does not comes straight
+    // back, its `refreshAgents` turned away by the one under way.
+    let cameBack = await reaches(within: .milliseconds(300)) { view.agentsOnReturn != nil }
+    #expect(!cameBack, "The view's load came back before the detection had answered.")
+
     await heldGate.open()
     await fromTheView.value
 
-    #expect(sheet.agents.map(\.id.rawValue) == ["stub"])
+    #expect(view.agentsOnReturn == ["stub"])
     #expect(await registry.calls == 1)
+  }
+
+  /// Whether a state is reached within a bound: for a state that must *not* be reached while
+  /// something is held, where waiting for it has nothing else to end on.
+  private func reaches(within bound: Duration, _ condition: () -> Bool) async -> Bool {
+    let clock = ContinuousClock()
+    let start = clock.now
+    while clock.now - start < bound {
+      if condition() { return true }
+      try? await Task.sleep(for: .milliseconds(5))
+    }
+    return condition()
+  }
+
+  @MainActor private final class ViewLoad {
+    var hasEntered = false
+    var agentsOnReturn: [String]?
   }
 }
 
