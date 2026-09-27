@@ -1,4 +1,4 @@
-# 0029 — Ticket titles in the notes
+# 0031 — Ticket titles in the notes
 
 - Status: accepted
 - Date: 2026-09-27
