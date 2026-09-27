@@ -77,20 +77,48 @@ private struct NoTranscript: ClaudeCodeTranscriptWatching {
   }
 }
 
-/// A conversation the CLI only writes down with its first message, after several looks came
-/// back empty: the way a session started without a prompt waits for the user (#138).
+/// A conversation the CLI only writes down with its first message, `appearsAfter` into the
+/// launch: the way a session started without a prompt waits for the user (#138). Time is counted,
+/// not spent: a watch shorter than that comes back empty at once.
 private actor LateTranscript: ClaudeCodeTranscriptWatching {
-  private let appearsAfter: Int
-  private(set) var looks = 0
+  private let appearsAfter: Duration
+  private var watched: Duration = .zero
 
-  init(appearsAfter: Int) {
+  init(appearsAfter: Duration) {
     self.appearsAfter = appearsAfter
   }
 
   func awaitTranscript(identifier: String, timeout: Duration) async -> Bool {
-    looks += 1
-    return looks > appearsAfter
+    watched += timeout
+    return watched >= appearsAfter
   }
+}
+
+/// A transcript on disk, whose last look — the one `finish` makes — holds until the test lets it
+/// answer.
+private actor HeldLastLook: ClaudeCodeTranscriptWatching {
+  private(set) var isHolding = false
+  private var held: CheckedContinuation<Void, Never>?
+
+  func release() {
+    held?.resume()
+    held = nil
+  }
+
+  func awaitTranscript(identifier: String, timeout: Duration) async -> Bool {
+    guard timeout == .zero else {
+      try? await Task.sleep(for: timeout)
+      return false
+    }
+    isHolding = true
+    await withCheckedContinuation { held = $0 }
+    return true
+  }
+}
+
+/// Waits for a state, never for a deadline.
+private func eventually(_ condition: () async -> Bool) async {
+  while await !condition() { await Task.yield() }
 }
 
 /// A transcript on disk from the moment the test says so, and not before.
@@ -243,19 +271,60 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
   func waitsAsLongAsTheProcessLives() async {
     let session = claudeSession()
     let repository = ClaudeCaptureRepository(stored: session)
-    let transcripts = LateTranscript(appearsAfter: 3)
+    // The first message, written ten minutes after the launch.
+    let capture = ClaudeCodeSessionIdentifierCapture(
+      sessionID: session.id,
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: LateTranscript(appearsAfter: .seconds(600))
+    )
+
+    await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+
+    #expect(await capture.settled() == identifier)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+  }
+
+  @Test("A launch whose end is never reported stops watching after the limit")
+  func watchHasALimit() async {
+    let session = claudeSession()
+    let repository = ClaudeCaptureRepository(stored: session)
+    let capture = ClaudeCodeSessionIdentifierCapture(
+      sessionID: session.id,
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: NoTranscript(),
+      transcriptWatchLimit: .milliseconds(20)
+    )
+
+    await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+
+    // No `finish`: the watch ends on its own.
+    #expect(await capture.settled() == nil)
+    #expect(await repository.saveCount == 0)
+  }
+
+  @Test("Every report of the end returns once the identifier is written")
+  func concurrentFinishesAwaitTheFirst() async {
+    let session = claudeSession()
+    let repository = ClaudeCaptureRepository(stored: session)
+    let transcripts = HeldLastLook()
     let capture = ClaudeCodeSessionIdentifierCapture(
       sessionID: session.id,
       record: RecordAgentResumeIdentifier(repository: repository),
       transcripts: transcripts
     )
-
     await capture.record(plan: plan(arguments: ["--session-id", identifier]))
 
-    // Every look that came back empty was followed by another one, until the file was there.
-    #expect(await capture.settled() == identifier)
-    #expect(await transcripts.looks == 4)
-    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+    let first = Task { await capture.finish() }
+    await eventually { await transcripts.isHolding }
+    let second = Task {
+      await capture.finish()
+      return await repository.session(id: session.id)?.agent?.resumeIdentifier
+    }
+    await eventually { await capture.finishRequests == 2 }
+    await transcripts.release()
+
+    #expect(await second.value == identifier)
+    await first.value
   }
 
   @Test("A conversation written just before the process ended is stored when it ends")
@@ -267,7 +336,7 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
       sessionID: session.id,
       record: RecordAgentResumeIdentifier(repository: repository),
       transcripts: transcripts,
-      transcriptWatchWindow: .seconds(3600)
+      transcriptWatchLimit: .seconds(3600)
     )
 
     await capture.record(plan: plan(arguments: ["--session-id", identifier]))
@@ -318,6 +387,21 @@ struct ClaudeCodeTranscriptWatcherTests {
     try Data("{}\n".utf8).write(
       to: project.appendingPathComponent("\(identifier).jsonl", isDirectory: false))
     #expect(await watcher.awaitTranscript(identifier: identifier, timeout: .milliseconds(100)))
+  }
+
+  @Test("The watch slows down after its first period, up to the slowest pace")
+  func slowsDown() {
+    let watcher = ClaudeCodeTranscriptWatcher(
+      projectsDirectory: URL(fileURLWithPath: "/nowhere", isDirectory: true),
+      pollInterval: .milliseconds(500), briskPeriod: .seconds(30), slowestInterval: .seconds(5))
+
+    #expect(watcher.interval(after: .seconds(0)) == .milliseconds(500))
+    #expect(watcher.interval(after: .seconds(29)) == .milliseconds(500))
+    #expect(watcher.interval(after: .seconds(30)) == .seconds(1))
+    #expect(watcher.interval(after: .seconds(60)) == .seconds(2))
+    #expect(watcher.interval(after: .seconds(90)) == .seconds(4))
+    #expect(watcher.interval(after: .seconds(120)) == .seconds(5))
+    #expect(watcher.interval(after: .seconds(12 * 3600)) == .seconds(5))
   }
 
   @Test("A missing projects directory is simply no conversation yet")
