@@ -11,15 +11,22 @@ import VibeDomain
 /// at the trust prompt — and the next launch would then ask the CLI to resume a conversation
 /// it has never heard of. So, as for Codex, nothing is written until the transcript proves the
 /// conversation is real.
+///
+/// The CLI creates that transcript with the first message, not at launch (checked with 2.1.283):
+/// a session started without a prompt has none for as long as the user takes to write to it. So
+/// the watch lasts as long as the process does (#138) — bounded all the same by a limit of hours,
+/// so that a launch whose end is never reported cannot keep looking at the disk for good.
 public actor ClaudeCodeSessionIdentifierCapture {
   public static let defaultPersistenceWindow: Duration = .seconds(10)
-  public static let defaultTranscriptTimeout: Duration = .seconds(30)
+  /// How long the transcript is waited for at most. The process ending stops the watch well
+  /// before, as a rule: this is only the safety net, set for a working day.
+  public static let defaultTranscriptWatchLimit: Duration = .seconds(12 * 3600)
   static let retryInterval: Duration = .milliseconds(200)
 
   private let sessionID: SessionID
   private let record: RecordAgentResumeIdentifier
   private let transcripts: any ClaudeCodeTranscriptWatching
-  private let transcriptTimeout: Duration
+  private let transcriptWatchLimit: Duration
   private let persistenceWindow: Duration
 
   private var assigned: String?
@@ -27,18 +34,23 @@ public actor ClaudeCodeSessionIdentifierCapture {
   private var unstored: String?
   private var watcher: Task<Void, Never>?
   private var persister: Task<Void, Never>?
+  /// The last look of `finish`, awaited by every call that follows the first.
+  private var finishing: Task<Void, Never>?
+  /// Calls to `finish` so far, for the tests.
+  private(set) var finishRequests = 0
 
   public init(
     sessionID: SessionID,
     record: RecordAgentResumeIdentifier,
     transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
-    transcriptTimeout: Duration = ClaudeCodeSessionIdentifierCapture.defaultTranscriptTimeout,
+    transcriptWatchLimit: Duration =
+      ClaudeCodeSessionIdentifierCapture.defaultTranscriptWatchLimit,
     persistenceWindow: Duration = ClaudeCodeSessionIdentifierCapture.defaultPersistenceWindow
   ) {
     self.sessionID = sessionID
     self.record = record
     self.transcripts = transcripts
-    self.transcriptTimeout = transcriptTimeout
+    self.transcriptWatchLimit = transcriptWatchLimit
     self.persistenceWindow = persistenceWindow
   }
 
@@ -65,6 +77,7 @@ public actor ClaudeCodeSessionIdentifierCapture {
     persister?.cancel()
     watcher = nil
     persister = nil
+    finishing = nil
     assigned = identifier
     captured = nil
     unstored = nil
@@ -86,14 +99,42 @@ public actor ClaudeCodeSessionIdentifierCapture {
     persister = nil
   }
 
+  /// The process ended: the watch stops, after one last look. A first message sent just before
+  /// the agent quit leaves a transcript the watch has not seen yet, and it is a conversation to
+  /// resume all the same.
+  ///
+  /// The end is reported more than once — the terminal's output ends, then the launcher lets go
+  /// of the session — and every call returns only once that last look is over: none of them
+  /// may return while the identifier is still being written.
+  public func finish() async {
+    finishRequests += 1
+    if let finishing {
+      await finishing.value
+      return
+    }
+    let wasWatching = watcher != nil
+    stop()
+    guard wasWatching, let identifier = assigned, captured == nil else { return }
+    let last = Task<Void, Never> { [weak self] in await self?.lookOnceMore(for: identifier) }
+    finishing = last
+    await last.value
+  }
+
+  private func lookOnceMore(for identifier: String) async {
+    guard await transcripts.awaitTranscript(identifier: identifier, timeout: .zero) else { return }
+    guard assigned == identifier, captured == nil else { return }
+    _ = await persist(identifier)
+  }
+
   /// Waits for the conversation to exist, then writes its identifier down.
   ///
-  /// A conversation that never appears is a conversation there is nothing to resume, so the
-  /// identifier is dropped rather than surfaced: unlike a write that failed, nothing was lost.
+  /// The wait ends with the process (`stop`, `finish`), or at the latest after the watch limit: a
+  /// conversation that never appears is one there is nothing to resume, so the identifier is
+  /// dropped rather than surfaced — unlike a write that failed, nothing was lost.
   private func storeOnceWritten(_ identifier: String) async {
     let exists = await transcripts.awaitTranscript(
       identifier: identifier,
-      timeout: transcriptTimeout
+      timeout: transcriptWatchLimit
     )
     guard !Task.isCancelled, exists, assigned == identifier else { return }
 

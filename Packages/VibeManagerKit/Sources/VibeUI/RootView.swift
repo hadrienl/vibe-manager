@@ -871,6 +871,12 @@ public struct RootView: View {
     model.terminals == nil ? nil : AnyView(DrawerStatusButton(model: model, session: session))
   }
 
+  /// Restart, at the foot of a session's terminal: the session's own, which resumes its
+  /// conversation — never the pane's process run again as it was launched (#138).
+  private func sessionRestart(for id: SessionID) -> () -> Void {
+    { Task { await model.restart(id) } }
+  }
+
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
     let presentation = model.presentation(of: session)
@@ -887,7 +893,8 @@ public struct RootView: View {
             model: pane, autoStart: false, isActive: isActive,
             accessibilityTitle: terminalTitle(for: listed, pane: pane),
             statusAccessory: statusAccessory(for: listed),
-            claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation
+            claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
+            restart: sessionRestart(for: listed.id), canRestart: model.canRestart(listed)
           )
           .id(listed.id)
           .opacity(isActive ? 1 : 0)
@@ -914,7 +921,9 @@ public struct RootView: View {
             // shown in.
             if let pane = model.pane(for: id) {
               Divider()
-              TerminalStatusBar(pane: pane, accessory: statusAccessory(for: listed))
+              TerminalStatusBar(
+                pane: pane, accessory: statusAccessory(for: listed),
+                restart: sessionRestart(for: id), canRestart: model.canRestart(listed))
             }
           }
           .opacity(isActive ? 1 : 0)

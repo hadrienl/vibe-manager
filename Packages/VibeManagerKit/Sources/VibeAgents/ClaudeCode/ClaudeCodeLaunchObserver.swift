@@ -20,7 +20,7 @@ public actor ClaudeCodeLaunchObserver: AgentLaunchObserver {
   public func observe(output: String) async {}
 
   public func finished() async {
-    await capture.stop()
+    await capture.finish()
   }
 }
 
