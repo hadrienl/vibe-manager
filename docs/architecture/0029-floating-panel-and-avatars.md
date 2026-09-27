@@ -1,4 +1,4 @@
-# 0027 — The floating panel of requests, and its avatars
+# 0029 — The floating panel of requests, and its avatars
 
 - Status: accepted
 - Date: 2026-09-26
