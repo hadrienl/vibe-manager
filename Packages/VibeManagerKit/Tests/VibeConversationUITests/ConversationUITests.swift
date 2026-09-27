@@ -318,6 +318,7 @@ struct ConversationModelTests {
 
   private final class Answers: @unchecked Sendable {
     var given: [(AgentAnswer, AgentRequestID)] = []
+    var sends = true
   }
 
   private func asking(
@@ -330,7 +331,10 @@ struct ConversationModelTests {
       reference: AgentToolReference(tool: "AskUserQuestion"), isShown: true)
     let answers = Answers()
     model.pendingRequest = { ConversationRequest(request: request, answers: kinds, isSending: false) }
-    model.answerRequest = { answer, id in answers.given.append((answer, id)) }
+    model.answerRequest = { answer, id in
+      answers.given.append((answer, id))
+      return answers.sends
+    }
     model.activity = .awaitingUser(.question)
     return (model, terminal, answers, id)
   }
@@ -424,6 +428,41 @@ struct ConversationModelTests {
     #expect(answers.given.first?.0 == .answers([.text("Green")]))
     #expect(terminal.written.isEmpty)
     #expect(model.draft.isEmpty)
+  }
+
+  @Test("A free answer that could not be typed stays in the composer")
+  func freeAnswerKept() async {
+    let (model, _, answers, _) = asking([Self.colour], answers: [.chooseOption, .writeText])
+    answers.sends = false
+    model.draft = "Green"
+    #expect(await model.send() == false)
+    #expect(model.draft == "Green")
+  }
+
+  @Test("A permission's buttons go under the call it names, not the last one waiting")
+  func permissionUnderItsCall() {
+    let (model, _) = model()
+    let first = ToolCall(callID: "t1", kind: .shell, parameters: [ToolParameter(.command, "rm -r build")])
+    let last = ToolCall(callID: "t2", kind: .shell, parameters: [ToolParameter(.command, "ls")])
+    model.apply(
+      ConversationSnapshot(
+        entries: [
+          ConversationEntry(id: "e1", content: .tool(first)),
+          ConversationEntry(id: "e2", content: .tool(last)),
+        ], availability: .available))
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: model.sessionID, key: "p"), receivedAt: Date(),
+      kind: .approval,
+      content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "rm -r build")),
+      reference: AgentToolReference(tool: "Bash"), isShown: true)
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: [.allowOnce, .deny], isSending: false)
+    }
+    model.answerRequest = { _, _ in true }
+    model.activity = .awaitingUser(.approval)
+    #expect(model.pendingCall?.callID == "t2")
+    #expect(model.request(for: first) != nil)
+    #expect(model.request(for: last) == nil)
   }
 
   @Test("A question only its terminal can answer leaves the options and the composer closed")

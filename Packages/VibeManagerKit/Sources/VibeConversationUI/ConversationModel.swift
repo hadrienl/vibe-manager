@@ -170,7 +170,9 @@ public final class ConversationModel {
   /// state each time, so that the views follow it.
   @ObservationIgnored public var pendingRequest: () -> ConversationRequest? = { nil }
   /// Types an answer into the session's terminal, as the palette does (#40).
-  @ObservationIgnored public var answerRequest: ((AgentAnswer, AgentRequestID) async -> Void)?
+  /// Types an answer into the session's terminal, as the palette does (#40); `true` once it is
+  /// typed in full.
+  @ObservationIgnored public var answerRequest: ((AgentAnswer, AgentRequestID) async -> Bool)?
   /// The options chosen so far, for a request of several questions answered together.
   public private(set) var questionChoices: [Int: AgentQuestionAnswer] = [:]
   private var choicesRequestID: AgentRequestID?
@@ -378,10 +380,29 @@ public final class ConversationModel {
     return pendingRequest()
   }
 
-  /// The request, when `call` is the one the agent waits on.
+  /// The request, under the block of the call it is about. A permission names what it would run:
+  /// several calls may wait at once, and the one marked as waiting is only the last of them.
   public func request(for call: ToolCall) -> ConversationRequest? {
-    guard let pending = pendingCall, pending.callID == call.callID else { return nil }
+    guard let request, requestCall(of: request)?.callID == call.callID else { return nil }
     return request
+  }
+
+  private func requestCall(of request: ConversationRequest) -> ToolCall? {
+    guard case .permission(let permission) = request.request.content,
+      let subject = permission.subject
+    else { return pendingCall }
+    let unfinished = blocks.flatMap { block -> [ToolCall] in
+      switch block {
+      case .entry(let entry): return entry.toolCall.map { [$0] } ?? []
+      case .toolGroup(_, let entries): return entries.compactMap(\.toolCall)
+      }
+    }.filter { !$0.state.isFinished || $0.state == .awaitingPermission }
+    return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
+  }
+
+  /// Whether a permission's subject is what `call` shows.
+  static func isAbout(_ call: ToolCall, _ subject: String) -> Bool {
+    call.parameter(.command) == subject || call.parameter(.path) == subject
   }
 
   /// Chooses an option of a question: one question of one choice is answered at once; otherwise
@@ -435,7 +456,7 @@ public final class ConversationModel {
   public func answer(_ answer: AgentAnswer) {
     guard let request, !request.isSending, let answerRequest else { return }
     let id = request.request.id
-    Task { await answerRequest(answer, id) }
+    Task { _ = await answerRequest(answer, id) }
   }
 
   public var isAgentWorking: Bool { activity == .working && isProcessRunning }
@@ -456,9 +477,10 @@ public final class ConversationModel {
   public func send() async -> Bool {
     if composerState == .answeringQuestion {
       guard canSend, let request, let answerRequest else { return false }
+      // The draft stays until the answer is typed: a request gone meanwhile loses nothing.
       let text = freeAnswer
-      draft = ""
-      await answerRequest(.answers([.text(text)]), request.request.id)
+      guard await answerRequest(.answers([.text(text)]), request.request.id) else { return false }
+      if freeAnswer == text { draft = "" }
       return true
     }
     guard canSend, let write else { return false }

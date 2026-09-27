@@ -134,7 +134,7 @@ struct ToolBlockView: View {
         VStack(alignment: .leading, spacing: 12) {
           ToolCallDetails(call: call, model: model)
           if let request = model.request(for: call) {
-            RequestActions(model: model, request: request)
+            RequestActions(model: model, request: request, call: call)
           }
         }
         .padding(12)
@@ -658,11 +658,31 @@ private struct OptionButtonStyle: ButtonStyle {
 struct RequestActions: View {
   let model: ConversationModel
   let request: ConversationRequest
+  let call: ToolCall
   @Environment(\.conversationTheme) private var theme
 
   var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      // What would be allowed, unless the block above shows exactly that.
+      if case .permission(let permission) = request.request.content, let subject = permission.subject,
+        !ConversationModel.isAbout(call, subject)
+      {
+        Text(verbatim: DisplaySafeText.visible(subject))
+          .font(theme.codeFont(size: 12))
+          .foregroundStyle(theme.text.color)
+          .textSelection(.enabled)
+          .lineLimit(6)
+          .padding(8)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(theme.codeBackground.color, in: RoundedRectangle(cornerRadius: 6))
+      }
+      buttons
+    }
+  }
+
+  private var buttons: some View {
     let answers = request.answers
-    HStack(spacing: 8) {
+    return HStack(spacing: 8) {
       switch request.request.content {
       case .permission(let permission):
         if answers.contains(.allowOnce) {

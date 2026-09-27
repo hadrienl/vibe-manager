@@ -82,7 +82,7 @@ extension AppModel {
           isSending: self.answeringRequestIDs.contains(request.id))
       }
       model.answerRequest = { [weak self] answer, requestID in
-        await self?.answer(answer, to: requestID)
+        await self?.answer(answer, to: requestID) ?? false
       }
       model.activity = self?.activities[id]?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activities[id])

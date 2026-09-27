@@ -86,8 +86,10 @@ extension AppModel {
 
   /// Types `answer` into the terminal of the request's session. The session on screen is neither
   /// changed nor sent anything.
-  public func answer(_ answer: AgentAnswer, to id: AgentRequestID) async {
-    guard let answerRequest, !answeringRequestIDs.contains(id) else { return }
+  /// Whether it was typed in full.
+  @discardableResult
+  public func answer(_ answer: AgentAnswer, to id: AgentRequestID) async -> Bool {
+    guard let answerRequest, !answeringRequestIDs.contains(id) else { return false }
     let name = sessions.first { $0.id == id.sessionID }?.name ?? ""
     answeringRequestIDs.insert(id)
     let outcome = await answerRequest(answer, to: id)
@@ -95,6 +97,7 @@ extension AppModel {
     requestOutcome = RequestOutcome(
       id: UUID(), sessionName: name, answer: answer, outcome: outcome)
     Announcer.announce(Self.announcement(of: answer, outcome: outcome, sessionName: name))
+    return outcome == .sent
   }
 
   /// Clears the word said about the last answer, once it has been read.
