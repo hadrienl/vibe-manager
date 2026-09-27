@@ -17,9 +17,12 @@ public struct SettingsView: View {
   private let permissions: PermissionsModel?
   private let model: AppModel?
 
-  /// The width of the tabs that are a single form. The window takes each tab's size, and its
-  /// toolbar holds the tabs: at 500 points, the last ones fell into an overflow menu, where
-  /// Requests went unseen. Wide enough for every tab's label, in French as well.
+  /// The width of the tabs that are a single form, and the least any tab is given (#129).
+  ///
+  /// The window takes each tab's size, and its toolbar holds the tabs. Too narrow, the last ones
+  /// fall into an overflow menu where SwiftUI greys them out: at 500 points, Conversation,
+  /// Requests and Avatar could not be reached. The ten labels need about 670 points in French,
+  /// 640 in English: this leaves room for a longer translation, or one more tab.
   static let formWidth: CGFloat = 780
 
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
@@ -31,106 +34,36 @@ public struct SettingsView: View {
     if let model {
       TabView(selection: Bindable(model).settingsTab) {
         general
-          .tabItem {
-            Label {
-              Text("General", bundle: .module, comment: "A tab of the Settings window.")
-            } icon: {
-              Image(systemName: "gearshape")
-            }
-          }
-          .tag(SettingsTab.general)
+          .settingsPage(.general)
         if let permissions {
           PrivacySettingsView(permissions: permissions, sessionName: model.sessionName(for:))
-            .tabItem {
-              Label {
-                Text("Privacy", bundle: .module, comment: "A tab of the Settings window.")
-              } icon: {
-                Image(systemName: "hand.raised")
-              }
-            }
-            .tag(SettingsTab.privacy)
+            .settingsPage(.privacy)
         }
         PromptTemplatesView(model: model.templates)
-          .tabItem {
-            Label {
-              Text("Templates", bundle: .module, comment: "A tab of the Settings window.")
-            } icon: {
-              Image(systemName: "text.badge.plus")
-            }
-          }
-          .tag(SettingsTab.templates)
+          .settingsPage(.templates)
         if let browser = model.browser {
           WebViewSettings(browser: browser)
-            .tabItem {
-              Label {
-                Text("Web View", bundle: .module, comment: "A tab of the Settings window.")
-              } icon: {
-                Image(systemName: "globe")
-              }
-            }
-            .tag(SettingsTab.webView)
+            .settingsPage(.webView)
         }
         if let terminals = model.terminals {
           TerminalSettings(terminals: terminals)
-            .tabItem {
-              Label {
-                Text("Terminals", bundle: .module, comment: "A tab of the Settings window.")
-              } icon: {
-                Image(systemName: "apple.terminal")
-              }
-            }
-            .tag(SettingsTab.terminals)
+            .settingsPage(.terminals)
         }
         if model.ticketTitles.canReadPages {
           TicketSettingsView(model: model.ticketTitles)
-            .tabItem {
-              Label {
-                Text("Tickets", bundle: .module, comment: "A tab of the Settings window.")
-              } icon: {
-                Image(systemName: "ticket")
-              }
-            }
-            .tag(SettingsTab.tickets)
+            .settingsPage(.tickets)
         }
         if let journal = model.journal {
           ActivitySettings(journal: journal)
-            .tabItem {
-              Label {
-                Text("Activity", bundle: .module, comment: "A tab of the Settings window.")
-              } icon: {
-                Image(systemName: "list.bullet.rectangle")
-              }
-            }
-            .tag(SettingsTab.activity)
+            .settingsPage(.activity)
         }
         ConversationSettingsView(appearance: Bindable(model.conversations).appearance)
-          .tabItem {
-            Label {
-              Text("Conversation", bundle: .module, comment: "A tab of the Settings window.")
-            } icon: {
-              Image(systemName: "bubble.left.and.text.bubble.right")
-            }
-          }
-          .tag(SettingsTab.conversation)
+          .settingsPage(.conversation)
         RequestSettings(model: model)
-          .tabItem {
-            Label {
-              Text("Requests", bundle: .module, comment: "A tab of the Settings window.")
-            } icon: {
-              Image(systemName: "hand.raised")
-            }
-          }
-          .tag(SettingsTab.requests)
+          .settingsPage(.requests)
         if let studio = model.avatarStudio {
           AvatarSettings(studio: studio)
-            .tabItem {
-              Label {
-                Text("Avatar", bundle: .module, comment: "A tab of the Settings window.")
-              } icon: {
-                Image(systemName: "face.smiling")
-              }
-            }
-            .tag(SettingsTab.avatar)
+            .settingsPage(.avatar)
         }
       }
     } else {
@@ -219,8 +152,8 @@ public struct SettingsView: View {
   }
 }
 
-/// The tabs of the settings window.
-public enum SettingsTab: String, Hashable, Sendable {
+/// The tabs of the settings window, in the order of its toolbar.
+public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
   case general
   /// Full Disk Access, and the processes it has to reach (#76).
   case privacy
@@ -241,6 +174,74 @@ public enum SettingsTab: String, Hashable, Sendable {
   case requests
   /// The avatar of the floating panel: made, imported, exported (#41).
   case avatar
+
+  /// The label of the tab in the toolbar.
+  var title: LocalizedStringResource {
+    switch self {
+    case .general:
+      LocalizedStringResource("General", bundle: .module, comment: "A tab of the Settings window.")
+    case .privacy:
+      LocalizedStringResource("Privacy", bundle: .module, comment: "A tab of the Settings window.")
+    case .templates:
+      LocalizedStringResource(
+        "Templates", bundle: .module, comment: "A tab of the Settings window.")
+    case .webView:
+      LocalizedStringResource(
+        "Web View", bundle: .module, comment: "A tab of the Settings window.")
+    case .terminals:
+      LocalizedStringResource(
+        "Terminals", bundle: .module, comment: "A tab of the Settings window.")
+    case .tickets:
+      LocalizedStringResource("Tickets", bundle: .module, comment: "A tab of the Settings window.")
+    case .activity:
+      LocalizedStringResource(
+        "Activity", bundle: .module, comment: "A tab of the Settings window.")
+    case .conversation:
+      LocalizedStringResource(
+        "Conversation", bundle: .module, comment: "A tab of the Settings window.")
+    case .requests:
+      LocalizedStringResource(
+        "Requests", bundle: .module, comment: "A tab of the Settings window.")
+    case .avatar:
+      LocalizedStringResource("Avatar", bundle: .module, comment: "A tab of the Settings window.")
+    }
+  }
+
+  /// The symbol of the tab in the toolbar.
+  var symbolName: String {
+    switch self {
+    case .general: "gearshape"
+    case .privacy: "hand.raised"
+    case .templates: "text.badge.plus"
+    case .webView: "globe"
+    case .terminals: "apple.terminal"
+    case .tickets: "ticket"
+    case .activity: "list.bullet.rectangle"
+    case .conversation: "bubble.left.and.text.bubble.right"
+    case .requests: "hand.raised"
+    case .avatar: "face.smiling"
+    }
+  }
+}
+
+extension View {
+  /// Makes this view the page of a tab of the settings window: its label, its tag, and at least
+  /// the width of `SettingsView.formWidth`.
+  ///
+  /// The window takes the size of the tab shown, and its toolbar holds every tab: a page narrower
+  /// than the toolbar needs sends the last tabs into an overflow menu where they cannot be
+  /// clicked (#129). Given here rather than by each page, a tab added later cannot forget it.
+  func settingsPage(_ tab: SettingsTab) -> some View {
+    frame(minWidth: SettingsView.formWidth)
+      .tabItem {
+        Label {
+          Text(tab.title)
+        } icon: {
+          Image(systemName: tab.symbolName)
+        }
+      }
+      .tag(tab)
+  }
 }
 
 /// How the requests of background sessions are signalled (#40): notifications, the Dock badge,
