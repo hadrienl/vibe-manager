@@ -228,6 +228,20 @@ struct AvatarArchiveTests {
     }
   }
 
+  @Test("A sheet larger than a drawn grid is dropped, not decoded, and the avatar still reads")
+  func tooLargeSheet() throws {
+    let wide = try ImageCodec.png(
+      RGBAImage(width: AvatarImageProcessor.maximumSheetSide + 1, height: 16))
+    let zip = HandMadeZip(entries: [
+      .init(name: "neutral.png", contents: try sprite()),
+      .init(name: "sheet.png", contents: wide),
+    ])
+    let (avatar, ignored) = try processor.avatar(fromArchive: zip.data())
+    #expect(avatar.sheet == nil)
+    #expect(avatar.sprites[.neutral] != nil)
+    #expect(ignored == 0)
+  }
+
   @Test("An image too small is refused")
   func tooSmall() throws {
     let zip = HandMadeZip(entries: [.init(name: "neutral.png", contents: try sprite(side: 64))])

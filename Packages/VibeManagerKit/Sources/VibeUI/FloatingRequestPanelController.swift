@@ -220,8 +220,24 @@ public final class FloatingRequestPanelController {
     let half = FloatingRequestPanel.avatarSize / 2 + FloatingRequestPanel.padding
     let avatarX = layout.bubbleLeading ? contentSize.width - half : half
     let avatarY = layout.alignedBottom ? half : contentSize.height - half
-    let origin = CGPoint(x: anchor.x - avatarX, y: anchor.y - avatarY)
+    var origin = CGPoint(x: anchor.x - avatarX, y: anchor.y - avatarY)
+    // A borderless panel is not pushed back by the system: a tall bubble, from an avatar near the
+    // middle, would open past an edge and hide the start of its card. Then the window moves, not
+    // the avatar's place — except under the pointer, which it follows while dragged.
+    if dragOrigin == nil, let frame = screen?.visibleFrame {
+      origin = Self.fit(CGRect(origin: origin, size: contentSize), in: frame).origin
+    }
     window.setFrame(CGRect(origin: origin, size: contentSize), display: true)
+  }
+
+  /// `rect` moved just enough to stay in `frame`; its top kept first when it is the taller.
+  static func fit(_ rect: CGRect, in frame: CGRect) -> CGRect {
+    var fitted = rect
+    fitted.origin.x = min(max(rect.minX, frame.minX), frame.maxX - rect.width)
+    fitted.origin.y = max(min(rect.minY, frame.maxY - rect.height), frame.minY)
+    if fitted.height > frame.height { fitted.origin.y = frame.maxY - rect.height }
+    if fitted.width > frame.width { fitted.origin.x = frame.minX }
+    return fitted
   }
 
   fileprivate func dragged(by delta: CGSize?) {

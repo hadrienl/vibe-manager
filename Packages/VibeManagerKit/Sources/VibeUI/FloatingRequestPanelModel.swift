@@ -54,7 +54,9 @@ public final class FloatingRequestPanelModel {
   public var isShown: Bool {
     guard isEnabled, let app else { return false }
     guard !(app.isApplicationActive && app.isMainWindowVisible) else { return false }
-    return !requests.isEmpty || idle == .avatarOnly || app.requestOutcome != nil
+    // The outcome keeps it only while the bubble shows it: that line is what clears it, and folded
+    // it would never be cleared, leaving the avatar above everything.
+    return !requests.isEmpty || idle == .avatarOnly || (app.requestOutcome != nil && !isCollapsed)
   }
 
   /// The request in the bubble: the one the user moved to while it waits, else the oldest.

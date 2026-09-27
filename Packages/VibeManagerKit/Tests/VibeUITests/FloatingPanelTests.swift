@@ -115,6 +115,41 @@ struct FloatingPanelTests {
     #expect(panel.isShown)
   }
 
+  @Test("The word about the last answer keeps the bubble up, but never a folded avatar")
+  func outcomeWhileFolded() async {
+    let (model, panel) = await makeModel([session("First")])
+    panel.isEnabled = true
+    model.applicationWillResignActive()
+    model.requestOutcome = RequestOutcome(
+      id: UUID(), sessionName: "First", answer: .allowOnce, outcome: .sent)
+    #expect(panel.isShown)
+
+    // Folded, the line that clears it is not drawn: it would stay above everything.
+    panel.toggleCollapsed()
+    #expect(!panel.isShown)
+  }
+
+  @Test("A tall bubble opening past an edge is moved back on screen, its top kept first")
+  func fitsOnScreen() {
+    let screen = CGRect(x: 0, y: 0, width: 1_000, height: 800)
+    let fit = FloatingRequestPanelController.fit
+    // Opened upward from just below the middle: its top was 100 points past the edge.
+    #expect(
+      fit(CGRect(x: 600, y: 350, width: 300, height: 550), screen)
+        == CGRect(x: 600, y: 250, width: 300, height: 550))
+    // Opened downward from just above the middle.
+    #expect(
+      fit(CGRect(x: 600, y: -100, width: 300, height: 550), screen)
+        == CGRect(x: 600, y: 0, width: 300, height: 550))
+    #expect(
+      fit(CGRect(x: 600, y: 100, width: 300, height: 400), screen)
+        == CGRect(x: 600, y: 100, width: 300, height: 400))
+    // Taller than the screen: the start of the card stays in view.
+    #expect(
+      fit(CGRect(x: 600, y: -300, width: 300, height: 900), screen)
+        == CGRect(x: 600, y: -100, width: 300, height: 900))
+  }
+
   @Test("While it is on, no notification repeats a request the bubble shows; the badge stays")
   func noNotification() async {
     let first = session("First")

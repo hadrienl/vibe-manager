@@ -11,6 +11,9 @@ public struct AvatarImageProcessor: AvatarImageProcessing {
   static let minimumDrawingSide = 128
   /// The largest side an image of an archive may have: four times a sprite's.
   static let maximumDrawingSide = 2_048
+  /// The largest side the sheet of an archive may have: a grid of drawings, kept only as a
+  /// reference, and dropped rather than decoded when larger.
+  static let maximumSheetSide = 4_096
 
   public init() {}
 
@@ -41,7 +44,8 @@ public struct AvatarImageProcessor: AvatarImageProcessing {
       } else if lowered == Self.sheetFileName {
         guard sheet == nil else { throw AvatarProblem.archiveUnsafeEntry(entry.name) }
         // Kept only as the reference to draw from, and only if it reads as an image.
-        sheet = (try? ImageCodec.decode(entry.contents)).flatMap { try? ImageCodec.png($0) }
+        sheet = (try? ImageCodec.decode(entry.contents, maximumSide: Self.maximumSheetSide))
+          .flatMap { try? ImageCodec.png($0) }
       } else if let expression = Self.expression(named: entry.name) {
         // `neutral.png` and `Neutral.jpg` would be two images for one expression.
         guard !drawings.contains(where: { $0.0 == expression }) else {
