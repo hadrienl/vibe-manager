@@ -43,6 +43,11 @@ struct SessionSidebar: View {
       prompt: Text("Search sessions", bundle: .module)
     )
     .onChange(of: model.filter.column) { closeSwipe(animated: false) }
+    // A row left outlined, or about to open, by a drag its delegate never saw end.
+    .clearsWhenDragEnds(!rowDropHover.isEmpty) {
+      rowDropHover = [:]
+      springLoading.cancel()
+    }
     // Rows that move under a still pointer do not say so: the hover is only trusted again once
     // the pointer moves.
     .onChange(of: model.visibleSessions.map(\.id)) { hoveredSessionID = nil }

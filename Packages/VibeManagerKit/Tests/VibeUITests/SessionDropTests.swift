@@ -138,6 +138,50 @@ struct SpringLoadingTests {
     for _ in 0..<20 { await Task.yield() }
     #expect(fired == [second])
   }
+
+  @Test("A drag that ended without a word no longer opens the row")
+  func cancels() async {
+    let sleeper = ManualSleeper()
+    let loading = SpringLoading(sleep: { _ in await sleeper.sleep() })
+    var fired: [SessionID] = []
+    let id = SessionID()
+    loading.enter(id) { fired.append(id) }
+    loading.cancel()
+    await waitUntil { await sleeper.sleeping == 1 }
+    await sleeper.wake()
+    for _ in 0..<20 { await Task.yield() }
+    #expect(fired.isEmpty)
+  }
+}
+
+@MainActor
+@Suite("A hover left by a drag is cleared once the button is up")
+struct DragEndWatchTests {
+  @Test("It waits while the button is held, and returns once it is released")
+  func waitsForRelease() async throws {
+    var presses = [true, true, false]
+    var checks = 0
+    try await DragEndWatch.waitForRelease(
+      isButtonDown: {
+        checks += 1
+        return presses.removeFirst()
+      },
+      sleep: { _ in })
+    #expect(checks == 3)
+  }
+
+  @Test("Cancelled, it throws rather than clear the hover of the next drag")
+  func cancelled() async {
+    let task = Task { @MainActor in
+      try await DragEndWatch.waitForRelease(
+        isButtonDown: { true },
+        sleep: { _ in
+          try await Task.sleep(for: .seconds(60))
+        })
+    }
+    task.cancel()
+    await #expect(throws: CancellationError.self) { try await task.value }
+  }
 }
 
 @MainActor
