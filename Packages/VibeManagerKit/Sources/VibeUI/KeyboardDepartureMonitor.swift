@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Behind a list, says when the window's keyboard goes somewhere else (#128).
+/// Behind the sidebar's list, says when the window's keyboard goes somewhere other than the list
+/// or the sidebar's search field (#128).
 ///
 /// Read from the window's first responder rather than from SwiftUI's focus: in the application's
 /// window, the sidebar's `@FocusState` stayed true while the keyboard was in a terminal — an
@@ -9,7 +10,7 @@ import SwiftUI
 /// Any view that takes the keyboard — the terminal, the web view, the notes, the composer, a
 /// field — is seen the same way: the window says who has it.
 struct KeyboardDepartureMonitor: NSViewRepresentable {
-  /// Called each time the keyboard moves somewhere other than the list.
+  /// Called each time the keyboard moves somewhere other than the list or the search field.
   var departed: () -> Void
 
   func makeNSView(context: Context) -> MonitorView {
@@ -24,6 +25,8 @@ struct KeyboardDepartureMonitor: NSViewRepresentable {
 
   final class MonitorView: NSView {
     var departed: (() -> Void)?
+    /// How many moves of the keyboard it has looked at, for the tests to wait on.
+    private(set) var movesSeen = 0
     private var observation: NSKeyValueObservation?
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -41,20 +44,49 @@ struct KeyboardDepartureMonitor: NSViewRepresentable {
     }
 
     private func reportIfDeparted() {
+      movesSeen += 1
       guard let window, !holdsKeyboard(window.firstResponder) else { return }
       departed?()
     }
 
-    /// Whether the responder is the list this view stands behind, or a field in one of its rows.
-    /// This view is the list's background, beside it rather than above it: the list is the scroll
-    /// view drawn where this view is.
+    /// The list this view stands behind: beside it, in the hosting view they share. None while
+    /// the list is not mounted — the keyboard is then nowhere in it.
+    var list: NSTableView? {
+      guard let host = superview, let container = host.superview else { return nil }
+      return container.subviews.lazy.filter { $0 !== host }.compactMap(Self.table(in:)).first
+    }
+
+    /// The pane of the split view the list is drawn in: the sidebar, with its search field.
+    private var column: NSView? {
+      var view: NSView = self
+      while let parent = view.superview {
+        if parent is NSSplitView { return view }
+        view = parent
+      }
+      return nil
+    }
+
+    /// Whether the responder is the list, a field in one of its rows, or the sidebar's search
+    /// field. Told by where the view sits among the window's views, not by where it is drawn:
+    /// the request palette at the foot of the sidebar can cover the list, and its field is not
+    /// the list. A search keeps the selection, which it only prunes of the rows it hides (#77).
     private func holdsKeyboard(_ responder: NSResponder?) -> Bool {
-      guard let responder = responder as? NSView, responder.window === window else { return false }
-      let frame = convert(bounds, to: nil)
-      // Not laid out yet: nothing can be told, and nothing is taken from the selection for it.
-      guard !frame.isEmpty else { return true }
-      let area = responder.enclosingScrollView ?? responder
-      return area.convert(area.bounds, to: nil).contains(CGPoint(x: frame.midX, y: frame.midY))
+      guard var view = responder as? NSView, view.window === window else { return false }
+      // A field being typed into hands the keyboard to the window's field editor: the field is
+      // what it edits.
+      if let editor = view as? NSTextView, editor.isFieldEditor,
+        let field = editor.delegate as? NSView
+      {
+        view = field
+      }
+      if let list, view.isDescendant(of: list.enclosingScrollView ?? list) { return true }
+      if view is NSSearchField, let column, view.isDescendant(of: column) { return true }
+      return false
+    }
+
+    private static func table(in view: NSView) -> NSTableView? {
+      if let table = view as? NSTableView { return table }
+      return view.subviews.lazy.compactMap(table(in:)).first
     }
   }
 }

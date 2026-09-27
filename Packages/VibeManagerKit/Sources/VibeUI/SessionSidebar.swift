@@ -139,7 +139,8 @@ struct SessionSidebar: View {
     // The keyboard gone elsewhere, ⌘W and the Session menu act on the session on screen alone:
     // a selection nobody is looking at must not be what a shortcut typed in a terminal closes.
     // Told by the window rather than by `isListFocused`, which a click in the terminal left true
-    // (#128). A menu — the list's own, or the Session menu — does not move the keyboard: the
+    // (#128). The search field counts as the sidebar: a search prunes the selection, it does not
+    // shrink it. A menu — the list's own, or the Session menu — does not move the keyboard: the
     // selection holds until its command.
     .background(KeyboardDepartureMonitor { model.collapseSelection() })
     // Walked with the arrows, the list keeps the keyboard (#105); Return or → hands it to the
