@@ -151,6 +151,7 @@ struct ReportAgentActivityTests {
       [OpenProvider()], "open", consents: InMemoryAgentHookConsentStore(), consent: consent)
     #expect(launch.plan.arguments == ["-C", "/w", "--settings", "{}"])
     #expect(launch.decoder != nil)
+    #expect(launch.hooksApproved)
     #expect(consent.requests.isEmpty)
   }
 
@@ -159,8 +160,8 @@ struct ReportAgentActivityTests {
     let provider = ReportingProvider(trust: .trusted)
     let consents = InMemoryAgentHookConsentStore()
     let consent = ConsentCounter(answer: .declined)
-    _ = await report([provider], "cli", consents: consents, consent: consent)
-    _ = await report([provider], "cli", consents: consents, consent: consent)
+    #expect(await report([provider], "cli", consents: consents, consent: consent).hooksApproved)
+    #expect(await report([provider], "cli", consents: consents, consent: consent).hooksApproved)
     #expect(provider.trustChecks == 1)
     #expect(consent.requests.isEmpty)
   }
@@ -174,6 +175,7 @@ struct ReportAgentActivityTests {
     #expect(consent.requests == [["hook"]])
     #expect(provider.approvals == 1)
     #expect(launch.decoder != nil)
+    #expect(launch.hooksApproved)
     #expect(launch.plan.arguments.contains("hooks.Stop=x"))
     _ = await report([provider], "cli", consents: consents, consent: consent)
     #expect(consent.requests.count == 1)
@@ -187,12 +189,15 @@ struct ReportAgentActivityTests {
     let launch = await report([provider], "cli", consents: consents, consent: consent)
     #expect(launch.plan == plan("cli"))
     #expect(launch.decoder == nil)
+    #expect(!launch.hooksApproved)
     #expect(consents.isDeclined(AgentProviderID("cli")))
     _ = await report([provider], "cli", consents: consents, consent: consent)
     #expect(consent.requests.count == 1)
     #expect(provider.trustChecks == 1)
   }
 
+  // The hooks are passed, but Codex may still be told no in the terminal: they are not counted as
+  // approved, and the launch does not rely on them (#144).
   @Test("An approval that fails, or a CLI that cannot be asked, leaves it to the CLI to ask")
   func failuresLaunchWithHooks() async {
     let failing = ReportingProvider(trust: .needsApproval(commands: ["hook"]))
@@ -201,6 +206,7 @@ struct ReportAgentActivityTests {
     let launch = await report(
       [failing], "cli", consents: consents, consent: ConsentCounter(answer: .approved))
     #expect(launch.decoder != nil)
+    #expect(!launch.hooksApproved)
     #expect(consents.approvedFingerprint(for: AgentProviderID("cli")) == nil)
 
     let unknown = ReportingProvider(trust: .unknown)
@@ -208,6 +214,7 @@ struct ReportAgentActivityTests {
       [unknown], "cli", consents: InMemoryAgentHookConsentStore(),
       consent: ConsentCounter(answer: .approved))
     #expect(second.decoder != nil)
+    #expect(!second.hooksApproved)
   }
 
   @Test("The fingerprint follows the CLI, its version and its hooks, not the session")
@@ -270,5 +277,6 @@ struct ReportAgentActivityTests {
     let second = await use(plan("cli"), for: SessionID(), askConsent: consent.ask)
     #expect(provider.trustChecks == 1)
     #expect(second.decoder != nil)
+    #expect(!second.hooksApproved)
   }
 }

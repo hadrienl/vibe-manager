@@ -122,6 +122,8 @@ public actor CodexSessionIdentifierCapture {
   private var pending: String?
   /// What the agent's hook last named. Once set, nothing else is written.
   private var named: String?
+  /// What the rollout or the terminal found for this launch, if anything.
+  private var found: String?
   private var watcher: Task<Void, Never>?
   private var persister: Task<Void, Never>?
   /// The last look of `finish`, awaited by every call that follows the first.
@@ -221,6 +223,11 @@ public actor CodexSessionIdentifierCapture {
     persister?.cancel()
     persister = nil
     await discovery.claim(identifier)
+    // What the rollout suggested was another launch's after all: it is theirs to find.
+    if let found, found != identifier {
+      self.found = nil
+      await discovery.release(found)
+    }
     await stopWatching()
 
     switch await persist(identifier, from: .hook) {
@@ -246,19 +253,18 @@ public actor CodexSessionIdentifierCapture {
       await finishing.value
       return
     }
-    let wasDiscovering = isDiscovering
     watcher?.cancel()
     watcher = nil
     isDiscovering = false
-    let last = Task<Void, Never> { [weak self] in
-      await self?.lookOnceMore(wasDiscovering: wasDiscovering)
-    }
+    let last = Task<Void, Never> { [weak self] in await self?.lookOnceMore() }
     finishing = last
     await last.value
   }
 
-  private func lookOnceMore(wasDiscovering: Bool) async {
-    if wasDiscovering, let launch, captured == nil, pending == nil, named == nil,
+  /// Made whether or not the watch was still running: a first message sent after the half minute
+  /// of a launch with hooks, just before the agent quit, may have left its hook unread.
+  private func lookOnceMore() async {
+    if let launch, captured == nil, pending == nil, named == nil,
       let identifier = await discovery.discoverSessionIdentifier(for: launch, timeout: .zero)
     {
       await store(identifier, from: .rollout)
@@ -279,6 +285,11 @@ public actor CodexSessionIdentifierCapture {
     captured
   }
 
+  /// Whether the rollout is still being looked for, for the tests.
+  var isWatchingRollouts: Bool {
+    isDiscovering
+  }
+
   /// The session the agent named and that is not stored yet: what an instance that adopts the
   /// process from the terminal host still has to write (#141, #144).
   public var awaitedIdentifier: String? {
@@ -295,6 +306,7 @@ public actor CodexSessionIdentifierCapture {
   private func store(_ identifier: String, from source: Source) async {
     guard captured == nil, pending == nil, named == nil else { return }
     pending = identifier
+    found = identifier
     // The rollout watcher claimed it already, and calls this as it ends; cancelling it from inside
     // its own task would only cancel the work that follows.
     if source == .terminal {

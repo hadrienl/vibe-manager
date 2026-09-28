@@ -62,10 +62,17 @@ public struct ReportedLaunch: Sendable {
   public let plan: AgentLaunchPlan
   /// `nil` when the agent reports nothing: its activity is then read from its output.
   public let decoder: (any AgentSignalDecoding)?
+  /// Whether the CLI will really run the hooks the plan carries: approved in Vibe Manager, or not
+  /// needing an approval. `false` when their approval is unknown or did not take — the CLI then
+  /// asks for itself, and the user may say no (#144).
+  public let hooksApproved: Bool
 
-  public init(plan: AgentLaunchPlan, decoder: (any AgentSignalDecoding)?) {
+  public init(
+    plan: AgentLaunchPlan, decoder: (any AgentSignalDecoding)?, hooksApproved: Bool = false
+  ) {
     self.plan = plan
     self.decoder = decoder
+    self.hooksApproved = hooksApproved && decoder != nil
   }
 }
 
@@ -112,15 +119,16 @@ public struct ReportAgentActivity: Sendable {
       return ReportedLaunch(plan: plan, decoder: nil)
     }
     let reported = reporting.reportingActivity(plan, to: log)
-    let launch = ReportedLaunch(
-      plan: reported,
-      decoder: reporting.activityDecoder(
-        workingDirectoryPath: reported.workingDirectoryPath, environment: reported.environment))
+    let decoder = reporting.activityDecoder(
+      workingDirectoryPath: reported.workingDirectoryPath, environment: reported.environment)
+    let launch = ReportedLaunch(plan: reported, decoder: decoder, hooksApproved: true)
+    // It carries the hooks, but whether they will run is the CLI's to ask.
+    let unconfirmed = ReportedLaunch(plan: reported, decoder: decoder, hooksApproved: false)
     guard let trusting else { return launch }
 
     let fingerprint = Self.fingerprint(of: reported)
     guard consents.approvedFingerprint(for: plan.providerID) != fingerprint else { return launch }
-    guard await !unknown.contains(fingerprint) else { return launch }
+    guard await !unknown.contains(fingerprint) else { return unconfirmed }
     switch await trusting.hookTrust(for: reported) {
     case .trusted:
       consents.setApprovedFingerprint(fingerprint, for: plan.providerID)
@@ -128,6 +136,7 @@ public struct ReportAgentActivity: Sendable {
       // The CLI will ask for itself, in the terminal.
       await unknown.insert(fingerprint)
       record(.notice, "activity.trustUnknown", plan)
+      return unconfirmed
     case .needsApproval(let commands):
       let name = provider.descriptor.displayName
       switch await askConsent(name, commands) {
@@ -146,6 +155,7 @@ public struct ReportAgentActivity: Sendable {
         record(.info, "activity.hooksApproved", plan)
       } catch {
         record(.error, "activity.trustFailed", plan)
+        return unconfirmed
       }
     }
     return launch

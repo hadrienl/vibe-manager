@@ -7,6 +7,10 @@ import VibeDomain
 /// each provider and only this shape crosses into the application.
 public protocol AgentLaunchObserver: Sendable {
   func launched(plan: AgentLaunchPlan) async
+  /// The same, knowing whether the CLI will really run the hooks the plan carries: approved, or
+  /// not needing an approval (#144). A plan whose hooks may still be refused in the terminal is
+  /// launched with `false`.
+  func launched(plan: AgentLaunchPlan, hooksApproved: Bool) async
   func observe(output: String) async
   func finished() async
   /// The identifier this launch gave its conversation and has not yet seen written down, if any:
@@ -24,6 +28,10 @@ public protocol AgentLaunchObserver: Sendable {
 }
 
 extension AgentLaunchObserver {
+  public func launched(plan: AgentLaunchPlan, hooksApproved: Bool) async {
+    await launched(plan: plan)
+  }
+
   /// A CLI that is not told its identifier has none to wait for: it is discovered or it is not.
   public func awaitedResumeIdentifier() async -> String? { nil }
 

@@ -7,10 +7,10 @@ import VibeDomain
 /// The capture needs the working directory the process was actually started in, which only the
 /// plan knows, so it is built when the launch happens rather than when the session is created.
 ///
-/// Codex names its session only with the first message (#144). A launch whose hooks report to the
-/// application hears the name from the agent itself, through `conversationNamed`, and looks for
-/// the rollout only for the usual half minute, in case the hooks do not run. A launch without
-/// hooks has only the rollout: it is looked for as long as the process lives.
+/// Codex names its session only with the first message (#144). A launch whose hooks are approved
+/// hears the name from the agent itself, through `conversationNamed`, and looks for the rollout
+/// only for the usual half minute. A launch without hooks, or with hooks Codex may still refuse to
+/// run, relies on the rollout: it is looked for as long as the process lives.
 public actor CodexLaunchObserver: AgentLaunchObserver {
   private let sessionID: SessionID
   private let repository: any SessionRepository
@@ -27,8 +27,16 @@ public actor CodexLaunchObserver: AgentLaunchObserver {
     self.provider = provider
   }
 
+  /// A launch nobody said had approved hooks: the rollout is its only sure source.
   public func launched(plan: AgentLaunchPlan) async {
-    let reportsThroughHooks = plan.environment[AgentActivityHookCommand.environmentKey] != nil
+    await launched(plan: plan, hooksApproved: false)
+  }
+
+  /// The half minute is kept only for hooks known to run. Hooks the plan carries but whose
+  /// approval is unknown, or did not take, may still be refused in the terminal (#144).
+  public func launched(plan: AgentLaunchPlan, hooksApproved: Bool) async {
+    let reportsThroughHooks =
+      hooksApproved && plan.environment[AgentActivityHookCommand.environmentKey] != nil
     let capture = provider.identifierCapture(
       for: sessionID,
       workingDirectoryPath: plan.workingDirectoryPath,

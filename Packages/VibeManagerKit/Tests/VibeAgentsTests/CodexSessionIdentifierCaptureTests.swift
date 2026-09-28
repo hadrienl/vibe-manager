@@ -51,14 +51,23 @@ private struct StubDiscovery: CodexSessionDiscovering {
     }
     return timeout >= writtenAfter ? identifier : nil
   }
+
+  func release(_ identifier: String) async {
+    await looks?.released(identifier)
+  }
 }
 
 /// Every look the capture asked the discovery for, with how long it was allowed.
 private actor LookCounter {
   private(set) var timeouts: [Duration] = []
+  private(set) var releases: [String] = []
 
   func looked(timeout: Duration) {
     timeouts.append(timeout)
+  }
+
+  func released(_ identifier: String) {
+    releases.append(identifier)
   }
 }
 
@@ -402,7 +411,7 @@ struct CodexLateConversationTests {
       sessionID: session.id, repository: repository,
       provider: codexProvider(discovery: StubDiscovery(identifier: nil, looks: looks)))
 
-    await observer.launched(plan: plan(hooks: true))
+    await observer.launched(plan: plan(hooks: true), hooksApproved: true)
     // The rollout is looked for as it always was, as a net under hooks that would not run.
     try await waitUntil { await looks.timeouts == [CodexSessionIdentifierCapture.defaultTimeout] }
     await observer.conversationNamed(identifier)
@@ -415,19 +424,73 @@ struct CodexLateConversationTests {
   func hookReplacesWhatTheRolloutSuggested() async throws {
     let session = codexSession()
     let repository = CaptureRepository(stored: session)
+    let looks = LookCounter()
     let capture = CodexSessionIdentifierCapture(
       sessionID: session.id, workingDirectoryPath: "/Users/test/app",
-      discovery: StubDiscovery(identifier: other),
+      discovery: StubDiscovery(identifier: other, looks: looks),
       record: RecordAgentResumeIdentifier(repository: repository))
 
     await capture.start()
     try await waitUntil { await capture.identifier == other }
     await capture.named(identifier)
+    // The rollout it had taken is another launch's to find.
+    #expect(await looks.releases == [other])
 
     #expect(await capture.identifier == identifier)
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
     // Nothing else may write over the agent's own word afterwards.
     await capture.observe(output: "session id: \(other)\n")
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+  }
+
+  @Test("Hooks passed but not approved: the rollout is looked for as long as the process lives")
+  func unapprovedHooksKeepTheLongWatch() async throws {
+    let session = codexSession()
+    let looks = LookCounter()
+    let observer = CodexLaunchObserver(
+      sessionID: session.id, repository: CaptureRepository(stored: session),
+      provider: codexProvider(discovery: StubDiscovery(identifier: nil, looks: looks)))
+
+    // Codex could not be asked, or the approval did not take: it may still be refused.
+    await observer.launched(plan: plan(hooks: true), hooksApproved: false)
+
+    try await waitUntil {
+      await looks.timeouts == [CodexSessionIdentifierCapture.defaultWatchLimit]
+    }
+    await observer.finished()
+  }
+
+  @Test("A rollout written after the half minute, just before the agent quit, is stored at the end")
+  func lastLookAfterTheWatchEnded() async throws {
+    let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+      .appendingPathComponent("codex-sessions-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let capture = CodexSessionIdentifierCapture(
+      sessionID: session.id, workingDirectoryPath: "/Users/test/app",
+      discovery: CodexRolloutSessionDiscovery(
+        sessionsDirectory: root, pollInterval: .milliseconds(10), claims: CodexSessionClaims()),
+      record: RecordAgentResumeIdentifier(repository: repository),
+      timeout: .milliseconds(20))
+    let launchedAt = Date()
+    await capture.start(launchedAt: launchedAt)
+    try await waitUntil { await !capture.isWatchingRollouts }
+
+    // The first message comes once the watch is over, and the agent quits before its hook is read.
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let line = """
+      {"type":"session_meta","payload":{"id":"\(identifier)","cwd":"/Users/test/app",\
+      "timestamp":"\(formatter.string(from: launchedAt))"}}
+
+      """
+    try line.write(
+      to: root.appendingPathComponent("rollout-late-\(identifier).jsonl"), atomically: true,
+      encoding: .utf8)
+    await capture.finish()
+
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
   }
 

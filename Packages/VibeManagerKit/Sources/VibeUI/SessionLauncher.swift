@@ -281,7 +281,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     signpostFirstOutput(of: terminal)
     await activity?.processStarted(session.id, decoder: reported.decoder)
     followOutput(of: session.id, terminal: terminal)
-    await startObserver(for: session, plan: plan, terminal: terminal)
+    await startObserver(
+      for: session, plan: plan, hooksApproved: reported.hooksApproved, terminal: terminal)
     await forwardConversationAlreadyNamed(session.id)
     // Recorded once there is something to record, and from the terminal rather than from the
     // plan: the process group is the child's own pid, which only exists after the spawn. A
@@ -863,6 +864,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private func startObserver(
     for session: WorkSession,
     plan: AgentLaunchPlan,
+    hooksApproved: Bool,
     terminal: any TerminalSession
   ) async {
     // The plan names the agent that is actually starting. The stored agent said the same until
@@ -875,7 +877,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
 
     let observer = observing.launchObserver(for: session.id, repository: repository)
     observers[session.id] = observer
-    await observer.launched(plan: plan)
+    await observer.launched(plan: plan, hooksApproved: hooksApproved)
 
     outputTasks[session.id]?.cancel()
     outputTasks[session.id] = Task {

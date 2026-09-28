@@ -107,6 +107,10 @@ public actor CodexSessionClaims {
   /// dated once the process is started, a moment after it really was, and a session begins with
   /// the process: this covers the gap, with a wide margin.
   public static let startTolerance: TimeInterval = 5
+  /// How long after its launch a process may still begin its session, and so be the one a
+  /// rollout belongs to. Codex begins it as it starts; a screen it shows first — a folder to
+  /// trust — can delay that, and a session begun later than this is not seen as that launch's.
+  public static let startWindow: TimeInterval = 30
 
   private struct Waiting {
     let directory: String
@@ -137,8 +141,12 @@ public actor CodexSessionClaims {
     guard !claimed.contains(identifier) else { return false }
     let floor = { (launchedAt: Date) in launchedAt.addingTimeInterval(-Self.startTolerance) }
     guard startedAt >= floor(launch.launchedAt) else { return false }
+    // Another waiting launch stands in the way only if the session began while it was starting:
+    // Codex begins its session as its process starts, so a pane left silent for an hour does not
+    // stop a pane launched since from recognising its own rollout.
     let rivals = waiting.filter { id, other in
       id != launch.id && other.directory == directory && startedAt >= floor(other.launchedAt)
+        && startedAt <= other.launchedAt.addingTimeInterval(Self.startWindow)
     }
     guard rivals.isEmpty else { return false }
     claimed.insert(identifier)
@@ -176,12 +184,16 @@ public protocol CodexSessionDiscovering: Sendable {
   /// A session learned some other way — the agent's own hook, its terminal — is taken: no other
   /// launch may be handed it.
   func claim(_ identifier: String) async
+  /// A session found on disk turned out not to be this launch's: its own hook named another one.
+  /// It goes back to whichever launch it does belong to.
+  func release(_ identifier: String) async
 }
 
 extension CodexSessionDiscovering {
   public func beginWaiting(_ launch: CodexLaunch) async {}
   public func endWaiting(_ launch: CodexLaunch) async {}
   public func claim(_ identifier: String) async {}
+  public func release(_ identifier: String) async {}
 }
 
 /// Watches the rollout files Codex writes under `$CODEX_HOME/sessions`.
@@ -247,6 +259,10 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
 
   public func claim(_ identifier: String) async {
     _ = await claims.claim(identifier)
+  }
+
+  public func release(_ identifier: String) async {
+    await claims.release(identifier)
   }
 
   /// A launch of its own, for a caller that only knows where and when.

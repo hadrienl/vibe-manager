@@ -380,6 +380,27 @@ struct CodexRolloutSessionDiscoveryTests {
       await discovery.discoverSessionIdentifier(for: second, timeout: .zero) == Self.identifier)
   }
 
+  @Test("A pane left silent for an hour does not stop a pane launched since from finding its own")
+  func silentPaneDoesNotStandInTheWay() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let discovery = discovery(root, claims: CodexSessionClaims())
+    let later = CodexLaunch(workingDirectoryPath: "/Users/test/app", launchedAt: Date())
+    // Launched an hour before in the same repository, and never written to: still waiting.
+    let silent = CodexLaunch(
+      workingDirectoryPath: "/Users/test/app",
+      launchedAt: later.launchedAt.addingTimeInterval(-3600))
+    await discovery.beginWaiting(silent)
+    await discovery.beginWaiting(later)
+    try writeRollout(
+      in: day, cwd: "/Users/test/app", createdAt: later.launchedAt.addingTimeInterval(120),
+      startedAt: later.launchedAt.addingTimeInterval(0.5))
+
+    #expect(await discovery.discoverSessionIdentifier(for: silent, timeout: .zero) == nil)
+    #expect(
+      await discovery.discoverSessionIdentifier(for: later, timeout: .zero) == Self.identifier)
+  }
+
   @Test("A pane waiting in another folder does not stand in the way")
   func waitingElsewhereDoesNotMatter() async throws {
     let (day, root) = try makeSessionsDirectory()
