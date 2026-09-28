@@ -391,10 +391,15 @@ public final class AppEnvironment {
     // The requests above the other applications, and the avatar that presents them (#41).
     appModel.floatingPanel = FloatingRequestPanelModel(
       preferences: UserDefaultsFloatingPanelPreferences(suiteName: data.defaultsSuite))
+    // The library of avatars (#154), which takes in the single avatar of earlier versions. Until
+    // the screens list it, they see its avatar in use as "the" avatar.
+    let avatarLibrary = FileAvatarLibrary(
+      directory: dataFolder.appendingPathComponent("Avatars", isDirectory: true),
+      legacy: dataFolder.appendingPathComponent("Avatar", isDirectory: true),
+      defaultAvatar: { DefaultAvatar.load() })
     let avatarStudio = AvatarStudioModel(
       workshop: AvatarWorkshop(processing: AvatarImageProcessor(), diagnostics: diagnostics),
-      store: FileAvatarStore(
-        directory: dataFolder.appendingPathComponent("Avatar", isDirectory: true)),
+      store: LibraryAvatarStore(library: avatarLibrary),
       generators: AgentAvatarGenerators(agents: registry),
       defaultAvatar: { DefaultAvatar.load() })
     appModel.avatarStudio = avatarStudio

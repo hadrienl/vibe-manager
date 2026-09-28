@@ -125,12 +125,18 @@ let package = Package(
     ),
     // Resolves a string in a given language, from the catalog of the module it belongs to.
     .target(name: "VibeLocalizationTesting", path: "Tests/VibeLocalizationTesting"),
+    // What every library of avatars does, run against the one in memory and the one on disk (#154).
+    .target(
+      name: "VibeAvatarLibraryTesting", dependencies: ["VibeApplication"],
+      path: "Tests/VibeAvatarLibraryTesting"),
     .testTarget(
       name: "VibeDomainTests", dependencies: ["VibeDomain", "VibeLocalizationTesting"]),
     .testTarget(name: "VibeProcessTests", dependencies: ["VibeProcess"]),
     .testTarget(
       name: "VibeApplicationTests",
-      dependencies: ["VibeApplication", "VibeDomain", "VibeLocalizationTesting"]
+      dependencies: [
+        "VibeApplication", "VibeDomain", "VibeLocalizationTesting", "VibeAvatarLibraryTesting",
+      ]
     ),
     .testTarget(
       name: "VibePersistenceTests",
@@ -188,7 +194,9 @@ let package = Package(
     ),
     .testTarget(
       name: "VibeAvatarTests",
-      dependencies: ["VibeAvatar", "VibeApplication", "VibePersistence"],
+      dependencies: [
+        "VibeAvatar", "VibeApplication", "VibePersistence", "VibeAvatarLibraryTesting",
+      ],
       resources: [.copy("Fixtures")]
     ),
     .testTarget(
