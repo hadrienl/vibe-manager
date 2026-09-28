@@ -43,16 +43,18 @@ its content and a folder or an image a copy (#131). A file is therefore also wha
 place, and only when the URL it gives is the original: a copy made for the reading is not one.
 
 The composer's text field is the exception the surface had (#146). SwiftUI draws it with an
-`NSTextView`, which AppKit gives a drag before the zone, being the frontmost view registered for it:
-it typed a file's path where it was let go. The field keeps the drags of text — a selection of a
-page, a text from another application, a web address — and inserts them where they are let go, as a
-text field does. A drag that carries a file, a folder, an image, with or without a file, or a
-promised file is handed, from its entry to its end, to the view that would take it without the
-field: the zone, which makes chips of it as anywhere else, with the same veil and the same refusals.
-`TextEditor` exposes neither its text view nor what it accepts, so the text view it made is given,
-at run time, a subclass of its own class that overrides the methods of `NSDraggingDestination` and
-nothing else, as key-value observing does; pasting is left alone. A text view SwiftUI could not
-give it to keeps AppKit's behaviour.
+`NSTextView` registered for files too, and AppKit gives a drag to the frontmost visible view under
+the pointer whose registered types meet the drag's: the field took a file before the zone and typed
+its path where it was let go. A transparent view is laid over the field, registered only for the
+types of files, images and promised files. In front of the field, it wins the drags that carry one
+of them — a file, a folder, an image with or without a file, a promised file — and relays them,
+from their entry to their end, to the frontmost view behind it registered for them, text views
+aside: the zone, which makes chips of them as anywhere else, with the same veil and the same
+refusals. Every other drag — a selection of a page, a text from another application, a web
+address — meets none of its types and goes to the field, which inserts it where it is let go. AppKit
+finds a drag's destination without asking `hitTest(_:)`, so the overlay answers no click: the
+I-beam, the clicks and the scrolling stay the field's, and VoiceOver does not see it. Pasting is
+left alone.
 
 Where the drop goes is decided by `SessionDropRoute`, a pure function of the session's presentation,
 its process and its composer:

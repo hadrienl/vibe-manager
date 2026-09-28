@@ -1,5 +1,4 @@
 import AppKit
-import ObjectiveC
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -7,37 +6,27 @@ import UniformTypeIdentifiers
 ///
 /// A file dropped on the conversation becomes a chip of the composer: the session's column takes
 /// the drop, over all of its surface (ADR 0028). But the text view SwiftUI draws the field with
-/// is an `NSTextView`, and AppKit gives a drag to the frontmost view registered for it: the field
-/// took a file first and typed its path. It keeps the drags of text, which it inserts where they
-/// are let go; a drag that carries a file, an image or a promised file is handed, from its entry
-/// to its end, to the view that would have taken it without the field — the session's zone, which
-/// reads it as every other drop.
+/// is an `NSTextView` registered for files too, and AppKit gives a drag to the frontmost visible
+/// view under the pointer whose registered types meet the drag's: the field took a file first and
+/// typed its path.
 ///
-/// SwiftUI's `TextEditor` exposes neither its text view nor a way to choose what it accepts: the
-/// text view it made is given a subclass of its own class, made at run time, that overrides the
-/// methods of `NSDraggingDestination` and nothing else — as key-value observing does.
+/// A transparent view laid over the field, `ComposerFileDropCatcher`, is registered for the types
+/// of files, images and promised files only. In front of the field, it wins the drags that carry
+/// one of them and leaves every other drag — a text, a web address, a selection of a page — to the
+/// field, which inserts it where it is let go. It takes no click: AppKit finds a drag's destination
+/// without asking `hitTest(_:)`. What it catches it relays, from the drag's entry to its end, to the
+/// view that would have taken it without the field — the session's zone, which reads it as every
+/// other drop.
 @MainActor
 enum ComposerDropPassage {
-  private static let prefix = "VibeComposerDropPassage_"
-
-  /// The view each text view hands the drag in progress to.
-  private static let targets = NSMapTable<NSView, NSView>.weakToWeakObjects()
-
-  /// Gives `textView` the passage. Nothing happens to one that has it already, or whose class
-  /// cannot be given a subclass — one already observed, for instance: it keeps AppKit's behaviour.
-  static func install(on textView: NSTextView) {
-    guard let original = object_getClass(textView) else { return }
-    let name = String(cString: class_getName(original))
-    guard !name.hasPrefix(prefix), !name.hasPrefix("NSKVONotifying_"),
-      let subclass = subclass(of: original, named: prefix + name)
-    else { return }
-    object_setClass(textView, subclass)
-  }
-
-  static func isInstalled(on textView: NSTextView) -> Bool {
-    guard let current = object_getClass(textView) else { return false }
-    return String(cString: class_getName(current)).hasPrefix(prefix)
-  }
+  /// What the catcher is registered for: files of the disk, images, promised files.
+  static let fileTypes: [NSPasteboard.PasteboardType] =
+    [
+      .fileURL, .init("NSFilenamesPboardType"),
+      .tiff, .init("NeXT TIFF v4.0 pasteboard type"), .png, .init("Apple PNG pasteboard type"),
+      .init(UTType.jpeg.identifier), .init(UTType.heic.identifier), .init(UTType.gif.identifier),
+      .init(UTType.webP.identifier), .init(UTType.image.identifier),
+    ] + NSFilePromiseReceiver.readableDraggedTypes.map { .init($0) }
 
   /// Whether a drag carries what the session's zone makes a chip of: a file of the disk — a
   /// folder, an image — an image with no file, or a file its source promises. A text, a web
@@ -55,243 +44,110 @@ enum ComposerDropPassage {
     }
   }
 
-  /// The view that takes a drag let go at `location`, in the window's coordinates, when no text
-  /// view is there: the frontmost view registered for drags under that point.
-  static func destination(behind textView: NSView, at location: NSPoint) -> NSView? {
-    guard let root = textView.window?.contentView else { return nil }
-    return frontmost(in: root, at: location)
+  /// The view that takes a drag of `types` let go at `location`, in the window's coordinates,
+  /// when neither the catcher nor a text field is there: the frontmost visible view under that
+  /// point registered for one of those types.
+  static func destination(
+    behind catcher: NSView, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
+  ) -> NSView? {
+    guard let root = catcher.window?.contentView else { return nil }
+    return frontmost(in: root, at: location, for: types, excluding: catcher)
   }
 
-  private static func frontmost(in view: NSView, at location: NSPoint) -> NSView? {
-    // No text view, this one or another composer of the stack of conversations, which would pass
-    // the drag on in turn.
-    guard !view.isHidden, !(view is NSTextView),
+  private static func frontmost(
+    in view: NSView, at location: NSPoint, for types: [NSPasteboard.PasteboardType],
+    excluding catcher: NSView
+  ) -> NSView? {
+    // Neither the catcher nor a text field — this one, or the composer of another conversation
+    // of the stack.
+    guard view !== catcher, !view.isHidden, !(view is NSTextView),
       view.bounds.contains(view.convert(location, from: nil))
     else { return nil }
     for subview in view.subviews.reversed() {
-      if let found = frontmost(in: subview, at: location) { return found }
+      if let found = frontmost(in: subview, at: location, for: types, excluding: catcher) {
+        return found
+      }
     }
-    return view.registeredDraggedTypes.isEmpty ? nil : view
+    return accepts(view.registeredDraggedTypes, types) ? view : nil
   }
 
-  // MARK: - The drag, from its entry to its end
-
-  fileprivate static func entered(
-    _ textView: NSTextView, _ drag: any NSDraggingInfo, otherwise: () -> NSDragOperation
-  ) -> NSDragOperation {
-    targets.removeObject(forKey: textView)
-    guard carriesFiles(drag.draggingPasteboard),
-      let target = destination(behind: textView, at: drag.draggingLocation)
-    else { return otherwise() }
-    targets.setObject(target, forKey: textView)
-    return target.draggingEntered(drag)
-  }
-
-  fileprivate static func updated(
-    _ textView: NSTextView, _ drag: any NSDraggingInfo, otherwise: () -> NSDragOperation
-  ) -> NSDragOperation {
-    guard let target = targets.object(forKey: textView) else {
-      // Entered before the passage was given, or never announced: taken from here.
-      guard carriesFiles(drag.draggingPasteboard) else { return otherwise() }
-      return entered(textView, drag, otherwise: otherwise)
-    }
-    return target.draggingUpdated(drag)
-  }
-
-  fileprivate static func exited(
-    _ textView: NSTextView, _ drag: (any NSDraggingInfo)?, otherwise: () -> Void
-  ) {
-    guard let target = targets.object(forKey: textView) else { return otherwise() }
-    targets.removeObject(forKey: textView)
-    target.draggingExited(drag)
-  }
-
-  fileprivate static func prepare(
-    _ textView: NSTextView, _ drag: any NSDraggingInfo, otherwise: () -> Bool
+  /// Whether a view registered for `registered` takes a drag of `types`: one of them is
+  /// registered, or conforms to a type that is — SwiftUI's zone registers `public.item`.
+  static func accepts(
+    _ registered: [NSPasteboard.PasteboardType], _ types: [NSPasteboard.PasteboardType]
   ) -> Bool {
-    guard let target = targets.object(forKey: textView) else { return otherwise() }
-    return target.prepareForDragOperation(drag)
-  }
-
-  fileprivate static func perform(
-    _ textView: NSTextView, _ drag: any NSDraggingInfo, otherwise: () -> Bool
-  ) -> Bool {
-    guard let target = targets.object(forKey: textView) else { return otherwise() }
-    return target.performDragOperation(drag)
-  }
-
-  fileprivate static func conclude(
-    _ textView: NSTextView, _ drag: (any NSDraggingInfo)?, otherwise: () -> Void
-  ) {
-    guard let target = targets.object(forKey: textView) else { return otherwise() }
-    targets.removeObject(forKey: textView)
-    target.concludeDragOperation(drag)
-  }
-
-  fileprivate static func ended(_ textView: NSTextView, _ drag: any NSDraggingInfo) {
-    guard let target = targets.object(forKey: textView) else { return }
-    targets.removeObject(forKey: textView)
-    target.draggingEnded(drag)
-  }
-
-  // MARK: - The subclass
-
-  private typealias Operation =
-    @convention(c) (NSObject, Selector, any NSDraggingInfo) ->
-    NSDragOperation
-  private typealias Decision = @convention(c) (NSObject, Selector, any NSDraggingInfo) -> Bool
-  private typealias Notice = @convention(c) (NSObject, Selector, (any NSDraggingInfo)?) -> Void
-  private typealias Ending = @convention(c) (NSObject, Selector, any NSDraggingInfo) -> Void
-
-  private static func subclass(of original: AnyClass, named name: String) -> AnyClass? {
-    if let existing = objc_lookUpClass(name) { return existing }
-    guard let subclass = objc_allocateClassPair(original, name, 0) else { return nil }
-    for (selector, block) in overrides(of: original) {
-      guard let method = class_getInstanceMethod(original, selector),
-        class_addMethod(
-          subclass, selector, imp_implementationWithBlock(block), method_getTypeEncoding(method))
-      else {
-        objc_disposeClassPair(subclass)
-        return nil
-      }
+    guard !registered.isEmpty else { return false }
+    let exact = Set(registered)
+    let general = registered.compactMap { UTType($0.rawValue) }
+    return types.contains { type in
+      if exact.contains(type) { return true }
+      guard let uti = UTType(type.rawValue) else { return false }
+      return general.contains { uti.conforms(to: $0) }
     }
-    objc_registerClassPair(subclass)
-    return subclass
-  }
-
-  /// Each method of `NSDraggingDestination` the text view implements, and what replaces it: the
-  /// passage, falling back on the original class's own method — its `super`.
-  private static func overrides(of original: AnyClass) -> [(Selector, Any)] {
-    func inherited<Function>(_ selector: Selector, as _: Function.Type) -> Function {
-      unsafeBitCast(class_getMethodImplementation(original, selector), to: Function.self)
-    }
-    let enteredSelector = #selector(NSDraggingDestination.draggingEntered(_:))
-    let updatedSelector = #selector(NSDraggingDestination.draggingUpdated(_:))
-    let exitedSelector = #selector(NSDraggingDestination.draggingExited(_:))
-    let prepareSelector = #selector(NSDraggingDestination.prepareForDragOperation(_:))
-    let performSelector = #selector(NSDraggingDestination.performDragOperation(_:))
-    let concludeSelector = #selector(NSDraggingDestination.concludeDragOperation(_:))
-    let endedSelector = #selector(NSDraggingDestination.draggingEnded(_:))
-
-    let superEntered = inherited(enteredSelector, as: Operation.self)
-    let superUpdated = inherited(updatedSelector, as: Operation.self)
-    let superExited = inherited(exitedSelector, as: Notice.self)
-    let superPrepare = inherited(prepareSelector, as: Decision.self)
-    let superPerform = inherited(performSelector, as: Decision.self)
-    let superConclude = inherited(concludeSelector, as: Notice.self)
-    let superEnded = inherited(endedSelector, as: Ending.self)
-
-    let entered: @convention(block) (NSTextView, any NSDraggingInfo) -> NSDragOperation = {
-      view, drag in
-      MainActor.assumeIsolated {
-        Self.entered(view, drag) { superEntered(view, enteredSelector, drag) }
-      }
-    }
-    let updated: @convention(block) (NSTextView, any NSDraggingInfo) -> NSDragOperation = {
-      view, drag in
-      MainActor.assumeIsolated {
-        Self.updated(view, drag) { superUpdated(view, updatedSelector, drag) }
-      }
-    }
-    let exited: @convention(block) (NSTextView, (any NSDraggingInfo)?) -> Void = { view, drag in
-      MainActor.assumeIsolated {
-        Self.exited(view, drag) { superExited(view, exitedSelector, drag) }
-      }
-    }
-    let prepare: @convention(block) (NSTextView, any NSDraggingInfo) -> Bool = { view, drag in
-      MainActor.assumeIsolated {
-        Self.prepare(view, drag) { superPrepare(view, prepareSelector, drag) }
-      }
-    }
-    let perform: @convention(block) (NSTextView, any NSDraggingInfo) -> Bool = { view, drag in
-      MainActor.assumeIsolated {
-        Self.perform(view, drag) { superPerform(view, performSelector, drag) }
-      }
-    }
-    let conclude: @convention(block) (NSTextView, (any NSDraggingInfo)?) -> Void = {
-      view, drag in
-      MainActor.assumeIsolated {
-        Self.conclude(view, drag) { superConclude(view, concludeSelector, drag) }
-      }
-    }
-    let ended: @convention(block) (NSTextView, any NSDraggingInfo) -> Void = { view, drag in
-      MainActor.assumeIsolated {
-        Self.ended(view, drag)
-        // The text view ends what it began, if it began anything: its own drop caret.
-        superEnded(view, endedSelector, drag)
-      }
-    }
-    return [
-      (enteredSelector, entered), (updatedSelector, updated), (exitedSelector, exited),
-      (prepareSelector, prepare), (performSelector, perform), (concludeSelector, conclude),
-      (endedSelector, ended),
-    ]
   }
 }
 
-/// Placed behind the composer's `TextEditor`, finds the text view SwiftUI made for it and gives
-/// it the passage — again whenever the composer is drawn anew, SwiftUI being free to make another.
-struct ComposerDropPassageAnchor: NSViewRepresentable {
-  func makeNSView(context: Context) -> AnchorView { AnchorView() }
+/// Laid over the composer's `TextEditor`: catches the drags of files and hands them to the
+/// session's zone behind (#146).
+struct ComposerFileDropCatcher: NSViewRepresentable {
+  func makeNSView(context: Context) -> CatcherView { CatcherView() }
 
-  func updateNSView(_ view: AnchorView, context: Context) {
-    view.scheduleInstall()
-  }
+  func updateNSView(_ view: CatcherView, context: Context) {}
 
-  final class AnchorView: NSView {
+  final class CatcherView: NSView {
+    /// The view the drag in progress is relayed to.
+    private weak var target: NSView?
+
+    override init(frame: NSRect) {
+      super.init(frame: frame)
+      registerForDraggedTypes(ComposerDropPassage.fileTypes)
+      // Nothing to VoiceOver: the field under it is what is read and typed into.
+      setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    /// Clicks, scrolling and the I-beam stay the field's.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    override func viewDidMoveToWindow() {
-      super.viewDidMoveToWindow()
-      scheduleInstall()
+    private func relay(_ drag: any NSDraggingInfo) -> NSView? {
+      if let target { return target }
+      let pasteboard = drag.draggingPasteboard
+      guard ComposerDropPassage.carriesFiles(pasteboard) else { return nil }
+      target = ComposerDropPassage.destination(
+        behind: self, at: drag.draggingLocation, for: pasteboard.types ?? [])
+      return target
     }
 
-    override func layout() {
-      super.layout()
-      scheduleInstall()
+    override func draggingEntered(_ drag: any NSDraggingInfo) -> NSDragOperation {
+      target = nil
+      return relay(drag)?.draggingEntered(drag) ?? []
     }
 
-    /// Once SwiftUI has put the text editor in place and laid it out, next to this view — which
-    /// it may do some turns of the run loop after this view: looked for again a few times.
-    func scheduleInstall() {
-      install(attempts: 20, after: .milliseconds(0))
+    override func draggingUpdated(_ drag: any NSDraggingInfo) -> NSDragOperation {
+      relay(drag)?.draggingUpdated(drag) ?? []
     }
 
-    private func install(attempts: Int, after delay: DispatchTimeInterval) {
-      DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-        MainActor.assumeIsolated {
-          guard let self, self.window != nil, !self.install(), attempts > 1 else { return }
-          self.install(attempts: attempts - 1, after: .milliseconds(50))
-        }
-      }
+    override func draggingExited(_ drag: (any NSDraggingInfo)?) {
+      target?.draggingExited(drag)
+      target = nil
     }
 
-    /// SwiftUI hosts this view and the text editor side by side, the background first, each
-    /// wrapped in views of its own: the text view is in the first of the views drawn after one
-    /// of this view's ancestors that lies where this view lies.
-    /// Whether the text view was found.
-    private func install() -> Bool {
-      guard let root = window?.contentView else { return false }
-      let frame = convert(bounds, to: nil)
-      var child: NSView = self
-      while child !== root, let parent = child.superview,
-        let index = parent.subviews.firstIndex(of: child)
-      {
-        for sibling in parent.subviews[(index + 1)...]
-        where sibling.convert(sibling.bounds, to: nil).intersects(frame) {
-          if let textView = Self.textView(in: sibling) {
-            ComposerDropPassage.install(on: textView)
-            return true
-          }
-        }
-        child = parent
-      }
-      return false
+    override func prepareForDragOperation(_ drag: any NSDraggingInfo) -> Bool {
+      target?.prepareForDragOperation(drag) ?? false
     }
 
-    private static func textView(in view: NSView) -> NSTextView? {
-      if let textView = view as? NSTextView { return textView }
-      return view.subviews.lazy.compactMap(textView(in:)).first
+    override func performDragOperation(_ drag: any NSDraggingInfo) -> Bool {
+      target?.performDragOperation(drag) ?? false
+    }
+
+    override func concludeDragOperation(_ drag: (any NSDraggingInfo)?) {
+      target?.concludeDragOperation(drag)
+    }
+
+    override func draggingEnded(_ drag: any NSDraggingInfo) {
+      target?.draggingEnded(drag)
+      target = nil
     }
   }
 }

@@ -45,7 +45,7 @@ struct PromptComposer: View {
           .frame(minHeight: size * 1.6, maxHeight: size * 1.5 * 8)
           .fixedSize(horizontal: false, vertical: true)
           // A file dropped on the field is a chip, as anywhere else on the conversation (#146).
-          .background(ComposerDropPassageAnchor())
+          .overlay(ComposerFileDropCatcher())
           .focused($isFocused)
           .disabled(state != .ready && state != .answeringQuestion)
           .accessibilityLabel(

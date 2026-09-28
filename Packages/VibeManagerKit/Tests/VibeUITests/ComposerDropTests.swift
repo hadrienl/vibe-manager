@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 import Testing
+import UniformTypeIdentifiers
 import VibeApplication
 import VibeDomain
 
@@ -9,8 +10,8 @@ import VibeDomain
 @testable import VibeUI
 
 /// A Finder drag let go on the composer's text field, in a real window: the conversation's own
-/// view in the session's drop zone, a real pasteboard, and the text view SwiftUI draws the field
-/// with — the view AppKit hands the drag to, being the frontmost one registered for it (#146).
+/// view in the session's drop zone, a real pasteboard, and the view AppKit hands the drag to — the
+/// frontmost visible one under the pointer registered for one of its types (#146).
 @MainActor
 @Suite("Dropping on the composer's text field (#146)")
 struct ComposerDropTests {
@@ -19,6 +20,7 @@ struct ComposerDropTests {
 
   private struct Fixture {
     let model: AppModel
+    let supervisor: WorkspaceSupervisor
     let conversation: ConversationModel
     let session: WorkSession
     let folder: URL
@@ -48,9 +50,9 @@ struct ComposerDropTests {
     )
     let repository = WorkspaceRepository(sessions: [session])
     let registry = WorkspaceRegistry(providers: [Self.provider])
+    let supervisor = WorkspaceSupervisor()
     let launcher = SessionLauncher(
-      supervisor: WorkspaceSupervisor(), repository: repository, agents: registry,
-      viewportTimeout: .zero)
+      supervisor: supervisor, repository: repository, agents: registry, viewportTimeout: .zero)
     let model = AppModel(
       repository: repository, agents: registry, launcher: launcher, dropStore: KeepingDropStore())
     model.connectConversations()
@@ -74,7 +76,9 @@ struct ComposerDropTests {
     await waitUntil { conversation.snapshot.availability != .loading }
     #expect(conversation.composerState == .ready)
     #expect(model.dropRoute(for: session.id) == .conversation)
-    return Fixture(model: model, conversation: conversation, session: session, folder: folder)
+    return Fixture(
+      model: model, supervisor: supervisor, conversation: conversation, session: session,
+      folder: folder)
   }
 
   /// What the field made of a drag: whether it was taken, and the operation proposed.
@@ -109,19 +113,25 @@ struct ComposerDropTests {
     let textView = try #require(Self.textView(in: host))
     // As in a window on screen: the text view registers the types it reads.
     textView.updateDragTypeRegistration()
-    #expect(!textView.registeredDraggedTypes.isEmpty)
-    // The composer gives its text view the passage once SwiftUI has put it in place.
-    await waitUntil { ComposerDropPassage.isInstalled(on: textView) }
     let location = textView.convert(
       NSPoint(x: textView.bounds.midX, y: textView.bounds.midY), to: nil)
-    let destination = try #require(Self.dropDestination(in: host, at: location))
-    // The premise of #146: the field, not the zone, is given the drag.
-    #expect(destination === textView)
 
     let pasteboard = NSPasteboard(name: .init("ComposerDropTests-\(UUID().uuidString)"))
     defer { pasteboard.releaseGlobally() }
     pasteboard.clearContents()
     pasteboard.writeObjects(objects)
+    let types = pasteboard.types ?? []
+    let destination = try #require(Self.dropDestination(in: host, at: location, for: types))
+    // AppKit's own choice, where it can be asked: the same view.
+    if let chosen = Self.appKitDestination(in: window, at: location, for: types) {
+      #expect(chosen === destination)
+    }
+    // A file for the catcher laid over the field, a text for the field itself.
+    if ComposerDropPassage.carriesFiles(pasteboard) {
+      #expect(destination is ComposerFileDropCatcher.CatcherView)
+    } else {
+      #expect(destination === textView)
+    }
     let drag = PasteboardDrag(
       pasteboard: pasteboard, location: location, window: window, sourceMask: sourceMask)
     _ = destination.draggingEntered(drag)
@@ -139,15 +149,40 @@ struct ComposerDropTests {
     return view.subviews.lazy.compactMap(textView(in:)).first
   }
 
-  /// The frontmost view under `location`, in the window's coordinates, registered for drags.
-  private static func dropDestination(in view: NSView, at location: NSPoint) -> NSView? {
+  /// The frontmost visible view under `location`, in the window's coordinates, registered for
+  /// one of `types` — as AppKit chooses a drag's destination, without asking `hitTest(_:)`.
+  private static func dropDestination(
+    in view: NSView, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
+  ) -> NSView? {
     guard !view.isHidden, view.bounds.contains(view.convert(location, from: nil)) else {
       return nil
     }
     for subview in view.subviews.reversed() {
-      if let found = dropDestination(in: subview, at: location) { return found }
+      if let found = dropDestination(in: subview, at: location, for: types) { return found }
     }
-    return view.registeredDraggedTypes.isEmpty ? nil : view
+    let registered = Set(view.registeredDraggedTypes)
+    let general = registered.compactMap { UTType($0.rawValue) }
+    let takes = types.contains { type in
+      registered.contains(type)
+        || UTType(type.rawValue).map { uti in general.contains { uti.conforms(to: $0) } } == true
+    }
+    return takes ? view : nil
+  }
+
+  /// AppKit's own lookup, `-[NSView _hitTest:dragTypes:]`, when it answers: a private method,
+  /// asked here only, to check the test's reading of it.
+  private static func appKitDestination(
+    in window: NSWindow, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
+  ) -> NSView? {
+    typealias Lookup =
+      @convention(c) (NSObject, Selector, UnsafeMutablePointer<NSPoint>, NSSet) -> NSView?
+    let selector = NSSelectorFromString("_hitTest:dragTypes:")
+    guard let frame = window.contentView?.superview, frame.responds(to: selector),
+      let implementation = class_getMethodImplementation(type(of: frame), selector)
+    else { return nil }
+    var point = frame.convert(location, from: nil)
+    let lookup = unsafeBitCast(implementation, to: Lookup.self)
+    return lookup(frame, selector, &point, NSSet(array: types.map(\.rawValue)))
   }
 
   private func file(named name: String, in fixture: Fixture) throws -> URL {
@@ -216,19 +251,24 @@ struct ComposerDropTests {
     #expect(fixture.conversation.attachments.isEmpty)
   }
 
-  @Test("Every composer's text view is given the passage, the first and the next ones")
-  func everyComposer() {
-    let first = NSTextView()
-    let second = NSTextView()
-    ComposerDropPassage.install(on: first)
-    ComposerDropPassage.install(on: second)
-    ComposerDropPassage.install(on: second)
-    #expect(ComposerDropPassage.isInstalled(on: first))
-    #expect(ComposerDropPassage.isInstalled(on: second))
-    #expect(!ComposerDropPassage.isInstalled(on: NSTextView()))
-    // Still the text view it was, for AppKit and SwiftUI alike.
-    #expect(second.isKind(of: NSTextView.self))
-    #expect(second.string.isEmpty)
+  @Test("A file let go on the field of a stopped session is refused, and makes no chip")
+  func stopped() async throws {
+    let fixture = try await running()
+    defer { try? FileManager.default.removeItem(at: fixture.folder) }
+    let agent = try #require(
+      await fixture.supervisor.session(for: fixture.session.id.agentTerminal)
+        as? WorkspaceTerminal)
+    await agent.finish(state: .exited(code: 0))
+    await waitUntil { fixture.conversation.composerState == .stopped }
+    #expect(fixture.model.dropRoute(for: fixture.session.id) == .refused(.stopped))
+    let url = try file(named: "simple.txt", in: fixture)
+
+    let outcome = try await dropOnField([url as NSURL], on: fixture)
+
+    #expect(!outcome.taken)
+    #expect(!outcome.proposed.contains(.copy))
+    #expect(fixture.conversation.attachments.isEmpty)
+    #expect(fixture.conversation.draft.isEmpty)
   }
 
   @Test("Only a drag carrying a file, an image or a promised file passes through the field")
