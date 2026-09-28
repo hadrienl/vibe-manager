@@ -92,8 +92,9 @@ struct FileAvatarLibraryTests {
     try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
   }
 
+  /// What the folder holds, besides the lock the library takes.
   func names(in url: URL) throws -> Set<String> {
-    Set(try FileManager.default.contentsOfDirectory(atPath: url.path))
+    Set(try FileManager.default.contentsOfDirectory(atPath: url.path)).subtracting(["library.lock"])
   }
 
   // MARK: - On disk
@@ -167,26 +168,42 @@ struct FileAvatarLibraryTests {
     #expect(try names(in: folder.library) == ["library.json", fox.uuidString])
   }
 
-  @Test("A change that cannot be written leaves the library as it was")
+  struct DiskFull: Error {}
+
+  @Test("A change the index cannot record leaves the library as it was")
   func failedWrite() async throws {
     let folder = TemporaryFolder()
     let library = library(folder)
     let fox = try await library.duplicate(.default)
     try await library.setInUse(fox)
     let before = try await library.entries()
-    // The index can no longer be replaced: a folder stands where it is.
-    try FileManager.default.removeItem(at: folder.index)
-    try FileManager.default.createDirectory(at: folder.index, withIntermediateDirectories: false)
+    await library.failIndexWrites(with: DiskFull())
 
-    await #expect(throws: (any Error).self) {
-      _ = try await library.saveDraft(contract.avatar("Robot"), basedOn: nil)
-    }
-    await #expect(throws: (any Error).self) { try await library.remove(fox) }
-    await #expect(throws: (any Error).self) { try await library.setInUse(.default) }
+    await #expect(throws: DiskFull.self) { try await library.remove(fox) }
+    await #expect(throws: DiskFull.self) { try await library.setInUse(.default) }
+    await library.failIndexWrites(with: nil)
     #expect(try await library.entries() == before)
     #expect(try await library.inUse() == fox)
     #expect(try names(in: folder.library) == ["library.json", fox.description])
     #expect(try await library.load(fox).isComplete)
+  }
+
+  @Test("An avatar made while the index cannot be written is not lost: it comes back, kept")
+  func failedAdd() async throws {
+    let folder = TemporaryFolder()
+    let library = library(folder)
+    #expect(try await library.entries().count == 1)
+    await library.failIndexWrites(with: DiskFull())
+    await #expect(throws: DiskFull.self) {
+      _ = try await library.saveDraft(contract.avatar("Robot", marker: 3), basedOn: nil)
+    }
+    #expect(try names(in: folder.library).count == 2)
+    await library.failIndexWrites(with: nil)
+
+    let robot = try #require(try await library.entries().last)
+    #expect(robot.state == .kept)
+    #expect(try await library.load(robot.id).sprites[.neutral] == TestSprites.sprite(3))
+    #expect(try await self.library(folder).entries().map(\.id) == [.default, robot.id])
   }
 
   @Test("Kept, a redrawing draft whose index cannot be written leaves the original's images")
@@ -196,14 +213,28 @@ struct FileAvatarLibraryTests {
     let fox = try await library.saveDraft(contract.avatar("Fox", marker: 1), basedOn: nil)
     _ = try await library.keep(fox)
     let draft = try await library.saveDraft(contract.avatar("Fox", marker: 2), basedOn: fox)
-    try FileManager.default.removeItem(at: folder.index)
-    try FileManager.default.createDirectory(at: folder.index, withIntermediateDirectories: false)
+    await library.failIndexWrites(with: DiskFull())
 
-    await #expect(throws: (any Error).self) { _ = try await library.keep(draft) }
+    await #expect(throws: DiskFull.self) { _ = try await library.keep(draft) }
+    await library.failIndexWrites(with: nil)
     #expect(try await library.load(fox).sprites[.neutral] == TestSprites.sprite(1))
     #expect(try await library.load(draft).sprites[.neutral] == TestSprites.sprite(2))
     #expect(
       try names(in: folder.library) == ["library.json", fox.description, draft.description])
+  }
+
+  @Test("Two instances on the same data: each change starts from what the other wrote")
+  func twoInstances() async throws {
+    let folder = TemporaryFolder()
+    let first = library(folder)
+    let second = library(folder)
+    let fox = try await first.duplicate(.default)
+    #expect(try await second.entries().map(\.id) == [.default, fox])
+    let robot = try await second.duplicate(.default)
+    try await first.setInUse(robot)
+    let third = library(folder)
+    #expect(try await third.entries().map(\.id) == [.default, fox, robot])
+    #expect(try await third.inUse() == robot)
   }
 
   // MARK: - The index
@@ -300,7 +331,7 @@ struct FileAvatarLibraryTests {
     try FileAvatarLibrary.write(avatar, into: folder.legacy)
   }
 
-  @Test("The avatar of an earlier version is moved in, kept and in use")
+  @Test("The avatar of an earlier version is taken in, kept and in use")
   func migration() async throws {
     let folder = TemporaryFolder()
     try writeLegacy(contract.avatar("Mine", marker: 7), in: folder)
@@ -328,7 +359,7 @@ struct FileAvatarLibraryTests {
     #expect(try await second.inUse() == first.last?.id)
   }
 
-  @Test("An unreadable avatar of an earlier version is moved in all the same, listed with why")
+  @Test("An unreadable avatar of an earlier version is taken in all the same, listed with why")
   func migrationUnreadable() async throws {
     let folder = TemporaryFolder()
     try FileManager.default.createDirectory(at: folder.legacy, withIntermediateDirectories: true)
@@ -347,9 +378,12 @@ struct FileAvatarLibraryTests {
     #expect(
       try names(in: folder.library.appendingPathComponent(entry.id.description))
         == ["manifest.json", "neutral.png"])
+    let migrated = folder.library.appendingPathComponent(entry.id.description)
+    #expect(try mode(migrated) == 0o700)
+    #expect(try mode(migrated.appendingPathComponent("neutral.png")) == 0o600)
   }
 
-  @Test("An incomplete avatar of an earlier version is moved in, and says what it lacks")
+  @Test("An incomplete avatar of an earlier version is taken in, and says what it lacks")
   func migrationIncomplete() async throws {
     let folder = TemporaryFolder()
     try writeLegacy(contract.avatar("Old", missing: [.thinking]), in: folder)
@@ -369,14 +403,23 @@ struct FileAvatarLibraryTests {
     #expect(try names(in: folder.library) == ["library.json"])
   }
 
-  @Test("A library already there leaves the earlier version's folder alone")
-  func libraryAlreadyThere() async throws {
+  @Test("An avatar an earlier version wrote beside the library is taken in, kept and in use")
+  func legacyBesideLibrary() async throws {
     let folder = TemporaryFolder()
-    _ = try await library(folder).entries()
-    try writeLegacy(contract.avatar("Later"), in: folder)
+    let first = library(folder, legacy: true)
+    let fox = try await first.duplicate(.default)
+    try await first.setInUse(fox)
+    // Back to an earlier version, which made another avatar: the user's latest choice.
+    try writeLegacy(contract.avatar("Later", marker: 8), in: folder)
+
     let library = library(folder, legacy: true)
-    #expect(try await library.entries().map(\.id) == [.default])
-    #expect(FileManager.default.fileExists(atPath: folder.legacy.path))
+    let entries = try await library.entries()
+    #expect(entries.count == 3)
+    #expect(entries.first { $0.id == fox }?.state == .kept)
+    let later = try #require(entries.last)
+    #expect(later.manifest?.name == "Later")
+    #expect(try await library.inUse() == later.id)
+    #expect(!FileManager.default.fileExists(atPath: folder.legacy.path))
   }
 
   @Test("A migration interrupted before the move is taken up again")
@@ -387,6 +430,42 @@ struct FileAvatarLibraryTests {
     let library = library(folder, legacy: true)
     #expect(try await library.entries().count == 2)
     #expect(try await library.inUse() != .default)
+  }
+
+  @Test("A migration interrupted after the copy, before the index: started over, still in use")
+  func interruptedAfterCopy() async throws {
+    let folder = TemporaryFolder()
+    try writeLegacy(contract.avatar("Mine", marker: 9), in: folder)
+    // What the copy left: the avatar in the library, no index, and the old folder still there.
+    let copy = try Self.writeFolder(contract.avatar("Mine", marker: 9), in: folder)
+
+    let library = library(folder, legacy: true)
+    let inUse = try await library.inUse()
+    #expect(inUse != .default)
+    #expect(inUse != .stored(copy))
+    #expect(try await library.load(inUse) == contract.avatar("Mine", marker: 9))
+    // At worst a second copy, kept: nothing is lost.
+    #expect(try await library.entries().count == 3)
+    #expect(!FileManager.default.fileExists(atPath: folder.legacy.path))
+  }
+
+  @Test("A migration whose index cannot be written keeps the old folder, and ends once it can")
+  func migrationWithoutIndex() async throws {
+    let folder = TemporaryFolder()
+    try writeLegacy(contract.avatar("Mine", marker: 9), in: folder)
+    let library = library(folder, legacy: true)
+    await library.failIndexWrites(with: DiskFull())
+    await #expect(throws: DiskFull.self) { _ = try await library.entries() }
+    await #expect(throws: DiskFull.self) { _ = try await library.inUse() }
+    #expect(FileManager.default.fileExists(atPath: folder.legacy.path))
+
+    await library.failIndexWrites(with: nil)
+    let inUse = try await library.inUse()
+    #expect(try await library.load(inUse) == contract.avatar("Mine", marker: 9))
+    // The copy made before is the one used: no second one.
+    #expect(try await library.entries().count == 2)
+    #expect(!FileManager.default.fileExists(atPath: folder.legacy.path))
+    #expect(try await self.library(folder).inUse() == inUse)
   }
 
   @Test("An avatar in use that lost a file since says which, as the single avatar did")
