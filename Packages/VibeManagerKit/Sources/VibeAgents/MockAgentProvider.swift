@@ -276,6 +276,6 @@ extension MockAgentProvider: AgentConversationReporting {
 
   /// The mock reads a line at a time: a paste without brackets, then Return.
   public var promptFormat: AgentPromptFormat {
-    AgentPromptFormat(usesBracketedPaste: transcriptDirectory != nil)
+    AgentPromptFormat(textEntry: transcriptDirectory != nil ? .bracketedPaste : .plain)
   }
 }

@@ -544,7 +544,10 @@ public final class ConversationModel {
     attachments = []
     scroll.jumpedToBottom()
     scrollToBottomRequest += 1
-    await write(keystrokes.paste)
+    for (index, keys) in keystrokes.writes.enumerated() {
+      if index > 0 { try? await Task.sleep(for: keystrokes.interval) }
+      await write(keys)
+    }
     try? await Task.sleep(for: submitDelay)
     await write(keystrokes.submit)
     scheduleEchoCheck()

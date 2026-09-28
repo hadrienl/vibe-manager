@@ -18,30 +18,66 @@ public struct PromptSubmission: Hashable, Sendable {
 /// The bytes a prompt becomes in the agent's terminal (#38).
 ///
 /// The conversation view writes to the agent exactly as a keyboard would, and by no other road:
-/// the terminal stays the one channel to it (ADR 0025). A paste, then the key that sends it,
-/// written apart so that the TUI has seen the paste end.
+/// the terminal stays the one channel to it (ADR 0025). The text, typed or pasted as the agent
+/// wants it, then the key that sends it, written apart so that the TUI has seen the text end.
 public enum PromptEncoding {
   public struct Keystrokes: Hashable, Sendable {
-    public let paste: [UInt8]
+    /// What writes the prompt, in order, `interval` apart.
+    public let writes: [[UInt8]]
+    public let interval: Duration
     public let submit: [UInt8]
   }
 
   public static func keystrokes(
     for submission: PromptSubmission, format: AgentPromptFormat, whileWorking: Bool
   ) -> Keystrokes {
-    var body = sanitized(submission.text).trimmingCharacters(in: .whitespacesAndNewlines)
+    let body = sanitized(submission.text).trimmingCharacters(in: .whitespacesAndNewlines)
     // A file named with a control character could close the paste and type on its own: such a
     // path is not written at all.
     let paths = submission.attachments.map(\.path).filter(PathInsertion.isWritablePath)
-      .map(PathInsertion.shellEscaped)
-    if !paths.isEmpty {
-      body += (body.isEmpty ? "" : " ") + paths.joined(separator: " ")
+      .map(PathInsertion.shellEscaped).joined(separator: " ")
+    let separator = body.isEmpty || paths.isEmpty ? "" : " "
+    let submit = whileWorking ? format.queueKey : format.submitKey
+    switch format.textEntry {
+    case .plain:
+      return Keystrokes(
+        writes: [Array((body + separator + paths).utf8)], interval: .zero, submit: submit)
+    case .bracketedPaste:
+      return Keystrokes(
+        writes: [bracketed(body + separator + paths)], interval: .zero, submit: submit)
+    case .typed(let chunkSize, let chunkDelay):
+      // A `!` typed first switches Claude Code to its shell, even pasted alone: pasted with the
+      // rest, it stays text.
+      if body.hasPrefix("!") {
+        return Keystrokes(
+          writes: [bracketed(body + separator + paths)], interval: .zero, submit: submit)
+      }
+      // A tab typed is taken for a key, not text. The paths stay pasted: an image is joined to
+      // the prompt only from a pasted path.
+      var writes = chunks(of: body.replacingOccurrences(of: "\t", with: "    "), size: chunkSize)
+      if !paths.isEmpty { writes.append(bracketed(separator + paths)) }
+      return Keystrokes(writes: writes, interval: chunkDelay, submit: submit)
     }
-    var paste = Array(body.utf8)
-    if format.usesBracketedPaste {
-      paste = Array("\u{1B}[200~".utf8) + paste + Array("\u{1B}[201~".utf8)
+  }
+
+  private static func bracketed(_ text: String) -> [UInt8] {
+    Array("\u{1B}[200~".utf8) + Array(text.utf8) + Array("\u{1B}[201~".utf8)
+  }
+
+  /// The UTF-8 of `text` in pieces of at most `size` bytes, never splitting a character.
+  private static func chunks(of text: String, size: Int) -> [[UInt8]] {
+    var chunks: [[UInt8]] = []
+    var current: [UInt8] = []
+    for scalar in text.unicodeScalars {
+      let bytes = Array(String(scalar).utf8)
+      if !current.isEmpty && current.count + bytes.count > size {
+        chunks.append(current)
+        current = []
+      }
+      current += bytes
     }
-    return Keystrokes(paste: paste, submit: whileWorking ? format.queueKey : format.submitKey)
+    if !current.isEmpty { chunks.append(current) }
+    return chunks
   }
 
   /// Every control character but the line break and the tab is dropped, Escape first of all: a

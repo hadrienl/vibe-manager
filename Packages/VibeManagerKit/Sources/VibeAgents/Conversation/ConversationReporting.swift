@@ -31,9 +31,11 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
     ClaudeCodeConversationDecoder(file: file)
   }
 
-  /// Claude Code keeps a prompt sent during a turn for when the turn ends, whatever the key.
+  /// Claude Code keeps a prompt sent during a turn for when the turn ends, whatever the key. It
+  /// wraps any paste in `<pasted_content>` (2.1.283), and takes 4 kB arriving at once for one:
+  /// typed 256 bytes every 20 ms, a prompt arrives as written.
   public var promptFormat: AgentPromptFormat {
-    AgentPromptFormat()
+    AgentPromptFormat(textEntry: .typed(chunkSize: 256, chunkDelay: .milliseconds(20)))
   }
 }
 
