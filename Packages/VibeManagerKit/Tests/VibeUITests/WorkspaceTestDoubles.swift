@@ -17,15 +17,19 @@ actor WorkspaceSupervisor: TerminalSupervisor {
   private var initialState: TerminalProcessState
   /// What a stop leaves behind: a clean exit, or a process group the kernel would not let go of.
   private let stopState: TerminalProcessState
+  /// What each terminal has already printed, replayed by every view that attaches to it.
+  private let history: [UInt8]
 
   init(
     failure: TerminalError? = nil,
     initialState: TerminalProcessState = .running(processIdentifier: 4242),
-    stopState: TerminalProcessState = .exited(code: 0)
+    stopState: TerminalProcessState = .exited(code: 0),
+    history: [UInt8] = []
   ) {
     self.failure = failure
     self.initialState = initialState
     self.stopState = stopState
+    self.history = history
   }
 
   /// What the next process starts in, for a test whose second launch must not repeat the fate
@@ -38,7 +42,7 @@ actor WorkspaceSupervisor: TerminalSupervisor {
     if let failure { throw failure }
     startCount += 1
     lastSpec = spec
-    let session = WorkspaceTerminal(id: id, state: initialState)
+    let session = WorkspaceTerminal(id: id, state: initialState, history: history)
     sessions[id] = session
     return session
   }
@@ -62,13 +66,18 @@ actor WorkspaceTerminal: TerminalSession {
   nonisolated let id: TerminalID
   private var current: TerminalProcessState
   private var continuations: [AsyncStream<TerminalEvent>.Continuation] = []
+  private let printed: [UInt8]
+  /// How many views attached to this terminal, each of them replaying what it printed.
+  private(set) var attachCount = 0
 
-  init(id: TerminalID, state: TerminalProcessState) {
+  init(id: TerminalID, state: TerminalProcessState, history: [UInt8] = []) {
     self.id = id
     current = state
+    printed = history
   }
 
   func attach() -> TerminalAttachment {
+    attachCount += 1
     let state = current
     var continuation: AsyncStream<TerminalEvent>.Continuation?
     let events = AsyncStream<TerminalEvent> { continuation = $0 }
@@ -81,7 +90,7 @@ actor WorkspaceTerminal: TerminalSession {
     }
     return TerminalAttachment(
       state: state,
-      history: TerminalHistorySnapshot(bytes: [], droppedByteCount: 0),
+      history: TerminalHistorySnapshot(bytes: printed, droppedByteCount: 0),
       events: events
     )
   }
@@ -89,7 +98,7 @@ actor WorkspaceTerminal: TerminalSession {
   func state() -> TerminalProcessState { current }
 
   func history() -> TerminalHistorySnapshot {
-    TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
+    TerminalHistorySnapshot(bytes: printed, droppedByteCount: 0)
   }
 
   /// Everything typed into the terminal, write by write.

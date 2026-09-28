@@ -804,42 +804,42 @@ public struct RootView: View {
   /// The terminal is never taken out of the hierarchy, nor narrowed to nothing: when the web view
   /// takes its place, it is drawn over it. A terminal resized to zero columns would tell its agent
   /// so, and every full-screen program in it would redraw for a window it does not have.
-  @ViewBuilder
+  ///
+  /// One structure whatever the web view does, the web view alone being conditional (#149): the
+  /// terminal stack holds every session's terminal, and a branch per arrangement made showing or
+  /// hiding the web view a different view to SwiftUI — every terminal torn down and remade, each
+  /// replaying its whole history on the main thread, at each click of the toolbar's button.
   private func sessionContent(for session: WorkSession) -> some View {
-    if let workspace = model.browser, session.status != .archived {
-      let browser = workspace.browser(for: session.id)
-      switch model.layout.columns.browser {
-      case .hidden:
+    let workspace = session.status == .archived ? nil : model.browser
+    let arrangement = workspace == nil ? .hidden : model.layout.columns.browser
+    return GeometryReader { proxy in
+      // The terminal keeps its eighty columns: the web view gives way first.
+      let available =
+        Double(proxy.size.width) - Self.terminalMinimumWidth - Double(SplitHandle.thickness)
+      let upper = max(WorkspaceLayout.browserWidthRange.lowerBound, available)
+      let width = min(model.layout.browserWidth, upper)
+      HStack(spacing: 0) {
         terminalStack(for: session)
-      case .beside:
-        GeometryReader { proxy in
-          // The terminal keeps its eighty columns: the web view gives way first.
-          let available =
-            Double(proxy.size.width) - Self.terminalMinimumWidth
-            - Double(SplitHandle.thickness)
-          let upper = max(WorkspaceLayout.browserWidthRange.lowerBound, available)
-          let width = min(model.layout.browserWidth, upper)
-          HStack(spacing: 0) {
-            terminalStack(for: session)
-            SplitHandle(
-              length: width,
-              range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
-              label: Text("Divider between the terminal and the web view", bundle: .module),
-              onChange: { model.layout.browserWidthChanged(to: $0) })
-            BrowserPanel(model: model, workspace: workspace, browser: browser)
-              .frame(width: width)
+          .overlay {
+            if let workspace, arrangement == .alternating,
+              model.layout.showsBrowserWhenAlternating
+            {
+              BrowserPanel(
+                model: model, workspace: workspace, browser: workspace.browser(for: session.id))
+            }
           }
-        }
-      case .alternating:
-        ZStack {
-          terminalStack(for: session)
-          if model.layout.showsBrowserWhenAlternating {
-            BrowserPanel(model: model, workspace: workspace, browser: browser)
-          }
+        if let workspace, arrangement == .beside {
+          SplitHandle(
+            length: width,
+            range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
+            label: Text("Divider between the terminal and the web view", bundle: .module),
+            onChange: { model.layout.browserWidthChanged(to: $0) })
+          BrowserPanel(
+            model: model, workspace: workspace, browser: workspace.browser(for: session.id)
+          )
+          .frame(width: width)
         }
       }
-    } else {
-      terminalStack(for: session)
     }
   }
 
