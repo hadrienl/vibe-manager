@@ -346,6 +346,40 @@ struct CodexActivityReportingTests {
     }
     #expect(decoder.approvalAnswerKeys == [[0x79], [0x61], [0x70], [0x6E], [0x0D]])
   }
+
+  @Test("SessionStart keeps the session Codex names, and only it (#144)")
+  func sessionStartNamesTheConversation() throws {
+    let log = try temporaryLog()
+    let hook = try #require(CodexActivityHooks.hooks.first { $0.event == "SessionStart" })
+    let command = AgentActivityHookCommand.command(event: hook.event, payload: hook.payload)
+    // What codex-cli 0.157.1 hands its SessionStart hook, with the first message.
+    let identifier = "01a0e584-b41b-7cd2-96e8-7fdaf4eacc8a"
+    let rollout =
+      "/Users/a/.codex/sessions/2026/09/28/rollout-2026-09-28T02-57-54-\(identifier).jsonl"
+    _ = try runHook(
+      command,
+      input:
+        #"{"session_id":"\#(identifier)","transcript_path":"\#(rollout)","cwd":"/Users/a/dev","#
+        + #""hook_event_name":"SessionStart","model":"gpt-5","permission_mode":"default","#
+        + #""source":"startup"}"#,
+      log: log)
+
+    let line = try #require(lines(of: log).first)
+    #expect(line.last == #"{"session_id":"\#(identifier)"}"#)
+    let event = AgentActivityEvent(
+      name: line[0], date: Date(), payload: Data((line.last ?? "").utf8))
+    let decoder = CodexSignalDecoder()
+    #expect(decoder.conversationIdentifier(in: event) == identifier)
+    #expect(decoder.signal(for: event) == .channelConfirmed)
+    // No other event names a conversation, nor does a payload that is not an identifier.
+    #expect(
+      decoder.conversationIdentifier(
+        in: AgentActivityEvent(name: "Stop", date: Date(), payload: Data(line[2].utf8))) == nil)
+    #expect(
+      decoder.conversationIdentifier(
+        in: AgentActivityEvent(
+          name: "SessionStart", date: Date(), payload: Data(#"{"session_id":"x"}"#.utf8))) == nil)
+  }
 }
 
 extension AgentSignal {

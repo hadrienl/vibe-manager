@@ -79,22 +79,70 @@ extension Character {
   }
 }
 
-/// Finds the identifier of the Codex session a terminal just started.
-/// The Codex sessions already attributed to a pane in this process.
+/// One launch of Codex, as the discovery of its session sees it.
+public struct CodexLaunch: Hashable, Sendable {
+  public let id: UUID
+  public let workingDirectoryPath: String
+  /// Taken once the process is started: its session cannot have begun much before.
+  public let launchedAt: Date
+
+  public init(id: UUID = UUID(), workingDirectoryPath: String, launchedAt: Date) {
+    self.id = id
+    self.workingDirectoryPath = workingDirectoryPath
+    self.launchedAt = launchedAt
+  }
+}
+
+/// The Codex sessions already attributed to a pane in this process, and the launches still waiting
+/// for theirs.
 ///
-/// Two panes started seconds apart in the same repository see the same rollout files. Creation
-/// time alone cannot tell them apart — a slow pane would happily adopt the session of the pane
-/// that started just before it — so a session is claimed once and never handed out twice.
+/// Two panes started in the same repository see the same rollout files. Creation time alone cannot
+/// tell them apart — a slow pane would happily adopt the session of the pane that started just
+/// before it — so a session is claimed once and never handed out twice, and one that could belong
+/// to either of two waiting launches is handed to neither (#144).
 public actor CodexSessionClaims {
   public static let shared = CodexSessionClaims()
 
+  /// How much earlier than the launch it was taken for a session may say it began. The launch is
+  /// dated once the process is started, a moment after it really was, and a session begins with
+  /// the process: this covers the gap, with a wide margin.
+  public static let startTolerance: TimeInterval = 5
+
+  private struct Waiting {
+    let directory: String
+    let launchedAt: Date
+  }
+
   private var claimed: Set<String> = []
+  private var waiting: [UUID: Waiting] = [:]
 
   public init() {}
 
   /// Claims a session for the caller. `false` means another pane already owns it.
   public func claim(_ identifier: String) -> Bool {
     claimed.insert(identifier).inserted
+  }
+
+  /// Claims a session found on disk for `launch`, only when it can be no other launch's.
+  ///
+  /// - Parameters:
+  ///   - startedAt: when the session began — at the start of its process, not with the first
+  ///     message that wrote its rollout.
+  ///   - directory: the session's working directory, canonical.
+  /// - Returns: `false` when the session is already claimed, began before `launch`, or could just
+  ///   as well belong to another launch still waiting in the same directory.
+  public func claim(
+    _ identifier: String, startedAt: Date, directory: String, for launch: CodexLaunch
+  ) -> Bool {
+    guard !claimed.contains(identifier) else { return false }
+    let floor = { (launchedAt: Date) in launchedAt.addingTimeInterval(-Self.startTolerance) }
+    guard startedAt >= floor(launch.launchedAt) else { return false }
+    let rivals = waiting.filter { id, other in
+      id != launch.id && other.directory == directory && startedAt >= floor(other.launchedAt)
+    }
+    guard rivals.isEmpty else { return false }
+    claimed.insert(identifier)
+    return true
   }
 
   public func release(_ identifier: String) {
@@ -104,32 +152,63 @@ public actor CodexSessionClaims {
   public func isClaimed(_ identifier: String) -> Bool {
     claimed.contains(identifier)
   }
+
+  /// `launch` waits for its session, in `directory` (canonical): until it ends, a session that
+  /// began after it in that directory may be its own.
+  public func beginWaiting(_ launch: CodexLaunch, directory: String) {
+    waiting[launch.id] = Waiting(directory: directory, launchedAt: launch.launchedAt)
+  }
+
+  public func endWaiting(_ launch: CodexLaunch) {
+    waiting[launch.id] = nil
+  }
 }
 
 public protocol CodexSessionDiscovering: Sendable {
-  /// Identifier of the session created after `since` for that working directory, or `nil`
-  /// when none appears before the deadline.
-  func discoverSessionIdentifier(
-    workingDirectoryPath: String,
-    since: Date,
-    timeout: Duration
-  ) async -> String?
+  /// Identifier of the session `launch` started, or `nil` when none that can only be its own
+  /// appears before the deadline.
+  func discoverSessionIdentifier(for launch: CodexLaunch, timeout: Duration) async -> String?
+  /// `launch` is waiting for its session, however it will learn it: another launch must not take
+  /// a session that may be this one's.
+  func beginWaiting(_ launch: CodexLaunch) async
+  /// `launch` knows its session, or has ended.
+  func endWaiting(_ launch: CodexLaunch) async
+  /// A session learned some other way — the agent's own hook, its terminal — is taken: no other
+  /// launch may be handed it.
+  func claim(_ identifier: String) async
+}
+
+extension CodexSessionDiscovering {
+  public func beginWaiting(_ launch: CodexLaunch) async {}
+  public func endWaiting(_ launch: CodexLaunch) async {}
+  public func claim(_ identifier: String) async {}
 }
 
 /// Watches the rollout files Codex writes under `$CODEX_HOME/sessions`.
 ///
-/// A session records `session_id` and `cwd` in the very first line of its rollout file, which
-/// makes it the one identifier source that does not depend on how the interface renders.
-/// Matching uses the working directory and the launch time, and keeps the *oldest* rollout
-/// created after the launch: the newest one may belong to a pane started a moment later in
-/// the same repository, which would give two sessions the same identifier.
+/// A session records `session_id`, `cwd` and the instant it began in the very first line of its
+/// rollout file, which makes it the one identifier source that does not depend on how the interface
+/// renders. Codex begins the session when it starts but writes the file only with the first
+/// message (checked with 0.157.1), minutes later if nobody writes to it: the file's date says when
+/// the user spoke, the first line says which launch it came from.
+///
+/// Matching uses the working directory, the launch time, and the launches still waiting in that
+/// directory (`CodexSessionClaims`): a rollout that could belong to another of them is taken by
+/// none. Among those that remain, the *oldest* created after the launch is kept.
 public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
   /// The first line carries the session metadata and the base instructions, which are large
   /// but bounded. A file without a newline within that window is simply not written yet.
   static let maximumFirstLineByteCount = 4 * 1024 * 1024
+  /// How long the watch keeps its first pace before slowing down: a prompt given at launch writes
+  /// the rollout within a few seconds.
+  public static let briskPeriod: Duration = .seconds(30)
+  /// The longest pause between two looks, once slowed down.
+  public static let slowestInterval: Duration = .seconds(5)
 
   private let sessionsDirectory: URL
   private let pollInterval: Duration
+  private let briskPeriod: Duration
+  private let slowestInterval: Duration
   private let claims: CodexSessionClaims
 
   public init(
@@ -147,30 +226,58 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
   public init(
     sessionsDirectory: URL,
     pollInterval: Duration = .milliseconds(500),
+    briskPeriod: Duration = CodexRolloutSessionDiscovery.briskPeriod,
+    slowestInterval: Duration = CodexRolloutSessionDiscovery.slowestInterval,
     claims: CodexSessionClaims = .shared
   ) {
     self.sessionsDirectory = sessionsDirectory
     self.pollInterval = pollInterval
+    self.briskPeriod = briskPeriod
+    self.slowestInterval = max(slowestInterval, pollInterval)
     self.claims = claims
   }
 
+  public func beginWaiting(_ launch: CodexLaunch) async {
+    await claims.beginWaiting(launch, directory: Self.canonicalPath(launch.workingDirectoryPath))
+  }
+
+  public func endWaiting(_ launch: CodexLaunch) async {
+    await claims.endWaiting(launch)
+  }
+
+  public func claim(_ identifier: String) async {
+    _ = await claims.claim(identifier)
+  }
+
+  /// A launch of its own, for a caller that only knows where and when.
   public func discoverSessionIdentifier(
     workingDirectoryPath: String,
     since: Date,
     timeout: Duration
   ) async -> String? {
+    await discoverSessionIdentifier(
+      for: CodexLaunch(workingDirectoryPath: workingDirectoryPath, launchedAt: since),
+      timeout: timeout)
+  }
+
+  public func discoverSessionIdentifier(for launch: CodexLaunch, timeout: Duration) async -> String?
+  {
     // The deadline and the sleeps are read from the same clock: a timeout measured against
     // an injected date while sleeping against the real one would never expire.
-    let deadline = ContinuousClock.now.advanced(by: timeout)
-    let workingDirectory = Self.canonicalPath(workingDirectoryPath)
+    let start = ContinuousClock.now
+    let deadline = start.advanced(by: timeout)
+    let workingDirectory = Self.canonicalPath(launch.workingDirectoryPath)
+    // A first line never changes once written: read once per file, not once per look.
+    var metas: [URL: SessionMeta] = [:]
 
     while !Task.isCancelled {
-      if let identifier = await identifier(matching: workingDirectory, since: since) {
+      if let identifier = await identifier(matching: workingDirectory, for: launch, metas: &metas) {
         return identifier
       }
-      guard ContinuousClock.now < deadline else { return nil }
+      let now = ContinuousClock.now
+      guard now < deadline else { return nil }
       do {
-        try await Task.sleep(for: pollInterval)
+        try await Task.sleep(for: min(interval(after: now - start), deadline - now))
       } catch {
         return nil
       }
@@ -178,14 +285,36 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
     return nil
   }
 
-  private func identifier(matching workingDirectory: String, since: Date) async -> String? {
-    let candidates = rollouts(since: since)
-    for candidate in candidates {
-      guard let meta = sessionMeta(at: candidate.url) else { continue }
+  /// The pause before the next look, once the watch has lasted `elapsed`: the first pace during
+  /// the brisk period, then twice as long for every further brisk period, up to the slowest.
+  func interval(after elapsed: Duration) -> Duration {
+    guard elapsed >= briskPeriod, briskPeriod > .zero else { return pollInterval }
+    let periods = min(Int(elapsed / briskPeriod), 16)
+    return min(pollInterval * (1 << periods), slowestInterval)
+  }
+
+  private func identifier(
+    matching workingDirectory: String, for launch: CodexLaunch, metas: inout [URL: SessionMeta]
+  ) async -> String? {
+    for candidate in rollouts(since: launch.launchedAt) {
+      let meta: SessionMeta
+      if let known = metas[candidate.url] {
+        meta = known
+      } else if let read = sessionMeta(at: candidate.url) {
+        metas[candidate.url] = read
+        meta = read
+      } else {
+        continue
+      }
       guard Self.canonicalPath(meta.cwd) == workingDirectory else { continue }
       guard UUID(uuidString: meta.sessionID) != nil else { continue }
-      // A session another pane already took is not ours, however well it matches.
-      guard await claims.claim(meta.sessionID) else { continue }
+      // A session another pane already took, one that began before this launch, or one that
+      // may be another waiting launch's is not ours, however well it matches.
+      guard
+        await claims.claim(
+          meta.sessionID, startedAt: meta.startedAt ?? candidate.createdAt,
+          directory: workingDirectory, for: launch)
+      else { continue }
       return meta.sessionID
     }
     return nil
@@ -287,7 +416,17 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
     else {
       return nil
     }
-    return SessionMeta(sessionID: sessionID, cwd: cwd)
+    return SessionMeta(
+      sessionID: sessionID, cwd: cwd, startedAt: payload.timestamp.flatMap(Self.date(from:)))
+  }
+
+  /// `2026-09-28T00:57:54.460Z`, with or without its fraction of a second.
+  static func date(from text: String) -> Date? {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = formatter.date(from: text) { return date }
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter.date(from: text)
   }
 
   /// `/tmp` and `/private/tmp` are the same directory; a session must not be missed over it.
@@ -295,9 +434,11 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
     URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
   }
 
-  private struct SessionMeta {
+  struct SessionMeta {
     let sessionID: String
     let cwd: String
+    /// When the session began — with its process. `nil` in a first line that does not say.
+    let startedAt: Date?
   }
 
   private struct RolloutRecord: Decodable {
@@ -307,11 +448,13 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
       let sessionID: String?
       let id: String?
       let cwd: String?
+      let timestamp: String?
 
       private enum CodingKeys: String, CodingKey {
         case sessionID = "session_id"
         case id
         case cwd
+        case timestamp
       }
     }
   }

@@ -30,16 +30,35 @@ private actor CaptureRepository: SessionRepository {
 private struct StubDiscovery: CodexSessionDiscovering {
   var identifier: String?
   var delay: Duration = .zero
+  /// How long after the launch the rollout is written: a watch that ends sooner never sees it.
+  var writtenAfter: Duration = .zero
+  var looks: LookCounter? = nil
+  /// Written after the watch looked for the last time before the end: only the look made as the
+  /// process ends sees it.
+  var onlyAtTheLastLook = false
 
-  func discoverSessionIdentifier(
-    workingDirectoryPath: String,
-    since: Date,
-    timeout: Duration
-  ) async -> String? {
+  func discoverSessionIdentifier(for launch: CodexLaunch, timeout: Duration) async -> String? {
+    await looks?.looked(timeout: timeout)
+    if onlyAtTheLastLook {
+      guard timeout == .zero else {
+        try? await Task.sleep(for: timeout)
+        return nil
+      }
+      return identifier
+    }
     if delay != .zero {
       try? await Task.sleep(for: delay)
     }
-    return identifier
+    return timeout >= writtenAfter ? identifier : nil
+  }
+}
+
+/// Every look the capture asked the discovery for, with how long it was allowed.
+private actor LookCounter {
+  private(set) var timeouts: [Duration] = []
+
+  func looked(timeout: Duration) {
+    timeouts.append(timeout)
   }
 }
 
@@ -314,5 +333,159 @@ private actor Gate {
 private func waitUntil(_ condition: @Sendable () async -> Bool) async throws {
   while await !condition() {
     try await Task.sleep(for: .milliseconds(10))
+  }
+}
+
+/// A Codex provider whose rollouts are looked for by `discovery`.
+private func codexProvider(discovery: any CodexSessionDiscovering) -> CodexAgentProvider {
+  let environment = ["PATH": "/usr/bin", "HOME": "/Users/test"]
+  return CodexAgentProvider(
+    base: CommandLineAgentProvider(
+      descriptor: CodexAgentProvider.descriptor,
+      specification: CodexAgentProvider.specification,
+      models: [],
+      argumentBuilder: CodexArgumentBuilder(),
+      availabilityProbe: AgentAvailabilityProbe(
+        descriptor: CodexAgentProvider.descriptor,
+        specification: CodexAgentProvider.specification,
+        locator: StubLocator(location: .notFound),
+        probe: StubProcessProbe(),
+        environment: environment,
+        now: { Date(timeIntervalSince1970: 0) }
+      ),
+      environment: environment
+    ),
+    catalog: CodexModelCatalog(cacheURL: URL(fileURLWithPath: "/nonexistent/models_cache.json")),
+    discovery: discovery
+  )
+}
+
+/// A Codex session that begins with its process and is named only with the first message (#144).
+@Suite("A Codex conversation named long after the launch", .timeLimit(.minutes(2)))
+struct CodexLateConversationTests {
+  private let identifier = "019ee0a1-06d9-7e52-957b-d61a982d6b43"
+  private let other = "019ee0a1-9999-7e52-957b-d61a982d6b43"
+
+  private func plan(hooks: Bool, arguments: [String] = ["-C", "/Users/test/app"])
+    -> AgentLaunchPlan
+  {
+    AgentLaunchPlan(
+      providerID: CodexAgentProvider.id, executablePath: "/usr/local/bin/codex",
+      arguments: arguments,
+      environment: hooks ? [AgentActivityHookCommand.environmentKey: "/data/s.log"] : [:],
+      workingDirectoryPath: "/Users/test/app", promptDelivery: .none)
+  }
+
+  @Test("Without hooks, a rollout written ten minutes after the launch is still stored (#144)")
+  func rolloutWrittenLongAfterTheLaunchIsStored() async throws {
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let observer = CodexLaunchObserver(
+      sessionID: session.id, repository: repository,
+      provider: codexProvider(
+        discovery: StubDiscovery(identifier: identifier, writtenAfter: .seconds(600))))
+
+    await observer.launched(plan: plan(hooks: false))
+
+    try await waitUntil {
+      await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier
+    }
+    await observer.finished()
+  }
+
+  @Test("With hooks, the session the agent names is stored, however late")
+  func sessionNamedByTheHookIsStored() async throws {
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let looks = LookCounter()
+    let observer = CodexLaunchObserver(
+      sessionID: session.id, repository: repository,
+      provider: codexProvider(discovery: StubDiscovery(identifier: nil, looks: looks)))
+
+    await observer.launched(plan: plan(hooks: true))
+    // The rollout is looked for as it always was, as a net under hooks that would not run.
+    try await waitUntil { await looks.timeouts == [CodexSessionIdentifierCapture.defaultTimeout] }
+    await observer.conversationNamed(identifier)
+
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+    #expect(await observer.awaitedResumeIdentifier() == nil)
+  }
+
+  @Test("The session the hook names replaces the rollout another pane wrote")
+  func hookReplacesWhatTheRolloutSuggested() async throws {
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let capture = CodexSessionIdentifierCapture(
+      sessionID: session.id, workingDirectoryPath: "/Users/test/app",
+      discovery: StubDiscovery(identifier: other),
+      record: RecordAgentResumeIdentifier(repository: repository))
+
+    await capture.start()
+    try await waitUntil { await capture.identifier == other }
+    await capture.named(identifier)
+
+    #expect(await capture.identifier == identifier)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+    // Nothing else may write over the agent's own word afterwards.
+    await capture.observe(output: "session id: \(other)\n")
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+  }
+
+  @Test("A name not written yet is handed on, and written by the instance that adopts the agent")
+  func unwrittenNameIsHandedOn() async throws {
+    // The session is not ready to carry it yet: its agent configuration is still missing.
+    let session = WorkSession(name: "Refonte du parseur")
+    let repository = CaptureRepository(stored: session)
+    let first = CodexLaunchObserver(
+      sessionID: session.id, repository: repository,
+      provider: codexProvider(discovery: StubDiscovery(identifier: nil)))
+    await first.launched(plan: plan(hooks: true))
+    await first.conversationNamed(identifier)
+    await first.finished()
+    #expect(await first.awaitedResumeIdentifier() == identifier)
+
+    var ready = session
+    ready.agent = SessionAgentConfiguration(providerID: "codex", modelID: "gpt-6-astra")
+    await repository.save(ready)
+    let adopting = CodexLaunchObserver(
+      sessionID: session.id, repository: repository,
+      provider: codexProvider(discovery: StubDiscovery(identifier: nil)))
+    await adopting.adopted(awaitedResumeIdentifier: identifier)
+
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+    #expect(await adopting.awaitedResumeIdentifier() == nil)
+  }
+
+  @Test("A resumed conversation does not look for a rollout: a new one would be another pane's")
+  func resumedConversationDoesNotDiscover() async throws {
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let looks = LookCounter()
+    let observer = CodexLaunchObserver(
+      sessionID: session.id, repository: repository,
+      provider: codexProvider(discovery: StubDiscovery(identifier: other, looks: looks)))
+
+    await observer.launched(
+      plan: plan(hooks: false, arguments: ["resume", "-C", "/Users/test/app", "--", identifier]))
+    await observer.finished()
+
+    #expect(await looks.timeouts.isEmpty)
+    #expect(await repository.saveCount == 0)
+  }
+
+  @Test("A rollout written just before the agent quit is stored when it ends")
+  func rolloutWrittenJustBeforeTheEndIsStored() async throws {
+    let session = codexSession()
+    let repository = CaptureRepository(stored: session)
+    let observer = CodexLaunchObserver(
+      sessionID: session.id, repository: repository,
+      provider: codexProvider(
+        discovery: StubDiscovery(identifier: identifier, onlyAtTheLastLook: true)))
+
+    await observer.launched(plan: plan(hooks: false))
+    #expect(await repository.saveCount == 0)
+    await observer.finished()
+
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
   }
 }

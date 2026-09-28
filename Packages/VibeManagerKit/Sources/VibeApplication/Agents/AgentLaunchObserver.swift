@@ -17,6 +17,10 @@ public protocol AgentLaunchObserver: Sendable {
   /// terminal host kept: `identifier` is the one it was still waiting for (#141). There is no plan
   /// to read it from, only what that instance wrote down.
   func adopted(awaitedResumeIdentifier identifier: String) async
+  /// The agent named its conversation itself, through the hooks of this very process (#144): the
+  /// one report that cannot belong to another launch. Given to the observer of a launch, and to
+  /// the observer of a process adopted from the terminal host.
+  func conversationNamed(_ identifier: String) async
 }
 
 extension AgentLaunchObserver {
@@ -25,6 +29,10 @@ extension AgentLaunchObserver {
 
   public func adopted(awaitedResumeIdentifier identifier: String) async {
     // Nothing was waited for, so there is nothing to take up.
+  }
+
+  public func conversationNamed(_ identifier: String) async {
+    // A CLI told its identifier up front has nothing to learn from the report.
   }
 }
 

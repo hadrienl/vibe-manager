@@ -1,4 +1,5 @@
 import Foundation
+import VibeDomain
 
 /// What a question from an agent is waiting for.
 ///
@@ -86,5 +87,16 @@ public struct AgentActivityEvent: Hashable, Sendable {
     self.name = name
     self.date = date
     self.payload = payload
+  }
+}
+
+/// An agent named the conversation its session holds, through its own hooks (#144).
+public struct AgentConversationNamed: Hashable, Sendable {
+  public let sessionID: SessionID
+  public let identifier: String
+
+  public init(sessionID: SessionID, identifier: String) {
+    self.sessionID = sessionID
+    self.identifier = identifier
   }
 }

@@ -66,13 +66,27 @@ public actor CodexTerminalIdentifierAccumulator {
 
 /// Captures the identifier of a running Codex session and stores it on its work session.
 ///
-/// Two sources race: the rollout file Codex writes, which is reliable, and the terminal
-/// output, which is immediate but only as stable as the interface. The first to produce an
-/// identifier wins, and nothing overwrites it for the rest of the launch — a false positive
-/// read from the screen must not replace what the rollout established, and the other way
-/// round. A later launch of the same work session does replace it: that is a new conversation.
+/// Codex creates its session when it starts but names it nowhere until the first message, which
+/// may come hours later (#144). Three sources can name it:
+///
+/// - the agent's own `SessionStart` hook (`named(_:)`), written by this very process into its
+///   session's log: the only one that cannot belong to another launch, and so the one that wins
+///   over the others, even after them;
+/// - the rollout file Codex writes, found by `CodexSessionDiscovering` among those of the same
+///   folder: reliable, as long as no other launch may have written it;
+/// - the terminal output, which is immediate but only as stable as the interface.
+///
+/// Between the last two, the first to produce an identifier wins and nothing but the hook
+/// overwrites it for the rest of the launch. A later launch of the same work session does replace
+/// it: that is a new conversation.
 public actor CodexSessionIdentifierCapture {
+  /// How long the rollout is looked for when the hooks can name the session: the net under them,
+  /// for as long as it always was.
   public static let defaultTimeout: Duration = .seconds(30)
+  /// How long the rollout is looked for when nothing else will name the session — a launch without
+  /// hooks. The process ending stops the watch well before, as a rule: this is only the safety
+  /// net, set for a working day.
+  public static let defaultWatchLimit: Duration = .seconds(12 * 3600)
   public static let defaultPersistenceWindow: Duration = .seconds(30)
   /// How much terminal output may wait to be accumulated before the oldest read is dropped.
   static let maximumQueuedByteCount = 256 * 1024
@@ -80,6 +94,7 @@ public actor CodexSessionIdentifierCapture {
   private enum Source {
     case rollout
     case terminal
+    case hook
   }
 
   private enum Persistence {
@@ -97,10 +112,20 @@ public actor CodexSessionIdentifierCapture {
   private let persistenceWindow: Duration
   private let retryInterval: Duration
 
+  private var launch: CodexLaunch?
+  /// Whether `launch` is still registered as waiting for its session.
+  private var isWaiting = false
+  /// Whether the rollout is still being looked for.
+  private var isDiscovering = false
   private var captured: String?
+  /// What the rollout or the terminal found, while it is being written.
   private var pending: String?
+  /// What the agent's hook last named. Once set, nothing else is written.
+  private var named: String?
   private var watcher: Task<Void, Never>?
   private var persister: Task<Void, Never>?
+  /// The last look of `finish`, awaited by every call that follows the first.
+  private var finishing: Task<Void, Never>?
   private var queued: [String] = []
   private var queuedByteCount = 0
   private var draining = false
@@ -131,17 +156,24 @@ public actor CodexSessionIdentifierCapture {
     self.retryInterval = retryInterval
   }
 
-  public func start(launchedAt: Date = Date()) {
-    guard watcher == nil, captured == nil, pending == nil else { return }
-    watcher = Task { [discovery, workingDirectoryPath, timeout] in
-      let identifier = await discovery.discoverSessionIdentifier(
-        workingDirectoryPath: workingDirectoryPath,
-        since: launchedAt,
-        timeout: timeout
-      )
-      guard let identifier, !Task.isCancelled else { return }
-      await self.store(identifier, from: .rollout)
+  /// Starts looking for the rollout of the session this launch began, for `timeout` at most.
+  public func start(launchedAt: Date = Date()) async {
+    guard launch == nil, captured == nil, pending == nil, named == nil else { return }
+    let launch = CodexLaunch(workingDirectoryPath: workingDirectoryPath, launchedAt: launchedAt)
+    self.launch = launch
+    isWaiting = true
+    isDiscovering = true
+    await discovery.beginWaiting(launch)
+    watcher = Task { [discovery, timeout] in
+      let identifier = await discovery.discoverSessionIdentifier(for: launch, timeout: timeout)
+      await self.discoveryEnded(with: Task.isCancelled ? nil : identifier)
     }
+  }
+
+  private func discoveryEnded(with identifier: String?) async {
+    isDiscovering = false
+    guard let identifier else { return }
+    await store(identifier, from: .rollout)
   }
 
   /// Feeds one decoded read of the terminal to the identifier accumulator, in order.
@@ -150,7 +182,7 @@ public actor CodexSessionIdentifierCapture {
   /// accumulator splices an identifier straddling two reads, so handing it the second read
   /// first would splice the wrong halves and lose the identifier for the whole launch.
   public func observe(output text: String) async {
-    guard captured == nil, pending == nil else { return }
+    guard captured == nil, pending == nil, named == nil else { return }
     queued.append(text)
     queuedByteCount += text.utf8.count
     // A pane can write faster than the accumulator drains. Older reads go first: the
@@ -162,7 +194,7 @@ public actor CodexSessionIdentifierCapture {
 
     draining = true
     defer { draining = false }
-    while !queued.isEmpty, captured == nil, pending == nil {
+    while !queued.isEmpty, captured == nil, pending == nil, named == nil {
       let next = queued.removeFirst()
       queuedByteCount -= next.utf8.count
       guard let identifier = await accumulator.consume(next) else { continue }
@@ -172,15 +204,80 @@ public actor CodexSessionIdentifierCapture {
     queuedByteCount = 0
   }
 
+  /// The agent named its session through its hook (#144): stored, in place of whatever another
+  /// source found, and every other watch ends. A later name — a new conversation begun in the
+  /// same process — replaces it in turn.
+  public func named(_ identifier: String) async {
+    guard UUID(uuidString: identifier) != nil, identifier != named else { return }
+    named = identifier
+    pending = nil
+    unstoredIdentifier = nil
+    persister?.cancel()
+    persister = nil
+    await discovery.claim(identifier)
+    await stopWatching()
+
+    switch await persist(identifier, from: .hook) {
+    case .kept, .rejected:
+      return
+    case .retry:
+      persister = Task { [weak self] in await self?.keepTrying(identifier, from: .hook) }
+    }
+  }
+
   /// Stops looking for an identifier. A write already under way is left to finish: the pane may
   /// be gone, the session it opened is not.
-  public func stop() {
+  public func stop() async {
+    await stopWatching()
+  }
+
+  /// The process ended: the watch stops, after one last look for a rollout written just before —
+  /// a first message sent as the agent quit is a conversation to resume all the same.
+  ///
+  /// The end is reported more than once, and every call returns only once that last look is over.
+  public func finish() async {
+    if let finishing {
+      await finishing.value
+      return
+    }
+    let wasDiscovering = isDiscovering
     watcher?.cancel()
     watcher = nil
+    isDiscovering = false
+    let last = Task<Void, Never> { [weak self] in
+      await self?.lookOnceMore(wasDiscovering: wasDiscovering)
+    }
+    finishing = last
+    await last.value
+  }
+
+  private func lookOnceMore(wasDiscovering: Bool) async {
+    if wasDiscovering, let launch, captured == nil, pending == nil, named == nil,
+      let identifier = await discovery.discoverSessionIdentifier(for: launch, timeout: .zero)
+    {
+      await store(identifier, from: .rollout)
+    }
+    await stopWatching()
+  }
+
+  private func stopWatching() async {
+    watcher?.cancel()
+    watcher = nil
+    isDiscovering = false
+    guard isWaiting, let launch else { return }
+    isWaiting = false
+    await discovery.endWaiting(launch)
   }
 
   public var identifier: String? {
     captured
+  }
+
+  /// The session the agent named and that is not stored yet: what an instance that adopts the
+  /// process from the terminal host still has to write (#141, #144).
+  public var awaitedIdentifier: String? {
+    guard let named, captured != named else { return nil }
+    return named
   }
 
   /// Waits for a pending write to settle and returns what was stored.
@@ -190,26 +287,35 @@ public actor CodexSessionIdentifierCapture {
   }
 
   private func store(_ identifier: String, from source: Source) async {
-    guard captured == nil, pending == nil else { return }
+    guard captured == nil, pending == nil, named == nil else { return }
     pending = identifier
-    // The rollout watcher calls this as it ends; cancelling it from inside its own task would
-    // only cancel the work that follows.
-    if source == .terminal { watcher?.cancel() }
+    // The rollout watcher claimed it already, and calls this as it ends; cancelling it from inside
+    // its own task would only cancel the work that follows.
+    if source == .terminal {
+      await discovery.claim(identifier)
+      watcher?.cancel()
+    }
     watcher = nil
+    await stopWatching()
 
-    switch await persist(identifier) {
+    switch await persist(identifier, from: source) {
     case .kept, .rejected:
       return
     case .retry:
-      persister = Task { [weak self] in await self?.keepTrying(identifier) }
+      persister = Task { [weak self] in await self?.keepTrying(identifier, from: source) }
     }
+  }
+
+  /// Whether `identifier`, found by `source`, is still the one to write.
+  private func isCurrent(_ identifier: String, from source: Source) -> Bool {
+    source == .hook ? named == identifier : named == nil && pending == identifier
   }
 
   /// Retries until the session is ready to carry the identifier, or the window closes.
   ///
   /// The session may not exist yet, or may not have its agent configuration attached, when the
   /// rollout file shows up a fraction of a second after the launch.
-  private func keepTrying(_ identifier: String) async {
+  private func keepTrying(_ identifier: String, from source: Source) async {
     let deadline = ContinuousClock.now.advanced(by: persistenceWindow)
     while ContinuousClock.now < deadline {
       do {
@@ -217,29 +323,42 @@ public actor CodexSessionIdentifierCapture {
       } catch {
         break
       }
-      switch await persist(identifier) {
+      guard isCurrent(identifier, from: source) else { return }
+      switch await persist(identifier, from: source) {
       case .kept, .rejected:
         return
       case .retry:
         continue
       }
     }
-    guard captured == nil else { return }
-    pending = nil
+    guard isCurrent(identifier, from: source), captured != identifier else { return }
+    if source != .hook { pending = nil }
     unstoredIdentifier = identifier
   }
 
-  private func persist(_ identifier: String) async -> Persistence {
-    guard captured == nil else { return .kept }
+  private func persist(_ identifier: String, from source: Source) async -> Persistence {
+    guard isCurrent(identifier, from: source) else { return .rejected }
     let outcome: RecordAgentResumeIdentifierOutcome
     do {
       outcome = try await record(sessionID: sessionID, identifier: identifier)
     } catch {
       return .retry
     }
+    // The hook named the session while this was being written, and its own write may have landed
+    // first: it is written again, so that the agent's word is the last one.
+    guard isCurrent(identifier, from: source) else {
+      if let named, outcome.isPersisted {
+        if (try? await record(sessionID: sessionID, identifier: named))?.isPersisted == true,
+          self.named == named
+        {
+          captured = named
+        }
+      }
+      return .rejected
+    }
     if outcome.isPersisted {
       captured = identifier
-      pending = nil
+      if source != .hook { pending = nil }
       unstoredIdentifier = nil
       return .kept
     }

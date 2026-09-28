@@ -40,6 +40,8 @@ public actor TrackAgentActivity {
     /// Claude Code starts a session again on every `/clear` and every compaction.
     var sourceEvent: AgentActivityEvent?
     var sourceTask: Task<Void, Never>?
+    /// The conversation the agent last named through its hooks (#144), for this process only.
+    var conversationIdentifier: String?
     var tasks: [Task<Void, Never>] = []
     /// Which process the tasks belong to. A log line still on its way from the previous one must
     /// not move the new one.
@@ -57,6 +59,7 @@ public actor TrackAgentActivity {
   /// an adoption included: it is on screen now.
   private var visibleSessionID: SessionID?
   private var continuations: [UUID: AsyncStream<AgentActivityUpdate>.Continuation] = [:]
+  private var namings: [UUID: AsyncStream<AgentConversationNamed>.Continuation] = [:]
   private var timer: Task<Void, Never>?
   private var pendingWrite: Task<Void, Never>?
   private var hasLoaded = false
@@ -88,6 +91,28 @@ public actor TrackAgentActivity {
 
   private func removeContinuation(_ key: UUID) {
     continuations[key] = nil
+  }
+
+  /// Every conversation an agent names through its hooks from now on (#144): what makes a Codex
+  /// session resumable, known by the process itself rather than guessed from the disk.
+  public func conversationsNamed() -> AsyncStream<AgentConversationNamed> {
+    let (stream, continuation) = AsyncStream<AgentConversationNamed>.makeStream()
+    let key = UUID()
+    namings[key] = continuation
+    continuation.onTermination = { [weak self] _ in
+      Task { await self?.removeNaming(key) }
+    }
+    return stream
+  }
+
+  private func removeNaming(_ key: UUID) {
+    namings[key] = nil
+  }
+
+  /// The conversation the session's current process last named, if it has named one: for an
+  /// observer armed after the line was read.
+  public func conversationIdentifier(for id: SessionID) -> String? {
+    sessions[id]?.conversationIdentifier
   }
 
   public func state(for id: SessionID) -> AgentActivityState? {
@@ -144,6 +169,7 @@ public actor TrackAgentActivity {
     tracked.restoredRequests = []
     tracked.restoredUncertainty = false
     tracked.sourceEvent = nil
+    tracked.conversationIdentifier = nil
     tracked.state = reduce(tracked.state, .processStarted(structured: decoder != nil), for: id)
     sessions[id] = tracked
     if decoder != nil { follow(id, from: nil) }
@@ -173,6 +199,7 @@ public actor TrackAgentActivity {
     tracked.restoredActivity = nil
     tracked.restoredRequests = []
     tracked.restoredUncertainty = false
+    tracked.conversationIdentifier = nil
     if isVisible(id) { tracked.state.unreadSince = nil }
     sessions[id] = tracked
     if hasLog {
@@ -318,7 +345,13 @@ public actor TrackAgentActivity {
       tracked.state = reduce(
         tracked.state, .signal(signal), for: id, at: event.date, requestID: requestID)
     }
+    let named = decoder.conversationIdentifier(in: event)
+    if let named { tracked.conversationIdentifier = named }
     sessions[id] = tracked
+    if let named {
+      let naming = AgentConversationNamed(sessionID: id, identifier: named)
+      for continuation in namings.values { continuation.yield(naming) }
+    }
     openSource(after: event, for: id)
     // The position moved: written down even when the state did not.
     changed(id, from: previous, force: true)
