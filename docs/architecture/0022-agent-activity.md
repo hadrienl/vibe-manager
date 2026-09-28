@@ -41,7 +41,9 @@ closed pipe would report an error), writes nothing on its output (a `PermissionR
 answered would decide in the user's place), and always exits 0.
 
 Only what the next features need is kept: the payload of questions and permissions (for #40), of
-`SessionStart` (the transcript path) and of `Notification`. A prompt's text and a tool's output —
+`SessionStart` (the transcript path) and of `Notification`. Codex's `SessionStart` keeps only its
+`session_id`: it is how a Codex session learns the conversation it holds, which Codex names
+nowhere else before the first message (#144, ADR 0005). A prompt's text and a tool's output —
 possibly megabytes — are dropped by the hook itself; for `UserPromptSubmit`, only whether the
 prompt is the `<task-notification>` a background task sends is written back.
 

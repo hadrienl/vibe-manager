@@ -311,6 +311,12 @@ reaches the session only once its transcript exists, through `RecordAgentResumeI
 guard against an agent switch (#15). Quitting again before the first message hands it on to the next
 instance. The field is optional: a document without it reads as waiting for nothing, and a build
 that does not know it ignores it, so the schema stays at 2.
+
+Codex has no identifier to hand on before the first message: it names its session only then,
+through its `SessionStart` hook (ADR 0005, #144). An adopted process that is still running gets an
+observer all the same, which hears that name from the log its hooks keep writing to; a name heard
+but not yet stored is handed on in `awaitedResumeIdentifier` like Claude Code's.
+
 The first size the view reports is followed by a `redraw`: `SIGWINCH` to the group the child leads.
 The kernel raises nothing for a size that did not change, and a full-screen program redraws itself
 for the window it is now in rather than showing a history cut wherever the buffer was trimmed.
