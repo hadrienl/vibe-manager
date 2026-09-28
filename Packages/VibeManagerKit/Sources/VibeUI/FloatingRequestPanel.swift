@@ -141,7 +141,7 @@ struct FloatingRequestPanel: View {
 
   private func avatar(count: Int) -> some View {
     AvatarView(
-      images: model.avatarStudio?.currentImages ?? [:], expression: animator.expression,
+      images: model.avatars?.inUseImages ?? [:], expression: animator.expression,
       size: Self.avatarSize
     )
     .shadow(color: .black.opacity(0.25), radius: 4, y: 2)

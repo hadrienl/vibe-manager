@@ -62,7 +62,7 @@ public enum AvatarPresentation {
     }
   }
 
-  public static func message(for problem: AvatarStudioModel.Problem) -> LocalizedStringResource {
+  public static func message(for problem: AvatarLibraryModel.Problem) -> LocalizedStringResource {
     switch problem {
     case .generation(let error):
       return message(for: error)
@@ -77,6 +77,10 @@ public enum AvatarPresentation {
       return LocalizedStringResource(
         "Your avatar could not be read: the default one is shown. Make or import it again.",
         bundle: .module, comment: "The kept avatar cannot be read.")
+    case .limitReached:
+      return LocalizedStringResource(
+        "\(AvatarLibraryRules.maximumCount) avatars at most: delete one to make another.",
+        bundle: .module, comment: "The library of avatars is full. The number is the limit.")
     case .saving:
       return LocalizedStringResource(
         "The avatar could not be saved: the previous one is kept.", bundle: .module,

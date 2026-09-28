@@ -356,8 +356,7 @@ struct FileAvatarLibraryTests {
     try writeLegacy(contract.avatar("Mine", marker: 7), in: folder)
 
     let library = library(folder, legacy: true)
-    let store = LibraryAvatarStore(library: library)
-    #expect(try await store.load() == contract.avatar("Mine", marker: 7))
+    #expect(try await library.load(library.inUse()) == contract.avatar("Mine", marker: 7))
     let entries = try await library.entries()
     #expect(entries.count == 2)
     #expect(entries.last?.state == .kept)
@@ -390,8 +389,9 @@ struct FileAvatarLibraryTests {
     #expect(entry.id != .default)
     #expect(entry.problem == .unreadable)
     // As before: the default avatar is shown, and why.
+    #expect(try await library.inUse() == entry.id)
     await #expect(throws: AvatarStoreError.unreadable) {
-      _ = try await LibraryAvatarStore(library: library).load()
+      _ = try await library.load(library.inUse())
     }
     #expect(!FileManager.default.fileExists(atPath: folder.legacy.path))
     #expect(
@@ -408,9 +408,7 @@ struct FileAvatarLibraryTests {
     try writeLegacy(contract.avatar("Old", missing: [.thinking]), in: folder)
     let library = library(folder, legacy: true)
     #expect(try await library.entries().last?.problem == .incomplete([.thinking]))
-    await #expect(throws: AvatarStoreError.incomplete([.thinking])) {
-      _ = try await LibraryAvatarStore(library: library).load()
-    }
+    #expect(try await library.load(library.inUse()).missingExpressions == [.thinking])
   }
 
   @Test("No avatar of an earlier version: an empty library, the default avatar in use")
@@ -607,13 +605,16 @@ struct FileAvatarLibraryTests {
   @Test("An avatar in use that lost a file since says which, as the single avatar did")
   func inUseLostFile() async throws {
     let folder = TemporaryFolder()
-    try await LibraryAvatarStore(library: library(folder)).save(contract.avatar("Fox"))
-    let fox = try await library(folder).inUse()
+    let writing = library(folder)
+    let fox = try await writing.keep(writing.saveDraft(contract.avatar("Fox"), basedOn: nil))
+    try await writing.setInUse(fox)
     try FileManager.default.removeItem(
       at: folder.library.appendingPathComponent(fox.description)
         .appendingPathComponent("thinking.png"))
-    let store = LibraryAvatarStore(library: library(folder))
-    await #expect(throws: AvatarStoreError.incomplete([.thinking])) { _ = try await store.load() }
+    let reading = library(folder)
+    #expect(try await reading.inUse() == fox)
+    #expect(try await reading.load(fox).missingExpressions == [.thinking])
+    #expect(try await reading.entries().last?.problem == .incomplete([.thinking]))
   }
 }
 

@@ -1273,6 +1273,17 @@
         }
       }
     },
+    "%lld avatars at most: delete one to make another." : {
+      "comment" : "The library of avatars is full. The number is the limit.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld avatars au plus : supprimez-en un pour en créer un autre."
+          }
+        }
+      }
+    },
     "%lld behind" : {
       "comment" : "A number of commits the upstream has and the branch has not.",
       "localizations" : {
@@ -6192,16 +6203,6 @@
         }
       }
     },
-    "Go back to the default avatar?" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revenir à l’avatar par défaut ?"
-          }
-        }
-      }
-    },
     "Granted" : {
       "comment" : "The state of Full Disk Access.",
       "localizations" : {
@@ -6665,6 +6666,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Son processus de contenu web s’est arrêté. Les autres onglets et le terminal n’ont pas été touchés."
+          }
+        }
+      }
+    },
+    "Keep" : {
+      "comment" : "Keeps an avatar just made in the library.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder"
           }
         }
       }
@@ -11296,13 +11308,13 @@
         }
       }
     },
-    "The avatar is ready: check it, then use it." : {
+    "The avatar is ready: check it, then keep it." : {
       "comment" : "Said when a generated avatar can be previewed.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’avatar est prêt : vérifiez-le, puis utilisez-le."
+            "value" : "L’avatar est prêt : vérifiez-le, puis gardez-le."
           }
         }
       }
@@ -12923,12 +12935,12 @@
         }
       }
     },
-    "Use This Avatar" : {
+    "Use it in the floating panel" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Utiliser cet avatar"
+            "value" : "L’utiliser dans le panneau flottant"
           }
         }
       }
@@ -12939,16 +12951,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser le ticket de la branche"
-          }
-        }
-      }
-    },
-    "Use the Default Avatar" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser l’avatar par défaut"
           }
         }
       }
@@ -13429,16 +13431,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre avatar n’a pas pu être lu : l’avatar par défaut est montré. Recréez-le ou importez-le de nouveau."
-          }
-        }
-      }
-    },
-    "Your avatar is deleted. Export it first to keep it." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre avatar sera supprimé. Exportez-le d’abord pour le garder."
           }
         }
       }

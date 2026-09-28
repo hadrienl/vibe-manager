@@ -118,7 +118,7 @@ reads and is complete.
 
 - The option is off by default; off, #40 is unchanged.
 - A new module, `VibeAvatar` (ImageIO, Core Graphics, Vision), keeps images and archives out of the
-  rest; `VibeUI` sees it only through `AvatarImageProcessing` and `AvatarStore`.
+  rest; `VibeUI` sees it only through `AvatarImageProcessing` and `AvatarLibrary` (#154).
 - The panel is visible on every Space, including while the screen is shared: that is what the option
   is for, and it is off by default.
 - Codex reads the user's global `AGENTS.md` even with `--ignore-user-config`: its instructions
