@@ -31,7 +31,9 @@ public struct PromptTemplatesView: View {
       }
       .padding(16)
     }
-    .frame(minWidth: 1000, idealWidth: 1180, minHeight: 600, idealHeight: 700)
+    // No least width here: the list and the detail give it (1,008 points). A `minWidth` below
+    // theirs would be the one the window reads, and the page would overflow it on both sides.
+    .frame(idealWidth: 1180, minHeight: 600, idealHeight: 700)
     .task { await model.load() }
     .confirmationDialog(
       Text(

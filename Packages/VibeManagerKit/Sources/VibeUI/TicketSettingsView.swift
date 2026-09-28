@@ -32,8 +32,9 @@ struct TicketSettingsView: View {
       tester
     }
     .padding(16)
-    .frame(
-      minWidth: SettingsView.formWidth, idealWidth: 860, minHeight: 620, idealHeight: 680)
+    // No least width: `settingsPage` gives the settings' width, and what the page holds gives more
+    // when it needs more. A `minWidth` would hide the latter from the window (#152).
+    .frame(idealWidth: 860, minHeight: 620, idealHeight: 680)
     .task {
       await model.load()
       formatText = model.lineFormat.template
@@ -213,93 +214,109 @@ struct TicketSettingsView: View {
     if let draft {
       let binding = Binding(get: { self.draft ?? draft }, set: { self.draft = $0 })
       let issues = binding.wrappedValue.validate()
-      Form {
-        TextField(text: binding.name, prompt: Text(verbatim: "Redmine")) {
-          Text("Name", bundle: .module)
-        }
-        TextField(
-          text: binding.pattern,
-          prompt: Text(verbatim: #"https://redmine\.acme\.fr/issues/(?<number>[0-9]+)"#)
-        ) {
-          Text("Address pattern", bundle: .module)
-          Text(
-            "A regular expression, with named captures such as (?<number>[0-9]+).",
-            bundle: .module)
-        }
-        .font(.body.monospaced())
-        TextField(text: binding.shortID, prompt: Text(verbatim: "#{number}")) {
-          Text("Identifier", bundle: .module)
-          Text("Shown before the title: the captures in braces, and {host}.", bundle: .module)
-        }
-        .font(.body.monospaced())
-        Section {
-          ForEach(binding.titleCleanup.indices, id: \.self) { index in
-            HStack {
-              TextField(text: binding.titleCleanup[index], prompt: Text(verbatim: " - Redmine$")) {
-                Text("Rule \(index + 1)", bundle: .module, comment: "A rule's position.")
-              }
-              .labelsHidden()
-              .font(.body.monospaced())
-              Button {
-                self.draft?.titleCleanup.remove(at: index)
-              } label: {
-                Image(systemName: "minus.circle")
-              }
-              .buttonStyle(.borderless)
-              .help(Text("Remove the rule", bundle: .module))
+      // One column: the form above its buttons. Two views side by side here were two more
+      // columns of the tab, each as wide as the editor, which pushed the tab past its window.
+      VStack(spacing: 0) {
+        Form {
+          TextField(text: binding.name, prompt: Text(verbatim: "Redmine")) {
+            Text("Name", bundle: .module)
+          }
+          // The value in a fixed-width font, not its label and its explanation.
+          LabeledContent {
+            TextField(
+              text: binding.pattern,
+              prompt: Text(verbatim: #"https://redmine\.acme\.fr/issues/(?<number>[0-9]+)"#)
+            ) {
+              Text("Address pattern", bundle: .module)
             }
-          }
-          Button {
-            self.draft?.titleCleanup.append("")
+            .labelsHidden()
+            .font(.body.monospaced())
           } label: {
-            Text("Add a Rule", bundle: .module)
+            Text("Address pattern", bundle: .module)
+            Text(
+              "A regular expression, with named captures such as (?<number>[0-9]+).",
+              bundle: .module)
           }
-        } header: {
-          Text("Title cleanup", bundle: .module)
-        } footer: {
-          Text(
-            "Regular expressions whose matches are removed from the page's title, in this order.",
-            bundle: .module)
-        }
-        if !issues.isEmpty {
+          LabeledContent {
+            TextField(text: binding.shortID, prompt: Text(verbatim: "#{number}")) {
+              Text("Identifier", bundle: .module)
+            }
+            .labelsHidden()
+            .font(.body.monospaced())
+          } label: {
+            Text("Identifier", bundle: .module)
+            Text("Shown before the title: the captures in braces, and {host}.", bundle: .module)
+          }
           Section {
-            ForEach(issues, id: \.self) { issue in
-              Text(Self.sentence(issue))
-                .foregroundStyle(.orange)
+            ForEach(binding.titleCleanup.indices, id: \.self) { index in
+              HStack {
+                TextField(text: binding.titleCleanup[index], prompt: Text(verbatim: " - Redmine$"))
+                {
+                  Text("Rule \(index + 1)", bundle: .module, comment: "A rule's position.")
+                }
+                .labelsHidden()
+                .font(.body.monospaced())
+                Button {
+                  self.draft?.titleCleanup.remove(at: index)
+                } label: {
+                  Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(Text("Remove the rule", bundle: .module))
+              }
+            }
+            Button {
+              self.draft?.titleCleanup.append("")
+            } label: {
+              Text("Add a Rule", bundle: .module)
+            }
+          } header: {
+            Text("Title cleanup", bundle: .module)
+          } footer: {
+            Text(
+              "Regular expressions whose matches are removed from the page's title, in this order.",
+              bundle: .module)
+          }
+          if !issues.isEmpty {
+            Section {
+              ForEach(issues, id: \.self) { issue in
+                Text(Self.sentence(issue))
+                  .foregroundStyle(.orange)
+              }
             }
           }
         }
-      }
-      .formStyle(.grouped)
-      HStack {
-        if let origin = draft.preset,
-          TicketResolverPresets.shipped(id: origin.id).map({
-            !binding.wrappedValue.sameRules(as: $0)
-          })
-            == true
-        {
-          Button {
-            self.draft = TicketResolverPresets.restoring(binding.wrappedValue)
-          } label: {
-            Text("Restore the Shipped Version", bundle: .module)
+        .formStyle(.grouped)
+        HStack {
+          if let origin = draft.preset,
+            TicketResolverPresets.shipped(id: origin.id).map({
+              !binding.wrappedValue.sameRules(as: $0)
+            })
+              == true
+          {
+            Button {
+              self.draft = TicketResolverPresets.restoring(binding.wrappedValue)
+            } label: {
+              Text("Restore the Shipped Version", bundle: .module)
+            }
           }
+          Spacer()
+          Button {
+            self.draft = model.resolvers.first { $0.id == draft.id }
+          } label: {
+            Text("Revert", bundle: .module)
+          }
+          .disabled(!isDirty)
+          Button {
+            Task { await saveDraft() }
+          } label: {
+            Text("Save", bundle: .module)
+          }
+          .keyboardShortcut("s", modifiers: .command)
+          .disabled(!isDirty || !issues.isEmpty)
         }
-        Spacer()
-        Button {
-          self.draft = model.resolvers.first { $0.id == draft.id }
-        } label: {
-          Text("Revert", bundle: .module)
-        }
-        .disabled(!isDirty)
-        Button {
-          Task { await saveDraft() }
-        } label: {
-          Text("Save", bundle: .module)
-        }
-        .keyboardShortcut("s", modifiers: .command)
-        .disabled(!isDirty || !issues.isEmpty)
+        .padding(.horizontal, 20)
       }
-      .padding(.horizontal, 20)
     } else {
       ContentUnavailableView {
         Label {
