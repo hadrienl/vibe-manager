@@ -67,11 +67,13 @@ extension AppModel {
     guard sessionInCreation == nil else {
       Task {
         guard let creation = await sheet.submit() else { return }
+        // Brought on screen only if the user is still waiting on its draft, not elsewhere.
+        let isWaited = isPresentingNewSession && newSessionModel === sheet
         if newSessionModel === sheet {
           isPresentingNewSession = false
           newSessionModel = nil
         }
-        await publish(creation, launching: launching, tracked: false)
+        await publish(creation, launching: launching, tracked: false, follows: isWaited)
       }
       return
     }
@@ -81,8 +83,9 @@ extension AppModel {
     Task {
       guard let creation = await sheet.submit() else {
         sessionInCreation = nil
-        // Back to the draft, unless another one was begun meanwhile: that one is the user's now.
-        if newSessionModel == nil {
+        // Back to the draft, unless another one was begun meanwhile and written in: that one is
+        // the user's now. One still empty gives way — the refused one holds what they typed.
+        if newSessionModel?.isPristine ?? true {
           newSessionModel = sheet
           showNewSessionDraft()
         }

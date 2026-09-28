@@ -67,6 +67,8 @@ public struct NewSessionDraftView: View {
       Divider()
       ScrollView {
         optionsCard
+          // On its way while another session is made: nothing more is changed in it.
+          .disabled(model.isSubmitting)
           .frame(maxWidth: 760)
           .padding(.horizontal, 24)
           .padding(.vertical, 24)
@@ -92,6 +94,9 @@ public struct NewSessionDraftView: View {
     .task {
       showsMoreOptions =
         !model.draft.ticketText.isEmpty || !model.issues(for: .appearance).isEmpty
+      // At once, so that nothing typed meanwhile goes elsewhere; again once the agents and the
+      // folders are there, for a draft that came back refused.
+      placeCaret()
       await model.load()
       placeCaret()
     }
@@ -102,15 +107,10 @@ public struct NewSessionDraftView: View {
       model.attach(urls.filter(\.isFileURL))
       return true
     }
-    .background {
-      // Escape sets the draft aside. A button rather than a key handler: the prompt is an AppKit
-      // text view, which keeps Escape for itself otherwise.
-      Button(action: dismissed) {
-        Text("Set Aside", bundle: .module, comment: "Escape in a new session's draft.")
-      }
-      .keyboardShortcut(.cancelAction)
-      .hidden()
-    }
+    // Escape sets the draft aside — only from inside it: a key equivalent would take Escape from
+    // the whole window, Open Quickly and the sidebar included. The prompt, an AppKit text view,
+    // hands it over itself.
+    .onExitCommand(perform: dismissed)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New Session", bundle: .module, comment: "An unnamed new session."))
     .accessibilityIdentifier("new-session-draft")
@@ -145,6 +145,7 @@ public struct NewSessionDraftView: View {
           Text("Discard", bundle: .module, comment: "Discards the new session's draft.")
         }
         .controlSize(.small)
+        .disabled(model.isSubmitting)
         .help(Text("Discard this draft. No session is created.", bundle: .module))
         .accessibilityIdentifier("new-session-discard")
       }
@@ -563,7 +564,8 @@ public struct NewSessionDraftView: View {
             accessibilityLabel: String(localized: "Initial prompt", bundle: .module),
             focusRequested: editorRequest == .draft(.initialPrompt),
             isBordered: false,
-            onSubmit: submit
+            onSubmit: submit,
+            onCancel: dismissed
           )
           .focused($focus, equals: .draft(.initialPrompt))
           .accessibilityIdentifier("new-session-prompt")
@@ -725,9 +727,17 @@ public struct NewSessionDraftView: View {
 
   private func placeCaret() {
     // Back from a creation that was refused: the caret goes to what stopped it.
-    moveFocus(
-      to: firstIssueTarget ?? model.draft.templateFill.flatMap(firstEmptyField)
-        ?? .draft(.initialPrompt))
+    let target =
+      firstIssueTarget ?? model.draft.templateFill.flatMap(firstEmptyField)
+      ?? .draft(.initialPrompt)
+    // An AppKit prompt takes the caret when its request turns on: asked again for the same one,
+    // the request is turned off first, and on at the next turn of the run loop.
+    guard editorRequest == target else {
+      moveFocus(to: target)
+      return
+    }
+    editorRequest = nil
+    DispatchQueue.main.async { moveFocus(to: target) }
   }
 
   private func moveFocus(to target: FocusTarget?) {

@@ -321,6 +321,54 @@ struct NewSessionDraftTests {
     #expect(draft.draft.initialPrompt == "/tmp/notes.md")
   }
 
+  @Test("Open Quickly leaves the draft for the session chosen")
+  func openQuicklyLeavesTheDraft() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.beginNewSession()
+    try #require(model.newSessionModel).draft.initialPrompt = "Kept"
+
+    model.goToSession(previous.id)
+
+    #expect(!model.isPresentingNewSession)
+    #expect(model.selectedSessionID == previous.id)
+    #expect(model.newSessionModel != nil)
+  }
+
+  @Test("Nothing of the session underneath is within reach of the menus")
+  func hiddenSessionIsOutOfReach() async throws {
+    let first = existing()
+    let second = existing()
+    let model = await makeModel(sessions: [first, second])
+    model.select(second.id)
+    model.beginNewSession()
+
+    #expect(model.selectedBrowser == nil)
+    #expect(model.selectedGroup == nil)
+    #expect(!model.canMoveSelection(by: -1))
+    #expect(!model.terminalClaimsKeyboardOnActivation)
+  }
+
+  @Test("A refused draft comes back over an empty one begun meanwhile, unnamed again")
+  func refusedDraftWinsOverAnEmptyOne() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let refused = try #require(model.newSessionModel)
+    refused.draft = SessionDraft(
+      initialPrompt: "Somewhere gone", providerID: "stub",
+      workingDirectoryPath: "/nonexistent/\(UUID())")
+
+    model.submitNewSession(launching: true)
+    model.beginNewSession()
+    #expect(model.newSessionModel !== refused)
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
+
+    #expect(model.newSessionModel === refused)
+    #expect(model.isPresentingNewSession)
+    #expect(refused.draft.initialPrompt == "Somewhere gone")
+    #expect(refused.draft.name.isEmpty)
+  }
+
   @Test("Sent without a name, the session is named after its prompt")
   func unnamedDraftIsNamedAfterItsPrompt() async throws {
     let model = await makeModel(sessions: [])

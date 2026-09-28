@@ -10523,17 +10523,6 @@
         }
       }
     },
-    "Set Aside" : {
-      "comment" : "Escape in a new session's draft.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mettre de côté"
-          }
-        }
-      }
-    },
     "Set Ticket" : {
       "localizations" : {
         "fr" : {

@@ -123,7 +123,8 @@ extension AppModel {
 
   /// Move Up and Move Down in the Session menu, on the selected session.
   public func canMoveSelection(by offset: Int) -> Bool {
-    selectedSessionID.map { canMove($0, by: offset) } ?? false
+    guard isSessionOnScreen else { return false }
+    return selectedSessionID.map { canMove($0, by: offset) } ?? false
   }
 
   public func moveSelection(by offset: Int) async {

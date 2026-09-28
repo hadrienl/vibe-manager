@@ -68,7 +68,7 @@ extension AppModel {
   /// made and used; it is the keyboard leaving the sidebar that brings the selection back to
   /// the session on screen, so that ⇧⌘W never closes sessions nobody is looking at.
   public var terminalClaimsKeyboardOnActivation: Bool {
-    !hasMultipleSelection
+    !hasMultipleSelection && canClaimKeyboard
   }
 
   /// View › Show Conversation / Show Terminal (⌥⌘T), for the selected session.

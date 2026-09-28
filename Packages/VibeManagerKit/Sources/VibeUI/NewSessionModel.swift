@@ -31,6 +31,8 @@ public final class NewSessionModel {
   /// The name the template made last. The name follows the template as long as it is empty or
   /// still that name: once the user types their own, it is theirs.
   private var generatedName: String?
+  /// The name `settleName()` gave the draft for sending, taken back if it is refused.
+  private var settledName: String?
   /// The folder a template put in the field last, and the one that was there before any did.
   /// Like the name, the folder follows the template until the user picks their own.
   private var presetFolder: String?
@@ -173,6 +175,16 @@ public final class NewSessionModel {
   public func settleName() {
     guard draft.trimmedName.isEmpty else { return }
     draft.name = draft.suggestedName
+    settledName = draft.name
+  }
+
+  /// A draft refused comes back unnamed if it was only named for sending: its name follows its
+  /// prompt, or its template, again.
+  private func unsettleName() {
+    if let settledName, draft.name == settledName, settledName != generatedName {
+      draft.name = ""
+    }
+    settledName = nil
   }
 
   /// Files joined to the prompt: their paths, as the agent reads them in a terminal, at the end
@@ -526,6 +538,7 @@ public final class NewSessionModel {
     guard !isSubmitting else { return true }
     settleName()
     guard !draft.validate().isEmpty else { return false }
+    unsettleName()
     revalidation?.cancel()
     revalidation = nil
     hasSubmitted = true
@@ -553,6 +566,7 @@ public final class NewSessionModel {
       return creation
     } catch let rejection as SessionCreationRejected {
       issues = rejection.issues
+      unsettleName()
       return nil
     } catch {
       issues = [
@@ -564,6 +578,7 @@ public final class NewSessionModel {
             localized: "Try again, and report the failure if it persists.", bundle: .module)
         )
       ]
+      unsettleName()
       return nil
     }
   }

@@ -342,6 +342,9 @@ public struct RootView: View {
           Divider()
         }
         detail
+          // Under the draft, neither Tab nor VoiceOver reaches the session's web view or drawer.
+          .disabled(model.isPresentingNewSession)
+          .accessibilityHidden(model.isPresentingNewSession)
           .overlay {
             if let creation = model.shownCreation {
               SessionCreationPlaceholder(creation: creation)
@@ -888,9 +891,9 @@ public struct RootView: View {
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
     let presentation = model.presentation(of: session)
-    // Under the placeholder of a session being made, nothing keeps the keyboard: typed into, the
-    // session left would take what was meant for the new one.
-    let isCovered = model.shownCreation != nil
+    // Under the placeholder of a session being made, or a new session's draft (#177), nothing
+    // keeps the keyboard: typed into, the session left would take what was meant for the new one.
+    let isCovered = model.shownCreation != nil || model.isPresentingNewSession
     ZStack {
       ForEach(model.sessions) { listed in
         if let pane = model.pane(for: listed.id) {

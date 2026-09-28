@@ -1004,6 +1004,8 @@ public final class AppModel {
       showArchived(id)
       return
     }
+    // Chosen in Open Quickly: the user goes there, away from a new session's draft (#177).
+    leaveNewSessionDraft()
     follow(id)
     // One request or the other, never both: a stopped agent's row takes the keyboard.
     if launcher?.isRunning(id) != true || !focusSession() { focusSidebar() }
@@ -2452,9 +2454,12 @@ public final class AppModel {
   /// for its icon at once: sessions already run there, so reading it asks the system nothing new.
   public func beginNewSession(template: PromptTemplateID? = nil, folder: String? = nil) {
     guard let agents, canCreateSession else { return }
-    if let draft = newSessionModel, !draft.isSubmitting {
-      if let template { draft.selectTemplate(template) }
-      if let folder { Task { await draft.folderChosen(folder) } }
+    // A draft on its way is brought back as it is: replaced, it would be lost if refused.
+    if let draft = newSessionModel {
+      if !draft.isSubmitting {
+        if let template { draft.selectTemplate(template) }
+        if let folder { Task { await draft.folderChosen(folder) } }
+      }
       showNewSessionDraft()
       return
     }
@@ -2512,7 +2517,10 @@ public final class AppModel {
   /// stored but not started, it would read as a closed session with nothing running in it.
   ///
   /// - Parameter tracked: whether this is the session `sessionInCreation` stands for.
-  func publish(_ creation: SessionCreation, launching: Bool, tracked: Bool) async {
+  /// - Parameter follows: for a session not tracked, whether it is brought on screen once made.
+  func publish(
+    _ creation: SessionCreation, launching: Bool, tracked: Bool, follows: Bool = true
+  ) async {
     let id = creation.session.id
     insert(creation.session)
     // Stored, so its folder is one sessions were created in: offered again from now on.
@@ -2522,7 +2530,9 @@ public final class AppModel {
       sessionInCreation?.phase = .starting
     }
     // Unless the user went elsewhere meanwhile.
-    let isFollowed = { [weak self] in !tracked || self?.sessionInCreation?.isFollowed != false }
+    let isFollowed = { [weak self] in
+      tracked ? self?.sessionInCreation?.isFollowed != false : follows
+    }
     // Under a draft begun meanwhile, if there is one: that one is the user's now.
     if isFollowed() {
       select(id, leavingDraft: false)
@@ -2868,7 +2878,8 @@ extension AppModel {
   /// Read Last Output, ⌃⌥⌘O: VoiceOver says the last lines the selected session's terminal
   /// showed. On demand only — never as output arrives.
   public func readLastOutput() async {
-    guard let id = selectedSessionID, let session = pane(for: id)?.session else {
+    guard isSessionOnScreen, let id = selectedSessionID, let session = pane(for: id)?.session
+    else {
       Announcer.announce(LocalizedStringResource("No terminal is selected.", bundle: .module))
       return
     }

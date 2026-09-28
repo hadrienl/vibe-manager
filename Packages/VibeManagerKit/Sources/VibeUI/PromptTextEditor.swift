@@ -25,6 +25,7 @@ public struct PromptTextEditor: View {
   private let isEditable: Bool
   private let isBordered: Bool
   private let onSubmit: (() -> Void)?
+  private let onCancel: (() -> Void)?
   @State private var height: CGFloat?
 
   public init(
@@ -37,7 +38,8 @@ public struct PromptTextEditor: View {
     focusRequested: Bool = false,
     isEditable: Bool = true,
     isBordered: Bool = true,
-    onSubmit: (() -> Void)? = nil
+    onSubmit: (() -> Void)? = nil,
+    onCancel: (() -> Void)? = nil
   ) {
     _text = text
     self.minimumLines = minimumLines
@@ -49,6 +51,7 @@ public struct PromptTextEditor: View {
     self.isEditable = isEditable
     self.isBordered = isBordered
     self.onSubmit = onSubmit
+    self.onCancel = onCancel
   }
 
   public var body: some View {
@@ -61,7 +64,8 @@ public struct PromptTextEditor: View {
       highlightsPlaceholders: highlightsPlaceholders,
       focusRequested: focusRequested,
       isEditable: isEditable,
-      onSubmit: onSubmit
+      onSubmit: onSubmit,
+      onCancel: onCancel
     )
     .frame(height: height ?? PromptTextStyle.height(forLines: minimumLines))
     .overlay(alignment: .topLeading) {
@@ -136,6 +140,7 @@ private struct GrowingTextView: NSViewRepresentable {
   let focusRequested: Bool
   let isEditable: Bool
   let onSubmit: (() -> Void)?
+  let onCancel: (() -> Void)?
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
@@ -222,6 +227,14 @@ private struct GrowingTextView: NSViewRepresentable {
     /// Return submits when the editor was given something to submit to. ⇧↩ and ⌥↩ still go to the
     /// line, and so does Return while an input method is composing: it confirms the characters.
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+      // Escape, which a text view otherwise keeps for completion, goes to `onCancel` when given.
+      if selector == #selector(NSResponder.cancelOperation(_:))
+        || selector == #selector(NSTextView.complete(_:)),
+        let onCancel = parent?.onCancel, !textView.hasMarkedText()
+      {
+        onCancel()
+        return true
+      }
       guard selector == #selector(NSResponder.insertNewline(_:)), let onSubmit = parent?.onSubmit,
         !textView.hasMarkedText()
       else { return false }
