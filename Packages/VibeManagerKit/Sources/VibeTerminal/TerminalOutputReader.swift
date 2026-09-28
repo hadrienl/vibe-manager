@@ -193,8 +193,10 @@ final class TerminalOutputReader: @unchecked Sendable {
 
   private func flush(endOfFile: Bool) {
     lock.lock()
+    // Handed over whole, `pending` would give each chunk the capacity of the largest burst ever read:
+    // a spinner redraw of a few dozen bytes would then hold tens of kilobytes in the history.
     let bytes = pending
-    pending.removeAll(keepingCapacity: true)
+    pending = []
     isFlushScheduled = false
     let hasFinished = isFinished
     // Bytes that are never yielded are never acknowledged either, so they must not

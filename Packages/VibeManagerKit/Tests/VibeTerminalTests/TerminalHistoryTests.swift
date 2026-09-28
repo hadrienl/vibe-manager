@@ -73,3 +73,18 @@ func historyReportsDroppedBytes() {
   #expect(history.append(bytes("abcdefgh")) == 8)
   #expect(history.snapshot.droppedByteCount == 8)
 }
+
+@Test("History stores each block at its own size, whatever buffer it was read into")
+func historyCompactsOversizedBlocks() {
+  var history = TerminalHistory(limits: .default)
+
+  for _ in 0..<100 {
+    var chunk = [UInt8]()
+    chunk.reserveCapacity(64 * 1_024)
+    chunk.append(contentsOf: bytes("spinner\r"))
+    history.append(chunk)
+  }
+
+  #expect(history.snapshot.bytes.count == 800)
+  #expect(history.storageByteCount < 100 * 64)
+}

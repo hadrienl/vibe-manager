@@ -28,6 +28,12 @@ struct TerminalHistory {
     return TerminalHistorySnapshot(bytes: bytes, droppedByteCount: droppedByteCount)
   }
 
+  /// Memory held by the blocks still in the history, which the budget only bounds while each block
+  /// is stored at its own size.
+  var storageByteCount: Int {
+    blocks[head...].reduce(0) { $0 + $1.bytes.capacity }
+  }
+
   /// Output that never reached this buffer at all — trimmed from another one before it was copied
   /// here — still counts as lost, and the snapshot has to say so.
   mutating func noteDropped(_ byteCount: Int) {
@@ -41,7 +47,10 @@ struct TerminalHistory {
     let newlines = bytes.reduce(into: 0) { total, byte in
       if byte == UInt8(ascii: "\n") { total += 1 }
     }
-    blocks.append(Block(bytes: bytes, newlineCount: newlines))
+    // The budget counts bytes, not the storage behind them: a block kept with a buffer sized for a
+    // much larger read would let the history weigh many times its limit.
+    let stored = bytes.capacity > 2 * bytes.count ? bytes.withUnsafeBufferPointer(Array.init) : bytes
+    blocks.append(Block(bytes: stored, newlineCount: newlines))
     byteCount += bytes.count
     newlineCount += newlines
 
