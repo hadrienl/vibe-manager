@@ -254,6 +254,7 @@ struct SessionSidebar: View {
 
   private func row(for session: WorkSession, position: Int?, width: CGFloat) -> some View {
     let isSwiped = swipe?.sessionID == session.id
+    let rowOffset = isSwiped && !reduceMotion ? swipe?.offset ?? 0 : 0
     let commands = SessionCommands(model: model, session: session)
     return SessionRow(
       session: session,
@@ -264,11 +265,12 @@ struct SessionSidebar: View {
       shortcutPosition: position,
       commands: commands
     )
-    // Moves with the row: a click on the buttons a swipe uncovered is not a click on the row.
-    .background(SwipeRowMarker(sessionID: session.id))
+    // Moves with the row: a click on the buttons a swipe uncovered is not a click on the row. It
+    // slides the row's selection too, which the list draws out of SwiftUI's reach.
+    .background(SwipeRowMarker(sessionID: session.id, offset: rowOffset))
     // Only the swiped row moves, out of the way of its buttons. With Reduce Motion it stays,
     // and the buttons fade in over it.
-    .offset(x: isSwiped && !reduceMotion ? swipe?.offset ?? 0 : 0)
+    .offset(x: rowOffset)
     .overlay(alignment: .leading) {
       if isSwiped, let swipe, swipe.offset > 0 {
         SwipeButtons(

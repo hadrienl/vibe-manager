@@ -212,8 +212,14 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
 
 /// Behind a row of the list, says which session it draws, so that `HorizontalSwipeMonitor` can
 /// find the row under the fingers where it is really drawn.
+///
+/// It also slides the row's selection along with the row. The list draws that rounded background
+/// itself, in the table row behind the cell, where SwiftUI's offset does not reach: without it the
+/// content of a selected row left its background behind, alone under the buttons.
 struct SwipeRowMarker: NSViewRepresentable {
   let sessionID: SessionID
+  /// How far the row is slid, positive to the right.
+  var offset: CGFloat = 0
 
   func makeNSView(context: Context) -> MarkerView {
     let view = MarkerView()
@@ -223,11 +229,125 @@ struct SwipeRowMarker: NSViewRepresentable {
 
   func updateNSView(_ view: MarkerView, context: Context) {
     view.sessionID = sessionID
+    // The row settles with a SwiftUI animation; the selection follows with the same one. The
+    // fingers' own moves are not animated.
+    if context.transaction.animation != nil, #available(macOS 15, *) {
+      view.slideSelection(by: offset) { context.animate(changes: $0, completion: $1) }
+    } else {
+      view.slideSelection(by: offset)
+    }
   }
 
   final class MarkerView: NSView {
     var sessionID: SessionID?
+    /// Stands in for the selection while the row slides. The list's own is laid out, and its
+    /// layer reset, by the table whenever it likes: a moved frame or a transform does not stay.
+    private var card: NSVisualEffectView?
+    /// The list's selection, hidden under the card.
+    private weak var hiddenSelection: NSView?
+    /// Tells a card put away late from the one a new swipe brought out since.
+    private var generation = 0
+    private var offset: CGFloat = 0
+
+    typealias Animate = (_ changes: () -> Void, _ completion: @escaping () -> Void) -> Void
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+      if newSuperview == nil {
+        offset = 0
+        putCardAway(animate: nil)
+      }
+      super.viewWillMove(toSuperview: newSuperview)
+    }
+
+    /// On a system that draws the selection otherwise, nothing moves.
+    /// - Parameter animate: runs the changes, animated, then the completion. Without it, the
+    ///   card is where it goes at once.
+    func slideSelection(by offset: CGFloat, animate: Animate? = nil) {
+      // Any other update of the row leaves a card on its way back alone.
+      guard offset != 0 || self.offset != 0 else { return }
+      self.offset = offset
+      generation += 1
+      let selection = offset == 0 ? nil : selectionView()
+      guard let selection, let row = selection.superview else {
+        putCardAway(animate: animate)
+        return
+      }
+      if hiddenSelection !== selection {
+        hiddenSelection?.alphaValue = 1
+        hiddenSelection = selection
+      }
+      let card = card(in: row, standingFor: selection)
+      selection.alphaValue = 0
+      let frame = selection.frame.offsetBy(dx: offset, dy: 0)
+      if let animate {
+        animate({ card.animator().frame = frame }, {})
+      } else {
+        card.frame = frame
+      }
+    }
+
+    /// Back under the row, then gone, the list's selection shown again.
+    private func putCardAway(animate: Animate?) {
+      guard let card else {
+        hiddenSelection?.alphaValue = 1
+        hiddenSelection = nil
+        return
+      }
+      let generation = generation
+      let remove = { [weak self] in
+        guard let self, self.generation == generation else { return }
+        card.removeFromSuperview()
+        self.card = nil
+        self.hiddenSelection?.alphaValue = 1
+        self.hiddenSelection = nil
+      }
+      guard let animate else { return remove() }
+      let home = hiddenSelection?.frame ?? card.frame
+      animate({ card.animator().frame = home }, remove)
+    }
+
+    private func selectionView() -> NSView? {
+      var ancestor = superview
+      while let view = ancestor, !(view is NSTableRowView) { ancestor = view.superview }
+      guard let row = ancestor as? NSTableRowView, row.isSelected else { return nil }
+      return row.subviews.first { $0 is NSVisualEffectView && $0 !== card }
+    }
+
+    /// Drawn as the list draws its selection, just above it and under the row's content.
+    private func card(in row: NSView, standingFor selection: NSView) -> NSVisualEffectView {
+      let card: NSVisualEffectView
+      if let existing = self.card, existing.superview === row {
+        card = existing
+      } else {
+        self.card?.removeFromSuperview()
+        card = NSVisualEffectView(frame: selection.frame)
+        row.addSubview(card, positioned: .above, relativeTo: selection)
+        self.card = card
+      }
+      if let effect = selection as? NSVisualEffectView {
+        card.material = effect.material
+        card.blendingMode = effect.blendingMode
+        card.state = effect.state
+        card.isEmphasized = effect.isEmphasized
+        card.maskImage =
+          effect.maskImage ?? Self.roundedMask(radius: effect.layer?.cornerRadius ?? 0)
+      }
+      return card
+    }
+
+    private static func roundedMask(radius: CGFloat) -> NSImage? {
+      guard radius > 0 else { return nil }
+      let side = radius * 2 + 1
+      let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+        NSColor.black.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        return true
+      }
+      image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+      image.resizingMode = .stretch
+      return image
+    }
   }
 }
