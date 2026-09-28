@@ -52,6 +52,22 @@ its process and its composer:
 - a stopped or archived session refuses it while the drag still hovers: a red veil, and no "+" on
   the pointer. Nothing is kept for later.
 
+The drawer of side terminals (#43, ADR 0030) lies under that column, outside its zone, and has its
+own (#139): a drop is typed into a side terminal, never into the agent's, by the same rules — the
+same reader, the same `Drops/<session>/`, the same encoder, a bracketed paste when its program asked
+for one. The target is the terminal under the pointer, not the one that has the keyboard: over the
+terminal area, the tab in front; over a tab of the bar, that tab, which comes in front, as a row of
+the sidebar selects its session. A tab of the bar also takes the tabs dragged along it: its drag
+carries a prefixed text (`DrawerTabDrag`), which moves the tab and which no drop ever types; anything
+else — a file, an image, a promised file, a text — is dropped into that tab's terminal. While the
+drag hovers, a tab is told apart by the drag's pasteboard, since the drop's items cannot be read
+before it is let go; the drop itself goes by what it carries. Every drop on a tab proposes a copy,
+the tabs' included: a text view lets its text be copied, never moved. The rest of the bar, the + and
+the button that hides the drawer, takes nothing. A side terminal takes a drop while its shell runs,
+whatever the agent does; one whose shell ended refuses it — a file or a text alike — with the red
+veil, and its tab does not come in front. The notice of a drop stays at the top of the
+session's column.
+
 A row of the sidebar takes the same drop: the session is selected, then receives it. A drag that
 rests on a row for 0.8 s selects its session, as the Finder opens a folder, so that the drop can be
 let go exactly where the user wants in its view.

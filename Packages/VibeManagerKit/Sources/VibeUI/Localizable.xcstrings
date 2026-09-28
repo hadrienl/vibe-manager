@@ -5482,6 +5482,23 @@
         }
       }
     },
+    "Dropped into the side terminal %@ of %@." : {
+      "comment" : "VoiceOver, after a drop on a side terminal. The arguments are its title, then its session's name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dropped into the side terminal %1$@ of %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposé dans le terminal annexe %1$@ de %2$@."
+          }
+        }
+      }
+    },
     "Dropped into the terminal of %@." : {
       "comment" : "VoiceOver, after a drop on a terminal. The argument is a session's name.",
       "localizations" : {
@@ -7942,6 +7959,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien n’a été déposé : %@ est arrêtée."
+          }
+        }
+      }
+    },
+    "Nothing dropped: the shell of %@ is not running." : {
+      "comment" : "VoiceOver, after a drop refused. The argument is a side terminal's title.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été déposé : le shell de %@ ne tourne pas."
           }
         }
       }
@@ -11833,6 +11861,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le shell s’est terminé avec le code %@."
+          }
+        }
+      }
+    },
+    "The shell is not running" : {
+      "comment" : "Over a side terminal, while a drag hovers: its shell has ended, it takes no drop.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le shell ne tourne pas"
           }
         }
       }

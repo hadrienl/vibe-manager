@@ -158,6 +158,11 @@ struct DropHoverOverlay: View {
       String(localized: "The session is stopped", bundle: .module)
     case .refusing(.archived):
       String(localized: "The session is archived", bundle: .module)
+    case .refusing(.shellNotRunning):
+      String(
+        localized: "The shell is not running", bundle: .module,
+        comment: "Over a side terminal, while a drag hovers: its shell has ended, it takes no drop."
+      )
     }
   }
 }

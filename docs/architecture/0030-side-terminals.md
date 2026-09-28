@@ -156,7 +156,10 @@ session shut down, while it was starting is stopped as soon as it has started.
 - `SessionLauncher` stays the one road to an agent, and tells the drawer what happens to its session
   (`SessionSideTerminals`). The drawer starts its own shells through the same supervisor.
 - A side terminal is a `TerminalPaneModel` in a `TerminalPaneView`, the agent's own component: what
-  the main terminal learns — the file drops of #42 among them — the side terminals have.
+  the main terminal learns, the side terminals have. What the view around it sets up does not come
+  with it: the file drops of #42 are taken by a zone of the session's column, which stops above the
+  drawer, so the drawer has its own (#139, ADR 0028): its terminal in front, and each tab of its
+  bar, which also takes the tabs moved along it.
 - A session opens at most eight side terminals: the host runs 64 terminals at once, agents included.
 - Deleting a session is not a verb of V1 (ADR 0009); the store removes a session's drawer the day it
   is.
