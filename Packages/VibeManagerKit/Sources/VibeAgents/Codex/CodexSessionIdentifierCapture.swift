@@ -164,6 +164,12 @@ public actor CodexSessionIdentifierCapture {
     isWaiting = true
     isDiscovering = true
     await discovery.beginWaiting(launch)
+    // The process may have ended, or named its session, while the launch was being registered:
+    // its end may then have reached the registry first, and is told again.
+    guard isWaiting, isDiscovering else {
+      if !isWaiting { await discovery.endWaiting(launch) }
+      return
+    }
     watcher = Task { [discovery, timeout] in
       let identifier = await discovery.discoverSessionIdentifier(for: launch, timeout: timeout)
       await self.discoveryEnded(with: Task.isCancelled ? nil : identifier)
