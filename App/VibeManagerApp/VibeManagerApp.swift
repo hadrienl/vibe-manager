@@ -656,7 +656,7 @@ private struct InnerCloseButton: View {
     }
   }
 
-  /// On the ticket's pinned tab, ⌘W is available and beeps: it closes nothing else instead.
+  /// On the ticket's pinned tab, ⌘W stays available and beeps; nothing else is closed instead.
   private var isEnabled: Bool {
     switch focus.front {
     case .workspace: target != nil

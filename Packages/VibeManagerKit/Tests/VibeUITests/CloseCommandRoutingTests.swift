@@ -192,7 +192,7 @@ struct CloseCommandRoutingTests {
       model.innerCloseTarget == .webTab
         && (inAddressBar || workspace.window.firstResponder === workspace.page)
     }
-    model.closeInnerElement()
+    #expect(workspace.window.performKeyEquivalent(with: commandW()), "\(workspace.state)")
     try await waitUntil("a second tab closed", in: workspace) { workspace.tabs.count == 1 }
     #expect(model.pendingClose == nil, "\(workspace.state)")
     #expect(model.sessions.first?.status == .active, "\(workspace.state)")
@@ -216,6 +216,65 @@ struct CloseCommandRoutingTests {
     }
   }
 
+  @Test("A tab brought forward while the keyboard is elsewhere leaves it there")
+  func switchingTabsElsewhereLeavesTheKeyboard() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let model = workspace.model
+    let page = try #require(workspace.page)
+    let terminal = try #require(workspace.agentTerminal)
+    workspace.window.makeFirstResponder(terminal)
+    try await waitUntil("the agent's terminal holding the keyboard", in: workspace) {
+      workspace.window.firstResponder === terminal && model.innerCloseTarget == nil
+    }
+
+    // ⌃⇥, then an agent's tab_activate, which activates the tab the same way.
+    model.selectNextWebTab()
+    try await waitUntil("the second page on screen", in: workspace) {
+      workspace.page.map { $0 !== page } == true
+    }
+    let second = try #require(workspace.page)
+    let browser = try #require(model.selectedBrowser)
+    let third = try #require(browser.allTabs.last)
+    browser.activate(third.id)
+    try await waitUntil("the third page on screen", in: workspace) {
+      workspace.page.map { $0 !== page && $0 !== second } == true
+    }
+    #expect(workspace.window.firstResponder === terminal, "\(workspace.state)")
+    #expect(model.innerCloseTarget == nil, "\(workspace.state)")
+  }
+
+  @Test("The web view moved from beside the terminal to taking turns with it keeps the keyboard")
+  func layoutChangeKeepsTheKeyboard() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let model = workspace.model
+    let page = try #require(workspace.page)
+    workspace.window.makeFirstResponder(page)
+    try await waitUntil("⌘W aimed at the web tab", in: workspace) {
+      model.innerCloseTarget == .webTab
+    }
+
+    // Too narrow for both: the web view takes turns with the terminal, in another view.
+    model.layout.setShowsBrowserWhenAlternating(true)
+    var frame = workspace.window.frame
+    frame.size.width = 800
+    workspace.window.setFrame(frame, display: false)
+    try await waitUntil("the page taking turns with the terminal, with the keyboard", in: workspace)
+    {
+      model.layout.columns.browser == .alternating && workspace.page === page
+        && workspace.window.firstResponder === page && model.innerCloseTarget == .webTab
+    }
+
+    // And back beside it.
+    frame.size.width = 1600
+    workspace.window.setFrame(frame, display: false)
+    try await waitUntil("the page beside the terminal, with the keyboard", in: workspace) {
+      model.layout.columns.browser == .beside && workspace.page === page
+        && workspace.window.firstResponder === page && model.innerCloseTarget == .webTab
+    }
+  }
+
   @Test("With the keyboard in the agent's terminal, ⌘W closes nothing; in the drawer, its tab")
   func terminalAndDrawer() async throws {
     let workspace = try await workspace()
@@ -234,7 +293,7 @@ struct CloseCommandRoutingTests {
     #expect(model.sessions.first?.status == .active, "\(workspace.state)")
     #expect(workspace.tabs.count == 3, "\(workspace.state)")
 
-    // The drawer: ⌘W closes its terminal in front.
+    // The drawer: ⌘W closes its terminal in front, or asks first while a command runs in it.
     await workspace.drawer.show()
     try await waitUntil("a side terminal on screen", in: workspace) {
       workspace.sideTerminal != nil
@@ -244,5 +303,11 @@ struct CloseCommandRoutingTests {
     try await waitUntil("⌘W aimed at the side terminal", in: workspace) {
       model.innerCloseTarget == .drawerTerminal
     }
+    model.closeInnerElement()
+    try await waitUntil("the side terminal closed, or its close asked about", in: workspace) {
+      workspace.drawer.terminals.isEmpty || model.pendingTerminalClose != nil
+    }
+    #expect(model.pendingClose == nil, "\(workspace.state)")
+    #expect(model.sessions.first?.status == .active, "\(workspace.state)")
   }
 }
