@@ -27,34 +27,68 @@ public final class AccessibleTerminalView: TerminalView {
   /// the window, and SwiftUI may update the view before it has one.
   var onWindowChange: (() -> Void)?
 
-  /// The size a hidden terminal was given, applied once it is shown again (#150).
+  /// The size a hidden terminal was given, held back while the column keeps changing (#150).
   ///
   /// Every session's terminal stays mounted, hidden behind the one on screen, and a new size
   /// makes SwiftTerm reflow the whole scrollback — ten thousand lines and more. Folding the
   /// sidebar, or opening the web view, narrows the column one animation frame at a time: every
-  /// hidden terminal reflowed at every frame, on the main thread, and the animation stuttered. A
-  /// hidden terminal is not drawn, so its size can wait until it is: it then takes the last one,
-  /// in a single reflow, and tells its program then.
+  /// hidden terminal reflowed at every frame, on the main thread, and the animation stuttered.
   ///
-  /// Its first size is never held back: a terminal mounted hidden — a session restored behind the
-  /// one on screen — needs one to start its program. Should the column change after that, the
-  /// program learns it when its session is shown, as it would after any resize.
+  /// A hidden terminal is not drawn, so it waits for the size to settle — `settleDelay` without a
+  /// new one, the end of a live resize, or being shown — and then takes the last one, in a single
+  /// reflow, and tells its program. It must not wait for longer: a session shown as a
+  /// conversation keeps its terminal hidden, and the agent formats what it writes for the width
+  /// its terminal reports; a session restored behind the one on screen starts its agent at the
+  /// first size its terminal got, often one of the layout's intermediate passes.
   private(set) var deferredSize: NSSize?
 
+  /// How long a hidden terminal's size must stay unchanged before it is taken: longer than the
+  /// frames of an animation are apart, short enough that a program is told almost at once.
+  var settleDelay: Duration = .milliseconds(250)
+
+  private var settleTask: Task<Void, Never>?
+
   public override func setFrameSize(_ newSize: NSSize) {
+    // Its first size is never held back: the program cannot start without one.
     if isHidden, !frame.size.equalTo(.zero) {
       deferredSize = newSize.equalTo(frame.size) ? nil : newSize
+      scheduleSettle()
       return
     }
     deferredSize = nil
+    settleTask?.cancel()
+    settleTask = nil
     super.setFrameSize(newSize)
   }
 
-  public override func viewDidUnhide() {
-    if let size = deferredSize {
-      deferredSize = nil
-      super.setFrameSize(size)
+  private func scheduleSettle() {
+    settleTask?.cancel()
+    settleTask = nil
+    guard deferredSize != nil else { return }
+    let delay = settleDelay
+    settleTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: delay)
+      guard !Task.isCancelled else { return }
+      self?.applyDeferredSize()
     }
+  }
+
+  /// Takes the size held back, if there is one.
+  func applyDeferredSize() {
+    settleTask?.cancel()
+    settleTask = nil
+    guard let size = deferredSize else { return }
+    deferredSize = nil
+    super.setFrameSize(size)
+  }
+
+  public override func viewDidEndLiveResize() {
+    super.viewDidEndLiveResize()
+    applyDeferredSize()
+  }
+
+  public override func viewDidUnhide() {
+    applyDeferredSize()
     super.viewDidUnhide()
   }
 

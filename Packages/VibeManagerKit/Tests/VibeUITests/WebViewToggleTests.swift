@@ -192,19 +192,32 @@ struct WebViewToggleTests {
     #expect(await workspace.attachCount() == attached)
   }
 
-  @Test("A narrowing column resizes the terminal on screen, the others once shown (#150)")
-  func hiddenTerminalsWaitForTheirSize() async throws {
+  /// The size each session's program was told, whether its terminal is on screen or not.
+  private func viewports(in workspace: Workspace) -> [TerminalSize?] {
+    workspace.sessions.map { workspace.model.pane(for: $0.id)?.viewportSize }
+  }
+
+  @Test("Hidden terminals take the column's size once it settles, not at every step (#150)")
+  func hiddenTerminalsWaitForTheSizeToSettle() async throws {
     let workspace = try await workspace()
     defer { workspace.close() }
     let sessions = workspace.sessions
     let shown = try #require(workspace.shownTerminal(of: sessions[0]))
     let hidden = workspace.terminals.filter { $0 !== shown }
     #expect(hidden.count == sessions.count - 1)
+
+    // Once laid out, every program knows the size of the column — the hidden ones too: a
+    // session shown as a conversation keeps its terminal hidden, and its agent writes for it.
+    try await waitUntil("every program told the column's size", in: workspace) {
+      let sizes = viewports(in: workspace)
+      return sizes[0] != nil && sizes.allSatisfy { $0 == sizes[0] }
+    }
+    let settled = viewports(in: workspace)[0]
     let hiddenSizes = hidden.map(\.frame.size)
     let shownWidth = shown.frame.width
 
     // What an animation of the sidebar or of the web view does to the column: a few points
-    // narrower at each frame.
+    // narrower at each frame, the hidden terminals left alone meanwhile.
     let window = workspace.window
     for _ in 0..<10 {
       var frame = window.frame
@@ -215,7 +228,14 @@ struct WebViewToggleTests {
     #expect(shown.frame.width <= shownWidth - 150, "\(workspace.state)")
     #expect(hidden.map(\.frame.size) == hiddenSizes, "\(workspace.state)")
 
-    // The session shown next takes the column as it now is.
+    // Then the column stays put: each hidden terminal takes its size, once.
+    try await waitUntil("every program told the narrower column's size", in: workspace) {
+      let sizes = viewports(in: workspace)
+      return sizes[0] != settled && sizes.allSatisfy { $0 == sizes[0] }
+    }
+    #expect(hidden.allSatisfy { $0.frame.size == shown.frame.size }, "\(workspace.state)")
+
+    // And the session shown next is at the column's width.
     let width = shown.frame.width
     workspace.model.select(sessions[1].id)
     try await waitUntil("the second terminal, at the column's width", in: workspace) {
