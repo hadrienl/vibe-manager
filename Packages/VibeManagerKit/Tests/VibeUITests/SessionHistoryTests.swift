@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Keeping and archiving the session history")
+@Suite("Keeping and archiving the session history", .timeLimit(.minutes(2)))
 struct SessionHistoryTests {
   private func plan() -> AgentLaunchPlan {
     AgentLaunchPlan(
@@ -143,7 +143,7 @@ struct SessionHistoryTests {
 
     await supervisor.finish(id: stored.id, with: .exited(code: 0))
 
-    try await waitUntil {
+    await waitUntil("the session whose process ended is closed") {
       await repository.session(id: stored.id)?.status == .closed
     }
     // Closed, not archived, and the terminal is still there to be read.
@@ -165,7 +165,7 @@ struct SessionHistoryTests {
 
     await launcher.launch(session: stored, plan: plan())
 
-    try await waitUntil {
+    await waitUntil("the session whose process ended during its launch is closed") {
       await repository.session(id: stored.id)?.status == .closed
     }
   }
@@ -644,18 +644,6 @@ struct SessionHistoryTests {
 
     #expect(model.visibleSessions.map(\.name) == ["Documentation"])
     #expect(model.selectedSessionID == first.id)
-  }
-
-  private func waitUntil(
-    timeout: Duration = .seconds(2),
-    _ condition: @Sendable () async -> Bool
-  ) async throws {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
-      if await condition() { return }
-      try await Task.sleep(for: .milliseconds(10))
-    }
-    #expect(await condition())
   }
 }
 

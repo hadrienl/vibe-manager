@@ -286,63 +286,57 @@ func ignoresOperationsAfterCompletion() async throws {
   #expect(await session.state() == .exited(code: 0))
 }
 
-@Test("A process that lets go of its terminal is still running until it exits or is stopped")
-func sessionKeepsAProcessThatOutlivesItsTerminal() async throws {
-  // The shell drops every descriptor onto the pseudo terminal. The session holds the slave too, so
-  // the terminal does not end with them: the process is still there, and said to be.
-  let session = try TerminalTestSupport.makeSession(
-    script: "exec 0<&- 1>&- 2>&-; sleep 30"
-  )
-  let processIdentifier = await session.processIdentifierForTesting
-  try await Task.sleep(for: .milliseconds(300))
-  #expect(await session.state() == .running(processIdentifier: processIdentifier))
+/// What becomes of a process once its terminal lets go of it, or it of its terminal: waited for as
+/// a state, through `eventually`, since a runner that stalls can hold the kernel's reaping or the
+/// output for seconds.
+@Suite("A process and its terminal parting ways", .timeLimit(.minutes(3)))
+struct PTYProcessEndTests {
+  @Test("A process that lets go of its terminal is still running until it exits or is stopped")
+  func sessionKeepsAProcessThatOutlivesItsTerminal() async throws {
+    // The shell drops every descriptor onto the pseudo terminal. The session holds the slave too,
+    // so the terminal does not end with them: the process is still there, and said to be.
+    let session = try TerminalTestSupport.makeSession(
+      script: "exec 0<&- 1>&- 2>&-; sleep 30"
+    )
+    let processIdentifier = await session.processIdentifierForTesting
+    try await Task.sleep(for: .milliseconds(300))
+    #expect(await session.state() == .running(processIdentifier: processIdentifier))
 
-  await session.stop(gracePeriod: .seconds(2))
+    await session.stop(gracePeriod: .seconds(2))
 
-  #expect(await session.state().isFinished)
-  let deadline = ContinuousClock.now + .seconds(2)
-  while isProcessAlive(processIdentifier), ContinuousClock.now < deadline {
-    try? await Task.sleep(for: .milliseconds(20))
+    #expect(await session.state().isFinished)
+    #expect(await eventually(timeout: .seconds(60)) { !isProcessAlive(processIdentifier) })
   }
-  #expect(!isProcessAlive(processIdentifier))
-}
 
-@Test("A process that wrote and exited before anything was read keeps what it wrote")
-func outputOutlivesTheProcess() async throws {
-  // Nobody reads the master until the child has exited. On a terminal that is not the child's
-  // controlling one — as on the CI runner's macOS 15 — closing the last slave descriptor would
-  // have thrown the output away.
-  let terminal = try PseudoTerminalLauncher.launch(
-    TerminalTestSupport.spec(script: "echo the last line"))
-  defer {
-    terminal.closeSlave()
-    close(terminal.masterDescriptor)
-  }
-  // The child waits in its exit for its output to be read; it is read long after it wrote it.
-  try await Task.sleep(for: .milliseconds(300))
-
-  var received: [UInt8] = []
-  var buffer = [UInt8](repeating: 0, count: 4_096)
-  let deadline = ContinuousClock.now + .seconds(5)
-  while !String(decoding: received, as: UTF8.self).contains("the last line"),
-    ContinuousClock.now < deadline
-  {
-    let count = buffer.withUnsafeMutableBytes {
-      read(terminal.masterDescriptor, $0.baseAddress, $0.count)
+  @Test("A process that wrote and exited before anything was read keeps what it wrote")
+  func outputOutlivesTheProcess() async throws {
+    // Nobody reads the master until the child has exited. On a terminal that is not the child's
+    // controlling one — as on the CI runner's macOS 15 — closing the last slave descriptor would
+    // have thrown the output away.
+    let terminal = try PseudoTerminalLauncher.launch(
+      TerminalTestSupport.spec(script: "echo the last line"))
+    defer {
+      terminal.closeSlave()
+      close(terminal.masterDescriptor)
     }
-    if count > 0 {
-      received.append(contentsOf: buffer[0..<count])
-    } else {
-      try await Task.sleep(for: .milliseconds(10))
-    }
-  }
-  #expect(String(decoding: received, as: UTF8.self).contains("the last line"))
+    // The child waits in its exit for its output to be read; it is read long after it wrote it.
+    try await Task.sleep(for: .milliseconds(300))
 
-  var status: Int32 = 0
-  let reapDeadline = ContinuousClock.now + .seconds(5)
-  while waitpid(terminal.processIdentifier, &status, WNOHANG) == 0,
-    ContinuousClock.now < reapDeadline
-  {
-    try await Task.sleep(for: .milliseconds(10))
+    var received: [UInt8] = []
+    var buffer = [UInt8](repeating: 0, count: 4_096)
+    let lineArrived = await eventually(timeout: .seconds(60)) {
+      let count = buffer.withUnsafeMutableBytes {
+        read(terminal.masterDescriptor, $0.baseAddress, $0.count)
+      }
+      if count > 0 { received.append(contentsOf: buffer[0..<count]) }
+      return String(decoding: received, as: UTF8.self).contains("the last line")
+    }
+    #expect(lineArrived)
+
+    var status: Int32 = 0
+    let reaped = await eventually(timeout: .seconds(60)) {
+      waitpid(terminal.processIdentifier, &status, WNOHANG) != 0
+    }
+    #expect(reaped)
   }
 }

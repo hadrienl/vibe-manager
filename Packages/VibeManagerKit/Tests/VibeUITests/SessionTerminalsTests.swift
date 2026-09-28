@@ -189,16 +189,7 @@ private struct Harness {
   }
 }
 
-@MainActor
-private func eventually(_ condition: @MainActor () async -> Bool) async -> Bool {
-  for _ in 0..<500 {
-    if await condition() { return true }
-    try? await Task.sleep(for: .milliseconds(5))
-  }
-  return await condition()
-}
-
-@Suite("A session's drawer of side terminals")
+@Suite("A session's drawer of side terminals", .timeLimit(.minutes(2)))
 @MainActor
 struct SessionTerminalsTests {
   @Test("Shown for the first time, it opens one shell in the session's folder, typing nothing")
@@ -298,11 +289,11 @@ struct SessionTerminalsTests {
     await drawer.show()
     let terminal = try #require(drawer.terminals.first)
 
-    #expect(await eventually { terminal.title == "npm run dev" })
+    await waitUntil("the title the shell set is shown") { terminal.title == "npm run dev" }
     #expect(terminal.isRunningCommand)
     harness.inspector.set(command: nil, directory: "/work/app/web")
     await harness.shells.shells[terminal.id]?.emit("$ ")
-    #expect(await eventually { terminal.title == "web" })
+    await waitUntil("the title set by hand is shown") { terminal.title == "web" }
     #expect(!terminal.isRunningCommand)
   }
 
@@ -345,7 +336,9 @@ struct SessionTerminalsTests {
     drawer.rename(ids[1], to: "Tests")
     drawer.activate(ids[0])
     await first.shells.shells[ids[0]]?.emit("$ npm run dev\r\nready\r\n")
-    #expect(await eventually { drawer.terminals[0].currentDirectory == "/work/app/web" })
+    await waitUntil("the folder the shell moved to is known") {
+      drawer.terminals[0].currentDirectory == "/work/app/web"
+    }
     await first.terminals.shutDown(session)
 
     // A relaunch: a new workspace over the same store.
@@ -440,7 +433,7 @@ struct SessionTerminalsTests {
     let shell = try #require(await harness.shells.shells[terminal.id])
     await shell.emit("failed build\r\n")
     await shell.finish(.exited(code: 1))
-    #expect(await eventually { terminal.exitStatus != nil })
+    await waitUntil("the exit status is known") { terminal.exitStatus != nil }
 
     await drawer.relaunch(terminal.id)
 
@@ -526,11 +519,13 @@ struct SessionTerminalsTests {
     let (failing, exiting) = (drawer.terminals[0], drawer.terminals[1])
 
     await harness.shells.shells[exiting.id]?.finish(.exited(code: 0))
-    #expect(await eventually { drawer.terminals.map(\.id) == [failing.id] })
+    await waitUntil("only the failing terminal is left") {
+      drawer.terminals.map(\.id) == [failing.id]
+    }
 
     drawer.hide()
     await harness.shells.shells[failing.id]?.finish(.exited(code: 1))
-    #expect(await eventually { failing.hasUnseenExit })
+    await waitUntil("the failed exit is marked unseen") { failing.hasUnseenExit }
     #expect(drawer.attention == .ended)
     #expect(drawer.terminals.map(\.id) == [failing.id])
 
@@ -550,7 +545,7 @@ struct SessionTerminalsTests {
     await harness.shells.shells[front.id]?.emit("seen")
     await harness.shells.shells[background.id]?.emit("not seen")
 
-    #expect(await eventually { background.hasUnseenOutput })
+    await waitUntil("the output in the background is marked unseen") { background.hasUnseenOutput }
     #expect(!front.hasUnseenOutput)
     #expect(drawer.attention == .output)
     #expect(drawer.noticeTerminal === background)
@@ -589,7 +584,7 @@ struct SessionTerminalsTests {
 
     let restoring = Task { await harness.terminals.sessionStarted(session) }
     let drawer = harness.terminals.drawer(for: session)
-    #expect(await eventually { drawer.terminals.count == 2 })
+    await waitUntil("the second terminal is open") { drawer.terminals.count == 2 }
     let closing = Task { await harness.terminals.shutDown(session) }
     await gate.open()
     await restoring.value

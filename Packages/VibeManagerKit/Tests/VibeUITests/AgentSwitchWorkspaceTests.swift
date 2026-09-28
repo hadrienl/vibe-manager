@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Switching the agent of a session from the workspace")
+@Suite("Switching the agent of a session from the workspace", .timeLimit(.minutes(2)))
 struct AgentSwitchWorkspaceTests {
   // MARK: - Fixtures
 
@@ -273,14 +273,14 @@ struct AgentSwitchWorkspaceTests {
 
     // A model the account cannot run: the CLI says so and exits.
     await supervisor.finish(id: subject.id, state: .exited(code: 1))
-    await waitUntil { model.switchBackOffers[subject.id] != nil }
+    await waitUntil("the switch back is offered") { model.switchBackOffers[subject.id] != nil }
 
     let offer = try #require(model.switchBackOffers[subject.id])
     #expect(offer.target == AgentTarget(providerID: "stub", modelID: "fast"))
     #expect(offer.label == "Stub Agent · Fast")
 
     // Taking it opens the sheet on that agent: it is a switch like any other, confirmed.
-    await waitUntil { model.sessions.first?.status == .closed }
+    await waitUntil("the session is closed") { model.sessions.first?.status == .closed }
     model.switchBack(subject.id)
     let back = try #require(model.pendingSwitch)
     #expect(back.providerID == "stub")
@@ -368,15 +368,5 @@ struct AgentSwitchWorkspaceTests {
       previous: "Stub Agent · Fast", at: date)
     #expect(model.contains("Model changed"))
     #expect(model.contains("same conversation"))
-  }
-
-  private func waitUntil(
-    _ condition: @MainActor () -> Bool,
-    attempts: Int = 200
-  ) async {
-    for _ in 0..<attempts {
-      if condition() { return }
-      try? await Task.sleep(for: .milliseconds(5))
-    }
   }
 }

@@ -31,16 +31,7 @@ private func makeJournal(opener: FakeOpener) -> SessionJournalModel {
     preferences: InMemoryJournalPreferences(), opener: opener)
 }
 
-@MainActor
-private func eventually(_ condition: () -> Bool) async -> Bool {
-  for _ in 0..<200 {
-    if condition() { return true }
-    try? await Task.sleep(for: .milliseconds(10))
-  }
-  return condition()
-}
-
-@Suite("The links of the summary")
+@Suite("The links of the summary", .timeLimit(.minutes(2)))
 @MainActor
 struct SessionJournalLinkTests {
   @Test("A link of the summary opens in the session's web view, not in the default browser")
@@ -67,7 +58,7 @@ struct SessionJournalLinkTests {
     let journal = makeJournal(opener: opener)
     journal.openInWebView = { _, _ in false }
     journal.openLink(URL(string: "https://example.com/a")!, from: SessionID())
-    #expect(await eventually { opener.opened == ["/a"] })
+    await waitUntil("the first link is opened") { opener.opened == ["/a"] }
   }
 
   @Test("Open in Browser keeps going to the default browser")
@@ -80,7 +71,7 @@ struct SessionJournalLinkTests {
       return true
     }
     journal.openInBrowser(URL(string: "https://example.com/b")!)
-    #expect(await eventually { opener.opened == ["/b"] })
+    await waitUntil("the second link is opened") { opener.opened == ["/b"] }
     #expect(shown == 0)
   }
 

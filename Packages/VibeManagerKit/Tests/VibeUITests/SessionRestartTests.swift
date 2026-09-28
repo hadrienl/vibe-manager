@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Restarting a closed session from the workspace")
+@Suite("Restarting a closed session from the workspace", .timeLimit(.minutes(2)))
 struct SessionRestartTests {
   // MARK: - Fixtures
 
@@ -473,7 +473,7 @@ struct SessionRestartTests {
     await model.reload()
 
     await model.restart(subject.id)
-    await waitUntil { model.resumeRefusals.contains(subject.id) }
+    await waitUntil("the resume is refused") { model.resumeRefusals.contains(subject.id) }
 
     // One process, and it is the resumed one: nothing was relaunched on the user's behalf, and
     // nothing was put on screen over a session the user has just finished with.
@@ -490,7 +490,7 @@ struct SessionRestartTests {
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
     await model.restart(subject.id)
-    await waitUntil { model.resumeRefusals.contains(subject.id) }
+    await waitUntil("the resume is refused") { model.resumeRefusals.contains(subject.id) }
 
     await model.restart(subject.id)
 
@@ -521,7 +521,7 @@ struct SessionRestartTests {
     await model.reload()
 
     await model.restart(subject.id)
-    await waitUntil { model.resumeRefusals.contains(subject.id) }
+    await waitUntil("the resume is refused") { model.resumeRefusals.contains(subject.id) }
 
     #expect(model.resumeRefusals.contains(subject.id))
 
@@ -543,7 +543,7 @@ struct SessionRestartTests {
     // Twenty seconds of work, then the agent exits with an error of its own.
     clock.advance(by: 20)
     await supervisor.finish(id: subject.id, state: .exited(code: 1))
-    await waitUntil { model.sessions.first?.status == .closed }
+    await waitUntil("the session is closed") { model.sessions.first?.status == .closed }
 
     #expect(model.resumeRefusals.isEmpty)
   }
@@ -557,7 +557,7 @@ struct SessionRestartTests {
     await model.reload()
 
     await model.restart(subject.id)
-    await waitUntil { model.sessions.first?.status == .closed }
+    await waitUntil("the session is closed") { model.sessions.first?.status == .closed }
 
     #expect(model.resumeRefusals.isEmpty)
   }
@@ -569,11 +569,11 @@ struct SessionRestartTests {
     let (model, _, _, _) = makeWorkspace(session: subject)
     await model.reload()
     await model.restart(subject.id)
-    await waitUntil { model.sessions.first?.status == .active }
+    await waitUntil("the session is active") { model.sessions.first?.status == .active }
 
     // Close, inside the probation window: the resume had worked, and the user simply stopped.
     await model.close(subject.id)
-    await waitUntil { model.sessions.first?.status == .closed }
+    await waitUntil("the session is closed") { model.sessions.first?.status == .closed }
 
     #expect(model.resumeRefusals.isEmpty)
   }
@@ -589,7 +589,7 @@ struct SessionRestartTests {
 
     await launcher.pane(for: subject.id)?.write([UInt8]("hello".utf8))
     await supervisor.finish(id: subject.id, state: .exited(code: 1))
-    await waitUntil { model.sessions.first?.status == .closed }
+    await waitUntil("the session is closed") { model.sessions.first?.status == .closed }
 
     #expect(model.resumeRefusals.isEmpty)
   }
@@ -613,7 +613,7 @@ struct SessionRestartTests {
 
     await launcher.launch(session: subject, plan: plan(path: path))
     await supervisor.finish(id: subject.id, state: .exited(code: 3))
-    await waitUntil { reported != nil }
+    await waitUntil("the failure is reported") { reported != nil }
 
     #expect(reported == .exited(code: 3))
   }
@@ -666,7 +666,7 @@ struct SessionRestartTests {
     let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
     await model.reload()
     await model.restart(subject.id)
-    await waitUntil { model.resumeRefusals.contains(subject.id) }
+    await waitUntil("the resume is refused") { model.resumeRefusals.contains(subject.id) }
 
     await supervisor.nextProcessStarts(in: .running(processIdentifier: 99))
     await model.restart(subject.id)
@@ -714,16 +714,6 @@ struct SessionRestartTests {
     // `RestartSession` trims before it believes an identifier, and this sentence has to agree
     // with it: promising a resume that will not happen is worse than saying nothing.
     #expect(model.expectedRestartMode(for: subject).contains("new process, with a summary"))
-  }
-
-  private func waitUntil(
-    _ condition: @MainActor () -> Bool,
-    attempts: Int = 200
-  ) async {
-    for _ in 0..<attempts {
-      if condition() { return }
-      try? await Task.sleep(for: .milliseconds(5))
-    }
   }
 }
 

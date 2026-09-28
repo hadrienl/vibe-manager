@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Recording the runs a launcher starts")
+@Suite("Recording the runs a launcher starts", .timeLimit(.minutes(2)))
 struct SessionUsageRecordingTests {
   private func plan() -> AgentLaunchPlan {
     AgentLaunchPlan(
@@ -56,7 +56,7 @@ struct SessionUsageRecordingTests {
 
     await launcher.launch(session: subject, plan: plan())
     await supervisor.finish(id: subject.id, state: .exited(code: 0))
-    for _ in 0..<200 where !closed { try? await Task.sleep(for: .milliseconds(5)) }
+    await waitUntil("the run is closed") { closed }
     _ = await launcher.detach(subject.id)
 
     let recorded = await runs(ledger)
@@ -83,7 +83,7 @@ struct SessionUsageRecordingTests {
     launcher.sessionDidClose = { _, _ in closed = true }
 
     await launcher.launch(session: subject, plan: plan())
-    for _ in 0..<200 where !closed { try? await Task.sleep(for: .milliseconds(5)) }
+    await waitUntil("the run is closed") { closed }
 
     let recorded = await runs(ledger)
     #expect(closed)

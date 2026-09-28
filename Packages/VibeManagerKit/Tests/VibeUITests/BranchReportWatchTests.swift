@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Reading the branches of the session on screen")
+@Suite("Reading the branches of the session on screen", .timeLimit(.minutes(2)))
 struct BranchReportWatchTests {
   private let api = WorkSession(
     name: "API",
@@ -45,7 +45,9 @@ struct BranchReportWatchTests {
     #expect(await reader.reads(of: "/work/api") == settled)
 
     model.select(web.id)
-    #expect(await poll { await reader.reads(of: "/work/web") >= 1 })
+    await waitUntil("the other session's report is read") {
+      await reader.reads(of: "/work/web") >= 1
+    }
   }
 
   @Test("The repositories of the report are watched, and what the disk says lands in the model")
@@ -57,20 +59,25 @@ struct BranchReportWatchTests {
     await model.load()
     model.select(api.id)
 
-    #expect(
-      await poll { model.repositoryStatus(for: api.id, path: "/work/api")?.phase == .fresh })
+    await waitUntil("the repository of the session on screen is read") {
+      model.repositoryStatus(for: api.id, path: "/work/api")?.phase == .fresh
+    }
     let before = await reader.reads(of: "/work/api")
 
     // A branch moved: the report is read again, without any timer.
     events.send(.changed(["/work/api/.git/refs/heads/main"]))
-    #expect(await poll { await reader.reads(of: "/work/api") > before })
+    await waitUntil("a branch that moved on disk has the report read again") {
+      await reader.reads(of: "/work/api") > before
+    }
 
     // Another session on screen: the first one's repository is no longer watched.
     model.select(web.id)
-    #expect(
-      await poll { model.repositoryStatus(for: api.id, path: "/work/api")?.phase == .unobserved })
-    #expect(
-      await poll { model.repositoryStatus(for: web.id, path: "/work/web")?.phase == .fresh })
+    await waitUntil("the session left is no longer watched") {
+      model.repositoryStatus(for: api.id, path: "/work/api")?.phase == .unobserved
+    }
+    await waitUntil("the repository of the new session on screen is read") {
+      model.repositoryStatus(for: web.id, path: "/work/web")?.phase == .fresh
+    }
     await model.stopWatchingRepositories()
   }
 
@@ -142,17 +149,6 @@ struct RepositoryStatusPresentationTests {
     #expect(presentation.isStale)
     #expect(presentation.command == "git config --global --add safe.directory /work/api")
   }
-}
-
-private func poll(
-  timeout: Duration = .seconds(3), _ condition: @MainActor () async -> Bool
-) async -> Bool {
-  let deadline = ContinuousClock.now + timeout
-  while ContinuousClock.now < deadline {
-    if await condition() { return true }
-    try? await Task.sleep(for: .milliseconds(10))
-  }
-  return await condition()
 }
 
 private actor CountingReader: RepositoryActivityReading {

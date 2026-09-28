@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Creating a session without waiting for it")
+@Suite("Creating a session without waiting for it", .timeLimit(.minutes(2)))
 struct OptimisticCreationTests {
   private let folder = FileManager.default.temporaryDirectory.path
 
@@ -32,14 +32,6 @@ struct OptimisticCreationTests {
     return sheet
   }
 
-  private func settled(_ model: AppModel) async -> Bool {
-    for _ in 0..<500 {
-      if model.sessionInCreation == nil { return true }
-      try? await Task.sleep(for: .milliseconds(10))
-    }
-    return false
-  }
-
   @Test("Create closes the sheet and shows the session to come before it is even stored")
   func placeholderComesFirst() async throws {
     let previous = existing()
@@ -56,7 +48,7 @@ struct OptimisticCreationTests {
     #expect(model.creationRow?.name == "Brand new")
 
     await repository.open()
-    #expect(await settled(model))
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
     let created = try #require(model.sessions.first { $0.name == "Brand new" })
     #expect(model.selectedSessionID == created.id)
     #expect(model.pane(for: created.id) != nil)
@@ -73,7 +65,7 @@ struct OptimisticCreationTests {
     let sheet = try openSheet(in: model, name: "Nowhere", folder: "/nonexistent/\(UUID())")
 
     model.submitNewSession(launching: true)
-    #expect(await settled(model))
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
 
     #expect(model.isPresentingNewSession)
     #expect(model.newSessionModel === sheet)
@@ -102,7 +94,7 @@ struct OptimisticCreationTests {
     #expect(model.creationRow?.name == "Later")
 
     await repository.open()
-    #expect(await settled(model))
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
     #expect(model.sessions.contains { $0.name == "Later" })
     #expect(model.selectedSessionID == second.id)
   }
@@ -121,10 +113,8 @@ struct OptimisticCreationTests {
     #expect(model.sessionInCreation?.name == "First")
 
     await repository.open()
-    #expect(await settled(model))
-    for _ in 0..<500 where model.sessions.count < 2 {
-      try? await Task.sleep(for: .milliseconds(10))
-    }
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
+    await waitUntil("both sessions are listed") { model.sessions.count >= 2 }
     #expect(Set(model.sessions.map(\.name)) == ["First", "Second"])
     #expect(!model.isPresentingNewSession)
   }

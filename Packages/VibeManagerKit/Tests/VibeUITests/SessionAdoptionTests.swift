@@ -139,7 +139,7 @@ private actor ReluctantHost: TerminalHosting {
 }
 
 @MainActor
-@Suite("Taking back the agents the terminal host kept")
+@Suite("Taking back the agents the terminal host kept", .timeLimit(.minutes(2)))
 struct SessionAdoptionTests {
   private func session(status: SessionStatus = .active) -> WorkSession {
     WorkSession(
@@ -148,14 +148,6 @@ struct SessionAdoptionTests {
       status: status,
       repositories: [RepositoryContext(path: "/workspace")]
     )
-  }
-
-  private func eventually(_ condition: () async -> Bool) async -> Bool {
-    for _ in 0..<250 {
-      if await condition() { return true }
-      try? await Task.sleep(for: .milliseconds(20))
-    }
-    return await condition()
   }
 
   @Test("A running agent is shown as it is: nothing started, nothing written to the store")
@@ -192,7 +184,9 @@ struct SessionAdoptionTests {
 
     await terminal.finish(state: .exited(code: 0))
 
-    #expect(await eventually { await repository.status(of: stored.id) == .closed })
+    await waitUntil("the session is stored closed") {
+      await repository.status(of: stored.id) == .closed
+    }
   }
 
   @Test("Handed off on the way out, an agent's exit is no longer this launch's to record")

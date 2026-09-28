@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Remembering the folders sessions are created in")
+@Suite("Remembering the folders sessions are created in", .timeLimit(.minutes(2)))
 struct RecentFolderHistoryTests {
   private func session(in folder: String, createdAt seconds: TimeInterval = 1_699_000_000)
     -> WorkSession
@@ -154,19 +154,13 @@ struct RecentFolderHistoryTests {
     model.forgetRecentFolder(RecentFolder(lexicalPath: "/a"))
 
     #expect(model.recentFolders.entries.map(\.path) == ["/b"])
-    try await waitFor { await store.load()?.entries.map(\.path) == ["/b"] }
+    await waitUntil("the forgotten folder is left out of the store") {
+      await store.load()?.entries.map(\.path) == ["/b"]
+    }
   }
 
   private func recent(_ paths: String...) -> [RecentFolder] {
     paths.map(RecentFolder.init(lexicalPath:))
-  }
-
-  private func waitFor(_ condition: () async -> Bool) async throws {
-    for _ in 0..<200 {
-      if await condition() { return }
-      try await Task.sleep(for: .milliseconds(10))
-    }
-    Issue.record("The condition never held.")
   }
 }
 

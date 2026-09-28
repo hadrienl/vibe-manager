@@ -93,14 +93,6 @@ private actor GatedNotesStore: SessionNotesStore {
 }
 
 @MainActor
-private func settle(_ condition: @MainActor () async -> Bool) async {
-  for _ in 0..<2_000 {
-    if await condition() { return }
-    try? await Task.sleep(for: .milliseconds(1))
-  }
-}
-
-@MainActor
 private func type(_ text: String, into document: NotesDocument) {
   let end = NSRange(location: document.storage.length, length: 0)
   guard document.shouldChange(in: end, replacement: text) else { return }
@@ -115,7 +107,7 @@ private func isSaved(_ document: NotesDocument) -> Bool {
 }
 
 @MainActor
-@Suite("Saving the notes as they are typed")
+@Suite("Saving the notes as they are typed", .timeLimit(.minutes(2)))
 struct NotesSavingTests {
   private let id = SessionID()
 
@@ -125,7 +117,7 @@ struct NotesSavingTests {
     let sleeper = ManualSleeper()
     let model = NotesModel(store: store, sleep: sleeper.sleep)
     let document = model.document(for: id)
-    await settle { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
     return (model, document, sleeper)
   }
 
@@ -136,17 +128,17 @@ struct NotesSavingTests {
 
     type("Keep lodash.", into: document)
     #expect(document.state == .edited)
-    await settle { sleeper.pending == [.seconds(1), .seconds(5)] }
+    await waitUntil("both saves are scheduled") { sleeper.pending == [.seconds(1), .seconds(5)] }
     #expect(sleeper.pending == [.seconds(1), .seconds(5)])
 
     sleeper.fire(.seconds(1))
-    await settle { isSaved(document) }
+    await waitUntil("the notes are saved") { isSaved(document) }
 
     #expect(isSaved(document))
     #expect(await store.saveCount == 1)
     #expect(try await store.notes(for: id).text == "Keep lodash.")
     // The write took the five-second one with it.
-    await settle { sleeper.pending.isEmpty }
+    await waitUntil("no save is left scheduled") { sleeper.pending.isEmpty }
     #expect(sleeper.pending.isEmpty)
   }
 
@@ -158,12 +150,12 @@ struct NotesSavingTests {
     type("One", into: document)
     type(" two", into: document)
     type(" three", into: document)
-    await settle { sleeper.pending == [.seconds(1), .seconds(5)] }
+    await waitUntil("both saves are scheduled") { sleeper.pending == [.seconds(1), .seconds(5)] }
     // Each keystroke replaced the one-second wait; there is still only one of each.
     #expect(sleeper.pending == [.seconds(1), .seconds(5)])
 
     sleeper.fire(.seconds(5))
-    await settle { isSaved(document) }
+    await waitUntil("the notes are saved") { isSaved(document) }
 
     #expect(await store.saveCount == 1)
     #expect(try await store.notes(for: id).text == "One two three")
@@ -189,9 +181,9 @@ struct NotesSavingTests {
     let (_, document, sleeper) = await make(store)
 
     type("Precious", into: document)
-    await settle { sleeper.pending == [.seconds(1), .seconds(5)] }
+    await waitUntil("both saves are scheduled") { sleeper.pending == [.seconds(1), .seconds(5)] }
     sleeper.fire(.seconds(1))
-    await settle {
+    await waitUntil("the write fails and is tried again") {
       if case .failed = document.state { return sleeper.pending == [.seconds(1)] }
       return false
     }
@@ -203,12 +195,12 @@ struct NotesSavingTests {
     #expect(document.text == "Precious")
 
     sleeper.fire(.seconds(1))
-    await settle { sleeper.pending == [.seconds(2)] }
+    await waitUntil("the retry is scheduled") { sleeper.pending == [.seconds(2)] }
     #expect(sleeper.pending == [.seconds(2)])
 
     await store.failWrites(with: nil)
     sleeper.fire(.seconds(2))
-    await settle { isSaved(document) }
+    await waitUntil("the notes are saved") { isSaved(document) }
     #expect(isSaved(document))
     #expect(try await store.notes(for: id).text == "Precious")
   }
@@ -220,11 +212,11 @@ struct NotesSavingTests {
 
     type("A", into: document)
     let first = Task { await document.save() }
-    await settle { await store.waitingWrites == 1 }
+    await waitUntil("a write waits") { await store.waitingWrites == 1 }
     type("B", into: document)
     await store.release()
-    await settle { await store.writes == ["A"] }
-    await settle { await store.waitingWrites == 1 }
+    await waitUntil("the first text is written") { await store.writes == ["A"] }
+    await waitUntil("a write waits") { await store.waitingWrites == 1 }
 
     // The first write is done, but "B" is not on disk: still edited.
     #expect(document.hasUnsavedChanges)
@@ -258,7 +250,7 @@ struct NotesSavingTests {
     let sleeper = ManualSleeper()
     let model = NotesModel(store: store, sleep: sleeper.sleep)
     let document = model.document(for: id)
-    await settle { document.state != .loading }
+    await waitUntil("the notes are read") { document.state != .loading }
 
     #expect(document.state == .unreadable(reason: "test"))
     #expect(!document.isLoaded)
@@ -286,7 +278,7 @@ struct NotesSavingTests {
 
     model.startPreparing(importing: ImportLegacyNotes(repository: repository, notes: store))
     let document = model.document(for: session.id)
-    await settle { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
 
     #expect(document.text == "Written before #16")
     #expect(try await store.notes(for: session.id).text == "Written before #16")
@@ -307,7 +299,7 @@ struct NotesSavingTests {
 }
 
 @MainActor
-@Suite("Searching and summarising with the notes")
+@Suite("Searching and summarising with the notes", .timeLimit(.minutes(2)))
 struct NotesIndexTests {
   @Test("Every session's notes are read for the search, then follow the typing")
   func searchIndex() async throws {
@@ -320,7 +312,7 @@ struct NotesIndexTests {
     #expect(model.searchIndex == [first: "Rolled back the refactoring"])
 
     let document = model.document(for: second)
-    await settle { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
     type("Keep lodash", into: document)
 
     #expect(model.searchIndex[second] == "Keep lodash")
@@ -336,7 +328,7 @@ struct NotesIndexTests {
     let store = InMemorySessionNotesStore(notes: [session.id: "Le réfactoring est annulé"])
     let model = AppModel(repository: repository, notesStore: store)
     await model.load()
-    await settle { !model.notes.searchIndex.isEmpty }
+    await waitUntil("the notes are indexed") { !model.notes.searchIndex.isEmpty }
 
     model.setColumn(.done)
     model.setSearchText("refactoring")
@@ -346,7 +338,7 @@ struct NotesIndexTests {
 }
 
 @MainActor
-@Suite("The notes editor")
+@Suite("The notes editor", .timeLimit(.minutes(2)))
 struct NotesEditorTests {
   private func editor(
     for document: NotesDocument
@@ -366,7 +358,7 @@ struct NotesEditorTests {
     let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)
     let first = model.document(for: SessionID())
     let second = model.document(for: SessionID())
-    await settle { first.isLoaded && second.isLoaded }
+    await waitUntil("both notes are loaded") { first.isLoaded && second.isLoaded }
     let (textView, coordinator) = editor(for: first)
 
     textView.insertText("Typed in the first", replacementRange: textView.selectedRange())
@@ -388,7 +380,7 @@ struct NotesEditorTests {
   func lineEndingsAreNormalized() async throws {
     let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)
     let document = model.document(for: SessionID())
-    await settle { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
     let (textView, _) = editor(for: document)
 
     textView.insertText("one\r\ntwo\rthree", replacementRange: textView.selectedRange())
@@ -400,7 +392,7 @@ struct NotesEditorTests {
   func crlfOnlyIsNormalized() async throws {
     let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)
     let document = model.document(for: SessionID())
-    await settle { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
     let (textView, _) = editor(for: document)
 
     textView.insertText("one\r\ntwo\r\n", replacementRange: textView.selectedRange())
@@ -413,7 +405,7 @@ struct NotesEditorTests {
     let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)
     let first = model.document(for: SessionID())
     let second = model.document(for: SessionID())
-    await settle { first.isLoaded && second.isLoaded }
+    await waitUntil("both notes are loaded") { first.isLoaded && second.isLoaded }
     let (textView, coordinator) = editor(for: first)
     textView.insertText("Hello world", replacementRange: textView.selectedRange())
     textView.setSelectedRange(NSRange(location: 5, length: 0))
@@ -434,7 +426,7 @@ struct NotesEditorTests {
     let model = NotesModel(store: store, sleep: ManualSleeper().sleep)
     let id = SessionID()
     let document = model.document(for: id)
-    await settle { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
     let (textView, _) = editor(for: document)
     textView.insertText(text, replacementRange: textView.selectedRange())
 

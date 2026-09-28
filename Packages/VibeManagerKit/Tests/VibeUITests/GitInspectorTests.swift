@@ -290,7 +290,7 @@ struct RepositoryGroupPresentationTests {
 }
 
 @MainActor
-@Suite("The Git pane's screen state")
+@Suite("The Git pane's screen state", .timeLimit(.minutes(2)))
 struct GitInspectorModelTests {
   private let session = SessionID()
 
@@ -408,7 +408,9 @@ struct GitInspectorModelTests {
     #expect(await reads.value == 0)
 
     git.setExpanded(directory: folder, true, in: session)
-    #expect(await poll { git.listing(of: folder, in: session) != .loading })
+    await waitUntil("the unfolded folder is listed") {
+      git.listing(of: folder, in: session) != .loading
+    }
     #expect(
       git.listing(of: folder, in: session)
         == .loaded(
@@ -416,7 +418,9 @@ struct GitInspectorModelTests {
     #expect(await reads.value == 1)
 
     git.statesChanged([withFolder])
-    #expect(await poll { await reads.value == 2 })
+    await waitUntil("the folder is read again when its repository moves") {
+      await reads.value == 2
+    }
 
     // The folder was committed: forgotten, and not read.
     git.statesChanged([state([], session: session)])
@@ -441,7 +445,7 @@ struct GitInspectorModelTests {
       session: session)
     git.statesChanged([withFolder])
     git.setExpanded(directory: folder, true, in: session)
-    #expect(await poll { await gate.entered == 1 })
+    await waitUntil("the unfolded folder is read") { await gate.entered == 1 }
 
     // Three states land while the first reading runs: they ask for one more, not three.
     git.statesChanged([withFolder])
@@ -451,16 +455,15 @@ struct GitInspectorModelTests {
     #expect(await gate.entered == 1)
 
     await gate.release()
-    #expect(await poll { await gate.entered == 2 })
+    await waitUntil("the folder is read a second time") { await gate.entered == 2 }
     // The first answer was already old: it is not shown.
     #expect(git.listing(of: folder, in: session) == .loading)
     await gate.release()
-    #expect(
-      await poll {
-        git.listing(of: folder, in: session)
-          == .loaded(
-            UntrackedListing(directory: "node_modules/", paths: ["node_modules/v2"], totalCount: 1))
-      })
+    await waitUntil("the second listing is shown") {
+      git.listing(of: folder, in: session)
+        == .loaded(
+          UntrackedListing(directory: "node_modules/", paths: ["node_modules/v2"], totalCount: 1))
+    }
     try? await Task.sleep(for: .milliseconds(50))
     #expect(await gate.entered == 2)
   }
@@ -717,16 +720,4 @@ private actor ReadCounter {
 /// The processor time the calling thread has used so far.
 private func threadProcessorTime() -> Duration {
   .nanoseconds(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID))
-}
-
-@MainActor
-private func poll(timeout: Duration = .seconds(3), _ condition: @MainActor () async -> Bool) async
-  -> Bool
-{
-  let deadline = ContinuousClock.now + timeout
-  while ContinuousClock.now < deadline {
-    if await condition() { return true }
-    try? await Task.sleep(for: .milliseconds(10))
-  }
-  return await condition()
 }
