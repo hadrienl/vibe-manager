@@ -9895,26 +9895,6 @@
         }
       }
     },
-    "Several “Vibe Manager” in the list? Drag this copy into it to add the right one." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plusieurs « Vibe Manager » dans la liste ? Glissez-y cette copie pour ajouter la bonne."
-          }
-        }
-      }
-    },
-    "Several “Vibe Manager” in the list? Each build signed differently is a separate entry. Drag this copy into the list to add the right one." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plusieurs « Vibe Manager » dans la liste ? Chaque build signé différemment est une entrée distincte. Glissez cette copie dans la liste pour ajouter la bonne."
-          }
-        }
-      }
-    },
     "Shared by every session, apart from Safari." : {
       "localizations" : {
         "fr" : {
@@ -10844,17 +10824,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changer…"
-          }
-        }
-      }
-    },
-    "System Settings" : {
-      "comment" : "A section of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réglages Système"
           }
         }
       }

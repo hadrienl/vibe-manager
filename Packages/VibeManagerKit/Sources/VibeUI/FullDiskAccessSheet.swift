@@ -11,7 +11,6 @@ import SwiftUI
 /// almost never in a protected folder, and the user who says no will simply never see an alert.
 struct FullDiskAccessSheet: View {
   let openSystemSettings: () -> Void
-  let revealInFinder: () -> Void
   let skip: () -> Void
 
   var body: some View {
@@ -54,22 +53,6 @@ struct FullDiskAccessSheet: View {
             bundle: .module))
       }
       .padding(.vertical, 2)
-
-      HStack(alignment: .firstTextBaseline) {
-        Text(
-          """
-          Several “Vibe Manager” in the list? Drag this copy into it to add the right one.
-          """,
-          bundle: .module
-        )
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-        Spacer(minLength: 8)
-        Button(action: revealInFinder) {
-          Text("Show in Finder", bundle: .module)
-        }
-      }
 
       Text(
         """

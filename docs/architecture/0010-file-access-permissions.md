@@ -144,8 +144,10 @@ Apple Development one — is asked once. The boolean of the first version reads 
 The step does not come back otherwise: not once access is granted, because the status alone settles
 it; not after a refusal by the same identity, because the answer was recorded. The way back is the
 Privacy tab of the Settings window — a permanent entrance, rather than something that surges up
-unbidden. Since System Settings shows every identity under the same name, the step and the tab
-offer **Show in Finder**, to drag this very copy into the list.
+unbidden, whose **Open System Settings** stays there whatever the access. System Settings shows
+every identity under the same name; the step and the tab used to offer **Show in Finder**, to drag
+this very copy into the list, but only builds signed differently on one Mac produce such
+duplicates — a developer's situation, not a user's — and the aid was removed (#151).
 
 ### No folder is proposed any more
 
