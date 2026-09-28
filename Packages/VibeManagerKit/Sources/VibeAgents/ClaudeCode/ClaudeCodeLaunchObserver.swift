@@ -22,6 +22,14 @@ public actor ClaudeCodeLaunchObserver: AgentLaunchObserver {
   public func finished() async {
     await capture.finish()
   }
+
+  public func awaitedResumeIdentifier() async -> String? {
+    await capture.awaitedIdentifier
+  }
+
+  public func adopted(awaitedResumeIdentifier identifier: String) async {
+    await capture.watch(identifier: identifier)
+  }
 }
 
 extension ClaudeCodeAgentProvider: AgentLaunchObserverProviding {

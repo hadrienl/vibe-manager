@@ -66,13 +66,28 @@ public actor ClaudeCodeSessionIdentifierCapture {
     unstored
   }
 
+  /// The identifier assigned to the conversation, for as long as it has not been stored: what an
+  /// instance that adopts the process from the terminal host still has to watch for (#141).
+  public var awaitedIdentifier: String? {
+    captured == nil ? assigned : nil
+  }
+
   @discardableResult
   public func record(plan: AgentLaunchPlan) -> String? {
     guard let identifier = ClaudeCodeArgumentBuilder.assignedSessionIdentifier(in: plan.arguments)
     else {
       return nil
     }
+    watch(identifier: identifier)
+    return identifier
+  }
 
+  /// Watches for the conversation `identifier` names, and stores it once written.
+  ///
+  /// `record(plan:)` comes here with the identifier its plan assigned. So does an instance that
+  /// adopts a process the terminal host kept (#141), with the identifier the previous instance
+  /// was still waiting for: the watch, its limit and its end are the same.
+  public func watch(identifier: String) {
     watcher?.cancel()
     persister?.cancel()
     watcher = nil
@@ -83,7 +98,6 @@ public actor ClaudeCodeSessionIdentifierCapture {
     unstored = nil
 
     watcher = Task { [weak self] in await self?.storeOnceWritten(identifier) }
-    return identifier
   }
 
   public func settled() async -> String? {

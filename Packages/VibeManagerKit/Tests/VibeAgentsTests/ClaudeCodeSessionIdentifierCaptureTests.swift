@@ -347,6 +347,41 @@ struct ClaudeCodeSessionIdentifierCaptureTests {
     #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
   }
 
+  @Test("A conversation still unwritten is handed over, and nothing once it is stored (#141)")
+  func handsOverWhatItStillWaitsFor() async {
+    let session = claudeSession()
+    let repository = ClaudeCaptureRepository(stored: session)
+    let transcripts = TranscriptOnDisk()
+    let capture = ClaudeCodeSessionIdentifierCapture(
+      sessionID: session.id,
+      record: RecordAgentResumeIdentifier(repository: repository),
+      transcripts: transcripts,
+      transcriptWatchLimit: .seconds(3600)
+    )
+
+    await capture.record(plan: plan(arguments: ["--session-id", identifier]))
+    await capture.finish()
+
+    #expect(await capture.awaitedIdentifier == identifier)
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == nil)
+
+    // The next instance takes the watch up with no plan, only the identifier handed over.
+    let adopted = ClaudeCodeLaunchObserver(
+      capture: ClaudeCodeSessionIdentifierCapture(
+        sessionID: session.id,
+        record: RecordAgentResumeIdentifier(repository: repository),
+        transcripts: transcripts,
+        transcriptWatchLimit: .seconds(3600)
+      ))
+    await adopted.adopted(awaitedResumeIdentifier: identifier)
+    #expect(await adopted.awaitedResumeIdentifier() == identifier)
+    await transcripts.write()
+    await adopted.finished()
+
+    #expect(await repository.session(id: session.id)?.agent?.resumeIdentifier == identifier)
+    #expect(await adopted.awaitedResumeIdentifier() == nil)
+  }
+
   @Test("An identifier that could never be stored is surfaced, not dropped")
   func reportsUnstoredIdentifier() async {
     let session = claudeSession()
