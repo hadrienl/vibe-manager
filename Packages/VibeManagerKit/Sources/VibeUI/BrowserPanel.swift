@@ -518,6 +518,7 @@ private struct BrowserWebViewHost: NSViewRepresentable {
       }
       webView.removeFromSuperview()
       container.addSubview(webView)
+      container.handKeyboard(to: webView)
     }
     if context.coordinator.focusRequest != focusRequest {
       let isFirst = context.coordinator.focusRequest == nil
@@ -549,7 +550,7 @@ private struct BrowserWebViewHost: NSViewRepresentable {
 }
 
 /// The view pages are shown in. It tells the workspace when the keyboard enters or leaves a page,
-/// so that ⌘W closes a tab rather than the session while a page has it.
+/// so that ⌘W closes the tab while a page has it.
 final class BrowserWebViewContainer: NSView {
   var focusChanged: ((Bool) -> Void)?
   var isAddressBarFocused: (() -> Bool)?
@@ -574,6 +575,26 @@ final class BrowserWebViewContainer: NSView {
     return true
   }
   private var observation: NSKeyValueObservation?
+  /// Whether the page that just left held the keyboard, for the page shown next to take it.
+  private var pageHadKeyboard = false
+
+  /// The page that goes — the tab closed, or another one brought forward — takes the keyboard
+  /// with it, to the window itself: nothing held it any more, and the next ⌘W, meant for the next
+  /// tab, went to the session instead (#165). As in Safari, the page shown next has it.
+  override func willRemoveSubview(_ subview: NSView) {
+    if let responder = window?.firstResponder as? NSView, responder.isDescendant(of: subview) {
+      pageHadKeyboard = true
+    }
+    super.willRemoveSubview(subview)
+  }
+
+  /// Gives the page just put here the keyboard the previous one had — unless it went elsewhere
+  /// meanwhile.
+  func handKeyboard(to page: NSView) {
+    defer { pageHadKeyboard = false }
+    guard pageHadKeyboard, let window, window.firstResponder === window else { return }
+    window.makeFirstResponder(page)
+  }
 
   /// The page always fills the view: a page moved in from another panel, or from the parking
   /// window, keeps the size it had there otherwise.

@@ -1,0 +1,248 @@
+import AppKit
+import Foundation
+import SwiftUI
+import Testing
+import VibeApplication
+import VibeBrowser
+import VibeDomain
+import VibeTerminalUI
+import WebKit
+
+@testable import VibeUI
+
+/// What ⌘W closes in the real window (#165): the element inside the session that holds the
+/// keyboard — a tab of the web view, its page or its address bar (ADR 0023), a side terminal
+/// (#43) — and nothing when the keyboard is anywhere else: the session is ⇧⌘W's.
+@MainActor
+@Suite("⌘W follows the keyboard in the window", .serialized, .timeLimit(.minutes(2)))
+struct CloseCommandRoutingTests {
+  private static let provider = WorkspaceProvider()
+
+  @MainActor private final class Workspace {
+    let model: AppModel
+    let session: WorkSession
+    let drawer: SessionTerminalDrawer
+    let window: NSWindow
+    let folder: String
+
+    init(
+      model: AppModel, session: WorkSession, drawer: SessionTerminalDrawer, window: NSWindow,
+      folder: String
+    ) {
+      self.model = model
+      self.session = session
+      self.drawer = drawer
+      self.window = window
+      self.folder = folder
+    }
+
+    /// The page on screen, once it has a size.
+    var page: WKWebView? {
+      all(BrowserWebViewContainer.self, in: window.contentView)
+        .first { !$0.bounds.isEmpty }?
+        .subviews.compactMap { $0 as? WKWebView }.first
+    }
+
+    /// The agent's terminal, on screen.
+    var agentTerminal: AccessibleTerminalView? {
+      all(AccessibleTerminalView.self, in: window.contentView)
+        .first { !$0.isHidden && $0.accessibilityTitle.contains("Terminal — \(session.name)") }
+    }
+
+    /// The side terminal in front of the drawer, on screen.
+    var sideTerminal: AccessibleTerminalView? {
+      all(AccessibleTerminalView.self, in: window.contentView)
+        .first { !$0.isHidden && $0.accessibilityTitle.hasPrefix("Side terminal") }
+    }
+
+    var tabs: [BrowserTabModel] {
+      model.browser?.browser(for: session.id).allTabs ?? []
+    }
+
+    var state: String {
+      let responder = window.firstResponder.map { String(describing: type(of: $0)) } ?? "none"
+      return """
+        first responder: \(responder), page: \(page.map { "\($0.frame)" } ?? "none"), \
+        target: \(String(describing: model.innerCloseTarget)), tabs: \(tabs.count), \
+        session: \(String(describing: model.sessions.first?.status))
+        """
+    }
+
+    func close() {
+      window.contentView = nil
+      window.close()
+      try? FileManager.default.removeItem(atPath: folder)
+    }
+
+    func all<T: NSView>(_ type: T.Type, in view: NSView?) -> [T] {
+      guard let view else { return [] }
+      if let match = view as? T { return [match] }
+      return view.subviews.flatMap { all(type, in: $0) }
+    }
+  }
+
+  private struct NeverReached: Error, CustomStringConvertible {
+    let description: String
+  }
+
+  /// One running session, three pages open in its web view, shown beside its terminal — or in
+  /// turns with it, in a window too narrow for both.
+  private func workspace(width: CGFloat = 1600) async throws -> Workspace {
+    _ = NSApplication.shared
+    let folder = NSTemporaryDirectory().appending("vibe-close-routing-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+    let session = WorkSession(
+      name: "Alpha", agent: SessionAgentConfiguration(providerID: "stub"), status: .closed,
+      createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 2),
+      closedAt: Date(timeIntervalSince1970: 1), repositories: [RepositoryContext(path: folder)])
+    let supervisor = WorkspaceSupervisor()
+    let repository = WorkspaceRepository(sessions: [session])
+    let registry = WorkspaceRegistry(providers: [Self.provider])
+    let launcher = SessionLauncher(
+      supervisor: supervisor, repository: repository, agents: registry, viewportTimeout: .zero)
+    let terminals = SessionTerminals(
+      supervisor: supervisor, viewportTimeout: .milliseconds(1), sessionFolder: { _ in folder })
+    let browser = BrowserWorkspace()
+    let model = AppModel(
+      repository: repository, agents: registry, launcher: launcher,
+      layout: WorkspaceLayoutController(store: RecordingLayoutStore()), browser: browser,
+      terminals: terminals)
+    let plan = try await Self.provider.launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: folder))
+    await launcher.launch(session: session, plan: plan)
+    await model.load()
+    model.select(session.id)
+    for page in ["first", "second", "third"] {
+      _ = browser.open(
+        URL(string: "data:text/html,<p>\(page)</p><input>")!, in: session.id, openedBy: .user)
+    }
+    let tabs = browser.browser(for: session.id)
+    if let first = tabs.allTabs.first { tabs.activate(first.id) }
+    browser.setVisible(true, for: session.id)
+
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: width, height: 900),
+      styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = NSHostingView(rootView: RootView(model: model))
+    let workspace = Workspace(
+      model: model, session: session, drawer: terminals.drawer(for: session.id), window: window,
+      folder: folder)
+    if width < WorkspaceLayoutPolicy.browserBesideThreshold {
+      try await waitUntil("the web view taking turns with the terminal", in: workspace) {
+        model.layout.columns.browser == .alternating
+      }
+      model.layout.setShowsBrowserWhenAlternating(true)
+    }
+    try await waitUntil("the page and the terminal on screen", in: workspace) {
+      workspace.page != nil && workspace.agentTerminal != nil && workspace.tabs.count == 3
+    }
+    return workspace
+  }
+
+  /// A state is waited for, not a deadline: the bound only makes a state never reached say which.
+  private func waitUntil(
+    _ what: String, in workspace: Workspace, _ condition: () -> Bool
+  ) async throws {
+    let clock = ContinuousClock()
+    let start = clock.now
+    while true {
+      workspace.window.contentView?.layoutSubtreeIfNeeded()
+      if condition() { return }
+      guard clock.now - start < .seconds(45) else {
+        throw NeverReached(description: "Never reached: \(what). \(workspace.state)")
+      }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+  }
+
+  private func commandW() -> NSEvent {
+    NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+      windowNumber: 0, context: nil, characters: "w", charactersIgnoringModifiers: "w",
+      isARepeat: false, keyCode: 13)!
+  }
+
+  @Test(
+    "With the keyboard in the page or its address bar, ⌘W closes the tab, then the next one",
+    arguments: [1600, 800] as [CGFloat], [false, true])
+  func closesTabAfterTab(width: CGFloat, inAddressBar: Bool) async throws {
+    let workspace = try await workspace(width: width)
+    defer { workspace.close() }
+    let model = workspace.model
+    let page = try #require(workspace.page)
+
+    if inAddressBar {
+      model.focusAddressBar()
+    } else {
+      #expect(workspace.window.makeFirstResponder(page), "\(workspace.state)")
+    }
+    try await waitUntil("⌘W aimed at the web tab", in: workspace) {
+      model.innerCloseTarget == .webTab
+    }
+
+    // What the key does in the window: the tab in front goes, and its neighbour comes forward.
+    #expect(workspace.window.performKeyEquivalent(with: commandW()), "\(workspace.state)")
+    try await waitUntil("the next page on screen", in: workspace) {
+      workspace.tabs.count == 2 && workspace.page.map { $0 !== page } == true
+    }
+
+    // The keyboard stays where it was: the next ⌘W closes the next tab, not the session.
+    try await waitUntil("⌘W aimed at the next tab", in: workspace) {
+      model.innerCloseTarget == .webTab
+        && (inAddressBar || workspace.window.firstResponder === workspace.page)
+    }
+    model.closeInnerElement()
+    try await waitUntil("a second tab closed", in: workspace) { workspace.tabs.count == 1 }
+    #expect(model.pendingClose == nil, "\(workspace.state)")
+    #expect(model.sessions.first?.status == .active, "\(workspace.state)")
+  }
+
+  @Test("Another tab brought forward takes the keyboard the page had")
+  func switchingTabsKeepsTheKeyboard() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let model = workspace.model
+    let page = try #require(workspace.page)
+    workspace.window.makeFirstResponder(page)
+    try await waitUntil("⌘W aimed at the web tab", in: workspace) {
+      model.innerCloseTarget == .webTab
+    }
+
+    model.selectNextWebTab()
+    try await waitUntil("the next page on screen, with the keyboard", in: workspace) {
+      guard let shown = workspace.page, shown !== page else { return false }
+      return workspace.window.firstResponder === shown && model.innerCloseTarget == .webTab
+    }
+  }
+
+  @Test("With the keyboard in the agent's terminal, ⌘W closes nothing; in the drawer, its tab")
+  func terminalAndDrawer() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let model = workspace.model
+
+    // The agent's terminal: nothing inside the session holds the keyboard, and the session is
+    // ⇧⌘W's — ⌘W leaves it alone.
+    let terminal = try #require(workspace.agentTerminal)
+    workspace.window.makeFirstResponder(terminal)
+    try await waitUntil("⌘W aimed at nothing", in: workspace) {
+      model.innerCloseTarget == nil
+    }
+    model.closeInnerElement()
+    #expect(model.pendingClose == nil, "\(workspace.state)")
+    #expect(model.sessions.first?.status == .active, "\(workspace.state)")
+    #expect(workspace.tabs.count == 3, "\(workspace.state)")
+
+    // The drawer: ⌘W closes its terminal in front.
+    await workspace.drawer.show()
+    try await waitUntil("a side terminal on screen", in: workspace) {
+      workspace.sideTerminal != nil
+    }
+    let side = try #require(workspace.sideTerminal)
+    workspace.window.makeFirstResponder(side)
+    try await waitUntil("⌘W aimed at the side terminal", in: workspace) {
+      model.innerCloseTarget == .drawerTerminal
+    }
+  }
+}
