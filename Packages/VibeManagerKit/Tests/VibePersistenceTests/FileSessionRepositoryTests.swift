@@ -16,9 +16,11 @@ private func makeStoreURL() throws -> URL {
   return directory.appendingPathComponent("sessions.json")
 }
 
-private func makeCompleteSession(name: String = "Persistent session") -> WorkSession {
-  let date = Date(timeIntervalSince1970: 1_700_000_000)
-  return WorkSession(
+private func makeCompleteSession(
+  name: String = "Persistent session",
+  date: Date = Date(timeIntervalSince1970: 1_700_000_000)
+) -> WorkSession {
+  WorkSession(
     name: name,
     initialPrompt: "Build the persistence layer 🗃️",
     agent: SessionAgentConfiguration(
@@ -58,6 +60,33 @@ func fileRepositoryRoundTrip() async throws {
   let reloaded = try await FileSessionRepository(storeURL: storeURL).sessions()
 
   #expect(reloaded == [session])
+}
+
+@Test("A read after another writer changed the store returns what it wrote")
+func readSeesAnotherWriter() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let reader = FileSessionRepository(storeURL: storeURL)
+  var session = makeCompleteSession(name: "Before")
+
+  try await reader.save(session)
+  #expect(try await reader.session(id: session.id)?.name == "Before")
+  session.name = "After"
+  try await FileSessionRepository(storeURL: storeURL).save(session)
+
+  #expect(try await reader.session(id: session.id)?.name == "After")
+}
+
+@Test("Dates keep their fractions of a second through the store")
+func fractionalDatesRoundTrip() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let session = makeCompleteSession(date: Date(timeIntervalSince1970: 1_700_000_000.25))
+
+  try await FileSessionRepository(storeURL: storeURL).save(session)
+  let reloaded = try await FileSessionRepository(storeURL: storeURL).session(id: session.id)
+
+  #expect(reloaded?.createdAt == session.createdAt)
 }
 
 @Test("The store uses restrictive permissions and a field allowlist")
