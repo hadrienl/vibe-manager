@@ -42,6 +42,20 @@ own type — plain text, a folder, a PNG — to be opened in place. Read as that
 its content and a folder or an image a copy (#131). A file is therefore also what a provider opens in
 place, and only when the URL it gives is the original: a copy made for the reading is not one.
 
+The composer's text field is the exception the surface had (#146). SwiftUI draws it with an
+`NSTextView` registered for files too, and AppKit gives a drag to the frontmost visible view under
+the pointer whose registered types meet the drag's: the field took a file before the zone and typed
+its path where it was let go. A transparent view is laid over the field, registered only for the
+types of files, images and promised files. In front of the field, it wins the drags that carry one
+of them — a file, a folder, an image with or without a file, a promised file — and relays them,
+from their entry to their end, to the frontmost view behind it registered for them, text views
+aside: the zone, which makes chips of them as anywhere else, with the same veil and the same
+refusals. Every other drag — a selection of a page, a text from another application, a web
+address — meets none of its types and goes to the field, which inserts it where it is let go. AppKit
+finds a drag's destination without asking `hitTest(_:)`, so the overlay answers no click: the
+I-beam, the clicks and the scrolling stay the field's, and VoiceOver does not see it. Pasting is
+left alone.
+
 Where the drop goes is decided by `SessionDropRoute`, a pure function of the session's presentation,
 its process and its composer:
 
@@ -105,7 +119,8 @@ drop would. Every drop is announced to VoiceOver.
 
 - A dropped path is a user's keystrokes: it travels through the pane's input, like a paste, and is
   never read as the answer to an agent's permission (#45).
-- Text dropped on the composer joins the end of the draft, not the position of its cursor, which
-  SwiftUI's text editor does not expose.
+- Text dropped on the conversation outside the composer's field joins the end of the draft, not
+  the position of its cursor, which SwiftUI's text editor does not expose; dropped on the field, it
+  is inserted where it is let go.
 - A drop on a session whose agent has not asked for bracketed pastes — a bare shell — types the paths
   as characters, which is what Terminal.app does too.
