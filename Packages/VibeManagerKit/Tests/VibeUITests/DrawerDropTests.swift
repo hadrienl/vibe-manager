@@ -52,6 +52,16 @@ struct SideTerminalDropRouteTests {
     let (items, failed) = await DropReader.read([NSItemProvider(object: tab as NSString)])
     #expect(items.isEmpty)
     #expect(failed == 0)
+
+    // Told apart while it hovers, from the drag's pasteboard.
+    let pasteboard = NSPasteboard(name: .init("DrawerDropTests-\(UUID().uuidString)"))
+    defer { pasteboard.releaseGlobally() }
+    pasteboard.clearContents()
+    pasteboard.writeObjects([tab as NSString])
+    #expect(DrawerTabDrag.carriesTab(pasteboard))
+    pasteboard.clearContents()
+    pasteboard.writeObjects(["hello" as NSString])
+    #expect(!DrawerTabDrag.carriesTab(pasteboard))
   }
 }
 
@@ -131,13 +141,23 @@ struct DrawerDropTests {
     return await terminal.written.map { String(decoding: $0, as: UTF8.self) }
   }
 
+  /// What the drawer made of a drag: the operation it proposed while the drag hovered, and
+  /// whether it took the drop.
+  private struct Outcome {
+    let proposed: NSDragOperation
+    let taken: Bool
+  }
+
+  /// What a text view — Safari, the composer — lets be done with its text: never a move.
+  private static let textSource: NSDragOperation = [.copy, .generic]
+
   /// Lets `objects` go at `location` of the drawer's window — the origin at the bottom left, the
-  /// bar of tabs along the top — and says whether the drawer took them. The pasteboard, which the
-  /// drop reads after it was let go, is kept until `delivered` holds.
+  /// bar of tabs along the top — and says what the drawer did. The pasteboard, which the drop reads
+  /// after it was let go, is kept until `delivered` holds.
   private func drop(
     _ objects: [any NSPasteboardWriting], at location: NSPoint, on fixture: Fixture,
-    until delivered: () async -> Bool = { true }
-  ) async throws -> Bool {
+    sourceMask: NSDragOperation = .copy, until delivered: () async -> Bool = { true }
+  ) async throws -> Outcome {
     let host = NSHostingView(
       rootView: TerminalDrawerView(
         model: fixture.model, drawer: fixture.drawer, sessionName: fixture.session.name
@@ -157,14 +177,17 @@ struct DrawerDropTests {
     defer { pasteboard.releaseGlobally() }
     pasteboard.clearContents()
     pasteboard.writeObjects(objects)
-    guard let destination = Self.dropDestination(in: host) else { return false }
-    let drag = PasteboardDrag(pasteboard: pasteboard, location: location, window: window)
+    guard let destination = Self.dropDestination(in: host) else {
+      return Outcome(proposed: [], taken: false)
+    }
+    let drag = PasteboardDrag(
+      pasteboard: pasteboard, location: location, window: window, sourceMask: sourceMask)
     _ = destination.draggingEntered(drag)
-    _ = destination.draggingUpdated(drag)
+    let proposed = destination.draggingUpdated(drag)
     _ = destination.prepareForDragOperation(drag)
     let taken = destination.performDragOperation(drag)
     if taken { await waitUntil(delivered) }
-    return taken
+    return Outcome(proposed: proposed, taken: taken)
   }
 
   private static func dropDestination(in view: NSView) -> NSView? {
@@ -193,7 +216,7 @@ struct DrawerDropTests {
     #expect(
       try await drop([url as NSURL], at: Self.terminalPoint, on: fixture) {
         await !typed(fixture.supervisor, side.id).isEmpty
-      })
+      }.taken)
 
     // A file of the temporary folder is kept in the session's drop folder, as #42 does.
     let kept =
@@ -215,7 +238,7 @@ struct DrawerDropTests {
     #expect(
       try await drop([url as NSURL], at: Self.firstTabPoint, on: fixture) {
         await !typed(fixture.supervisor, first.id).isEmpty
-      })
+      }.taken)
 
     let kept = "/Drops/\(fixture.session.id.rawValue.uuidString)/simple.txt "
     #expect(await typed(fixture.supervisor, first.id) == [kept])
@@ -231,11 +254,14 @@ struct DrawerDropTests {
     let first = fixture.drawer.terminals[0]
     let second = fixture.drawer.terminals[1]
 
-    #expect(
-      try await drop(
-        [DrawerTabDrag.text(for: second.id) as NSString], at: Self.firstTabPoint, on: fixture
-      ) { fixture.drawer.terminals.first?.id == second.id })
+    let outcome = try await drop(
+      [DrawerTabDrag.text(for: second.id) as NSString], at: Self.firstTabPoint, on: fixture,
+      sourceMask: Self.textSource
+    ) { fixture.drawer.terminals.first?.id == second.id }
 
+    #expect(outcome.taken)
+    // A copy, which a text source allows: a move would have refused a text dropped here.
+    #expect(!outcome.proposed.intersection(Self.textSource).isEmpty)
     #expect(fixture.drawer.terminals.map(\.id) == [second.id, first.id])
     #expect(await typed(fixture.supervisor, first.id).isEmpty)
     #expect(await typed(fixture.supervisor, second.id).isEmpty)
@@ -254,12 +280,53 @@ struct DrawerDropTests {
         == .refused(.shellNotRunning))
     let url = try file(named: "simple.txt", in: fixture)
 
-    #expect(try await !drop([url as NSURL], at: Self.terminalPoint, on: fixture))
+    #expect(try await !drop([url as NSURL], at: Self.terminalPoint, on: fixture).taken)
 
     #expect(await typed(fixture.supervisor, side.id).isEmpty)
     #expect(await typed(fixture.supervisor, fixture.session.id.agentTerminal).isEmpty)
     #expect(
       AppModel.refusalAnnouncement(.shellNotRunning, name: "zsh")
         == "Nothing dropped: the shell of zsh is not running.")
+  }
+
+  @Test("A text dragged out of a text view onto a tab behind is typed into that tab")
+  func textOnTab() async throws {
+    let fixture = try await running(tabs: 2)
+    defer { try? FileManager.default.removeItem(at: fixture.folder) }
+    let first = fixture.drawer.terminals[0]
+    let second = fixture.drawer.terminals[1]
+
+    let outcome = try await drop(
+      ["npm run dev" as NSString], at: Self.firstTabPoint, on: fixture,
+      sourceMask: Self.textSource
+    ) { await !typed(fixture.supervisor, first.id).isEmpty }
+
+    #expect(outcome.taken)
+    #expect(!outcome.proposed.intersection(Self.textSource).isEmpty)
+    #expect(await typed(fixture.supervisor, first.id) == ["npm run dev "])
+    #expect(fixture.drawer.activeTerminalID == first.id)
+    #expect(await typed(fixture.supervisor, second.id).isEmpty)
+  }
+
+  @Test("A text dropped on a tab whose shell ended is refused, and the tab stays behind")
+  func textOnEndedTab() async throws {
+    let fixture = try await running(tabs: 2)
+    defer { try? FileManager.default.removeItem(at: fixture.folder) }
+    let first = fixture.drawer.terminals[0]
+    let second = fixture.drawer.terminals[1]
+    let shell = try #require(
+      await fixture.supervisor.session(for: first.id) as? WorkspaceTerminal)
+    await shell.finish(state: .exited(code: 1))
+    await waitUntil { first.pane.status != .running }
+
+    let outcome = try await drop(
+      ["npm run dev" as NSString], at: Self.firstTabPoint, on: fixture,
+      sourceMask: Self.textSource)
+
+    #expect(!outcome.taken)
+    #expect(outcome.proposed.isEmpty)
+    #expect(fixture.drawer.activeTerminalID == second.id)
+    #expect(await typed(fixture.supervisor, first.id).isEmpty)
+    #expect(await typed(fixture.supervisor, second.id).isEmpty)
   }
 }

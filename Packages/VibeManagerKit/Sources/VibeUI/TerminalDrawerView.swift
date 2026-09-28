@@ -289,6 +289,14 @@ enum DrawerTabDrag {
     return TerminalID(rawValue: uuid)
   }
 
+  /// Whether a drag's pasteboard holds a tab of a drawer, read while it hovers.
+  static func carriesTab(_ pasteboard: NSPasteboard) -> Bool {
+    guard let items = pasteboard.pasteboardItems, items.count == 1,
+      let text = items[0].string(forType: .string)
+    else { return false }
+    return terminalID(in: text) != nil
+  }
+
   /// The tab a drop carries, when it carries one and nothing else. Only text is read: never the
   /// content of a file, which a provider opened in place would give as text (#131).
   @MainActor
@@ -386,29 +394,38 @@ struct DrawerTabDropDelegate: DropDelegate {
     model.dropRoute(for: drawer.sessionID, target: .sideTerminal(terminalID))
   }
 
-  /// A tab carries text alone; a file or an image is surely a drop to type. Text from elsewhere
-  /// cannot be told from a tab before it is read, and is shown as one.
-  private static func carriesFiles(_ info: DropInfo) -> Bool {
-    info.hasItemsConforming(to: [.fileURL, .image])
+  /// A file, an image or a promised file (Mail, Photos) is surely a drop to type.
+  private static let fileTypes: [UTType] =
+    [.fileURL, .image]
+    + NSFilePromiseReceiver.readableDraggedTypes.compactMap { UTType($0) }
+
+  /// Whether the drag hovering is a tab of a drawer. `DropInfo` cannot be read before the drop,
+  /// so the drag's own pasteboard is: a tab's text is on it for the whole drag. The drop itself
+  /// goes by what it carries, read then.
+  private static func isTabDrag(_ info: DropInfo) -> Bool {
+    !info.hasItemsConforming(to: fileTypes)
+      && DrawerTabDrag.carriesTab(NSPasteboard(name: .drag))
   }
 
   func dropEntered(info: DropInfo) {
     track(info)
   }
 
+  /// `.copy` for a tab too: a text view — Safari, the composer — lets its text be copied, never
+  /// moved, and a proposal of `.move` would refuse it.
   func dropUpdated(info: DropInfo) -> DropProposal? {
     track(info)
-    guard Self.carriesFiles(info) else { return DropProposal(operation: .move) }
+    guard !Self.isTabDrag(info) else { return DropProposal(operation: .copy) }
     return DropProposal(operation: route.isRefused ? .forbidden : .copy)
   }
 
   private func track(_ info: DropInfo) {
     let next: DrawerTabHover?
-    if Self.carriesFiles(info) {
+    if Self.isTabDrag(info) {
+      next = DragEndWatch.isButtonDown() ? .reordering : nil
+    } else {
       next = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
         .map(DrawerTabHover.dropping)
-    } else {
-      next = DragEndWatch.isButtonDown() ? .reordering : nil
     }
     if hover != next { hover = next }
   }
@@ -419,7 +436,7 @@ struct DrawerTabDropDelegate: DropDelegate {
 
   func performDrop(info: DropInfo) -> Bool {
     hover = nil
-    if Self.carriesFiles(info), route.isRefused { return false }
+    if !Self.isTabDrag(info), route.isRefused { return false }
     let providers = info.itemProviders(for: DropReader.acceptedTypes)
     let model = model
     let drawer = drawer
@@ -432,7 +449,11 @@ struct DrawerTabDropDelegate: DropDelegate {
         drawer.move(dragged, to: index)
         return
       }
-      drawer.activate(terminalID)
+      // A shell that ended takes nothing and stays behind: the drop says why, and that is all.
+      let target = SessionDropTarget.sideTerminal(terminalID)
+      if !model.dropRoute(for: drawer.sessionID, target: target).isRefused {
+        drawer.activate(terminalID)
+      }
       await model.deliverDrop(providers, to: drawer.sessionID, target: .sideTerminal(terminalID))
     }
     return true

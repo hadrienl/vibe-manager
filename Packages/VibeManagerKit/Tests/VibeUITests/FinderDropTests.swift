@@ -12,15 +12,20 @@ final class PasteboardDrag: NSObject, NSDraggingInfo {
   let draggingPasteboard: NSPasteboard
   let draggingLocation: NSPoint
   weak var draggingDestinationWindow: NSWindow?
+  /// What the source lets be done: `.copy` for the Finder here, `.copy | .generic` for a text view.
+  let draggingSourceOperationMask: NSDragOperation
 
   @MainActor
-  init(pasteboard: NSPasteboard, location: NSPoint, window: NSWindow) {
+  init(
+    pasteboard: NSPasteboard, location: NSPoint, window: NSWindow,
+    sourceMask: NSDragOperation = .copy
+  ) {
     draggingPasteboard = pasteboard
     draggingLocation = location
     draggingDestinationWindow = window
+    draggingSourceOperationMask = sourceMask
   }
 
-  var draggingSourceOperationMask: NSDragOperation { .copy }
   var draggedImageLocation: NSPoint { draggingLocation }
   var draggedImage: NSImage? { nil }
   var draggingSource: Any? { nil }

@@ -59,9 +59,13 @@ for one. The target is the terminal under the pointer, not the one that has the 
 terminal area, the tab in front; over a tab of the bar, that tab, which comes in front, as a row of
 the sidebar selects its session. A tab of the bar also takes the tabs dragged along it: its drag
 carries a prefixed text (`DrawerTabDrag`), which moves the tab and which no drop ever types; anything
-else is dropped into that tab's terminal. The rest of the bar, the + and the button that hides the
-drawer, takes nothing. A side terminal takes a drop while its shell runs, whatever the agent does;
-one whose shell ended refuses it, with the red veil. The notice of a drop stays at the top of the
+else — a file, an image, a promised file, a text — is dropped into that tab's terminal. While the
+drag hovers, a tab is told apart by the drag's pasteboard, since the drop's items cannot be read
+before it is let go; the drop itself goes by what it carries. Every drop on a tab proposes a copy,
+the tabs' included: a text view lets its text be copied, never moved. The rest of the bar, the + and
+the button that hides the drawer, takes nothing. A side terminal takes a drop while its shell runs,
+whatever the agent does; one whose shell ended refuses it — a file or a text alike — with the red
+veil, and its tab does not come in front. The notice of a drop stays at the top of the
 session's column.
 
 A row of the sidebar takes the same drop: the session is selected, then receives it. A drag that

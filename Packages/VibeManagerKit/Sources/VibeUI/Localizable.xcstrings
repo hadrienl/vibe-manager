@@ -11866,6 +11866,7 @@
       }
     },
     "The shell is not running" : {
+      "comment" : "Over a side terminal, while a drag hovers: its shell has ended, it takes no drop.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
