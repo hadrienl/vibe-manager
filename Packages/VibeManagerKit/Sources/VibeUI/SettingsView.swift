@@ -355,11 +355,6 @@ struct PrivacySettingsView: View {
           .fixedSize(horizontal: false, vertical: true)
         }
       }
-      Section {
-        SystemSettingsRow(permissions: permissions)
-      } header: {
-        Text("System Settings", bundle: .module, comment: "A section of the Settings window.")
-      }
     }
     .formStyle(.grouped)
     .scrollDisabled(true)
@@ -399,12 +394,6 @@ private struct FullDiskAccessRow: View {
         .font(.callout)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
-
-        Button {
-          permissions.openSystemSettings()
-        } label: {
-          Text("Open System Settings", bundle: .module)
-        }
       case .pendingRestart(let runner, let running):
         PendingRestartExplanation(runner: runner, runningAgents: running)
           .font(.callout)
@@ -415,6 +404,13 @@ private struct FullDiskAccessRow: View {
         }
       case .granted, .checking:
         EmptyView()
+      }
+
+      // In every state: to grant the access, and to take it back.
+      Button {
+        permissions.openSystemSettings()
+      } label: {
+        Text("Open System Settings", bundle: .module)
       }
     }
   }
@@ -554,38 +550,6 @@ private struct ProcessAccessRows: View {
       return LocalizedStringResource(
         "Unknown", bundle: .module,
         comment: "The state of Full Disk Access of a process that cannot say.")
-    }
-  }
-}
-
-/// Where the switch is, and which of several identical entries is this copy.
-private struct SystemSettingsRow: View {
-  let permissions: PermissionsModel
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(
-        """
-        Several “Vibe Manager” in the list? Each build signed differently is a separate entry. \
-        Drag this copy into the list to add the right one.
-        """,
-        bundle: .module
-      )
-      .font(.callout)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-      HStack {
-        Button {
-          permissions.revealInFinder()
-        } label: {
-          Text("Show in Finder", bundle: .module)
-        }
-        Button {
-          permissions.openSystemSettings()
-        } label: {
-          Text("Open System Settings", bundle: .module)
-        }
-      }
     }
   }
 }

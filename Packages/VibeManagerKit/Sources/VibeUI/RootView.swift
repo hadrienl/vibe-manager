@@ -117,7 +117,6 @@ public struct RootView: View {
             openSystemSettings: {
               Task { await permissions.answerStepByOpeningSystemSettings() }
             },
-            revealInFinder: { permissions.revealInFinder() },
             skip: { Task { await permissions.skipStep() } }
           )
         }

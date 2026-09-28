@@ -77,7 +77,9 @@ agent ends, **Restart Now…** stops the agents it names and resumes them. When 
 restarts by itself.
 
 System Settings may list several "Vibe Manager": each signature is a separate entry, and nothing
-tells them apart. **Show in Finder**, in the same tab, reveals this copy to drag into the list.
+tells them apart. It only happens to whoever runs several builds — Debug, Apple Development,
+Developer ID — so the application says nothing about it (#151): reveal the copy in use in the
+Finder and drag it into the list.
 
 To see what TCC decides — `/usr/bin/log`, since zsh has a `log` of its own:
 

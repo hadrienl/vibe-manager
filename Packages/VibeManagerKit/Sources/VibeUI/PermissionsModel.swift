@@ -51,7 +51,6 @@ public final class PermissionsModel {
   private let control: (any AgentRunnerControl)?
   private let restartHost: RestartAgentHost?
   private let openURL: @MainActor (URL) -> Void
-  private let revealApplication: @MainActor () -> Void
   /// Until when coming back to the application is a reason to look again: set by a trip to System
   /// Settings, and bounded, since each look spawns a process and a user who chose not to turn the
   /// switch on would otherwise pay for one at every return for the rest of the run.
@@ -65,9 +64,6 @@ public final class PermissionsModel {
     control: (any AgentRunnerControl)? = nil,
     restartHost: RestartAgentHost? = nil,
     openURL: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
-    revealApplication: @escaping @MainActor () -> Void = {
-      NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
-    },
     now: @escaping @MainActor () -> Date = Date.init
   ) {
     self.now = now
@@ -75,7 +71,6 @@ public final class PermissionsModel {
     self.control = control
     self.restartHost = restartHost
     self.openURL = openURL
-    self.revealApplication = revealApplication
   }
 
   /// What the application's identity has, as last known.
@@ -169,10 +164,6 @@ public final class PermissionsModel {
 
   /// Shows this very copy of the application in the Finder, to be dragged into the list when
   /// System Settings holds several "Vibe Manager" that nothing tells apart.
-  public func revealInFinder() {
-    revealApplication()
-  }
-
   /// The step's own default button: opens the pane and closes the step. Coming back to the
   /// application is when the answer is looked for.
   public func answerStepByOpeningSystemSettings() async {
