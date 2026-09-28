@@ -286,6 +286,19 @@ struct SyntaxHighlighterTests {
     }
   }
 
+  @Test(
+    "A character that starts nothing is still consumed — an attribute, a superscript, a foreign digit",
+    .timeLimit(.minutes(1)))
+  func alwaysAdvances() {
+    for (code, language) in [
+      ("@MainActor final class A {}", "swift"), ("@dataclass\nclass A: pass", "python"),
+      ("x = 2²", "swift"), ("½ + ① + ٣", "js"), ("user@host", "sh"),
+    ] {
+      let joined = SyntaxHighlighter.segments(of: code, language: language).map(\.text).joined()
+      #expect(joined == code)
+    }
+  }
+
   @Test("A diff colours its lines by their sign")
   func diff() {
     let segments = SyntaxHighlighter.segments(of: "@@ -1 +1 @@\n-a\n+b\n c", language: "diff")

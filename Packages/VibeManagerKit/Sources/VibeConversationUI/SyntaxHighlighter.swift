@@ -176,7 +176,7 @@ public enum SyntaxHighlighter {
         continue
       }
       if character.isNumber, index == 0 || !isIdentifier(characters[index - 1]) {
-        var end = index
+        var end = index + 1
         while end < characters.count,
           characters[end].isHexDigit || characters[end] == "." || characters[end] == "_"
             || characters[end] == "x"
@@ -188,7 +188,7 @@ public enum SyntaxHighlighter {
         continue
       }
       if isIdentifierStart(character) {
-        var end = index
+        var end = index + 1
         while end < characters.count, isIdentifier(characters[end]) { end += 1 }
         let word = String(characters[index..<end])
         let kind: Kind
