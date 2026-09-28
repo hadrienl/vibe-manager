@@ -128,7 +128,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ ne peut pas résumer cette session : il n’est pas connecté."
+            "value" : "%@ ne peut pas résumer cette session : il n’est pas connecté."
           }
         }
       }
@@ -139,7 +139,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ ne peut pas résumer cette session : il n’en offre pas le moyen."
+            "value" : "%@ ne peut pas résumer cette session : il n’en offre pas le moyen."
           }
         }
       }
@@ -150,7 +150,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ ne peut pas résumer cette session : son outil en ligne de commande ne peut pas être lancé."
+            "value" : "%@ ne peut pas résumer cette session : son outil en ligne de commande ne peut pas être lancé."
           }
         }
       }
@@ -161,7 +161,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ ne peut pas résumer cette session : son outil en ligne de commande est trop ancien."
+            "value" : "%@ ne peut pas résumer cette session : son outil en ligne de commande est trop ancien."
           }
         }
       }
@@ -365,7 +365,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ n’existe plus ; le dossier le plus proche a été affiché."
+            "value" : "%@ n’existe plus ; le dossier le plus proche a été affiché."
           }
         }
       }
@@ -2090,19 +2090,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Le résumé de %lld sessions doit d’abord être relu : redémarrez-les une par une."
+                  "value" : "Le résumé de %lld sessions doit d’abord être relu : redémarrez-les une par une."
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Le résumé de %lld session doit d’abord être relu : redémarrez-la seule."
+                  "value" : "Le résumé de %lld session doit d’abord être relu : redémarrez-la seule."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Le résumé de %lld sessions doit d’abord être relu : redémarrez-les une par une."
+                  "value" : "Le résumé de %lld sessions doit d’abord être relu : redémarrez-les une par une."
                 }
               }
             }
@@ -4395,19 +4395,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Archiver %lld sessions ?"
+                  "value" : "Archiver %lld sessions ?"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Archiver %lld session ?"
+                  "value" : "Archiver %lld session ?"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Archiver %lld sessions ?"
+                  "value" : "Archiver %lld sessions ?"
                 }
               }
             }
@@ -5019,19 +5019,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Fermer %lld sessions ?"
+                  "value" : "Fermer %lld sessions ?"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Fermer %lld session ?"
+                  "value" : "Fermer %lld session ?"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Fermer %lld sessions ?"
+                  "value" : "Fermer %lld sessions ?"
                 }
               }
             }
@@ -6545,7 +6545,7 @@
       }
     },
     "Generation under way, %@" : {
-      "comment" : "Read by VoiceOver: an avatar being drawn, and for how long (“42 seconds”).",
+      "comment" : "Read by VoiceOver: an avatar being drawn, and for how long (“2 minutes”).",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7101,7 +7101,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Son résumé doit d’abord être relu : redémarrez-la seule."
+            "value" : "Son résumé doit d’abord être relu : redémarrez-la seule."
           }
         }
       }
@@ -7467,19 +7467,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Déplacer %lld sessions vers %@ ?"
+                  "value" : "Déplacer %lld sessions vers %@ ?"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Déplacer %lld session vers %@ ?"
+                  "value" : "Déplacer %lld session vers %@ ?"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Déplacer %lld sessions vers %@ ?"
+                  "value" : "Déplacer %lld sessions vers %@ ?"
                 }
               }
             }
@@ -8499,7 +8499,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et les sessions restent consultables dans Archivées. Elles ne pourront plus être rouvertes avant d’avoir été désarchivées."
+            "value" : "Rien n’est supprimé : les notes, les dépôts et les métadonnées Git sont conservés, et les sessions restent consultables dans Archivées. Elles ne pourront plus être rouvertes avant d’avoir été désarchivées."
           }
         }
       }
@@ -9691,19 +9691,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Redémarrer %lld sessions ?"
+                  "value" : "Redémarrer %lld sessions ?"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Redémarrer %lld session ?"
+                  "value" : "Redémarrer %lld session ?"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Redémarrer %lld sessions ?"
+                  "value" : "Redémarrer %lld sessions ?"
                 }
               }
             }
@@ -10439,7 +10439,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plusieurs choix : répondez dans la session."
+            "value" : "Plusieurs choix : répondez dans la session."
           }
         }
       }
@@ -12005,6 +12005,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’avatar « %@ » est gardé, et présente les demandes dans le panneau flottant."
+          }
+        }
+      }
+    },
+    "The avatar “%@” is kept, but could not be put in the floating panel: the panel keeps its own." : {
+      "comment" : "Said when a draft avatar is kept, and putting it in use failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » est gardé, mais n’a pas pu être mis dans le panneau flottant : le panneau garde le sien."
           }
         }
       }
@@ -14972,6 +14983,17 @@
         }
       }
     },
+    "less than a minute" : {
+      "comment" : "Read by VoiceOver: how long an avatar has been drawn for, under a minute.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moins d’une minute"
+          }
+        }
+      }
+    },
     "live" : {
       "comment" : "Said of a Git list that follows the disk as it changes.",
       "localizations" : {
@@ -15278,6 +15300,17 @@
         }
       }
     },
+    "shipped with the application" : {
+      "comment" : "Read by VoiceOver after the default avatar's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fourni avec l’application"
+          }
+        }
+      }
+    },
     "signed out: sign in from a terminal" : {
       "comment" : "Why an agent cannot draw an avatar: after its name.",
       "localizations" : {
@@ -15509,7 +15542,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« %@ » est introuvable : le dossier récent suivant est proposé."
+            "value" : "« %@ » est introuvable : le dossier récent suivant est proposé."
           }
         }
       }

@@ -147,12 +147,14 @@ description of a failed generation does not replace, unasked, one being written 
 ### Accessibility
 
 Each row of the list is one VoiceOver element: its name, where it comes from and when, then its
-states as its value — in use, to check, a generation under way and for how long, failed,
-unreadable, incomplete. Its actions are those of its menu that can be done now, and Cancel,
+states as its value — in use, to check, a generation under way and for how long in whole minutes
+(read again each minute, not each second), failed and since when, unreadable, incomplete. Its
+actions are those of its menu that can be done now, and Cancel,
 Try Again, Save Again, Remove for a generation. The card is a button whose value says Folded or
 Unfolded and, greyed out, why. An expression the avatar lacks is said missing. The model announces
 the start and the end of a generation or an import, a failure, an avatar kept, put in use, deleted
-or discarded — through one `announce` that the tests replace. The words are tested without the
+or discarded — each once: a draft kept but not put in use is one sentence, and an avatar deleted
+while it is redrawn is not said cancelled first — through one `announce` that the tests replace. The words are tested without the
 views: SwiftUI builds a hosted view's accessibility tree only for an assistive application.
 
 ## Consequences

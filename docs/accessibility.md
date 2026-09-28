@@ -120,7 +120,9 @@ none either.
 VoiceOver announces, without moving its cursor: a generation or an import that starts, and that
 ends; a generation that failed, was cancelled, or could not be written; an archive refused, and
 why; an avatar kept, put in use, deleted or discarded — each once, with its name; any change the
-library refused. The in-use, to-check and failed pills are words with a symbol, never a colour
+library refused. A draft kept whose putting in use failed is one sentence that says both; an
+avatar deleted while one of its expressions is drawn again is said deleted, never "cancelled"
+first. The in-use, to-check and failed pills are words with a symbol, never a colour
 alone; so is an expression the avatar lacks, said "missing".
 
 ## Sessions
@@ -158,8 +160,8 @@ closing the window is in Safari, and asks first while the agent is at work. Over
 | Its counter | "Request 1 of 2" | — | Previous request, Next request | — |
 | Pages of Settings › Requests | "Requests Section" | "Alerts" or "Avatars" | — | `requests-pane` |
 | Avatar of the floating panel, in Settings › Requests › Alerts | "Avatar", its explanation as the hint; the row's own text is hidden, not said twice | the avatar in use | — | `avatar-in-use-picker`, `manage-avatars` |
-| An avatar of Settings › Requests › Avatars, one element | its name, where it comes from and when ("Robot, imported on September 27, 2026", "Default Avatar, Shipped with the application") | its states: "In Use", "To Check", "Generation under way, 42 seconds", "Unreadable", "Incomplete, 2 expressions missing" | Use This Avatar, Rename…, Duplicate, Export…, Export Without the Description…, Delete… or Discard… — each only when it can be done now; Cancel while an expression is drawn again | `avatar-row` |
-| A generation that is not an avatar yet, one element | the first line of its description | "Generation under way, 42 seconds", "Saving…", "Failed, 2 minutes ago" | Cancel while it runs; Try Again (when a new avatar can be made) or Save Again, and Remove, once it failed | `avatar-job-row` |
+| An avatar of Settings › Requests › Avatars, one element | its name, where it comes from and when ("Robot, imported on September 27, 2026", "Default Avatar, shipped with the application") | its states: "In Use", "To Check", "Generation under way, less than a minute", then "…, 2 minutes" — whole minutes, read again each minute, while the row shows the seconds; "Unreadable", "Incomplete, 2 expressions missing" | Use This Avatar, Rename…, Duplicate, Export…, Export Without the Description…, Delete… or Discard… — each only when it can be done now; Cancel while an expression is drawn again | `avatar-row` |
+| A generation that is not an avatar yet, one element | the first line of its description | "Generation under way, 2 minutes" (whole minutes), "Saving…", "Failed, 2 minutes ago" — read again each minute | Cancel while it runs; Try Again (when a new avatar can be made) or Save Again, and Remove, once it failed | `avatar-job-row` |
 | The card "Create a New Avatar" | "Create a New Avatar" | "Folded" or "Unfolded"; greyed out, why ("Folded, 20 avatars at most: delete one to make another.") | activate | `avatar-create-card` |
 | An expression of the preview | its name; "Worried, missing" when the avatar lacks it | — | its button, "Generate Worried again" or "Generate Worried" | — |
 | Avatar preview, in Settings › Requests › Avatars | "Animated preview of the avatar"; the request's bubble beside it is hidden | — | — | — |
