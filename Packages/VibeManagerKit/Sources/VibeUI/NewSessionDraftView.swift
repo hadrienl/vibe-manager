@@ -1,9 +1,16 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import VibeApplication
 import VibeDomain
 
-public struct NewSessionSheet: View {
+/// A new session, before it exists (#177): a conversation not started yet, in the main area.
+///
+/// The options come first, as a card at the head of the thread — the template, which may propose
+/// the rest, then where the agent works and which agent — and the composer at the foot is the
+/// initial prompt. Sending creates the session and launches it; nothing is stored and nothing runs
+/// before. Send stays unavailable, and says why, until what is required is there.
+public struct NewSessionDraftView: View {
   /// Bindable, not `@State`: the fields need bindings, but the model belongs to `AppModel` and
   /// must not be frozen at the value this view was first given.
   @Bindable private var model: NewSessionModel
@@ -11,6 +18,9 @@ public struct NewSessionSheet: View {
   /// The prompt areas are AppKit text views, which SwiftUI's focus does not reach: where the caret
   /// was sent is kept here too, and they take it themselves.
   @State private var editorRequest: FocusTarget?
+  /// The ticket and the appearance, folded away until asked for — or until one of them has
+  /// something to say.
+  @State private var showsMoreOptions = false
 
   /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
   enum FocusTarget: Hashable {
@@ -18,23 +28,36 @@ public struct NewSessionSheet: View {
     case templateField(String)
   }
 
-  /// Create was pressed on a draft that passes its own checks: whether to launch the session now
+  /// Bumped each time the draft is brought on screen: the caret goes back to the composer.
+  private let focusRequest: Int
+  /// Send was pressed on a draft that passes its own checks: whether to launch the session now
   /// or leave it in To Do (#80). The rest — the folder, the agent, the store — is checked with the
-  /// sheet closed, and a refusal brings it back.
+  /// draft gone, and a refusal brings it back.
   private let submitted: (Bool) -> Void
-  private let cancelled: () -> Void
-  /// Opens the templates in the settings. `nil`: the sheet offers no way there.
+  /// Escape: the draft is set aside, or dropped when nothing of the user's is in it.
+  private let dismissed: () -> Void
+  /// Discard: the draft goes, whatever is in it.
+  private let discarded: () -> Void
+  /// Opens the panel to choose files to join to the prompt.
+  private let chooseFiles: () -> Void
+  /// Opens the templates in the settings. `nil`: the draft offers no way there.
   private let manageTemplates: (() -> Void)?
 
   public init(
     model: NewSessionModel,
+    focusRequest: Int = 0,
     submitted: @escaping (Bool) -> Void,
-    cancelled: @escaping () -> Void,
+    dismissed: @escaping () -> Void,
+    discarded: @escaping () -> Void,
+    chooseFiles: @escaping () -> Void,
     manageTemplates: (() -> Void)? = nil
   ) {
     _model = Bindable(model)
+    self.focusRequest = focusRequest
     self.submitted = submitted
-    self.cancelled = cancelled
+    self.dismissed = dismissed
+    self.discarded = discarded
+    self.chooseFiles = chooseFiles
     self.manageTemplates = manageTemplates
   }
 
@@ -42,84 +65,165 @@ public struct NewSessionSheet: View {
     VStack(spacing: 0) {
       header
       Divider()
-      form
-      Divider()
-      footer
-    }
-    .frame(width: 640, height: 760)
-    .task {
-      await model.load()
-      // Back from a creation that was refused: the caret goes to what stopped it.
-      moveFocus(
-        to: firstIssueTarget ?? model.draft.templateFill.flatMap(firstEmptyField)
-          ?? .draft(.name))
-    }
-  }
-
-  private var header: some View {
-    VStack(alignment: .leading, spacing: 3) {
-      Text("New Session", bundle: .module, comment: "Title of the New Session sheet.")
-        .font(.title2.weight(.semibold))
-      Text("The terminal and the agent start as soon as the session is created.", bundle: .module)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 24)
-    .padding(.top, 20)
-    .padding(.bottom, 14)
-  }
-
-  /// The required fields come first, and the cosmetic one last: the folder used to sit below the
-  /// fold, which left the sheet refusing to create a session over a field nobody could see.
-  private var form: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        templateField
-        nameField
-        if model.draft.templateFill != nil {
-          templateFields
-          previewField
-        } else {
-          promptField
-        }
-        folderField
-        ticketField
-        agentField
-        modelField
-        appearanceField
+      ScrollView {
+        optionsCard
+          .frame(maxWidth: 760)
+          .padding(.horizontal, 24)
+          .padding(.vertical, 24)
+          .frame(maxWidth: .infinity)
       }
-      .padding(.horizontal, 24)
-      .padding(.vertical, 18)
+      composer
+        .frame(maxWidth: 800)
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity)
     }
+    .background(.background)
     .onChange(of: model.draft) {
       model.draftChanged()
     }
+    .onChange(of: model.issues) {
+      if !model.issues(for: .appearance).isEmpty { showsMoreOptions = true }
+    }
+    .onChange(of: focusRequest) {
+      placeCaret()
+    }
+    .task {
+      showsMoreOptions =
+        !model.draft.ticketText.isEmpty || !model.issues(for: .appearance).isEmpty
+      await model.load()
+      placeCaret()
+    }
+    // A file dropped anywhere on the draft joins its prompt, as the composer of a conversation
+    // takes one.
+    .dropDestination(for: URL.self) { urls, _ in
+      guard model.draft.templateFill == nil else { return false }
+      model.attach(urls.filter(\.isFileURL))
+      return true
+    }
+    .background {
+      // Escape sets the draft aside. A button rather than a key handler: the prompt is an AppKit
+      // text view, which keeps Escape for itself otherwise.
+      Button(action: dismissed) {
+        Text("Set Aside", bundle: .module, comment: "Escape in a new session's draft.")
+      }
+      .keyboardShortcut(.cancelAction)
+      .hidden()
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel(Text("New Session", bundle: .module, comment: "An unnamed new session."))
+    .accessibilityIdentifier("new-session-draft")
   }
 
-  private var nameField: some View {
-    LabeledField(
-      Text("Name", bundle: .module, comment: "The name of the new session."),
-      issues: model.issues(for: .name)
-    ) {
-      TextField(
-        String(localized: "What are you working on?", bundle: .module),
-        text: $model.draft.name
-      )
-      .textFieldStyle(.roundedBorder)
-      .focused($focus, equals: .draft(.name))
-      .accessibilityIdentifier("new-session-name")
+  // MARK: - Header
+
+  /// The name, typed where a session shows its name. Left empty, it shows the one the session will
+  /// be given.
+  private var header: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 10) {
+        SessionBadge(
+          appearance: model.draft.effectiveAppearance,
+          icon: model.icons?.image(for: model.draft.effectiveAppearance.iconID), size: 26)
+        TextField(
+          text: $model.draft.name,
+          prompt: Text(verbatim: model.placeholderName)
+        ) {
+          Text("Name", bundle: .module, comment: "The name of the new session.")
+        }
+        .textFieldStyle(.plain)
+        .font(.title3.weight(.semibold))
+        .focused($focus, equals: .draft(.name))
+        .accessibilityIdentifier("new-session-name")
+        Spacer(minLength: 12)
+        Text("Nothing starts before you send.", bundle: .module)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+        Button(role: .destructive, action: discarded) {
+          Text("Discard", bundle: .module, comment: "Discards the new session's draft.")
+        }
+        .controlSize(.small)
+        .help(Text("Discard this draft. No session is created.", bundle: .module))
+        .accessibilityIdentifier("new-session-discard")
+      }
+      ForEach(model.issues(for: .name)) { issue in
+        IssueLabel(issue: issue)
+      }
     }
+    .padding(.horizontal, 20)
+    .padding(.vertical, 12)
+  }
+
+  // MARK: - Options
+
+  /// The options, as the first message of the thread.
+  private var optionsCard: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: "terminal")
+        .font(.system(size: 14))
+        .foregroundStyle(.secondary)
+        .frame(width: 28, height: 28)
+        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityHidden(true)
+
+      VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Where, and with which agent?", bundle: .module)
+            .font(.headline)
+          Text("What you write below is the agent’s first message.", bundle: .module)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        // The template first, and its fields with it: it may propose the folder, the name and the
+        // appearance, and what it needs filled in is what Send waits for.
+        templateField
+        templateFields
+        Divider()
+        folderField
+        agentField
+        modelField
+        moreOptions
+      }
+      .padding(16)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: 14).strokeBorder(.separator)
+      }
+    }
+  }
+
+  private var moreOptions: some View {
+    DisclosureGroup(isExpanded: $showsMoreOptions) {
+      VStack(alignment: .leading, spacing: 14) {
+        ticketField
+        appearanceField
+      }
+      .padding(.top, 10)
+    } label: {
+      HStack(spacing: 6) {
+        Text("More Options", bundle: .module, comment: "Unfolds the ticket and the appearance.")
+        Text("Ticket, appearance", bundle: .module, comment: "What More Options unfolds.")
+          .foregroundStyle(.secondary)
+      }
+      .font(.callout)
+    }
+    .accessibilityIdentifier("new-session-more-options")
   }
 
   @ViewBuilder
   private var templateField: some View {
     LabeledField(
-      Text("Template", bundle: .module, comment: "The prompt template the session starts from."),
+      Text("Prompt template", bundle: .module, comment: "The template the session starts from."),
       help: model.templates.isEmpty
         ? Text(
           "No templates yet — Manage… to write one, or add the examples.", bundle: .module,
-          comment: "Manage… is the button next to the template picker.") : nil,
+          comment: "Manage… is the button next to the template picker.")
+        : Text("A template can propose the folder, the name and the appearance.", bundle: .module),
       issues: []
     ) {
       HStack(spacing: 8) {
@@ -130,6 +234,8 @@ public struct NewSessionSheet: View {
               model.selectTemplate(id)
               if let fill = model.draft.templateFill {
                 moveFocus(to: firstEmptyField(in: fill))
+              } else {
+                moveFocus(to: .draft(.initialPrompt))
               }
             }
           )
@@ -148,7 +254,7 @@ public struct NewSessionSheet: View {
             .tag(PromptTemplateID?.some(template.id))
           }
         } label: {
-          Text("Template", bundle: .module, comment: "The prompt template the session starts from.")
+          Text("Prompt template", bundle: .module, comment: "The template the session starts from.")
         }
         .labelsHidden()
         .frame(maxWidth: 280, alignment: .leading)
@@ -174,7 +280,7 @@ public struct NewSessionSheet: View {
         }
         .controlSize(.small)
       }
-      .padding(.leading, 130)
+      .padding(.leading, LabeledField<EmptyView>.titleWidth + 12)
       .accessibilityElement(children: .combine)
     }
   }
@@ -185,7 +291,10 @@ public struct NewSessionSheet: View {
     if let fill = model.draft.templateFill {
       ForEach(fill.template.fields) { field in
         LabeledField(
-          Text(verbatim: field.isRequired ? "\(field.label) *" : field.label),
+          Text(verbatim: field.label),
+          requirement: field.isRequired
+            ? (model.value(for: field.name).trimmingCharacters(in: .whitespacesAndNewlines)
+              .isEmpty ? .missing : .met) : nil,
           issues: model.issues(forTemplateField: field.name)
         ) {
           let text = Binding(
@@ -222,88 +331,10 @@ public struct NewSessionSheet: View {
     }
   }
 
-  /// The prompt exactly as it will be sent, with what was typed in bold and what is still missing
-  /// named in its place.
-  @ViewBuilder
-  private var previewField: some View {
-    if let rendered = model.renderedPrompt, let fill = model.draft.templateFill {
-      LabeledField(
-        Text("Prompt", bundle: .module, comment: "The prompt the agent is started with."),
-        issues: model.issues(for: .initialPrompt)
-      ) {
-        VStack(alignment: .leading, spacing: 6) {
-          ScrollView {
-            PromptPreviewText(rendered: rendered)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(8)
-          }
-          .frame(maxHeight: 180)
-          .fixedSize(horizontal: false, vertical: true)
-          .background(
-            Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6)
-          )
-          .overlay {
-            RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
-          }
-
-          HStack(spacing: 6) {
-            Text(
-              "\(PromptSize.label(rendered.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit)) · From “\(fill.template.trimmedName)”, revision \(String(fill.template.revision))",
-              bundle: .module,
-              comment:
-                "The prompt's size, the most an agent accepts, the template's name and revision."
-            )
-            .font(.caption)
-            .foregroundStyle(
-              rendered.byteCount > AgentPromptLimits.argumentByteLimit ? Color.red : .secondary)
-            Spacer()
-            Button {
-              model.editAsText()
-              moveFocus(to: .draft(.initialPrompt))
-            } label: {
-              Text("Edit as Text", bundle: .module)
-            }
-            .controlSize(.small)
-            .help(
-              Text(
-                "Turn the prompt into free text. The session will not refer to the template.",
-                bundle: .module))
-          }
-        }
-      }
-    }
-  }
-
-  private var promptField: some View {
-    LabeledField(
-      Text("Initial prompt", bundle: .module),
-      help: Text("Optional — handed to the agent as its first message.", bundle: .module),
-      issues: model.issues(for: .initialPrompt)
-    ) {
-      PromptTextEditor(
-        text: $model.draft.initialPrompt,
-        accessibilityLabel: String(localized: "Initial prompt", bundle: .module),
-        focusRequested: editorRequest == .draft(.initialPrompt)
-      )
-      .focused($focus, equals: .draft(.initialPrompt))
-      .accessibilityIdentifier("new-session-prompt")
-    }
-  }
-
-  private func moveFocus(to target: FocusTarget?) {
-    focus = target
-    editorRequest = target
-  }
-
-  private func firstEmptyField(in fill: PromptTemplateFill) -> FocusTarget? {
-    let fields = fill.template.fields
-    let empty = fields.first { fill.value(for: $0.name).isEmpty } ?? fields.first
-    return empty.map { .templateField($0.name) }
-  }
-
   private var agentField: some View {
     LabeledField(
       Text("Agent", bundle: .module, comment: "The coding agent the session runs."),
+      requirement: model.selectedAgent?.isUsable == true ? .met : .missing,
       issues: model.issues(for: .agent)
     ) {
       VStack(alignment: .leading, spacing: 8) {
@@ -413,6 +444,7 @@ public struct NewSessionSheet: View {
   private var folderField: some View {
     LabeledField(
       Text("Working folder", bundle: .module),
+      requirement: model.draft.resolvedWorkingDirectoryPath == nil ? .missing : .met,
       help: folderNotice.map { Text($0) }
         ?? (model.folderComesFromTemplate
           ? Text("Proposed by the template — change it if needed.", bundle: .module) : nil),
@@ -511,58 +543,202 @@ public struct NewSessionSheet: View {
     }
   }
 
-  private var footer: some View {
-    HStack {
-      if model.hasSubmitted, !model.issues.isEmpty {
-        Label {
-          Text("\(model.issues.count) problems to fix", bundle: .module)
-        } icon: {
-          Image(systemName: "exclamationmark.circle")
+  // MARK: - Composer
+
+  /// The initial prompt, where a conversation is written to: the free text, or the template's
+  /// rendering. Send and Add to To Do sit under it, with what they are waiting for.
+  private var composer: some View {
+    VStack(spacing: 6) {
+      VStack(alignment: .leading, spacing: 8) {
+        if let rendered = model.renderedPrompt, let fill = model.draft.templateFill {
+          renderedPrompt(rendered, of: fill)
+        } else {
+          PromptTextEditor(
+            text: $model.draft.initialPrompt,
+            minimumLines: 3,
+            maximumLines: 12,
+            placeholder: String(
+              localized: "Describe the task: it will be the agent’s first message…",
+              bundle: .module),
+            accessibilityLabel: String(localized: "Initial prompt", bundle: .module),
+            focusRequested: editorRequest == .draft(.initialPrompt),
+            isBordered: false,
+            onSubmit: submit
+          )
+          .focused($focus, equals: .draft(.initialPrompt))
+          .accessibilityIdentifier("new-session-prompt")
         }
-        .font(.caption)
-        .foregroundStyle(.red)
-      } else {
+        ForEach(model.issues(for: .initialPrompt)) { issue in
+          IssueLabel(issue: issue)
+        }
+        composerBar
+      }
+      .padding(12)
+      .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
+      .overlay {
+        RoundedRectangle(cornerRadius: 16).strokeBorder(.separator)
+      }
+
+      Text(
+        "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape sets the draft aside",
+        bundle: .module
+      )
+      .font(.caption2)
+      .foregroundStyle(.tertiary)
+      .multilineTextAlignment(.center)
+    }
+  }
+
+  /// The prompt exactly as it will be sent, with what was typed in bold and what is still missing
+  /// named in its place.
+  private func renderedPrompt(_ rendered: RenderedPrompt, of fill: PromptTemplateFill)
+    -> some View
+  {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
         Text(
-          "Cancel creates nothing — no session, no process.", bundle: .module,
-          comment: "Cancel is the button of the sheet."
+          "\(PromptSize.label(rendered.byteCount)) of \(PromptSize.label(AgentPromptLimits.argumentByteLimit)) · From “\(fill.template.trimmedName)”, revision \(String(fill.template.revision))",
+          bundle: .module,
+          comment:
+            "The prompt's size, the most an agent accepts, the template's name and revision."
         )
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(
+          rendered.byteCount > AgentPromptLimits.argumentByteLimit ? Color.red : .secondary)
+        Spacer()
+        Button {
+          model.editAsText()
+          moveFocus(to: .draft(.initialPrompt))
+        } label: {
+          Text("Edit as Text", bundle: .module)
+        }
+        .controlSize(.small)
+        .help(
+          Text(
+            "Turn the prompt into free text. The session will not refer to the template.",
+            bundle: .module))
+      }
+      ScrollView {
+        PromptPreviewText(rendered: rendered)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .frame(maxHeight: 140)
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityLabel(
+        Text("Prompt", bundle: .module, comment: "The prompt the agent is started with."))
+    }
+  }
+
+  private var composerBar: some View {
+    HStack(spacing: 8) {
+      Button(action: chooseFiles) {
+        Image(systemName: "plus")
+          .font(.system(size: 12, weight: .semibold))
+          .frame(width: 24, height: 24)
+          .overlay { Circle().strokeBorder(.separator) }
+          .contentShape(Circle())
+      }
+      .buttonStyle(.plain)
+      .disabled(model.draft.templateFill != nil)
+      .help(Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
+      .accessibilityLabel(
+        Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
+
+      if let summary {
+        Text(verbatim: summary)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
       }
 
-      Spacer()
+      Spacer(minLength: 8)
 
-      Button(role: .cancel, action: cancelled) {
-        Text("Cancel", bundle: .module)
-      }
-      .keyboardShortcut(.cancelAction)
+      status
+        .font(.caption)
+        .lineLimit(2)
+        .multilineTextAlignment(.trailing)
+
       // Prepared now, started later with a swipe to In Progress: the prompt waits in To Do.
       Button {
         submit(launching: false)
       } label: {
         Text("Add to To Do", bundle: .module, comment: "Creates a session without launching it.")
       }
+      .keyboardShortcut(.return, modifiers: .option)
       .disabled(!model.canSubmit)
       .accessibilityIdentifier("new-session-add-to-do")
+
       Button(action: submit) {
-        Text("Create & Launch", bundle: .module)
+        Image(systemName: "arrow.up")
+          .font(.system(size: 13, weight: .bold))
+          .foregroundStyle(.white)
+          .frame(width: 28, height: 28)
+          .background(
+            Circle().fill(model.canSubmit ? Color.accentColor : Color.secondary.opacity(0.4))
+          )
+          .contentShape(Circle())
       }
-      .keyboardShortcut(.defaultAction)
-      .buttonStyle(.borderedProminent)
+      .buttonStyle(.plain)
+      // Return goes to the line in a template's fields; ⌘↩ creates from anywhere in the draft.
+      .keyboardShortcut(.return, modifiers: .command)
       .disabled(!model.canSubmit)
+      .help(
+        model.missingRequirement.map { Text(verbatim: $0) }
+          ?? Text("Create & Launch", bundle: .module)
+      )
+      .accessibilityLabel(Text("Create & Launch", bundle: .module))
+      .accessibilityHint(model.missingRequirement.map { Text(verbatim: $0) } ?? Text(verbatim: ""))
       .accessibilityIdentifier("new-session-create")
-      // Return goes to the line in a prompt; ⌘↩ creates from anywhere in the form.
-      .background {
-        Button(action: submit) {
-          Text("Create & Launch", bundle: .module)
-        }
-        .keyboardShortcut(.return, modifiers: .command)
-        .disabled(!model.canSubmit)
-        .hidden()
-      }
     }
-    .padding(.horizontal, 24)
-    .padding(.vertical, 13)
+  }
+
+  /// What the send waits for, the problems of the last try, or what an empty prompt means.
+  @ViewBuilder
+  private var status: some View {
+    if let missing = model.missingRequirement {
+      Text(verbatim: missing)
+        .foregroundStyle(.orange)
+    } else if model.hasSubmitted, !model.issues.isEmpty {
+      Label {
+        Text("\(model.issues.count) problems to fix", bundle: .module)
+      } icon: {
+        Image(systemName: "exclamationmark.circle")
+      }
+      .foregroundStyle(.red)
+    } else if model.draft.trimmedPrompt.isEmpty {
+      Text("Without a prompt, the agent starts with nothing to do.", bundle: .module)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  /// Where and with what, as the composer of a conversation names its agent: `app · Claude Code`.
+  private var summary: String? {
+    let folder = model.draft.resolvedWorkingDirectoryPath.map {
+      ($0 as NSString).lastPathComponent
+    }
+    let parts = [folder, model.selectedAgent?.name].compactMap { $0 }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  // MARK: - Actions
+
+  private func placeCaret() {
+    // Back from a creation that was refused: the caret goes to what stopped it.
+    moveFocus(
+      to: firstIssueTarget ?? model.draft.templateFill.flatMap(firstEmptyField)
+        ?? .draft(.initialPrompt))
+  }
+
+  private func moveFocus(to target: FocusTarget?) {
+    focus = target
+    editorRequest = target
+  }
+
+  private func firstEmptyField(in fill: PromptTemplateFill) -> FocusTarget? {
+    let fields = fill.template.fields
+    let empty = fields.first { fill.value(for: $0.name).isEmpty } ?? fields.first
+    return empty.map { .templateField($0.name) }
   }
 
   /// Only these fields own a control that can take the keyboard: aiming the caret at any other
@@ -576,6 +752,10 @@ public struct NewSessionSheet: View {
   }
 
   private func submit(launching: Bool) {
+    guard model.canSubmit else {
+      NSSound.beep()
+      return
+    }
     Task {
       guard await model.refusesBeforeCreating() else {
         submitted(launching)
@@ -616,7 +796,7 @@ public struct NewSessionSheet: View {
     panel.canCreateDirectories = true
     panel.prompt = String(
       localized: "Choose", bundle: .module, comment: "The button of the folder panel.")
-    // The panel opens on the home directory when nothing is chosen yet. The sheet itself
+    // The panel opens on the home directory when nothing is chosen yet. The draft itself
     // proposes no folder — accepting one that contains Desktop, Documents and Downloads would
     // send an agent into them with nothing said — but the panel has to start somewhere.
     panel.directoryURL = URL(
@@ -628,19 +808,31 @@ public struct NewSessionSheet: View {
   }
 }
 
+/// A row of the options: its title on the left, the control on the right, and under it the
+/// problems, else the help. A required option says whether it is filled.
 private struct LabeledField<Content: View>: View {
+  enum Requirement {
+    case missing
+    case met
+  }
+
+  static var titleWidth: CGFloat { 132 }
+
   private let title: Text
+  private let requirement: Requirement?
   private let help: Text?
   private let issues: [SessionDraftIssue]
   private let content: Content
 
   init(
     _ title: Text,
+    requirement: Requirement? = nil,
     help: Text? = nil,
     issues: [SessionDraftIssue],
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
+    self.requirement = requirement
     self.help = help
     self.issues = issues
     self.content = content()
@@ -648,9 +840,29 @@ private struct LabeledField<Content: View>: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 12) {
-      title
-        .foregroundStyle(.secondary)
-        .frame(width: 118, alignment: .trailing)
+      VStack(alignment: .trailing, spacing: 4) {
+        title
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.trailing)
+        switch requirement {
+        case .missing:
+          Text("Required", bundle: .module, comment: "An option of a new session to fill.")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.orange)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Color.orange.opacity(0.15), in: Capsule())
+        case .met:
+          Image(systemName: "checkmark.circle.fill")
+            .font(.caption)
+            .foregroundStyle(.green)
+            .accessibilityLabel(
+              Text("Filled", bundle: .module, comment: "VoiceOver: a required option, filled."))
+        case nil:
+          EmptyView()
+        }
+      }
+      .frame(width: Self.titleWidth, alignment: .trailing)
 
       VStack(alignment: .leading, spacing: 5) {
         content

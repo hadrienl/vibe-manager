@@ -51,17 +51,19 @@ extension AppModel {
     return creation
   }
 
-  /// Create, optimistically: the sheet closes now, and the window shows the session to come while
-  /// it is checked, stored and started. A draft that is refused on the way brings the sheet back,
-  /// with its problems, exactly as it was left.
+  /// Create, optimistically: the draft gives way now, and the window shows the session to come
+  /// while it is checked, stored and started. A draft that is refused on the way comes back, with
+  /// its problems, exactly as it was left.
   ///
-  /// Only a draft that passes its own checks gets here: those cost nothing, and a sheet that
-  /// closed and came straight back for an empty name would only flicker.
+  /// Only a draft that passes its own checks gets here: those cost nothing, and a draft that went
+  /// and came straight back for a missing folder would only flicker.
   ///
-  /// One session is made this way at a time. A second Create pressed while the first is still on
-  /// its way waits in its sheet, as every creation used to.
+  /// One session is made this way at a time. A second Send pressed while the first is still on
+  /// its way waits in its draft, as every creation used to.
   public func submitNewSession(launching: Bool) {
     guard let sheet = newSessionModel, !sheet.isSubmitting else { return }
+    // Named now, so that the session to come shows the name it will have.
+    sheet.settleName()
     guard sessionInCreation == nil else {
       Task {
         guard let creation = await sheet.submit() else { return }
@@ -79,15 +81,39 @@ extension AppModel {
     Task {
       guard let creation = await sheet.submit() else {
         sessionInCreation = nil
-        // Back to the form, unless another one was opened meanwhile: that one is the user's now.
+        // Back to the draft, unless another one was begun meanwhile: that one is the user's now.
         if newSessionModel == nil {
           newSessionModel = sheet
-          isPresentingNewSession = true
+          showNewSessionDraft()
         }
         return
       }
       await publish(creation, launching: launching, tracked: true)
     }
+  }
+
+  /// Brings the draft on screen, the keyboard in its composer.
+  public func showNewSessionDraft() {
+    guard newSessionModel != nil else { return }
+    isPresentingNewSession = true
+    newSessionFocusRequest += 1
+  }
+
+  /// The user goes elsewhere: the draft stays for later, unless nothing of theirs is in it yet —
+  /// then it goes, as an empty draft left in the sidebar would only be in the way.
+  public func leaveNewSessionDraft() {
+    guard isPresentingNewSession else { return }
+    isPresentingNewSession = false
+    if let draft = newSessionModel, draft.isPristine, !draft.isSubmitting {
+      newSessionModel = nil
+    }
+  }
+
+  /// Escape in the draft: an empty draft is discarded, one with something in it is put aside, and
+  /// the session underneath comes back.
+  public func dismissNewSessionDraft() {
+    leaveNewSessionDraft()
+    focusSession()
   }
 
   func creationWasLeft(for id: SessionID?) {

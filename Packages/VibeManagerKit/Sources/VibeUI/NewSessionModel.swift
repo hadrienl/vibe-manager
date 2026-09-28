@@ -123,9 +123,68 @@ public final class NewSessionModel {
     return agents.first { $0.id.rawValue == providerID }
   }
 
+  /// The name is not asked for (#177): left empty, the session is named after its prompt, its
+  /// template or its folder. What must be chosen is where the agent works, and which agent.
   public var canSubmit: Bool {
-    !isSubmitting && !draft.trimmedName.isEmpty && draft.resolvedWorkingDirectoryPath != nil
-      && (draft.templateFill?.missingRequiredFields.isEmpty ?? true)
+    !isSubmitting && missingRequirement == nil
+  }
+
+  /// What still keeps the draft from being sent, said as what to do: the first one only, since the
+  /// composer has room for one line. `nil` once everything required is there.
+  public var missingRequirement: String? {
+    if draft.resolvedWorkingDirectoryPath == nil {
+      return String(
+        localized: "Choose a working folder to send.", bundle: .module,
+        comment: "Next to the Send button of a new session.")
+    }
+    if draft.providerID?.isEmpty ?? true {
+      return String(
+        localized: "Choose an agent to send.", bundle: .module,
+        comment: "Next to the Send button of a new session.")
+    }
+    if let field = draft.templateFill?.missingRequiredFields.first {
+      return String(
+        localized: "Fill in “\(field.label)” to send.", bundle: .module,
+        comment: "Next to the Send button of a new session. The label of a template's field.")
+    }
+    return nil
+  }
+
+  /// The name shown where the name is typed, until one is: the one the session would be given.
+  public var placeholderName: String {
+    let suggested = draft.suggestedName
+    return suggested.isEmpty
+      ? String(localized: "New Session", bundle: .module, comment: "An unnamed new session.")
+      : suggested
+  }
+
+  /// Whether the user has put anything of theirs in the draft yet: a draft still pristine is
+  /// dropped rather than kept when the user goes elsewhere. The folder and the agent are the
+  /// form's own defaults, so choosing them alone does not count.
+  public var isPristine: Bool {
+    draft.trimmedName.isEmpty
+      && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && draft.templateFill == nil
+      && draft.ticketText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  /// Gives the draft the name it would be created with, if none was typed. Done at Send, so the
+  /// name keeps following the prompt until then.
+  public func settleName() {
+    guard draft.trimmedName.isEmpty else { return }
+    draft.name = draft.suggestedName
+  }
+
+  /// Files joined to the prompt: their paths, as the agent reads them in a terminal, at the end
+  /// of the text. A template's prompt is its own; nothing is added to it.
+  public func attach(_ files: [URL]) {
+    guard draft.templateFill == nil else { return }
+    let paths = files.map(\.path).filter(PathInsertion.isWritablePath)
+      .map(PathInsertion.shellEscaped)
+    guard !paths.isEmpty else { return }
+    let text = draft.initialPrompt
+    let separator = text.isEmpty || text.last?.isWhitespace == true ? "" : " "
+    draft.initialPrompt = text + separator + paths.joined(separator: " ")
   }
 
   // MARK: - Templates
@@ -465,6 +524,7 @@ public final class NewSessionModel {
   /// nothing, so they are asked with the sheet still open; the rest waits for `submit()`.
   public func refusesBeforeCreating() async -> Bool {
     guard !isSubmitting else { return true }
+    settleName()
     guard !draft.validate().isEmpty else { return false }
     revalidation?.cancel()
     revalidation = nil

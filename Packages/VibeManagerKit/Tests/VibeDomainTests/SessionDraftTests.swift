@@ -188,3 +188,42 @@ struct FreePromptLineBreakTests {
     #expect(draft.session().initialPrompt == "one\ntwo\nthree")
   }
 }
+
+@Suite("The name a session is given when none is typed (#177)")
+struct SuggestedNameTests {
+  @Test("The first line of the prompt, without its margins")
+  func firstLineOfThePrompt() {
+    let draft = SessionDraft(
+      initialPrompt: "\n   Fix the scroll  \nthen the tests", workingDirectoryPath: "/work/app")
+    #expect(draft.suggestedName == "Fix the scroll")
+    #expect(draft.effectiveName == "Fix the scroll")
+  }
+
+  @Test("A long first line is cut at a word, and says so")
+  func longLineIsCutAtAWord() {
+    let line = String(repeating: "word ", count: 30)
+    let name = SessionDraft(initialPrompt: line).suggestedName
+    #expect(name.count <= SessionDraft.suggestedNameLength)
+    #expect(name.hasSuffix("word…"))
+  }
+
+  @Test("Without a prompt, the folder's name; without either, nothing")
+  func folderThenNothing() {
+    #expect(
+      SessionDraft(workingDirectoryPath: "/work/vibe-manager/").suggestedName == "vibe-manager")
+    #expect(SessionDraft().suggestedName.isEmpty)
+  }
+
+  @Test("A name typed wins over the suggestion")
+  func typedNameWins() {
+    let draft = SessionDraft(name: "  Mine ", initialPrompt: "Something else")
+    #expect(draft.effectiveName == "Mine")
+  }
+
+  @Test("The badge of an unnamed draft is the one its session will wear")
+  func appearanceFollowsTheSuggestion() {
+    let unnamed = SessionDraft(initialPrompt: "Fix the scroll")
+    let named = SessionDraft(name: "Fix the scroll")
+    #expect(unnamed.effectiveAppearance == named.effectiveAppearance)
+  }
+}

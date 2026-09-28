@@ -29,18 +29,58 @@ struct NewSessionModelTests {
     )
   }
 
-  @Test("Create stays out of reach until a name and a folder are there")
-  func submissionRequiresNameAndFolder() async {
+  @Test("Send waits for a folder and an agent, not for a name (#177), and says what it waits for")
+  func submissionRequiresFolderAndAgent() async {
     let model = makeModel()
     await model.load()
 
     #expect(!model.canSubmit)
-
-    model.draft.name = "Refactor the webhook"
-    #expect(!model.canSubmit)
+    #expect(model.missingRequirement == "Choose a working folder to send.")
 
     model.draft.workingDirectoryPath = "/workspace"
     #expect(model.canSubmit)
+    #expect(model.missingRequirement == nil)
+
+    model.draft.providerID = nil
+    #expect(!model.canSubmit)
+    #expect(model.missingRequirement == "Choose an agent to send.")
+  }
+
+  @Test("An unnamed draft is named at Send after its prompt, and a typed name is kept")
+  func nameIsSettledAtSend() async {
+    let model = makeModel()
+    await model.load()
+    model.draft.workingDirectoryPath = "/workspace"
+    model.draft.initialPrompt = "Fix the blank conversation\nafter scrolling"
+    #expect(model.placeholderName == "Fix the blank conversation")
+
+    #expect(!(await model.refusesBeforeCreating()))
+    #expect(model.draft.name == "Fix the blank conversation")
+
+    model.draft.name = "Mine"
+    model.settleName()
+    #expect(model.draft.name == "Mine")
+  }
+
+  @Test("A draft is pristine until the user writes something of theirs in it")
+  func pristineUntilWritten() async {
+    let model = makeModel()
+    await model.load()
+    model.draft.workingDirectoryPath = "/workspace"
+    #expect(model.isPristine)
+
+    model.draft.initialPrompt = "Something"
+    #expect(!model.isPristine)
+  }
+
+  @Test("Files joined to a free prompt are written at its end, as a terminal reads them")
+  func attachedFilesJoinThePrompt() {
+    let model = makeModel()
+    model.draft.initialPrompt = "Look at"
+
+    model.attach([URL(fileURLWithPath: "/tmp/a b.png"), URL(fileURLWithPath: "/tmp/c.txt")])
+
+    #expect(model.draft.initialPrompt == #"Look at /tmp/a\ b.png /tmp/c.txt"#)
   }
 
   @Test("The default agent is the first usable one, and the others stay listed")
@@ -544,6 +584,7 @@ struct NewSessionTemplateTests {
       templates: templates
     )
     model.draft.workingDirectoryPath = "/workspace"
+    model.draft.providerID = "claude-code"
     return model
   }
 

@@ -71,3 +71,52 @@ struct SessionCreationRow: View {
     .accessibilityIdentifier("session-creation-row")
   }
 }
+
+/// The new session's draft in the sidebar (#177): its badge outlined, its name in italics until
+/// it is a session. Not a row of the list's selection — it has no session to select — but a button
+/// that brings the draft back, drawn selected while the draft is on screen.
+struct NewSessionDraftRow: View {
+  let draft: NewSessionModel
+  let isShown: Bool
+  let show: () -> Void
+
+  var body: some View {
+    Button(action: show) {
+      HStack(spacing: 10) {
+        RoundedRectangle(cornerRadius: 6)
+          .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+          .foregroundStyle(isShown ? Color.white.opacity(0.85) : Color.secondary)
+          .frame(width: 24, height: 24)
+          .overlay {
+            Image(systemName: "plus")
+              .font(.system(size: 11, weight: .semibold))
+          }
+        VStack(alignment: .leading, spacing: 2) {
+          Text(verbatim: draft.draft.trimmedName.isEmpty ? draft.placeholderName : draft.draft.name)
+            .italic()
+            .fontWeight(.medium)
+            .lineLimit(1)
+          Text("Draft", bundle: .module, comment: "Under a new session not created yet.")
+            .font(.caption)
+            .foregroundStyle(isShown ? Color.white.opacity(0.85) : Color.secondary)
+        }
+        Spacer(minLength: 4)
+      }
+      .padding(.vertical, 4)
+      .padding(.horizontal, 6)
+      .foregroundStyle(isShown ? Color.white : Color.primary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        RoundedRectangle(cornerRadius: 6)
+          .fill(isShown ? Color.accentColor : Color.clear)
+      )
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+    .selectionDisabled()
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(isShown ? [.isSelected] : [])
+    .accessibilityIdentifier("new-session-draft-row")
+  }
+}

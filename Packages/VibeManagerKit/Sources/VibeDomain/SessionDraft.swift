@@ -77,13 +77,49 @@ public struct SessionDraft: Hashable, Sendable {
     effectivePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  /// A choice the user made wins, always; then the project's icon; then what the name gives.
+  /// The name the session is given when none is typed (#177): what the template makes of it, else
+  /// the template's own name, else the first line of the prompt, else the folder's name. Empty
+  /// when there is nothing to name it after.
+  public var suggestedName: String {
+    if let templateFill {
+      return templateFill.sessionName() ?? templateFill.template.trimmedName
+    }
+    let firstLine = PromptText.normalizingLineBreaks(initialPrompt)
+      .split(separator: "\n").lazy
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .first { !$0.isEmpty }
+    if let firstLine {
+      return Self.shortened(firstLine)
+    }
+    guard let path = resolvedWorkingDirectoryPath else { return "" }
+    return (path as NSString).lastPathComponent
+  }
+
+  /// The name the session will be created with: the one typed, else the suggested one.
+  public var effectiveName: String {
+    trimmedName.isEmpty ? suggestedName : trimmedName
+  }
+
+  /// How long a name taken from a prompt may be, the "…" included.
+  public static let suggestedNameLength = 60
+
+  /// Cut at the last word that fits, so that a name never ends in half a word.
+  private static func shortened(_ line: String) -> String {
+    guard line.count > suggestedNameLength else { return line }
+    let head = line.prefix(suggestedNameLength - 1)
+    let cut = head.lastIndex(of: " ").map { head[..<$0] } ?? head
+    return cut.trimmingCharacters(in: .whitespaces) + "…"
+  }
+
+  /// A choice the user made wins, always; then the project's icon; then what the name gives — the
+  /// one typed, or the one the session will be given.
   ///
   /// With the icon, the symbol and the colour are still those of the name: they are what the badge
   /// falls back on if the icon's file ever goes missing.
   public var effectiveAppearance: SessionAppearance {
     if let appearance { return appearance }
-    var derived = SessionAppearanceCatalog.derived(forName: name)
+    var derived = SessionAppearanceCatalog.derived(
+      forName: trimmedName.isEmpty ? suggestedName : name)
     derived.iconID = projectIcon?.id
     return derived
   }

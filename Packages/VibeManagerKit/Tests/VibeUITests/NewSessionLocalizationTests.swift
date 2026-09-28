@@ -2,15 +2,18 @@ import Foundation
 import Testing
 import VibeLocalizationTesting
 
-@Suite("The New Session and Switch Agent sheets, in English and in French")
+@Suite("The new session's draft and the Switch Agent sheet, in English and in French")
 struct NewSessionLocalizationTests {
   @Test("The sentences of the sheets read in both languages")
   func sentences() {
     #expect(
       Localization.string("Create & Launch", module: "VibeUI", in: "fr") == "Créer et lancer")
     #expect(
-      Localization.string("What are you working on?", module: "VibeUI", in: "fr")
-        == "Sur quoi travaillez-vous\u{00A0}?")
+      Localization.string("Where, and with which agent?", module: "VibeUI", in: "fr")
+        == "Où, et avec quel agent\u{00A0}?")
+    #expect(
+      Localization.string("Fill in “\("URL")” to send.", module: "VibeUI", in: "fr")
+        == "Remplissez «\u{00A0}URL\u{00A0}» pour envoyer.")
     let name = "Codex"
     #expect(
       Localization.string("Switch Agent — \(name)", module: "VibeUI", in: "en")

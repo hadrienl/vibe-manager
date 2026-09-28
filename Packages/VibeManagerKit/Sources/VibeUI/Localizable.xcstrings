@@ -843,7 +843,7 @@
       }
     },
     "%@: %@" : {
-      "comment" : "A session's name, then a sentence about it.\nA session's name, then what happened to it when the sessions were restored.",
+      "comment" : "A session's name, then a sentence about it.\nA session's name, then what a command on several sessions could not do with it.\nA session's name, then what happened to it when the sessions were restored.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3842,6 +3842,16 @@
         }
       }
     },
+    "A template can propose the folder, the name and the appearance." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un modèle peut proposer le dossier, le nom et l’apparence."
+          }
+        }
+      }
+    },
     "A template is a prompt with fields to fill in — “Review {{url}}” — ready to start a session from." : {
       "localizations" : {
         "fr" : {
@@ -4548,6 +4558,17 @@
         }
       }
     },
+    "Attach Files…" : {
+      "comment" : "Joins files to the prompt.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre des fichiers…"
+          }
+        }
+      }
+    },
     "Attached to your message to %@." : {
       "comment" : "VoiceOver, after a drop on a conversation. The argument is a session's name.",
       "localizations" : {
@@ -4707,17 +4728,6 @@
         }
       }
     },
-    "Cancel creates nothing — no session, no process." : {
-      "comment" : "Cancel is the button of the sheet.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Annuler ne crée rien — ni session, ni processus."
-          }
-        }
-      }
-    },
     "Can’t reach %@" : {
       "localizations" : {
         "fr" : {
@@ -4818,6 +4828,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisissez un dossier"
+          }
+        }
+      }
+    },
+    "Choose a working folder to send." : {
+      "comment" : "Next to the Send button of a new session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un dossier de travail pour envoyer."
+          }
+        }
+      }
+    },
+    "Choose an agent to send." : {
+      "comment" : "Next to the Send button of a new session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un agent pour envoyer."
           }
         }
       }
@@ -5524,7 +5556,7 @@
       }
     },
     "Delete “%@”?" : {
-      "comment" : "The name of the prompt template to delete.\nThe name of the avatar to delete.",
+      "comment" : "The name of the prompt template to delete.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -5595,6 +5627,16 @@
         }
       }
     },
+    "Describe the task: it will be the agent’s first message…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez la tâche : ce sera le premier message de l’agent…"
+          }
+        }
+      }
+    },
     "Description" : {
       "localizations" : {
         "fr" : {
@@ -5656,6 +5698,7 @@
       }
     },
     "Discard" : {
+      "comment" : "Discards the new session's draft.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -5671,6 +5714,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abandonner ce modèle"
+          }
+        }
+      }
+    },
+    "Discard this draft. No session is created." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandonner ce brouillon. Aucune session n’est créée."
           }
         }
       }
@@ -5799,6 +5852,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Double-cliquez pour renommer"
+          }
+        }
+      }
+    },
+    "Draft" : {
+      "comment" : "Under a new session not created yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brouillon"
           }
         }
       }
@@ -6264,6 +6328,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écriture de fichier"
+          }
+        }
+      }
+    },
+    "Fill in “%@” to send." : {
+      "comment" : "Next to the Send button of a new session. The label of a template's field.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplissez « %@ » pour envoyer."
+          }
+        }
+      }
+    },
+    "Filled" : {
+      "comment" : "VoiceOver: a required option, filled.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rempli"
           }
         }
       }
@@ -6888,6 +6974,7 @@
       }
     },
     "Import" : {
+      "comment" : "The title of the report of an import.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -7397,6 +7484,17 @@
         }
       }
     },
+    "More Options" : {
+      "comment" : "Unfolds the ticket and the appearance.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus d’options"
+          }
+        }
+      }
+    },
     "More actions" : {
       "localizations" : {
         "fr" : {
@@ -7745,7 +7843,7 @@
       }
     },
     "New Session" : {
-      "comment" : "Title of the New Session sheet.",
+      "comment" : "An unnamed new session.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -8554,6 +8652,16 @@
         }
       }
     },
+    "Nothing starts before you send." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien ne démarre avant l’envoi."
+          }
+        }
+      }
+    },
     "Nothing to commit in %lld repositories" : {
       "localizations" : {
         "en" : {
@@ -8826,16 +8934,6 @@
         }
       }
     },
-    "Optional — handed to the agent as its first message." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Facultatif — transmis à l’agent comme premier message."
-          }
-        }
-      }
-    },
     "Optional — names the sessions made from it, with the same {{fields}}." : {
       "localizations" : {
         "fr" : {
@@ -9099,6 +9197,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modèles de prompt"
+          }
+        }
+      }
+    },
+    "Prompt template" : {
+      "comment" : "The template the session starts from.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle de prompt"
           }
         }
       }
@@ -9536,7 +9645,7 @@
       }
     },
     "Replace" : {
-      "comment" : "Replace the template of the library.\nPuts the description of a failed generation in the card.",
+      "comment" : "Replace the template of the library.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -9612,7 +9721,7 @@
       }
     },
     "Required" : {
-      "comment" : "VoiceOver: a field that must be filled.",
+      "comment" : "An option of a new session to fill.\nVoiceOver: a field that must be filled.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -9988,6 +10097,16 @@
         }
       }
     },
+    "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape sets the draft aside" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour crée et lance · Maj-Retour va à la ligne · Option-Retour ajoute à À faire · Échap met le brouillon de côté"
+          }
+        }
+      }
+    },
     "Reveal Folder in Finder" : {
       "localizations" : {
         "fr" : {
@@ -10251,7 +10370,7 @@
       }
     },
     "Saving…" : {
-      "comment" : "The state of a session's notes.",
+      "comment" : "A generated avatar being written to disk.\nThe state of a session's notes.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -10400,6 +10519,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sessions indisponibles"
+          }
+        }
+      }
+    },
+    "Set Aside" : {
+      "comment" : "Escape in a new session's draft.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre de côté"
           }
         }
       }
@@ -11384,17 +11514,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changer…"
-          }
-        }
-      }
-    },
-    "Template" : {
-      "comment" : "The prompt template the session starts from.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modèle de prompt"
           }
         }
       }
@@ -12663,16 +12782,6 @@
         }
       }
     },
-    "The terminal and the agent start as soon as the session is created." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le terminal et l’agent démarrent dès la création de la session."
-          }
-        }
-      }
-    },
     "The terminal has shown nothing yet." : {
       "localizations" : {
         "fr" : {
@@ -13223,6 +13332,17 @@
         }
       }
     },
+    "Ticket, appearance" : {
+      "comment" : "What More Options unfolds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ticket, apparence"
+          }
+        }
+      }
+    },
     "Ticket, pull or merge request URL, branch, folder or title" : {
       "comment" : "The placeholder of Open Quickly's field.",
       "localizations" : {
@@ -13492,6 +13612,7 @@
       }
     },
     "Try Again" : {
+      "comment" : "Reads the tickets' pages again.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -13682,7 +13803,7 @@
       }
     },
     "Unreadable" : {
-      "comment" : "The state of a session's notes.\nAn avatar that cannot be read.",
+      "comment" : "An avatar that cannot be read.\nThe state of a session's notes.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -14060,16 +14181,6 @@
         }
       }
     },
-    "What are you working on?" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sur quoi travaillez-vous ?"
-          }
-        }
-      }
-    },
     "What each side terminal showed is written to disk, so that it is still there when its session is reopened or Vibe Manager relaunched. It stays on this Mac, readable by you alone and out of backups. Turned off, the histories already kept are erased." : {
       "localizations" : {
         "fr" : {
@@ -14121,6 +14232,16 @@
         }
       }
     },
+    "What you write below is the agent’s first message." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que vous écrivez ci-dessous sera le premier message de l’agent."
+          }
+        }
+      }
+    },
     "When Vibe Manager is not in front, an avatar presents the requests in a bubble. Notifications are then not needed." : {
       "localizations" : {
         "fr" : {
@@ -14161,12 +14282,32 @@
         }
       }
     },
+    "Where, and with which agent?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Où, et avec quel agent ?"
+          }
+        }
+      }
+    },
     "With no pending request" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sans demande en attente"
+          }
+        }
+      }
+    },
+    "Without a prompt, the agent starts with nothing to do." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans prompt, l’agent démarre sans rien à faire."
           }
         }
       }

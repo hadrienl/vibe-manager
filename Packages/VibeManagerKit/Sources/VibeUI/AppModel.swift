@@ -50,8 +50,13 @@ public final class AppModel {
   }
   public private(set) var isRefreshingAgents = false
   public private(set) var selectedSessionID: SessionID?
+  /// Whether the new session's draft is what the main area shows (#177), over the session
+  /// selected, which stays selected underneath.
   public internal(set) var isPresentingNewSession = false
+  /// The new session's draft, shown or not: kept while the user looks at another session.
   public internal(set) var newSessionModel: NewSessionModel?
+  /// Bumped each time the draft is brought on screen: its composer takes the keyboard.
+  public internal(set) var newSessionFocusRequest = 0
   /// The session between Create and its terminal, shown in its place meanwhile.
   public internal(set) var sessionInCreation: SessionInCreation?
   /// What each session's agent can do right now, refreshed with the detections. Held here so
@@ -972,7 +977,7 @@ public final class AppModel {
     if session.taskStatus != filter.column, session.taskStatus != .archived {
       update { $0.column = session.taskStatus }
     }
-    select(id)
+    select(id, leavingDraft: false)
   }
 
   // MARK: - Open Quickly
@@ -1089,7 +1094,7 @@ public final class AppModel {
     let isStillSelected = selectedSessionID == id
     await reload()
     // A search can hide the row; the session the user was on stays in front of them.
-    if isStillSelected, selectedSessionID != id { select(id) }
+    if isStillSelected, selectedSessionID != id { select(id, leavingDraft: false) }
   }
 
   private func stopSession(_ id: SessionID) async throws -> SessionClosure {
@@ -1330,11 +1335,11 @@ public final class AppModel {
     guard let neighbour, visibleSessions.contains(where: { $0.id == neighbour.id }) else {
       // An emptied column keeps the selection, as `reconcileSelection` does: the session just
       // moved stays on screen rather than leaving the main area blank.
-      if let first = visibleSessions.first { select(first.id) }
+      if let first = visibleSessions.first { select(first.id, leavingDraft: false) }
       return
     }
     guard selectedSessionID != neighbour.id else { return }
-    select(neighbour.id)
+    select(neighbour.id, leavingDraft: false)
   }
 
   /// The row that will take a session's place, handed to the reload so that it lands on it
@@ -2284,7 +2289,12 @@ public final class AppModel {
   ///
   /// A session a folded group hides is shown: its group unfolds. The quick switcher, a new session
   /// or a banner can all land on one, and a selection nobody can see is a lost one.
-  public func select(_ id: SessionID?) {
+  ///
+  /// - Parameter leavingDraft: whether the user is going there, away from a new session's draft
+  ///   on screen (#177). A selection the application moves by itself — a session that changed
+  ///   column, or went — must not take the draft away from under the user's typing.
+  public func select(_ id: SessionID?, leavingDraft: Bool = true) {
+    if leavingDraft { leaveNewSessionDraft() }
     keepsKeyboardInSidebar = false
     creationWasLeft(for: id)
     // Going to a session is choosing it alone (#77).
@@ -2305,6 +2315,7 @@ public final class AppModel {
 
   /// The multi-selection's own way in: it shows a session without undoing the selection (#77).
   func showFromSelection(_ id: SessionID?) {
+    leaveNewSessionDraft()
     creationWasLeft(for: id)
     preferredSelection = nil
     if id != shownArchivedSessionID { shownArchivedSessionID = nil }
@@ -2427,14 +2438,26 @@ public final class AppModel {
     launcher?.failure(for: id)
   }
 
-  /// The sheet's model lives here, not in the sheet: SwiftUI may evaluate the presentation
-  /// closure more than once, and a draft must survive that without being typed twice.
-  /// Opens the New Session sheet, on a template when one is given.
+  /// Shows the new session's draft (#177), on a template when one is given: a conversation not
+  /// started yet, in the main area, where the options are chosen and the composer holds the
+  /// initial prompt.
   ///
-  /// With a folder — New Session in This Folder, from a group — the sheet opens on it and looks
+  /// One draft at a time. ⌘N with a draft already begun brings it back as it was left, and a
+  /// template or a folder asked for is applied to it, as they would be in its form.
+  ///
+  /// The draft's model lives here, not in its view: SwiftUI may rebuild the view at any time, and
+  /// the draft must survive that — and survive going to another session and coming back.
+  ///
+  /// With a folder — New Session in This Folder, from a group — the draft opens on it and looks
   /// for its icon at once: sessions already run there, so reading it asks the system nothing new.
   public func beginNewSession(template: PromptTemplateID? = nil, folder: String? = nil) {
     guard let agents, canCreateSession else { return }
+    if let draft = newSessionModel, !draft.isSubmitting {
+      if let template { draft.selectTemplate(template) }
+      if let folder { Task { await draft.folderChosen(folder) } }
+      showNewSessionDraft()
+      return
+    }
     let model = NewSessionModel(
       create: CreateSession(
         repository: repository, agents: agents, ticketContext: readTicketContext,
@@ -2455,15 +2478,15 @@ public final class AppModel {
     if let folder {
       Task { await model.folderChosen(folder) }
     }
-    // Loaded from here, as the Switch Agent sheet is, and not only from the sheet's `.task`: the
-    // agents the launch detected are offered whether or not SwiftUI runs it (#132). The sheet
+    // Loaded from here, as the Switch Agent sheet is, and not only from the view's `.task`: the
+    // agents the launch detected are offered whether or not SwiftUI runs it (#132). The view
     // still awaits the same load before placing the caret.
     Task { await model.load() }
     newSessionModel = model
-    isPresentingNewSession = true
+    showNewSessionDraft()
   }
 
-  /// Cancelling leaves nothing behind: no session, no process, and no draft either.
+  /// Discarding leaves nothing behind: no session, no process, and no draft either.
   public func cancelNewSession() {
     isPresentingNewSession = false
     newSessionModel = nil
@@ -2500,8 +2523,9 @@ public final class AppModel {
     }
     // Unless the user went elsewhere meanwhile.
     let isFollowed = { [weak self] in !tracked || self?.sessionInCreation?.isFollowed != false }
+    // Under a draft begun meanwhile, if there is one: that one is the user's now.
     if isFollowed() {
-      select(id)
+      select(id, leavingDraft: false)
     }
     // In the background, never waited for: the agent starts whatever the pages do (#89).
     ticketTitles.start(creation.tickets, for: id)

@@ -56,7 +56,9 @@ extension AppModel {
   }
 
   public var isWebViewAvailable: Bool {
-    browser != nil && selectedSession.map { $0.status != .archived } == true
+    // Over a new session's draft, the session underneath is not the one on screen (#177).
+    browser != nil && !isPresentingNewSession
+      && selectedSession.map { $0.status != .archived } == true
   }
 
   /// Whether the selected session's web view is open, whatever room the window gives it.

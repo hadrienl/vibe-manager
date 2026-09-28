@@ -26,7 +26,7 @@ extension AppModel {
 
   /// Show Terminals / Hide Terminals.
   public var canToggleDrawer: Bool {
-    selectedDrawer != nil
+    !isPresentingNewSession && selectedDrawer != nil
   }
 
   public var isDrawerShown: Bool {
@@ -48,7 +48,7 @@ extension AppModel {
 
   /// ⌘T: a new tab, the drawer shown if it was not.
   public var canAddDrawerTerminal: Bool {
-    selectedDrawer?.canAddTerminal ?? false
+    !isPresentingNewSession && (selectedDrawer?.canAddTerminal ?? false)
   }
 
   public func newDrawerTerminal() {
