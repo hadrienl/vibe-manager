@@ -273,14 +273,14 @@ struct AgentSwitchWorkspaceTests {
 
     // A model the account cannot run: the CLI says so and exits.
     await supervisor.finish(id: subject.id, state: .exited(code: 1))
-    await waitUntil { model.switchBackOffers[subject.id] != nil }
+    await waitUntil("the switch back is offered") { model.switchBackOffers[subject.id] != nil }
 
     let offer = try #require(model.switchBackOffers[subject.id])
     #expect(offer.target == AgentTarget(providerID: "stub", modelID: "fast"))
     #expect(offer.label == "Stub Agent · Fast")
 
     // Taking it opens the sheet on that agent: it is a switch like any other, confirmed.
-    await waitUntil { model.sessions.first?.status == .closed }
+    await waitUntil("the session is closed") { model.sessions.first?.status == .closed }
     model.switchBack(subject.id)
     let back = try #require(model.pendingSwitch)
     #expect(back.providerID == "stub")
@@ -368,22 +368,5 @@ struct AgentSwitchWorkspaceTests {
       previous: "Stub Agent · Fast", at: date)
     #expect(model.contains("Model changed"))
     #expect(model.contains("same conversation"))
-  }
-
-  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
-  /// leave the task that publishes it unscheduled for seconds. The bound only stops a state never
-  /// reached, and says so at the line that waited for it.
-  private func waitUntil(
-    _ condition: @MainActor () -> Bool, sourceLocation: SourceLocation = #_sourceLocation
-  ) async {
-    let clock = ContinuousClock()
-    let start = clock.now
-    while !condition() {
-      guard clock.now - start < .seconds(60) else {
-        Issue.record("Never reached: the state waited for.", sourceLocation: sourceLocation)
-        return
-      }
-      try? await Task.sleep(for: .milliseconds(5))
-    }
   }
 }

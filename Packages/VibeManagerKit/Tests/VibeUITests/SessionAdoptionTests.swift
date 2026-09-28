@@ -150,19 +150,6 @@ struct SessionAdoptionTests {
     )
   }
 
-  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
-  /// leave the task that publishes it unscheduled for seconds. The bound only stops a state never
-  /// reached, which the `#expect` around the call then names.
-  private func eventually(_ condition: () async -> Bool) async -> Bool {
-    let clock = ContinuousClock()
-    let start = clock.now
-    while !(await condition()) {
-      guard clock.now - start < .seconds(60) else { return false }
-      try? await Task.sleep(for: .milliseconds(20))
-    }
-    return true
-  }
-
   @Test("A running agent is shown as it is: nothing started, nothing written to the store")
   func adoptsARunningAgent() async {
     let stored = session()
@@ -197,7 +184,9 @@ struct SessionAdoptionTests {
 
     await terminal.finish(state: .exited(code: 0))
 
-    #expect(await eventually { await repository.status(of: stored.id) == .closed })
+    await waitUntil("the session is stored closed") {
+      await repository.status(of: stored.id) == .closed
+    }
   }
 
   @Test("Handed off on the way out, an agent's exit is no longer this launch's to record")

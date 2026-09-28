@@ -133,7 +133,8 @@ func eventually(
   _ condition: () async -> Bool
 ) async -> Bool {
   var waited = Duration.zero
-  while waited < timeout {
+  // A cancelled test stops waiting: its sleeps would no longer sleep, and the loop would spin.
+  while waited < timeout, !Task.isCancelled {
     if await condition() { return true }
     waited += await sleepCountingRunTime()
   }

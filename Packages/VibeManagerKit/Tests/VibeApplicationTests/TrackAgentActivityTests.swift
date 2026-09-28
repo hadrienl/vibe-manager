@@ -145,21 +145,9 @@ private let t0 = Date(timeIntervalSince1970: 2_000_000)
 
 /// The tracker subscribes to a log on a task of its own: lines written before that are the test's
 /// mistake, not the tracker's.
+/// Waits until the logs of `id` are followed; see `eventually`.
 func following(_ logs: ScriptedActivityLogs, _ id: SessionID) async -> Bool {
-  await waitingForState { await logs.isFollowing(id) }
-}
-
-/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
-/// the tracker's tasks unscheduled for seconds — a second was given before. The bound only stops a
-/// state never reached, which the `#expect` around the call then names.
-func waitingForState(_ condition: () async -> Bool) async -> Bool {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !(await condition()) {
-    guard clock.now - start < .seconds(60) else { return false }
-    try? await Task.sleep(for: .milliseconds(5))
-  }
-  return true
+  await eventually { await logs.isFollowing(id) }
 }
 
 func makeTracker(
@@ -172,12 +160,12 @@ func makeTracker(
     persistenceDelay: .seconds(3600))
 }
 
-/// Waits until the tracker reports `predicate`; see `waitingForState`.
+/// Waits until the tracker reports `predicate`; see `eventually`.
 func eventually(
   _ tracker: TrackAgentActivity, _ id: SessionID,
   _ predicate: @Sendable (AgentActivityState?) -> Bool
 ) async -> Bool {
-  await waitingForState { predicate(await tracker.state(for: id)) }
+  await eventually { predicate(await tracker.state(for: id)) }
 }
 
 /// Reads the conversation a `start` line names, as Codex's `SessionStart` does (#144).
@@ -461,5 +449,5 @@ struct TrackAgentActivityTests {
 }
 
 private func eventuallyTrue(_ predicate: @Sendable () -> Bool) async -> Bool {
-  await waitingForState { predicate() }
+  await eventually { predicate() }
 }

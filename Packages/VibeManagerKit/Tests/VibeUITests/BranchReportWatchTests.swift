@@ -45,7 +45,7 @@ struct BranchReportWatchTests {
     #expect(await reader.reads(of: "/work/api") == settled)
 
     model.select(web.id)
-    try await waitUntil("the other session's report is read") {
+    await waitUntil("the other session's report is read") {
       await reader.reads(of: "/work/web") >= 1
     }
   }
@@ -59,23 +59,23 @@ struct BranchReportWatchTests {
     await model.load()
     model.select(api.id)
 
-    try await waitUntil("the repository of the session on screen is read") {
+    await waitUntil("the repository of the session on screen is read") {
       model.repositoryStatus(for: api.id, path: "/work/api")?.phase == .fresh
     }
     let before = await reader.reads(of: "/work/api")
 
     // A branch moved: the report is read again, without any timer.
     events.send(.changed(["/work/api/.git/refs/heads/main"]))
-    try await waitUntil("a branch that moved on disk has the report read again") {
+    await waitUntil("a branch that moved on disk has the report read again") {
       await reader.reads(of: "/work/api") > before
     }
 
     // Another session on screen: the first one's repository is no longer watched.
     model.select(web.id)
-    try await waitUntil("the session left is no longer watched") {
+    await waitUntil("the session left is no longer watched") {
       model.repositoryStatus(for: api.id, path: "/work/api")?.phase == .unobserved
     }
-    try await waitUntil("the repository of the new session on screen is read") {
+    await waitUntil("the repository of the new session on screen is read") {
       model.repositoryStatus(for: web.id, path: "/work/web")?.phase == .fresh
     }
     await model.stopWatchingRepositories()
@@ -149,29 +149,6 @@ struct RepositoryStatusPresentationTests {
     #expect(presentation.isStale)
     #expect(presentation.command == "git config --global --add safe.directory /work/api")
   }
-}
-
-/// A state is waited for, not a deadline: the reading goes through several tasks (the report, the
-/// monitor, its stream to the model), and a CI runner whose cooperative pool is saturated can leave
-/// one of them unscheduled for seconds — three were given, and ran out. The bound is far beyond
-/// what the slowest runner needs; it is only there so that a state never reached says which one,
-/// rather than the suite's time limit saying nothing.
-@MainActor
-private func waitUntil(
-  _ what: String, _ condition: @MainActor () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !(await condition()) {
-    guard clock.now - start < .seconds(60) else {
-      throw NeverReached(description: "Never reached: \(what).")
-    }
-    try await Task.sleep(for: .milliseconds(10))
-  }
-}
-
-private struct NeverReached: Error, CustomStringConvertible {
-  let description: String
 }
 
 private actor CountingReader: RepositoryActivityReading {

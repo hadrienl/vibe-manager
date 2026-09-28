@@ -6,24 +6,6 @@ import VibeDomain
 
 @testable import VibeUI
 
-/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
-/// the task that publishes it unscheduled for seconds. The bound only stops a state never reached,
-/// and says so at the line that waited for it.
-@MainActor
-private func eventually(
-  _ condition: @MainActor () -> Bool, sourceLocation: SourceLocation = #_sourceLocation
-) async {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !condition() {
-    guard clock.now - start < .seconds(60) else {
-      Issue.record("Never reached: the state waited for.", sourceLocation: sourceLocation)
-      return
-    }
-    try? await Task.sleep(for: .milliseconds(10))
-  }
-}
-
 /// A web view that answers what the test says, when the test says so.
 @MainActor
 private final class ScriptedReader: TicketPageReading {
@@ -81,7 +63,7 @@ struct TicketTitlesTests {
       notes: notesModel, reader: reader)
     await model.load()
     let document = notesModel.document(for: id)
-    await eventually { document.isLoaded }
+    await waitUntil("the notes are loaded") { document.isLoaded }
     return (model, notesModel)
   }
 
@@ -162,7 +144,9 @@ struct TicketTitlesTests {
     let (model, notes) = await make(notes: "Notes", reader: reader)
 
     model.start(tickets([1, 2]), for: id)
-    await eventually { model.entries[id]?.allSatisfy { !$0.state.isUnderWay } == true }
+    await waitUntil("no title is under way") {
+      model.entries[id]?.allSatisfy { !$0.state.isUnderWay } == true
+    }
 
     #expect(reader.read == ["acme/app#1", "acme/app#2"])
     #expect(
@@ -183,12 +167,12 @@ struct TicketTitlesTests {
     model.lineFormat = format
 
     model.start(tickets([1, 2]), for: id)
-    await eventually { model.entries[id]?.last?.state == .inserted }
+    await waitUntil("the last title is inserted") { model.entries[id]?.last?.state == .inserted }
     #expect(model.entries[id]?.first?.state == .signInRequired(host: "sso.example.com"))
     #expect(notes.document(for: id).text == "Two\n")
 
     reader.signIn("acme/app#1")
-    await eventually { model.entries[id]?.first?.state == .inserted }
+    await waitUntil("the first title is inserted") { model.entries[id]?.first?.state == .inserted }
     #expect(notes.document(for: id).text == "One\nTwo\n")
   }
 
@@ -211,12 +195,14 @@ struct TicketTitlesTests {
     ]
     let (model, _) = await make(reader: reader)
     model.start(tickets([1, 2]), for: id)
-    await eventually { model.entries[id]?.allSatisfy { !$0.state.isUnderWay } == true }
+    await waitUntil("no title is under way") {
+      model.entries[id]?.allSatisfy { !$0.state.isUnderWay } == true
+    }
     #expect(model.entries[id]?.last?.state == .failed(.offline))
 
     reader.outcomes["acme/app#2"] = .title("Two", raw: "Two")
     model.retry(id)
-    await eventually { model.entries[id]?.last?.state == .inserted }
+    await waitUntil("the last title is inserted") { model.entries[id]?.last?.state == .inserted }
     #expect(reader.read == ["acme/app#1", "acme/app#2", "acme/app#2"])
   }
 

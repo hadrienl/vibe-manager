@@ -35,19 +35,6 @@ struct BoundedProcessTests {
     return size > 0 && info.pbi_status != UInt32(SZOMB)
   }
 
-  /// A state is waited for, not a deadline: a CI runner that stalls can keep the process that
-  /// reaches it from running for seconds. The bound only stops a state never reached, which the
-  /// `#expect` around the call then names.
-  private func eventually(_ condition: () -> Bool) async -> Bool {
-    let clock = ContinuousClock()
-    let start = clock.now
-    while !condition() {
-      guard clock.now - start < .seconds(60) else { return false }
-      try? await Task.sleep(for: .milliseconds(25))
-    }
-    return true
-  }
-
   @Test("It captures both streams and the exit status")
   func capturesOutput() async throws {
     let result = try await BoundedProcess.run(shell("echo out; echo err >&2; exit 3"))
@@ -114,7 +101,7 @@ struct BoundedProcessTests {
 
     #expect(result.didTimeOut)
     let grandchild = try #require(Int32(text(result.standardOutput)))
-    #expect(await eventually { !isAlive(grandchild) })
+    await waitUntil("the grandchild that ignores SIGTERM is gone") { !isAlive(grandchild) }
   }
 
   @Test("What a command leaves in its group when it exits is stopped with it")
@@ -124,7 +111,7 @@ struct BoundedProcessTests {
 
     #expect(result.termination == .exited(0))
     let grandchild = try #require(Int32(text(result.standardOutput)))
-    #expect(await eventually { !isAlive(grandchild) })
+    await waitUntil("what the command left behind is gone") { !isAlive(grandchild) }
   }
 
   @Test("Cancelling the task stops the group instead of waiting for the timeout")
@@ -141,7 +128,7 @@ struct BoundedProcessTests {
 
     // Cancelled once it runs — before it is spawned would prove nothing — its pid leading its group.
     let written = { (try? Data(contentsOf: started)).flatMap { pid_t(text($0)) } }
-    #expect(await eventually { written() != nil })
+    await waitUntil("the command has written its pid") { written() != nil }
     let group = try #require(written())
     task.cancel()
 
@@ -149,7 +136,7 @@ struct BoundedProcessTests {
     // Compared with the timeout rather than a delay: however busy the runner, a cancellation that
     // waited for the timeout is the only way to reach it.
     #expect(clock.now - start < request.timeout)
-    #expect(await eventually { kill(-group, 0) != 0 })
+    await waitUntil("the cancelled group is gone") { kill(-group, 0) != 0 }
   }
 
   @Test("Output beyond the limit is drained, dropped and reported")

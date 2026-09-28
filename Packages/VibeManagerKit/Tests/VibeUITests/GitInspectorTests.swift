@@ -394,7 +394,7 @@ struct GitInspectorModelTests {
   }
 
   @Test("An untracked folder is read when unfolded, again when its repository moves, never folded")
-  func untrackedFolders() async throws {
+  func untrackedFolders() async {
     let reads = ReadCounter()
     let git = makeModel(list: { directory, _ in
       await reads.increment()
@@ -408,7 +408,7 @@ struct GitInspectorModelTests {
     #expect(await reads.value == 0)
 
     git.setExpanded(directory: folder, true, in: session)
-    try await waitUntil("the unfolded folder is listed") {
+    await waitUntil("the unfolded folder is listed") {
       git.listing(of: folder, in: session) != .loading
     }
     #expect(
@@ -418,7 +418,7 @@ struct GitInspectorModelTests {
     #expect(await reads.value == 1)
 
     git.statesChanged([withFolder])
-    try await waitUntil("the folder is read again when its repository moves") {
+    await waitUntil("the folder is read again when its repository moves") {
       await reads.value == 2
     }
 
@@ -432,7 +432,7 @@ struct GitInspectorModelTests {
   }
 
   @Test("One listing at a time per folder; what the folder became meanwhile is read once more")
-  func listingsDoNotPileUp() async throws {
+  func listingsDoNotPileUp() async {
     let gate = ListingGate()
     let git = makeModel(list: { directory, _ in
       let round = await gate.enter()
@@ -445,7 +445,7 @@ struct GitInspectorModelTests {
       session: session)
     git.statesChanged([withFolder])
     git.setExpanded(directory: folder, true, in: session)
-    try await waitUntil("the unfolded folder is read") { await gate.entered == 1 }
+    await waitUntil("the unfolded folder is read") { await gate.entered == 1 }
 
     // Three states land while the first reading runs: they ask for one more, not three.
     git.statesChanged([withFolder])
@@ -455,11 +455,11 @@ struct GitInspectorModelTests {
     #expect(await gate.entered == 1)
 
     await gate.release()
-    try await waitUntil("the folder is read a second time") { await gate.entered == 2 }
+    await waitUntil("the folder is read a second time") { await gate.entered == 2 }
     // The first answer was already old: it is not shown.
     #expect(git.listing(of: folder, in: session) == .loading)
     await gate.release()
-    try await waitUntil("the second listing is shown") {
+    await waitUntil("the second listing is shown") {
       git.listing(of: folder, in: session)
         == .loaded(
           UntrackedListing(directory: "node_modules/", paths: ["node_modules/v2"], totalCount: 1))
@@ -720,27 +720,4 @@ private actor ReadCounter {
 /// The processor time the calling thread has used so far.
 private func threadProcessorTime() -> Duration {
   .nanoseconds(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID))
-}
-
-/// A state is waited for, not a deadline: a listing lands through tasks that a CI runner whose
-/// cooperative pool is saturated can leave unscheduled for seconds — three were given before, a
-/// bet the runner could lose. The bound is far beyond what the slowest runner needs; it is only
-/// there so that a state never reached says which one, rather than the suite's time limit saying
-/// nothing.
-@MainActor
-private func waitUntil(
-  _ what: String, _ condition: @MainActor () async -> Bool
-) async throws {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !(await condition()) {
-    guard clock.now - start < .seconds(60) else {
-      throw NeverReached(description: "Never reached: \(what).")
-    }
-    try await Task.sleep(for: .milliseconds(10))
-  }
-}
-
-private struct NeverReached: Error, CustomStringConvertible {
-  let description: String
 }

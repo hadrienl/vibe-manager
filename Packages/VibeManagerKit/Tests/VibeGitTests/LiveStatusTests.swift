@@ -13,21 +13,6 @@ struct LiveStatusTests {
     box.states.last { $0.key.repositoryPath == path }
   }
 
-  /// A state is waited for, not a deadline: Git, FSEvents and the monitor's tasks all have to run,
-  /// and a CI runner that stalls can hold any of them for seconds. The bound only stops a state
-  /// never reached, which the `#expect` around the call then names.
-  private func waitFor(
-    _ box: StateBox, _ path: String, _ condition: (RepositoryStatusState) -> Bool
-  ) async -> Bool {
-    let clock = ContinuousClock()
-    let start = clock.now
-    while clock.now - start < .seconds(60) {
-      if let state = latest(path, in: box), condition(state) { return true }
-      try? await Task.sleep(for: .milliseconds(20))
-    }
-    return false
-  }
-
   @Test("A write, an add, a commit and a checkout made elsewhere each reach the state")
   func externalChanges() async throws {
     let sandbox = try Sandbox()
@@ -50,22 +35,32 @@ struct LiveStatusTests {
     let path = CanonicalPath.of(repository)
 
     await monitor.observe(session, repositories: [ObservedRepository(path: path)])
-    #expect(await waitFor(box, path) { $0.phase == .fresh && $0.lastValid?.isClean == true })
+    await waitUntil("the new repository reads clean") {
+      latest(path, in: box).map { $0.phase == .fresh && $0.lastValid?.isClean == true } == true
+    }
     // FSEvents only reports what happens after its stream has started.
     try await Task.sleep(for: .milliseconds(300))
 
     try Data("changed\n".utf8).write(to: URL(fileURLWithPath: repository + "/README"))
-    #expect(await waitFor(box, path) { $0.lastValid?.counts.unstaged == 1 })
+    await waitUntil("the written file reads unstaged") {
+      latest(path, in: box).map { $0.lastValid?.counts.unstaged == 1 } == true
+    }
 
     try await git(["add", "README"], in: repository)
-    #expect(await waitFor(box, path) { $0.lastValid?.counts.staged == 1 })
+    await waitUntil("the added file reads staged") {
+      latest(path, in: box).map { $0.lastValid?.counts.staged == 1 } == true
+    }
 
     // A commit touches nothing in the working tree: only Git's own folder says it happened.
     try await git(["commit", "-q", "-m", "Change"], in: repository)
-    #expect(await waitFor(box, path) { $0.lastValid?.isClean == true })
+    await waitUntil("the commit leaves the tree clean") {
+      latest(path, in: box).map { $0.lastValid?.isClean == true } == true
+    }
 
     try await git(["checkout", "-q", "-b", "feature"], in: repository)
-    #expect(await waitFor(box, path) { $0.lastValid?.branch.branchName == "feature" })
+    await waitUntil("the new branch is read") {
+      latest(path, in: box).map { $0.lastValid?.branch.branchName == "feature" } == true
+    }
 
     await monitor.stop()
   }

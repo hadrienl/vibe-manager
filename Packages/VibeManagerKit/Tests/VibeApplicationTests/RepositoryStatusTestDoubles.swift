@@ -174,15 +174,16 @@ final class SteppingClock: SessionClock, @unchecked Sendable {
   }
 }
 
-/// Waits for a condition that an actor elsewhere will make true, and fails after `timeout`.
+/// Waits for a condition that an actor elsewhere will make true, and fails after `timeout`: the
+/// one wait of these tests.
 ///
 /// The timeout is only ever reached by a test that fails: a loaded CI runner may take seconds to
-/// schedule what takes milliseconds here. It counts only the time this wait was given to run: when
-/// the runner stalls every task for seconds — tests that block their thread take the whole
-/// cooperative pool — the work awaited is stalled too, and a wall-clock deadline would pass
-/// without it ever having had a chance.
+/// schedule what takes milliseconds here, which is why it is a minute. It counts only the time this
+/// wait was given to run: when the runner stalls every task for seconds — tests that block their
+/// thread take the whole cooperative pool — the work awaited is stalled too, and a wall-clock
+/// deadline would pass without it ever having had a chance. A cancelled test stops waiting.
 func eventually(
-  timeout: Duration = .seconds(10),
+  timeout: Duration = .seconds(60),
   _ condition: @Sendable () async -> Bool
 ) async -> Bool {
   let poll = Duration.milliseconds(10)
@@ -190,7 +191,11 @@ func eventually(
   while waited < timeout {
     if await condition() { return true }
     let asleep = ContinuousClock.now
-    try? await Task.sleep(for: poll)
+    do {
+      try await Task.sleep(for: poll)
+    } catch {
+      return await condition()
+    }
     // Woken much later than asked: the runner stalled; that time is not counted.
     waited += min(ContinuousClock.now - asleep, poll * 5)
   }

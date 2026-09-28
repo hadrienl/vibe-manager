@@ -31,20 +31,6 @@ private func makeJournal(opener: FakeOpener) -> SessionJournalModel {
     preferences: InMemoryJournalPreferences(), opener: opener)
 }
 
-/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
-/// the task that publishes it unscheduled for seconds. The bound only stops a state never reached,
-/// which the `#expect` around the call then names.
-@MainActor
-private func eventually(_ condition: () -> Bool) async -> Bool {
-  let clock = ContinuousClock()
-  let start = clock.now
-  while !condition() {
-    guard clock.now - start < .seconds(60) else { return false }
-    try? await Task.sleep(for: .milliseconds(10))
-  }
-  return true
-}
-
 @Suite("The links of the summary", .timeLimit(.minutes(2)))
 @MainActor
 struct SessionJournalLinkTests {
@@ -72,7 +58,7 @@ struct SessionJournalLinkTests {
     let journal = makeJournal(opener: opener)
     journal.openInWebView = { _, _ in false }
     journal.openLink(URL(string: "https://example.com/a")!, from: SessionID())
-    #expect(await eventually { opener.opened == ["/a"] })
+    await waitUntil("the first link is opened") { opener.opened == ["/a"] }
   }
 
   @Test("Open in Browser keeps going to the default browser")
@@ -85,7 +71,7 @@ struct SessionJournalLinkTests {
       return true
     }
     journal.openInBrowser(URL(string: "https://example.com/b")!)
-    #expect(await eventually { opener.opened == ["/b"] })
+    await waitUntil("the second link is opened") { opener.opened == ["/b"] }
     #expect(shown == 0)
   }
 

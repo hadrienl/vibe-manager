@@ -154,28 +154,13 @@ struct RecentFolderHistoryTests {
     model.forgetRecentFolder(RecentFolder(lexicalPath: "/a"))
 
     #expect(model.recentFolders.entries.map(\.path) == ["/b"])
-    try await waitFor("the forgotten folder is left out of the store") {
+    await waitUntil("the forgotten folder is left out of the store") {
       await store.load()?.entries.map(\.path) == ["/b"]
     }
   }
 
   private func recent(_ paths: String...) -> [RecentFolder] {
     paths.map(RecentFolder.init(lexicalPath:))
-  }
-
-  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
-  /// leave the task that publishes it unscheduled for seconds. The bound is far beyond what the
-  /// slowest runner needs; it is only there so that a state never reached says which one.
-  private func waitFor(_ what: String, _ condition: () async -> Bool) async throws {
-    let clock = ContinuousClock()
-    let start = clock.now
-    while !(await condition()) {
-      guard clock.now - start < .seconds(60) else {
-        Issue.record("Never reached: \(what).")
-        return
-      }
-      try await Task.sleep(for: .milliseconds(10))
-    }
   }
 }
 

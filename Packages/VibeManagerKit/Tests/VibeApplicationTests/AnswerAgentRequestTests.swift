@@ -91,16 +91,16 @@ private struct Fixture {
     let id = SessionID()
     await terminals.run(id)
     await tracker.processStarted(id, decoder: PermissionDecoder())
-    _ = await following(logs, id)
+    #expect(await following(logs, id))
     await logs.write("start", at: t1, for: id)
     await logs.write("ask", at: t1, for: id, payload: command)
-    _ = await eventually(tracker, id) { $0?.requests.count == 1 }
+    #expect(await eventually(tracker, id) { $0?.requests.count == 1 })
     let request = await tracker.state(for: id)?.requests.first?.id
     return (id, request ?? AgentRequestID(sessionID: id, key: "none"))
   }
 }
 
-@Suite("Answering a request from the palette")
+@Suite("Answering a request from the palette", .timeLimit(.minutes(2)))
 struct AnswerAgentRequestTests {
   @Test("The answer is typed into the terminal of the request's session, and nowhere else")
   func routed() async {
@@ -121,7 +121,7 @@ struct AnswerAgentRequestTests {
     let fixture = Fixture()
     let (id, request) = await fixture.asking("touch a")
     await fixture.logs.write("done", at: t1, for: id, payload: "touch a")
-    _ = await eventually(fixture.tracker, id) { $0?.requests.isEmpty == true }
+    #expect(await eventually(fixture.tracker, id) { $0?.requests.isEmpty == true })
 
     #expect(await fixture.answer(.allowOnce, to: request) == .requestGone)
     #expect(await fixture.terminals.written[id] == nil)
@@ -143,7 +143,7 @@ struct AnswerAgentRequestTests {
     let tracker = fixture.tracker
     await fixture.terminals.setOnWrite { id in
       await logs.write("done", at: t1, for: id, payload: "touch a")
-      _ = await eventually(tracker, id) { $0?.requests.isEmpty == true }
+      #expect(await eventually(tracker, id) { $0?.requests.isEmpty == true })
     }
     #expect(await fixture.answer(.deny, to: request) == .interrupted)
     #expect(await fixture.terminals.written[id] == [[0x33]])
@@ -177,10 +177,10 @@ struct AnswerAgentRequestTests {
     let tracker = makeTracker(logs: logs, store: store, clock: TestClock(t1))
     let id = SessionID()
     await tracker.processStarted(id, decoder: PermissionDecoder())
-    _ = await following(logs, id)
+    #expect(await following(logs, id))
     await logs.write("start", at: t1, for: id)
     await logs.write("ask", at: t1, for: id, payload: "touch a")
-    _ = await eventually(tracker, id) { $0?.requests.count == 1 }
+    #expect(await eventually(tracker, id) { $0?.requests.count == 1 })
     await tracker.flush()
     #expect(await store.stored[id]?.requests.count == 1)
 
