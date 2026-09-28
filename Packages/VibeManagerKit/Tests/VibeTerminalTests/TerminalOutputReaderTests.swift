@@ -32,6 +32,7 @@ func smallChunksDoNotInheritBurstCapacity() async throws {
   #expect(pipe(&descriptors) == 0)
   let (readEnd, writeEnd) = (descriptors[0], descriptors[1])
   _ = fcntl(readEnd, F_SETFL, fcntl(readEnd, F_GETFL, 0) | O_NONBLOCK)
+  defer { close(writeEnd) }
 
   let reader = TerminalOutputReader(descriptor: readEnd)
   let burst = [UInt8](repeating: UInt8(ascii: "x"), count: 48 * 1_024)
@@ -47,11 +48,13 @@ func smallChunksDoNotInheritBurstCapacity() async throws {
     if received == burst.count {
       // Waits for the burst to be handed over, so the tail comes out as a chunk of its own.
       #expect(tail.withUnsafeBytes { write(writeEnd, $0.baseAddress, $0.count) } == tail.count)
-    } else if received == burst.count + tail.count {
+    } else if received >= burst.count + tail.count {
       tailCapacity = bytes.capacity
-      close(writeEnd)
+      break
     }
   }
+  // End of file does not end the stream: only finishing does.
+  reader.finish()
 
   let capacity = try #require(tailCapacity)
   #expect(capacity < 1_024)
