@@ -39,6 +39,20 @@ extension AppModel {
   ///
   /// Its identity is resolved through its links here, and only here: creation has just opened
   /// this folder, so reading it again raises no consent alert that has not already been answered.
+  /// The folder of a session just stored, put at the top by its spelling alone, without reading
+  /// the disk or writing anything: a New Session sheet opened while the agent starts — which takes
+  /// seconds — proposes it already. `rememberFolder(of:)` settles its identity and writes the
+  /// list afterwards.
+  func noteFolder(of session: WorkSession) {
+    guard let path = session.repositories.first?.path, !path.isEmpty else { return }
+    let lexical = RecentFolder.lexicalKey(of: path)
+    // Already listed under its resolved identity: it moves up rather than appearing twice.
+    let known = recentFolders.entries.first {
+      $0.key == lexical || RecentFolder.lexicalKey(of: $0.path) == lexical
+    }
+    recentFolders = recentFolders.recording(RecentFolder(path: path, key: known?.key ?? lexical))
+  }
+
   func rememberFolder(of session: WorkSession) async {
     guard let path = session.repositories.first?.path, !path.isEmpty else { return }
     let lexical = RecentFolder.lexicalKey(of: path)

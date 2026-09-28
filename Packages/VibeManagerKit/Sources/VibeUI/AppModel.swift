@@ -2487,6 +2487,8 @@ public final class AppModel {
   func publish(_ creation: SessionCreation, launching: Bool, tracked: Bool) async {
     let id = creation.session.id
     insert(creation.session)
+    // Stored, so its folder is one sessions were created in: offered again from now on.
+    noteFolder(of: creation.session)
     if tracked {
       sessionInCreation?.sessionID = id
       sessionInCreation?.phase = .starting
@@ -2516,7 +2518,8 @@ public final class AppModel {
     if tracked {
       sessionInCreation = nil
     }
-    // After the launch: the terminal does not wait for a list of folders to be written.
+    // After the launch: the terminal does not wait for a folder to be resolved and a list of
+    // folders to be written. The sheet did not wait either: the folder was noted on insertion.
     await rememberFolder(of: creation.session)
   }
 

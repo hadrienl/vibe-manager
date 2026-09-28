@@ -119,6 +119,37 @@ struct OptimisticCreationTests {
     #expect(!model.isPresentingNewSession)
   }
 
+  @Test("The folder of a session whose agent is starting is proposed again at once")
+  func folderIsOfferedBeforeTheAgentRuns() async throws {
+    let repository = GatedRepository(sessions: [], open: true)
+    // The agent waits for its terminal to be measured, which nothing does until the test says.
+    let launcher = SessionLauncher(
+      supervisor: FakeSupervisor(), repository: repository, agents: OneAgent(),
+      viewportTimeout: .seconds(600))
+    let model = AppModel(repository: repository, agents: OneAgent(), launcher: launcher)
+    await model.load()
+    _ = try openSheet(in: model, name: "First", folder: folder)
+
+    model.submitNewSession(launching: true)
+    await waitUntil("the session is stored and its agent starting") {
+      model.sessionInCreation?.phase == .starting
+    }
+    model.beginNewSession()
+    let next = try #require(model.newSessionModel)
+
+    #expect(next.recentFolders.map(\.folder.path) == [folder])
+
+    let id = try #require(model.sessionInCreation?.sessionID)
+    await waitUntil("its terminal is made") { model.pane(for: id) != nil }
+    await model.pane(for: id)?.reportViewportSize(TerminalSize(columns: 80, rows: 24))
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
+    // Resolved and written once the agent runs, in place of the spelling noted meanwhile.
+    await waitUntil("the folder is written under its identity") {
+      await model.recentFolderStore.load()?.entries.map(\.key) == [CanonicalPath.of(folder)]
+    }
+    #expect(model.recentFolders.entries.count == 1)
+  }
+
   @Test("A draft that fails its own checks keeps the sheet open")
   func localProblemsStayInTheSheet() async throws {
     let repository = GatedRepository(sessions: [], open: true)
