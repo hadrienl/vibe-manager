@@ -518,6 +518,8 @@ public final class AppModel {
   /// The folders sessions were created in, offered again by the New Session sheet (#39).
   let recentFolderStore: any RecentFolderStore
   public internal(set) var recentFolders = RecentFolders()
+  /// The folder of a session being started, offered before it joins `recentFolders`.
+  var notedFolder: RecentFolder?
   var recentFolderHistory = RecentFolderHistory.unread
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
@@ -2441,7 +2443,7 @@ public final class AppModel {
       templates: templates.all,
       projectIcons: projectIcons,
       icons: icons,
-      recentFolders: recentFolders.entries,
+      recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) }
     )
     if let template {
@@ -2487,6 +2489,8 @@ public final class AppModel {
   func publish(_ creation: SessionCreation, launching: Bool, tracked: Bool) async {
     let id = creation.session.id
     insert(creation.session)
+    // Stored, so its folder is one sessions were created in: offered again from now on.
+    noteFolder(of: creation.session)
     if tracked {
       sessionInCreation?.sessionID = id
       sessionInCreation?.phase = .starting
@@ -2516,7 +2520,8 @@ public final class AppModel {
     if tracked {
       sessionInCreation = nil
     }
-    // After the launch: the terminal does not wait for a list of folders to be written.
+    // After the launch: the terminal does not wait for a folder to be resolved and a list of
+    // folders to be written. The sheet did not wait either: the folder was noted on insertion.
     await rememberFolder(of: creation.session)
   }
 

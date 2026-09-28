@@ -109,6 +109,12 @@ final class SmokeTests: XCTestCase {
     app.typeKey(.return, modifierFlags: .command)
     XCTAssertTrue(
       nameField.waitForNonExistence(timeout: 20), "The sheet did not close for \(name)")
+    // The sheet closes at Create, before the session is stored (#117): its placeholder stands for
+    // it until its agent has started. Only then is the session made, and the next one begun.
+    let placeholder = app.descendants(matching: .any)
+      .matching(identifier: "session-creation-placeholder").firstMatch
+    XCTAssertTrue(
+      placeholder.waitForNonExistence(timeout: 20), "\(name) was never done being created")
   }
 
   func testNominalJourneyFromTheKeyboard() throws {
@@ -226,10 +232,12 @@ final class SmokeTests: XCTestCase {
       rows.element(boundBy: 2).click()
     }
     rows.element(boundBy: 1).rightClick()
-    let archive = app.menuItems["Archive 3 Sessions…"]
+    // The context menu's item, not the Session menu's one of the same title (#77).
+    let archive = app.outlines["session-list"].menuItems["Archive 3 Sessions…"]
     XCTAssertTrue(archive.waitForExistence(timeout: 5))
     archive.click()
-    let confirm = app.buttons["Archive"].firstMatch
+    // The dialog's button: the Touch Bar shows one of the same title, which cannot be clicked.
+    let confirm = app.sheets.buttons["Archive"]
     XCTAssertTrue(confirm.waitForExistence(timeout: 5), "One question for the three sessions")
     confirm.click()
 
