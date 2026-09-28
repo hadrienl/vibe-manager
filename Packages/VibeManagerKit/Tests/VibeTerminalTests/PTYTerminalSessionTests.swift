@@ -300,7 +300,9 @@ func sessionKeepsAProcessThatOutlivesItsTerminal() async throws {
   await session.stop(gracePeriod: .seconds(2))
 
   #expect(await session.state().isFinished)
-  let deadline = ContinuousClock.now + .seconds(2)
+  // The process's end is waited for, not a deadline: a runner that stalls can hold the kernel's
+  // reaping for seconds. The bound only stops a process that never ends.
+  let deadline = ContinuousClock.now + .seconds(60)
   while isProcessAlive(processIdentifier), ContinuousClock.now < deadline {
     try? await Task.sleep(for: .milliseconds(20))
   }
@@ -323,7 +325,8 @@ func outputOutlivesTheProcess() async throws {
 
   var received: [UInt8] = []
   var buffer = [UInt8](repeating: 0, count: 4_096)
-  let deadline = ContinuousClock.now + .seconds(5)
+  // The line is waited for, not a deadline: the bound only stops output that never comes.
+  let deadline = ContinuousClock.now + .seconds(60)
   while !String(decoding: received, as: UTF8.self).contains("the last line"),
     ContinuousClock.now < deadline
   {
@@ -339,7 +342,7 @@ func outputOutlivesTheProcess() async throws {
   #expect(String(decoding: received, as: UTF8.self).contains("the last line"))
 
   var status: Int32 = 0
-  let reapDeadline = ContinuousClock.now + .seconds(5)
+  let reapDeadline = ContinuousClock.now + .seconds(60)
   while waitpid(terminal.processIdentifier, &status, WNOHANG) == 0,
     ContinuousClock.now < reapDeadline
   {

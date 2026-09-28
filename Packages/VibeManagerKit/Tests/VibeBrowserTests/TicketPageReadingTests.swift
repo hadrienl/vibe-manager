@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeBrowser
 
 /// A ticket's page, read in a session's web view (#89): real pages, served on this Mac.
-@Suite("Reading a ticket's title in the web view", .serialized)
+@Suite("Reading a ticket's title in the web view", .serialized, .timeLimit(.minutes(3)))
 @MainActor
 struct TicketPageReadingTests {
   private static func page(title: String, ogTitle: String? = nil, script: String = "") -> String {
@@ -99,7 +99,7 @@ struct TicketPageReadingTests {
         if case .signInRequired = progress { waited = true }
       }
     }
-    for _ in 0..<80 where !waited { try await Task.sleep(for: .milliseconds(100)) }
+    try await waitUntil { waited }
     #expect(waited)
 
     // The user signs in; the site sends them back to the ticket.
@@ -144,7 +144,7 @@ struct TicketPageReadingTests {
         if case .signInRequired = progress { waited = true }
       }
     }
-    for _ in 0..<80 where !waited { try await Task.sleep(for: .milliseconds(100)) }
+    try await waitUntil { waited }
     #expect(workspace.browser(for: session).tabs.count == 1)
     workspace.close(existing.id, in: session)
 
@@ -184,12 +184,23 @@ struct TicketPageReadingTests {
         if case .notFound = progress { notFound = true }
       }
     }
-    for _ in 0..<80 where !notFound { try await Task.sleep(for: .milliseconds(100)) }
+    try await waitUntil { notFound }
     #expect(notFound)
 
     server.setPage("/issues/11", Self.page(title: "Private at last - Tracker"))
     workspace.browser(for: session).tabs.first?.reload()
 
     #expect(await reading.value == .title("Private at last", raw: "Private at last - Tracker"))
+  }
+
+  /// A state is waited for, not a deadline: WebKit's processes, the local server and the reading
+  /// all have to run, and a CI runner that stalls can hold any of them for seconds. The bound only
+  /// stops a state never reached; the `#expect` after the call then says which.
+  private func waitUntil(_ condition: () -> Bool) async throws {
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !condition(), clock.now - start < .seconds(60) {
+      try await Task.sleep(for: .milliseconds(100))
+    }
   }
 }

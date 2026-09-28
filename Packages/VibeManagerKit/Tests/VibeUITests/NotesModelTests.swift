@@ -92,10 +92,20 @@ private actor GatedNotesStore: SessionNotesStore {
   }
 }
 
+/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
+/// the task that publishes it unscheduled for seconds. The bound only stops a state never reached,
+/// and says so at the line that waited for it.
 @MainActor
-private func settle(_ condition: @MainActor () async -> Bool) async {
-  for _ in 0..<2_000 {
-    if await condition() { return }
+private func settle(
+  _ condition: @MainActor () async -> Bool, sourceLocation: SourceLocation = #_sourceLocation
+) async {
+  let clock = ContinuousClock()
+  let start = clock.now
+  while !(await condition()) {
+    guard clock.now - start < .seconds(60) else {
+      Issue.record("Never reached: the state waited for.", sourceLocation: sourceLocation)
+      return
+    }
     try? await Task.sleep(for: .milliseconds(1))
   }
 }
@@ -115,7 +125,7 @@ private func isSaved(_ document: NotesDocument) -> Bool {
 }
 
 @MainActor
-@Suite("Saving the notes as they are typed")
+@Suite("Saving the notes as they are typed", .timeLimit(.minutes(2)))
 struct NotesSavingTests {
   private let id = SessionID()
 
@@ -307,7 +317,7 @@ struct NotesSavingTests {
 }
 
 @MainActor
-@Suite("Searching and summarising with the notes")
+@Suite("Searching and summarising with the notes", .timeLimit(.minutes(2)))
 struct NotesIndexTests {
   @Test("Every session's notes are read for the search, then follow the typing")
   func searchIndex() async throws {
@@ -346,7 +356,7 @@ struct NotesIndexTests {
 }
 
 @MainActor
-@Suite("The notes editor")
+@Suite("The notes editor", .timeLimit(.minutes(2)))
 struct NotesEditorTests {
   private func editor(
     for document: NotesDocument

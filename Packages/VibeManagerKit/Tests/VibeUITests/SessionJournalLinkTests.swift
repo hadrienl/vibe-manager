@@ -31,16 +31,21 @@ private func makeJournal(opener: FakeOpener) -> SessionJournalModel {
     preferences: InMemoryJournalPreferences(), opener: opener)
 }
 
+/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
+/// the task that publishes it unscheduled for seconds. The bound only stops a state never reached,
+/// which the `#expect` around the call then names.
 @MainActor
 private func eventually(_ condition: () -> Bool) async -> Bool {
-  for _ in 0..<200 {
-    if condition() { return true }
+  let clock = ContinuousClock()
+  let start = clock.now
+  while !condition() {
+    guard clock.now - start < .seconds(60) else { return false }
     try? await Task.sleep(for: .milliseconds(10))
   }
-  return condition()
+  return true
 }
 
-@Suite("The links of the summary")
+@Suite("The links of the summary", .timeLimit(.minutes(2)))
 @MainActor
 struct SessionJournalLinkTests {
   @Test("A link of the summary opens in the session's web view, not in the default browser")

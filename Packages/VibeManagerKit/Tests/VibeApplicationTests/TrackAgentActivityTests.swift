@@ -146,11 +146,20 @@ private let t0 = Date(timeIntervalSince1970: 2_000_000)
 /// The tracker subscribes to a log on a task of its own: lines written before that are the test's
 /// mistake, not the tracker's.
 func following(_ logs: ScriptedActivityLogs, _ id: SessionID) async -> Bool {
-  for _ in 0..<200 {
-    if await logs.isFollowing(id) { return true }
+  await waitingForState { await logs.isFollowing(id) }
+}
+
+/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
+/// the tracker's tasks unscheduled for seconds — a second was given before. The bound only stops a
+/// state never reached, which the `#expect` around the call then names.
+func waitingForState(_ condition: () async -> Bool) async -> Bool {
+  let clock = ContinuousClock()
+  let start = clock.now
+  while !(await condition()) {
+    guard clock.now - start < .seconds(60) else { return false }
     try? await Task.sleep(for: .milliseconds(5))
   }
-  return false
+  return true
 }
 
 func makeTracker(
@@ -163,16 +172,12 @@ func makeTracker(
     persistenceDelay: .seconds(3600))
 }
 
-/// Waits until the tracker reports `predicate`, or fails after a second.
+/// Waits until the tracker reports `predicate`; see `waitingForState`.
 func eventually(
   _ tracker: TrackAgentActivity, _ id: SessionID,
   _ predicate: @Sendable (AgentActivityState?) -> Bool
 ) async -> Bool {
-  for _ in 0..<200 {
-    if predicate(await tracker.state(for: id)) { return true }
-    try? await Task.sleep(for: .milliseconds(5))
-  }
-  return false
+  await waitingForState { predicate(await tracker.state(for: id)) }
 }
 
 /// Reads the conversation a `start` line names, as Codex's `SessionStart` does (#144).
@@ -189,7 +194,7 @@ private struct NamingDecoder: AgentSignalDecoding {
   }
 }
 
-@Suite("Conversations named through the hooks")
+@Suite("Conversations named through the hooks", .timeLimit(.minutes(2)))
 struct ConversationNamingTests {
   @Test("A conversation the agent names is told, and kept for the observer armed after it (#144)")
   func namedConversationIsToldAndKept() async {
@@ -214,7 +219,7 @@ struct ConversationNamingTests {
   }
 }
 
-@Suite("Tracking agent activity")
+@Suite("Tracking agent activity", .timeLimit(.minutes(2)))
 struct TrackAgentActivityTests {
   @Test("An answer finished out of sight is unread until the session is shown")
   func unreadUntilShown() async {
@@ -456,9 +461,5 @@ struct TrackAgentActivityTests {
 }
 
 private func eventuallyTrue(_ predicate: @Sendable () -> Bool) async -> Bool {
-  for _ in 0..<200 {
-    if predicate() { return true }
-    try? await Task.sleep(for: .milliseconds(5))
-  }
-  return false
+  await waitingForState { predicate() }
 }

@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Keeping and archiving the session history")
+@Suite("Keeping and archiving the session history", .timeLimit(.minutes(2)))
 struct SessionHistoryTests {
   private func plan() -> AgentLaunchPlan {
     AgentLaunchPlan(
@@ -143,7 +143,7 @@ struct SessionHistoryTests {
 
     await supervisor.finish(id: stored.id, with: .exited(code: 0))
 
-    try await waitUntil {
+    try await waitUntil("the session whose process ended is closed") {
       await repository.session(id: stored.id)?.status == .closed
     }
     // Closed, not archived, and the terminal is still there to be read.
@@ -165,7 +165,7 @@ struct SessionHistoryTests {
 
     await launcher.launch(session: stored, plan: plan())
 
-    try await waitUntil {
+    try await waitUntil("the session whose process ended during its launch is closed") {
       await repository.session(id: stored.id)?.status == .closed
     }
   }
@@ -646,16 +646,24 @@ struct SessionHistoryTests {
     #expect(model.selectedSessionID == first.id)
   }
 
+  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
+  /// leave the task that publishes it unscheduled for seconds. The bound is far beyond what the
+  /// slowest runner needs; it is only there so that a state never reached says which one.
   private func waitUntil(
-    timeout: Duration = .seconds(2),
-    _ condition: @Sendable () async -> Bool
+    _ what: String, _ condition: @Sendable () async -> Bool
   ) async throws {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
-      if await condition() { return }
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !(await condition()) {
+      guard clock.now - start < .seconds(60) else {
+        throw NeverReached(description: "Never reached: \(what).")
+      }
       try await Task.sleep(for: .milliseconds(10))
     }
-    #expect(await condition())
+  }
+
+  private struct NeverReached: Error, CustomStringConvertible {
+    let description: String
   }
 }
 

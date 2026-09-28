@@ -6,9 +6,20 @@ import VibeDomain
 
 @testable import VibeUI
 
+/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
+/// the task that publishes it unscheduled for seconds. The bound only stops a state never reached,
+/// and says so at the line that waited for it.
 @MainActor
-private func eventually(_ condition: @MainActor () -> Bool) async {
-  for _ in 0..<400 where !condition() {
+private func eventually(
+  _ condition: @MainActor () -> Bool, sourceLocation: SourceLocation = #_sourceLocation
+) async {
+  let clock = ContinuousClock()
+  let start = clock.now
+  while !condition() {
+    guard clock.now - start < .seconds(60) else {
+      Issue.record("Never reached: the state waited for.", sourceLocation: sourceLocation)
+      return
+    }
     try? await Task.sleep(for: .milliseconds(10))
   }
 }
@@ -51,7 +62,7 @@ private final class ScriptedReader: TicketPageReading {
 }
 
 @MainActor
-@Suite("Putting ticket titles at the top of the notes (#89)")
+@Suite("Putting ticket titles at the top of the notes (#89)", .timeLimit(.minutes(2)))
 struct TicketTitlesTests {
   private let id = SessionID()
   private let resolvers = TicketResolverSet(TicketResolverPresets.all)

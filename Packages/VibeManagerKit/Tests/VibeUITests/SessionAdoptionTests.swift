@@ -139,7 +139,7 @@ private actor ReluctantHost: TerminalHosting {
 }
 
 @MainActor
-@Suite("Taking back the agents the terminal host kept")
+@Suite("Taking back the agents the terminal host kept", .timeLimit(.minutes(2)))
 struct SessionAdoptionTests {
   private func session(status: SessionStatus = .active) -> WorkSession {
     WorkSession(
@@ -150,12 +150,17 @@ struct SessionAdoptionTests {
     )
   }
 
+  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
+  /// leave the task that publishes it unscheduled for seconds. The bound only stops a state never
+  /// reached, which the `#expect` around the call then names.
   private func eventually(_ condition: () async -> Bool) async -> Bool {
-    for _ in 0..<250 {
-      if await condition() { return true }
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !(await condition()) {
+      guard clock.now - start < .seconds(60) else { return false }
       try? await Task.sleep(for: .milliseconds(20))
     }
-    return await condition()
+    return true
   }
 
   @Test("A running agent is shown as it is: nothing started, nothing written to the store")

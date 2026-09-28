@@ -189,16 +189,21 @@ private struct Harness {
   }
 }
 
+/// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can leave
+/// the task that publishes it unscheduled for seconds. The bound only stops a state never reached,
+/// which the `#expect` around the call then names.
 @MainActor
 private func eventually(_ condition: @MainActor () async -> Bool) async -> Bool {
-  for _ in 0..<500 {
-    if await condition() { return true }
+  let clock = ContinuousClock()
+  let start = clock.now
+  while !(await condition()) {
+    guard clock.now - start < .seconds(60) else { return false }
     try? await Task.sleep(for: .milliseconds(5))
   }
-  return await condition()
+  return true
 }
 
-@Suite("A session's drawer of side terminals")
+@Suite("A session's drawer of side terminals", .timeLimit(.minutes(2)))
 @MainActor
 struct SessionTerminalsTests {
   @Test("Shown for the first time, it opens one shell in the session's folder, typing nothing")

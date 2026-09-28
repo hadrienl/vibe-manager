@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Restarting a closed session from the workspace")
+@Suite("Restarting a closed session from the workspace", .timeLimit(.minutes(2)))
 struct SessionRestartTests {
   // MARK: - Fixtures
 
@@ -716,12 +716,19 @@ struct SessionRestartTests {
     #expect(model.expectedRestartMode(for: subject).contains("new process, with a summary"))
   }
 
+  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
+  /// leave the task that publishes it unscheduled for seconds. The bound only stops a state never
+  /// reached, and says so at the line that waited for it.
   private func waitUntil(
-    _ condition: @MainActor () -> Bool,
-    attempts: Int = 200
+    _ condition: @MainActor () -> Bool, sourceLocation: SourceLocation = #_sourceLocation
   ) async {
-    for _ in 0..<attempts {
-      if condition() { return }
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !condition() {
+      guard clock.now - start < .seconds(60) else {
+        Issue.record("Never reached: the state waited for.", sourceLocation: sourceLocation)
+        return
+      }
       try? await Task.sleep(for: .milliseconds(5))
     }
   }

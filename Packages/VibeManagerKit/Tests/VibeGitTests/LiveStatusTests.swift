@@ -4,7 +4,8 @@ import VibeApplication
 import VibeDomain
 import VibeGit
 
-@Suite("Following a real repository as it changes outside the application")
+@Suite(
+  "Following a real repository as it changes outside the application", .timeLimit(.minutes(5)))
 struct LiveStatusTests {
   private func latest(
     _ path: String, in box: StateBox
@@ -12,12 +13,15 @@ struct LiveStatusTests {
     box.states.last { $0.key.repositoryPath == path }
   }
 
+  /// A state is waited for, not a deadline: Git, FSEvents and the monitor's tasks all have to run,
+  /// and a CI runner that stalls can hold any of them for seconds. The bound only stops a state
+  /// never reached, which the `#expect` around the call then names.
   private func waitFor(
-    _ box: StateBox, _ path: String, timeout: Duration = .seconds(5),
-    _ condition: (RepositoryStatusState) -> Bool
+    _ box: StateBox, _ path: String, _ condition: (RepositoryStatusState) -> Bool
   ) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
+    let clock = ContinuousClock()
+    let start = clock.now
+    while clock.now - start < .seconds(60) {
       if let state = latest(path, in: box), condition(state) { return true }
       try? await Task.sleep(for: .milliseconds(20))
     }

@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Creating a session without waiting for it")
+@Suite("Creating a session without waiting for it", .timeLimit(.minutes(2)))
 struct OptimisticCreationTests {
   private let folder = FileManager.default.temporaryDirectory.path
 
@@ -32,12 +32,21 @@ struct OptimisticCreationTests {
     return sheet
   }
 
+  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
+  /// leave the creation unscheduled for seconds. The bound only stops a state never reached, which
+  /// the `#expect` around the call then names.
   private func settled(_ model: AppModel) async -> Bool {
-    for _ in 0..<500 {
-      if model.sessionInCreation == nil { return true }
+    await eventually { model.sessionInCreation == nil }
+  }
+
+  private func eventually(_ condition: () -> Bool) async -> Bool {
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !condition() {
+      guard clock.now - start < .seconds(60) else { return false }
       try? await Task.sleep(for: .milliseconds(10))
     }
-    return false
+    return true
   }
 
   @Test("Create closes the sheet and shows the session to come before it is even stored")
@@ -122,9 +131,7 @@ struct OptimisticCreationTests {
 
     await repository.open()
     #expect(await settled(model))
-    for _ in 0..<500 where model.sessions.count < 2 {
-      try? await Task.sleep(for: .milliseconds(10))
-    }
+    _ = await eventually { model.sessions.count >= 2 }
     #expect(Set(model.sessions.map(\.name)) == ["First", "Second"])
     #expect(!model.isPresentingNewSession)
   }

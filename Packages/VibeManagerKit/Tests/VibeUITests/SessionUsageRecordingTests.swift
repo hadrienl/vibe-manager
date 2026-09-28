@@ -6,7 +6,7 @@ import VibeDomain
 @testable import VibeUI
 
 @MainActor
-@Suite("Recording the runs a launcher starts")
+@Suite("Recording the runs a launcher starts", .timeLimit(.minutes(2)))
 struct SessionUsageRecordingTests {
   private func plan() -> AgentLaunchPlan {
     AgentLaunchPlan(
@@ -56,7 +56,7 @@ struct SessionUsageRecordingTests {
 
     await launcher.launch(session: subject, plan: plan())
     await supervisor.finish(id: subject.id, state: .exited(code: 0))
-    for _ in 0..<200 where !closed { try? await Task.sleep(for: .milliseconds(5)) }
+    await waitUntil { closed }
     _ = await launcher.detach(subject.id)
 
     let recorded = await runs(ledger)
@@ -83,7 +83,7 @@ struct SessionUsageRecordingTests {
     launcher.sessionDidClose = { _, _ in closed = true }
 
     await launcher.launch(session: subject, plan: plan())
-    for _ in 0..<200 where !closed { try? await Task.sleep(for: .milliseconds(5)) }
+    await waitUntil { closed }
 
     let recorded = await runs(ledger)
     #expect(closed)
@@ -155,5 +155,22 @@ struct SessionUsageRecordingTests {
     #expect(UsagePresentation.duration(20) == "< 1 min")
     #expect(UsagePresentation.tokens(1_234_567) == "1.2 M")
     #expect(UsagePresentation.tokens(48_000) == "48.0 k")
+  }
+
+  /// A state is waited for, not a deadline: a CI runner whose cooperative pool is saturated can
+  /// leave the task that closes the run unscheduled for seconds. The bound only stops a state never
+  /// reached, and says so at the line that waited for it.
+  private func waitUntil(
+    _ condition: () -> Bool, sourceLocation: SourceLocation = #_sourceLocation
+  ) async {
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !condition() {
+      guard clock.now - start < .seconds(60) else {
+        Issue.record("Never reached: the state waited for.", sourceLocation: sourceLocation)
+        return
+      }
+      try? await Task.sleep(for: .milliseconds(5))
+    }
   }
 }

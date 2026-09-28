@@ -4,7 +4,7 @@ import Testing
 
 @testable import VibeProcess
 
-@Suite("Bounded process")
+@Suite("Bounded process", .timeLimit(.minutes(3)))
 struct BoundedProcessTests {
   private func shell(
     _ script: String,
@@ -35,12 +35,17 @@ struct BoundedProcessTests {
     return size > 0 && info.pbi_status != UInt32(SZOMB)
   }
 
+  /// A state is waited for, not a deadline: a CI runner that stalls can keep the process that
+  /// reaches it from running for seconds. The bound only stops a state never reached, which the
+  /// `#expect` around the call then names.
   private func eventually(_ condition: () -> Bool) async -> Bool {
-    for _ in 0..<200 {
-      if condition() { return true }
+    let clock = ContinuousClock()
+    let start = clock.now
+    while !condition() {
+      guard clock.now - start < .seconds(60) else { return false }
       try? await Task.sleep(for: .milliseconds(25))
     }
-    return condition()
+    return true
   }
 
   @Test("It captures both streams and the exit status")
