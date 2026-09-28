@@ -162,8 +162,6 @@ public final class PermissionsModel {
     openURL(Self.fullDiskAccessSettingsURL)
   }
 
-  /// Shows this very copy of the application in the Finder, to be dragged into the list when
-  /// System Settings holds several "Vibe Manager" that nothing tells apart.
   /// The step's own default button: opens the pane and closes the step. Coming back to the
   /// application is when the answer is looked for.
   public func answerStepByOpeningSystemSettings() async {

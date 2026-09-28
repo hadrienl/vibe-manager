@@ -399,19 +399,34 @@ private struct FullDiskAccessRow: View {
           .font(.callout)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
-        if runner == .host, running > 0 {
-          RestartHostButtons(permissions: permissions, origin: .settings)
-        }
       case .granted, .checking:
         EmptyView()
       }
 
-      // In every state: to grant the access, and to take it back.
-      Button {
-        permissions.openSystemSettings()
-      } label: {
-        Text("Open System Settings", bundle: .module)
+      // In every state, checking included: to grant the access, and to take it back. On the row of
+      // the restart buttons when there are some, rather than on a row of its own under them.
+      if offersRestart {
+        RestartHostButtons(permissions: permissions, origin: .settings) {
+          openSystemSettingsButton
+        }
+      } else {
+        openSystemSettingsButton
       }
+    }
+  }
+
+  private var offersRestart: Bool {
+    guard case .pendingRestart(let runner, let running) = permissions.situation else {
+      return false
+    }
+    return runner == .host && running > 0
+  }
+
+  private var openSystemSettingsButton: some View {
+    Button {
+      permissions.openSystemSettings()
+    } label: {
+      Text("Open System Settings", bundle: .module)
     }
   }
 
@@ -473,10 +488,20 @@ struct PendingRestartExplanation: View {
 }
 
 /// Restart the host when the last agent ends, or now — the one road that stops agents, and only
-/// once they have been named.
-struct RestartHostButtons: View {
+/// once they have been named. `trailing` ends the same row: another action of the same place.
+struct RestartHostButtons<Trailing: View>: View {
   let permissions: PermissionsModel
   let origin: RestartNowRequest.Origin
+  @ViewBuilder let trailing: () -> Trailing
+
+  init(
+    permissions: PermissionsModel, origin: RestartNowRequest.Origin,
+    @ViewBuilder trailing: @escaping () -> Trailing
+  ) {
+    self.permissions = permissions
+    self.origin = origin
+    self.trailing = trailing
+  }
 
   var body: some View {
     HStack {
@@ -505,7 +530,14 @@ struct RestartHostButtons: View {
         Text("Restart Now…", bundle: .module)
       }
       .disabled(!permissions.canRestartNow)
+      trailing()
     }
+  }
+}
+
+extension RestartHostButtons where Trailing == EmptyView {
+  init(permissions: PermissionsModel, origin: RestartNowRequest.Origin) {
+    self.init(permissions: permissions, origin: origin) { EmptyView() }
   }
 }
 
