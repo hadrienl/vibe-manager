@@ -176,9 +176,9 @@ struct RequestsSettingsTests {
     segments.selectedSegment = 1
     _ = segments.sendAction(segments.action, to: segments.target)
     #expect(model.requestsPane == .avatars)
-    // The page of the avatars: its description, and no switch of the alerts.
+    // The page of the avatars: its list, and no switch of the alerts.
     await settle(window, "the page of the avatars") {
-      Self.descendants(of: host.view).contains { $0 is NSTextView }
+      Self.descendants(of: host.view).contains { $0 is NSTableView }
         && Self.switches(in: host.view).count < 4
     }
 
@@ -277,7 +277,7 @@ struct RequestsSettingsTests {
       await settle(window, "the page \(pane)") {
         switch pane {
         case .signalling: Self.switches(in: view).count == 4
-        case .avatars: Self.descendants(of: view).contains { $0 is NSTextView }
+        case .avatars: Self.descendants(of: view).contains { $0 is NSTableView }
         }
       }
       #expect(window.contentLayoutRect.width >= RequestsSettingsView.pageSize.width)

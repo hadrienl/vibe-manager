@@ -227,6 +227,38 @@
         }
       }
     },
+    "%@ is drawing ten expressions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ dessine dix expressions"
+          }
+        }
+      }
+    },
+    "%@ is drawing “%@” again… %@" : {
+      "comment" : "While an agent draws one expression again: the agent, the expression, the time since it started.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ redessine « %2$@ »… %3$@"
+          }
+        }
+      }
+    },
+    "%@ is drawing… %@" : {
+      "comment" : "While an agent draws an avatar: the agent, then the time since it started.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ dessine… %2$@"
+          }
+        }
+      }
+    },
     "%@ is multiline" : {
       "comment" : "A field's name.",
       "localizations" : {
@@ -519,6 +551,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ vont s’arrêter, puis reprendre leur conversation avec l’accès complet au disque. Ce qu’un agent est en train de faire est interrompu."
+          }
+        }
+      }
+    },
+    "%@ — %@" : {
+      "comment" : "An agent that cannot draw now, and why.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ — %2$@"
           }
         }
       }
@@ -1284,6 +1327,53 @@
         }
       }
     },
+    "%lld avatars · %@" : {
+      "comment" : "Above the list of avatars: how many, and their size on disk.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld avatar · %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld avatars · %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld avatars · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld avatar · %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld avatars · %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld behind" : {
       "comment" : "A number of commits the upstream has and the branch has not.",
       "localizations" : {
@@ -1428,6 +1518,52 @@
         }
       }
     },
+    "%lld characters at most." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld character at most."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld characters at most."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractères au plus."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractère au plus."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractères au plus."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld commits since %@ (merge base %@)" : {
       "comment" : "A number of commits, the branch they are compared with, and an abbreviated commit.",
       "localizations" : {
@@ -1497,6 +1633,52 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld en conflit"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld expressions missing" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expression missing"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expressions missing"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expressions manquantes"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expression manquante"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expressions manquantes"
                 }
               }
             }
@@ -3606,12 +3788,12 @@
         }
       }
     },
-    "A zip archive dropped on the avatar is imported. It holds one image per expression, named after it (neutral.png, pleased.png…)." : {
+    "A zip archive dropped on the list is imported: one image per expression (neutral.png, pleased.png…)." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une archive zip déposée sur l’avatar est importée. Elle contient une image par expression, nommée d’après elle (neutral.png, pleased.png…)."
+            "value" : "Une archive .zip déposée sur la liste est importée : une image par expression (neutral.png, pleased.png…)."
           }
         }
       }
@@ -4313,8 +4495,30 @@
         }
       }
     },
+    "Available once the archive is read" : {
+      "comment" : "Why the card that makes an avatar is greyed out.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible une fois l’archive lue"
+          }
+        }
+      }
+    },
+    "Available once the generation under way ends" : {
+      "comment" : "Why the card that makes an avatar is greyed out.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible à la fin de la génération en cours"
+          }
+        }
+      }
+    },
     "Avatar" : {
-      "comment" : "A section of the Settings window.\nThe avatar of the floating panel.",
+      "comment" : "The avatar of the floating panel.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -4916,6 +5120,17 @@
         }
       }
     },
+    "Complete It" : {
+      "comment" : "Makes a draft to complete an avatar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le compléter"
+          }
+        }
+      }
+    },
     "Conflicts" : {
       "comment" : "A list of the Git inspector: conflicted files.",
       "localizations" : {
@@ -5100,13 +5315,12 @@
         }
       }
     },
-    "Create My Avatar" : {
-      "comment" : "A section of the Settings window.",
+    "Create a New Avatar" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créer mon avatar"
+            "value" : "Créer un nouvel avatar"
           }
         }
       }
@@ -5236,7 +5450,7 @@
       }
     },
     "Delete “%@”?" : {
-      "comment" : "The name of the prompt template to delete.",
+      "comment" : "The name of the prompt template to delete.\nThe name of the avatar to delete.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -5297,12 +5511,22 @@
         }
       }
     },
-    "Describe it" : {
+    "Describe it to an agent, or import an archive" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Décrivez-le"
+            "value" : "Le décrire à un agent, ou importer une archive"
+          }
+        }
+      }
+    },
+    "Description" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Description"
           }
         }
       }
@@ -5373,6 +5597,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abandonner ce modèle"
+          }
+        }
+      }
+    },
+    "Discard “%@”?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandonner « %@ » ?"
+          }
+        }
+      }
+    },
+    "Discard…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandonner…"
           }
         }
       }
@@ -5485,12 +5729,33 @@
         }
       }
     },
+    "Draw Everything Again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout redessiner"
+          }
+        }
+      }
+    },
     "Drawn by" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Généré par"
+            "value" : "Dessiné par"
+          }
+        }
+      }
+    },
+    "Drawn by %@ · %@" : {
+      "comment" : "Where an avatar comes from: the agent that drew it, and when.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dessiné par %1$@ · %2$@"
           }
         }
       }
@@ -5579,6 +5844,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modifier comme texte"
+          }
+        }
+      }
+    },
+    "Edit the Description…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier la description…"
           }
         }
       }
@@ -5730,6 +6005,16 @@
         }
       }
     },
+    "Export Without the Description…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter sans la description…"
+          }
+        }
+      }
+    },
     "Export “%@”…" : {
       "localizations" : {
         "fr" : {
@@ -5746,6 +6031,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exporter…"
+          }
+        }
+      }
+    },
+    "Expressions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expressions"
           }
         }
       }
@@ -5783,12 +6078,23 @@
       }
     },
     "Failed" : {
-      "comment" : "A session's state, in the sidebar.\nAn agent action in the web view that failed.",
+      "comment" : "A session's state, in the sidebar.\nAn agent action in the web view that failed.\nAn avatar that could not be drawn.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échec"
+          }
+        }
+      }
+    },
+    "Failed · %@" : {
+      "comment" : "A generation that failed, and when.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec · %@"
           }
         }
       }
@@ -5925,6 +6231,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replier les demandes"
+          }
+        }
+      }
+    },
+    "Folded" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replié"
           }
         }
       }
@@ -6112,16 +6428,6 @@
         }
       }
     },
-    "Generate Everything Again" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tout régénérer"
-          }
-        }
-      }
-    },
     "Generate this expression" : {
       "localizations" : {
         "fr" : {
@@ -6138,28 +6444,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Régénérer cette expression"
-          }
-        }
-      }
-    },
-    "Generating the avatar… %@" : {
-      "comment" : "While an agent draws an avatar. The time since it started.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Génération de l’avatar… %@"
-          }
-        }
-      }
-    },
-    "Generating “%@”… %@" : {
-      "comment" : "While an agent draws one expression again. The time since it started.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Génération de « %@ »… %@"
           }
         }
       }
@@ -6211,16 +6495,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Définie par le modèle — choisissez-en une autre si besoin."
-          }
-        }
-      }
-    },
-    "Go Back to the Default Avatar" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revenir à l’avatar par défaut"
           }
         }
       }
@@ -6526,6 +6800,16 @@
         }
       }
     },
+    "Import an Archive…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer une archive…"
+          }
+        }
+      }
+    },
     "Imported avatar" : {
       "comment" : "The name of an avatar read from an archive.",
       "localizations" : {
@@ -6533,6 +6817,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avatar importé"
+          }
+        }
+      }
+    },
+    "Imported · %@" : {
+      "comment" : "Where an avatar comes from: an archive, and when it was made.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importé · %@"
           }
         }
       }
@@ -6558,6 +6853,17 @@
         }
       }
     },
+    "In Use" : {
+      "comment" : "The avatar of the floating panel.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En usage"
+          }
+        }
+      }
+    },
     "In the default browser" : {
       "localizations" : {
         "fr" : {
@@ -6578,12 +6884,13 @@
         }
       }
     },
-    "Include the description in the export" : {
+    "Incomplete" : {
+      "comment" : "An avatar that lacks expressions.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inclure la description dans l’export"
+            "value" : "Incomplet"
           }
         }
       }
@@ -6648,6 +6955,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tickets"
+          }
+        }
+      }
+    },
+    "It cannot be recovered. Export it first to keep it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne pourra pas être récupéré. Exportez-le d’abord pour le garder."
           }
         }
       }
@@ -6959,6 +7276,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus"
+          }
+        }
+      }
+    },
+    "More Actions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus d’actions"
           }
         }
       }
@@ -7286,6 +7613,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau"
+          }
+        }
+      }
+    },
+    "New Avatar" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel avatar"
           }
         }
       }
@@ -7885,6 +8222,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas encore enregistré"
+          }
+        }
+      }
+    },
+    "Not written to disk yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore enregistré sur le disque"
           }
         }
       }
@@ -8753,6 +9100,16 @@
         }
       }
     },
+    "Reading the archive…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de l’archive…"
+          }
+        }
+      }
+    },
     "Reading the repositories…" : {
       "localizations" : {
         "fr" : {
@@ -9027,6 +9384,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renommer le groupe…"
+          }
+        }
+      }
+    },
+    "Rename the Avatar" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer l’avatar"
           }
         }
       }
@@ -9989,6 +10356,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commande shell"
+          }
+        }
+      }
+    },
+    "Shipped with the application" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fourni avec l’application"
           }
         }
       }
@@ -11627,6 +12004,16 @@
         }
       }
     },
+    "The floating panel will go back to the default avatar. Export it first to keep it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le panneau flottant reprendra l’avatar par défaut. Exportez-le d’abord pour le garder."
+          }
+        }
+      }
+    },
     "The format must hold {title}, and may hold {id} and {url}." : {
       "localizations" : {
         "fr" : {
@@ -12249,6 +12636,26 @@
         }
       }
     },
+    "This avatar cannot be read." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet avatar est illisible."
+          }
+        }
+      }
+    },
+    "This avatar cannot be read: delete it, or import it again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet avatar est illisible : supprimez-le, ou importez-le à nouveau."
+          }
+        }
+      }
+    },
     "This avatar comes from a later version of Vibe Manager." : {
       "comment" : "An avatar problem.",
       "localizations" : {
@@ -12267,6 +12674,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet avatar n’a pas pu être mis dans le panneau flottant : le panneau garde le sien."
+          }
+        }
+      }
+    },
+    "This avatar lacks %lld expressions: complete it to use it." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This avatar lacks %lld expression: complete it to use it."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This avatar lacks %lld expressions: complete it to use it."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il manque %lld expressions à cet avatar : complétez-le pour l’utiliser."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il manque %lld expression à cet avatar : complétez-le pour l’utiliser."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il manque %lld expressions à cet avatar : complétez-le pour l’utiliser."
+                }
+              }
+            }
           }
         }
       }
@@ -12573,6 +13026,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Titre de la page : « %@ »"
+          }
+        }
+      }
+    },
+    "To Check" : {
+      "comment" : "An avatar made and not yet kept.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À valider"
           }
         }
       }
@@ -12928,12 +13392,33 @@
         }
       }
     },
+    "Under Way" : {
+      "comment" : "An avatar being drawn.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours"
+          }
+        }
+      }
+    },
     "Unfold the palette when a request arrives" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déplier la palette à l’arrivée d’une demande"
+          }
+        }
+      }
+    },
+    "Unfolded" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplié"
           }
         }
       }
@@ -12950,7 +13435,7 @@
       }
     },
     "Unreadable" : {
-      "comment" : "The state of a session's notes.",
+      "comment" : "The state of a session's notes.\nAn avatar that cannot be read.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -13097,6 +13582,16 @@
         }
       }
     },
+    "Use This Avatar" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser cet avatar"
+          }
+        }
+      }
+    },
     "Use it in the floating panel" : {
       "localizations" : {
         "fr" : {
@@ -13113,6 +13608,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser le ticket de la branche"
+          }
+        }
+      }
+    },
+    "Usually one to two minutes. You can close Settings: the generation goes on." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En général une à deux minutes. Vous pouvez fermer les Réglages : la génération continue."
           }
         }
       }
@@ -13345,6 +13850,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui tourne dans ses terminaux annexes sera arrêté : %@."
+          }
+        }
+      }
+    },
+    "What was drawn is lost." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui a été dessiné sera perdu."
           }
         }
       }
@@ -14671,6 +15186,16 @@
         }
       }
     },
+    "“%@”" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ »"
+          }
+        }
+      }
+    },
     "“%@” can’t be sent: its name contains a control character." : {
       "comment" : "The argument is a file name.",
       "localizations" : {
@@ -14722,6 +15247,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "→ %@ a échoué"
+          }
+        }
+      }
+    },
+    "↻ to draw one again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↻ pour en redessiner une"
           }
         }
       }
