@@ -469,7 +469,10 @@ struct SessionRestartTests {
     let path = folder()
     let subject = session(path: path)
     let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
-    let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
+    // The clock stands still: a runner frozen past the probation would make the exit an ordinary
+    // end of work, and the refusal would never come.
+    let (model, _, _, _) = makeWorkspace(
+      session: subject, supervisor: supervisor, clock: SteppableClock(Date()))
     await model.reload()
 
     await model.restart(subject.id)
@@ -487,7 +490,10 @@ struct SessionRestartTests {
     let path = folder()
     let subject = session(path: path)
     let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
-    let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
+    // The clock stands still: a runner frozen past the probation would make the exit an ordinary
+    // end of work, and the refusal would never come.
+    let (model, _, _, _) = makeWorkspace(
+      session: subject, supervisor: supervisor, clock: SteppableClock(Date()))
     await model.reload()
     await model.restart(subject.id)
     await waitUntil("the resume is refused") { model.resumeRefusals.contains(subject.id) }
@@ -516,7 +522,8 @@ struct SessionRestartTests {
     let (model, _, _, _) = makeWorkspace(
       session: subject,
       supervisor: supervisor,
-      provider: WorkspaceProvider(observerDelayYields: 40)
+      provider: WorkspaceProvider(observerDelayYields: 40),
+      clock: SteppableClock(Date())
     )
     await model.reload()
 
@@ -663,7 +670,10 @@ struct SessionRestartTests {
     let path = folder()
     let subject = session(path: path)
     let supervisor = WorkspaceSupervisor(initialState: .exited(code: 1))
-    let (model, _, _, _) = makeWorkspace(session: subject, supervisor: supervisor)
+    // The clock stands still: a runner frozen past the probation would make the exit an ordinary
+    // end of work, and the refusal would never come.
+    let (model, _, _, _) = makeWorkspace(
+      session: subject, supervisor: supervisor, clock: SteppableClock(Date()))
     await model.reload()
     await model.restart(subject.id)
     await waitUntil("the resume is refused") { model.resumeRefusals.contains(subject.id) }

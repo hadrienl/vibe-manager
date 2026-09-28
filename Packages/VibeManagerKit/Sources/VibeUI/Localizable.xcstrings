@@ -10434,16 +10434,6 @@
         }
       }
     },
-    "Several choices: answer in the session." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plusieurs choix : répondez dans la session."
-          }
-        }
-      }
-    },
     "Several requests are waiting in this session: answer in the session." : {
       "comment" : "Why a request is answered in its terminal: which of them is on screen is not known.",
       "localizations" : {
