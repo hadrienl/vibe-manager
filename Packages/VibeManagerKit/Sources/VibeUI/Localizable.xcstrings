@@ -237,6 +237,34 @@
         }
       }
     },
+    "%@ is drawing the avatar. It takes one to two minutes." : {
+      "comment" : "Said when an agent starts drawing an avatar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ dessine l’avatar. Cela prend une à deux minutes."
+          }
+        }
+      }
+    },
+    "%@ is drawing “%@” again." : {
+      "comment" : "Said when an agent starts drawing one expression of an avatar again.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is drawing “%2$@” again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ redessine « %2$@ »."
+          }
+        }
+      }
+    },
     "%@ is drawing “%@” again… %@" : {
       "comment" : "While an agent draws one expression again: the agent, the expression, the time since it started.",
       "localizations" : {
@@ -706,6 +734,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@, groupe %2$lld sur %3$lld"
+          }
+        }
+      }
+    },
+    "%@, missing" : {
+      "comment" : "Read by VoiceOver: an expression the avatar lacks, after its name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, manquante"
           }
         }
       }
@@ -1322,7 +1361,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld avatars au plus : supprimez-en un pour en créer un autre."
+            "value" : "%lld avatars au plus : supprimez-en un pour en créer un autre."
           }
         }
       }
@@ -1831,7 +1870,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fichiers de l’archive ignorés, faute de correspondre à une expression : %lld."
+            "value" : "Fichiers de l’archive ignorés, faute de correspondre à une expression : %lld."
           }
         }
       }
@@ -6134,6 +6173,17 @@
         }
       }
     },
+    "Failed, %@" : {
+      "comment" : "Read by VoiceOver: a generation that failed, and when (“2 minutes ago”).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec, %@"
+          }
+        }
+      }
+    },
     "Field" : {
       "localizations" : {
         "fr" : {
@@ -6448,7 +6498,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Générer « %@ »"
+            "value" : "Générer « %@ »"
           }
         }
       }
@@ -6458,7 +6508,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Régénérer « %@ »"
+            "value" : "Régénérer « %@ »"
           }
         }
       }
@@ -6490,6 +6540,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Génération commencée il y a %@"
+          }
+        }
+      }
+    },
+    "Generation under way, %@" : {
+      "comment" : "Read by VoiceOver: an avatar being drawn, and for how long (“42 seconds”).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Génération en cours, %@"
           }
         }
       }
@@ -7020,7 +7081,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Son apparence seulement : l’agent dessine le même personnage dans dix expressions."
+            "value" : "Son apparence seulement : l’agent dessine le même personnage dans dix expressions."
           }
         }
       }
@@ -7363,7 +7424,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bouche en « O »"
+            "value" : "Bouche en « O »"
           }
         }
       }
@@ -11512,7 +11573,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’agent n’a pas pu dessiner l’avatar : rien n’a été modifié. Réessayez."
+            "value" : "L’agent n’a pas pu dessiner l’avatar : rien n’a été modifié. Réessayez."
           }
         }
       }
@@ -11585,7 +11646,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’agent a mis trop de temps : rien n’a été modifié. Réessayez."
+            "value" : "L’agent a mis trop de temps : rien n’a été modifié. Réessayez."
           }
         }
       }
@@ -11735,7 +11796,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’archive contient une entrée qui n’est pas un simple fichier de son dossier (%@) : elle n’a pas été importée."
+            "value" : "L’archive contient une entrée qui n’est pas un simple fichier de son dossier (%@) : elle n’a pas été importée."
           }
         }
       }
@@ -11746,7 +11807,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’archive contient plus d’une image de « %@ »."
+            "value" : "L’archive contient plus d’une image de « %@ »."
           }
         }
       }
@@ -11769,6 +11830,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’archive est chiffrée."
+          }
+        }
+      }
+    },
+    "The archive is imported, with expressions still missing." : {
+      "comment" : "Said when an archive became an incomplete avatar to check.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’archive est importée, mais il lui manque des expressions."
+          }
+        }
+      }
+    },
+    "The archive is imported: check the avatar, then keep it." : {
+      "comment" : "Said when an archive became an avatar to check.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’archive est importée : vérifiez l’avatar, puis gardez-le."
           }
         }
       }
@@ -11812,7 +11895,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’avatar n’a pas pu être gardé : il reste à valider."
+            "value" : "L’avatar n’a pas pu être gardé : il reste à valider."
           }
         }
       }
@@ -11845,7 +11928,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’avatar n’a pas pu être enregistré sur le disque. Il est gardé en attendant : réessayez l’enregistrement."
+            "value" : "L’avatar n’a pas pu être enregistré sur le disque. Il est gardé en attendant : réessayez l’enregistrement."
           }
         }
       }
@@ -11877,7 +11960,73 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’avatar est prêt : vérifiez-le, puis gardez-le."
+            "value" : "L’avatar est prêt : vérifiez-le, puis gardez-le."
+          }
+        }
+      }
+    },
+    "The avatar “%@” is deleted." : {
+      "comment" : "Said when an avatar is deleted.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » est supprimé."
+          }
+        }
+      }
+    },
+    "The avatar “%@” is deleted: the floating panel shows the default avatar again." : {
+      "comment" : "Said when the avatar in use is deleted.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » est supprimé : le panneau flottant reprend l’avatar par défaut."
+          }
+        }
+      }
+    },
+    "The avatar “%@” is discarded." : {
+      "comment" : "Said when a draft avatar is thrown away.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » est abandonné."
+          }
+        }
+      }
+    },
+    "The avatar “%@” is kept, and presents the requests in the floating panel." : {
+      "comment" : "Said when a draft avatar is kept and put in use.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » est gardé, et présente les demandes dans le panneau flottant."
+          }
+        }
+      }
+    },
+    "The avatar “%@” is kept." : {
+      "comment" : "Said when a draft avatar is kept.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » est gardé."
+          }
+        }
+      }
+    },
+    "The avatar “%@” now presents the requests in the floating panel." : {
+      "comment" : "Said when an avatar is put in use.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar « %@ » présente maintenant les demandes dans le panneau flottant."
           }
         }
       }
@@ -11888,7 +12037,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le fond de « %@ » n’a pas pu être retiré."
+            "value" : "Le fond de « %@ » n’a pas pu être retiré."
           }
         }
       }
@@ -11929,7 +12078,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le personnage de « %@ » n’a pas la taille des autres."
+            "value" : "Le personnage de « %@ » n’a pas la taille des autres."
           }
         }
       }
@@ -12021,7 +12170,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’expression « %@ » est coupée par le bord de son image."
+            "value" : "L’expression « %@ » est coupée par le bord de son image."
           }
         }
       }
@@ -12032,7 +12181,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’expression « %@ » est redessinée : vérifiez-la, puis gardez l’avatar."
+            "value" : "L’expression « %@ » est redessinée : vérifiez-la, puis gardez l’avatar."
           }
         }
       }
@@ -12043,7 +12192,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’expression « %@ » est vide."
+            "value" : "L’expression « %@ » est vide."
           }
         }
       }
@@ -12085,7 +12234,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le panneau flottant présente les demandes : aucune notification n’est envoyée tant qu’il est activé."
+            "value" : "Le panneau flottant présente les demandes : aucune notification n’est envoyée tant qu’il est activé."
           }
         }
       }
@@ -12106,6 +12255,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le format doit contenir {title}, et peut contenir {id} et {url}."
+          }
+        }
+      }
+    },
+    "The generation is cancelled: nothing was changed." : {
+      "comment" : "Said when the user cancels the drawing of an avatar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La génération est annulée : rien n’a été modifié."
           }
         }
       }
@@ -12136,7 +12296,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’image de « %@ » n’est pas carrée."
+            "value" : "L’image de « %@ » n’est pas carrée."
           }
         }
       }
@@ -12147,7 +12307,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’image de « %@ » n’a pas la taille des autres."
+            "value" : "L’image de « %@ » n’a pas la taille des autres."
           }
         }
       }
@@ -12158,7 +12318,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’image de « %@ » est trop petite : 128 pixels au moins."
+            "value" : "L’image de « %@ » est trop petite : 128 pixels au moins."
           }
         }
       }
@@ -12675,7 +12835,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cet agent ne peut pas dessiner pour l’instant : %@."
+            "value" : "Cet agent ne peut pas dessiner pour l’instant : %@."
           }
         }
       }
@@ -12759,7 +12919,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cet avatar n’a pas pu être mis dans le panneau flottant : le panneau garde le sien."
+            "value" : "Cet avatar n’a pas pu être mis dans le panneau flottant : le panneau garde le sien."
           }
         }
       }
@@ -14193,7 +14353,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Votre avatar n’a pas pu être lu : l’avatar par défaut est montré. Recréez-le ou importez-le de nouveau."
+            "value" : "Votre avatar n’a pas pu être lu : l’avatar par défaut est montré. Recréez-le ou importez-le de nouveau."
           }
         }
       }
@@ -14204,7 +14364,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il manque à votre avatar des expressions qu’affiche cette version (%@) : l’avatar par défaut est montré jusqu’à ce qu’elles soient générées."
+            "value" : "Il manque à votre avatar des expressions qu’affiche cette version (%@) : l’avatar par défaut est montré jusqu’à ce qu’elles soient générées."
           }
         }
       }
@@ -14498,6 +14658,23 @@
         }
       }
     },
+    "drawn by %@ on %@" : {
+      "comment" : "Read by VoiceOver after an avatar's name: the agent that drew it, and when.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "drawn by %1$@ on %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dessiné par %1$@ le %2$@"
+          }
+        }
+      }
+    },
     "edited summary, %@" : {
       "comment" : "What an agent switch handed over: a size, “1.2 KiB”.",
       "localizations" : {
@@ -14549,6 +14726,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "avec un résumé"
+          }
+        }
+      }
+    },
+    "imported on %@" : {
+      "comment" : "Read by VoiceOver after an avatar's name: made from an archive, and when.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "importé le %@"
           }
         }
       }
@@ -15096,7 +15284,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "déconnecté : connectez-vous depuis un terminal"
+            "value" : "déconnecté : connectez-vous depuis un terminal"
           }
         }
       }
@@ -15151,7 +15339,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "trop ancien : mettez-le à jour"
+            "value" : "trop ancien : mettez-le à jour"
           }
         }
       }

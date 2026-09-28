@@ -178,6 +178,8 @@ struct AvatarLibraryView: View {
               avatars: avatars, entry: entry, isSelected: avatars.selection == .avatar(entry.id),
               menu: { menuItems(for: entry) }
             )
+            // One element for VoiceOver: the actions of its menu, and Cancel, are its own.
+            .accessibilityActions { accessibilityActions(for: entry) }
             .tag(AvatarLibraryModel.Selection.avatar(entry.id))
             .contextMenu { menuItems(for: entry) }
           }
@@ -192,6 +194,7 @@ struct AvatarLibraryView: View {
           }
           ForEach(AvatarLibraryPresentation.listedJobs(avatars.jobs)) { job in
             AvatarJobRow(avatars: avatars, job: job)
+              .accessibilityActions { accessibilityActions(for: job) }
               .tag(AvatarLibraryModel.Selection.job(job.id))
           }
           if avatars.isImporting {
@@ -337,6 +340,60 @@ struct AvatarLibraryView: View {
         }
       }
       .keyboardShortcut(.delete, modifiers: .command)
+    }
+  }
+
+  /// The actions VoiceOver offers on the row of an avatar: those its menu can do now.
+  @ViewBuilder
+  func accessibilityActions(for entry: AvatarLibraryEntry) -> some View {
+    let actions = AvatarLibraryPresentation.rowActions(for: entry, avatars: avatars)
+    ForEach(actions, id: \.self) { action in
+      Button {
+        perform(action, on: entry.id)
+      } label: {
+        Text(AvatarLibraryPresentation.title(of: action))
+      }
+    }
+  }
+
+  /// The actions VoiceOver offers on the row of a generation.
+  @ViewBuilder
+  func accessibilityActions(for job: AvatarLibraryModel.Job) -> some View {
+    let actions = AvatarLibraryPresentation.jobActions(for: job, avatars: avatars)
+    ForEach(actions, id: \.self) { action in
+      Button {
+        perform(action, on: job)
+      } label: {
+        Text(AvatarLibraryPresentation.title(of: action))
+      }
+    }
+  }
+
+  func perform(_ action: AvatarLibraryPresentation.RowAction, on id: AvatarID) {
+    switch action {
+    case .use: Task { await avatars.use(id) }
+    case .rename: startRenaming(id)
+    case .duplicate: Task { await avatars.duplicate(id) }
+    case .export: export(id, includingDescription: true)
+    case .exportWithoutDescription: export(id, includingDescription: false)
+    // Asked first, as from the menu.
+    case .delete, .discard: deleting = id
+    case .cancel: avatars.cancel()
+    }
+  }
+
+  func perform(_ action: AvatarLibraryPresentation.JobAction, on job: AvatarLibraryModel.Job) {
+    switch action {
+    case .cancel: avatars.cancel()
+    case .retry: avatars.retry(job.id)
+    case .saveAgain: Task { await avatars.retrySaving(job.id) }
+    case .remove:
+      // What was drawn and not written is lost with it: asked first, as from the preview.
+      if case .unsaved = job.phase {
+        confirming = .removeUnsaved(job.id)
+      } else {
+        Task { await avatars.dismiss(job.id) }
+      }
     }
   }
 
@@ -521,6 +578,29 @@ final class PageWindow {
 struct AvatarBadge: View {
   enum Kind {
     case inUse, toCheck, running, failed, unreadable, incomplete
+
+    /// Its words: on the pill, and in what VoiceOver reads of the row.
+    var title: LocalizedStringResource {
+      switch self {
+      case .inUse:
+        LocalizedStringResource(
+          "In Use", bundle: .module, comment: "The avatar of the floating panel.")
+      case .toCheck:
+        LocalizedStringResource(
+          "To Check", bundle: .module, comment: "An avatar made and not yet kept.")
+      case .running:
+        LocalizedStringResource("Under Way", bundle: .module, comment: "An avatar being drawn.")
+      case .failed:
+        LocalizedStringResource(
+          "Failed", bundle: .module, comment: "An avatar that could not be drawn.")
+      case .unreadable:
+        LocalizedStringResource(
+          "Unreadable", bundle: .module, comment: "An avatar that cannot be read.")
+      case .incomplete:
+        LocalizedStringResource(
+          "Incomplete", bundle: .module, comment: "An avatar that lacks expressions.")
+      }
+    }
   }
 
   let kind: Kind
@@ -542,17 +622,7 @@ struct AvatarBadge: View {
   }
 
   private var label: Text {
-    switch kind {
-    case .inUse: Text("In Use", bundle: .module, comment: "The avatar of the floating panel.")
-    case .toCheck:
-      Text("To Check", bundle: .module, comment: "An avatar made and not yet kept.")
-    case .running: Text("Under Way", bundle: .module, comment: "An avatar being drawn.")
-    case .failed: Text("Failed", bundle: .module, comment: "An avatar that could not be drawn.")
-    case .unreadable:
-      Text("Unreadable", bundle: .module, comment: "An avatar that cannot be read.")
-    case .incomplete:
-      Text("Incomplete", bundle: .module, comment: "An avatar that lacks expressions.")
-    }
+    Text(kind.title)
   }
 
   private var symbol: String {
@@ -596,9 +666,23 @@ struct AvatarRow<Menu: View>: View {
   @Environment(\.locale) private var locale
 
   var body: some View {
-    let name = DisplaySafeText.visible(AvatarLibraryModel.name(of: entry))
     let redrawing = avatars.work.flatMap { $0.avatar == entry.id ? $0 : nil }
-    HStack(spacing: 11) {
+    // Read again each second while an expression is drawn: VoiceOver hears for how long.
+    TimelineView(.animation(minimumInterval: 1, paused: redrawing?.phase != .running)) { context in
+      let spoken = AvatarLibraryPresentation.spoken(
+        entry, avatars: avatars, now: context.date, locale: locale)
+      row(redrawing: redrawing)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: spoken.label))
+        .accessibilityValue(Text(verbatim: spoken.value))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+    .accessibilityIdentifier("avatar-row")
+  }
+
+  private func row(redrawing: AvatarLibraryModel.Job?) -> some View {
+    let name = DisplaySafeText.visible(AvatarLibraryModel.name(of: entry))
+    return HStack(spacing: 11) {
       AvatarThumbnail {
         if let image = avatars.thumbnails[entry.id] {
           AvatarView(images: [.neutral: image], expression: .neutral, size: 44)
@@ -659,7 +743,6 @@ struct AvatarRow<Menu: View>: View {
       }
     }
     .padding(.vertical, 4)
-    .accessibilityIdentifier("avatar-row")
   }
 
   private func nameText(_ name: String) -> Text {
@@ -674,6 +757,17 @@ struct AvatarJobRow: View {
   @Environment(\.locale) private var locale
 
   var body: some View {
+    TimelineView(.animation(minimumInterval: 1, paused: job.phase != .running)) { context in
+      let spoken = AvatarLibraryPresentation.spoken(job, now: context.date, locale: locale)
+      row
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: spoken.label))
+        .accessibilityValue(Text(verbatim: spoken.value))
+    }
+    .accessibilityIdentifier("avatar-job-row")
+  }
+
+  private var row: some View {
     HStack(spacing: 11) {
       AvatarThumbnail {
         if job.isUnderWay {
@@ -720,7 +814,6 @@ struct AvatarJobRow: View {
       }
     }
     .padding(.vertical, 4)
-    .accessibilityIdentifier("avatar-job-row")
   }
 }
 
@@ -736,6 +829,7 @@ struct AvatarImportRow: View {
       Spacer()
     }
     .padding(.vertical, 4)
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -786,6 +880,7 @@ struct NewAvatarCard: View {
   var body: some View {
     let reason = AvatarLibraryPresentation.creationUnavailability(avatars)
     let isOpen = isExpanded && reason == nil
+    let spoken = AvatarLibraryPresentation.spokenCard(isOpen: isOpen, reason: reason)
     VStack(alignment: .leading, spacing: 0) {
       Button {
         isExpanded.toggle()
@@ -822,9 +917,9 @@ struct NewAvatarCard: View {
       }
       .buttonStyle(.plain)
       .disabled(reason != nil)
-      .accessibilityValue(
-        isOpen ? Text("Unfolded", bundle: .module) : Text("Folded", bundle: .module)
-      )
+      // Its state as its value — and, greyed out, why: VoiceOver says it is dimmed, and not why.
+      .accessibilityLabel(Text(verbatim: spoken.label))
+      .accessibilityValue(Text(verbatim: spoken.value))
       .accessibilityIdentifier("avatar-create-card")
       if isOpen {
         Divider()
@@ -1036,13 +1131,10 @@ enum AvatarLibraryPresentation {
   /// What a generation is called before it is an avatar: its description's first line.
   static func name(of job: AvatarLibraryModel.Job) -> Text {
     // Its whole first line: the row cuts it where it must, and says it whole in its tooltip.
-    let line = job.description.split(whereSeparator: \.isNewline)
-      .map { $0.trimmingCharacters(in: .whitespaces) }
-      .first { !$0.isEmpty }
-    if let line {
+    if let line = firstLine(of: job.description) {
       return Text(verbatim: DisplaySafeText.visible(line))
     }
-    return Text("New Avatar", bundle: .module)
+    return Text(newAvatarTitle)
   }
 
   /// "0:42": the time a generation has taken.

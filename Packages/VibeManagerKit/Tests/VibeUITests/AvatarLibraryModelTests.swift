@@ -371,7 +371,7 @@ struct AvatarLibraryModelTests {
     #expect(try await library.entries().count == AvatarLibraryRules.maximumCount + 1)
     #expect(
       Localization.string(AvatarPresentation.message(for: .limitReached), in: "fr")
-        == "20 avatars au plus : supprimez-en un pour en créer un autre.")
+        == "20 avatars au plus\u{00A0}: supprimez-en un pour en créer un autre.")
   }
 
   @Test("One generation, or one import, at a time")
@@ -861,7 +861,8 @@ struct AvatarLibraryModelTests {
   @Test("The names of the expressions and the problems read in French")
   func french() {
     #expect(
-      Localization.string(AvatarPresentation.name(of: .mouthRound), in: "fr") == "Bouche en « O »")
+      Localization.string(AvatarPresentation.name(of: .mouthRound), in: "fr")
+        == "Bouche en «\u{00A0}O\u{00A0}»")
     #expect(
       Localization.string(AvatarPresentation.reason(.notCapable), in: "fr")
         == "ne produit pas d’images")

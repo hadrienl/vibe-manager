@@ -103,6 +103,14 @@ the bundle: build a second time before testing a translation.
 | floating panel, bubble | panneau flottant, bulle |
 | avatar, expression, sprite sheet | avatar, expression, planche |
 | default avatar, (copy) | avatar par défaut, (copie) |
+| Requests (the tab), Alerts, Avatars (its pages) | Demandes, Signalement, Avatars |
+| library of avatars, draft | bibliothèque d’avatars, brouillon |
+| keep, discard (a draft) | garder, abandonner |
+| in use, to check, under way | en usage, à valider, en cours |
+| unreadable, incomplete, missing (an expression) | illisible, incomplet, manquante |
+| use this avatar, duplicate, draw again | utiliser cet avatar, dupliquer, redessiner |
+| drawn by (an agent), imported | dessiné par, importé |
+| folded, unfolded | replié, déplié |
 | generate, generate again | générer, régénérer |
 | allow, always, refuse | autoriser, toujours, refuser |
 | prompt template, template | modèle de prompt, modèle |
@@ -146,6 +154,9 @@ the bundle: build a second time before testing a translation.
   is given, but still picks the table of the process's language. A test runner declares no
   localization of its own, so the strings it resolves otherwise are English, whatever the Mac's
   language.
+- `AvatarLocalizationTests` resolves every label and every problem of Settings › Requests ›
+  Avatars in French, and fails on an English text left as it is or on a breakable space before
+  `:` `;` `?` `!` or inside « ».
 - The interface smoke test launches the application in English (`-AppleLanguages (en)`), and one
   test launches it in French.
 - French runs 20 to 30 % longer than English. The sidebar's lines are truncated already; the sheets,

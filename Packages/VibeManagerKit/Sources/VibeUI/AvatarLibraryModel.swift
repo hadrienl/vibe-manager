@@ -157,6 +157,11 @@ public final class AvatarLibraryModel {
   @ObservationIgnored private var thumbnailsWanted = false
   /// The reading of the faces under way: the tests wait for it rather than for a length of time.
   @ObservationIgnored private(set) var thumbnailTask: Task<Void, Never>?
+  /// Says a sentence to VoiceOver: what starts and ends, what was kept, used or deleted, and what
+  /// went wrong. The tests listen in its place.
+  @ObservationIgnored var announce: @MainActor (LocalizedStringResource) -> Void = {
+    Announcer.announce($0)
+  }
 
   public init(
     workshop: AvatarWorkshop, library: any AvatarLibrary,
@@ -519,6 +524,10 @@ public final class AvatarLibraryModel {
     task?.cancel()
     task = nil
     jobs.removeAll { $0.id == work.id }
+    announce(
+      LocalizedStringResource(
+        "The generation is cancelled: nothing was changed.", bundle: .module,
+        comment: "Said when the user cancels the drawing of an avatar."))
     if selection == .job(work.id) {
       selection = .avatar(inUse)
       Task { await self.reloadSelection() }
@@ -530,6 +539,7 @@ public final class AvatarLibraryModel {
   ) {
     problem = nil
     jobs.append(job)
+    announce(Self.startAnnouncement(of: job, agent: agentName(job.provider)))
     let workshop = workshop
     let run = UUID()
     currentRun = run
@@ -571,7 +581,7 @@ public final class AvatarLibraryModel {
       setPhase(of: id, .unsaved(at: now()))
       problem = .writing
       lastEvent = UUID()
-      Announcer.announce(AvatarPresentation.message(for: .writing))
+      announce(AvatarPresentation.message(for: .writing))
       await refresh()
       return
     }
@@ -584,7 +594,7 @@ public final class AvatarLibraryModel {
     await refresh()
     if follows { await select(.avatar(written)) }
     lastEvent = UUID()
-    Announcer.announce(Self.announcement(of: job, avatar))
+    announce(Self.announcement(of: job, avatar))
   }
 
   /// Where a result goes. A redrawing of a kept avatar changes its draft when one was made
@@ -613,6 +623,22 @@ public final class AvatarLibraryModel {
     }
     try await library.updateDraft(target, with: updated)
     return target
+  }
+
+  /// The name an agent is shown under.
+  private func agentName(_ provider: AgentProviderID) -> String {
+    options.first { $0.id == provider }?.descriptor.displayName ?? provider.rawValue
+  }
+
+  private static func startAnnouncement(of job: Job, agent: String) -> LocalizedStringResource {
+    if case .expression(let expression) = job.kind {
+      return LocalizedStringResource(
+        "\(agent) is drawing “\(AvatarPresentation.name(expression))” again.", bundle: .module,
+        comment: "Said when an agent starts drawing one expression of an avatar again.")
+    }
+    return LocalizedStringResource(
+      "\(agent) is drawing the avatar. It takes one to two minutes.", bundle: .module,
+      comment: "Said when an agent starts drawing an avatar.")
   }
 
   private static func announcement(of job: Job, _ avatar: AvatarSpriteSet)
@@ -652,7 +678,7 @@ public final class AvatarLibraryModel {
       problem = .generation(error)
     }
     lastEvent = UUID()
-    Announcer.announce(AvatarPresentation.message(for: .generation(error)))
+    announce(AvatarPresentation.message(for: .generation(error)))
   }
 
   // MARK: - Archives
@@ -662,12 +688,13 @@ public final class AvatarLibraryModel {
   public func importArchive(_ data: Data) async {
     guard isIdle else { return }
     guard canCreate else {
-      problem = .limitReached
+      report(.limitReached)
       return
     }
     problem = nil
     isImporting = true
     defer { isImporting = false }
+    announce(LocalizedStringResource("Reading the archive…", bundle: .module))
     let workshop = workshop
     do {
       var (avatar, ignored) = try await Task.detached(priority: .userInitiated) {
@@ -678,23 +705,31 @@ public final class AvatarLibraryModel {
       do {
         draft = try await library.saveDraft(avatar, basedOn: nil)
       } catch {
-        problem = .importing
+        report(.importing)
         return
       }
       ignoredFiles = ignored > 0 ? (draft, ignored) : nil
       await refresh()
       await select(.avatar(draft))
       lastEvent = UUID()
+      announce(
+        avatar.isComplete
+          ? LocalizedStringResource(
+            "The archive is imported: check the avatar, then keep it.", bundle: .module,
+            comment: "Said when an archive became an avatar to check.")
+          : LocalizedStringResource(
+            "The archive is imported, with expressions still missing.", bundle: .module,
+            comment: "Said when an archive became an incomplete avatar to check."))
     } catch let problem as AvatarProblem {
-      self.problem = .archive(problem)
+      report(.archive(problem))
     } catch {
-      problem = .archive(.archiveUnreadable)
+      report(.archive(.archiveUnreadable))
     }
   }
 
   /// An archive refused before it was read: too large to be one, or the library full.
   public func reject(_ problem: AvatarProblem) {
-    self.problem = .archive(problem)
+    report(.archive(problem))
   }
 
   /// The archive of an avatar — the default one included — with or without its description.
@@ -703,7 +738,7 @@ public final class AvatarLibraryModel {
       let avatar = try await library.load(id)
       return try workshop.exportArchive(avatar, includingDescription: includingDescription)
     } catch {
-      problem = .exporting
+      report(.exporting)
       return nil
     }
   }
@@ -729,17 +764,33 @@ public final class AvatarLibraryModel {
   public func keep(_ id: AvatarID) async {
     guard canKeep(id) else { return }
     let uses = usesKeptDraft
+    let kept: AvatarID
     do {
-      let kept = try await library.keep(id)
-      if uses { try await library.setInUse(kept) }
-      problem = nil
-      if ignoredFiles?.draft == id { ignoredFiles = nil }
-      await refresh()
-      await select(.avatar(kept))
+      kept = try await library.keep(id)
     } catch {
-      problem = Self.problem(for: error, otherwise: .keeping)
+      report(Self.problem(for: error, otherwise: .keeping))
       await refresh()
+      return
     }
+    // Kept, whatever comes next: said as it is, then why the panel keeps its own if it does.
+    var used = false
+    if uses {
+      used = (try? await library.setInUse(kept)) != nil
+    }
+    problem = uses && !used ? .using : nil
+    if ignoredFiles?.draft == id { ignoredFiles = nil }
+    await refresh()
+    await select(.avatar(kept))
+    let name = spokenName(kept)
+    announce(
+      used
+        ? LocalizedStringResource(
+          "The avatar “\(name)” is kept, and presents the requests in the floating panel.",
+          bundle: .module, comment: "Said when a draft avatar is kept and put in use.")
+        : LocalizedStringResource(
+          "The avatar “\(name)” is kept.", bundle: .module,
+          comment: "Said when a draft avatar is kept."))
+    if uses, !used { announce(AvatarPresentation.message(for: .using)) }
   }
 
   /// Throws a draft away: what redraws it stops first.
@@ -750,7 +801,12 @@ public final class AvatarLibraryModel {
 
   /// The avatar the floating panel shows: a kept one, complete, or the default one.
   public func use(_ id: AvatarID) async {
-    await change(otherwise: .using) { try await $0.setInUse(id) }
+    guard await change(otherwise: .using, { try await $0.setInUse(id) }) else { return }
+    let name = spokenName(id)
+    announce(
+      LocalizedStringResource(
+        "The avatar “\(name)” now presents the requests in the floating panel.", bundle: .module,
+        comment: "Said when an avatar is put in use."))
   }
 
   /// Whether an avatar can be renamed now: not the default one, nor one being redrawn, whose
@@ -772,7 +828,7 @@ public final class AvatarLibraryModel {
       await refresh()
       await select(.avatar(copy))
     } catch {
-      problem = Self.problem(for: error, otherwise: .duplicating)
+      report(Self.problem(for: error, otherwise: .duplicating))
       await refresh()
     }
   }
@@ -780,9 +836,30 @@ public final class AvatarLibraryModel {
   /// Deletes an avatar or discards a draft; what redraws it stops first. The one in use gives its
   /// place to the default one, in the panel at once.
   public func remove(_ id: AvatarID) async {
+    // Named before it goes; the panel goes back to the default avatar if it showed this one.
+    let name = spokenName(id)
+    let isDraft = entry(id)?.isDraft == true
+    let wasInUse = id == inUse
     if work?.avatar == id { cancel() }
-    await change(otherwise: .deleting) { try await $0.remove(id) }
+    let removed = await change(otherwise: .deleting) { try await $0.remove(id) }
     if ignoredFiles?.draft == id { ignoredFiles = nil }
+    guard removed else { return }
+    if isDraft {
+      announce(
+        LocalizedStringResource(
+          "The avatar “\(name)” is discarded.", bundle: .module,
+          comment: "Said when a draft avatar is thrown away."))
+    } else if wasInUse {
+      announce(
+        LocalizedStringResource(
+          "The avatar “\(name)” is deleted: the floating panel shows the default avatar again.",
+          bundle: .module, comment: "Said when the avatar in use is deleted."))
+    } else {
+      announce(
+        LocalizedStringResource(
+          "The avatar “\(name)” is deleted.", bundle: .module,
+          comment: "Said when an avatar is deleted."))
+    }
   }
 
   /// A draft to complete a kept avatar that lacks expressions — the one already made, if any —
@@ -795,21 +872,37 @@ public final class AvatarLibraryModel {
       await refresh()
       await select(.avatar(draft))
     } catch {
-      problem = Self.problem(for: error, otherwise: .completing)
+      report(Self.problem(for: error, otherwise: .completing))
       await refresh()
     }
   }
 
+  /// Makes a change to the library, then reads it again. Whether it was made.
+  @discardableResult
   private func change(
     otherwise failure: Problem, _ body: (any AvatarLibrary) async throws -> Void
-  ) async {
+  ) async -> Bool {
+    var made = true
     do {
       try await body(library)
       problem = nil
     } catch {
-      problem = Self.problem(for: error, otherwise: failure)
+      report(Self.problem(for: error, otherwise: failure))
+      made = false
     }
     await refresh()
+    return made
+  }
+
+  /// What went wrong, on the screen and to VoiceOver.
+  private func report(_ problem: Problem) {
+    self.problem = problem
+    announce(AvatarPresentation.message(for: problem))
+  }
+
+  /// An avatar's name, as said: the default one's in the user's language.
+  private func spokenName(_ id: AvatarID) -> String {
+    DisplaySafeText.visible(entry(id).map(Self.name) ?? Self.importedName)
   }
 
   private static func problem(for error: any Error, otherwise failure: Problem) -> Problem {

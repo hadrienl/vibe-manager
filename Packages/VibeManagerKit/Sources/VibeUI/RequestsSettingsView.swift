@@ -282,7 +282,9 @@ struct AvatarInUseRow: View {
           .fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityElement(children: .combine)
+      // The menu says it for VoiceOver: "Avatar", the one in use, and this explanation as its
+      // hint. Read here as well, the row would say it twice.
+      .accessibilityHidden(true)
       AvatarView(images: avatars.inUseImages, expression: .neutral, size: 26)
         .padding(2)
         .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary))
@@ -326,12 +328,8 @@ struct AvatarInUseRow: View {
     Binding(
       get: { avatars.inUse },
       set: { id in
-        Task {
-          await avatars.use(id)
-          if avatars.problem == .using {
-            Announcer.announce(AvatarPresentation.message(for: .using))
-          }
-        }
+        // The model says to VoiceOver that it is in use, or why it is not.
+        Task { await avatars.use(id) }
       })
   }
 }
