@@ -124,6 +124,11 @@ keeps its place when it is restarted, closed, archived or moved to another colum
 Sessions (⌥⌘A) opens the archive from the menu. See
 [`docs/architecture/0027-manual-session-order.md`](docs/architecture/0027-manual-session-order.md).
 
+A session is closed with Session ▸ Close Session (⇧⌘W), which asks first while its agent is at
+work. ⌘W closes what is inside the session and holds the keyboard — a tab of its web view, a side
+terminal — and nothing otherwise: it never closes the session, as in Safari, where ⌘W closes a tab
+and ⇧⌘W the window.
+
 A closed session goes back to work with one command. When the agent can resume its own
 conversation, it does, and it is handed no prompt; when it cannot — no identifier was ever kept,
 or the CLI would refuse the one that was — the application says so and offers a new process with a

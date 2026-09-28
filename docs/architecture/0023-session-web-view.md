@@ -144,9 +144,13 @@ not run on a click.
 
 ### ⌘W follows the keyboard
 
-With the keyboard in the web view — the page or its address bar — ⌘W closes its tab, and the Session
-menu's item says "Close Tab"; anywhere else it closes the session (#51). On the ticket's pinned tab
-it beeps: it never falls back on the session, so a burst of ⌘W cannot close one by accident. The
+With the keyboard in the web view — the page or its address bar — ⌘W closes its tab, and the File
+menu's item says "Close Tab". The page shown next — the neighbour of the tab closed, or the tab
+brought forward — takes the keyboard the previous one had, so that ⌘W again closes the next tab:
+left to the window, the keyboard was nowhere, and the second ⌘W of a burst closed the session
+(#165). ⌘W no longer closes the session anywhere: the session is ⇧⌘W, as the window is in Safari,
+and ⌘W, with the keyboard in none of the session's inner elements — the web view, the drawer of
+side terminals — is unavailable. On the ticket's pinned tab it beeps. The
 web view has its menu: ⌘L, ⌘R, ⌘[ and ⌘], ⌃⇥ and ⌃⇧⇥; ⌥⌘B shows it, ⌥⌘4 focuses it.
 
 ### One store of cookies

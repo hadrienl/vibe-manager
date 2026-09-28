@@ -29,7 +29,7 @@ session archived on one axis only.
 
 The agent never moves a task. An agent waiting for an answer is not a task In Waiting — that is
 #45's orange, on the row and on the tab that hides it — and an agent that stops has not finished
-the task. Closing a session (⌘W) stops its agent and leaves the session in its column.
+the task. Closing a session (⇧⌘W) stops its agent and leaves the session in its column.
 
 Three transitions follow from a command, and only those:
 

@@ -143,6 +143,17 @@
         }
       }
     },
+    "Close" : {
+      "comment" : "⌘W with nothing inside the session to close, or over another window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        }
+      }
+    },
     "Close Session" : {
       "localizations" : {
         "fr" : {

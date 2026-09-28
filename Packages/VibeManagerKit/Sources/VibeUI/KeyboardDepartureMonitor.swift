@@ -6,7 +6,7 @@ import SwiftUI
 ///
 /// Read from the window's first responder rather than from SwiftUI's focus: in the application's
 /// window, the sidebar's `@FocusState` stayed true while the keyboard was in a terminal — an
-/// AppKit view — and a selection of several sessions survived there, for ⌘W to close them all.
+/// AppKit view — and a selection of several sessions survived there, for ⇧⌘W to close them all.
 /// Any view that takes the keyboard — the terminal, the web view, the notes, the composer, a
 /// field — is seen the same way: the window says who has it.
 struct KeyboardDepartureMonitor: NSViewRepresentable {

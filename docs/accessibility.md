@@ -42,7 +42,7 @@ menus already took the others before #19.
 |---|---|---|
 | Show / Hide Terminals | ⌘J, or the terminal button of the status bar | View |
 | New Terminal | ⌘T, or + in the tab bar | View |
-| Close Terminal, with the keyboard in the drawer | ⌘W | Session ("Close Terminal") |
+| Close Terminal, with the keyboard in the drawer | ⌘W | File ("Close Terminal") |
 | Show Next / Previous Tab, with the keyboard in the drawer | ⌃⇥ / ⌃⇧⇥ | Web |
 | Rename…, Move Left, Move Right, Close Terminal | — | A tab's context menu, and its VoiceOver actions |
 | The drawer's height | ↑ / ↓ on its divider with VoiceOver's adjust gestures | — |
@@ -61,12 +61,12 @@ component as the agent's, and VoiceOver reads it the same way ("Side terminal �
 | Reload Page | ⌘R | Web |
 | Back / Forward | ⌘[ / ⌘] | Web |
 | Show Next / Previous Tab | ⌃⇥ / ⌃⇧⇥ | Web |
-| Close Tab, with the keyboard in the web view | ⌘W | Session ("Close Tab") |
+| Close Tab, with the keyboard in the web view | ⌘W | File ("Close Tab") |
 | Deny an agent's request, in its banner | Escape | — |
 
 ⌘W closes a tab only while the keyboard is in the web view — the page or its address bar — and the
-Session menu's item then reads "Close Tab". On the ticket's pinned tab it beeps rather than closing
-the session.
+File menu's item then reads "Close Tab". The page shown next takes the keyboard, so that ⌘W again
+closes the next tab. On the ticket's pinned tab it beeps.
 
 ## The palette of requests
 
@@ -110,12 +110,18 @@ at once.
 | Restart in a new process, from anywhere in its sheet | ⌘↩ | — |
 | Switch Agent… | ⌃⌘M | Session |
 | Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
-| Close Session | ⌘W | Session |
+| Close Session | ⇧⌘W | Session |
 | Archive… / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
 | Move to Next / Previous Status, without a swipe | ⌥⌘→ / ⌥⌘← | Session › Status |
-| Close Window | ⇧⌘W | File |
+| Close Window | —, or the window's close button | File |
 | Usage window | ⌥⌘U | Window |
 | Export Diagnostics… | — | Help |
+
+⌘W never closes the session (#165): it closes what holds the keyboard inside it — a tab of the web
+view, a side terminal — and the File menu's item names which. With the keyboard anywhere else — the
+agent's terminal, the conversation, the sidebar — it is unavailable. Close Session is ⇧⌘W, as
+closing the window is in Safari, and asks first while the agent is at work. Over Settings or Usage,
+⌘W closes that window.
 
 ## What VoiceOver reads
 

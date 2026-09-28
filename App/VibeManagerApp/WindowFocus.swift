@@ -4,9 +4,10 @@ import SwiftUI
 
 /// Which window ⌘W is talking to.
 ///
-/// The menu is the same for every window, but ⌘W is not: over the workspace it closes the selected
-/// session, over any other window — Settings, later the floating HITL panel — it closes that
-/// window, and over a sheet it does nothing, so the session behind a dialog is never the one closed.
+/// The menu is the same for every window, but ⌘W is not: over the workspace it closes what holds the
+/// keyboard inside the session — a web tab, a side terminal — over any other window — Settings,
+/// Usage — it closes that window, and over a sheet it does nothing. Close Session, ⇧⌘W, acts over
+/// the workspace alone, so the session behind a dialog or another window is never the one closed.
 @MainActor
 @Observable
 final class WindowFocus {
@@ -22,7 +23,7 @@ final class WindowFocus {
   }
 
   private(set) var front: Front = .none
-  /// Whether the workspace window is there to be brought forward: not after ⇧⌘W closed it.
+  /// Whether the workspace window is there to be brought forward: not after Close Window, or its red button, closed it.
   private(set) var hasWorkspace = false
 
   @ObservationIgnored private weak var workspaceWindow: NSWindow?
@@ -58,8 +59,8 @@ final class WindowFocus {
     workspaceWindow?.makeKeyAndOrderFront(nil)
   }
 
-  /// Closes the window that holds the keyboard, whichever it is: what ⇧⌘W does everywhere, and
-  /// what ⌘W does over a window that is not the workspace.
+  /// Closes the window that holds the keyboard, whichever it is: what Close Window does
+  /// everywhere, and what ⌘W does over a window that is not the workspace.
   func closeKeyWindow() {
     NSApp.keyWindow?.performClose(nil)
   }

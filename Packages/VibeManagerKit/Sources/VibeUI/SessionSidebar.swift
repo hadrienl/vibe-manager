@@ -136,7 +136,7 @@ struct SessionSidebar: View {
     }
     .focused($isListFocused)
     .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
-    // The keyboard gone elsewhere, ⌘W and the Session menu act on the session on screen alone:
+    // The keyboard gone elsewhere, ⇧⌘W and the Session menu act on the session on screen alone:
     // a selection nobody is looking at must not be what a shortcut typed in a terminal closes.
     // Told by the window rather than by `isListFocused`, which a click in the terminal left true
     // (#128). The search field counts as the sidebar: a search prunes the selection, it does not
