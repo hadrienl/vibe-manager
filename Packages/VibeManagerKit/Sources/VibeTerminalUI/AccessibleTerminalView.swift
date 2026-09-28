@@ -27,6 +27,37 @@ public final class AccessibleTerminalView: TerminalView {
   /// the window, and SwiftUI may update the view before it has one.
   var onWindowChange: (() -> Void)?
 
+  /// The size a hidden terminal was given, applied once it is shown again (#150).
+  ///
+  /// Every session's terminal stays mounted, hidden behind the one on screen, and a new size
+  /// makes SwiftTerm reflow the whole scrollback — ten thousand lines and more. Folding the
+  /// sidebar, or opening the web view, narrows the column one animation frame at a time: every
+  /// hidden terminal reflowed at every frame, on the main thread, and the animation stuttered. A
+  /// hidden terminal is not drawn, so its size can wait until it is: it then takes the last one,
+  /// in a single reflow, and tells its program then.
+  ///
+  /// Its first size is never held back: a terminal mounted hidden — a session restored behind the
+  /// one on screen — needs one to start its program. Should the column change after that, the
+  /// program learns it when its session is shown, as it would after any resize.
+  private(set) var deferredSize: NSSize?
+
+  public override func setFrameSize(_ newSize: NSSize) {
+    if isHidden, !frame.size.equalTo(.zero) {
+      deferredSize = newSize.equalTo(frame.size) ? nil : newSize
+      return
+    }
+    deferredSize = nil
+    super.setFrameSize(newSize)
+  }
+
+  public override func viewDidUnhide() {
+    if let size = deferredSize {
+      deferredSize = nil
+      super.setFrameSize(size)
+    }
+    super.viewDidUnhide()
+  }
+
   public override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     onWindowChange?()

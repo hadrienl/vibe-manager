@@ -191,4 +191,35 @@ struct WebViewToggleTests {
     #expect(workspace.terminals.map(ObjectIdentifier.init) == terminals, "\(workspace.state)")
     #expect(await workspace.attachCount() == attached)
   }
+
+  @Test("A narrowing column resizes the terminal on screen, the others once shown (#150)")
+  func hiddenTerminalsWaitForTheirSize() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let sessions = workspace.sessions
+    let shown = try #require(workspace.shownTerminal(of: sessions[0]))
+    let hidden = workspace.terminals.filter { $0 !== shown }
+    #expect(hidden.count == sessions.count - 1)
+    let hiddenSizes = hidden.map(\.frame.size)
+    let shownWidth = shown.frame.width
+
+    // What an animation of the sidebar or of the web view does to the column: a few points
+    // narrower at each frame.
+    let window = workspace.window
+    for _ in 0..<10 {
+      var frame = window.frame
+      frame.size.width -= 16
+      window.setFrame(frame, display: false)
+      window.contentView?.layoutSubtreeIfNeeded()
+    }
+    #expect(shown.frame.width <= shownWidth - 150, "\(workspace.state)")
+    #expect(hidden.map(\.frame.size) == hiddenSizes, "\(workspace.state)")
+
+    // The session shown next takes the column as it now is.
+    let width = shown.frame.width
+    workspace.model.select(sessions[1].id)
+    try await waitUntil("the second terminal, at the column's width", in: workspace) {
+      workspace.shownTerminal(of: sessions[1])?.frame.width == width
+    }
+  }
 }
