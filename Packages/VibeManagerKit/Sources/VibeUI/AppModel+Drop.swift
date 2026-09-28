@@ -43,11 +43,29 @@ public enum SessionDropRoute: Equatable, Sendable {
       }
     }
   }
+
+  /// Where a drop on one of the session's side terminals goes (#139): typed into that terminal
+  /// while its shell runs, whatever the session shows and whether its agent runs.
+  public static func decideSideTerminal(isArchived: Bool, isShellRunning: Bool) -> SessionDropRoute
+  {
+    if isArchived { return .refused(.archived) }
+    return isShellRunning ? .terminal(fallback: false) : .refused(.shellNotRunning)
+  }
 }
 
 public enum SessionDropRefusal: Equatable, Sendable {
   case stopped
   case archived
+  /// The shell of the side terminal dropped on has ended, or has not started yet.
+  case shellNotRunning
+}
+
+/// Which of a session's terminals a drop is for.
+public enum SessionDropTarget: Equatable, Sendable {
+  /// The session itself: its agent's terminal or its conversation, whichever is on screen.
+  case session
+  /// One of its side terminals (#43), the tab dropped on or the one in front of the drawer (#139).
+  case sideTerminal(TerminalID)
 }
 
 /// What the last drop on a session has to say, under its terminal or its composer (#42).
@@ -60,10 +78,16 @@ public struct SessionDropNotice: Equatable, Identifiable, Sendable {
 }
 
 extension AppModel {
-  /// Where a drop on the session would go now.
-  public func dropRoute(for id: SessionID) -> SessionDropRoute {
+  /// Where a drop on the session, or on one of its side terminals, would go now.
+  public func dropRoute(for id: SessionID, target: SessionDropTarget = .session) -> SessionDropRoute
+  {
     guard let session = sessions.first(where: { $0.id == id }) else {
       return .refused(.stopped)
+    }
+    if case .sideTerminal(let terminalID) = target {
+      return SessionDropRoute.decideSideTerminal(
+        isArchived: session.status == .archived,
+        isShellRunning: sideTerminal(terminalID, of: id)?.pane.status == .running)
     }
     return SessionDropRoute.decide(
       isArchived: session.status == .archived,
@@ -72,11 +96,19 @@ extension AppModel {
       composer: conversations.existingModel(for: id)?.composerState)
   }
 
-  /// A drop on the session, from its terminal, its conversation or its row of the sidebar.
-  func deliverDrop(_ providers: [NSItemProvider], to id: SessionID) async {
-    guard !announceRefusal(for: id) else { return }
+  /// A drop on the session, from its terminal, its conversation or its row of the sidebar, or on
+  /// one of its side terminals.
+  func deliverDrop(
+    _ providers: [NSItemProvider], to id: SessionID, target: SessionDropTarget = .session
+  ) async {
+    guard !announceRefusal(for: id, target: target) else { return }
     let (items, unreadable) = await DropReader.read(providers)
-    await deliver(items, unreadable: unreadable, to: id)
+    await deliver(items, unreadable: unreadable, to: id, target: target)
+  }
+
+  /// One of the session's side terminals, when its drawer has it.
+  func sideTerminal(_ terminalID: TerminalID, of id: SessionID) -> DrawerTerminal? {
+    terminals?.existingDrawer(for: id)?.terminals.first { $0.id == terminalID }
   }
 
   /// Session › Attach Files… (⌘O): the files chosen, for the selected session.
@@ -102,11 +134,20 @@ extension AppModel {
   // MARK: -
 
   /// Says why nothing can be dropped, when nothing can. Returns whether it refused.
-  private func announceRefusal(for id: SessionID) -> Bool {
-    guard case .refused(let refusal) = dropRoute(for: id) else { return false }
-    let name = sessions.first(where: { $0.id == id })?.name ?? ""
-    Announcer.announce(Self.refusalAnnouncement(refusal, name: name))
+  private func announceRefusal(for id: SessionID, target: SessionDropTarget = .session) -> Bool {
+    guard case .refused(let refusal) = dropRoute(for: id, target: target) else { return false }
+    Announcer.announce(
+      Self.refusalAnnouncement(refusal, name: refusalName(for: id, target: target)))
     return true
+  }
+
+  /// What a refusal names: the session, or the side terminal whose shell does not run.
+  private func refusalName(for id: SessionID, target: SessionDropTarget) -> String {
+    if case .sideTerminal(let terminalID) = target, let terminal = sideTerminal(terminalID, of: id)
+    {
+      return terminal.title
+    }
+    return sessions.first(where: { $0.id == id })?.name ?? ""
   }
 
   static func refusalAnnouncement(_ refusal: SessionDropRefusal, name: String) -> String {
@@ -119,10 +160,17 @@ extension AppModel {
       String(
         localized: "Nothing dropped: \(name) is archived.", bundle: .module,
         comment: "VoiceOver, after a drop refused. The argument is a session's name.")
+    case .shellNotRunning:
+      String(
+        localized: "Nothing dropped: the shell of \(name) is not running.", bundle: .module,
+        comment: "VoiceOver, after a drop refused. The argument is a side terminal's title.")
     }
   }
 
-  func deliver(_ items: [DroppedItem], unreadable: Int, to id: SessionID) async {
+  func deliver(
+    _ items: [DroppedItem], unreadable: Int, to id: SessionID,
+    target: SessionDropTarget = .session
+  ) async {
     // What a promise was staged in goes whatever happens next, the session stopped meanwhile
     // included.
     defer {
@@ -130,7 +178,7 @@ extension AppModel {
         try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
       }
     }
-    let route = dropRoute(for: id)
+    let route = dropRoute(for: id, target: target)
     guard !route.isRefused, let session = sessions.first(where: { $0.id == id }) else { return }
     var failed = unreadable
     var payloads: [DropPayload] = []
@@ -190,10 +238,13 @@ extension AppModel {
           localized: "Attached to your message to \(session.name).", bundle: .module,
           comment: "VoiceOver, after a drop on a conversation. The argument is a session's name."))
     case .terminal(let fallback):
-      guard let pane = pane(for: id), await pane.insert(payloads) else {
+      let pane = dropPane(for: id, target: target)
+      guard let pane, await pane.insert(payloads) else {
         // Stopped between the drop and now: said, rather than lost without a word.
-        if pane(for: id)?.status != .running {
-          Announcer.announce(Self.refusalAnnouncement(.stopped, name: session.name))
+        if pane?.status != .running {
+          let refusal: SessionDropRefusal = target == .session ? .stopped : .shellNotRunning
+          Announcer.announce(
+            Self.refusalAnnouncement(refusal, name: refusalName(for: id, target: target)))
         }
         show(messages, offeringFullDiskAccess: false, for: id)
         return
@@ -205,10 +256,21 @@ extension AppModel {
               "This conversation can’t be written to from here: the drop was typed into the terminal.",
             bundle: .module))
       }
-      Announcer.announce(
-        String(
-          localized: "Dropped into the terminal of \(session.name).", bundle: .module,
-          comment: "VoiceOver, after a drop on a terminal. The argument is a session's name."))
+      if case .sideTerminal(let terminalID) = target {
+        let title = sideTerminal(terminalID, of: id)?.title ?? ""
+        Announcer.announce(
+          String(
+            localized: "Dropped into the side terminal \(title) of \(session.name).",
+            bundle: .module,
+            comment:
+              "VoiceOver, after a drop on a side terminal. The arguments are its title, then its session's name."
+          ))
+      } else {
+        Announcer.announce(
+          String(
+            localized: "Dropped into the terminal of \(session.name).", bundle: .module,
+            comment: "VoiceOver, after a drop on a terminal. The argument is a session's name."))
+      }
     case .refused:
       return
     }
@@ -224,6 +286,14 @@ extension AppModel {
           comment: "After a drop. The arguments are a protected folder, then a file name."))
     }
     show(messages, offeringFullDiskAccess: guarded != nil, for: id)
+  }
+
+  /// The terminal a drop is typed into: the agent's, or the side terminal dropped on.
+  private func dropPane(for id: SessionID, target: SessionDropTarget) -> TerminalPaneModel? {
+    switch target {
+    case .session: pane(for: id)
+    case .sideTerminal(let terminalID): sideTerminal(terminalID, of: id)?.pane
+    }
   }
 
   /// A file that exists is handed as it is; what has no file of its own — or one the system is

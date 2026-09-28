@@ -6,8 +6,9 @@ import UniformTypeIdentifiers
 
 @testable import VibeUI
 
-/// A drag of the Finder, reduced to what a drop destination reads of it: a real pasteboard.
-private final class PasteboardDrag: NSObject, NSDraggingInfo {
+/// A drag of the Finder, reduced to what a drop destination reads of it: a real pasteboard. Shared
+/// with `DrawerDropTests`.
+final class PasteboardDrag: NSObject, NSDraggingInfo {
   let draggingPasteboard: NSPasteboard
   let draggingLocation: NSPoint
   weak var draggingDestinationWindow: NSWindow?

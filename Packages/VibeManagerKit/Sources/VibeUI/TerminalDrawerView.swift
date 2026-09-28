@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import VibeApplication
 import VibeDomain
 import VibeTerminalUI
@@ -39,6 +40,9 @@ struct TerminalDrawerView: View {
           .accessibilityHidden(!isActive)
         }
       }
+      // The session's own zone stops above the drawer: a drop here is typed into the terminal in
+      // front, never into the agent's (#139).
+      .modifier(DrawerDropZone(model: model, drawer: drawer))
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Side Terminals", bundle: .module))
@@ -112,7 +116,7 @@ private struct DrawerTab: View {
 
   @State private var isRenaming = false
   @State private var name = ""
-  @State private var isDropTarget = false
+  @State private var dropHover: DrawerTabHover?
 
   private var isSelected: Bool { terminal.id == drawer.activeTerminalID }
 
@@ -170,22 +174,28 @@ private struct DrawerTab: View {
       }
     }
     .overlay(alignment: .leading) {
-      if isDropTarget {
+      if dropHover == .reordering {
         Rectangle().fill(Color.accentColor).frame(width: 2)
       }
     }
-    .draggable(terminal.id.rawValue.uuidString)
-    .dropDestination(for: String.self) { items, _ in
-      guard let raw = items.first, let uuid = UUID(uuidString: raw) else { return false }
-      let dragged = TerminalID(rawValue: uuid)
-      guard dragged != terminal.id, drawer.terminals.contains(where: { $0.id == dragged }) else {
-        return false
+    .overlay {
+      if case .dropping(let hover) = dropHover {
+        let color = hover.isRefusing ? Color.red : Color.accentColor
+        Rectangle()
+          .strokeBorder(color, lineWidth: 2)
+          .background(color.opacity(0.12))
+          .allowsHitTesting(false)
       }
-      drawer.move(dragged, to: index)
-      return true
-    } isTargeted: {
-      isDropTarget = $0
     }
+    .draggable(DrawerTabDrag.text(for: terminal.id))
+    // One destination for both: a tab of the drawer moves here, anything else is dropped into
+    // this tab's terminal (#139).
+    .onDrop(
+      of: DropReader.acceptedTypes,
+      delegate: DrawerTabDropDelegate(
+        model: model, drawer: drawer, terminalID: terminal.id, index: index, hover: $dropHover)
+    )
+    .clearsWhenDragEnds(dropHover != nil) { dropHover = nil }
     .contextMenu {
       Button {
         beginRenaming()
@@ -261,6 +271,171 @@ private struct DrawerTab: View {
   private func beginRenaming() {
     name = terminal.customTitle ?? terminal.title
     isRenaming = true
+  }
+}
+
+/// A tab of the drawer, dragged along the bar (#43): its text says which, under a prefix no drop
+/// types (#139).
+enum DrawerTabDrag {
+  static let prefix = "vibe-manager-drawer-tab:"
+
+  static func text(for id: TerminalID) -> String {
+    prefix + id.rawValue.uuidString
+  }
+
+  static func terminalID(in text: String) -> TerminalID? {
+    guard text.hasPrefix(prefix), let uuid = UUID(uuidString: String(text.dropFirst(prefix.count)))
+    else { return nil }
+    return TerminalID(rawValue: uuid)
+  }
+
+  /// The tab a drop carries, when it carries one and nothing else. Only text is read: never the
+  /// content of a file, which a provider opened in place would give as text (#131).
+  @MainActor
+  static func terminalID(in providers: [NSItemProvider]) async -> TerminalID? {
+    guard providers.count == 1, let provider = providers.first,
+      !provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier),
+      provider.registeredContentTypesForOpenInPlace.isEmpty,
+      provider.canLoadObject(ofClass: String.self)
+    else { return nil }
+    let text = await withCheckedContinuation { continuation in
+      _ = provider.loadObject(ofClass: String.self) { text, _ in
+        continuation.resume(returning: text)
+      }
+    }
+    return text.flatMap(terminalID(in:))
+  }
+}
+
+/// What a drag over a tab shows: where a tab would move, or the veil of a drop.
+enum DrawerTabHover: Equatable {
+  case reordering
+  case dropping(DropHover)
+}
+
+/// The terminal in front of the drawer as a place to drop files on (#139), with the rules and the
+/// veil of the session's own zone (#42).
+private struct DrawerDropZone: ViewModifier {
+  let model: AppModel
+  let drawer: SessionTerminalDrawer
+  @State private var hover: DropHover?
+
+  func body(content: Content) -> some View {
+    content
+      .overlay {
+        if let hover {
+          DropHoverOverlay(hover: hover)
+        }
+      }
+      .onDrop(
+        of: DropReader.acceptedTypes,
+        delegate: SideTerminalDropDelegate(model: model, drawer: drawer, hover: $hover)
+      )
+      .clearsWhenDragEnds(hover != nil) { hover = nil }
+      .onChange(of: drawer.activeTerminalID) { hover = nil }
+  }
+}
+
+/// A drop on the terminal in front of the drawer: typed into it, not into the agent's terminal.
+struct SideTerminalDropDelegate: DropDelegate {
+  let model: AppModel
+  let drawer: SessionTerminalDrawer
+  @Binding var hover: DropHover?
+
+  private var route: SessionDropRoute {
+    guard let id = drawer.activeTerminalID else { return .refused(.shellNotRunning) }
+    return model.dropRoute(for: drawer.sessionID, target: .sideTerminal(id))
+  }
+
+  func dropEntered(info: DropInfo) {
+    hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    let route = route
+    hover = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
+    return DropProposal(operation: route.isRefused ? .forbidden : .copy)
+  }
+
+  func dropExited(info: DropInfo) {
+    hover = nil
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    hover = nil
+    guard let id = drawer.activeTerminalID, !route.isRefused else { return false }
+    let providers = info.itemProviders(for: DropReader.acceptedTypes)
+    let model = model
+    let session = drawer.sessionID
+    Task { await model.deliverDrop(providers, to: session, target: .sideTerminal(id)) }
+    return true
+  }
+}
+
+/// A drop on a tab of the drawer (#139): another tab of the drawer moves before it, as it did;
+/// anything else is typed into this tab's terminal, which comes in front — as a drop on a row of
+/// the sidebar selects its session first.
+struct DrawerTabDropDelegate: DropDelegate {
+  let model: AppModel
+  let drawer: SessionTerminalDrawer
+  let terminalID: TerminalID
+  let index: Int
+  @Binding var hover: DrawerTabHover?
+
+  private var route: SessionDropRoute {
+    model.dropRoute(for: drawer.sessionID, target: .sideTerminal(terminalID))
+  }
+
+  /// A tab carries text alone; a file or an image is surely a drop to type. Text from elsewhere
+  /// cannot be told from a tab before it is read, and is shown as one.
+  private static func carriesFiles(_ info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.fileURL, .image])
+  }
+
+  func dropEntered(info: DropInfo) {
+    track(info)
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    track(info)
+    guard Self.carriesFiles(info) else { return DropProposal(operation: .move) }
+    return DropProposal(operation: route.isRefused ? .forbidden : .copy)
+  }
+
+  private func track(_ info: DropInfo) {
+    let next: DrawerTabHover?
+    if Self.carriesFiles(info) {
+      next = SessionDropDelegate.hover(for: route, isButtonDown: DragEndWatch.isButtonDown())
+        .map(DrawerTabHover.dropping)
+    } else {
+      next = DragEndWatch.isButtonDown() ? .reordering : nil
+    }
+    if hover != next { hover = next }
+  }
+
+  func dropExited(info: DropInfo) {
+    hover = nil
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    hover = nil
+    if Self.carriesFiles(info), route.isRefused { return false }
+    let providers = info.itemProviders(for: DropReader.acceptedTypes)
+    let model = model
+    let drawer = drawer
+    let terminalID = terminalID
+    let index = index
+    Task { @MainActor in
+      if let dragged = await DrawerTabDrag.terminalID(in: providers) {
+        guard dragged != terminalID, drawer.terminals.contains(where: { $0.id == dragged })
+        else { return }
+        drawer.move(dragged, to: index)
+        return
+      }
+      drawer.activate(terminalID)
+      await model.deliverDrop(providers, to: drawer.sessionID, target: .sideTerminal(terminalID))
+    }
+    return true
   }
 }
 

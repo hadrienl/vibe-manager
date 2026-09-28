@@ -64,9 +64,14 @@ enum DropReader {
 
   private static func reading(from provider: NSItemProvider) async -> Reading {
     guard let item = await read(provider) else { return .unreadable }
-    // A tab of the web view moved along its strip and let go here: nothing to type, and nothing
-    // to warn about. Read as an address as well as text, since its prefix looks like a scheme.
-    if case .text(let text) = item, BrowserTabDrag.tabID(in: text) != nil { return .ignored }
+    // A tab of the web view, or of the drawer of side terminals, moved along its strip and let go
+    // here: nothing to type, and nothing to warn about. Read as an address as well as text, since
+    // its prefix looks like a scheme.
+    if case .text(let text) = item,
+      BrowserTabDrag.tabID(in: text) != nil || DrawerTabDrag.terminalID(in: text) != nil
+    {
+      return .ignored
+    }
     return .item(item)
   }
 
