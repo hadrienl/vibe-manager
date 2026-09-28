@@ -579,7 +579,7 @@ struct FileAvatarLibraryTests {
     }
   }
 
-  @Test("An old folder that cannot be copied is left, and the diagnostics say so, without its name")
+  @Test("An old folder that cannot be copied: left, tried and reported once, taken at next launch")
   func legacyCopyFailure() async throws {
     let folder = TemporaryFolder()
     try FileManager.default.createDirectory(at: folder.library, withIntermediateDirectories: true)
@@ -592,10 +592,16 @@ struct FileAvatarLibraryTests {
       diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()))
 
     #expect(try await library.inUse() == .default)
-    #expect(log.events(named: "avatar.legacyCopyFailed").count >= 1)
+    #expect(try await library.entries().count == 1)
+    try await library.setInUse(.default)
+    #expect(log.events(named: "avatar.legacyCopyFailed").count == 1)
+    #expect(log.events(named: "avatar.legacyCopyFailed").first?.fields.count == 1)
+
+    // Readable again: this process does not try again while it is unchanged; the next one does.
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o700], ofItemAtPath: folder.legacy.path)
-    #expect(try await library.inUse() != .default)
+    #expect(try await library.inUse() == .default)
+    #expect(try await self.library(folder, legacy: true).inUse() != .default)
   }
 
   @Test("An avatar in use that lost a file since says which, as the single avatar did")

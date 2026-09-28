@@ -68,6 +68,9 @@ public actor FileAvatarLibrary: AvatarLibrary {
   /// The legacy avatar already copied in, while the index that uses it is not written yet: not
   /// copied a second time.
   private var legacyCopy: UUID?
+  /// The `Avatar/` this process failed to copy: not tried again, nor reported again, while it stays
+  /// as it was. The next launch tries once more.
+  private var legacyCopyFailed: AvatarLibraryIndex.LegacyMark?
   private var defaultAvatar: AvatarSpriteSet??
 
   /// - Parameters:
@@ -340,7 +343,8 @@ public actor FileAvatarLibrary: AvatarLibrary {
   /// the index says was taken.
   private func legacyWaiting(for index: AvatarLibraryIndex) -> Bool {
     guard let legacy, isDirectory(legacy) else { return false }
-    return Self.stamp(of: legacy.path) != index.legacy
+    let stamp = Self.stamp(of: legacy.path)
+    return stamp != index.legacy && stamp != legacyCopyFailed
   }
 
   /// Copies `Avatar/`, whatever state it is in, into the library, kept and in use, and marks it
@@ -364,6 +368,7 @@ public actor FileAvatarLibrary: AvatarLibrary {
         try fileManager.moveItem(at: staging, to: folder(id))
       } catch {
         removeQuietly(staging)
+        legacyCopyFailed = mark
         diagnostics.record(
           .store, .error, "avatar.legacyCopyFailed", ["code": Self.code(of: error)])
         return false
