@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ (copy)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (copie)"
+          }
+        }
+      }
+    },
     "%@ KiB" : {
       "comment" : "A size in kibibytes: “1.5 KiB”.",
       "localizations" : {
@@ -806,6 +816,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Date de création"
+          }
+        }
+      }
+    },
+    "Default Avatar" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar par défaut"
           }
         }
       }
