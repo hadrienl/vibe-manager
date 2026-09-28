@@ -348,7 +348,7 @@ struct PromptEncodingTests {
     let keys = PromptEncoding.keystrokes(
       for: PromptSubmission(text: "line 1\nline 2"), format: AgentPromptFormat(),
       whileWorking: false)
-    #expect(keys.paste == Array("\u{1B}[200~line 1\nline 2\u{1B}[201~".utf8))
+    #expect(keys.writes == [Array("\u{1B}[200~line 1\nline 2\u{1B}[201~".utf8)])
     #expect(keys.submit == [0x0D])
   }
 
@@ -365,7 +365,7 @@ struct PromptEncodingTests {
     let keys = PromptEncoding.keystrokes(
       for: PromptSubmission(text: "a\u{1B}[201~\u{7}b\r\nc\td"), format: AgentPromptFormat(),
       whileWorking: false)
-    #expect(keys.paste == Array("\u{1B}[200~a[201~b\nc\td\u{1B}[201~".utf8))
+    #expect(keys.writes == [Array("\u{1B}[200~a[201~b\nc\td\u{1B}[201~".utf8)])
   }
 
   @Test("A file named with a control character is never written into the terminal")
@@ -374,7 +374,7 @@ struct PromptEncodingTests {
     let keys = PromptEncoding.keystrokes(
       for: PromptSubmission(text: "look", attachments: [trap]), format: AgentPromptFormat(),
       whileWorking: false)
-    #expect(keys.paste == Array("\u{1B}[200~look\u{1B}[201~".utf8))
+    #expect(keys.writes == [Array("\u{1B}[200~look\u{1B}[201~".utf8)])
     #expect(!PathInsertion.isWritablePath(trap.path))
   }
 
@@ -383,10 +383,43 @@ struct PromptEncodingTests {
     let keys = PromptEncoding.keystrokes(
       for: PromptSubmission(
         text: "look", attachments: [URL(fileURLWithPath: "/Users/a/My Shot (1).png")]),
-      format: AgentPromptFormat(usesBracketedPaste: false), whileWorking: false)
-    #expect(String(decoding: keys.paste, as: UTF8.self) == #"look /Users/a/My\ Shot\ \(1\).png"#)
+      format: AgentPromptFormat(textEntry: .plain), whileWorking: false)
+    #expect(keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
+      #"look /Users/a/My\ Shot\ \(1\).png"#
+    ])
     #expect(PromptSubmission(text: "  \n").isEmpty)
     #expect(!PromptSubmission(text: "", attachments: [URL(fileURLWithPath: "/a")]).isEmpty)
+  }
+
+  private let typed = AgentPromptFormat(
+    textEntry: .typed(chunkSize: 8, chunkDelay: .milliseconds(20)))
+
+  @Test("Typed for Claude Code, which wraps a paste in <pasted_content>: in pieces, lines kept")
+  func typedText() {
+    let keys = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "1. oui\n2. été\tok"), format: typed, whileWorking: false)
+    #expect(keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
+      "1. oui\n2", ". été ", "   ok",
+    ])
+    #expect(keys.writes.allSatisfy { $0.count <= 8 })
+    #expect(!keys.writes.joined().contains(0x1B))
+    #expect(keys.interval == .milliseconds(20))
+    #expect(keys.submit == [0x0D])
+  }
+
+  @Test("Typed, the joined files are still pasted, for an image to be joined")
+  func typedAttachments() {
+    let keys = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "look", attachments: [URL(fileURLWithPath: "/a/b.png")]),
+      format: typed, whileWorking: false)
+    #expect(keys.writes == [Array("look".utf8), Array("\u{1B}[200~ /a/b.png\u{1B}[201~".utf8)])
+  }
+
+  @Test("Typed, a prompt opening on ! is pasted whole, not taken for a shell command")
+  func typedBang() {
+    let keys = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "!important"), format: typed, whileWorking: false)
+    #expect(keys.writes == [Array("\u{1B}[200~!important\u{1B}[201~".utf8)])
   }
 
   @Test("Each joined file gives the agent more time before the key that sends the prompt")

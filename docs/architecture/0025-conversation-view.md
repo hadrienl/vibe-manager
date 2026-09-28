@@ -100,6 +100,12 @@ sends a prompt given Return into the turn under way and queues one given Tab; Cl
 either way — each provider declares the key. Every control character but the line break and the
 tab is removed first, so that a pasted text cannot close the paste or send a sequence of its own;
 a joined file whose path holds one is not written at all.
+Claude Code 2.1.283 records any paste in its transcript as `<pasted_content>`, and its model then
+takes the prompt for text the user did not write — it refused to act on a plain "yes". For Claude
+Code the text is therefore typed, 256 bytes every 20 ms: a line feed stays a line break, while 4 kB
+arriving at once is still taken for a paste. A tab typed is a key, so it becomes four spaces. The
+joined paths stay pasted, since an image is attached only from a pasted path; so does a prompt
+opening on `!`, which typed would switch the TUI to its shell.
 The composer is closed while the agent waits for an answer in its terminal, where a prompt would
 be read as the answer. Files joined to a prompt are written as paths escaped the way Terminal.app
 drops them. The sent prompt shows as an echo until the transcript has it; after ten seconds without

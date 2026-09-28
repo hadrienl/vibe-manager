@@ -454,6 +454,16 @@ struct ConversationModelTests {
     #expect(terminal.written.last == [0x09])
   }
 
+  @Test("Typed for Claude Code: every piece written in order, then Return")
+  func sendTyped() async {
+    let (model, terminal) = model()
+    model.promptFormat = AgentPromptFormat(
+      textEntry: .typed(chunkSize: 4, chunkDelay: .zero), submitDelay: .zero)
+    model.draft = "oui\noui"
+    #expect(await model.send())
+    #expect(terminal.written == [Array("oui\n".utf8), Array("oui".utf8), [0x0D]])
+  }
+
   @Test("A request for the keyboard waits for the composer, and is spent once (#105)")
   func focusRequest() {
     let (model, _) = model()

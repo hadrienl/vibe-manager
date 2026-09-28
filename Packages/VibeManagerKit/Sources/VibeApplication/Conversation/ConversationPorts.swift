@@ -33,13 +33,25 @@ public protocol ConversationDecoding: AnyObject {
   var entries: [ConversationEntry] { get }
 }
 
+/// How the text of a prompt reaches the agent's input.
+public enum PromptTextEntry: Hashable, Sendable {
+  /// The bytes as they are, for a program that reads a line at a time.
+  case plain
+  /// One bracketed paste, so that a line break is text rather than a validation.
+  case bracketedPaste
+  /// Typed, in pieces of at most `chunkSize` bytes `chunkDelay` apart: a TUI that tells a paste
+  /// by the size of what arrives at once takes a longer piece for one. A line feed stays text.
+  case typed(chunkSize: Int, chunkDelay: Duration)
+}
+
 /// How a prompt typed in the conversation view is written into an agent's terminal.
 ///
 /// Measured against Claude Code 2.1.282 and Codex 0.157.0 in a real terminal (ADR 0025): both take
 /// a bracketed paste of several lines as one prompt, keep its line breaks, and send it on Return.
+/// Claude Code 2.1.283 records a pasted text as `<pasted_content>`, which its model then takes for
+/// something the user did not write: it has the text typed instead.
 public struct AgentPromptFormat: Hashable, Sendable {
-  /// Written as one bracketed paste, so that a line break is text rather than a validation.
-  public var usesBracketedPaste: Bool
+  public var textEntry: PromptTextEntry
   /// What sends the prompt.
   public var submitKey: [UInt8]
   /// What sends it while the agent works, for it to be taken up when the turn ends. Codex sends a
@@ -57,14 +69,14 @@ public struct AgentPromptFormat: Hashable, Sendable {
   public var attachmentDelay: Duration
 
   public init(
-    usesBracketedPaste: Bool = true,
+    textEntry: PromptTextEntry = .bracketedPaste,
     submitKey: [UInt8] = [0x0D],
     queueKey: [UInt8] = [0x0D],
     interruptKey: [UInt8] = [0x1B],
     submitDelay: Duration = .milliseconds(80),
     attachmentDelay: Duration = .milliseconds(500)
   ) {
-    self.usesBracketedPaste = usesBracketedPaste
+    self.textEntry = textEntry
     self.submitKey = submitKey
     self.queueKey = queueKey
     self.interruptKey = interruptKey
