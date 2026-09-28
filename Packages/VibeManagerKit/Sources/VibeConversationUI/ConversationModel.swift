@@ -117,6 +117,8 @@ public final class ConversationModel {
   public private(set) var scrollToBottomRequest = 0
   /// Where the content's top was at the last scroll reading, to tell a scroll up from growth.
   @ObservationIgnored private var lastContentTop: Double?
+  /// The view was sent back to the end after landing past it, and has not left that state since.
+  @ObservationIgnored private var repositioning = false
 
   public var activity: AgentActivity? {
     didSet { if activity != oldValue { rebuild() } }
@@ -327,6 +329,24 @@ public final class ConversationModel {
       distanceToBottom: contentFrame.maxY - viewportHeight, contentMovedDown: movedDown)
     // Read on every frame of a scroll: only a change should reach the views that observe it.
     if next != scroll { scroll = next }
+    repositionIfPastTheEnd(contentFrame: contentFrame, viewportHeight: viewportHeight)
+  }
+
+  /// Rows laid out lazily are measured only when they come into view: sent to the end while they
+  /// were estimated taller — often while the conversation sat hidden behind another session — the
+  /// scroll view stays past the end of what they really make, and shows nothing until the reader
+  /// scrolls. Sent there again, once per such landing, it finds the end now that they are measured.
+  private func repositionIfPastTheEnd(contentFrame: CGRect, viewportHeight: Double) {
+    let pastTheEnd =
+      contentFrame.height > viewportHeight
+      && viewportHeight - contentFrame.maxY > viewportHeight / 2
+    guard pastTheEnd else {
+      repositioning = false
+      return
+    }
+    guard !repositioning else { return }
+    repositioning = true
+    scrollToBottomRequest += 1
   }
 
   public func jumpToBottom() {

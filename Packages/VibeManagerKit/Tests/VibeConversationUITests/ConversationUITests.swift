@@ -351,6 +351,38 @@ struct ConversationScrollStateTests {
       contentFrame: CGRect(x: 0, y: -300, width: 800, height: 1500), viewportHeight: viewport)
     #expect(!model.scroll.isFollowing)
   }
+
+  @MainActor
+  @Test("Left past the end of its content, the view is sent back to it, once per landing")
+  func pastTheEnd() {
+    let model = ConversationModel(sessionID: SessionID())
+    let viewport = 600.0
+    let asked = model.scrollToBottomRequest
+    // At the end, or bounced a little past it: nothing to do.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -400, width: 800, height: 1000), viewportHeight: viewport)
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -440, width: 800, height: 1000), viewportHeight: viewport)
+    #expect(model.scrollToBottomRequest == asked)
+    // Rows measured shorter than estimated: the content now ends above the viewport.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -1200, width: 800, height: 1000), viewportHeight: viewport)
+    #expect(model.scrollToBottomRequest == asked + 1)
+    // Still there on the next reading: asked only once.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -1100, width: 800, height: 1000), viewportHeight: viewport)
+    #expect(model.scrollToBottomRequest == asked + 1)
+    // Back at the end, then past it again: asked again.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -400, width: 800, height: 1000), viewportHeight: viewport)
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -1200, width: 800, height: 1000), viewportHeight: viewport)
+    #expect(model.scrollToBottomRequest == asked + 2)
+    // Content shorter than the viewport is never past its end.
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: 0, width: 800, height: 200), viewportHeight: viewport)
+    #expect(model.scrollToBottomRequest == asked + 2)
+  }
 }
 
 @Suite("A question answered, read back from its call")
