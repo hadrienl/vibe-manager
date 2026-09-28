@@ -236,7 +236,8 @@ final class SmokeTests: XCTestCase {
     let archive = app.outlines["session-list"].menuItems["Archive 3 Sessions…"]
     XCTAssertTrue(archive.waitForExistence(timeout: 5))
     archive.click()
-    let confirm = app.buttons["Archive"].firstMatch
+    // The dialog's button: the Touch Bar shows one of the same title, which cannot be clicked.
+    let confirm = app.sheets.buttons["Archive"]
     XCTAssertTrue(confirm.waitForExistence(timeout: 5), "One question for the three sessions")
     confirm.click()
 
