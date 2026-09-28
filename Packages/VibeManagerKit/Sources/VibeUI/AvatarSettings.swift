@@ -3,51 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
 
-/// The floating panel, in Settings › Requests (#41).
-struct FloatingPanelSettingsSection: View {
-  @Bindable var panel: FloatingRequestPanelModel
-
-  var body: some View {
-    Section {
-      Toggle(isOn: $panel.isEnabled) {
-        Text("Show requests above other applications", bundle: .module)
-        Text(
-          "When Vibe Manager is not in front, an avatar presents the requests in a bubble. Notifications are then not needed.",
-          bundle: .module)
-      }
-      .accessibilityIdentifier("floating-panel-toggle")
-      Picker(selection: $panel.idle) {
-        Text("Hide the panel", bundle: .module).tag(FloatingPanelIdle.hidden)
-        Text("Keep the avatar on screen", bundle: .module).tag(FloatingPanelIdle.avatarOnly)
-      } label: {
-        Text("With no pending request", bundle: .module)
-      }
-      .disabled(!panel.isEnabled)
-      LabeledContent {
-        Text(verbatim: "⌃⌥⌘P")
-          .monospaced()
-      } label: {
-        Text("Shortcut", bundle: .module)
-        Text("Reaches the bubble from any application.", bundle: .module)
-      }
-      LabeledContent {
-        Button {
-          panel.resetPositions()
-        } label: {
-          Text("Put Back in Place", bundle: .module)
-        }
-      } label: {
-        Text("Position", bundle: .module)
-        Text("The avatar goes back to the bottom right corner of each screen.", bundle: .module)
-      }
-      .disabled(!panel.isEnabled)
-    } header: {
-      Text("Floating Panel", bundle: .module, comment: "A section of the Settings window.")
-    }
-  }
-}
-
-/// Settings › Avatar (#41): the avatar in use, and the draft being made — described and generated
+/// Settings › Requests › Avatars (#41, #154): the avatar in use, and the draft being made — described and generated
 /// by an agent, or imported from an archive — with an animated preview before it is kept.
 ///
 /// Until the page of the library replaces it (#154), it shows the library as the single avatar did:
@@ -79,10 +35,10 @@ struct AvatarSettings: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: SettingsView.formWidth)
-    .frame(minHeight: 520)
+    // The size of the page of Settings › Requests, which scrolls what exceeds it.
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    // The library is read again by the tab, once each time it appears.
     .task {
-      await avatars.refresh()
       if candidate == nil, avatars.work == nil,
         let draft = avatars.entries.last(where: { $0.isDraft })
       {

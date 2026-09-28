@@ -7,7 +7,7 @@ import VibeConversationUI
 import VibeDomain
 
 /// The application's settings, in tabs: General, Privacy, the prompt templates, the web view, the
-/// activity and the conversation view.
+/// activity, the conversation view and the requests.
 ///
 /// Several lines are ways back to a question asked once. The Full Disk Access step at launch is
 /// not asked again by the same identity, and neither is the close confirmation once "Don't ask
@@ -21,8 +21,8 @@ public struct SettingsView: View {
   ///
   /// The window takes each tab's size, and its toolbar holds the tabs. Too narrow, the last ones
   /// fall into an overflow menu where SwiftUI greys them out: at 500 points, Conversation,
-  /// Requests and Avatar could not be reached. The ten labels need about 670 points in French,
-  /// 640 in English: this leaves room for a longer translation, or one more tab.
+  /// Requests and Avatar could not be reached. At this width the nine tabs of #154 leave room
+  /// for a longer translation, or one more tab.
   nonisolated static let formWidth: CGFloat = 780
 
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
@@ -59,12 +59,8 @@ public struct SettingsView: View {
         }
         ConversationSettingsView(appearance: Bindable(model.conversations).appearance)
           .settingsPage(.conversation)
-        RequestSettings(model: model)
+        RequestsSettingsView(model: model)
           .settingsPage(.requests)
-        if let avatars = model.avatars {
-          AvatarSettings(avatars: avatars)
-            .settingsPage(.avatar)
-        }
       }
     } else {
       general
@@ -170,10 +166,9 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
   case activity
   /// The conversation view of #38: its theme, its fonts, what it unfolds.
   case conversation
-  /// How the requests of background sessions are signalled (#40), and the floating panel (#41).
+  /// How the requests of background sessions are signalled (#40), the floating panel (#41), and
+  /// its avatars (#154), in two pages.
   case requests
-  /// The avatar of the floating panel: made, imported, exported (#41).
-  case avatar
 
   /// The label of the tab in the toolbar.
   var title: LocalizedStringResource {
@@ -202,8 +197,6 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .requests:
       LocalizedStringResource(
         "Requests", bundle: .module, comment: "A tab of the Settings window.")
-    case .avatar:
-      LocalizedStringResource("Avatar", bundle: .module, comment: "A tab of the Settings window.")
     }
   }
 
@@ -218,8 +211,8 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .tickets: "ticket"
     case .activity: "list.bullet.rectangle"
     case .conversation: "bubble.left.and.text.bubble.right"
-    case .requests: "hand.raised"
-    case .avatar: "face.smiling"
+    // Not Privacy's hand: a person speaking in a bubble, as the avatar of the panel does.
+    case .requests: "person.bubble"
     }
   }
 }
@@ -272,84 +265,6 @@ struct SettingsPageLayout: Layout {
       page.place(
         at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
         proposal: ProposedViewSize(bounds.size))
-    }
-  }
-}
-
-/// How the requests of background sessions are signalled (#40): notifications, the Dock badge,
-/// the palette.
-private struct RequestSettings: View {
-  @Bindable var model: AppModel
-  @State private var isAuthorized: Bool?
-
-  var body: some View {
-    Form {
-      Section {
-        Toggle(isOn: $model.notifiesRequests) {
-          Text("Notify me of requests", bundle: .module)
-          Text(
-            "When an agent in the background asks for something while Vibe Manager is not in front.",
-            bundle: .module)
-        }
-        Picker(selection: $model.requestNotificationContent) {
-          Text("The kind of request", bundle: .module).tag(RequestNotificationContent.kind)
-          Text("The command or the question", bundle: .module).tag(
-            RequestNotificationContent.detail)
-        } label: {
-          Text("Notifications show", bundle: .module)
-          Text(
-            "Either way, the lock screen shows only that a request arrived.", bundle: .module)
-        }
-        .disabled(!model.notifiesRequests)
-        if isAuthorized == false, model.notifiesRequests {
-          LabeledContent {
-            Button {
-              Self.openNotificationSettings()
-            } label: {
-              Text("Open System Settings…", bundle: .module)
-            }
-          } label: {
-            Label {
-              Text("Notifications are turned off for Vibe Manager.", bundle: .module)
-            } icon: {
-              Image(systemName: "bell.slash")
-            }
-          }
-        }
-      } header: {
-        Text("Notifications", bundle: .module, comment: "A section of the Settings window.")
-      }
-      Section {
-        Toggle(isOn: $model.showsRequestDockBadge) {
-          Text("Show the number of requests on the Dock icon", bundle: .module)
-        }
-        Toggle(isOn: $model.expandsPaletteOnRequest) {
-          Text("Unfold the palette when a request arrives", bundle: .module)
-          Text(
-            "Folded, the palette shows how many requests wait, and VoiceOver says each one.",
-            bundle: .module)
-        }
-      } header: {
-        Text("Palette", bundle: .module, comment: "A section of the Settings window.")
-      }
-      if let panel = model.floatingPanel {
-        FloatingPanelSettingsSection(panel: panel)
-      }
-    }
-    .formStyle(.grouped)
-    .scrollDisabled(true)
-    .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
-    .task { isAuthorized = await model.requestNotifier?.isAuthorized() }
-  }
-
-  static func openNotificationSettings() {
-    let identifier = Bundle.main.bundleIdentifier ?? ""
-    if let url = URL(
-      string:
-        "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(identifier)")
-    {
-      NSWorkspace.shared.open(url)
     }
   }
 }

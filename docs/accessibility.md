@@ -82,8 +82,9 @@ The requests of the sessions in the background (#40), over the foot of the sideb
 
 ## The floating panel of requests
 
-When Settings › Requests › "Show requests above other applications" is on, and Vibe Manager is not
-in front, the requests are presented by an avatar in a bubble above the other applications (#41).
+When Settings › Requests › Alerts › "Show requests above other applications" is on, and Vibe
+Manager is not in front, the requests are presented by an avatar in a bubble above the other
+applications (#41).
 Its window never takes the keyboard by itself: the application in front keeps it.
 
 | Action | Keys |
@@ -126,7 +127,9 @@ at once.
 | Palette of requests | "Pending requests: 2"; folded, "Pending requests: 2. Show" | — | a "Requests" rotor, one entry per request | `request-palette`, `request-palette-collapsed` |
 | Floating panel | "Pending requests: 2" | — | — | `floating-request-panel` |
 | Its counter | "Request 1 of 2" | — | Previous request, Next request | — |
-| Avatar preview, in Settings › Avatar | "Animated preview of the avatar" | — | — | — |
+| Pages of Settings › Requests | "Requests Section" | "Alerts" or "Avatars" | — | `requests-pane` |
+| Avatar of the floating panel, in Settings › Requests › Alerts | "Avatar" | the avatar in use | — | `avatar-in-use-picker`, `manage-avatars` |
+| Avatar preview, in Settings › Requests › Avatars | "Animated preview of the avatar" | — | — | — |
 | A request's card | session, agent, folder, branch, age, then what it asks ("Refactor, Claude Code, app, branch feat/40, 2 minutes ago. Shell command: swift test") | — | Allow, Always, Refuse — each only when the agent's dialog can take it from here; Open Session | `request-card` |
 | A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
 | Swipe buttons | "Move to ‹status›", "Archive…" | — | — | `swipe-‹status›` |
