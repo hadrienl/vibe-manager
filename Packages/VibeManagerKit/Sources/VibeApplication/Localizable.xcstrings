@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ (copy)" : {
+      "comment" : "The name of a copy of an avatar; %@ is the original's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (copie)"
+          }
+        }
+      }
+    },
     "%@ KiB" : {
       "comment" : "A size in kibibytes: “1.5 KiB”.",
       "localizations" : {
@@ -689,6 +700,17 @@
         }
       }
     },
+    "Avatar" : {
+      "comment" : "The name of a copy of an avatar that had none.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar"
+          }
+        }
+      }
+    },
     "Check Activity Monitor for a leftover process, then start a new terminal." : {
       "localizations" : {
         "fr" : {
@@ -806,6 +828,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Date de création"
+          }
+        }
+      }
+    },
+    "Default Avatar" : {
+      "comment" : "The avatar shipped with the application, in the list of avatars.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar par défaut"
           }
         }
       }

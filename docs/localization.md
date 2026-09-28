@@ -102,6 +102,7 @@ the bundle: build a second time before testing a translation.
 | palette (of requests) | palette |
 | floating panel, bubble | panneau flottant, bulle |
 | avatar, expression, sprite sheet | avatar, expression, planche |
+| default avatar, (copy) | avatar par défaut, (copie) |
 | generate, generate again | générer, régénérer |
 | allow, always, refuse | autoriser, toujours, refuser |
 | prompt template, template | modèle de prompt, modèle |
