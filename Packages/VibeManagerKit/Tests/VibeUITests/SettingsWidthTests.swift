@@ -18,9 +18,9 @@ struct SettingsWidthTests {
     let window = Self.toolbarWindow(language: language)
     defer { window.close() }
 
-    #expect(Self.visibleTabs(in: window, width: SettingsView.formWidth) == 10)
+    #expect(Self.visibleTabs(in: window, width: SettingsView.formWidth) == 9)
     // The measure can see an overflow: at the width of #129, the last tabs are out.
-    #expect(Self.visibleTabs(in: window, width: 500) < 10)
+    #expect(Self.visibleTabs(in: window, width: 500) < 9)
   }
 
   @Test("A tab narrower than the toolbar needs is widened")

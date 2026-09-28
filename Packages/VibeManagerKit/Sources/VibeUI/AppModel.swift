@@ -203,6 +203,9 @@ public final class AppModel {
   /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
   /// menu — can open them on the right one.
   public var settingsTab: SettingsTab = .general
+  /// The page Settings › Requests shows (#154). Kept here rather than by the window, so that
+  /// the settings reopen on it, and that "Manage Avatars…" can turn it.
+  public var requestsPane: RequestsPane = .signalling
   /// Where a drop writes what has no file of its own (#42).
   let dropStore: (any SessionDropStore)?
   /// What the last drop on a session has to say: a file left out, a folder the agent may not

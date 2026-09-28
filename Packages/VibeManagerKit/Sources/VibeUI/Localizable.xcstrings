@@ -3794,6 +3794,17 @@
         }
       }
     },
+    "Alerts" : {
+      "comment" : "A page of Settings › Requests: how requests are signalled.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement"
+          }
+        }
+      }
+    },
     "All time" : {
       "comment" : "A period of the Usage window.",
       "localizations" : {
@@ -4303,12 +4314,23 @@
       }
     },
     "Avatar" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A section of the Settings window.\nThe avatar of the floating panel.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avatar"
+          }
+        }
+      }
+    },
+    "Avatars" : {
+      "comment" : "A page of Settings › Requests: the avatars of the floating panel.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatars"
           }
         }
       }
@@ -6867,6 +6889,16 @@
         }
       }
     },
+    "Manage Avatars…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer les avatars…"
+          }
+        }
+      }
+    },
     "Manage…" : {
       "comment" : "Opens the prompt templates window.",
       "localizations" : {
@@ -9070,6 +9102,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demandes"
+          }
+        }
+      }
+    },
+    "Requests Section" : {
+      "comment" : "The pages of Settings › Requests.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section des demandes"
           }
         }
       }
@@ -11574,6 +11617,16 @@
         }
       }
     },
+    "The floating panel presents the requests: no notification is posted while it is on." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le panneau flottant présente les demandes : aucune notification n’est envoyée tant qu’il est activé."
+          }
+        }
+      }
+    },
     "The format must hold {title}, and may hold {id} and {url}." : {
       "localizations" : {
         "fr" : {
@@ -11697,6 +11750,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les notes n’ont pas pu être enregistrées : %@"
+          }
+        }
+      }
+    },
+    "The one that presents the requests. Others are made in Avatars." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celui qui présente les demandes. Les autres se créent dans Avatars."
           }
         }
       }
