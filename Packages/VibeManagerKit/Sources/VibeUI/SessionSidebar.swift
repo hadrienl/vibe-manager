@@ -70,7 +70,9 @@ struct SessionSidebar: View {
     GeometryReader { geometry in
       let width = geometry.size.width
       list(width: width)
-        .frame(width: width, height: geometry.size.height, alignment: .topLeading)
+        // Its width alone: a height set here would keep the inset below from shortening it, and
+        // push the palette out of the column, over the line of the archived sessions.
+        .frame(width: width)
         .background(
           HorizontalSwipeMonitor(
             began: { id in beginTrackpadSwipe(on: id, width: width) },
