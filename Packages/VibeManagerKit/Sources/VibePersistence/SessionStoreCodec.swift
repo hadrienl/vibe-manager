@@ -131,9 +131,7 @@ struct SessionStoreCodec {
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     encoder.dateEncodingStrategy = .custom { date, encoder in
       var container = encoder.singleValueContainer()
-      let formatter = ISO8601DateFormatter()
-      formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-      try container.encode(formatter.string(from: date))
+      try container.encode(StoreDates.format(date))
     }
     return encoder
   }
@@ -143,14 +141,7 @@ struct SessionStoreCodec {
     decoder.dateDecodingStrategy = .custom { decoder in
       let container = try decoder.singleValueContainer()
       let value = try container.decode(String.self)
-      let fractionalFormatter = ISO8601DateFormatter()
-      fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-      if let date = fractionalFormatter.date(from: value) {
-        return date
-      }
-      let formatter = ISO8601DateFormatter()
-      formatter.formatOptions = [.withInternetDateTime]
-      guard let date = formatter.date(from: value) else {
+      guard let date = StoreDates.parse(value) else {
         throw DecodingError.dataCorruptedError(
           in: container,
           debugDescription: "Invalid ISO 8601 date"
@@ -159,6 +150,32 @@ struct SessionStoreCodec {
       return date
     }
     return decoder
+  }
+}
+
+/// The store's dates, read and written by formatters made once. Making two per date cost a
+/// quarter of a second per read of a store of two hundred sessions — and the store is read every
+/// few seconds by each conversation followed, which kept its actor busy enough to hold a launch
+/// waiting on it for twenty seconds.
+private enum StoreDates {
+  nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
+  nonisolated(unsafe) private static let whole: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+  private static let lock = NSLock()
+
+  static func parse(_ text: String) -> Date? {
+    lock.withLock { fractional.date(from: text) ?? whole.date(from: text) }
+  }
+
+  static func format(_ date: Date) -> String {
+    lock.withLock { fractional.string(from: date) }
   }
 }
 

@@ -50,6 +50,11 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   private let codec = SessionStoreCodec()
   private let beforeReplace: (@Sendable () throws -> Void)?
   private let diagnostics: any DiagnosticLog
+  /// The last document read, and what it held. Every read still reads the file — another writer
+  /// is seen at once — but bytes that did not change are not decoded again: conversations and
+  /// journals ask for a session every few seconds each, and decoding the whole store for every
+  /// one of them kept this actor busy enough to hold a launch waiting behind them.
+  private var lastRead: (data: Data, sessions: [WorkSession])?
 
   public init(
     storeURL: URL = FileSessionRepository.defaultStoreURL(),
@@ -227,8 +232,12 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       throw SessionStoreError.cannotAccessStore
     }
 
+    if let lastRead, lastRead.data == data { return lastRead.sessions }
+
     do {
       let decoded = try codec.decode(data)
+      // A document still to migrate is decoded again, so that its rewrite is tried again.
+      lastRead = decoded.requiresRewrite ? nil : (data, decoded.sessions)
       if decoded.requiresRewrite, persistingMigration {
         // Reading must succeed even when the migrated document cannot be written
         // back, for instance on a full disk or a read-only container.
