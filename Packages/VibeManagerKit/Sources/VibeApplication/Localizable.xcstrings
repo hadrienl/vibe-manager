@@ -2,6 +2,7 @@
   "sourceLanguage" : "en",
   "strings" : {
     "%@ (copy)" : {
+      "comment" : "The name of a copy of an avatar; %@ is the original's name.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -699,6 +700,17 @@
         }
       }
     },
+    "Avatar" : {
+      "comment" : "The name of a copy of an avatar that had none.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar"
+          }
+        }
+      }
+    },
     "Check Activity Monitor for a leftover process, then start a new terminal." : {
       "localizations" : {
         "fr" : {
@@ -821,6 +833,7 @@
       }
     },
     "Default Avatar" : {
+      "comment" : "The avatar shipped with the application, in the list of avatars.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

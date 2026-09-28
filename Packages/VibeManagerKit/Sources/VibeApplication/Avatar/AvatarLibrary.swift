@@ -68,7 +68,9 @@ public struct AvatarLibraryEntry: Identifiable, Hashable, Sendable {
   public var addedAt: Date
   /// What it takes on disk.
   public var byteCount: Int64
-  /// Why it cannot be used, when it cannot. It stays listed: only the user deletes it.
+  /// Why a kept avatar cannot be used, when it cannot. It stays listed: only the user deletes it,
+  /// or completes an incomplete one through a draft. A draft that lacks expressions is not a
+  /// problem: it is being made.
   public var problem: AvatarStoreError?
 
   public init(
@@ -95,13 +97,13 @@ public enum AvatarLibraryError: Error, Hashable, Sendable {
   case notFound
   /// The default avatar is not written anywhere: it is not renamed, deleted or replaced.
   case defaultAvatarIsFixed
-  /// `AvatarLibraryRules.maximumCount` avatars already, drafts included.
+  /// `AvatarLibraryRules.maximumCount` avatars already: no new one is made.
   case limitReached
-  /// A draft is kept, or discarded, before it is used.
+  /// Only a kept avatar is used or copied: a draft is kept first.
   case notKept
   /// Only a draft is kept, updated or discarded as one.
   case notADraft
-  /// A draft is kept only complete.
+  /// A draft is kept, and an avatar used or copied, only complete.
   case incomplete([AvatarExpression])
   /// A name is not only blank.
   case emptyName
@@ -114,19 +116,27 @@ public enum AvatarLibraryError: Error, Hashable, Sendable {
 public protocol AvatarLibrary: Sendable {
   /// Every avatar, the default one first, then in the order they entered the library.
   func entries() async throws -> [AvatarLibraryEntry]
-  /// An avatar's images.
-  /// - Throws: `AvatarLibraryError.notFound`, or the `AvatarStoreError` of one that cannot be read.
+  /// Whether a new avatar can be made — generated, imported or copied — or the library is full
+  /// (`AvatarLibraryRules.maximumCount`). The screen asks before it starts one.
+  func canCreate() async throws -> Bool
+  /// An avatar's images, possibly incomplete: `missingExpressions` says what they lack.
+  /// - Throws: `AvatarLibraryError.notFound`, or `AvatarStoreError.unreadable`.
   func load(_ id: AvatarID) async throws -> AvatarSpriteSet
-  /// Writes what was just made as a draft, at once, so that it outlives the application. `basedOn`
-  /// is the kept avatar it redraws, which it replaces once kept.
+  /// Writes what was just made as a draft, at once, so that it outlives the application — even
+  /// beyond the limit: what was made is never lost. `basedOn` is the kept avatar it redraws, which
+  /// it replaces once kept.
   func saveDraft(_ avatar: AvatarSpriteSet, basedOn: AvatarID?) async throws -> AvatarID
   /// Replaces a draft's images: an expression of a draft drawn again.
   func updateDraft(_ id: AvatarID, with avatar: AvatarSpriteSet) async throws
-  /// Keeps a complete draft. One based on a kept avatar replaces it, which keeps its identifier
-  /// — and so stays in use if it was. Returns the identifier of the avatar kept.
+  /// A draft to complete a kept avatar that lacks expressions: its copy, based on it, which
+  /// replaces it once complete and kept. The one already made, if there is one.
+  func draftToComplete(_ id: AvatarID) async throws -> AvatarID
+  /// Keeps a complete draft. One based on a kept avatar replaces its images; the original keeps its
+  /// identifier, its name, its place — and so stays in use if it was. Returns the identifier of the
+  /// avatar kept.
   func keep(_ id: AvatarID) async throws -> AvatarID
   func rename(_ id: AvatarID, to name: String) async throws
-  /// A kept copy, named after the original.
+  /// A kept copy of a complete avatar, kept or the default one, named after it.
   func duplicate(_ id: AvatarID) async throws -> AvatarID
   /// Deletes an avatar, or discards a draft. The one in use gives its place to the default one.
   func remove(_ id: AvatarID) async throws

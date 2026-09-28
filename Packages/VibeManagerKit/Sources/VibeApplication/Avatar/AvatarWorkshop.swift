@@ -110,10 +110,8 @@ public struct AvatarWorkshop: Sendable {
 
   /// The name an avatar gets: the one given, or the start of its description.
   static func name(_ name: String, description: String) -> String {
-    let given = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    let source = given.isEmpty ? AvatarPrompt.sanitizedDescription(description) : given
-    let line = source.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
-    return String(line.prefix(AvatarManifest.maximumNameLength))
+    AvatarLibraryRules.name(name)
+      ?? AvatarLibraryRules.name(AvatarPrompt.sanitizedDescription(description)) ?? ""
   }
 
   static func token(of error: AvatarGenerationError) -> DiagnosticToken {

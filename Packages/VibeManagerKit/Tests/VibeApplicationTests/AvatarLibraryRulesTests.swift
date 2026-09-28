@@ -85,20 +85,24 @@ struct AvatarLibraryRulesTests {
     let long = AvatarLibraryRules.copyName(of: String(repeating: "b", count: 60))
     #expect(long.count == AvatarManifest.maximumNameLength)
     #expect(long.hasSuffix("b (copy)"))
+    #expect(AvatarLibraryRules.copyName(of: "  Renard\nroux") == "Renard (copy)")
+    #expect(AvatarLibraryRules.copyName(of: " ") == "Avatar (copy)")
   }
 
-  @Test("20 avatars at most, drafts included: the 21st is refused and nothing changes")
+  @Test("20 avatars at most, drafts included: no 21st is created, and nothing changes")
   func limit() throws {
     var index = AvatarLibraryIndex()
     for number in 0..<AvatarLibraryRules.maximumCount {
-      let state: AvatarLibraryEntry.State = number.isMultiple(of: 2) ? .kept : .draft(basedOn: nil)
-      try index.add(UUID(), as: state, at: Date(timeIntervalSince1970: Double(number)))
+      let date = Date(timeIntervalSince1970: Double(number))
+      if number.isMultiple(of: 2) {
+        try index.addCopy(UUID(), at: date)
+      } else {
+        try index.addDraft(UUID(), basedOn: nil, at: date)
+      }
     }
-    #expect(!index.hasRoom)
+    #expect(!index.canCreate)
     let before = index
-    #expect(throws: AvatarLibraryError.limitReached) {
-      try index.add(UUID(), as: .draft(basedOn: nil), at: .now)
-    }
+    #expect(throws: AvatarLibraryError.limitReached) { try index.addCopy(UUID(), at: .now) }
     #expect(index == before)
   }
 
@@ -106,7 +110,7 @@ struct AvatarLibraryRulesTests {
   func removeInUse() throws {
     let id = UUID()
     var index = AvatarLibraryIndex()
-    try index.add(id, as: .kept, at: .now)
+    try index.addCopy(id, at: .now)
     try index.setInUse(.stored(id))
     try index.remove(.stored(id))
     #expect(index.inUse == .default)
@@ -133,7 +137,7 @@ struct AvatarLibraryRulesTests {
   func draftNotUsed() throws {
     let id = UUID()
     var index = AvatarLibraryIndex()
-    try index.add(id, as: .draft(basedOn: nil), at: .now)
+    try index.addDraft(id, basedOn: nil, at: .now)
     #expect(throws: AvatarLibraryError.notKept) { try index.setInUse(.stored(id)) }
     let read = AvatarLibraryIndex(
       inUse: .stored(id), records: [.init(id: id, state: .draft(basedOn: nil), addedAt: .now)])
@@ -245,18 +249,36 @@ struct AvatarLibraryRulesTests {
     #expect(try await library.entries().last?.state == .kept)
   }
 
-  @Test("At the limit, neither a draft nor a copy is added")
+  @Test("At the limit, no copy is made, and a generation that ends there is still written")
   func libraryLimit() async throws {
     let library = Self.library()
-    for _ in 0..<AvatarLibraryRules.maximumCount {
+    for _ in 0..<AvatarLibraryRules.maximumCount - 1 {
       _ = try await library.saveDraft(Self.avatar("Robot"), basedOn: nil)
     }
-    await #expect(throws: AvatarLibraryError.limitReached) {
-      _ = try await library.saveDraft(Self.avatar("Robot"), basedOn: nil)
-    }
+    #expect(try await library.canCreate())
+    // A generation starts at 19, and another avatar is imported meanwhile: 20.
+    _ = try await library.saveDraft(Self.avatar("Imported"), basedOn: nil)
+    #expect(try await !library.canCreate())
+    let generated = try await library.saveDraft(Self.avatar("Generated"), basedOn: nil)
+    #expect(try await library.entries().last?.id == generated)
     await #expect(throws: AvatarLibraryError.limitReached) {
       _ = try await library.duplicate(.default)
     }
+    #expect(try await library.entries().count == AvatarLibraryRules.maximumCount + 2)
+  }
+
+  @Test("At the limit, a kept avatar can still be redrawn: its draft replaces it")
+  func redrawAtLimit() async throws {
+    let clock = Clock()
+    let library = InMemoryAvatarLibrary(
+      defaultAvatar: Self.avatar("Placeholder"),
+      kept: (0..<AvatarLibraryRules.maximumCount).map { Self.avatar("Robot \($0)") },
+      now: { clock.now() })
+    #expect(try await !library.canCreate())
+    let robot = try #require(try await library.entries().last?.id)
+    let draft = try await library.saveDraft(Self.avatar("Robot", marker: 2), basedOn: robot)
+    #expect(try await !library.canCreate())
+    #expect(try await library.keep(draft) == robot)
     #expect(try await library.entries().count == AvatarLibraryRules.maximumCount + 1)
   }
 
@@ -276,5 +298,135 @@ struct AvatarLibraryRulesTests {
     let robot = try await library.saveDraft(avatar, basedOn: nil)
     let entry = try #require(try await library.entries().first { $0.id == robot })
     #expect(entry.byteCount == Int64(AvatarExpression.allCases.count + 100))
+  }
+
+  @Test("Kept, a redrawing draft brings its images and description, not the name it was given")
+  func redrawKeepsName() async throws {
+    let library = Self.library()
+    let robot = try await library.saveDraft(Self.avatar("Robot", marker: 1), basedOn: nil)
+    _ = try await library.keep(robot)
+    let place = try await library.entries().map(\.id)
+    var redrawn = Self.avatar("Robot", marker: 2)
+    redrawn.manifest.description = "A mint robot"
+    let draft = try await library.saveDraft(redrawn, basedOn: robot)
+    try await library.rename(robot, to: "Robot rétro menthe")
+    _ = try await library.keep(draft)
+    let kept = try await library.load(robot)
+    #expect(kept.manifest.name == "Robot rétro menthe")
+    #expect(kept.manifest.description == "A mint robot")
+    #expect(kept.sprites[.neutral] == Data([2]))
+    #expect(try await library.entries().map(\.id) == place)
+  }
+
+  @Test("A kept avatar that lacks expressions: listed with why, read partly, completed by a draft")
+  func incompleteKept() async throws {
+    let library = InMemoryAvatarLibrary(
+      defaultAvatar: Self.avatar("Placeholder"), kept: [Self.avatar("Old", missing: [.worried])])
+    let old = try #require(try await library.entries().last)
+    #expect(old.problem == .incomplete([.worried]))
+    #expect(try await library.load(old.id).missingExpressions == [.worried])
+    await #expect(throws: AvatarLibraryError.incomplete([.worried])) {
+      try await library.setInUse(old.id)
+    }
+    await #expect(throws: AvatarLibraryError.incomplete([.worried])) {
+      _ = try await library.duplicate(old.id)
+    }
+
+    let draft = try await library.draftToComplete(old.id)
+    #expect(try await library.draftToComplete(old.id) == draft)
+    await #expect(throws: AvatarLibraryError.incomplete([.worried])) {
+      _ = try await library.keep(draft)
+    }
+    try await library.updateDraft(draft, with: Self.avatar("Old"))
+    #expect(try await library.keep(draft) == old.id)
+    #expect(try await library.entries().last?.problem == nil)
+    try await library.setInUse(old.id)
+  }
+
+  @Test("A draft is neither copied nor used")
+  func draftNotCopied() async throws {
+    let library = Self.library()
+    let draft = try await library.saveDraft(Self.avatar("Robot"), basedOn: nil)
+    await #expect(throws: AvatarLibraryError.notKept) { _ = try await library.duplicate(draft) }
+    await #expect(throws: AvatarLibraryError.notKept) { try await library.setInUse(draft) }
+  }
+
+  @Test("Discarding a draft leaves the avatar in use alone")
+  func discardKeepsUse() async throws {
+    let library = Self.library()
+    let robot = try await library.duplicate(.default)
+    try await library.setInUse(robot)
+    let draft = try await library.saveDraft(Self.avatar("Robot"), basedOn: robot)
+    try await library.remove(draft)
+    #expect(try await library.inUse() == robot)
+    #expect(try await library.load(robot).manifest.name == "Default Avatar (copy)")
+  }
+
+  @Test("Using an avatar the library does not hold is refused")
+  func useUnknown() async throws {
+    let library = Self.library()
+    await #expect(throws: AvatarLibraryError.notFound) {
+      try await library.setInUse(.stored(UUID()))
+    }
+    #expect(try await library.inUse() == .default)
+  }
+
+  @Test("Deleting the avatar in use, through the library: the default one is back in use")
+  func removeInUseThroughLibrary() async throws {
+    let library = Self.library()
+    let robot = try await library.duplicate(.default)
+    try await library.setInUse(robot)
+    try await library.remove(robot)
+    #expect(try await library.inUse() == .default)
+    #expect(try await library.entries().map(\.id) == [.default])
+  }
+
+  @Test("library.json reads back as it was written, to the millisecond")
+  func indexRoundTrip() throws {
+    let kept = UUID()
+    let draft = UUID()
+    var index = AvatarLibraryIndex()
+    try index.addCopy(kept, at: Date(timeIntervalSince1970: 1_790_000_000.125))
+    try index.addDraft(
+      draft, basedOn: .stored(kept), at: Date(timeIntervalSince1970: 1_790_000_001))
+    try index.setInUse(.stored(kept))
+    let data = try JSONEncoder().encode(index)
+    let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(json["format"] as? Int == 1)
+    #expect(json["inUse"] as? String == kept.uuidString)
+    let entries = try #require(json["entries"] as? [[String: Any]])
+    #expect(entries.map { $0["state"] as? String } == ["kept", "draft"])
+    #expect(entries[1]["basedOn"] as? String == kept.uuidString)
+    #expect(entries[0]["addedAt"] as? String == "2026-09-21T14:13:20.125Z")
+    #expect(try JSONDecoder().decode(AvatarLibraryIndex.self, from: data) == index)
+  }
+
+  @Test("An index read from disk is made consistent: each avatar once, drafts on kept avatars only")
+  func indexConsistency() throws {
+    let kept = UUID()
+    let draft = UUID()
+    let orphan = UUID()
+    let json = """
+      { "format": 1, "inUse": "\(draft.uuidString)", "entries": [
+        { "id": "\(kept.uuidString)", "state": "kept", "addedAt": "2026-09-21T14:13:20.000Z" },
+        { "id": "\(kept.uuidString)", "state": "draft" },
+        { "id": "\(draft.uuidString)", "state": "draft", "basedOn": "\(kept.uuidString)" },
+        { "id": "\(orphan.uuidString)", "state": "draft", "basedOn": "\(draft.uuidString)" } ] }
+      """
+    let index = try JSONDecoder().decode(AvatarLibraryIndex.self, from: Data(json.utf8))
+    #expect(index.records.map(\.id) == [kept, draft, orphan])
+    #expect(index.record(kept)?.state == .kept)
+    #expect(index.record(draft)?.state == .draft(basedOn: .stored(kept)))
+    #expect(index.record(orphan)?.state == .draft(basedOn: nil))
+    #expect(index.record(draft)?.addedAt == .distantPast)
+    #expect(index.inUse == .default)
+  }
+
+  @Test("An index of a later version is not read: the folders will say what there is")
+  func laterIndex() {
+    let json = #"{ "format": 2, "inUse": "default", "entries": [] }"#
+    #expect(throws: DecodingError.self) {
+      _ = try JSONDecoder().decode(AvatarLibraryIndex.self, from: Data(json.utf8))
+    }
   }
 }
