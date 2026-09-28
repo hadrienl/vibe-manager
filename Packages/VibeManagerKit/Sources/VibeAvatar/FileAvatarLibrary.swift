@@ -128,6 +128,26 @@ public actor FileAvatarLibrary: AvatarLibrary {
     try loadSet(id, in: try prepared())
   }
 
+  /// Reads `neutral.png` alone, checked as `load` checks it: a list of twenty avatars does not read
+  /// two hundred images and their sheets.
+  public func thumbnail(_ id: AvatarID) async throws -> Data? {
+    let index = try prepared()
+    guard let uuid = id.storedID else {
+      guard let defaultAvatar = defaultAvatarSet() else { throw AvatarStoreError.unreadable }
+      return defaultAvatar.sprites[.neutral]
+    }
+    guard index.record(uuid) != nil else { throw AvatarLibraryError.notFound }
+    let folder = folder(uuid)
+    guard isDirectory(folder) else { throw AvatarLibraryError.notFound }
+    guard readManifest(in: folder) != nil else { throw AvatarStoreError.unreadable }
+    let url = folder.appendingPathComponent(AvatarExpression.neutral.fileName)
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    guard let image = try? ImageCodec.decode(data),
+      image.width == AvatarSpriteSet.spriteSide, image.height == AvatarSpriteSet.spriteSide
+    else { throw AvatarStoreError.unreadable }
+    return data
+  }
+
   public func inUse() async throws -> AvatarID { try prepared().inUse }
 
   // MARK: - Changing

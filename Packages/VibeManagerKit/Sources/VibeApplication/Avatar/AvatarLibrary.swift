@@ -122,6 +122,9 @@ public protocol AvatarLibrary: Sendable {
   /// An avatar's images, possibly incomplete: `missingExpressions` says what they lack.
   /// - Throws: `AvatarLibraryError.notFound`, or `AvatarStoreError.unreadable`.
   func load(_ id: AvatarID) async throws -> AvatarSpriteSet
+  /// An avatar's neutral sprite alone, for a list: nothing else is read. `nil` when it lacks one.
+  /// - Throws: `AvatarLibraryError.notFound`, or `AvatarStoreError.unreadable`.
+  func thumbnail(_ id: AvatarID) async throws -> Data?
   /// Writes what was just made as a draft, at once, so that it outlives the application — even
   /// beyond the limit: what was made is never lost. `basedOn` is the kept avatar it redraws, which
   /// it replaces once kept.

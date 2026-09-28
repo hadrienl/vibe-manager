@@ -114,6 +114,8 @@ public final class AvatarLibraryModel {
   /// cannot be read.
   public private(set) var selectedAvatar: AvatarSpriteSet?
   public private(set) var selectedImages: [AvatarExpression: NSImage] = [:]
+  /// The neutral face of each avatar, for the list; missing while it is read, or when it cannot be.
+  public private(set) var thumbnails: [AvatarID: NSImage] = [:]
 
   /// Whether keeping a draft also puts it in the floating panel: checked by default.
   public var usesKeptDraft = true
@@ -149,6 +151,12 @@ public final class AvatarLibraryModel {
   @ObservationIgnored private var refreshInstalled = 0
   @ObservationIgnored private var imagesStarted = 0
   @ObservationIgnored private var imagesInstalled = 0
+  /// The entry each thumbnail was read for: read again only once its entry changed.
+  @ObservationIgnored private var thumbnailSources: [AvatarID: AvatarLibraryEntry] = [:]
+  /// Whether a page has shown the list: the faces are read only then.
+  @ObservationIgnored private var thumbnailsWanted = false
+  /// The reading of the faces under way: the tests wait for it rather than for a length of time.
+  @ObservationIgnored private(set) var thumbnailTask: Task<Void, Never>?
 
   public init(
     workshop: AvatarWorkshop, library: any AvatarLibrary,
@@ -191,6 +199,41 @@ public final class AvatarLibraryModel {
     if let canCreate { self.canCreate = canCreate }
     await loadInUseImages()
     await reloadSelection()
+    // Not waited for: the list shows its faces as they come.
+    startThumbnails()
+  }
+
+  /// Reads the faces of the list, in the background, and again after each change: the page asks
+  /// when it appears. Until then — at launch, with no page open — none is read.
+  public func showThumbnails() {
+    thumbnailsWanted = true
+    startThumbnails()
+  }
+
+  private func startThumbnails() {
+    guard thumbnailsWanted else { return }
+    let previous = thumbnailTask
+    // One reading after the other: a later one sees the entries as they are now.
+    thumbnailTask = Task { [weak self] in
+      await previous?.value
+      await self?.loadThumbnails()
+    }
+  }
+
+  /// Reads the neutral face of the avatars whose entry changed since it was read, and that face
+  /// alone: the list shows one per avatar, and a library of 20 is not read again at each change.
+  private func loadThumbnails() async {
+    let entries = entries
+    for entry in entries where thumbnailSources[entry.id] != entry {
+      thumbnailSources[entry.id] = entry
+      let data = try? await library.thumbnail(entry.id)
+      // Changed again meanwhile: the later reading counts.
+      guard thumbnailSources[entry.id] == entry else { continue }
+      thumbnails[entry.id] = data.flatMap(NSImage.init(data:))
+    }
+    let ids = Set(self.entries.map(\.id))
+    thumbnails = thumbnails.filter { ids.contains($0.key) }
+    thumbnailSources = thumbnailSources.filter { ids.contains($0.key) }
   }
 
   /// The images the floating panel shows: those of the avatar in use, or of the default one while
@@ -273,6 +316,14 @@ public final class AvatarLibraryModel {
     await reloadSelection()
   }
 
+  /// Selects at once, and reads the avatar in the background: what the list selects is shown
+  /// selected without waiting.
+  public func choose(_ selection: Selection?) {
+    guard selection != self.selection else { return }
+    self.selection = selection
+    Task { await reloadSelection() }
+  }
+
   /// Reads the selected avatar again. One no longer there gives its place to the avatar in use.
   private func reloadSelection() async {
     let fallback: Selection? = entries.isEmpty ? nil : .avatar(inUse)
@@ -289,7 +340,14 @@ public final class AvatarLibraryModel {
     let avatar = try? await library.load(id)
     // Another selection meanwhile: its own reading counts.
     guard selection == requested else { return }
+    // The same avatar read again — selected again, or the library read after another change —
+    // keeps the images already made.
+    guard avatar != selectedAvatar else { return }
     setSelected(avatar)
+    // What was just read is newest: an expression drawn again shows in the list at once.
+    if thumbnailsWanted, let image = selectedImages[.neutral] {
+      thumbnails[id] = image
+    }
   }
 
   // MARK: - Agents

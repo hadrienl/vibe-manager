@@ -56,6 +56,10 @@ public actor InMemoryAvatarLibrary: AvatarLibrary {
     return avatar
   }
 
+  public func thumbnail(_ id: AvatarID) async throws -> Data? {
+    try await load(id).sprites[.neutral]
+  }
+
   public func saveDraft(_ avatar: AvatarSpriteSet, basedOn: AvatarID?) async throws -> AvatarID {
     let id = makeID()
     try index.addDraft(id, basedOn: basedOn, at: now())

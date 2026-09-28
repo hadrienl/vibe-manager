@@ -66,7 +66,7 @@ struct RequestsSettingsView: View {
   @ViewBuilder
   private var page: some View {
     if model.requestsPane == .avatars, let avatars = model.avatars {
-      AvatarSettings(avatars: avatars)
+      AvatarLibraryView(avatars: avatars)
     } else {
       SignallingSettings(model: model)
     }
