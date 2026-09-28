@@ -518,6 +518,8 @@ public final class AppModel {
   /// The folders sessions were created in, offered again by the New Session sheet (#39).
   let recentFolderStore: any RecentFolderStore
   public internal(set) var recentFolders = RecentFolders()
+  /// The folder of a session being started, offered before it joins `recentFolders`.
+  var notedFolder: RecentFolder?
   var recentFolderHistory = RecentFolderHistory.unread
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
@@ -2441,7 +2443,7 @@ public final class AppModel {
       templates: templates.all,
       projectIcons: projectIcons,
       icons: icons,
-      recentFolders: recentFolders.entries,
+      recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) }
     )
     if let template {

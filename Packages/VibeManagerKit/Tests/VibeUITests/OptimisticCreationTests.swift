@@ -119,15 +119,29 @@ struct OptimisticCreationTests {
     #expect(!model.isPresentingNewSession)
   }
 
-  @Test("The folder of a session whose agent is starting is proposed again at once")
-  func folderIsOfferedBeforeTheAgentRuns() async throws {
+  /// A model whose agents wait for their terminal to be measured, which nothing does until
+  /// `startAgent(of:in:)`: the creation stays in its `.starting` phase meanwhile.
+  private func makeModelWithHeldAgents(recentFolders: RecentFolders? = nil) async -> AppModel {
     let repository = GatedRepository(sessions: [], open: true)
-    // The agent waits for its terminal to be measured, which nothing does until the test says.
     let launcher = SessionLauncher(
       supervisor: FakeSupervisor(), repository: repository, agents: OneAgent(),
       viewportTimeout: .seconds(600))
-    let model = AppModel(repository: repository, agents: OneAgent(), launcher: launcher)
+    let model = AppModel(
+      repository: repository, agents: OneAgent(), launcher: launcher,
+      recentFolderStore: InMemoryRecentFolderStore(recentFolders))
     await model.load()
+    return model
+  }
+
+  private func startAgent(of id: SessionID, in model: AppModel) async {
+    await waitUntil("its terminal is made") { model.pane(for: id) != nil }
+    await model.pane(for: id)?.reportViewportSize(TerminalSize(columns: 80, rows: 24))
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
+  }
+
+  @Test("The folder of a session whose agent is starting is proposed again at once")
+  func folderIsOfferedBeforeTheAgentRuns() async throws {
+    let model = await makeModelWithHeldAgents()
     _ = try openSheet(in: model, name: "First", folder: folder)
 
     model.submitNewSession(launching: true)
@@ -138,16 +152,51 @@ struct OptimisticCreationTests {
     let next = try #require(model.newSessionModel)
 
     #expect(next.recentFolders.map(\.folder.path) == [folder])
+    // Offered, not yet in the history.
+    #expect(model.recentFolders.entries.isEmpty)
 
-    let id = try #require(model.sessionInCreation?.sessionID)
-    await waitUntil("its terminal is made") { model.pane(for: id) != nil }
-    await model.pane(for: id)?.reportViewportSize(TerminalSize(columns: 80, rows: 24))
-    await waitUntil("the creation is over") { model.sessionInCreation == nil }
-    // Resolved and written once the agent runs, in place of the spelling noted meanwhile.
+    await startAgent(of: try #require(model.sessionInCreation?.sessionID), in: model)
+    // Resolved and written once the agent runs, and the note gone.
     await waitUntil("the folder is written under its identity") {
       await model.recentFolderStore.load()?.entries.map(\.key) == [CanonicalPath.of(folder)]
     }
     #expect(model.recentFolders.entries.count == 1)
+    #expect(model.notedFolder == nil)
+  }
+
+  @Test("A folder noted meanwhile neither doubles an equivalent spelling nor pushes a folder out")
+  func notedFolderLosesNothing() async throws {
+    // A folder reached through a link: two spellings of one folder, as `/tmp` and `/private/tmp`.
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("NotedFolder-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let real = root.appendingPathComponent("real", isDirectory: true)
+    try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+    let folder = root.appendingPathComponent("link").path
+    try FileManager.default.createSymbolicLink(atPath: folder, withDestinationPath: real.path)
+    let canonical = CanonicalPath.of(folder)
+    try #require(canonical != RecentFolder.lexicalKey(of: folder))
+    let others = (0..<(RecentFolders.limit - 1)).map { RecentFolder(lexicalPath: "/work/\($0)") }
+    let full = RecentFolders([RecentFolder(path: canonical, key: canonical)] + others)
+    #expect(full.entries.count == RecentFolders.limit)
+    let model = await makeModelWithHeldAgents(recentFolders: full)
+    _ = try openSheet(in: model, name: "Again", folder: folder)
+
+    model.submitNewSession(launching: true)
+    await waitUntil("the noted folder is resolved") { model.notedFolder?.key == canonical }
+    model.beginNewSession()
+    let next = try #require(model.newSessionModel)
+
+    let offered = next.recentFolders.map(\.folder.key)
+    #expect(offered == [canonical] + others.map(\.key))
+    #expect(model.recentFolders == full)
+
+    await startAgent(of: try #require(model.sessionInCreation?.sessionID), in: model)
+    await waitUntil("the folder is written again") {
+      await model.recentFolderStore.load()?.entries.first?.path == folder
+    }
+    let written = try #require(await model.recentFolderStore.load())
+    #expect(written.entries.map(\.key) == [canonical] + others.map(\.key))
   }
 
   @Test("A draft that fails its own checks keeps the sheet open")
