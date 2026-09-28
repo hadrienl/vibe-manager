@@ -47,42 +47,48 @@ struct FloatingPanelSettingsSection: View {
   }
 }
 
-/// Settings › Avatar (#41): the avatar in use, and the one being made — described and generated
-/// by an agent, or imported from an archive — with an animated preview before it is used.
+/// Settings › Avatar (#41): the avatar in use, and the draft being made — described and generated
+/// by an agent, or imported from an archive — with an animated preview before it is kept.
+///
+/// Until the page of the library replaces it (#154), it shows the library as the single avatar did:
+/// the one in use, and the draft selected.
 struct AvatarSettings: View {
-  @Bindable var studio: AvatarStudioModel
+  @Bindable var avatars: AvatarLibraryModel
   @State private var isImporting = false
   @State private var isExporting = false
   @State private var exportDocument: AvatarArchiveDocument?
+  @State private var exportName = ""
   @State private var includesDescription = true
-  @State private var confirmsReset = false
   @State private var isDropTargeted = false
 
   var body: some View {
     Form {
       currentSection
-      if let problem = studio.problem {
+      // A result not written is said by its own section, with what to do.
+      if let problem = avatars.problem ?? avatars.inUseProblem, problem != .writing {
         Section {
-          Label {
-            Text(AvatarPresentation.message(for: problem))
-              .fixedSize(horizontal: false, vertical: true)
-          } icon: {
-            Image(systemName: "exclamationmark.triangle.fill")
-              .foregroundStyle(.orange)
-          }
-          .accessibilityIdentifier("avatar-problem")
+          problemLabel(problem)
         }
       }
+      ForEach(avatars.failures) { failure in
+        failureSection(failure)
+      }
       createSection
-      if let candidate = studio.candidate {
-        candidateSection(candidate)
+      if let draft = candidate {
+        candidateSection(draft)
       }
     }
     .formStyle(.grouped)
     .frame(width: SettingsView.formWidth)
     .frame(minHeight: 520)
     .task {
-      await studio.refreshOptions()
+      await avatars.refresh()
+      if candidate == nil, avatars.work == nil,
+        let draft = avatars.entries.last(where: { $0.isDraft })
+      {
+        await avatars.select(.avatar(draft.id))
+      }
+      await avatars.refreshOptions()
     }
     .fileImporter(isPresented: $isImporting, allowedContentTypes: [.zip]) { result in
       guard case .success(let url) = result else { return }
@@ -90,21 +96,27 @@ struct AvatarSettings: View {
     }
     .fileExporter(
       isPresented: $isExporting, document: exportDocument, contentType: .zip,
-      defaultFilename: studio.exportFileName
+      defaultFilename: exportName
     ) { _ in
       exportDocument = nil
     }
-    .confirmationDialog(
-      Text("Go back to the default avatar?", bundle: .module), isPresented: $confirmsReset
-    ) {
-      Button(role: .destructive) {
-        Task { await studio.resetToDefault() }
-      } label: {
-        Text("Use the Default Avatar", bundle: .module)
-      }
-    } message: {
-      Text("Your avatar is deleted. Export it first to keep it.", bundle: .module)
+  }
+
+  /// The draft selected: the avatar being made, until it is kept or discarded.
+  private var candidate: AvatarLibraryEntry? {
+    guard let entry = avatars.selectedEntry, entry.isDraft else { return nil }
+    return entry
+  }
+
+  private func problemLabel(_ problem: AvatarLibraryModel.Problem) -> some View {
+    Label {
+      Text(AvatarPresentation.message(for: problem))
+        .fixedSize(horizontal: false, vertical: true)
+    } icon: {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
     }
+    .accessibilityIdentifier("avatar-problem")
   }
 
   // MARK: - In use
@@ -112,7 +124,7 @@ struct AvatarSettings: View {
   private var currentSection: some View {
     Section {
       HStack(alignment: .center, spacing: 16) {
-        AvatarPreview(images: studio.currentImages)
+        AvatarPreview(images: avatars.inUseImages)
           .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first, url.pathExtension.lowercased() == "zip" else {
               return false
@@ -134,24 +146,21 @@ struct AvatarSettings: View {
             } label: {
               Text("Import…", bundle: .module)
             }
-            .disabled(studio.work != nil || studio.isImporting)
+            .disabled(!avatars.canStartCreation)
             .accessibilityIdentifier("avatar-import")
             Button {
-              exportDocument = studio.exportArchive(includingDescription: includesDescription)
-                .map { AvatarArchiveDocument(data: $0) }
-              isExporting = exportDocument != nil
+              export(avatars.inUse)
             } label: {
               Text("Export…", bundle: .module)
             }
-            .disabled(studio.current == nil)
           }
           Toggle(isOn: $includesDescription) {
             Text("Include the description in the export", bundle: .module)
           }
           .controlSize(.small)
-          if studio.isCustom {
+          if avatars.inUse != .default {
             Button {
-              confirmsReset = true
+              Task { await avatars.use(.default) }
             } label: {
               Text("Go Back to the Default Avatar", bundle: .module)
             }
@@ -171,12 +180,49 @@ struct AvatarSettings: View {
   }
 
   private var currentName: String {
-    guard studio.isCustom, let name = studio.current?.manifest.name, !name.isEmpty else {
+    guard avatars.inUse != .default, avatars.inUseProblem == nil,
+      let entry = avatars.entry(avatars.inUse)
+    else {
       return String(
         localized: LocalizedStringResource(
           "Default avatar", bundle: .module, comment: "The avatar shipped with the application."))
     }
-    return name
+    return AvatarLibraryModel.name(of: entry)
+  }
+
+  // MARK: - Failures
+
+  private func failureSection(_ failure: AvatarLibraryModel.Job) -> some View {
+    Section {
+      if case .failed(let error, _) = failure.phase {
+        problemLabel(.generation(error))
+      } else {
+        problemLabel(.writing)
+      }
+      HStack {
+        Spacer()
+        Button {
+          Task { await avatars.dismiss(failure.id) }
+        } label: {
+          Text("Remove", bundle: .module)
+        }
+        if case .unsaved = failure.phase {
+          Button {
+            Task { await avatars.retrySaving(failure.id) }
+          } label: {
+            Text("Save Again", bundle: .module, comment: "Writes a generated avatar again.")
+          }
+          .disabled(avatars.work != nil)
+        } else {
+          Button {
+            avatars.retry(failure.id)
+          } label: {
+            Text("Try Again", bundle: .module)
+          }
+          .disabled(!avatars.canStartCreation)
+        }
+      }
+    }
   }
 
   // MARK: - Making
@@ -185,7 +231,7 @@ struct AvatarSettings: View {
     Section {
       VStack(alignment: .leading, spacing: 4) {
         Text("Describe it", bundle: .module)
-        TextEditor(text: $studio.description)
+        TextEditor(text: $avatars.description)
           .font(.body)
           .frame(height: 64)
           .scrollContentBackground(.hidden)
@@ -201,8 +247,8 @@ struct AvatarSettings: View {
         .font(.caption)
         .foregroundStyle(.secondary)
       }
-      Picker(selection: $studio.selectedProvider) {
-        ForEach(studio.options) { option in
+      Picker(selection: $avatars.selectedProvider) {
+        ForEach(avatars.options) { option in
           Group {
             if let reason = option.unavailability {
               Text(
@@ -220,9 +266,14 @@ struct AvatarSettings: View {
         Text("Drawn by", bundle: .module)
         Text("The generation uses the account and the quota of this agent.", bundle: .module)
       }
-      .disabled(studio.work != nil)
+      .disabled(avatars.work != nil)
+      if !avatars.canCreate {
+        Text(AvatarPresentation.message(for: .limitReached))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
       HStack {
-        if let work = studio.work {
+        if let work = avatars.work {
           ProgressView().controlSize(.small)
           TimelineView(.periodic(from: work.startedAt, by: 1)) { context in
             Text(
@@ -233,19 +284,19 @@ struct AvatarSettings: View {
           }
           Spacer()
           Button {
-            studio.cancel()
+            avatars.cancel()
           } label: {
             Text("Cancel", bundle: .module)
           }
         } else {
           Spacer()
           Button {
-            studio.generate()
+            avatars.generate()
           } label: {
             Text("Generate", bundle: .module)
           }
           .buttonStyle(.borderedProminent)
-          .disabled(!studio.canGenerate)
+          .disabled(!avatars.canGenerate)
           .accessibilityIdentifier("avatar-generate")
         }
       }
@@ -254,7 +305,7 @@ struct AvatarSettings: View {
     }
   }
 
-  private func progressText(_ work: AvatarStudioModel.Work, elapsed: TimeInterval) -> String {
+  private func progressText(_ work: AvatarLibraryModel.Work, elapsed: TimeInterval) -> String {
     let duration = Duration.seconds(Int(elapsed)).formatted(.units(allowed: [.minutes, .seconds]))
     switch work {
     case .wholeSet:
@@ -272,10 +323,11 @@ struct AvatarSettings: View {
 
   // MARK: - Candidate
 
-  private func candidateSection(_ candidate: AvatarSpriteSet) -> some View {
-    Section {
+  private func candidateSection(_ draft: AvatarLibraryEntry) -> some View {
+    let isComplete = avatars.selectedAvatar?.isComplete ?? false
+    return Section {
       HStack(alignment: .top, spacing: 16) {
-        AvatarPreview(images: studio.candidateImages)
+        AvatarPreview(images: avatars.selectedImages)
         LazyVGrid(
           columns: Array(repeating: GridItem(.fixed(64), spacing: 8), count: 5), spacing: 8
         ) {
@@ -284,46 +336,47 @@ struct AvatarSettings: View {
           }
         }
       }
-      if studio.ignoredFiles > 0 {
+      if let ignored = avatars.ignoredFiles, ignored.draft == draft.id {
         Text(
-          "\(studio.ignoredFiles) files of the archive were ignored: they are no expression's.",
+          "\(ignored.count) files of the archive were ignored: they are no expression's.",
           bundle: .module
         )
         .font(.caption)
         .foregroundStyle(.secondary)
       }
-      if !candidate.isComplete {
+      if avatars.selectedAvatar != nil, !isComplete {
         Text(
-          "Expressions are missing: generate them before using this avatar.", bundle: .module
+          "Expressions are missing: generate them before keeping this avatar.", bundle: .module
         )
         .font(.caption)
         .foregroundStyle(.orange)
       }
+      Toggle(isOn: $avatars.usesKeptDraft) {
+        Text("Use it in the floating panel", bundle: .module)
+      }
+      .accessibilityIdentifier("avatar-use-kept")
       HStack {
-        if !(studio.candidate?.manifest.description ?? "").isEmpty {
+        if !(draft.manifest?.description ?? "").isEmpty {
           Button {
-            if let description = studio.candidate?.manifest.description {
-              studio.description = description
-            }
-            studio.generate()
+            avatars.regenerateAll(draft.id)
           } label: {
             Text("Generate Everything Again", bundle: .module)
           }
-          .disabled(studio.work != nil || studio.selectedGenerator == nil)
+          .disabled(!avatars.isIdle || avatars.selectedGenerator == nil)
         }
         Spacer()
         Button {
-          studio.discard()
+          Task { await avatars.discard(draft.id) }
         } label: {
           Text("Discard", bundle: .module)
         }
         Button {
-          Task { await studio.accept() }
+          Task { await avatars.keep(draft.id) }
         } label: {
-          Text("Use This Avatar", bundle: .module)
+          Text("Keep", bundle: .module, comment: "Keeps an avatar just made in the library.")
         }
         .buttonStyle(.borderedProminent)
-        .disabled(!candidate.isComplete || studio.work != nil)
+        .disabled(!isComplete || !avatars.canKeep(draft.id))
         .accessibilityIdentifier("avatar-accept")
       }
     } header: {
@@ -332,7 +385,7 @@ struct AvatarSettings: View {
   }
 
   private func expressionTile(_ expression: AvatarExpression) -> some View {
-    let image = studio.candidateImages[expression]
+    let image = avatars.selectedImages[expression]
     return VStack(spacing: 2) {
       ZStack {
         RoundedRectangle(cornerRadius: 8).fill(.quaternary)
@@ -345,13 +398,13 @@ struct AvatarSettings: View {
       .frame(width: 64, height: 64)
       .overlay(alignment: .topTrailing) {
         Button {
-          studio.regenerate(expression)
+          avatars.regenerate(expression)
         } label: {
           Image(systemName: image == nil ? "plus.circle.fill" : "arrow.clockwise.circle.fill")
             .symbolRenderingMode(.hierarchical)
         }
         .buttonStyle(.borderless)
-        .disabled(studio.work != nil || studio.selectedGenerator == nil)
+        .disabled(!avatars.canRegenerate)
         .help(
           image == nil
             ? Text("Generate this expression", bundle: .module)
@@ -373,23 +426,34 @@ struct AvatarSettings: View {
 
   // MARK: - Files
 
+  private func export(_ id: AvatarID) {
+    let includesDescription = includesDescription
+    Task {
+      guard let data = await avatars.exportArchive(id, includingDescription: includesDescription)
+      else { return }
+      exportName = avatars.exportFileName(id)
+      exportDocument = AvatarArchiveDocument(data: data)
+      isExporting = true
+    }
+  }
+
   private func importArchive(at url: URL) {
     let scoped = url.startAccessingSecurityScopedResource()
     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
     // Read with the same bound as the archive itself: a larger file is not read at all.
     guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else {
-      studio.reject(.archiveUnreadable)
+      avatars.reject(.archiveUnreadable)
       return
     }
     guard size <= 30 * 1024 * 1024 else {
-      studio.reject(.archiveTooLarge)
+      avatars.reject(.archiveTooLarge)
       return
     }
     guard let data = try? Data(contentsOf: url) else {
-      studio.reject(.archiveUnreadable)
+      avatars.reject(.archiveUnreadable)
       return
     }
-    Task { await studio.importArchive(data) }
+    Task { await avatars.importArchive(data) }
   }
 }
 

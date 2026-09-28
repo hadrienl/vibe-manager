@@ -61,8 +61,8 @@ public struct SettingsView: View {
           .settingsPage(.conversation)
         RequestSettings(model: model)
           .settingsPage(.requests)
-        if let studio = model.avatarStudio {
-          AvatarSettings(studio: studio)
+        if let avatars = model.avatars {
+          AvatarSettings(avatars: avatars)
             .settingsPage(.avatar)
         }
       }

@@ -62,7 +62,7 @@ public enum AvatarPresentation {
     }
   }
 
-  public static func message(for problem: AvatarStudioModel.Problem) -> LocalizedStringResource {
+  public static func message(for problem: AvatarLibraryModel.Problem) -> LocalizedStringResource {
     switch problem {
     case .generation(let error):
       return message(for: error)
@@ -77,10 +77,39 @@ public enum AvatarPresentation {
       return LocalizedStringResource(
         "Your avatar could not be read: the default one is shown. Make or import it again.",
         bundle: .module, comment: "The kept avatar cannot be read.")
-    case .saving:
+    case .limitReached:
       return LocalizedStringResource(
-        "The avatar could not be saved: the previous one is kept.", bundle: .module,
-        comment: "Writing the avatar failed.")
+        "\(AvatarLibraryRules.maximumCount) avatars at most: delete one to make another.",
+        bundle: .module, comment: "The library of avatars is full. The number is the limit.")
+    case .writing:
+      return LocalizedStringResource(
+        "The avatar could not be written to disk. It is kept until then: save it again.",
+        bundle: .module, comment: "Writing a generated avatar failed; it is kept in memory.")
+    case .importing:
+      return LocalizedStringResource(
+        "The archive could not be added to the avatars. Try again.", bundle: .module,
+        comment: "Writing an imported avatar failed.")
+    case .keeping:
+      return LocalizedStringResource(
+        "The avatar could not be kept: it stays to be checked.", bundle: .module,
+        comment: "Keeping a draft avatar failed.")
+    case .using:
+      return LocalizedStringResource(
+        "This avatar could not be put in the floating panel: the panel keeps its own.",
+        bundle: .module, comment: "Changing the avatar in use failed.")
+    case .renaming:
+      return LocalizedStringResource(
+        "The avatar could not be renamed.", bundle: .module, comment: "Renaming failed.")
+    case .duplicating:
+      return LocalizedStringResource(
+        "The avatar could not be duplicated.", bundle: .module, comment: "Duplicating failed.")
+    case .deleting:
+      return LocalizedStringResource(
+        "The avatar could not be deleted.", bundle: .module, comment: "Deleting failed.")
+    case .completing:
+      return LocalizedStringResource(
+        "The avatar could not be prepared for completion. Try again.", bundle: .module,
+        comment: "Making the draft that completes an incomplete avatar failed.")
     case .exporting:
       return LocalizedStringResource(
         "The avatar could not be exported.", bundle: .module, comment: "Exporting failed.")

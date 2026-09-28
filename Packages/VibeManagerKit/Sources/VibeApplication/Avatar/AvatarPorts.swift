@@ -132,34 +132,10 @@ public protocol AvatarImageProcessing: Sendable {
   func archive(_ avatar: AvatarSpriteSet) throws -> Data
 }
 
-/// Why the avatar kept on disk cannot be used. The default one is shown meanwhile, and nothing is
+/// Why an avatar of the library cannot be used. The default one is shown meanwhile, and nothing is
 /// deleted: the user decides.
 public enum AvatarStoreError: Error, Hashable, Sendable {
   case unreadable
   /// It lacks expressions this version shows: kept from an older one.
   case incomplete([AvatarExpression])
-}
-
-/// Where the avatar in use is kept. None kept: the default one.
-public protocol AvatarStore: Sendable {
-  /// The avatar in use, or `nil` for the default one.
-  /// - Throws: when one is kept and cannot be read; the default one is shown meanwhile.
-  func load() async throws -> AvatarSpriteSet?
-  /// Replaces the avatar in use, all at once: a failure leaves the previous one.
-  func save(_ avatar: AvatarSpriteSet) async throws
-  /// Back to the default one.
-  func remove() async throws
-}
-
-/// An avatar that stays in memory for the run. What a workspace assembled without disk uses.
-public actor InMemoryAvatarStore: AvatarStore {
-  private var avatar: AvatarSpriteSet?
-
-  public init(_ avatar: AvatarSpriteSet? = nil) {
-    self.avatar = avatar
-  }
-
-  public func load() async throws -> AvatarSpriteSet? { avatar }
-  public func save(_ avatar: AvatarSpriteSet) async throws { self.avatar = avatar }
-  public func remove() async throws { avatar = nil }
 }

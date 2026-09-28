@@ -95,8 +95,8 @@ public final class AppModel {
       requestsDidChange()
     }
   }
-  /// The avatar in use and the one being made (#41).
-  public var avatarStudio: AvatarStudioModel?
+  /// The library of avatars: the one in use, and those being made (#41, #154).
+  public var avatars: AvatarLibraryModel?
   /// Brings the application forward: "Open Session" from the floating panel, while another
   /// application is in front.
   @ObservationIgnored public var activateApplication: @MainActor () -> Void = {
