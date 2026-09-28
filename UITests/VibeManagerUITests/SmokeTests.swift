@@ -172,8 +172,8 @@ final class SmokeTests: XCTestCase {
       app.typeKey(.return, modifierFlags: .command)
     }
 
-    // Close Session: with a running agent it asks first, and Return confirms.
-    app.typeKey("w", modifierFlags: .command)
+    // Close Session, ⇧⌘W (#165): with a running agent it asks first, and Return confirms.
+    app.typeKey("w", modifierFlags: [.command, .shift])
     let confirm = app.sheets.buttons.firstMatch
     if confirm.waitForExistence(timeout: 3) {
       app.typeKey(.return, modifierFlags: [])
