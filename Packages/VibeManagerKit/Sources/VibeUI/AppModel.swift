@@ -55,6 +55,9 @@ public final class AppModel {
   public internal(set) var isPresentingNewSession = false
   /// The new session's draft, shown or not: kept while the user looks at another session.
   public internal(set) var newSessionModel: NewSessionModel?
+  /// The drafts put aside for another one — New Session in This Folder, or from a template, over a
+  /// draft with something in it — the most recent first. Each keeps its row in the sidebar.
+  public internal(set) var setAsideDrafts: [NewSessionModel] = []
   /// Bumped each time the draft is brought on screen: its composer takes the keyboard.
   public internal(set) var newSessionFocusRequest = 0
   /// The session between Create and its terminal, shown in its place meanwhile.
@@ -756,7 +759,8 @@ public final class AppModel {
 
     // A template saved while the sheet is open is said there, never swapped in under the user.
     templates.libraryDidChange = { [weak self] library in
-      self?.newSessionModel?.templatesChanged(library.templates)
+      guard let self else { return }
+      for draft in self.newSessionDrafts { draft.templatesChanged(library.templates) }
     }
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
@@ -2444,8 +2448,9 @@ public final class AppModel {
   /// started yet, in the main area, where the options are chosen and the composer holds the
   /// initial prompt.
   ///
-  /// One draft at a time. ⌘N with a draft already begun brings it back as it was left, and a
-  /// template or a folder asked for is applied to it, as they would be in its form.
+  /// ⌘N with a draft already begun brings it back as it was left. A template or a folder asked
+  /// for starts a draft of its own, the one begun put aside with its row — unless nothing was
+  /// changed in it yet, in which case it simply takes them.
   ///
   /// The draft's model lives here, not in its view: SwiftUI may rebuild the view at any time, and
   /// the draft must survive that — and survive going to another session and coming back.
@@ -2454,14 +2459,20 @@ public final class AppModel {
   /// for its icon at once: sessions already run there, so reading it asks the system nothing new.
   public func beginNewSession(template: PromptTemplateID? = nil, folder: String? = nil) {
     guard let agents, canCreateSession else { return }
-    // A draft on its way is brought back as it is: replaced, it would be lost if refused.
     if let draft = newSessionModel {
-      if !draft.isSubmitting {
+      if template == nil && folder == nil {
+        showNewSessionDraft()
+        return
+      }
+      if draft.isPristine, !draft.isSubmitting {
         if let template { draft.selectTemplate(template) }
         if let folder { Task { await draft.folderChosen(folder) } }
+        showNewSessionDraft()
+        return
       }
-      showNewSessionDraft()
-      return
+      // Put aside, never replaced: a draft on its way would be lost if refused.
+      setAsideDrafts.insert(draft, at: 0)
+      newSessionModel = nil
     }
     let model = NewSessionModel(
       create: CreateSession(

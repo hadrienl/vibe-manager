@@ -62,15 +62,23 @@ struct NewSessionModelTests {
     #expect(model.draft.name == "Mine")
   }
 
-  @Test("A draft is pristine until the user writes something of theirs in it")
-  func pristineUntilWritten() async {
-    let model = makeModel()
-    await model.load()
-    model.draft.workingDirectoryPath = "/workspace"
-    #expect(model.isPristine)
+  @Test("A draft is pristine until the user changes something in it, a choice included")
+  func pristineUntilChanged() async {
+    let written = makeModel()
+    await written.load()
+    #expect(written.isPristine)
+    written.draft.initialPrompt = "Something"
+    #expect(!written.isPristine)
 
-    model.draft.initialPrompt = "Something"
-    #expect(!model.isPristine)
+    let folder = makeModel()
+    await folder.load()
+    folder.draft.workingDirectoryPath = "/workspace"
+    #expect(!folder.isPristine)
+
+    let appearance = makeModel()
+    await appearance.load()
+    appearance.draft.appearance = SessionAppearance(symbolName: "star", colorHex: "#FF0000")
+    #expect(!appearance.isPristine)
   }
 
   @Test("Files joined to a free prompt are written at its end, as a terminal reads them")

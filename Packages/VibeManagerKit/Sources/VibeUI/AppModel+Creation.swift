@@ -73,6 +73,7 @@ extension AppModel {
           isPresentingNewSession = false
           newSessionModel = nil
         }
+        setAsideDrafts.removeAll { $0 === sheet }
         await publish(creation, launching: launching, tracked: false, follows: isWaited)
       }
       return
@@ -88,11 +89,31 @@ extension AppModel {
         if newSessionModel?.isPristine ?? true {
           newSessionModel = sheet
           showNewSessionDraft()
+        } else {
+          setAsideDrafts.insert(sheet, at: 0)
         }
         return
       }
       await publish(creation, launching: launching, tracked: true)
     }
+  }
+
+  /// Every draft, the current one first: the rows of the sidebar.
+  public var newSessionDrafts: [NewSessionModel] {
+    (newSessionModel.map { [$0] } ?? []) + setAsideDrafts
+  }
+
+  /// A draft's row clicked: that draft becomes the current one, and the one it replaces is put
+  /// aside — or dropped, if nothing was changed in it.
+  public func showNewSessionDraft(_ draft: NewSessionModel) {
+    if draft !== newSessionModel {
+      setAsideDrafts.removeAll { $0 === draft }
+      if let current = newSessionModel, !current.isPristine || current.isSubmitting {
+        setAsideDrafts.insert(current, at: 0)
+      }
+      newSessionModel = draft
+    }
+    showNewSessionDraft()
   }
 
   /// Brings the draft on screen, the keyboard in its composer.

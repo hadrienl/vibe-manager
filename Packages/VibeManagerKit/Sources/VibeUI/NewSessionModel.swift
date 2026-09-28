@@ -6,6 +6,9 @@ import VibeDomain
 @MainActor
 @Observable
 public final class NewSessionModel {
+  /// Tells drafts apart in a list.
+  public var draftID: ObjectIdentifier { ObjectIdentifier(self) }
+
   /// Shared with the switch of agent: one list, one wording, whichever sheet shows it.
   public typealias AgentOption = VibeUI.AgentOption
 
@@ -31,6 +34,8 @@ public final class NewSessionModel {
   /// The name the template made last. The name follows the template as long as it is empty or
   /// still that name: once the user types their own, it is theirs.
   private var generatedName: String?
+  /// The agent the form picked by itself: choosing it is not a change the user made.
+  private var defaultProviderID: String?
   /// The name `settleName()` gave the draft for sending, taken back if it is refused.
   private var settledName: String?
   /// The folder a template put in the field last, and the one that was there before any did.
@@ -160,11 +165,15 @@ public final class NewSessionModel {
       : suggested
   }
 
-  /// Whether the user has put anything of theirs in the draft yet: a draft still pristine is
-  /// dropped rather than kept when the user goes elsewhere. The folder and the agent are the
-  /// form's own defaults, so choosing them alone does not count.
+  /// Whether the user has changed anything in the draft yet: a draft still pristine is dropped
+  /// rather than kept when the user goes elsewhere. The folder and the agent the form proposed
+  /// itself are not changes; any other folder, agent, model or appearance is.
   public var isPristine: Bool {
-    draft.trimmedName.isEmpty
+    let folder = draft.workingDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return draft.trimmedName.isEmpty
+      && (folder.isEmpty || draft.workingDirectoryPath == preselectedFolder)
+      && (draft.providerID == nil || draft.providerID == defaultProviderID)
+      && draft.modelID == nil && draft.appearance == nil
       && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && draft.templateFill == nil
       && draft.ticketText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -373,6 +382,7 @@ public final class NewSessionModel {
     // user nothing. Only the default selection skips them.
     if draft.providerID == nil, let first = agents.first(where: \.isUsable) {
       draft.providerID = first.id.rawValue
+      defaultProviderID = first.id.rawValue
     }
     await loadModels()
     if hasSubmitted {

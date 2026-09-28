@@ -369,6 +369,41 @@ struct NewSessionDraftTests {
     #expect(refused.draft.name.isEmpty)
   }
 
+  @Test("A folder asked for over a draft with something in it starts another; both are kept")
+  func folderStartsAnotherDraft() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let first = try #require(model.newSessionModel)
+    first.draft.initialPrompt = "First"
+
+    model.beginNewSession(folder: folder)
+
+    let second = try #require(model.newSessionModel)
+    #expect(second !== first)
+    #expect(model.setAsideDrafts.first === first)
+    #expect(model.newSessionDrafts.count == 2)
+
+    // Its row brings the first back; the second, changed by its folder, is put aside in turn.
+    await waitUntil("the folder is in the second draft") {
+      second.draft.workingDirectoryPath == folder
+    }
+    model.showNewSessionDraft(first)
+    #expect(model.newSessionModel === first)
+    #expect(model.setAsideDrafts.first === second)
+  }
+
+  @Test("A draft nothing was changed in takes the folder asked for")
+  func pristineDraftTakesTheFolder() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+
+    model.beginNewSession(folder: folder)
+
+    #expect(model.newSessionModel === draft)
+    #expect(model.setAsideDrafts.isEmpty)
+  }
+
   @Test("Sent without a name, the session is named after its prompt")
   func unnamedDraftIsNamedAfterItsPrompt() async throws {
     let model = await makeModel(sessions: [])
