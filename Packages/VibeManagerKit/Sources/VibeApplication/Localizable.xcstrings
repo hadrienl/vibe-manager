@@ -475,7 +475,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "terminé : %lld sur %lld"
+            "value" : "terminé : %lld sur %lld"
           }
         }
       }
@@ -491,7 +491,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "tests en échec : %lld sur %lld"
+            "value" : "tests en échec : %lld sur %lld"
           }
         }
       }
@@ -1319,7 +1319,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recherche web : %@"
+            "value" : "Recherche web : %@"
           }
         }
       }
@@ -1399,7 +1399,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sous-agent : %@"
+            "value" : "Sous-agent : %@"
           }
         }
       }
