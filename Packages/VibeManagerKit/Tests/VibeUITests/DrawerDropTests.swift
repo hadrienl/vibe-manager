@@ -9,7 +9,7 @@ import VibeTerminalUI
 @testable import VibeUI
 
 /// Keeps what has no lasting file of its own, as the session's drop folder would.
-private actor KeepingDropStore: SessionDropStore {
+actor KeepingDropStore: SessionDropStore {
   private(set) var kept: [(name: String, id: SessionID)] = []
 
   func save(_ data: Data, suggestedName: String, for id: SessionID) -> URL {

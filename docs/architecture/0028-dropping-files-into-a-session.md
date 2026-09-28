@@ -42,6 +42,18 @@ own type — plain text, a folder, a PNG — to be opened in place. Read as that
 its content and a folder or an image a copy (#131). A file is therefore also what a provider opens in
 place, and only when the URL it gives is the original: a copy made for the reading is not one.
 
+The composer's text field is the exception the surface had (#146). SwiftUI draws it with an
+`NSTextView`, which AppKit gives a drag before the zone, being the frontmost view registered for it:
+it typed a file's path where it was let go. The field keeps the drags of text — a selection of a
+page, a text from another application, a web address — and inserts them where they are let go, as a
+text field does. A drag that carries a file, a folder, an image, with or without a file, or a
+promised file is handed, from its entry to its end, to the view that would take it without the
+field: the zone, which makes chips of it as anywhere else, with the same veil and the same refusals.
+`TextEditor` exposes neither its text view nor what it accepts, so the text view it made is given,
+at run time, a subclass of its own class that overrides the methods of `NSDraggingDestination` and
+nothing else, as key-value observing does; pasting is left alone. A text view SwiftUI could not
+give it to keeps AppKit's behaviour.
+
 Where the drop goes is decided by `SessionDropRoute`, a pure function of the session's presentation,
 its process and its composer:
 
@@ -105,7 +117,8 @@ drop would. Every drop is announced to VoiceOver.
 
 - A dropped path is a user's keystrokes: it travels through the pane's input, like a paste, and is
   never read as the answer to an agent's permission (#45).
-- Text dropped on the composer joins the end of the draft, not the position of its cursor, which
-  SwiftUI's text editor does not expose.
+- Text dropped on the conversation outside the composer's field joins the end of the draft, not
+  the position of its cursor, which SwiftUI's text editor does not expose; dropped on the field, it
+  is inserted where it is let go.
 - A drop on a session whose agent has not asked for bracketed pastes — a bare shell — types the paths
   as characters, which is what Terminal.app does too.
