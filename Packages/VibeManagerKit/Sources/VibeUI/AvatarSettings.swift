@@ -37,8 +37,8 @@ struct AvatarSettings: View {
     .formStyle(.grouped)
     // The size of the page of Settings › Requests, which scrolls what exceeds it.
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    // The library is read again by the tab, once each time it appears.
     .task {
-      await avatars.refresh()
       if candidate == nil, avatars.work == nil,
         let draft = avatars.entries.last(where: { $0.isDraft })
       {

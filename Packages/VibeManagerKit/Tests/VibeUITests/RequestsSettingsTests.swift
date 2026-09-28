@@ -54,6 +54,15 @@ private struct NoProcessing: AvatarImageProcessing {
   func archive(_ avatar: AvatarSpriteSet) throws -> Data { Data() }
 }
 
+/// A system that refuses the application's notifications.
+@MainActor
+private final class RefusedNotifier: RequestNotifying {
+  func post(_ notification: RequestNotification) {}
+  func remove(_ ids: [AgentRequestID]) {}
+  func setBadge(_ count: Int?) {}
+  func isAuthorized() async -> Bool? { false }
+}
+
 /// Settings › Requests (#154): one tab for the requests and their avatars, in two pages of the
 /// same size.
 @Suite("Settings › Requests", .timeLimit(.minutes(2)))
@@ -230,6 +239,29 @@ struct RequestsSettingsTests {
     }
   }
 
+  /// The other tall state of the alerts: the panel off, the notifications on but refused by the
+  /// system, whose line "Open System Settings…" replaces the reason of the greyed notifications.
+  @Test("The alerts are whole with the notifications refused", arguments: ["fr", "en"])
+  func alertsWholeWithNotificationsRefused(language: String) async throws {
+    let model = await workspace(panelEnabled: false)
+    model.notifiesRequests = true
+    model.requestNotifier = RefusedNotifier()
+    let (window, host) = window(model, language: language)
+    defer { window.close() }
+    let view = host.view
+    await settle(window, "the refused notifications") {
+      Self.switches(in: view).map(\.isEnabled) == [true, true, true, true]
+        && (Self.descendants(of: view).lazy.compactMap { $0 as? NSScrollView }.first?
+          .documentView?.frame.height ?? 0) > 0
+    }
+    let form = try #require(
+      Self.descendants(of: view).lazy.compactMap { $0 as? NSScrollView }.first)
+    let content = form.documentView?.frame.height ?? .infinity
+    #expect(
+      content <= form.contentView.bounds.height + 0.5,
+      "The form needs \(content) points, and shows \(form.contentView.bounds.height).")
+  }
+
   /// Each page, in the least window the settings accept: nothing is cut on any side. The
   /// captures are written when `VIBE_SETTINGS_SNAPSHOTS` names a folder.
   @Test(
@@ -255,6 +287,15 @@ struct RequestsSettingsTests {
       let bounds = tabView.bounds.insetBy(dx: -0.5, dy: -0.5)
       let cut = Self.drawnViews(in: tabView).filter { !bounds.contains($0) }
       #expect(cut.isEmpty, "Views outside the tab of \(tabView.bounds.size): \(cut)")
+      // The alerts are whole, the palette included: their form has nothing under the fold.
+      if pane == .signalling {
+        let form = try #require(
+          Self.descendants(of: view).lazy.compactMap { $0 as? NSScrollView }.first)
+        let content = form.documentView?.frame.height ?? .infinity
+        #expect(
+          content <= form.contentView.bounds.height + 0.5,
+          "The form needs \(content) points, and shows \(form.contentView.bounds.height).")
+      }
 
       if let folder = ProcessInfo.processInfo.environment["VIBE_SETTINGS_SNAPSHOTS"] {
         // The page alone, its layers over the window's background: drawn off screen by

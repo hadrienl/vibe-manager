@@ -82,8 +82,9 @@ The requests of the sessions in the background (#40), over the foot of the sideb
 
 ## The floating panel of requests
 
-When Settings › Requests › "Show requests above other applications" is on, and Vibe Manager is not
-in front, the requests are presented by an avatar in a bubble above the other applications (#41).
+When Settings › Requests › Alerts › "Show requests above other applications" is on, and Vibe
+Manager is not in front, the requests are presented by an avatar in a bubble above the other
+applications (#41).
 Its window never takes the keyboard by itself: the application in front keeps it.
 
 | Action | Keys |

@@ -33,7 +33,11 @@ struct RequestsSettingsView: View {
   @Bindable var model: AppModel
 
   /// The size of each page, under the segmented control.
-  nonisolated static let pageSize = CGSize(width: 900, height: 620)
+  ///
+  /// 700 points high rather than the 620 of the design of #154: the alerts need 673 in French
+  /// with the panel on, 691 with the notifications refused by the system, and at 620 the palette
+  /// fell under the fold of a form whose scroller is hidden.
+  nonisolated static let pageSize = CGSize(width: 900, height: 700)
 
   var body: some View {
     VStack(spacing: 0) {
@@ -55,6 +59,8 @@ struct RequestsSettingsView: View {
       page
         .frame(width: Self.pageSize.width, height: Self.pageSize.height)
     }
+    // Once each time the tab appears, for both pages: the avatars made or deleted meanwhile.
+    .task { await model.avatars?.refresh() }
   }
 
   @ViewBuilder
@@ -150,19 +156,25 @@ struct SignallingSettings: View {
         }
       }
       .disabled(isReplaced)
+      // Greyed out, a control says why to VoiceOver as well.
+      .accessibilityHint(isReplaced ? Self.replacedReason : Text(verbatim: ""))
     } header: {
       Text("Notifications", bundle: .module, comment: "A section of the Settings window.")
     } footer: {
       if isReplaced {
-        Text(
-          "The floating panel presents the requests: no notification is posted while it is on.",
-          bundle: .module
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+        Self.replacedReason
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
       }
     }
+  }
+
+  /// Why the notifications are greyed out.
+  private static var replacedReason: Text {
+    Text(
+      "The floating panel presents the requests: no notification is posted while it is on.",
+      bundle: .module)
   }
 
   static func openNotificationSettings() {
@@ -243,10 +255,28 @@ struct AvatarInUseRow: View {
   /// A row of its own rather than a `LabeledContent`: with its three controls, the form would lay
   /// them under the label. Here the explanation wraps first, and the controls stay beside it.
   var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      controls
+      // The avatar chosen could not be put in the panel: said here, where it was chosen.
+      if avatars.problem == .using {
+        Label {
+          Text(AvatarPresentation.message(for: .using))
+            .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundStyle(.orange)
+        }
+        .font(.callout)
+        .accessibilityIdentifier("avatar-in-use-problem")
+      }
+    }
+  }
+
+  private var controls: some View {
     HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text("Avatar", bundle: .module, comment: "The avatar of the floating panel.")
-        Text("The one that presents the requests. Others are made in Avatars.", bundle: .module)
+        Self.explanation
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -270,6 +300,7 @@ struct AvatarInUseRow: View {
       .frame(maxWidth: Self.menuWidth)
       .fixedSize(horizontal: false, vertical: true)
       .layoutPriority(1)
+      .accessibilityHint(Self.explanation)
       .accessibilityIdentifier("avatar-in-use-picker")
       Button {
         manage()
@@ -280,7 +311,10 @@ struct AvatarInUseRow: View {
       .layoutPriority(1)
       .accessibilityIdentifier("manage-avatars")
     }
-    .task { await avatars.refresh() }
+  }
+
+  private static var explanation: Text {
+    Text("The one that presents the requests. Others are made in Avatars.", bundle: .module)
   }
 
   /// The avatars that can be chosen: the default one first, then those kept, never a draft.
@@ -291,6 +325,13 @@ struct AvatarInUseRow: View {
   var inUse: Binding<AvatarID> {
     Binding(
       get: { avatars.inUse },
-      set: { id in Task { await avatars.use(id) } })
+      set: { id in
+        Task {
+          await avatars.use(id)
+          if avatars.problem == .using {
+            Announcer.announce(AvatarPresentation.message(for: .using))
+          }
+        }
+      })
   }
 }
