@@ -667,8 +667,8 @@ struct AvatarRow<Menu: View>: View {
 
   var body: some View {
     let redrawing = avatars.work.flatMap { $0.avatar == entry.id ? $0 : nil }
-    // Read again each second while an expression is drawn: VoiceOver hears for how long.
-    TimelineView(.animation(minimumInterval: 1, paused: redrawing?.phase != .running)) { context in
+    // Read again each minute of a redrawing: VoiceOver hears for how long, in whole minutes.
+    TimelineView(AvatarLibraryPresentation.spokenSchedule(from: redrawing?.startedAt)) { context in
       let spoken = AvatarLibraryPresentation.spoken(
         entry, avatars: avatars, now: context.date, locale: locale)
       row(redrawing: redrawing)
@@ -739,7 +739,6 @@ struct AvatarRow<Menu: View>: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel(Text("More Actions", bundle: .module))
-        .accessibilityIdentifier("avatar-row-menu")
       }
     }
     .padding(.vertical, 4)
@@ -757,7 +756,8 @@ struct AvatarJobRow: View {
   @Environment(\.locale) private var locale
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1, paused: job.phase != .running)) { context in
+    // Read again each minute: how long it has run, or since when it failed.
+    TimelineView(AvatarLibraryPresentation.spokenSchedule(from: Self.anchor(of: job))) { context in
       let spoken = AvatarLibraryPresentation.spoken(job, now: context.date, locale: locale)
       row
         .accessibilityElement(children: .ignore)
@@ -765,6 +765,14 @@ struct AvatarJobRow: View {
         .accessibilityValue(Text(verbatim: spoken.value))
     }
     .accessibilityIdentifier("avatar-job-row")
+  }
+
+  /// When its minutes are counted from.
+  private static func anchor(of job: AvatarLibraryModel.Job) -> Date {
+    switch job.phase {
+    case .running, .writing: job.startedAt
+    case .failed(_, let at), .unsaved(let at): at
+    }
   }
 
   private var row: some View {
@@ -806,7 +814,6 @@ struct AvatarJobRow: View {
           Text("Cancel", bundle: .module)
         }
         .controlSize(.small)
-        .accessibilityIdentifier("avatar-job-cancel")
       case .writing:
         EmptyView()
       case .failed, .unsaved:

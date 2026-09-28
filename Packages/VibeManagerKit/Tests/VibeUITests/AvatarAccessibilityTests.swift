@@ -75,6 +75,35 @@ private final class Agent: AvatarGenerating, @unchecked Sendable {
   }
 }
 
+/// A library whose avatar in use cannot be changed, as on a full disk: everything else goes
+/// through.
+private struct RefusingUse: AvatarLibrary {
+  struct Refused: Error {}
+  let library: InMemoryAvatarLibrary
+
+  func entries() async throws -> [AvatarLibraryEntry] { try await library.entries() }
+  func canCreate() async throws -> Bool { try await library.canCreate() }
+  func load(_ id: AvatarID) async throws -> AvatarSpriteSet { try await library.load(id) }
+  func thumbnail(_ id: AvatarID) async throws -> Data? { try await library.thumbnail(id) }
+  func saveDraft(_ avatar: AvatarSpriteSet, basedOn: AvatarID?) async throws -> AvatarID {
+    try await library.saveDraft(avatar, basedOn: basedOn)
+  }
+  func updateDraft(_ id: AvatarID, with avatar: AvatarSpriteSet) async throws {
+    try await library.updateDraft(id, with: avatar)
+  }
+  func draftToComplete(_ id: AvatarID) async throws -> AvatarID {
+    try await library.draftToComplete(id)
+  }
+  func keep(_ id: AvatarID) async throws -> AvatarID { try await library.keep(id) }
+  func rename(_ id: AvatarID, to name: String) async throws {
+    try await library.rename(id, to: name)
+  }
+  func duplicate(_ id: AvatarID) async throws -> AvatarID { try await library.duplicate(id) }
+  func remove(_ id: AvatarID) async throws { try await library.remove(id) }
+  func inUse() async throws -> AvatarID { try await library.inUse() }
+  func setInUse(_ id: AvatarID) async throws { throw Refused() }
+}
+
 private struct Agents: AvatarGeneratorResolving {
   let agent: Agent
 
@@ -109,7 +138,9 @@ struct AvatarAccessibilityTests {
   }
 
   /// The default avatar, a fox drawn by Codex and in use, a robot imported; and what they say.
-  private func library(drafts: [AvatarSpriteSet] = []) async -> (AvatarLibraryModel, Heard) {
+  private func library(drafts: [AvatarSpriteSet] = [], refusesUse: Bool = false) async -> (
+    AvatarLibraryModel, Heard
+  ) {
     _ = NSApplication.shared
     let library = InMemoryAvatarLibrary(
       defaultAvatar: Faces.avatar("Default", source: .bundled),
@@ -124,7 +155,8 @@ struct AvatarAccessibilityTests {
       _ = try? await library.saveDraft(draft, basedOn: nil)
     }
     let avatars = AvatarLibraryModel(
-      workshop: AvatarWorkshop(processing: processing), library: library,
+      workshop: AvatarWorkshop(processing: processing),
+      library: refusesUse ? RefusingUse(library: library) : library,
       generators: Agents(agent: agent))
     let heard = Heard()
     avatars.announce = { heard.sentences.append(Localization.string($0, in: "fr")) }
@@ -167,7 +199,7 @@ struct AvatarAccessibilityTests {
     #expect(owl.value == "À valider")
 
     let byDefault = try #require(avatars.entry(.default))
-    #expect(spoken(byDefault, avatars).label == "Avatar par défaut, Fourni avec l’application")
+    #expect(spoken(byDefault, avatars).label == "Avatar par défaut, fourni avec l’application")
     await avatars.use(.default)
     #expect(spoken(byDefault, avatars).value == "En usage")
   }
@@ -199,11 +231,32 @@ struct AvatarAccessibilityTests {
     let work = try #require(avatars.work)
     let later = work.startedAt.addingTimeInterval(42)
     #expect(
-      spoken(fox, avatars, now: later).value == "En usage, Génération en cours, 42\u{00A0}secondes")
+      spoken(fox, avatars, now: later).value
+        == "En usage, Génération en cours, moins d’une minute")
     #expect(AvatarLibraryPresentation.rowActions(for: fox, avatars: avatars).contains(.cancel))
     // Being redrawn, it is not renamed: what comes back would bring its name back.
     #expect(!AvatarLibraryPresentation.rowActions(for: fox, avatars: avatars).contains(.rename))
     avatars.cancel()
+  }
+
+  @Test("How long a generation has run is said in whole minutes, not every second")
+  func wholeMinutes() {
+    func said(_ seconds: TimeInterval) -> String {
+      // The space between the number and its unit is Foundation's: not what is tested here.
+      AvatarLibraryPresentation.spokenElapsed(seconds, locale: Self.fr, resolve: Self.french)
+        .replacingOccurrences(of: "\u{00A0}", with: " ")
+        .replacingOccurrences(of: "\u{202F}", with: " ")
+    }
+    #expect(said(0) == "moins d’une minute")
+    #expect(said(59) == "moins d’une minute")
+    #expect(said(60) == "1 minute")
+    #expect(said(119) == "1 minute")
+    #expect(said(150) == "2 minutes")
+    // One reading a minute, on the minutes of the start: what is said changes no more often.
+    let start = Date(timeIntervalSince1970: 1_790_424_000)
+    let dates = AvatarLibraryPresentation.spokenSchedule(from: start)
+      .entries(from: start.addingTimeInterval(1), mode: .normal).prefix(3)
+    #expect(Array(dates) == [0, 60, 120].map { start.addingTimeInterval($0) })
   }
 
   @Test("A generation's row says how it goes: under way, failed, or not written")
@@ -218,7 +271,8 @@ struct AvatarAccessibilityTests {
     }
     #expect(spoken(started.addingTimeInterval(42)).label == "Une chouette brune")
     #expect(
-      spoken(started.addingTimeInterval(42)).value == "Génération en cours, 42\u{00A0}secondes")
+      spoken(started.addingTimeInterval(42)).value
+        == "Génération en cours, moins d’une minute")
     job.phase = .writing
     #expect(spoken(started).value == "Enregistrement…")
     job.phase = .failed(.noImage, at: started)
@@ -433,6 +487,38 @@ struct AvatarAccessibilityTests {
     await avatars.remove(try entry(avatars, "Renard").id)
     #expect(
       heard.sentences == ["L’avatar «\u{00A0}Renard roux à écharpe bleue\u{00A0}» est supprimé."])
+  }
+
+  @Test("Kept, but not put in the panel: one sentence says both")
+  func keptNotUsed() async throws {
+    let (avatars, heard) = await library(drafts: [Faces.avatar("Chouette")], refusesUse: true)
+    let owl = try entry(avatars, "Chouette")
+    await avatars.select(.avatar(owl.id))
+    await avatars.keep(owl.id)
+    #expect(avatars.entry(owl.id)?.isDraft == false)
+    #expect(avatars.problem == .using)
+    #expect(
+      heard.sentences == [
+        "L’avatar «\u{00A0}Chouette\u{00A0}» est gardé, mais n’a pas pu être mis dans le panneau flottant\u{00A0}: le panneau garde le sien."
+      ])
+  }
+
+  @Test("Deleting an avatar being redrawn says it is deleted, not that a generation was cancelled")
+  func deletedWhileRedrawn() async throws {
+    let (avatars, heard) = await library()
+    let fox = try entry(avatars, "Renard")
+    await avatars.select(.avatar(fox.id))
+    agent.hold()
+    defer { agent.release() }
+    avatars.regenerate(.pleased)
+    #expect(avatars.work?.avatar == fox.id)
+    heard.sentences = []
+    await avatars.remove(fox.id)
+    #expect(avatars.work == nil)
+    #expect(
+      heard.sentences == [
+        "L’avatar «\u{00A0}Renard roux à écharpe bleue\u{00A0}» est supprimé\u{00A0}: le panneau flottant reprend l’avatar par défaut."
+      ])
   }
 
   @Test("A draft discarded is announced as discarded")

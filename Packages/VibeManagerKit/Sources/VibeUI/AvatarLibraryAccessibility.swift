@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import VibeApplication
 
 /// What VoiceOver hears on the page of the avatars (#154), apart from the views: each row one
@@ -95,7 +96,10 @@ extension AvatarLibraryPresentation {
     of entry: AvatarLibraryEntry, avatars: AvatarLibraryModel, locale: Locale, resolve: Resolve
   ) -> String? {
     if entry.id == .default {
-      return resolve(LocalizedStringResource("Shipped with the application", bundle: .module))
+      return resolve(
+        LocalizedStringResource(
+          "shipped with the application", bundle: .module,
+          comment: "Read by VoiceOver after the default avatar's name."))
     }
     guard let manifest = entry.manifest else { return nil }
     let date = (manifest.createdAt ?? entry.addedAt).formatted(
@@ -115,7 +119,9 @@ extension AvatarLibraryPresentation {
     }
   }
 
-  /// "Generation under way, 42 seconds", or "Saving…" once it can no longer be cancelled.
+  /// "Generation under way, less than a minute", then "…, 1 minute", "…, 2 minutes": whole
+  /// minutes, so that VoiceOver does not read the row again every second — the row itself shows
+  /// the seconds. "Saving…" once it can no longer be cancelled.
   private static func spokenProgress(
     of job: AvatarLibraryModel.Job, now: Date, locale: Locale, resolve: Resolve
   ) -> String {
@@ -124,12 +130,31 @@ extension AvatarLibraryPresentation {
         LocalizedStringResource(
           "Saving…", bundle: .module, comment: "A generated avatar being written to disk."))
     }
-    let elapsed = Duration.seconds(Int(max(now.timeIntervalSince(job.startedAt), 0)))
-      .formatted(.units(allowed: [.minutes, .seconds], width: .wide).locale(locale))
+    let elapsed = spokenElapsed(
+      now.timeIntervalSince(job.startedAt), locale: locale, resolve: resolve)
     return resolve(
       LocalizedStringResource(
         "Generation under way, \(elapsed)", bundle: .module,
-        comment: "Read by VoiceOver: an avatar being drawn, and for how long (“42 seconds”)."))
+        comment: "Read by VoiceOver: an avatar being drawn, and for how long (“2 minutes”)."))
+  }
+
+  /// How long a generation has taken, in whole minutes: "less than a minute", "1 minute"…
+  static func spokenElapsed(_ interval: TimeInterval, locale: Locale, resolve: Resolve) -> String {
+    let minutes = Int(max(interval, 0) / 60)
+    guard minutes > 0 else {
+      return resolve(
+        LocalizedStringResource(
+          "less than a minute", bundle: .module,
+          comment: "Read by VoiceOver: how long an avatar has been drawn for, under a minute."))
+    }
+    return Duration.seconds(minutes * 60)
+      .formatted(.units(allowed: [.hours, .minutes], width: .wide).locale(locale))
+  }
+
+  /// When what VoiceOver reads of a row may change: each minute from `anchor`, the start of a
+  /// generation or the moment it failed.
+  static func spokenSchedule(from anchor: Date?) -> PeriodicTimelineSchedule {
+    .periodic(from: anchor ?? .distantPast, by: 60)
   }
 
   /// "2 minutes ago", counted from `now`.

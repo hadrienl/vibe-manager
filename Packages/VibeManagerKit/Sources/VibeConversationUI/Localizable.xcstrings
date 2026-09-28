@@ -36,7 +36,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ n’est plus installée : la police du thème est utilisée."
+            "value" : "%@ n’est plus installée : la police du thème est utilisée."
           }
         }
       }
@@ -251,7 +251,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouté : %@"
+            "value" : "Ajouté : %@"
           }
         }
       }
@@ -703,7 +703,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En mode clair : %1$@. En mode sombre : %2$@. Choisir un thème l’attribue au mode actuel de macOS."
+            "value" : "En mode clair : %1$@. En mode sombre : %2$@. Choisir un thème l’attribue au mode actuel de macOS."
           }
         }
       }
@@ -823,7 +823,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un test échoue sur un fichier **remplacé** : je compare d’abord l’`inode`."
+            "value" : "Un test échoue sur un fichier **remplacé** : je compare d’abord l’`inode`."
           }
         }
       }
@@ -1045,7 +1045,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Retiré : %@"
+            "value" : "Retiré : %@"
           }
         }
       }
@@ -1455,7 +1455,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vous avez écrit : %@"
+            "value" : "Vous avez écrit : %@"
           }
         }
       }

@@ -84,7 +84,8 @@ the bundle: build a second time before testing a translation.
 ## French style
 
 - **Vouvoiement**, and the imperative for an instruction: « Choisissez un dossier ».
-- **Typography**: a no-break space (U+00A0) before `:` `;` `?` `!` and inside « » ; the typographic
+- **Typography**: a no-break space (U+00A0) before `:` `;` `?` `!` and inside « », never a
+  breakable one — `FrenchTypographyTests` checks it (see Guards); the typographic
   apostrophe `’`; `…` rather than three dots. Guillemets « » replace the English “ ” around a name.
 - **The tone of a native Mac application**: Apple's French for the words a Mac already uses —
   Réglages…, Annuler, OK, Fermer, Enregistrer, Ne pas enregistrer, Supprimer, Afficher dans le
@@ -154,9 +155,12 @@ the bundle: build a second time before testing a translation.
   is given, but still picks the table of the process's language. A test runner declares no
   localization of its own, so the strings it resolves otherwise are English, whatever the Mac's
   language.
+- `FrenchTypographyTests` reads every catalog — each `Localizable.xcstrings` of the package's
+  modules, and every `.xcstrings` of `App` — and fails on a French value, plural variants included,
+  with an ordinary space before `:` `;` `?` `!` or inside « » (after « or before »). A no-break
+  space (U+00A0) or a narrow one (U+202F) passes; there is no list of exceptions.
 - `AvatarLocalizationTests` resolves every label and every problem of Settings › Requests ›
-  Avatars in French, and fails on an English text left as it is or on a breakable space before
-  `:` `;` `?` `!` or inside « ».
+  Avatars in French, and fails on an English text left as it is.
 - The interface smoke test launches the application in English (`-AppleLanguages (en)`), and one
   test launches it in French.
 - French runs 20 to 30 % longer than English. The sidebar's lines are truncated already; the sheets,
