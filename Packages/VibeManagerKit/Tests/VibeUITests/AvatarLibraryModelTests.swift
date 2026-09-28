@@ -66,6 +66,10 @@ private final class ScriptedGenerator: AvatarGenerating, @unchecked Sendable {
   private let lock = NSLock()
   private var answers: [Result<Data, AvatarGenerationError>]
   private var isHeld = false
+  private var calls = 0
+
+  /// How many generations it was asked for.
+  var callCount: Int { lock.withLock { calls } }
 
   init(_ answers: [Result<Data, AvatarGenerationError>] = [.success(Data("sheet".utf8))]) {
     self.answers = answers
@@ -80,6 +84,7 @@ private final class ScriptedGenerator: AvatarGenerating, @unchecked Sendable {
   }
 
   func generate(_ request: AvatarGenerationRequest) async throws -> Data {
+    lock.withLock { calls += 1 }
     while lock.withLock({ isHeld }) {
       // Cancelled while it launched its process: it fails, as a real one would.
       if Task.isCancelled { throw AvatarGenerationError.failed("no launch plan") }
@@ -105,12 +110,41 @@ private struct FakeGenerators: AvatarGeneratorResolving {
   }
 }
 
-/// A library whose avatar in use is the one it is told, whatever it holds: one kept by another
-/// version, that lost expressions or cannot be read since.
-private struct ForcedInUse: AvatarLibrary {
+/// A disk that refuses to write.
+private struct DiskFull: Error {}
+
+/// A library in memory whose disk the test controls: the avatar in use it is told, whatever it
+/// holds — one kept by another version, that lost expressions or cannot be read since — writes
+/// that fail, or that wait until the test lets them go.
+private final class ScriptedLibrary: AvatarLibrary, @unchecked Sendable {
   let library: InMemoryAvatarLibrary
-  let inUseID: AvatarID
-  var unreadable = false
+  private let lock = NSLock()
+  private let inUseID: AvatarID?
+  private let unreadable: Bool
+  private var failures = 0
+  private var isHeld = false
+
+  init(library: InMemoryAvatarLibrary, inUseID: AvatarID? = nil, unreadable: Bool = false) {
+    self.library = library
+    self.inUseID = inUseID
+    self.unreadable = unreadable
+  }
+
+  /// The next `count` drafts written fail, as on a full disk.
+  func failWrites(_ count: Int) { lock.withLock { failures = count } }
+  /// Drafts are written only once `release()` is called.
+  func hold() { lock.withLock { isHeld = true } }
+  func release() { lock.withLock { isHeld = false } }
+
+  private func writing() async throws {
+    while lock.withLock({ isHeld }) { await Task.yield() }
+    let fails = lock.withLock {
+      guard failures > 0 else { return false }
+      failures -= 1
+      return true
+    }
+    if fails { throw DiskFull() }
+  }
 
   func entries() async throws -> [AvatarLibraryEntry] { try await library.entries() }
   func canCreate() async throws -> Bool { try await library.canCreate() }
@@ -119,9 +153,11 @@ private struct ForcedInUse: AvatarLibrary {
     return try await library.load(id)
   }
   func saveDraft(_ avatar: AvatarSpriteSet, basedOn: AvatarID?) async throws -> AvatarID {
-    try await library.saveDraft(avatar, basedOn: basedOn)
+    try await writing()
+    return try await library.saveDraft(avatar, basedOn: basedOn)
   }
   func updateDraft(_ id: AvatarID, with avatar: AvatarSpriteSet) async throws {
+    try await writing()
     try await library.updateDraft(id, with: avatar)
   }
   func draftToComplete(_ id: AvatarID) async throws -> AvatarID {
@@ -133,7 +169,10 @@ private struct ForcedInUse: AvatarLibrary {
   }
   func duplicate(_ id: AvatarID) async throws -> AvatarID { try await library.duplicate(id) }
   func remove(_ id: AvatarID) async throws { try await library.remove(id) }
-  func inUse() async throws -> AvatarID { inUseID }
+  func inUse() async throws -> AvatarID {
+    if let inUseID { return inUseID }
+    return try await library.inUse()
+  }
   func setInUse(_ id: AvatarID) async throws { try await library.setInUse(id) }
 }
 
@@ -213,7 +252,7 @@ struct AvatarLibraryModelTests {
   func inUseIncomplete() async throws {
     let inner = library(kept: [Sprites.set("Old", width: 4, missing: [.thinking])])
     let old = try #require(try await inner.entries().last?.id)
-    let model = await model(library: ForcedInUse(library: inner, inUseID: old))
+    let model = await model(library: ScriptedLibrary(library: inner, inUseID: old))
     #expect(model.inUseProblem == .storedAvatar(missing: [.thinking]))
     #expect(width(model.inUseImages) == 1)
   }
@@ -223,7 +262,7 @@ struct AvatarLibraryModelTests {
     let inner = library(kept: [Sprites.set("Old", width: 4)])
     let old = try #require(try await inner.entries().last?.id)
     let model = await model(
-      library: ForcedInUse(library: inner, inUseID: old, unreadable: true))
+      library: ScriptedLibrary(library: inner, inUseID: old, unreadable: true))
     #expect(model.inUseProblem == .storedAvatar(missing: []))
     #expect(width(model.inUseImages) == 1)
   }
@@ -435,20 +474,6 @@ struct AvatarLibraryModelTests {
     }
   }
 
-  @Test("A generation cancelled that fails afterwards changes nothing")
-  func cancelledThenFailed() async {
-    let generator = ScriptedGenerator()
-    generator.hold()
-    let model = await model(library: library(), generator: generator)
-    model.description = "a frog"
-    model.generate()
-    let old = model.task
-    model.cancel()
-    await old?.value
-    #expect(model.problem == nil)
-    #expect(model.jobs.isEmpty)
-  }
-
   @Test("No description, no generation")
   func noDescription() async {
     let model = await model(library: library())
@@ -656,10 +681,10 @@ struct AvatarLibraryModelTests {
     let model = await model(library: library())
     let draft = try await generated(model)
     await model.use(draft)
-    #expect(model.problem == .saving)
+    #expect(model.problem == .using)
     #expect(model.inUse == .default)
     await model.rename(.default, to: "Mine")
-    #expect(model.problem == .saving)
+    #expect(model.problem == .renaming)
     await model.remove(.default)
     #expect(model.entries.count == 2)
   }
@@ -691,6 +716,117 @@ struct AvatarLibraryModelTests {
     await task?.value
     #expect(model.jobs.isEmpty)
     #expect(try await library.entries().count == 1)
+  }
+
+  // MARK: - Writing
+
+  @Test("A result that cannot be written is kept, with its description, and written again")
+  func writeFailsThenSaved() async throws {
+    let generator = ScriptedGenerator()
+    let library = ScriptedLibrary(library: library())
+    library.failWrites(1)
+    let model = await model(library: library, generator: generator)
+    model.description = "a green frog"
+    model.generate()
+    await settle(model)
+
+    let unsaved = try #require(model.failures.first)
+    guard case .unsaved = unsaved.phase else {
+      Issue.record("Expected a result not written, got \(unsaved.phase)")
+      return
+    }
+    #expect(unsaved.result?.manifest.description == "a green frog")
+    #expect(unsaved.description == "a green frog")
+    #expect(model.problem == .writing)
+    #expect(model.selection == .job(unsaved.id))
+    #expect(try await library.entries().count == 1)
+    // Not a generation that failed: it is written again, not drawn again, nor edited.
+    model.retry(unsaved.id)
+    await model.reviseDescription(of: unsaved.id)
+    #expect(model.jobs == [unsaved])
+
+    generator.answer(.failure(.noImage))
+    await model.retrySaving(unsaved.id)
+    #expect(generator.callCount == 1)
+    #expect(model.jobs.isEmpty)
+    #expect(model.problem == nil)
+    let draft = try #require(model.entries.last)
+    #expect(draft.isDraft)
+    #expect(draft.manifest?.description == "a green frog")
+    #expect(model.selection == .avatar(draft.id))
+  }
+
+  @Test("A redrawing that cannot be written is kept too, and written to its draft")
+  func redrawWriteFails() async throws {
+    let library = ScriptedLibrary(library: library())
+    let model = await model(library: library)
+    let draft = try await generated(model)
+    library.failWrites(1)
+    model.regenerate(.worried)
+    await settle(model)
+    let unsaved = try #require(model.failures.first)
+    #expect(unsaved.phase != .running)
+    #expect(width(model.selectedImages, .worried) == 2)
+
+    await model.retrySaving(unsaved.id)
+    #expect(model.jobs.isEmpty)
+    #expect(model.entries.filter(\.isDraft).map(\.id) == [draft])
+    #expect(model.selection == .avatar(draft))
+    #expect(width(model.selectedImages, .worried) == 3)
+  }
+
+  @Test("Once what came back is being written, cancelling no longer throws it away")
+  func cancelWhileWriting() async throws {
+    let library = ScriptedLibrary(library: library())
+    library.hold()
+    let model = await model(library: library)
+    model.description = "a green frog"
+    model.generate()
+    while model.work?.phase != .writing { await Task.yield() }
+    model.cancel()
+    #expect(model.work?.phase == .writing)
+    library.release()
+    await settle(model)
+    #expect(model.jobs.isEmpty)
+    #expect(model.entries.last?.isDraft == true)
+  }
+
+  @Test("An avatar being redrawn is not renamed, nor completed meanwhile")
+  func renameWhileRedrawn() async throws {
+    let generator = ScriptedGenerator()
+    let model = await model(library: library(), generator: generator)
+    let draft = try await generated(model)
+    let name = try #require(model.entry(draft)?.manifest?.name)
+    generator.hold()
+    model.regenerate(.worried)
+    #expect(!model.canRename(draft))
+    await model.rename(draft, to: "Froggy")
+    generator.release()
+    await settle(model)
+    #expect(model.entry(draft)?.manifest?.name == name)
+    #expect(model.canRename(draft))
+    await model.rename(draft, to: "Froggy")
+    #expect(model.entry(draft)?.manifest?.name == "Froggy")
+  }
+
+  @Test("A draft of the same avatar made meanwhile is changed, not doubled")
+  func linkedDraftMadeMeanwhile() async throws {
+    let generator = ScriptedGenerator()
+    let inner = library(kept: [Sprites.set("Fox", width: 4, description: "a red fox")])
+    let fox = try #require(try await inner.entries().last?.id)
+    let model = await model(library: inner, generator: generator)
+    await model.select(.avatar(fox))
+    generator.hold()
+    model.regenerate(.pleased)
+    await model.completeDraft(of: fox)
+    #expect(model.entries.filter(\.isDraft).isEmpty)
+    // Another window of the application makes the draft meanwhile.
+    let other = try await inner.draftToComplete(fox)
+    generator.release()
+    await settle(model)
+    #expect(model.entries.filter(\.isDraft).map(\.id) == [other])
+    #expect(model.selection == .avatar(other))
+    #expect(width(model.selectedImages, .pleased) == 3)
   }
 
   // MARK: - Archives

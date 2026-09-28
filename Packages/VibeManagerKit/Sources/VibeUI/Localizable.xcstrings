@@ -5728,12 +5728,12 @@
         }
       }
     },
-    "Expressions are missing: generate them before using this avatar." : {
+    "Expressions are missing: generate them before keeping this avatar." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Des expressions manquent : générez-les avant d’utiliser cet avatar."
+            "value" : "Des expressions manquent : générez-les avant de garder cet avatar."
           }
         }
       }
@@ -9628,6 +9628,17 @@
         }
       }
     },
+    "Save Again" : {
+      "comment" : "Writes a generated avatar again.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer l’enregistrement"
+          }
+        }
+      }
+    },
     "Save the changes to “%@”?" : {
       "comment" : "The name of the prompt template being edited.",
       "localizations" : {
@@ -11221,6 +11232,17 @@
         }
       }
     },
+    "The archive could not be added to the avatars. Try again." : {
+      "comment" : "Writing an imported avatar failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’archive n’a pas pu être ajoutée aux avatars. Réessayez."
+          }
+        }
+      }
+    },
     "The archive holds an entry that is not a plain file of its folder (%@): it was not imported." : {
       "comment" : "An avatar problem.",
       "localizations" : {
@@ -11265,6 +11287,28 @@
         }
       }
     },
+    "The avatar could not be deleted." : {
+      "comment" : "Deleting failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar n’a pas pu être supprimé."
+          }
+        }
+      }
+    },
+    "The avatar could not be duplicated." : {
+      "comment" : "Duplicating failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar n’a pas pu être dupliqué."
+          }
+        }
+      }
+    },
     "The avatar could not be exported." : {
       "comment" : "Exporting failed.",
       "localizations" : {
@@ -11276,13 +11320,46 @@
         }
       }
     },
-    "The avatar could not be saved: the previous one is kept." : {
-      "comment" : "Writing the avatar failed.",
+    "The avatar could not be kept: it stays to be checked." : {
+      "comment" : "Keeping a draft avatar failed.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’avatar n’a pas pu être enregistré : le précédent est conservé."
+            "value" : "L’avatar n’a pas pu être gardé : il reste à valider."
+          }
+        }
+      }
+    },
+    "The avatar could not be prepared for completion. Try again." : {
+      "comment" : "Making the draft that completes an incomplete avatar failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar n’a pas pu être préparé pour être complété. Réessayez."
+          }
+        }
+      }
+    },
+    "The avatar could not be renamed." : {
+      "comment" : "Renaming failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar n’a pas pu être renommé."
+          }
+        }
+      }
+    },
+    "The avatar could not be written to disk. It is kept until then: save it again." : {
+      "comment" : "Writing a generated avatar failed; it is kept in memory.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’avatar n’a pas pu être enregistré sur le disque. Il est gardé en attendant : réessayez l’enregistrement."
           }
         }
       }
@@ -11439,6 +11516,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’expression « %@ » est coupée par le bord de son image."
+          }
+        }
+      }
+    },
+    "The expression “%@” is drawn again: check it, then keep the avatar." : {
+      "comment" : "Said when one expression of an avatar was drawn again.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’expression « %@ » est redessinée : vérifiez-la, puis gardez l’avatar."
           }
         }
       }
@@ -12105,6 +12193,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet avatar vient d’une version plus récente de Vibe Manager."
+          }
+        }
+      }
+    },
+    "This avatar could not be put in the floating panel: the panel keeps its own." : {
+      "comment" : "Changing the avatar in use failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet avatar n’a pas pu être mis dans le panneau flottant : le panneau garde le sien."
           }
         }
       }

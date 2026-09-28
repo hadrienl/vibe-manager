@@ -64,7 +64,8 @@ struct AvatarSettings: View {
   var body: some View {
     Form {
       currentSection
-      if let problem = avatars.problem ?? avatars.inUseProblem {
+      // A result not written is said by its own section, with what to do.
+      if let problem = avatars.problem ?? avatars.inUseProblem, problem != .writing {
         Section {
           problemLabel(problem)
         }
@@ -195,6 +196,8 @@ struct AvatarSettings: View {
     Section {
       if case .failed(let error, _) = failure.phase {
         problemLabel(.generation(error))
+      } else {
+        problemLabel(.writing)
       }
       HStack {
         Spacer()
@@ -203,12 +206,21 @@ struct AvatarSettings: View {
         } label: {
           Text("Remove", bundle: .module)
         }
-        Button {
-          avatars.retry(failure.id)
-        } label: {
-          Text("Try Again", bundle: .module)
+        if case .unsaved = failure.phase {
+          Button {
+            Task { await avatars.retrySaving(failure.id) }
+          } label: {
+            Text("Save Again", bundle: .module, comment: "Writes a generated avatar again.")
+          }
+          .disabled(avatars.work != nil)
+        } else {
+          Button {
+            avatars.retry(failure.id)
+          } label: {
+            Text("Try Again", bundle: .module)
+          }
+          .disabled(!avatars.canStartCreation)
         }
-        .disabled(!avatars.canStartCreation)
       }
     }
   }
@@ -334,7 +346,7 @@ struct AvatarSettings: View {
       }
       if avatars.selectedAvatar != nil, !isComplete {
         Text(
-          "Expressions are missing: generate them before using this avatar.", bundle: .module
+          "Expressions are missing: generate them before keeping this avatar.", bundle: .module
         )
         .font(.caption)
         .foregroundStyle(.orange)

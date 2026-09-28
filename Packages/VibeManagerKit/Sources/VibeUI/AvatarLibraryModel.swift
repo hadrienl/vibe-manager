@@ -21,8 +21,19 @@ public final class AvatarLibraryModel {
     case storedAvatar(missing: [AvatarExpression])
     /// `AvatarLibraryRules.maximumCount` avatars already: nothing new is made.
     case limitReached
-    /// The library refused or failed a change: it is as it was.
-    case saving
+    /// What a generation brought back could not be written: it is kept by its job until it is.
+    case writing
+    /// The archive read could not be added to the library.
+    case importing
+    /// The draft could not be kept: it stays a draft.
+    case keeping
+    /// The avatar could not be put in the floating panel: the panel keeps its own.
+    case using
+    case renaming
+    case duplicating
+    case deleting
+    /// The draft to complete a kept avatar could not be made.
+    case completing
     case exporting
   }
 
@@ -33,11 +44,16 @@ public final class AvatarLibraryModel {
   }
 
   /// A generation, under way or failed. One under way is the only one; one that failed stays
-  /// listed for the run, to try again or remove — never written.
+  /// listed for the run, to try again or remove.
   public struct Job: Identifiable, Equatable, Sendable {
     public enum Phase: Equatable, Sendable {
       case running
+      /// What it brought back is being written: it can no longer be cancelled.
+      case writing
       case failed(AvatarGenerationError, at: Date)
+      /// What it brought back could not be written: `result` keeps it, to write it again without
+      /// drawing it again.
+      case unsaved(at: Date)
     }
 
     /// Where what it brings back goes.
@@ -59,6 +75,11 @@ public final class AvatarLibraryModel {
     /// The avatar selected when it started, if it redraws one: the kept avatar whose draft it
     /// changes. Still selected at the end, the selection goes to what it wrote.
     public var origin: AvatarID?
+    /// What it brought back, while it is not written.
+    public var result: AvatarSpriteSet?
+
+    /// Running, or being written.
+    public var isUnderWay: Bool { phase == .running || phase == .writing }
 
     /// The avatar it redraws, when it redraws one rather than making a new avatar.
     public var avatar: AvatarID? {
@@ -123,6 +144,11 @@ public final class AvatarLibraryModel {
   @ObservationIgnored private var currentRun: UUID?
   /// The generation `task` runs: one that ends leaves the task of a later one alone.
   @ObservationIgnored private var taskRun: UUID?
+  /// Readings of the library, counted: one that ends after a later one installs nothing.
+  @ObservationIgnored private var refreshesStarted = 0
+  @ObservationIgnored private var refreshInstalled = 0
+  @ObservationIgnored private var imagesStarted = 0
+  @ObservationIgnored private var imagesInstalled = 0
 
   public init(
     workshop: AvatarWorkshop, library: any AvatarLibrary,
@@ -149,12 +175,20 @@ public final class AvatarLibraryModel {
 
   /// Reads the library again, after a change, or when the screen comes back.
   public func refresh() async {
+    refreshesStarted += 1
+    let reading = refreshesStarted
     // A library that cannot be read now — held by another instance — is shown as last read.
-    if let entries = try? await library.entries(), let inUse = try? await library.inUse() {
+    let entries = try? await library.entries()
+    let inUse = try? await library.inUse()
+    let canCreate = try? await library.canCreate()
+    // The library answers in order: a reading started later is newer, and wins.
+    guard reading > refreshInstalled else { return }
+    refreshInstalled = reading
+    if let entries, let inUse {
       self.entries = entries
       self.inUse = inUse
-      canCreate = (try? await library.canCreate()) ?? canCreate
     }
+    if let canCreate { self.canCreate = canCreate }
     await loadInUseImages()
     await reloadSelection()
   }
@@ -162,6 +196,8 @@ public final class AvatarLibraryModel {
   /// The images the floating panel shows: those of the avatar in use, or of the default one while
   /// it cannot be used.
   private func loadInUseImages() async {
+    imagesStarted += 1
+    let reading = imagesStarted
     let id = inUse
     var shown: AvatarSpriteSet?
     var problem: Problem?
@@ -178,8 +214,9 @@ public final class AvatarLibraryModel {
       }
     }
     if shown == nil { shown = try? await library.load(.default) }
-    // Another avatar put in use meanwhile: its own reading counts.
-    guard id == inUse else { return }
+    // Another avatar put in use meanwhile, or a later reading done: theirs counts.
+    guard id == inUse, reading > imagesInstalled else { return }
+    imagesInstalled = reading
     inUseProblem = problem
     inUseImages = Self.images(of: shown)
   }
@@ -193,14 +230,14 @@ public final class AvatarLibraryModel {
     jobs.first { $0.id == id }
   }
 
-  /// The generation under way.
+  /// The generation under way, running or being written.
   public var work: Job? {
-    jobs.first { $0.phase == .running }
+    jobs.first(where: \.isUnderWay)
   }
 
-  /// The generations that failed during this run.
+  /// The generations that failed during this run, or whose result could not be written.
   public var failures: [Job] {
-    jobs.filter { $0.phase != .running }
+    jobs.filter { !$0.isUnderWay }
   }
 
   /// The avatar selected, when it is one of the library.
@@ -306,7 +343,7 @@ public final class AvatarLibraryModel {
   /// Starts a failed generation again, from the same description: with the same agent, or the one
   /// selected when that one can no longer draw.
   public func retry(_ id: UUID) {
-    guard let failed = job(id), failed.phase != .running, canStartCreation else { return }
+    guard let failed = job(id), case .failed = failed.phase, canStartCreation else { return }
     let provider = generator(for: failed.provider) != nil ? failed.provider : selectedProvider
     guard let provider, let generator = generator(for: provider) else { return }
     jobs.removeAll { $0.id == id }
@@ -317,16 +354,24 @@ public final class AvatarLibraryModel {
       with: generator)
   }
 
-  /// Removes a failed generation from the list.
+  /// Writes again what a generation brought back and could not write: nothing is drawn again.
+  public func retrySaving(_ id: UUID) async {
+    guard let unsaved = job(id), case .unsaved = unsaved.phase, work == nil else { return }
+    setPhase(of: id, .writing)
+    await write(id)
+  }
+
+  /// Removes a failed generation from the list — and what it brought back, if it was not written:
+  /// the user asked.
   public func dismiss(_ id: UUID) async {
-    guard job(id)?.phase != .running else { return }
+    guard let job = job(id), !job.isUnderWay else { return }
     jobs.removeAll { $0.id == id }
     await reloadSelection()
   }
 
   /// Takes the description of a failed generation back, to change it, and removes it.
   public func reviseDescription(of id: UUID) async {
-    guard let failed = job(id), failed.phase != .running else { return }
+    guard let failed = job(id), case .failed = failed.phase else { return }
     description = failed.description
     await dismiss(id)
   }
@@ -408,9 +453,10 @@ public final class AvatarLibraryModel {
     setSelected(nil)
   }
 
-  /// Stops the generation under way: its process is stopped, nothing is written.
+  /// Stops the generation under way: its process is stopped, nothing is written. Once what it
+  /// brought back is being written, it is too late: what was made is not thrown away.
   public func cancel() {
-    guard let work else { return }
+    guard let work, work.phase == .running else { return }
     currentRun = nil
     task?.cancel()
     task = nil
@@ -442,47 +488,95 @@ public final class AvatarLibraryModel {
     }
   }
 
-  /// Writes what came back as a draft, at once — beyond the limit too: what was made is never
-  /// lost — then selects it.
+  /// Keeps what came back in its job, then writes it as a draft at once — beyond the limit too:
+  /// what was made is never lost.
   private func finish(_ job: Job, with avatar: AvatarSpriteSet, run: UUID) async {
     guard currentRun == run else { return }
-    // From here, what came back is written: cancelling no longer throws it away.
+    // From here, what came back is kept: cancelling no longer throws it away.
     currentRun = nil
-    let written: AvatarID?
+    if let index = jobs.firstIndex(where: { $0.id == job.id }) {
+      jobs[index].result = avatar
+      jobs[index].phase = .writing
+    }
+    await write(job.id)
+    if taskRun == run { task = nil }
+  }
+
+  /// Writes the result of a job. Written, the job gives its place to the draft; not written, it
+  /// stays listed with its result, to be written again.
+  private func write(_ id: UUID) async {
+    guard let job = job(id), let avatar = job.result else { return }
+    let written: AvatarID
     do {
-      switch job.destination {
-      case .newDraft(let basedOn):
-        written = try await library.saveDraft(avatar, basedOn: basedOn)
-      case .draft(let id):
-        try await library.updateDraft(id, with: avatar)
-        written = id
-      }
+      written = try await store(avatar, to: job.destination)
     } catch {
-      written = nil
+      setPhase(of: id, .unsaved(at: now()))
+      problem = .writing
+      lastEvent = UUID()
+      Announcer.announce(AvatarPresentation.message(for: .writing))
+      await refresh()
+      return
     }
     // The generation's line gives its place to the draft; a redrawing takes the eye to its draft.
     let follows =
-      selection == .job(job.id) || written.map { selection == .avatar($0) } == true
+      selection == .job(id) || selection == .avatar(written)
       || job.origin.map { selection == .avatar($0) } == true
-    jobs.removeAll { $0.id == job.id }
-    if taskRun == run { task = nil }
+    jobs.removeAll { $0.id == id }
+    if problem == .writing { problem = nil }
     await refresh()
-    guard let written else {
-      problem = .saving
-      lastEvent = UUID()
-      Announcer.announce(AvatarPresentation.message(for: .saving))
-      return
-    }
     if follows { await select(.avatar(written)) }
     lastEvent = UUID()
-    Announcer.announce(
-      avatar.isComplete
-        ? LocalizedStringResource(
-          "The avatar is ready: check it, then keep it.", bundle: .module,
-          comment: "Said when a generated avatar can be previewed.")
-        : LocalizedStringResource(
-          "The avatar is ready, with expressions still missing.", bundle: .module,
-          comment: "Said when an incomplete avatar can be previewed."))
+    Announcer.announce(Self.announcement(of: job, avatar))
+  }
+
+  /// Where a result goes. A redrawing of a kept avatar changes its draft when one was made
+  /// meanwhile, rather than making a second; a draft keeps the name it was given meanwhile. A
+  /// draft, or an original, deleted meanwhile: the result is written as a draft of its own.
+  private func store(_ avatar: AvatarSpriteSet, to destination: Job.Destination) async throws
+    -> AvatarID
+  {
+    let entries = try await library.entries()
+    var target: AvatarID?
+    switch destination {
+    case .newDraft(let basedOn?):
+      target = entries.first { $0.state == .draft(basedOn: basedOn) }?.id
+      if target == nil, entries.contains(where: { $0.id == basedOn && !$0.isDraft }) {
+        return try await library.saveDraft(avatar, basedOn: basedOn)
+      }
+    case .newDraft(nil):
+      break
+    case .draft(let id):
+      target = entries.contains { $0.id == id && $0.isDraft } ? id : nil
+    }
+    guard let target else { return try await library.saveDraft(avatar, basedOn: nil) }
+    var updated = avatar
+    if let name = entries.first(where: { $0.id == target })?.manifest?.name, !name.isEmpty {
+      updated.manifest.name = name
+    }
+    try await library.updateDraft(target, with: updated)
+    return target
+  }
+
+  private static func announcement(of job: Job, _ avatar: AvatarSpriteSet)
+    -> LocalizedStringResource
+  {
+    if case .expression(let expression) = job.kind {
+      return LocalizedStringResource(
+        "The expression “\(AvatarPresentation.name(expression))” is drawn again: check it, then keep the avatar.",
+        bundle: .module, comment: "Said when one expression of an avatar was drawn again.")
+    }
+    return avatar.isComplete
+      ? LocalizedStringResource(
+        "The avatar is ready: check it, then keep it.", bundle: .module,
+        comment: "Said when a generated avatar can be previewed.")
+      : LocalizedStringResource(
+        "The avatar is ready, with expressions still missing.", bundle: .module,
+        comment: "Said when an incomplete avatar can be previewed.")
+  }
+
+  private func setPhase(of id: UUID, _ phase: Job.Phase) {
+    guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
+    jobs[index].phase = phase
   }
 
   private func fail(_ job: Job, _ error: AvatarGenerationError, run: UUID) async {
@@ -526,7 +620,7 @@ public final class AvatarLibraryModel {
       do {
         draft = try await library.saveDraft(avatar, basedOn: nil)
       } catch {
-        problem = .saving
+        problem = .importing
         return
       }
       ignoredFiles = ignored > 0 ? (draft, ignored) : nil
@@ -585,7 +679,7 @@ public final class AvatarLibraryModel {
       await refresh()
       await select(.avatar(kept))
     } catch {
-      problem = Self.problem(for: error)
+      problem = Self.problem(for: error, otherwise: .keeping)
       await refresh()
     }
   }
@@ -598,11 +692,18 @@ public final class AvatarLibraryModel {
 
   /// The avatar the floating panel shows: a kept one, complete, or the default one.
   public func use(_ id: AvatarID) async {
-    await change { try await $0.setInUse(id) }
+    await change(otherwise: .using) { try await $0.setInUse(id) }
+  }
+
+  /// Whether an avatar can be renamed now: not the default one, nor one being redrawn, whose
+  /// result would bring back the name it had.
+  public func canRename(_ id: AvatarID) -> Bool {
+    id != .default && entry(id) != nil && work?.avatar != id
   }
 
   public func rename(_ id: AvatarID, to name: String) async {
-    await change { try await $0.rename(id, to: name) }
+    guard work?.avatar != id else { return }
+    await change(otherwise: .renaming) { try await $0.rename(id, to: name) }
   }
 
   /// A kept copy, selected.
@@ -613,7 +714,7 @@ public final class AvatarLibraryModel {
       await refresh()
       await select(.avatar(copy))
     } catch {
-      problem = Self.problem(for: error)
+      problem = Self.problem(for: error, otherwise: .duplicating)
       await refresh()
     }
   }
@@ -622,37 +723,40 @@ public final class AvatarLibraryModel {
   /// place to the default one, in the panel at once.
   public func remove(_ id: AvatarID) async {
     if work?.avatar == id { cancel() }
-    await change { try await $0.remove(id) }
+    await change(otherwise: .deleting) { try await $0.remove(id) }
     if ignoredFiles?.draft == id { ignoredFiles = nil }
   }
 
   /// A draft to complete a kept avatar that lacks expressions — the one already made, if any —
   /// selected.
   public func completeDraft(of id: AvatarID) async {
+    guard isIdle else { return }
     do {
       let draft = try await library.draftToComplete(id)
       problem = nil
       await refresh()
       await select(.avatar(draft))
     } catch {
-      problem = Self.problem(for: error)
+      problem = Self.problem(for: error, otherwise: .completing)
       await refresh()
     }
   }
 
-  private func change(_ body: (any AvatarLibrary) async throws -> Void) async {
+  private func change(
+    otherwise failure: Problem, _ body: (any AvatarLibrary) async throws -> Void
+  ) async {
     do {
       try await body(library)
       problem = nil
     } catch {
-      problem = Self.problem(for: error)
+      problem = Self.problem(for: error, otherwise: failure)
     }
     await refresh()
   }
 
-  private static func problem(for error: any Error) -> Problem {
+  private static func problem(for error: any Error, otherwise failure: Problem) -> Problem {
     if case AvatarLibraryError.limitReached = error { return .limitReached }
-    return .saving
+    return failure
   }
 
   // MARK: - Images
