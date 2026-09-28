@@ -81,18 +81,27 @@ struct CodexRolloutSessionDiscoveryTests {
     cwd: String,
     createdAt: Date,
     terminated: Bool = true,
-    name: String? = nil
+    name: String? = nil,
+    startedAt: Date? = nil
   ) throws -> URL {
     let url = directory.appendingPathComponent(
       name ?? "rollout-2026-09-21T17-19-47-\(identifier).jsonl")
+    // Codex dates the session when its process starts, and writes the file with the first message.
+    let started = startedAt.map { #","timestamp":"\#(Self.iso8601($0))""# } ?? ""
     var line = """
       {"timestamp":"2026-09-21T17:19:47.000Z","type":"session_meta","payload":\
-      {"session_id":"\(identifier)","cwd":"\(cwd)","originator":"codex-tui"}}
+      {"session_id":"\(identifier)","cwd":"\(cwd)","originator":"codex-tui"\(started)}}
       """
     if terminated { line += "\n" }
     try line.write(to: url, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.creationDate: createdAt], ofItemAtPath: url.path)
     return url
+  }
+
+  private static func iso8601(_ date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
   }
 
   private func discovery(
@@ -324,6 +333,101 @@ struct CodexRolloutSessionDiscoveryTests {
         since: launchedAt,
         timeout: .seconds(1)
       ) == Self.identifier)
+  }
+
+  @Test("A rollout written after a later launch, by a session begun before it, is not taken (#144)")
+  func sessionBegunBeforeTheLaunchIsNotTaken() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    // A pane started a minute ago in the same repository, and nobody wrote to it until now: its
+    // rollout is written after this launch, but its session began long before.
+    let launchedAt = Date()
+    try writeRollout(
+      in: day, cwd: "/Users/test/app", createdAt: launchedAt.addingTimeInterval(1),
+      startedAt: launchedAt.addingTimeInterval(-60))
+
+    let found = await discovery(root).discoverSessionIdentifier(
+      workingDirectoryPath: "/Users/test/app",
+      since: launchedAt,
+      timeout: .milliseconds(100)
+    )
+    #expect(found == nil)
+  }
+
+  @Test("A rollout two waiting panes could have written goes to neither, until one is out")
+  func ambiguousRolloutGoesToNeither() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let discovery = discovery(root, claims: CodexSessionClaims())
+    // Two panes started a second apart in the same repository, both still waiting.
+    let first = CodexLaunch(workingDirectoryPath: "/Users/test/app", launchedAt: Date())
+    let second = CodexLaunch(
+      workingDirectoryPath: "/Users/test/app", launchedAt: first.launchedAt.addingTimeInterval(1))
+    await discovery.beginWaiting(first)
+    await discovery.beginWaiting(second)
+    // Minutes later, someone writes to one of them.
+    try writeRollout(
+      in: day, cwd: "/Users/test/app", createdAt: second.launchedAt.addingTimeInterval(300),
+      startedAt: second.launchedAt.addingTimeInterval(0.5))
+
+    #expect(await discovery.discoverSessionIdentifier(for: first, timeout: .zero) == nil)
+    #expect(await discovery.discoverSessionIdentifier(for: second, timeout: .zero) == nil)
+
+    // The first pane learnt its session another way — its hook — or ended: the rollout can only
+    // be the second one's now.
+    await discovery.endWaiting(first)
+    #expect(
+      await discovery.discoverSessionIdentifier(for: second, timeout: .zero) == Self.identifier)
+  }
+
+  @Test("A pane left silent for an hour does not stop a pane launched since from finding its own")
+  func silentPaneDoesNotStandInTheWay() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let discovery = discovery(root, claims: CodexSessionClaims())
+    let later = CodexLaunch(workingDirectoryPath: "/Users/test/app", launchedAt: Date())
+    // Launched an hour before in the same repository, and never written to: still waiting.
+    let silent = CodexLaunch(
+      workingDirectoryPath: "/Users/test/app",
+      launchedAt: later.launchedAt.addingTimeInterval(-3600))
+    await discovery.beginWaiting(silent)
+    await discovery.beginWaiting(later)
+    try writeRollout(
+      in: day, cwd: "/Users/test/app", createdAt: later.launchedAt.addingTimeInterval(120),
+      startedAt: later.launchedAt.addingTimeInterval(0.5))
+
+    #expect(await discovery.discoverSessionIdentifier(for: silent, timeout: .zero) == nil)
+    #expect(
+      await discovery.discoverSessionIdentifier(for: later, timeout: .zero) == Self.identifier)
+  }
+
+  @Test("A pane waiting in another folder does not stand in the way")
+  func waitingElsewhereDoesNotMatter() async throws {
+    let (day, root) = try makeSessionsDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let discovery = discovery(root, claims: CodexSessionClaims())
+    let launch = CodexLaunch(workingDirectoryPath: "/Users/test/app", launchedAt: Date())
+    let elsewhere = CodexLaunch(
+      workingDirectoryPath: "/Users/test/other", launchedAt: launch.launchedAt)
+    await discovery.beginWaiting(launch)
+    await discovery.beginWaiting(elsewhere)
+    try writeRollout(
+      in: day, cwd: "/Users/test/app", createdAt: launch.launchedAt.addingTimeInterval(120),
+      startedAt: launch.launchedAt.addingTimeInterval(0.5))
+
+    #expect(
+      await discovery.discoverSessionIdentifier(for: launch, timeout: .zero) == Self.identifier)
+  }
+
+  @Test("The watch slows down after its first period, up to the slowest pace")
+  func watchSlowsDown() {
+    let discovery = CodexRolloutSessionDiscovery(
+      sessionsDirectory: URL(fileURLWithPath: "/nonexistent"), pollInterval: .milliseconds(500),
+      briskPeriod: .seconds(30), slowestInterval: .seconds(5))
+    #expect(discovery.interval(after: .seconds(10)) == .milliseconds(500))
+    #expect(discovery.interval(after: .seconds(31)) == .seconds(1))
+    #expect(discovery.interval(after: .seconds(61)) == .seconds(2))
+    #expect(discovery.interval(after: .seconds(3600)) == .seconds(5))
   }
 
   @Test("A missing sessions directory times out instead of failing")

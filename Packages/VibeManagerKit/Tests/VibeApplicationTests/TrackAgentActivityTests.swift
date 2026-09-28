@@ -175,6 +175,45 @@ func eventually(
   return false
 }
 
+/// Reads the conversation a `start` line names, as Codex's `SessionStart` does (#144).
+private struct NamingDecoder: AgentSignalDecoding {
+  let approvalAnswerKeys: Set<[UInt8]> = []
+
+  func signal(for event: AgentActivityEvent) -> AgentSignal? {
+    NamedDecoder().signal(for: event)
+  }
+
+  func conversationIdentifier(in event: AgentActivityEvent) -> String? {
+    guard event.name == "start", let payload = event.payload else { return nil }
+    return String(decoding: payload, as: UTF8.self)
+  }
+}
+
+@Suite("Conversations named through the hooks")
+struct ConversationNamingTests {
+  @Test("A conversation the agent names is told, and kept for the observer armed after it (#144)")
+  func namedConversationIsToldAndKept() async {
+    let logs = ScriptedActivityLogs()
+    let tracker = makeTracker(logs: logs, store: MemoryActivityStore(), clock: TestClock(t0))
+    let id = SessionID()
+    let named = await tracker.conversationsNamed()
+
+    await tracker.processStarted(id, decoder: NamingDecoder())
+    #expect(await following(logs, id))
+    await logs.write("prompt", at: t0, for: id)
+    await logs.write("start", at: t0, for: id, payload: "first")
+    var iterator = named.makeAsyncIterator()
+    #expect(await iterator.next() == AgentConversationNamed(sessionID: id, identifier: "first"))
+    #expect(await tracker.conversationIdentifier(for: id) == "first")
+
+    // A new conversation in the same process replaces it; a new process forgets it.
+    await logs.write("start", at: t0, for: id, payload: "second")
+    #expect(await iterator.next() == AgentConversationNamed(sessionID: id, identifier: "second"))
+    await tracker.processStarted(id, decoder: NamingDecoder())
+    #expect(await tracker.conversationIdentifier(for: id) == nil)
+  }
+}
+
 @Suite("Tracking agent activity")
 struct TrackAgentActivityTests {
   @Test("An answer finished out of sight is unread until the session is shown")

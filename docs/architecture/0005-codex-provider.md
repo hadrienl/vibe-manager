@@ -98,6 +98,52 @@ The capture object is built by the provider and handed the session, its director
 repository. Nothing starts an agent yet — the creation flow is #7 — so this ticket delivers
 the mechanism and its seam, not a live wiring.
 
+### The agent names its session itself, whenever it gets to it (#144)
+
+Checked against `codex-cli 0.157.1`: Codex creates its session — identifier, `session_meta`
+timestamp — when the process starts, but writes nothing that names it, not the rollout, not a row
+of its state database, until the first message. The rollout and the `SessionStart` hook then
+appear together, a fraction of a second apart, possibly hours after the launch. No option of the
+CLI sets the identifier or the rollout path, and neither the environment nor the first line of
+the rollout carries anything that ties it to one process (no pid).
+
+The one report that cannot belong to another launch is the hook: `SessionStart` receives
+`session_id` and `transcript_path`, and writes into the log of its own session (ADR 0022). Its
+payload keeps `session_id`, and only it. `TrackAgentActivity` reads it like any other line, the
+decoder recognises it (`conversationIdentifier(in:)`), and `SessionLauncher` hands it to the
+observer of that session's process (`conversationNamed`), launched or adopted. The capture then
+stores it, in place of whatever the rollout or the terminal suggested, and nothing else writes
+after it; a later `SessionStart` of the same process replaces it in turn. A name the session could
+not carry yet is handed to the next instance in `runtime.json`, as #141 does for Claude Code, and
+an adopted process gets an observer even with nothing to take up, to hear the name when it comes.
+
+The rollout discovery stays, as the net under hooks that do not run:
+
+- With hooks known to run — approved in Vibe Manager, or already trusted by Codex — it looks for
+  thirty seconds, as before.
+- Otherwise it looks for as long as the process lives: the user declined the hooks, or they are
+  passed but their approval is unknown or did not take, and Codex may still be told no in the
+  terminal (`ReportedLaunch.hooksApproved`). Every half second during thirty seconds, then twice
+  as slowly every thirty seconds up to one look every five seconds, with a limit of twelve hours.
+- Whichever it was, one last look is made when the process ends, the watch over or not: a first
+  message sent just before quitting may have left its hook unread.
+- A resumed conversation (`codex resume`) does not look at all: its rollout already exists, and a
+  new one in the same folder would be another launch's.
+
+Matching a rollout found that late needs more than its creation date, which now says when the
+user spoke. Its first line says when the session began, which is when its process started: a
+rollout whose session began more than five seconds before the launch is an earlier pane's, however
+late it was written. And every launch still waiting for its session is registered with its folder
+in `CodexSessionClaims`, until it knows its session or ends. A waiting launch stands in the way of
+a rollout only if the session began while it was starting — from five seconds before it to thirty
+seconds after (`startWindow`) — and a rollout two waiting launches of the same folder could have
+begun is handed to neither. A pane left silent for an hour therefore does not keep a pane launched
+since from finding its own; two panes started within thirty seconds of each other in the same
+folder record nothing from the disk until the doubt is lifted — the hook, or the other launch
+ending. Nothing is recorded rather than a conversation that may be another pane's. A session named
+by a hook or read from a terminal is claimed too, so that no discovery hands it out again, and a
+rollout the hook proved to be another launch's is released for that launch to find.
+
 ### Nothing lowers the user's safety settings
 
 Neither `--sandbox`, nor `--ask-for-approval`, nor `--dangerously-bypass-*`, nor `--worktree`,
@@ -138,6 +184,18 @@ line nobody exercised.
   starts — and the session is then simply not resumable, which the diagnostic states.
 - Polling the rollout directory is a compromise: it is bounded in time and reads only the
   first line of candidate files, but it is polling, not an event stream.
+- Without hooks, two Codex panes started within thirty seconds of each other in the same folder
+  record nothing until one of them ends; and a Codex started outside the application, in the
+  same folder, while a pane waits, can still be taken for that pane's. With hooks, the discovery
+  only runs thirty seconds, and the hook of the first message replaces whatever it found.
+- A session begun more than thirty seconds after its launch — a new conversation started in a
+  pane before its first message, a folder-trust screen left open — is not seen as that launch's:
+  a pane launched later in the same folder may take it — with hooks, only within its own first
+  thirty seconds, and until its own hook names its session.
+- A process adopted from a version that did not keep `session_id` in its `SessionStart` hook is
+  never named: its hooks are the ones it was started with.
+- Keeping `session_id` changed the command of the `SessionStart` hook: every user approves the
+  Codex hooks once more (ADR 0022).
 
 ## Rejected alternatives
 

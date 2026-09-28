@@ -126,6 +126,26 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
     changeTaskStatus = ChangeTaskStatus(repository: repository, clock: clock)
+    if let activity { forwardConversationsNamed(by: activity) }
+  }
+
+  /// Hands each conversation an agent names through its hooks to the observer of its process
+  /// (#144). Ends with the launcher: the stream is only read while it is there to act on it.
+  private func forwardConversationsNamed(by activity: TrackAgentActivity) {
+    Task { [weak self] in
+      for await naming in await activity.conversationsNamed() {
+        guard let self else { return }
+        await self.observers[naming.sessionID]?.conversationNamed(naming.identifier)
+      }
+    }
+  }
+
+  /// A conversation the process named before its observer was there to be told.
+  private func forwardConversationAlreadyNamed(_ id: SessionID) async {
+    guard let observer = observers[id],
+      let identifier = await activity?.conversationIdentifier(for: id)
+    else { return }
+    await observer.conversationNamed(identifier)
   }
 
   public func pane(for id: SessionID) -> TerminalPaneModel? {
@@ -261,7 +281,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     signpostFirstOutput(of: terminal)
     await activity?.processStarted(session.id, decoder: reported.decoder)
     followOutput(of: session.id, terminal: terminal)
-    await startObserver(for: session, plan: plan, terminal: terminal)
+    await startObserver(
+      for: session, plan: plan, hooksApproved: reported.hooksApproved, terminal: terminal)
+    await forwardConversationAlreadyNamed(session.id)
     // Recorded once there is something to record, and from the terminal rather than from the
     // plan: the process group is the child's own pid, which only exists after the spawn. A
     // process that has already ended by now leaves no record, which is the truth — there is
@@ -485,7 +507,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       .session, .info, "session.adopted",
       ["session": diagnostics.pseudonym(session.id), "state": .token(state.diagnosticToken)])
     let awaited = await recorder?.inheritedRecord(of: session.id)?.awaitedResumeIdentifier
-    let observer = await adoptionObserver(for: session, awaiting: awaited)
+    let observer = await adoptionObserver(
+      for: session, awaiting: awaited, isRunning: !state.isFinished)
     guard case .running(let processIdentifier) = state else {
       await observer?.finished()
       return true
@@ -506,6 +529,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
         workingDirectoryPath: RestartSession.workingDirectoryPath(of: session), environment: [:])
     }
     await activity?.processAdopted(session.id, decoder: decoder)
+    await forwardConversationAlreadyNamed(session.id)
     followOutput(of: session.id, terminal: terminal)
     // Still waited for, until the observer says otherwise: quitting again before the agent has
     // written its conversation hands the same identifier to the next instance.
@@ -518,21 +542,25 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   }
 
   /// The observer that takes up the watch of an adopted agent, already watching; `nil` when the
-  /// previous instance was waiting for nothing.
+  /// previous instance was waiting for nothing and the process has ended.
+  ///
+  /// A running process gets one even with nothing to take up: Codex names its conversation only
+  /// with the first message, through its hooks, and that may come long after the relaunch (#144).
   ///
   /// Asked of the session's agent: the process was launched for it, and a switch would have
   /// replaced the process. The observer's own guard still refuses to write on a session switched
   /// in the meantime (#15).
   private func adoptionObserver(
     for session: WorkSession,
-    awaiting identifier: String?
+    awaiting identifier: String?,
+    isRunning: Bool
   ) async -> (any AgentLaunchObserver)? {
-    guard let identifier, let providerID = session.agent?.providerID,
+    guard identifier != nil || isRunning, let providerID = session.agent?.providerID,
       let observing = await agents.provider(id: AgentProviderID(providerID))
         as? any AgentLaunchObserverProviding
     else { return nil }
     let observer = observing.launchObserver(for: session.id, repository: repository)
-    await observer.adopted(awaitedResumeIdentifier: identifier)
+    if let identifier { await observer.adopted(awaitedResumeIdentifier: identifier) }
     return observer
   }
 
@@ -836,6 +864,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private func startObserver(
     for session: WorkSession,
     plan: AgentLaunchPlan,
+    hooksApproved: Bool,
     terminal: any TerminalSession
   ) async {
     // The plan names the agent that is actually starting. The stored agent said the same until
@@ -848,7 +877,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
 
     let observer = observing.launchObserver(for: session.id, repository: repository)
     observers[session.id] = observer
-    await observer.launched(plan: plan)
+    await observer.launched(plan: plan, hooksApproved: hooksApproved)
 
     outputTasks[session.id]?.cancel()
     outputTasks[session.id] = Task {

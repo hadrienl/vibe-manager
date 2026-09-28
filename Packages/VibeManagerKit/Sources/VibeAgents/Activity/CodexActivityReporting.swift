@@ -14,8 +14,13 @@ public enum CodexActivityHooks {
 
   /// Checked against `codex-cli 0.156.1`, which also knows `Interrupt` — the one signal Claude
   /// Code does not give.
+  ///
+  /// `SessionStart` keeps its `session_id` (#144): Codex creates its session at launch but names
+  /// it nowhere until the first message, when the rollout and this hook appear together (checked
+  /// with 0.157.1). Written into this session's own log, it tells which rollout is whose even when
+  /// two panes work in the same folder.
   static let hooks: [Hook] = [
-    Hook(event: "SessionStart", payload: .drop),
+    Hook(event: "SessionStart", payload: .fields(["session_id"])),
     Hook(event: "UserPromptSubmit", payload: .drop),
     Hook(event: "PermissionRequest", payload: .keep),
     Hook(event: "PostToolUse", payload: .drop),
@@ -80,6 +85,15 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
 
   public var answerKeymap: (any AgentAnswerKeymap)? {
     CodexAnswerKeymap()
+  }
+
+  /// The session `SessionStart` names: the one this process holds from now on. Codex starts
+  /// another one when the user asks for a new conversation, and its hook names that one too.
+  public func conversationIdentifier(in event: AgentActivityEvent) -> String? {
+    guard event.name == "SessionStart", let identifier = event.string("session_id"),
+      UUID(uuidString: identifier) != nil
+    else { return nil }
+    return identifier
   }
 
   public func signal(for event: AgentActivityEvent) -> AgentSignal? {

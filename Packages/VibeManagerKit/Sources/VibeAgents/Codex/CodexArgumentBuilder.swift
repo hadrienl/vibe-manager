@@ -53,6 +53,15 @@ public struct CodexArgumentBuilder: CommandLineAgentArgumentBuilder {
     return arguments
   }
 
+  /// The conversation a plan resumes, `nil` for one that begins a new conversation. Read from
+  /// the arguments this builder shaped: the subcommand first, the identifier after `--`.
+  public static func resumedIdentifier(in arguments: [String]) -> String? {
+    guard arguments.first == "resume", let separator = arguments.firstIndex(of: "--"),
+      arguments.index(after: separator) < arguments.endIndex
+    else { return nil }
+    return arguments[arguments.index(after: separator)]
+  }
+
   /// Only the shape of a slug is checked. Membership of a catalog is not: see
   /// `CodexAgentProvider.models()`.
   static func validatedModelID(_ modelID: String) throws -> String {

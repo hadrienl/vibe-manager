@@ -37,9 +37,18 @@ public protocol AgentSignalDecoding: Sendable {
   /// How this agent's dialogs are answered from outside its terminal (#40); `nil` when they
   /// cannot be.
   var answerKeymap: (any AgentAnswerKeymap)? { get }
+  /// The conversation the agent says this event belongs to, when it says so: Codex's
+  /// `SessionStart` names its session (#144). Written by the process itself into its own
+  /// session's log, it is the one identifier two agents working in the same folder cannot mix up.
+  /// `nil` for every other event, and for an agent whose identifier is known some other way.
+  func conversationIdentifier(in event: AgentActivityEvent) -> String?
 }
 
 extension AgentSignalDecoding {
+  public func conversationIdentifier(in event: AgentActivityEvent) -> String? {
+    nil
+  }
+
   public func additionalSignals(after event: AgentActivityEvent) -> AsyncStream<AgentSignal>? {
     nil
   }
