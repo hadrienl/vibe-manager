@@ -519,15 +519,23 @@ public final class AvatarLibraryModel {
   /// Stops the generation under way: its process is stopped, nothing is written. Once what it
   /// brought back is being written, it is too late: what was made is not thrown away.
   public func cancel() {
+    cancel(announcing: true)
+  }
+
+  /// Stops the generation under way; says so only when the user cancelled it, not when what it
+  /// redraws is being deleted, which says so itself.
+  private func cancel(announcing: Bool) {
     guard let work, work.phase == .running else { return }
     currentRun = nil
     task?.cancel()
     task = nil
     jobs.removeAll { $0.id == work.id }
-    announce(
-      LocalizedStringResource(
-        "The generation is cancelled: nothing was changed.", bundle: .module,
-        comment: "Said when the user cancels the drawing of an avatar."))
+    if announcing {
+      announce(
+        LocalizedStringResource(
+          "The generation is cancelled: nothing was changed.", bundle: .module,
+          comment: "Said when the user cancels the drawing of an avatar."))
+    }
     if selection == .job(work.id) {
       selection = .avatar(inUse)
       Task { await self.reloadSelection() }
@@ -782,15 +790,20 @@ public final class AvatarLibraryModel {
     await refresh()
     await select(.avatar(kept))
     let name = spokenName(kept)
+    // One sentence says both: kept, and in the panel or not.
     announce(
       used
         ? LocalizedStringResource(
           "The avatar “\(name)” is kept, and presents the requests in the floating panel.",
           bundle: .module, comment: "Said when a draft avatar is kept and put in use.")
-        : LocalizedStringResource(
-          "The avatar “\(name)” is kept.", bundle: .module,
-          comment: "Said when a draft avatar is kept."))
-    if uses, !used { announce(AvatarPresentation.message(for: .using)) }
+        : uses
+          ? LocalizedStringResource(
+            "The avatar “\(name)” is kept, but could not be put in the floating panel: the panel keeps its own.",
+            bundle: .module,
+            comment: "Said when a draft avatar is kept, and putting it in use failed.")
+          : LocalizedStringResource(
+            "The avatar “\(name)” is kept.", bundle: .module,
+            comment: "Said when a draft avatar is kept."))
   }
 
   /// Throws a draft away: what redraws it stops first.
@@ -840,7 +853,7 @@ public final class AvatarLibraryModel {
     let name = spokenName(id)
     let isDraft = entry(id)?.isDraft == true
     let wasInUse = id == inUse
-    if work?.avatar == id { cancel() }
+    if work?.avatar == id { cancel(announcing: false) }
     let removed = await change(otherwise: .deleting) { try await $0.remove(id) }
     if ignoredFiles?.draft == id { ignoredFiles = nil }
     guard removed else { return }
