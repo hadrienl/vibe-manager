@@ -18,6 +18,9 @@ public actor SessionRuntimeRecorder {
   /// in those sessions, and a first launch here would otherwise overwrite its pid and its process
   /// groups at the first session started — leaving its agents unfindable at its own next launch.
   private var isSealed = false
+  /// What the previous instance recorded of each session it was running, as `claim` took it over:
+  /// what a session the terminal host kept was still waiting for when that instance let it go.
+  private var inherited: [SessionID: SessionRuntimeRecord] = [:]
 
   public init(
     store: any SessionRuntimeStateStore,
@@ -69,6 +72,9 @@ public actor SessionRuntimeRecorder {
   @discardableResult
   public func claim() async -> SessionRuntimeState? {
     let previous = await store.read()
+    inherited = Dictionary(
+      (previous?.sessions ?? []).map { ($0.sessionID, $0) }, uniquingKeysWith: { first, _ in first }
+    )
     let now = clock.now()
     state = SessionRuntimeState(
       phase: .running,
@@ -86,17 +92,40 @@ public actor SessionRuntimeRecorder {
   /// The start time is asked of the system rather than taken from the clock: it is the only half
   /// of the pair that can tell a leftover from a recycled pid, and a value we made up ourselves
   /// would agree with nothing.
-  public func started(_ id: SessionID, processGroup: Int32?) async {
+  ///
+  /// - Parameter awaitedResumeIdentifier: what the process was already waiting for when this
+  ///   instance took it over from the terminal host (#141).
+  public func started(
+    _ id: SessionID, processGroup: Int32?, awaitedResumeIdentifier: String? = nil
+  ) async {
     let startedAt = processGroup.flatMap { probe.startTime(of: $0) }
     var records = state.sessions.filter { $0.sessionID != id }
     records.append(
       SessionRuntimeRecord(
         sessionID: id,
         processGroup: processGroup,
-        processStartedAt: startedAt
+        processStartedAt: startedAt,
+        awaitedResumeIdentifier: awaitedResumeIdentifier
       )
     )
     await update(sessions: records)
+  }
+
+  /// Writes down the identifier a running session's agent still waits to see written, or that it
+  /// waits for nothing any more: what the next instance needs to keep watching, once the
+  /// application lets go of the process and the terminal host keeps it (#141).
+  public func awaiting(_ id: SessionID, resumeIdentifier: String?) async {
+    guard let index = state.sessions.firstIndex(where: { $0.sessionID == id }),
+      state.sessions[index].awaitedResumeIdentifier != resumeIdentifier
+    else { return }
+    var records = state.sessions
+    records[index] = records[index].awaiting(resumeIdentifier)
+    await update(sessions: records)
+  }
+
+  /// What the previous instance recorded of a session, as this one took the document over.
+  public func inheritedRecord(of id: SessionID) -> SessionRuntimeRecord? {
+    inherited[id]
   }
 
   public func stopped(_ id: SessionID) async {

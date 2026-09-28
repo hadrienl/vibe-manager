@@ -12,15 +12,35 @@ public struct SessionRuntimeRecord: Hashable, Codable, Sendable {
   public let sessionID: SessionID
   public let processGroup: Int32?
   public let processStartedAt: Date?
+  /// The identifier the agent's launch gave its conversation, still waiting for the agent to write
+  /// that conversation down when the application let go of the process (#141).
+  ///
+  /// Claude Code only files a conversation with its first message: a session left running in the
+  /// host before anyone wrote to it has an identifier nothing can resume yet. It is kept here, with
+  /// the process it belongs to, for the instance that adopts the process to keep watching — and
+  /// never on the session, where it would read as a conversation to resume. Absent from a document
+  /// written before it existed, and whenever there is nothing left to wait for.
+  public let awaitedResumeIdentifier: String?
 
-  public init(sessionID: SessionID, processGroup: Int32? = nil, processStartedAt: Date? = nil) {
+  public init(
+    sessionID: SessionID, processGroup: Int32? = nil, processStartedAt: Date? = nil,
+    awaitedResumeIdentifier: String? = nil
+  ) {
     self.sessionID = sessionID
     self.processGroup = processGroup
     self.processStartedAt = processStartedAt?.storageRounded
+    self.awaitedResumeIdentifier = awaitedResumeIdentifier
+  }
+
+  /// The same record, waiting for another identifier, or for none.
+  public func awaiting(_ identifier: String?) -> SessionRuntimeRecord {
+    SessionRuntimeRecord(
+      sessionID: sessionID, processGroup: processGroup, processStartedAt: processStartedAt,
+      awaitedResumeIdentifier: identifier)
   }
 
   private enum CodingKeys: String, CodingKey {
-    case sessionID, processGroup, processStartedAt
+    case sessionID, processGroup, processStartedAt, awaitedResumeIdentifier
   }
 
   /// The identifier is written as the plain UUID string it is. A synthesized encoding would nest
@@ -30,7 +50,9 @@ public struct SessionRuntimeRecord: Hashable, Codable, Sendable {
     self.init(
       sessionID: SessionID(rawValue: try container.decode(UUID.self, forKey: .sessionID)),
       processGroup: try container.decodeIfPresent(Int32.self, forKey: .processGroup),
-      processStartedAt: try container.decodeIfPresent(Date.self, forKey: .processStartedAt)
+      processStartedAt: try container.decodeIfPresent(Date.self, forKey: .processStartedAt),
+      awaitedResumeIdentifier: try container.decodeIfPresent(
+        String.self, forKey: .awaitedResumeIdentifier)
     )
   }
 
@@ -39,6 +61,7 @@ public struct SessionRuntimeRecord: Hashable, Codable, Sendable {
     try container.encode(sessionID.rawValue, forKey: .sessionID)
     try container.encodeIfPresent(processGroup, forKey: .processGroup)
     try container.encodeIfPresent(processStartedAt, forKey: .processStartedAt)
+    try container.encodeIfPresent(awaitedResumeIdentifier, forKey: .awaitedResumeIdentifier)
   }
 }
 

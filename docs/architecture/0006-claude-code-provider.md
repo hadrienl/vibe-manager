@@ -174,7 +174,10 @@ verified rather than what it assumes.
   restart opens a new conversation instead of resuming one the CLI would refuse.
 - The identifier is therefore not resumable *instantly*: between the launch and the first
   exchange the session carries none. That window belongs to a conversation that does not exist
-  yet, so nothing is lost by it.
+  yet, so nothing is lost by it. The window can span a relaunch of the application, when the agent
+  was left running in the terminal host (ADR 0017): the identifier still waited for is then
+  carried by the runtime document, and the instance that adopts the process takes the watch up
+  (#141).
 - Reading the catalog is still blocking file access inside an `async` function, now bounded to
   one read in the normal case. If a model picker ever reads it on every keystroke it wants a
   cache, not a smaller bound.

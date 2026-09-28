@@ -115,6 +115,58 @@ struct FileSessionRuntimeStateStoreTests {
     #expect(await store.read() == written)
   }
 
+  @Test("A session left running keeps the conversation it still waits for (#141)")
+  func awaitedIdentifierRoundTrip() async throws {
+    let location = url()
+    let store = FileSessionRuntimeStateStore(url: location)
+    var written = state(
+      phase: .detached,
+      sessions: [
+        SessionRuntimeRecord(
+          sessionID: SessionID(), processGroup: 7_001,
+          awaitedResumeIdentifier: "3f2b6c1e-8a4d-4f7b-9c2e-5d1a7b3c9e04"),
+        SessionRuntimeRecord(sessionID: SessionID(), processGroup: 7_002),
+      ]
+    )
+    written.stoppedAt = Date(timeIntervalSince1970: 1_700_000_600.5)
+
+    await store.write(written)
+
+    #expect(await store.read() == written)
+    let text = try String(contentsOf: location, encoding: .utf8)
+    #expect(
+      text.contains("\"awaitedResumeIdentifier\" : \"3f2b6c1e-8a4d-4f7b-9c2e-5d1a7b3c9e04\""))
+    // Written only when there is something to wait for.
+    #expect(text.components(separatedBy: "awaitedResumeIdentifier").count == 2)
+  }
+
+  @Test("A session recorded before anything was waited for reads as waiting for nothing")
+  func readsRecordsWithoutAwaitedIdentifier() async throws {
+    let location = url()
+    try FileManager.default.createDirectory(
+      at: location.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let document = """
+      {
+        "schemaVersion" : 2,
+        "state" : {
+          "phase" : "detached",
+          "processIdentifier" : 4242,
+          "launchedAt" : "2026-09-22T09:12:04.118Z",
+          "updatedAt" : "2026-09-22T11:47:31.002Z",
+          "stoppedAt" : "2026-09-22T11:47:31.002Z",
+          "sessions" : [
+            { "sessionID" : "6F9619FF-8B86-D011-B42D-00C04FC964FF", "processGroup" : 7001 }
+          ]
+        }
+      }
+      """
+    try Data(document.utf8).write(to: location)
+
+    let read = await FileSessionRuntimeStateStore(url: location).read()
+    #expect(read?.sessions.first?.processGroup == 7_001)
+    #expect(read?.sessions.first?.awaitedResumeIdentifier == nil)
+  }
+
   @Test("A document written before the terminal host is still read")
   func readsSchemaOne() async throws {
     let location = url()

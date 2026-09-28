@@ -256,11 +256,13 @@ with no session and no client, leaves after its grace period.
 2. `SessionHandOff.handOff` is asked of each running session. `SessionLauncher` answers yes for a
    `HostedTerminal` that is still running. It retires the exit watch, so the store is not told of
    an exit nobody here will see, and finishes the agent observer. **Nothing is written to the
-   store**: those sessions are active, because they are.
+   store**: those sessions are active, because they are. What the observer was still waiting for
+   is kept in the runtime document instead (see below, #141).
 3. What could not be handed off — a terminal in the fallback — is stopped and closed as a plain
    quit would, and named in the document's `resuming`.
 4. `runtime.json` is written `detached`, with the host's identity and, for each session left
-   running, its process group and the instant it started.
+   running, its process group, the instant it started and, when there is one, the identifier its
+   agent has not yet written its conversation under (`awaitedResumeIdentifier`).
 5. Only then `goodbye(keepRunning: true)`. Dying between 4 and 5 leaves a host that stops
    everything when its client vanishes, and a document whose host is then missing, which reads as
    the crash it was. The other order would leave agents running under a document that does not
@@ -293,6 +295,22 @@ reconciliation must not close it.
 Adopting a session starts nothing, sends nothing and writes nothing (`SessionLauncher.adopt`). The
 pane takes over the terminal (`TerminalPaneModel.adopt`), the exit watch and the record of its
 process group are armed again, and the surface replays the history and follows the live stream.
+
+The launch plan stays with the instance that launched the agent, and with it what the agent
+observer was watching for. Claude Code only files a conversation with its first message (ADR
+0006), so a session started without a prompt and left running before anyone wrote to it has an
+identifier nothing can resume yet — and the user's first message comes after the relaunch (#141).
+On hand-off, the identifier the observer still waits for is written beside the process group, as
+`awaitedResumeIdentifier`: in the runtime document, which describes the processes, and never on the
+session, where it would read as a conversation to resume. `claim` keeps what the previous instance
+recorded; adopting a running session asks the agent's provider for an observer and hands it that
+identifier (`AgentLaunchObserver.adopted`), which watches for the transcript exactly as the launch
+did, with the same limit and the same slowing pace, and looks once more when the process ends. A
+session that ended while the application was closed is looked at once, on adoption. The identifier
+reaches the session only once its transcript exists, through `RecordAgentResumeIdentifier` and its
+guard against an agent switch (#15). Quitting again before the first message hands it on to the next
+instance. The field is optional: a document without it reads as waiting for nothing, and a build
+that does not know it ignores it, so the schema stays at 2.
 The first size the view reports is followed by a `redraw`: `SIGWINCH` to the group the child leads.
 The kernel raises nothing for a size that did not change, and a full-screen program redraws itself
 for the window it is now in rather than showing a history cut wherever the buffer was trimmed.

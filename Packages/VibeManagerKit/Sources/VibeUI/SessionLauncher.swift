@@ -466,9 +466,15 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// or one that ended in the meantime, to show its last output.
   ///
   /// Nothing is launched and nothing is written to the store: a running session is still `active`
-  /// there, and one that ended was closed by the detection that found it. No agent observer is
-  /// started either — it needs the launch plan, which only the launch had — so an identifier the
-  /// agent had not yet written by the time the application quit is not captured afterwards.
+  /// there, and one that ended was closed by the detection that found it.
+  ///
+  /// The launch plan stayed with the instance that launched the agent, and with it what its
+  /// observer was watching for. What that instance wrote down on letting go of the process — the
+  /// identifier the agent had not yet written its conversation under — is taken up here (#141): a
+  /// session started without a prompt and left running before anyone wrote to it only gets its
+  /// conversation now, and without this its identifier would never be stored. A process that
+  /// ended while the application was closed is looked at once, for a conversation written before
+  /// it ended.
   @discardableResult
   public func adopt(_ session: WorkSession) async -> Bool {
     guard let terminal = await supervisor.session(for: session.id) else { return false }
@@ -478,7 +484,15 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     diagnostics.record(
       .session, .info, "session.adopted",
       ["session": diagnostics.pseudonym(session.id), "state": .token(state.diagnosticToken)])
-    guard case .running(let processIdentifier) = state else { return true }
+    let awaited = await recorder?.inheritedRecord(of: session.id)?.awaitedResumeIdentifier
+    let observer = await adoptionObserver(for: session, awaiting: awaited)
+    guard case .running(let processIdentifier) = state else {
+      await observer?.finished()
+      return true
+    }
+    // Armed before the exit watch, which is what finishes it: a process that ends at once has its
+    // conversation looked for one last time, as a launched one would.
+    if let observer { observers[session.id] = observer }
     startedAt[session.id] = .now
     watchForExit(id: session.id, terminal: terminal)
     // The hooks it was started with still write to its log: what it did meanwhile is read from
@@ -493,11 +507,33 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     }
     await activity?.processAdopted(session.id, decoder: decoder)
     followOutput(of: session.id, terminal: terminal)
-    await recorder?.started(session.id, processGroup: processIdentifier)
+    // Still waited for, until the observer says otherwise: quitting again before the agent has
+    // written its conversation hands the same identifier to the next instance.
+    await recorder?.started(
+      session.id, processGroup: processIdentifier, awaitedResumeIdentifier: awaited)
     processDidStart?(session.id, processIdentifier)
     // The side terminals it kept running are taken back with it.
     await sideTerminals?.sessionAdopted(session.id)
     return true
+  }
+
+  /// The observer that takes up the watch of an adopted agent, already watching; `nil` when the
+  /// previous instance was waiting for nothing.
+  ///
+  /// Asked of the session's agent: the process was launched for it, and a switch would have
+  /// replaced the process. The observer's own guard still refuses to write on a session switched
+  /// in the meantime (#15).
+  private func adoptionObserver(
+    for session: WorkSession,
+    awaiting identifier: String?
+  ) async -> (any AgentLaunchObserver)? {
+    guard let identifier, let providerID = session.agent?.providerID,
+      let observing = await agents.provider(id: AgentProviderID(providerID))
+        as? any AgentLaunchObserverProviding
+    else { return nil }
+    let observer = observing.launchObserver(for: session.id, repository: repository)
+    await observer.adopted(awaitedResumeIdentifier: identifier)
+    return observer
   }
 
   /// How many sessions are running in the terminal host, and so could be left running on quit.
@@ -526,7 +562,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   ///
   /// Its exit watch is retired, so the store is not told of an exit nobody here will see, and its
   /// observer is finished. The record of its process group stays: it is what the next launch looks
-  /// for if the host turns out to be gone.
+  /// for if the host turns out to be gone. So does, beside it, the identifier the agent had not yet
+  /// written its conversation under, for the next instance to keep watching for it (#141).
   public func handOff(_ id: SessionID) async -> Bool {
     guard let terminal = panes[id]?.session, terminal is any HostedTerminal,
       await !terminal.state().isFinished
@@ -536,7 +573,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     outputTasks.removeValue(forKey: id)?.cancel()
     activityTasks.removeValue(forKey: id)?.cancel()
     if let observer = observers.removeValue(forKey: id) {
+      // Asked once the watch is over: its last look may just have stored the identifier.
       await observer.finished()
+      await recorder?.awaiting(id, resumeIdentifier: observer.awaitedResumeIdentifier())
     }
     // The run goes on without the application: the next launch says how it ended.
     await usage?.detached(id)
