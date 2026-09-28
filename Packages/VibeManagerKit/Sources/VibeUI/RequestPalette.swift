@@ -301,7 +301,7 @@ struct RequestCard: View {
       ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
         questionContent(question, at: index, of: questions)
       }
-      if questions.count > 1, answers.contains(.chooseOption) {
+      if !answersAtOnce(questions), questions.allSatisfy(canChoose(in:)) {
         Button {
           send(.answers(questions.indices.compactMap { choices[$0] }))
         } label: {
@@ -388,29 +388,20 @@ struct RequestCard: View {
         .font(.callout)
         .fixedSize(horizontal: false, vertical: true)
       ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
-        Button {
-          choose(.option(option), for: index, of: all)
-        } label: {
-          VStack(alignment: .leading, spacing: 1) {
-            Text(verbatim: DisplaySafeText.visible(choice.label))
-            if let description = choice.description {
-              Text(verbatim: DisplaySafeText.visible(description))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.bordered)
-        .tint(choices[index] == .option(option) ? .accentColor : nil)
-        .disabled(!answers.contains(.chooseOption) || isSending || question.allowsMultipleChoices)
+        optionButton(choice, option: option, of: question, at: index, in: all)
       }
-      if question.allowsMultipleChoices {
-        // The palette ticks nothing: one click would be sent as the whole answer.
-        Text("Several choices: answer in the session.", bundle: .module)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      } else if answers.contains(.writeText), question.allowsFreeText {
+      if case .text(let text) = choices[index] {
+        // The free answer given, chosen as an option would be.
+        Label {
+          Text(verbatim: DisplaySafeText.visible(text))
+            .lineLimit(3)
+        } icon: {
+          Image(systemName: "largecircle.fill.circle")
+            .foregroundStyle(Color.accentColor)
+        }
+        .font(.callout)
+      }
+      if !question.allowsMultipleChoices, answers.contains(.writeText), question.allowsFreeText {
         if writingFor == index {
           HStack {
             TextField(text: $draft, prompt: Text("Your answer", bundle: .module)) {
@@ -572,12 +563,76 @@ struct RequestCard: View {
     }
   }
 
+  /// One question of one choice is answered at a click; otherwise the choices go together, as in
+  /// the conversation.
+  private func answersAtOnce(_ questions: [AgentQuestion]) -> Bool {
+    questions.count == 1 && !questions[0].allowsMultipleChoices
+  }
+
+  private func canChoose(in question: AgentQuestion) -> Bool {
+    answers.contains(question.allowsMultipleChoices ? .chooseOptions : .chooseOption)
+  }
+
+  private func isChosen(option: Int, ofQuestion index: Int) -> Bool {
+    switch choices[index] {
+    case .option(let chosen): return chosen == option
+    case .options(let chosen): return chosen.contains(option)
+    case .text, nil: return false
+    }
+  }
+
+  /// A choice shows itself ticked by its symbol rather than a tint: the panel by the avatar is
+  /// never the key window, where a bordered button's tint does not show.
+  private func optionButton(
+    _ choice: AgentQuestion.Option, option: Int, of question: AgentQuestion, at index: Int,
+    in all: [AgentQuestion]
+  ) -> some View {
+    let isChosen = isChosen(option: option, ofQuestion: index)
+    let symbol =
+      question.allowsMultipleChoices
+      ? (isChosen ? "checkmark.square.fill" : "square")
+      : (isChosen ? "largecircle.fill.circle" : "circle")
+    return Button {
+      if question.allowsMultipleChoices {
+        toggle(option, ofQuestion: index)
+      } else {
+        choose(.option(option), for: index, of: all)
+      }
+    } label: {
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        Image(systemName: symbol)
+          .foregroundStyle(isChosen ? Color.accentColor : Color.secondary)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(verbatim: DisplaySafeText.visible(choice.label))
+            .fontWeight(isChosen ? .semibold : nil)
+          if let description = choice.description {
+            Text(verbatim: DisplaySafeText.visible(description))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .buttonStyle(.bordered)
+    .disabled(!canChoose(in: question) || isSending)
+    .accessibilityAddTraits(isChosen ? .isSelected : [])
+  }
+
   private func choose(_ answer: AgentQuestionAnswer, for index: Int, of all: [AgentQuestion]) {
-    if all.count == 1 {
+    if answersAtOnce(all) {
       send(.answers([answer]))
     } else {
       choices[index] = answer
     }
+  }
+
+  /// Ticks or unticks an option of a question of several choices.
+  private func toggle(_ option: Int, ofQuestion index: Int) {
+    var ticked: Set<Int> = []
+    if case .options(let chosen) = choices[index] { ticked = chosen }
+    if ticked.remove(option) == nil { ticked.insert(option) }
+    choices[index] = ticked.isEmpty ? nil : .options(ticked)
   }
 
   private func submitDraft(for index: Int, of all: [AgentQuestion]) {
