@@ -23,7 +23,7 @@ public struct SettingsView: View {
   /// fall into an overflow menu where SwiftUI greys them out: at 500 points, Conversation,
   /// Requests and Avatar could not be reached. The ten labels need about 670 points in French,
   /// 640 in English: this leaves room for a longer translation, or one more tab.
-  static let formWidth: CGFloat = 780
+  nonisolated static let formWidth: CGFloat = 780
 
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
     self.permissions = permissions
@@ -232,15 +232,47 @@ extension View {
   /// than the toolbar needs sends the last tabs into an overflow menu where they cannot be
   /// clicked (#129). Given here rather than by each page, a tab added later cannot forget it.
   func settingsPage(_ tab: SettingsTab) -> some View {
-    frame(minWidth: SettingsView.formWidth)
-      .tabItem {
-        Label {
-          Text(tab.title)
-        } icon: {
-          Image(systemName: tab.symbolName)
-        }
+    SettingsPageLayout {
+      self
+    }
+    .tabItem {
+      Label {
+        Text(tab.title)
+      } icon: {
+        Image(systemName: tab.symbolName)
       }
-      .tag(tab)
+    }
+    .tag(tab)
+  }
+}
+
+/// A page at least `SettingsView.formWidth` wide, and never narrower than what it holds needs.
+///
+/// Not `frame(minWidth:)`: offered less than its least width, that frame answers its least width
+/// whatever the page inside needs. The settings window, which reads a tab's least size, then
+/// stayed 780 points wide around Templates (1,008) and Conversation (921), which overflowed it on
+/// both sides and lost their list, their buttons and their preview (#152).
+///
+/// A page made of several views lays them one over the other, centred, as a `ZStack` would: none
+/// is left out, and the page is as large as the largest.
+struct SettingsPageLayout: Layout {
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let offered = ProposedViewSize(
+      width: proposal.width.map { max($0, SettingsView.formWidth) }, height: proposal.height)
+    return subviews.reduce(CGSize(width: SettingsView.formWidth, height: 0)) { size, page in
+      let needed = page.sizeThatFits(offered)
+      return CGSize(width: max(size.width, needed.width), height: max(size.height, needed.height))
+    }
+  }
+
+  func placeSubviews(
+    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+  ) {
+    for page in subviews {
+      page.place(
+        at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
+        proposal: ProposedViewSize(bounds.size))
+    }
   }
 }
 
