@@ -730,7 +730,7 @@ struct SessionRestartTests {
 // MARK: - Doubles
 
 /// A clock a test moves by hand, for the one rule measured in seconds of real time.
-private final class SteppableClock: SessionClock, @unchecked Sendable {
+final class SteppableClock: SessionClock, @unchecked Sendable {
   private let lock = NSLock()
   private var time: Date
 

@@ -43,7 +43,8 @@ struct AgentSwitchWorkspaceTests {
 
   private func makeWorkspace(
     session: WorkSession,
-    supervisor: WorkspaceSupervisor = WorkspaceSupervisor()
+    supervisor: WorkspaceSupervisor = WorkspaceSupervisor(),
+    clock: any SessionClock = SystemSessionClock()
   ) async -> (AppModel, SessionLauncher, WorkspaceSupervisor, WorkspaceRepository) {
     let repository = WorkspaceRepository(sessions: [session])
     let registry = WorkspaceRegistry(providers: [Self.stub, Self.other])
@@ -53,7 +54,8 @@ struct AgentSwitchWorkspaceTests {
       agents: registry,
       viewportTimeout: .zero
     )
-    let model = AppModel(repository: repository, agents: registry, launcher: launcher)
+    let model = AppModel(
+      repository: repository, agents: registry, launcher: launcher, clock: clock)
     await model.reload()
     return (model, launcher, supervisor, repository)
   }
@@ -266,7 +268,10 @@ struct AgentSwitchWorkspaceTests {
   @Test("A new agent that stops at once, untouched, offers the previous one back")
   func quickFailureOffersTheWayBack() async throws {
     let subject = session(path: folder())
-    let (model, _, supervisor, _) = await makeWorkspace(session: subject)
+    // The clock stands still: a runner frozen past the probation would make the exit an ordinary
+    // end of work, and the switch back would never be offered.
+    let (model, _, supervisor, _) = await makeWorkspace(
+      session: subject, clock: SteppableClock(Date()))
     let sheet = try await openSheet(model, for: subject.id)
     await sheet.select(agent: "other")
     await model.confirmAgentSwitch()
