@@ -1,6 +1,6 @@
 /// Whether closing a session whose agent is still running asks first.
 ///
-/// Read synchronously, at the moment ⌘W is pressed: the answer decides whether a dialog opens or
+/// Read synchronously, at the moment ⇧⌘W is pressed: the answer decides whether a dialog opens or
 /// the agent stops, and it cannot wait on a suspension point to be known.
 @MainActor
 public protocol SessionClosePreferences: AnyObject {

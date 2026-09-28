@@ -40,7 +40,7 @@ struct BrowserKeyEquivalentTests {
     #expect(container.performKeyEquivalent(with: commandW()))
     #expect(closed == 1)
 
-    // ⇧⌘W is the window's, and a keyboard elsewhere leaves ⌘W to the session.
+    // ⇧⌘W is the session's, and a keyboard elsewhere leaves ⌘W to the menu.
     #expect(!container.performKeyEquivalent(with: commandW([.command, .shift])))
     window.makeFirstResponder(other)
     #expect(!container.performKeyEquivalent(with: commandW()))

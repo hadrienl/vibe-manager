@@ -126,8 +126,8 @@ extension AppModel {
     selectedBrowser?.activateNeighbour(offset: -1)
   }
 
-  /// Whether ⌘W would close a web tab: the view holds the keyboard, and the tab in front can be
-  /// closed. On the ticket's pinned tab it closes nothing — it does not fall back on the session.
+  /// Whether ⌘W would close a web tab: the view — its page or its address bar — holds the keyboard.
+  /// On the ticket's pinned tab it closes nothing, and beeps.
   public var closesWebTab: Bool {
     isAddressBarFocused || isWebPageFocused
   }

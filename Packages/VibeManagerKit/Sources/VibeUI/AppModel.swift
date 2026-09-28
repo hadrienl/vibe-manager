@@ -158,7 +158,7 @@ public final class AppModel {
   /// confirm. Closing can be undone with Restart, but the agent's work in progress cannot.
   public private(set) var pendingClose: WorkSession?
   /// Closes under way, from the command to the reload that shows the session closed. Until then
-  /// the session still reads as running, and a second ⌘W would stop it a second time.
+  /// the session still reads as running, and a second ⇧⌘W would stop it a second time.
   public private(set) var closingSessionIDs: Set<SessionID> = []
   /// The sessions selected in the sidebar, the one on screen among them (#77).
   var selection = SessionSelection()
@@ -506,7 +506,7 @@ public final class AppModel {
   /// Asks the web view's panel to take the keyboard, or its address bar.
   public internal(set) var webViewFocusRequest = 0
   public internal(set) var addressBarFocusRequest = 0
-  /// Whether the web view's address bar holds the keyboard: ⌘W then closes a tab, not the session.
+  /// Whether the web view's address bar holds the keyboard: ⌘W then closes its tab.
   public var isAddressBarFocused = false
   var webPageFocus = false
   /// Absent in a workspace assembled without the system around it — tests and previews. The
@@ -1038,7 +1038,7 @@ public final class AppModel {
     confirmsStoppingRunningAgent && launcher?.isRunning(session.id) == true
   }
 
-  /// What ⌘W and every other Close Session run: closes at once, or asks first when an agent
+  /// What ⇧⌘W and every other Close Session run: closes at once, or asks first when an agent
   /// would be interrupted. Does nothing for a session there is nothing left to close.
   public func requestClose(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canClose(session) else { return }

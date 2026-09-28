@@ -9,7 +9,7 @@ import VibeTerminalUI
 @testable import VibeUI
 
 /// A selection of several sessions is for the sidebar's commands only: once the keyboard is
-/// somewhere else, ⌘W and the Session menu act on the session on screen alone (#128).
+/// somewhere else, ⇧⌘W and the Session menu act on the session on screen alone (#128).
 @MainActor
 @Suite(
   "The keyboard leaving the sidebar shrinks its selection", .serialized, .timeLimit(.minutes(2)))
@@ -188,7 +188,7 @@ struct SidebarKeyboardTests {
     #expect(Set(workspace.model.commandTargets) == Set(workspace.ids), "\(workspace.state)")
   }
 
-  @Test("A click in the terminal leaves the Session menu and ⌘W to the session on screen")
+  @Test("A click in the terminal leaves the Session menu and ⇧⌘W to the session on screen")
   func terminalTakesTheKeyboard() async throws {
     let workspace = try await workspace()
     defer { workspace.close() }

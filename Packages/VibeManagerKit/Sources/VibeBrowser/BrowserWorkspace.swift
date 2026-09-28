@@ -56,6 +56,11 @@ public final class BrowserWorkspace {
   @ObservationIgnored public var agentDidOpenPage: (@MainActor (SessionID) -> Void)?
   /// Told when a session's web view is shown or hidden, so the layout can follow.
   @ObservationIgnored public var visibilityDidChange: (@MainActor (SessionID) -> Void)?
+  /// Whether the page taken off screen last held the keyboard, for the page put on screen next to
+  /// take it (#165). Kept here rather than by the view that showed the page: the view changes
+  /// when the web view moves from beside the terminal to taking turns with it, and the page with
+  /// it.
+  @ObservationIgnored public var pageLeftWithKeyboard = false
 
   @ObservationIgnored private var browsers: [SessionID: SessionBrowser] = [:]
   @ObservationIgnored private var restoreTasks: [SessionID: Task<Void, Never>] = [:]

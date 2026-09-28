@@ -361,7 +361,7 @@ struct SessionHistoryTests {
     #expect(!model.canClose(archived) && !model.canArchive(archived) && model.canRestore(archived))
   }
 
-  // MARK: - ⌘W
+  // MARK: - ⇧⌘W
 
   @Test("Close Session applies to a running session only, and to none while it is closing")
   func closeCommandAvailability() async {
@@ -371,7 +371,7 @@ struct SessionHistoryTests {
     await model.load()
     model.select(nil)
 
-    // No selection: the menu reads `nil`, and the command is disabled — ⌘W beeps.
+    // No selection: the menu reads `nil`, and the command is disabled — ⇧⌘W beeps.
     #expect(model.selectedSession == nil)
 
     model.select(running.id)
@@ -381,7 +381,7 @@ struct SessionHistoryTests {
 
     let closed = model.sessions.first { $0.id == running.id }
     #expect(closed?.status == .closed)
-    // The last running session is gone from the list, and the selection with it: ⌘W beeps.
+    // The last running session is gone from the list, and the selection with it: ⇧⌘W beeps.
     #expect((model.selectedSession.map(model.canClose) ?? false) == false)
   }
 
@@ -404,7 +404,7 @@ struct SessionHistoryTests {
     #expect(model.visibleSessions.map(\.id).contains(stored.id))
   }
 
-  @Test("A second ⌘W on the session just closed does nothing")
+  @Test("A second ⇧⌘W on the session just closed does nothing")
   func twoCloseCommandsCloseOneSession() async {
     let first = session(name: "First", status: .active)
     let second = session(name: "Second", status: .active)
