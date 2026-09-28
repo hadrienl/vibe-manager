@@ -3,6 +3,8 @@
 - Status: accepted
 - Date: 2026-09-26
 - Issue: [#41](https://github.com/hadrienl/vibe-manager/issues/41)
+- Amended by: [0032](0032-avatar-library.md) (#154) — the single avatar of `Avatar/` becomes the
+  avatar in use of a library, `Avatars/`; what is made is a draft written at once
 
 ## Context
 
@@ -98,6 +100,11 @@ sprite, and written again by the application as 512 × 512 PNGs, so that nothing
 file goes through. Every problem names its expression. What is made is a candidate: the avatar in
 use changes only when the user uses it, and is replaced on disk in one rename.
 
+> Since #154 (ADR 0032), a candidate is a **draft** of the library, written at once so that it
+> outlives the application, and kept or discarded by the user. Using an avatar no longer replaces
+> another on disk: it changes which avatar of the library is in use. Each avatar is still written
+> in a staging folder, then moved in with one rename.
+
 ### Archives
 
 An avatar travels as a zip holding what its folder holds: `manifest.json` and one PNG per
@@ -107,7 +114,8 @@ no link, no encryption, sizes as declared within bounds — and each entry infla
 larger than it declared, then checked against its CRC. Without a manifest, images named after the
 expressions are enough, so that an avatar can be drawn by hand; an incomplete one becomes a
 candidate whose missing expressions are generated before it can be used. The export includes the
-description unless the user leaves it out.
+description unless the user leaves it out (since #154, “Export Without the Description…”); an
+import makes a draft, never a replacement.
 
 **The default avatar is such an archive**, in `VibeAvatar`'s resources, read by the same code. The
 one shipped is a placeholder drawn by `Scripts/render-placeholder-avatar.swift`; it is replaced by

@@ -582,6 +582,8 @@ struct ExpressionTile: View {
             .frame(width: 18, height: 18)
         }
       }
+      // The picture says nothing the name below does not: VoiceOver reads the name.
+      .accessibilityHidden(true)
       .overlay {
         if isMissing {
           RoundedRectangle(cornerRadius: 7).strokeBorder(Color.orange, lineWidth: 1.5)
@@ -627,6 +629,10 @@ struct ExpressionTile: View {
         // Whole, at the size of the others: "Bouche grande ouverte" takes a third line.
         .lineLimit(3)
         .fixedSize(horizontal: false, vertical: true)
+        // "missing" in words, not in orange alone.
+        .accessibilityLabel(
+          Text(
+            verbatim: AvatarLibraryPresentation.spokenExpression(expression, isMissing: isMissing)))
     }
     .frame(maxWidth: .infinity)
     .accessibilityElement(children: .contain)
