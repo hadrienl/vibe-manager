@@ -221,21 +221,25 @@ struct TicketSettingsView: View {
           TextField(text: binding.name, prompt: Text(verbatim: "Redmine")) {
             Text("Name", bundle: .module)
           }
-          // The value in a fixed-width font, not its label and its explanation.
+          // The value in a fixed-width font, not its label and its explanation. The field is
+          // what VoiceOver reads, once: its own label, and the explanation as its hint; the
+          // label shown beside it is hidden from it.
           LabeledContent {
+            // A long pattern wraps rather than running out of the field.
             TextField(
               text: binding.pattern,
-              prompt: Text(verbatim: #"https://redmine\.acme\.fr/issues/(?<number>[0-9]+)"#)
+              prompt: Text(verbatim: #"https://redmine\.acme\.fr/issues/(?<number>[0-9]+)"#),
+              axis: .vertical
             ) {
               Text("Address pattern", bundle: .module)
             }
+            .lineLimit(1...4)
             .labelsHidden()
             .font(.body.monospaced())
+            .accessibilityHint(Text(Self.patternExplanation))
           } label: {
-            Text("Address pattern", bundle: .module)
-            Text(
-              "A regular expression, with named captures such as (?<number>[0-9]+).",
-              bundle: .module)
+            Text("Address pattern", bundle: .module).accessibilityHidden(true)
+            Text(Self.patternExplanation).accessibilityHidden(true)
           }
           LabeledContent {
             TextField(text: binding.shortID, prompt: Text(verbatim: "#{number}")) {
@@ -243,9 +247,10 @@ struct TicketSettingsView: View {
             }
             .labelsHidden()
             .font(.body.monospaced())
+            .accessibilityHint(Text(Self.identifierExplanation))
           } label: {
-            Text("Identifier", bundle: .module)
-            Text("Shown before the title: the captures in braces, and {host}.", bundle: .module)
+            Text("Identifier", bundle: .module).accessibilityHidden(true)
+            Text(Self.identifierExplanation).accessibilityHidden(true)
           }
           Section {
             ForEach(binding.titleCleanup.indices, id: \.self) { index in
@@ -277,16 +282,21 @@ struct TicketSettingsView: View {
               "Regular expressions whose matches are removed from the page's title, in this order.",
               bundle: .module)
           }
-          if !issues.isEmpty {
-            Section {
-              ForEach(issues, id: \.self) { issue in
-                Text(Self.sentence(issue))
-                  .foregroundStyle(.orange)
-              }
-            }
-          }
         }
         .formStyle(.grouped)
+        // Out of the form, above the buttons: when Save is greyed out, why is always in sight.
+        if !issues.isEmpty {
+          VStack(alignment: .leading, spacing: 4) {
+            ForEach(issues, id: \.self) { issue in
+              Text(Self.sentence(issue))
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 20)
+          .padding(.bottom, 8)
+        }
         HStack {
           if let origin = draft.preset,
             TicketResolverPresets.shipped(id: origin.id).map({
@@ -459,6 +469,13 @@ struct TicketSettingsView: View {
       isTesting = false
     }
   }
+
+  /// What the address pattern is: shown under its label, and read by VoiceOver as the field's hint.
+  static let patternExplanation = LocalizedStringResource(
+    "A regular expression, with named captures such as (?<number>[0-9]+).", bundle: .module)
+  /// What the identifier is: shown under its label, and read by VoiceOver as the field's hint.
+  static let identifierExplanation = LocalizedStringResource(
+    "Shown before the title: the captures in braces, and {host}.", bundle: .module)
 
   static func sentence(_ issue: TicketResolverIssue) -> String {
     switch issue {

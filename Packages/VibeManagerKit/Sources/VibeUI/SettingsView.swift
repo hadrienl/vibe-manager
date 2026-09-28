@@ -252,23 +252,27 @@ extension View {
 /// whatever the page inside needs. The settings window, which reads a tab's least size, then
 /// stayed 780 points wide around Templates (1,008) and Conversation (921), which overflowed it on
 /// both sides and lost their list, their buttons and their preview (#152).
+///
+/// A page made of several views lays them one over the other, centred, as a `ZStack` would: none
+/// is left out, and the page is as large as the largest.
 struct SettingsPageLayout: Layout {
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    guard let page = subviews.first else {
-      return CGSize(width: SettingsView.formWidth, height: 0)
+    let offered = ProposedViewSize(
+      width: proposal.width.map { max($0, SettingsView.formWidth) }, height: proposal.height)
+    return subviews.reduce(CGSize(width: SettingsView.formWidth, height: 0)) { size, page in
+      let needed = page.sizeThatFits(offered)
+      return CGSize(width: max(size.width, needed.width), height: max(size.height, needed.height))
     }
-    let size = page.sizeThatFits(
-      ProposedViewSize(
-        width: proposal.width.map { max($0, SettingsView.formWidth) }, height: proposal.height))
-    return CGSize(width: max(size.width, SettingsView.formWidth), height: size.height)
   }
 
   func placeSubviews(
     in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
   ) {
-    subviews.first?.place(
-      at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
-      proposal: ProposedViewSize(bounds.size))
+    for page in subviews {
+      page.place(
+        at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
+        proposal: ProposedViewSize(bounds.size))
+    }
   }
 }
 

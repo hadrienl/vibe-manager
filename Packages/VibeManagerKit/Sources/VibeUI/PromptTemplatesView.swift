@@ -27,12 +27,14 @@ public struct PromptTemplatesView: View {
         sidebar
           .frame(width: 220)
         detail
-          .frame(minWidth: 740, maxWidth: .infinity, maxHeight: .infinity)
+          .frame(
+            minWidth: Self.editorColumnWidth + 16 + Self.tryColumnWidth, maxWidth: .infinity,
+            maxHeight: .infinity)
       }
       .padding(16)
     }
-    // No least width here: the list and the detail give it (1,008 points). A `minWidth` below
-    // theirs would be the one the window reads, and the page would overflow it on both sides.
+    // No least width here: the list and the detail give it. A `minWidth` below theirs would be
+    // the one the window reads, and the page would overflow it on both sides (#152).
     .frame(idealWidth: 1180, minHeight: 600, idealHeight: 700)
     .task { await model.load() }
     .confirmationDialog(
@@ -396,10 +398,10 @@ public struct PromptTemplatesView: View {
           .padding(.bottom, 12)
           .disabled(model.isReadOnly)
         }
-        .frame(minWidth: 420, maxWidth: .infinity)
+        .frame(minWidth: Self.editorColumnWidth, maxWidth: .infinity)
 
         tryColumn(editing)
-          .frame(width: 300)
+          .frame(width: Self.tryColumnWidth)
       }
       footer(editing)
     }
@@ -420,6 +422,14 @@ public struct PromptTemplatesView: View {
       .fixedSize(horizontal: false, vertical: true)
     }
   }
+
+  /// The least width of the column the template is written in: the table of fields gives each
+  /// label and hint `fieldTextWidth`, beside the name and the two switches (#152).
+  static let editorColumnWidth: CGFloat = 560
+  /// The column on the right, where the template is tried.
+  static let tryColumnWidth: CGFloat = 300
+  /// The least width of a field's label and hint in the table: “Merge request URL” whole.
+  static let fieldTextWidth: CGFloat = 140
 
   /// One row per field, as the text first reads them: what the form calls it, the hint inside the
   /// empty control, and its two switches.
@@ -457,12 +467,14 @@ public struct PromptTemplatesView: View {
                 text: settingsBinding(field.name, \.label)
               )
               .textFieldStyle(.roundedBorder)
+              .frame(minWidth: Self.fieldTextWidth)
               .accessibilityLabel(
                 Text("Label of \(field.name)", bundle: .module, comment: "A field's name."))
               TextField(text: settingsBinding(field.name, \.help)) {
                 Text("Hint", bundle: .module)
               }
               .textFieldStyle(.roundedBorder)
+              .frame(minWidth: Self.fieldTextWidth)
               .accessibilityLabel(
                 Text("Hint of \(field.name)", bundle: .module, comment: "A field's name."))
               Toggle(

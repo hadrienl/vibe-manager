@@ -45,8 +45,6 @@ struct SettingsWidthTests {
     #expect(host.fittingSize.width >= SettingsView.formWidth)
   }
 
-  /// A window whose toolbar holds the tabs of the settings, labelled in the language given, as
-  /// SwiftUI's settings window does.
   @Test(
     "A page wider than the settings gives the window its least width",
     arguments: [(921.0, 921.0), (1008.0, 1180.0)])
@@ -155,6 +153,8 @@ struct SettingsWidthTests {
     view.subviews.flatMap { [$0] + descendants(of: $0) }
   }
 
+  /// A window whose toolbar holds the tabs of the settings, labelled in the language given, as
+  /// SwiftUI's settings window does.
   private static func toolbarWindow(language: String) -> NSWindow {
     _ = NSApplication.shared
     let tabs = NSTabViewController()
