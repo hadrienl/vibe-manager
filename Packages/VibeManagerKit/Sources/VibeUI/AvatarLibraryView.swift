@@ -23,7 +23,13 @@ struct AvatarLibraryView: View {
   @State var newName = ""
   /// The avatar whose deletion waits for its confirmation.
   @State var deleting: AvatarID?
+  /// Another change that loses something, waiting for its confirmation.
+  @State var confirming: Confirmation?
+  /// Asks the card to come into view and give the keyboard to its description, even unfolded.
+  @State var cardRequest = 0
   @FocusState var isDescriptionFocused: Bool
+  /// The window of the page: where the keyboard is, it says.
+  @State private var pageWindow = PageWindow()
   @Environment(\.locale) var locale
 
   /// The width of the list, as the form of Settings › Conversation.
@@ -32,6 +38,21 @@ struct AvatarLibraryView: View {
   static let previewWidth: CGFloat = 379
   /// What identifies the card in the list, to scroll to it.
   static let cardID = "new-avatar-card"
+
+  /// What loses something, and so is asked first.
+  enum Confirmation: Hashable {
+    /// Removes a generation whose result was not written: what was drawn is lost.
+    case removeUnsaved(UUID)
+    /// Draws a whole draft again: its current drawing is replaced.
+    case redrawAll(AvatarID)
+    /// Puts the description of a failed generation in place of the one being written.
+    case replaceDescription(UUID)
+
+    var isDestructive: Bool {
+      if case .replaceDescription = self { return false }
+      return true
+    }
+  }
 
   init(avatars: AvatarLibraryModel, isCreating: Bool = false) {
     self.avatars = avatars
@@ -47,8 +68,13 @@ struct AvatarLibraryView: View {
         .frame(width: Self.previewWidth)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    // The library is read again by the tab, once each time it appears; the agents, here.
-    .task { await avatars.refreshOptions() }
+    .background(PageWindow.Reader(page: pageWindow))
+    // The library is read again by the tab, once each time it appears; the agents and the faces
+    // of the list, here.
+    .task {
+      avatars.showThumbnails()
+      await avatars.refreshOptions()
+    }
     .fileImporter(isPresented: $isChoosingArchive, allowedContentTypes: [.zip]) { result in
       guard case .success(let url) = result else { return }
       importArchive(at: url)
@@ -107,6 +133,25 @@ struct AvatarLibraryView: View {
     } message: { id in
       deletionMessage(id)
     }
+    .confirmationDialog(
+      confirmationTitle,
+      isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
+      titleVisibility: .visible, presenting: confirming
+    ) { confirmation in
+      Button(role: confirmation.isDestructive ? .destructive : nil) {
+        confirm(confirmation)
+        confirming = nil
+      } label: {
+        confirmationAction(confirmation)
+      }
+      Button(role: .cancel) {
+        confirming = nil
+      } label: {
+        Text("Cancel", bundle: .module)
+      }
+    } message: { confirmation in
+      confirmationMessage(confirmation)
+    }
   }
 
   // MARK: - The list
@@ -134,11 +179,15 @@ struct AvatarLibraryView: View {
               menu: { menuItems(for: entry) }
             )
             .tag(AvatarLibraryModel.Selection.avatar(entry.id))
-            .contextMenu { menuItems(for: entry, showsShortcut: true) }
+            .contextMenu { menuItems(for: entry) }
           }
           // The list's table is drawn above the page's own drop destination, not inside it: an
           // archive dropped between its rows reaches the page through here.
-          .onInsert(of: [.fileURL]) { _, providers in
+          // Only while a new avatar can be made: otherwise nothing is shown as accepted. A file
+          // dragged from the Finder carries its URL, not its type: whether it is a zip archive is
+          // known only once dropped, and anything else is then left alone.
+          .onInsert(of: avatars.canStartCreation ? AvatarLibraryPresentation.droppedTypes : []) {
+            _, providers in
             dropFiles(providers)
           }
           ForEach(AvatarLibraryPresentation.listedJobs(avatars.jobs)) { job in
@@ -167,18 +216,27 @@ struct AvatarLibraryView: View {
           withAnimation { proxy.scrollTo(Self.cardID, anchor: .bottom) }
           isDescriptionFocused = true
         }
+        .onChange(of: cardRequest) {
+          withAnimation { proxy.scrollTo(Self.cardID, anchor: .bottom) }
+          isDescriptionFocused = true
+        }
         // What was just made, or started, comes into view.
         .onChange(of: avatars.selection) { _, selection in
           guard let selection else { return }
           proxy.scrollTo(selection)
         }
-        .onKeyPress(.return) {
-          guard let id = avatars.selectedID, avatars.canRename(id) else { return .ignored }
+        // The list's own keys: never those of the description typed in its card, whose Return
+        // goes to a new line and ⌘⌫ to the text.
+        .onKeyPress(.return, phases: .down) { press in
+          guard press.modifiers.isEmpty, !isTyping, let id = avatars.selectedID,
+            avatars.canRename(id)
+          else { return .ignored }
           startRenaming(id)
           return .handled
         }
         .onKeyPress(.delete, phases: .down) { press in
-          guard press.modifiers.contains(.command), let id = avatars.selectedID, id != .default
+          guard press.modifiers == .command, !isTyping, let id = avatars.selectedID,
+            id != .default
           else { return .ignored }
           deleting = id
           return .handled
@@ -206,6 +264,12 @@ struct AvatarLibraryView: View {
         .allowsHitTesting(false))
   }
 
+  /// Whether the keyboard is in a text of the page — the description of the card — rather than in
+  /// the list: asked of the window, whose first responder is the text as soon as it is clicked.
+  private var isTyping: Bool {
+    isDescriptionFocused || pageWindow.window?.firstResponder is NSText
+  }
+
   /// What the list selects: the model's, changed at once.
   private var selection: Binding<AvatarLibraryModel.Selection?> {
     Binding(get: { avatars.selection }, set: { avatars.choose($0) })
@@ -214,9 +278,10 @@ struct AvatarLibraryView: View {
   // MARK: - Actions
 
   /// The actions of an avatar: in the menus ••• of its row and of the preview, and in its
-  /// contextual menu, which alone shows ⌘⌫ — the list takes it as well.
+  /// contextual menu. Their shortcuts are the list's, and only shown here: typed in the
+  /// description, Return and ⌘⌫ stay the text's.
   @ViewBuilder
-  func menuItems(for entry: AvatarLibraryEntry, showsShortcut: Bool = false) -> some View {
+  func menuItems(for entry: AvatarLibraryEntry) -> some View {
     let actions = AvatarLibraryPresentation.actions(
       for: entry, inUse: avatars.inUse, canCreate: avatars.canCreate,
       canRename: avatars.canRename(entry.id))
@@ -234,6 +299,7 @@ struct AvatarLibraryView: View {
       } label: {
         Text("Rename…", bundle: .module)
       }
+      .keyboardShortcut(.return, modifiers: [])
       .disabled(!actions.enabled(.rename))
     }
     if actions.contains(.duplicate) {
@@ -270,9 +336,7 @@ struct AvatarLibraryView: View {
           Text("Delete…", bundle: .module)
         }
       }
-      // Only in the contextual menu, built when it opens: the menus ••• stay on the page, and
-      // would take ⌘⌫ from the description being typed.
-      .keyboardShortcut(showsShortcut ? KeyboardShortcut(.delete, modifiers: .command) : nil)
+      .keyboardShortcut(.delete, modifiers: .command)
     }
   }
 
@@ -302,6 +366,62 @@ struct AvatarLibraryView: View {
     return Text("It cannot be recovered. Export it first to keep it.", bundle: .module)
   }
 
+  private var confirmationTitle: Text {
+    switch confirming {
+    case .removeUnsaved: Text("Remove this avatar?", bundle: .module)
+    case .redrawAll: Text("Draw everything again?", bundle: .module)
+    case .replaceDescription: Text("Replace the description being written?", bundle: .module)
+    case nil: Text(verbatim: "")
+    }
+  }
+
+  private func confirmationAction(_ confirmation: Confirmation) -> Text {
+    switch confirmation {
+    case .removeUnsaved: Text("Remove", bundle: .module)
+    case .redrawAll: Text("Draw Everything Again", bundle: .module)
+    case .replaceDescription: Text("Replace", bundle: .module)
+    }
+  }
+
+  private func confirmationMessage(_ confirmation: Confirmation) -> Text {
+    switch confirmation {
+    case .removeUnsaved: Text("What was drawn is lost.", bundle: .module)
+    case .redrawAll: Text("The current drawing will be replaced.", bundle: .module)
+    case .replaceDescription:
+      Text(
+        "The description of the failed generation takes the place of the one in the card.",
+        bundle: .module)
+    }
+  }
+
+  private func confirm(_ confirmation: Confirmation) {
+    switch confirmation {
+    case .removeUnsaved(let id):
+      Task { await avatars.dismiss(id) }
+    case .redrawAll(let id):
+      avatars.regenerateAll(id)
+    case .replaceDescription(let id):
+      Task { await takeDescription(of: id) }
+    }
+  }
+
+  /// "Edit the Description…" of a failed generation: its description in the card, unfolded and in
+  /// view. A description being written in the card is not replaced without asking.
+  func reviseDescription(of id: UUID) {
+    guard let job = avatars.job(id) else { return }
+    if AvatarLibraryPresentation.replacesDescription(avatars.description, with: job.description) {
+      confirming = .replaceDescription(id)
+    } else {
+      Task { await takeDescription(of: id) }
+    }
+  }
+
+  private func takeDescription(of id: UUID) async {
+    await avatars.reviseDescription(of: id)
+    isCreating = true
+    cardRequest += 1
+  }
+
   func export(_ id: AvatarID, includingDescription: Bool) {
     Task {
       guard let data = await avatars.exportArchive(id, includingDescription: includingDescription)
@@ -317,15 +437,17 @@ struct AvatarLibraryView: View {
   /// An archive dropped on the list: the first zip file is imported, when something new can be
   /// made now.
   private func drop(_ urls: [URL]) -> Bool {
-    guard let url = AvatarLibraryPresentation.archive(in: urls), avatars.isIdle else {
+    guard let url = AvatarLibraryPresentation.archive(in: urls), avatars.canStartCreation else {
       return false
     }
     importArchive(at: url)
     return true
   }
 
-  /// Files dropped between the rows of the list: their URLs are read, then dropped as on the page.
-  private func dropFiles(_ providers: [NSItemProvider]) {
+  /// Files dropped between the rows of the list: their URLs are read, then dropped as on the page
+  /// — the first zip archive alone, when a new avatar can be made now.
+  func dropFiles(_ providers: [NSItemProvider]) {
+    guard avatars.canStartCreation else { return }
     for provider in providers where provider.canLoadObject(ofClass: URL.self) {
       _ = provider.loadObject(ofClass: URL.self) { url, _ in
         guard let url else { return }
@@ -359,6 +481,36 @@ struct AvatarLibraryView: View {
       await avatars.importArchive(data)
       // Imported: the card folds up, its work done.
       if avatars.problem == nil { isCreating = false }
+    }
+  }
+}
+
+/// The window the page is drawn in, without keeping it alive.
+final class PageWindow {
+  weak var window: NSWindow?
+
+  /// Hands the window to `PageWindow` as soon as the page is in one.
+  struct Reader: NSViewRepresentable {
+    let page: PageWindow
+
+    func makeNSView(context: Context) -> ReaderView {
+      let view = ReaderView()
+      view.page = page
+      return view
+    }
+
+    func updateNSView(_ nsView: ReaderView, context: Context) {
+      nsView.page = page
+      page.window = nsView.window
+    }
+  }
+
+  final class ReaderView: NSView {
+    weak var page: PageWindow?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      page?.window = window
     }
   }
 }
@@ -452,6 +604,9 @@ struct AvatarRow<Menu: View>: View {
           AvatarView(images: [.neutral: image], expression: .neutral, size: 44)
         } else if entry.problem == .unreadable {
           Image(systemName: "exclamationmark.triangle").foregroundStyle(.red)
+        } else {
+          // Still being read: the square keeps its place.
+          Color.clear
         }
       }
       VStack(alignment: .leading, spacing: 1) {
@@ -508,7 +663,7 @@ struct AvatarRow<Menu: View>: View {
   }
 
   private func nameText(_ name: String) -> Text {
-    entry.id == .default ? Text("Default avatar", bundle: .module) : Text(verbatim: name)
+    entry.id == .default ? Text(AvatarLibraryRules.defaultAvatarTitle) : Text(verbatim: name)
   }
 }
 
@@ -897,6 +1052,16 @@ enum AvatarLibraryPresentation {
 
   static func relative(_ locale: Locale) -> Date.RelativeFormatStyle {
     Date.RelativeFormatStyle(presentation: .named, unitsStyle: .abbreviated, locale: locale)
+  }
+
+  /// What the rows of the list accept: files — the Finder's drag says no more — of which the zip
+  /// archives alone are read.
+  static let droppedTypes: [UTType] = [.fileURL]
+
+  /// Whether taking a failed generation's description replaces another being written.
+  static func replacesDescription(_ current: String, with other: String) -> Bool {
+    let written = current.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !written.isEmpty && written != other.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   /// The first zip archive of what was dropped.

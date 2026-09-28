@@ -626,6 +626,7 @@ private struct KeepingAlive: AvatarLibrary {
   func entries() async throws -> [AvatarLibraryEntry] { try await library.entries() }
   func canCreate() async throws -> Bool { try await library.canCreate() }
   func load(_ id: AvatarID) async throws -> AvatarSpriteSet { try await library.load(id) }
+  func thumbnail(_ id: AvatarID) async throws -> Data? { try await library.thumbnail(id) }
   func saveDraft(_ avatar: AvatarSpriteSet, basedOn: AvatarID?) async throws -> AvatarID {
     try await library.saveDraft(avatar, basedOn: basedOn)
   }

@@ -152,6 +152,10 @@ private final class ScriptedLibrary: AvatarLibrary, @unchecked Sendable {
     if unreadable, id == inUseID { throw AvatarStoreError.unreadable }
     return try await library.load(id)
   }
+  func thumbnail(_ id: AvatarID) async throws -> Data? {
+    if unreadable, id == inUseID { throw AvatarStoreError.unreadable }
+    return try await library.thumbnail(id)
+  }
   func saveDraft(_ avatar: AvatarSpriteSet, basedOn: AvatarID?) async throws -> AvatarID {
     try await writing()
     return try await library.saveDraft(avatar, basedOn: basedOn)

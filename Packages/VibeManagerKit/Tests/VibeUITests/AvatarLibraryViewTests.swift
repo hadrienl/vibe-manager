@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Testing
+import UniformTypeIdentifiers
 import VibeApplication
 import VibeLocalizationTesting
 
@@ -303,6 +304,12 @@ struct AvatarLibraryViewTests {
     defer { window.close() }
     await settle(window, "the list") { Self.table(in: host.view) != nil }
     let table = try #require(Self.table(in: host.view))
+    // A file dragged from the Finder carries its URL, never the type of what it holds: the rows
+    // take file URLs, and read only the zip archives.
+    let board = NSPasteboard(name: NSPasteboard.Name("avatar-drop-\(UUID())"))
+    board.clearContents()
+    board.writeObjects([URL(fileURLWithPath: "/tmp/Avatar - Robot.zip") as NSURL])
+    #expect(board.types?.contains(NSPasteboard.PasteboardType(UTType.zip.identifier)) == false)
     #expect(table.registeredDraggedTypes.contains(.fileURL))
     // Around the list — its header, its footer — the page's destination takes the rest.
     let page = Self.descendants(of: host.view).filter {
@@ -314,11 +321,108 @@ struct AvatarLibraryViewTests {
   @Test("Each row has its avatar's face, read once, and gone with the avatar")
   func thumbnails() async throws {
     let avatars = await library()
+    // Not at launch: only once a page shows the list.
+    #expect(avatars.thumbnails.isEmpty)
+    avatars.showThumbnails()
+    await avatars.thumbnailTask?.value
     #expect(Set(avatars.thumbnails.keys) == Set(avatars.entries.map(\.id)))
     let robot = try #require(avatars.entries.last)
     await avatars.remove(robot.id)
+    await avatars.thumbnailTask?.value
     #expect(avatars.thumbnails[robot.id] == nil)
     #expect(Set(avatars.thumbnails.keys) == Set(avatars.entries.map(\.id)))
+  }
+
+  @Test("The avatar selected again keeps the images already made")
+  func sameImagesWhenSelectedAgain() async throws {
+    let avatars = await library()
+    let image = try #require(avatars.selectedImages[.neutral])
+    await avatars.refresh()
+    await avatars.select(avatars.selection)
+    #expect(avatars.selectedImages[.neutral] === image)
+  }
+
+  // MARK: - The keyboard
+
+  private static func key(
+    _ characters: String, code: UInt16, _ modifiers: NSEvent.ModifierFlags = [],
+    in window: NSWindow
+  ) -> NSEvent? {
+    NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+      windowNumber: window.windowNumber, context: nil, characters: characters,
+      charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
+  }
+
+  private static func press(
+    _ characters: String, code: UInt16, _ modifiers: NSEvent.ModifierFlags = [],
+    in window: NSWindow
+  ) {
+    guard let down = key(characters, code: code, modifiers, in: window) else { return }
+    window.sendEvent(down)
+  }
+
+  @Test("Return and ⌘⌫ typed in the description are the text's: nothing is renamed nor deleted")
+  func typingInTheDescription() async throws {
+    let avatars = await library()
+    let robot = try #require(avatars.entries.last)
+    await avatars.select(.avatar(robot.id))
+    avatars.description = "Une chouette"
+    let (window, host) = window(avatars, isCreating: true, language: "fr", dark: false)
+    defer { window.close() }
+    window.makeKeyAndOrderFront(nil)
+    var editor: NSTextView?
+    await settle(window, "the description") {
+      editor = Self.descendants(of: host.view).lazy.compactMap { $0 as? NSTextView }.first
+      return editor != nil
+    }
+    let text = try #require(editor)
+    await settle(window, "the keyboard in the description") {
+      window.firstResponder === text || window.makeFirstResponder(text)
+    }
+    text.setSelectedRange(NSRange(location: text.string.utf16.count, length: 0))
+    Self.press("\r", code: 36, in: window)
+    await settle(window, "the new line") { avatars.description.contains("\n") }
+    Self.press("\u{8}", code: 51, .command, in: window)
+    // Neither the alert that renames nor the question that deletes: the text had the keys.
+    for _ in 0..<20 {
+      window.contentView?.layoutSubtreeIfNeeded()
+      await Task.yield()
+    }
+    #expect(window.attachedSheet == nil)
+    #expect(avatars.entry(robot.id) != nil)
+  }
+
+  @Test("In the list, Return renames the avatar selected, and ⌘⌫ asks before deleting it")
+  func keysOfTheList() async throws {
+    let avatars = await library()
+    let robot = try #require(avatars.entries.last)
+    await avatars.select(.avatar(robot.id))
+    let (window, host) = window(avatars, isCreating: false, language: "fr", dark: false)
+    defer { window.close() }
+    window.makeKeyAndOrderFront(nil)
+    await settle(window, "the list") { Self.table(in: host.view) != nil }
+    let table = try #require(Self.table(in: host.view))
+    await settle(window, "the keyboard in the list") {
+      window.firstResponder === table || window.makeFirstResponder(table)
+    }
+    Self.press("\r", code: 36, in: window)
+    await settle(window, "the alert that renames") { window.attachedSheet != nil }
+    let rename = try #require(window.attachedSheet)
+    let field = Self.descendants(of: rename.contentView ?? NSView()).lazy
+      .compactMap { $0 as? NSTextField }.first { $0.isEditable }
+    #expect(field?.stringValue == "Robot rétro menthe")
+    window.endSheet(rename)
+    await settle(window, "the alert closed") { window.attachedSheet == nil }
+
+    await settle(window, "the keyboard in the list again") {
+      window.firstResponder === table || window.makeFirstResponder(table)
+    }
+    Self.press("\u{8}", code: 51, .command, in: window)
+    await settle(window, "the question that deletes") { window.attachedSheet != nil }
+    // Asked, not done.
+    #expect(avatars.entry(robot.id) != nil)
+    if let sheet = window.attachedSheet { window.endSheet(sheet) }
   }
 
   @Test("What the list selects is selected at once, and shown once read")
@@ -330,6 +434,45 @@ struct AvatarLibraryViewTests {
     await waitUntil("the robot shown") {
       avatars.selectedAvatar?.manifest.name == "Robot rétro menthe"
     }
+  }
+
+  @Test("The rows take only zip archives, and none while a new avatar cannot be made")
+  func rowsTakeArchivesOnly() async throws {
+    #expect(AvatarLibraryPresentation.droppedTypes == [.fileURL])
+    let avatars = await library()
+    generator.hold()
+    avatars.description = Self.owl
+    avatars.generate()
+    await waitUntil("the generation under way") { avatars.work != nil }
+    let view = AvatarLibraryView(avatars: avatars)
+    let archive = FileManager.default.temporaryDirectory
+      .appendingPathComponent("Avatar - \(UUID().uuidString).zip")
+    try Data("PK".utf8).write(to: archive)
+    defer { try? FileManager.default.removeItem(at: archive) }
+    // During a generation: not even read.
+    view.dropFiles([NSItemProvider(object: archive as NSURL)])
+    for _ in 0..<20 { await Task.yield() }
+    #expect(!avatars.isImporting)
+    #expect(avatars.problem == nil)
+    avatars.cancel()
+    generator.release()
+
+    // Another file is left alone; the archive is read — and refused here, being none.
+    let text = archive.deletingPathExtension().appendingPathExtension("txt")
+    try Data("PK".utf8).write(to: text)
+    defer { try? FileManager.default.removeItem(at: text) }
+    view.dropFiles([NSItemProvider(object: text as NSURL)])
+    for _ in 0..<20 { await Task.yield() }
+    #expect(avatars.problem == nil)
+    view.dropFiles([NSItemProvider(object: archive as NSURL)])
+    await waitUntil("the archive read") { avatars.problem == .archive(.archiveUnreadable) }
+  }
+
+  @Test("Edit the Description… does not replace, unasked, a description being written")
+  func replacesDescription() {
+    #expect(!AvatarLibraryPresentation.replacesDescription("", with: "Un hibou"))
+    #expect(!AvatarLibraryPresentation.replacesDescription(" Un hibou\n", with: "Un hibou"))
+    #expect(AvatarLibraryPresentation.replacesDescription("Un renard", with: "Un hibou"))
   }
 
   @Test("Only a zip archive is taken from what is dropped")
@@ -395,6 +538,7 @@ struct AvatarLibraryViewTests {
         avatars.entries.count + AvatarLibraryPresentation.listedJobs(avatars.jobs).count + 1
       await settle(window, "the rows of \(state)") {
         Self.table(in: view)?.numberOfRows == rows && Self.preview(in: view) != nil
+          && avatars.thumbnails.count == avatars.entries.count
           && (state != .card || Self.descendants(of: view).contains { $0 is NSTextView })
       }
       switch state {

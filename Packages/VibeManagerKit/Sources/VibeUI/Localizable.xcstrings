@@ -1640,6 +1640,52 @@
         }
       }
     },
+    "%lld expressions are missing: draw them with + before keeping this avatar." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expression is missing: draw it with + before keeping this avatar."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld expressions are missing: draw them with + before keeping this avatar."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il manque %lld expressions : dessinez-les avec + avant de garder cet avatar."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il manque %lld expression : dessinez-la avec + avant de garder cet avatar."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il manque %lld expressions : dessinez-les avec + avant de garder cet avatar."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld expressions missing" : {
       "localizations" : {
         "en" : {
@@ -5398,17 +5444,6 @@
         }
       }
     },
-    "Default avatar" : {
-      "comment" : "The avatar shipped with the application.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Avatar par défaut"
-          }
-        }
-      }
-    },
     "Default model of the agent" : {
       "localizations" : {
         "fr" : {
@@ -5739,6 +5774,16 @@
         }
       }
     },
+    "Draw everything again?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout redessiner ?"
+          }
+        }
+      }
+    },
     "Drawn by" : {
       "localizations" : {
         "fr" : {
@@ -6041,16 +6086,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Expressions"
-          }
-        }
-      }
-    },
-    "Expressions are missing: generate them before keeping this avatar." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des expressions manquent : générez-les avant de garder cet avatar."
           }
         }
       }
@@ -6444,6 +6479,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Régénérer cette expression"
+          }
+        }
+      }
+    },
+    "Generation started %@ ago" : {
+      "comment" : "Under the name of an avatar being drawn: for how long.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Génération commencée il y a %@"
           }
         }
       }
@@ -9367,6 +9413,16 @@
         }
       }
     },
+    "Remove this avatar?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer cet avatar ?"
+          }
+        }
+      }
+    },
     "Rename" : {
       "comment" : "Renames a group.",
       "localizations" : {
@@ -9419,12 +9475,22 @@
       }
     },
     "Replace" : {
-      "comment" : "Replace the template of the library.",
+      "comment" : "Replace the template of the library.\nPuts the description of a failed generation in the card.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remplacer"
+          }
+        }
+      }
+    },
+    "Replace the description being written?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer la description en cours ?"
           }
         }
       }
@@ -11895,6 +11961,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La conversation continue avec le modèle par défaut de l’agent."
+          }
+        }
+      }
+    },
+    "The current drawing will be replaced." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dessin actuel sera remplacé."
+          }
+        }
+      }
+    },
+    "The description of the failed generation takes the place of the one in the card." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La description de la génération échouée remplace celle de la carte."
           }
         }
       }
@@ -15203,6 +15289,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » ne peut pas être transmis : son nom contient un caractère de contrôle."
+          }
+        }
+      }
+    },
+    "“%@” is missing: draw it with + before keeping this avatar." : {
+      "comment" : "The expression a draft lacks.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il manque « %@ » : dessinez-la avec + avant de garder cet avatar."
           }
         }
       }

@@ -12,8 +12,13 @@ public enum AvatarLibraryRules {
 
   /// What the default avatar is called, whatever its manifest says.
   public static var defaultAvatarName: String {
-    String(
-      localized: "Default Avatar", bundle: .module,
+    String(localized: defaultAvatarTitle)
+  }
+
+  /// The same, for a screen that shows it in its own language.
+  public static var defaultAvatarTitle: LocalizedStringResource {
+    LocalizedStringResource(
+      "Default Avatar", bundle: .module,
       comment: "The avatar shipped with the application, in the list of avatars.")
   }
 

@@ -41,6 +41,7 @@ public struct AvatarLibraryContract: Sendable {
     case discardKeepsUse = "Discarding a draft leaves the avatar in use alone"
     case useUnknown = "Using or reading an avatar the library does not hold is refused"
     case removeInUse = "Deleting the avatar in use: the default one is back in use"
+    case thumbnails = "A thumbnail is the neutral sprite alone, or nothing when it lacks one"
   }
 
   private let make: Factory
@@ -132,6 +133,7 @@ public struct AvatarLibraryContract: Sendable {
     case .discardKeepsUse: try await discardKeepsUse()
     case .useUnknown: try await useUnknown()
     case .removeInUse: try await removeInUse()
+    case .thumbnails: try await thumbnails()
     }
   }
 
@@ -365,5 +367,24 @@ public struct AvatarLibraryContract: Sendable {
     try await library.remove(robot)
     try check(try await library.inUse() == .default, "default back")
     try check(try await library.entries().map(\.id) == [.default], "gone")
+  }
+
+  private func thumbnails() async throws {
+    let library = try await library(kept: [
+      avatar("Fox", marker: 2), avatar("Owl", missing: [.neutral], marker: 3),
+    ])
+    let entries = try await library.entries()
+    let fox = try await library.load(entries[1].id)
+    try check(
+      try await library.thumbnail(entries[1].id) == fox.sprites[.neutral], "the fox's neutral")
+    try check(try await library.thumbnail(entries[2].id) == nil, "the owl lacks one")
+    let placeholder = try await library.load(.default)
+    try check(
+      try await library.thumbnail(.default) == placeholder.sprites[.neutral], "the default's")
+    try await expect(AvatarLibraryError.notFound) {
+      _ = try await library.thumbnail(.stored(UUID()))
+    }
+    let missing = try await self.library(defaultAvatar: .some(nil))
+    try await expect(AvatarStoreError.unreadable) { _ = try await missing.thumbnail(.default) }
   }
 }

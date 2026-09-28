@@ -48,7 +48,7 @@ extension AvatarLibraryView {
       HStack(spacing: 8) {
         Group {
           if entry.id == .default {
-            Text("Default avatar", bundle: .module)
+            Text(AvatarLibraryRules.defaultAvatarTitle)
           } else {
             Text(verbatim: name)
           }
@@ -179,7 +179,8 @@ extension AvatarLibraryView {
     HStack(spacing: 6) {
       if !(entry.manifest?.description ?? "").isEmpty {
         Button {
-          avatars.regenerateAll(entry.id)
+          // What is drawn now is replaced: asked first.
+          confirming = .redrawAll(entry.id)
         } label: {
           Text("Draw Everything Again", bundle: .module)
         }
@@ -204,11 +205,21 @@ extension AvatarLibraryView {
       Text("Use it in the floating panel", bundle: .module)
     }
     .accessibilityIdentifier("avatar-use-kept")
-    if avatars.selectedAvatar != nil, !isComplete {
-      Text("Expressions are missing: generate them before keeping this avatar.", bundle: .module)
-        .font(.caption)
-        .foregroundStyle(.orange)
-        .fixedSize(horizontal: false, vertical: true)
+    if let missing = avatars.selectedAvatar?.missingExpressions, !missing.isEmpty {
+      Group {
+        if missing.count == 1, let expression = missing.first {
+          Text(
+            "“\(Text(AvatarPresentation.name(of: expression)))” is missing: draw it with + before keeping this avatar.",
+            bundle: .module)
+        } else {
+          Text(
+            "\(missing.count) expressions are missing: draw them with + before keeping this avatar.",
+            bundle: .module)
+        }
+      }
+      .font(.caption)
+      .foregroundStyle(.orange)
+      .fixedSize(horizontal: false, vertical: true)
     }
     if let ignored = avatars.ignoredFiles, ignored.draft == entry.id {
       Text(
@@ -228,10 +239,10 @@ extension AvatarLibraryView {
     let agent = AvatarLibraryPresentation.agentName(job.provider.rawValue, avatars: avatars)
     AvatarStage {
       if job.isUnderWay {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
           Circle()
             .strokeBorder(.tertiary, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
-            .frame(width: 72, height: 72)
+            .frame(width: 96, height: 96)
             .overlay(ProgressView().controlSize(.small))
           VStack(spacing: 2) {
             Text("\(agent) is drawing ten expressions", bundle: .module)
@@ -249,7 +260,8 @@ extension AvatarLibraryView {
             .progressViewStyle(.linear)
             .frame(width: 190)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
       } else {
         FailureMark()
       }
@@ -266,7 +278,12 @@ extension AvatarLibraryView {
       Group {
         switch job.phase {
         case .running, .writing:
-          AvatarProgressText(avatars: avatars, job: job)
+          TimelineView(.periodic(from: job.startedAt, by: 1)) { context in
+            Text(
+              "Generation started \(AvatarLibraryPresentation.elapsed(context.date.timeIntervalSince(job.startedAt))) ago",
+              bundle: .module, comment: "Under the name of an avatar being drawn: for how long.")
+          }
+          .monospacedDigit()
         case .failed(_, let at), .unsaved(let at):
           Text(
             "Drawn by \(agent) · \(at.formatted(AvatarLibraryPresentation.relative(locale)))",
@@ -293,10 +310,7 @@ extension AvatarLibraryView {
       errorBox(Text(AvatarPresentation.message(for: .generation(error))))
       HStack(spacing: 6) {
         Button {
-          Task {
-            await avatars.reviseDescription(of: job.id)
-            isCreating = true
-          }
+          reviseDescription(of: job.id)
         } label: {
           Text("Edit the Description…", bundle: .module)
         }
@@ -321,7 +335,8 @@ extension AvatarLibraryView {
       HStack(spacing: 6) {
         Spacer()
         Button {
-          Task { await avatars.dismiss(job.id) }
+          // What was drawn is lost with it: asked first.
+          confirming = .removeUnsaved(job.id)
         } label: {
           Text("Remove", bundle: .module)
         }
@@ -355,15 +370,13 @@ extension AvatarLibraryView {
       }
       .font(.caption)
       .foregroundStyle(.secondary)
-      LazyVGrid(columns: Self.expressionColumns, spacing: 6) {
-        ForEach(AvatarExpression.allCases, id: \.self) { expression in
-          ExpressionTile(
-            expression: expression, image: avatars.selectedImages[expression],
-            isLoaded: avatars.selectedAvatar != nil, redraws: redraws,
-            isEnabled: avatars.canRegenerate
-          ) {
-            avatars.regenerate(expression)
-          }
+      Self.expressionGrid { expression in
+        ExpressionTile(
+          expression: expression, image: avatars.selectedImages[expression],
+          isLoaded: avatars.selectedAvatar != nil, redraws: redraws,
+          isEnabled: avatars.canRegenerate
+        ) {
+          avatars.regenerate(expression)
         }
       }
     }
@@ -374,18 +387,31 @@ extension AvatarLibraryView {
       Text("Expressions", bundle: .module)
         .font(.caption)
         .foregroundStyle(.secondary)
-      LazyVGrid(columns: Self.expressionColumns, spacing: 6) {
-        ForEach(AvatarExpression.allCases, id: \.self) { expression in
-          ExpressionTile(
-            expression: expression, image: nil, isLoaded: false, redraws: false, isEnabled: false
-          ) {}
-        }
+      Self.expressionGrid { expression in
+        ExpressionTile(
+          expression: expression, image: nil, isLoaded: false, redraws: false, isEnabled: false
+        ) {}
       }
     }
   }
 
-  private static var expressionColumns: [GridItem] {
-    Array(repeating: GridItem(.flexible(), spacing: 6), count: 5)
+  /// The ten expressions, five by row, aligned on the top of their tiles: a name on three lines
+  /// does not move its tile down.
+  private static func expressionGrid<Tile: View>(
+    @ViewBuilder _ tile: @escaping (AvatarExpression) -> Tile
+  ) -> some View {
+    let rows = [
+      Array(AvatarExpression.allCases.prefix(5)), Array(AvatarExpression.allCases.dropFirst(5)),
+    ]
+    return Grid(alignment: .top, horizontalSpacing: 6, verticalSpacing: 6) {
+      ForEach(rows.indices, id: \.self) { row in
+        GridRow(alignment: .top) {
+          ForEach(rows[row], id: \.self) { expression in
+            tile(expression)
+          }
+        }
+      }
+    }
   }
 
   // MARK: - Messages
@@ -598,8 +624,9 @@ struct ExpressionTile: View {
         .font(.caption2)
         .foregroundStyle(isMissing ? .orange : .secondary)
         .multilineTextAlignment(.center)
-        .lineLimit(2, reservesSpace: true)
-        .minimumScaleFactor(0.8)
+        // Whole, at the size of the others: "Bouche grande ouverte" takes a third line.
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity)
     .accessibilityElement(children: .contain)
