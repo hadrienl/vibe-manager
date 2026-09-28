@@ -84,7 +84,8 @@ public enum AvatarLibraryRules {
 /// ```json
 /// { "format": 1, "inUse": "<id>|default",
 ///   "entries": [ { "id": "<id>", "state": "kept|draft", "basedOn": "<id>",
-///                  "addedAt": "2026-09-28T10:00:00.000Z" } ] }
+///                  "addedAt": "2026-09-28T10:00:00.000Z" } ],
+///   "legacy": { "inode": 1234, "modifiedNanoseconds": 1790000000000000000 } }
 /// ```
 public struct AvatarLibraryIndex: Hashable, Sendable, Codable {
   /// The version of `library.json` this application writes. One of a later version is not read:
@@ -162,12 +163,26 @@ public struct AvatarLibraryIndex: Hashable, Sendable, Codable {
     }
   }
 
+  /// Which folder of the single avatar of earlier versions (`Avatar/`) was already taken in, so
+  /// that it is not taken again while it stays as it was: when it could not be moved away.
+  public struct LegacyMark: Hashable, Sendable, Codable {
+    public let inode: UInt64
+    public let modifiedNanoseconds: Int64
+
+    public init(inode: UInt64, modifiedNanoseconds: Int64) {
+      self.inode = inode
+      self.modifiedNanoseconds = modifiedNanoseconds
+    }
+  }
+
   public private(set) var inUse: AvatarID
   public private(set) var records: [Record]
+  public var legacy: LegacyMark?
 
   /// An index as read from disk is made consistent: each avatar once, a draft based only on a kept
   /// avatar, the one in use kept.
-  public init(inUse: AvatarID = .default, records: [Record] = []) {
+  public init(inUse: AvatarID = .default, records: [Record] = [], legacy: LegacyMark? = nil) {
+    self.legacy = legacy
     var seen = Set<UUID>()
     let unique = records.filter { seen.insert($0.id).inserted }
     let kept = Set(unique.filter { $0.state == .kept }.map(\.id))
@@ -184,7 +199,7 @@ public struct AvatarLibraryIndex: Hashable, Sendable, Codable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case format, inUse, entries
+    case format, inUse, entries, legacy
   }
 
   public init(from decoder: any Decoder) throws {
@@ -196,7 +211,8 @@ public struct AvatarLibraryIndex: Hashable, Sendable, Codable {
     }
     self.init(
       inUse: (try? container.decodeIfPresent(AvatarID.self, forKey: .inUse)) ?? .default,
-      records: try container.decode([Record].self, forKey: .entries))
+      records: try container.decode([Record].self, forKey: .entries),
+      legacy: try? container.decodeIfPresent(LegacyMark.self, forKey: .legacy))
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -204,6 +220,7 @@ public struct AvatarLibraryIndex: Hashable, Sendable, Codable {
     try container.encode(Self.currentFormat, forKey: .format)
     try container.encode(inUse, forKey: .inUse)
     try container.encode(records, forKey: .entries)
+    try container.encodeIfPresent(legacy, forKey: .legacy)
   }
 
   public func record(_ id: UUID) -> Record? {

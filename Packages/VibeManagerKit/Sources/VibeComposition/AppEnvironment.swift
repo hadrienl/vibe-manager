@@ -396,7 +396,7 @@ public final class AppEnvironment {
     let avatarLibrary = FileAvatarLibrary(
       directory: dataFolder.appendingPathComponent("Avatars", isDirectory: true),
       legacy: dataFolder.appendingPathComponent("Avatar", isDirectory: true),
-      defaultAvatar: { DefaultAvatar.load() })
+      defaultAvatar: { DefaultAvatar.load() }, diagnostics: diagnostics)
     let avatarStudio = AvatarStudioModel(
       workshop: AvatarWorkshop(processing: AvatarImageProcessor(), diagnostics: diagnostics),
       store: LibraryAvatarStore(library: avatarLibrary),

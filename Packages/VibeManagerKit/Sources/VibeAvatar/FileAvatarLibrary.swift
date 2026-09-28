@@ -28,8 +28,11 @@ import VibeApplication
 ///
 /// The single avatar of the versions before the library (`Avatar/`, #41) is taken in, kept and in
 /// use, even unreadable: at the first launch, and again whenever an earlier version wrote one
-/// since — it is the user's latest choice. It is copied in, the index written, and only then is
-/// `Avatar/` deleted: an interruption starts over, at worst with a second copy, never with less.
+/// since — it is the user's latest choice. It is copied in, the index written with a mark of the
+/// folder taken, and only then is `Avatar/` renamed away in one step: an interruption starts over,
+/// at worst with a second copy, never with less; a folder that cannot be moved is not taken twice.
+///
+/// Readings go back to `library.json` when another instance rewrote it, without the lock.
 public actor FileAvatarLibrary: AvatarLibrary {
   static let indexFileName = "library.json"
   static let lockFileName = "library.lock"
@@ -48,36 +51,47 @@ public actor FileAvatarLibrary: AvatarLibrary {
   private let now: @Sendable () -> Date
   private let makeID: @Sendable () -> UUID
   private let fileManager = FileManager.default
+  private let writeIndexFile: @Sendable (Data, URL) throws -> Void
+  private let diagnostics: Diagnostics
+  private let lockTimeout: Duration
+
+  /// Another instance held the library longer than it takes to change it.
+  public struct Busy: Error, Hashable {}
 
   /// The index as last read or written; every change reads it again under the lock.
   private var index: AvatarLibraryIndex?
+  /// `library.json` as it was when `index` was read or written: another inode, or another date,
+  /// and it is read again.
+  private var indexStamp: AvatarLibraryIndex.LegacyMark?
+  /// Why the library changes nothing: an index it could not read, nor set aside.
+  private var readOnly: (any Error)?
   /// The legacy avatar already copied in, while the index that uses it is not written yet: not
   /// copied a second time.
   private var legacyCopy: UUID?
   private var defaultAvatar: AvatarSpriteSet??
-  /// What writing the index throws, for the tests: a full disk.
-  private var indexWriteFailure: (any Error)?
 
   /// - Parameters:
   ///   - directory: `Avatars/`.
   ///   - legacy: `Avatar/`, the single avatar of the versions before the library.
   ///   - defaultAvatar: the one shipped with the application, read on first use.
+  ///   - writeIndexFile: writes `library.json`; atomically, `0600`, unless a test says otherwise.
   public init(
     directory: URL, legacy: URL? = nil,
     defaultAvatar: @escaping @Sendable () -> AvatarSpriteSet? = { nil },
+    diagnostics: Diagnostics = .disabled,
+    lockTimeout: Duration = .seconds(5),
     now: @escaping @Sendable () -> Date = Date.init,
-    makeID: @escaping @Sendable () -> UUID = UUID.init
+    makeID: @escaping @Sendable () -> UUID = UUID.init,
+    writeIndexFile: (@Sendable (Data, URL) throws -> Void)? = nil
   ) {
     self.directory = directory
     self.legacy = legacy
     self.loadDefaultAvatar = defaultAvatar
+    self.diagnostics = diagnostics
+    self.lockTimeout = lockTimeout
     self.now = now
     self.makeID = makeID
-  }
-
-  /// Makes every writing of the index fail with `error`, or succeed again with `nil`.
-  func failIndexWrites(with error: (any Error)?) {
-    indexWriteFailure = error
+    self.writeIndexFile = writeIndexFile ?? { data, url in try Self.writeFile(data, to: url) }
   }
 
   // MARK: - Reading
@@ -255,49 +269,87 @@ public actor FileAvatarLibrary: AvatarLibrary {
 
   // MARK: - The index
 
-  /// The index as last read; read — rebuilt, migrated — under the lock the first time.
+  /// The index as last read. Read again, without the lock, when another instance rewrote it; under
+  /// the lock — rebuilt, migrated — when it is missing, unreadable, or `Avatar/` is to be taken.
   private func prepared() throws -> AvatarLibraryIndex {
-    if let index { return index }
+    let indexPath = indexURL.path
+    if let index, Self.stamp(of: indexPath) == indexStamp, !legacyWaiting(for: index) {
+      return index
+    }
+    if fileManager.fileExists(atPath: indexPath) {
+      let stamp = Self.stamp(of: indexPath)
+      // A reading error is not a damaged index: nothing is touched, the caller is told.
+      let data = try Data(contentsOf: indexURL)
+      if let read = try? JSONDecoder().decode(AvatarLibraryIndex.self, from: data),
+        !legacyWaiting(for: read)
+      {
+        let next = reconciled(read)
+        index = next
+        indexStamp = stamp
+        return next
+      }
+    }
     return try locked { try refreshed() }
   }
 
   /// Runs a change under the lock, from the index as it is on disk now.
   private func changing<T>(_ change: (AvatarLibraryIndex) throws -> T) throws -> T {
-    try locked { try change(try refreshed()) }
+    try locked {
+      let current = try refreshed()
+      if let readOnly { throw readOnly }
+      return try change(current)
+    }
   }
 
   /// The index read again, made to say what the folders hold, the legacy avatar taken in; written
   /// back when that changed it. Called under the lock only.
   private func refreshed() throws -> AvatarLibraryIndex {
     index = nil
+    readOnly = nil
     removeLeftovers()
-    let indexURL = directory.appendingPathComponent(Self.indexFileName)
+    let stamp = Self.stamp(of: indexURL.path)
     var read: AvatarLibraryIndex?
     if fileManager.fileExists(atPath: indexURL.path) {
-      if let data = try? Data(contentsOf: indexURL),
-        let decoded = try? JSONDecoder().decode(AvatarLibraryIndex.self, from: data)
-      {
+      // Unreadable is not undecodable: a reading error changes nothing, and is said.
+      let data = try Data(contentsOf: indexURL)
+      if let decoded = try? JSONDecoder().decode(AvatarLibraryIndex.self, from: data) {
         read = decoded
       } else {
-        try setAside(indexURL)
+        do {
+          try setAside(indexURL)
+        } catch {
+          // The damaged index stays where it is, never written over: the library is read from
+          // its folders, and changes nothing until it can be set aside.
+          readOnly = error
+          let next = reconciled(AvatarLibraryIndex())
+          index = next
+          indexStamp = stamp
+          return next
+        }
       }
     }
     var next = reconciled(read ?? AvatarLibraryIndex())
     let tookLegacy = takeLegacy(into: &next)
-    if next != read { next = try writeIndex(next) }
-    if tookLegacy, let legacy {
-      // Only now that the index uses its copy.
-      removeQuietly(legacy)
-      legacyCopy = nil
-    }
+    if next != read { next = try writeIndex(next) } else { indexStamp = stamp }
+    if tookLegacy { moveLegacyAway() }
     index = next
     return next
   }
 
-  /// Copies `Avatar/`, whatever state it is in, into the library, kept and in use. Nothing is
-  /// taken when it cannot be copied: `Avatar/` stays, and is tried again at the next change.
-  private func takeLegacy(into index: inout AvatarLibraryIndex) -> Bool {
+  /// Whether `Avatar/` holds an avatar the library has not taken yet: there, and not the folder
+  /// the index says was taken.
+  private func legacyWaiting(for index: AvatarLibraryIndex) -> Bool {
     guard let legacy, isDirectory(legacy) else { return false }
+    return Self.stamp(of: legacy.path) != index.legacy
+  }
+
+  /// Copies `Avatar/`, whatever state it is in, into the library, kept and in use, and marks it
+  /// taken. Nothing is taken when it cannot be copied: `Avatar/` stays, and is tried again at the
+  /// next change.
+  private func takeLegacy(into index: inout AvatarLibraryIndex) -> Bool {
+    guard let legacy, legacyWaiting(for: index), let mark = Self.stamp(of: legacy.path) else {
+      return false
+    }
     let id: UUID
     if let copied = legacyCopy, isDirectory(folder(copied)) {
       id = copied
@@ -312,6 +364,8 @@ public actor FileAvatarLibrary: AvatarLibrary {
         try fileManager.moveItem(at: staging, to: folder(id))
       } catch {
         removeQuietly(staging)
+        diagnostics.record(
+          .store, .error, "avatar.legacyCopyFailed", ["code": Self.code(of: error)])
         return false
       }
       legacyCopy = id
@@ -320,8 +374,25 @@ public actor FileAvatarLibrary: AvatarLibrary {
     index = AvatarLibraryIndex(
       inUse: .stored(id),
       records: index.records.filter { $0.id != id }
-        + [.init(id: id, state: .kept, addedAt: record.addedAt)])
+        + [.init(id: id, state: .kept, addedAt: record.addedAt)],
+      legacy: mark)
     return true
+  }
+
+  /// `Avatar/` out of the way, now that the index uses its copy: renamed in one step beside the
+  /// leftovers, never deleted in place, so that it is never found half emptied. Should the rename
+  /// fail, it stays, and the index's mark keeps it from being taken again while it is unchanged.
+  private func moveLegacyAway() {
+    guard let legacy else { return }
+    do {
+      try fileManager.moveItem(
+        at: legacy,
+        to: directory.appendingPathComponent(
+          "\(Self.backupPrefix)legacy-\(UUID().uuidString)", isDirectory: true))
+      legacyCopy = nil
+    } catch {
+      diagnostics.record(.store, .notice, "avatar.legacyNotMoved", ["code": Self.code(of: error)])
+    }
   }
 
   /// The index, made to say what the folders hold: an entry without a folder is dropped, a folder
@@ -333,7 +404,7 @@ public actor FileAvatarLibrary: AvatarLibrary {
     let found = folders.subtracting(known).map { (id: $0, date: arrival(of: $0)) }
       .sorted { ($0.date, $0.id.uuidString) < ($1.date, $1.id.uuidString) }
     records += found.map { AvatarLibraryIndex.Record(id: $0.id, state: .kept, addedAt: $0.date) }
-    return AvatarLibraryIndex(inUse: index.inUse, records: records)
+    return AvatarLibraryIndex(inUse: index.inUse, records: records, legacy: index.legacy)
   }
 
   /// When a folder found without an entry was made: its manifest's date, or the folder's.
@@ -367,12 +438,31 @@ public actor FileAvatarLibrary: AvatarLibrary {
 
   /// Writes the index, and returns it as it will read back: its dates to the millisecond.
   private func writeIndex(_ index: AvatarLibraryIndex) throws -> AvatarLibraryIndex {
-    if let indexWriteFailure { throw indexWriteFailure }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     let data = try encoder.encode(index)
-    try writeFile(data, to: directory.appendingPathComponent(Self.indexFileName))
+    try writeIndexFile(data, indexURL)
+    indexStamp = Self.stamp(of: indexURL.path)
     return (try? JSONDecoder().decode(AvatarLibraryIndex.self, from: data)) ?? index
+  }
+
+  private var indexURL: URL { directory.appendingPathComponent(Self.indexFileName) }
+
+  /// What tells a file or a folder apart from the one there before: its inode, and when it last
+  /// changed. A file written atomically is a new inode.
+  static func stamp(of path: String) -> AvatarLibraryIndex.LegacyMark? {
+    var info = stat()
+    guard lstat(path, &info) == 0 else { return nil }
+    let modified = info.st_mtimespec
+    return AvatarLibraryIndex.LegacyMark(
+      inode: UInt64(info.st_ino),
+      modifiedNanoseconds: Int64(modified.tv_sec) * 1_000_000_000 + Int64(modified.tv_nsec))
+  }
+
+  private static func code(of error: any Error) -> DiagnosticValue {
+    let error = error as NSError
+    let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError
+    return .code(Int32(truncatingIfNeeded: underlying?.code ?? error.code))
   }
 
   /// Keeps an index this build cannot read beside it, dated, rather than writing over it.
@@ -386,9 +476,9 @@ public actor FileAvatarLibrary: AvatarLibrary {
     try fileManager.moveItem(at: url, to: aside)
   }
 
-  /// What a change interrupted by the end of its process left: staging folders, and the previous
-  /// images of an avatar whose replacement had already been moved in. Under the lock, no other
-  /// change is under way.
+  /// What a change interrupted by the end of its process left: staging folders, the previous
+  /// images of an avatar whose replacement had already been moved in, the old `Avatar/` once
+  /// taken. Under the lock, no other change is under way.
   private func removeLeftovers() {
     let names = (try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? []
     for name in names where name.hasPrefix(Self.stagingPrefix) || name.hasPrefix(Self.backupPrefix)
@@ -398,15 +488,22 @@ public actor FileAvatarLibrary: AvatarLibrary {
   }
 
   /// Runs `body` holding `library.lock`: one change at a time, whichever instance makes it. The
-  /// lock goes with the file's descriptor, even when the process ends.
+  /// lock goes with the file's descriptor, even when the process ends. Never waited for forever:
+  /// past `lockTimeout`, `FileAvatarLibrary.Busy`.
   private func locked<T>(_ body: () throws -> T) throws -> T {
     try createFolder(directory, intermediate: true)
     let path = directory.appendingPathComponent(Self.lockFileName).path
     let descriptor = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600)
     guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
     defer { close(descriptor) }
-    while flock(descriptor, LOCK_EX) != 0 {
-      guard errno == EINTR else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    let deadline = ContinuousClock.now + lockTimeout
+    while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+      let code = errno
+      guard code == EWOULDBLOCK || code == EINTR else {
+        throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+      }
+      guard ContinuousClock.now < deadline else { throw Busy() }
+      usleep(10_000)
     }
     defer { flock(descriptor, LOCK_UN) }
     return try body()

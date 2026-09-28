@@ -5,9 +5,26 @@ import VibeAvatarLibraryTesting
 
 @testable import VibeAvatar
 
+/// Writes `library.json` as the application does, until a test makes it fail: a full disk.
+final class IndexWrites: @unchecked Sendable {
+  private let lock = NSLock()
+  private var failure: (any Error)?
+
+  func fail(with error: (any Error)?) {
+    lock.withLock { failure = error }
+  }
+
+  func write(_ data: Data, to url: URL) throws {
+    if let failure = lock.withLock({ failure }) { throw failure }
+    try data.write(to: url, options: .atomic)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+  }
+}
+
 /// A folder of its own for each test, removed after it.
 final class TemporaryFolder: @unchecked Sendable {
   let url: URL
+  let writes = IndexWrites()
 
   init() {
     url = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -17,6 +34,7 @@ final class TemporaryFolder: @unchecked Sendable {
 
   deinit {
     // Folders a test made read-only are made writable again first.
+    try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
     if let items = FileManager.default.enumerator(atPath: url.path) {
       for case let item as String in items {
         try? FileManager.default.setAttributes(
@@ -85,7 +103,8 @@ struct FileAvatarLibraryTests {
   func library(_ folder: TemporaryFolder, legacy: Bool = false) -> FileAvatarLibrary {
     FileAvatarLibrary(
       directory: folder.library, legacy: legacy ? folder.legacy : nil,
-      defaultAvatar: { [contract] in contract.avatar("Placeholder") })
+      defaultAvatar: { [contract] in contract.avatar("Placeholder") },
+      writeIndexFile: { [writes = folder.writes] in try writes.write($0, to: $1) })
   }
 
   func mode(_ url: URL) throws -> Int? {
@@ -177,11 +196,11 @@ struct FileAvatarLibraryTests {
     let fox = try await library.duplicate(.default)
     try await library.setInUse(fox)
     let before = try await library.entries()
-    await library.failIndexWrites(with: DiskFull())
+    folder.writes.fail(with: DiskFull())
 
     await #expect(throws: DiskFull.self) { try await library.remove(fox) }
     await #expect(throws: DiskFull.self) { try await library.setInUse(.default) }
-    await library.failIndexWrites(with: nil)
+    folder.writes.fail(with: nil)
     #expect(try await library.entries() == before)
     #expect(try await library.inUse() == fox)
     #expect(try names(in: folder.library) == ["library.json", fox.description])
@@ -193,12 +212,12 @@ struct FileAvatarLibraryTests {
     let folder = TemporaryFolder()
     let library = library(folder)
     #expect(try await library.entries().count == 1)
-    await library.failIndexWrites(with: DiskFull())
+    folder.writes.fail(with: DiskFull())
     await #expect(throws: DiskFull.self) {
       _ = try await library.saveDraft(contract.avatar("Robot", marker: 3), basedOn: nil)
     }
     #expect(try names(in: folder.library).count == 2)
-    await library.failIndexWrites(with: nil)
+    folder.writes.fail(with: nil)
 
     let robot = try #require(try await library.entries().last)
     #expect(robot.state == .kept)
@@ -213,10 +232,10 @@ struct FileAvatarLibraryTests {
     let fox = try await library.saveDraft(contract.avatar("Fox", marker: 1), basedOn: nil)
     _ = try await library.keep(fox)
     let draft = try await library.saveDraft(contract.avatar("Fox", marker: 2), basedOn: fox)
-    await library.failIndexWrites(with: DiskFull())
+    folder.writes.fail(with: DiskFull())
 
     await #expect(throws: DiskFull.self) { _ = try await library.keep(draft) }
-    await library.failIndexWrites(with: nil)
+    folder.writes.fail(with: nil)
     #expect(try await library.load(fox).sprites[.neutral] == TestSprites.sprite(1))
     #expect(try await library.load(draft).sprites[.neutral] == TestSprites.sprite(2))
     #expect(
@@ -454,18 +473,129 @@ struct FileAvatarLibraryTests {
     let folder = TemporaryFolder()
     try writeLegacy(contract.avatar("Mine", marker: 9), in: folder)
     let library = library(folder, legacy: true)
-    await library.failIndexWrites(with: DiskFull())
+    folder.writes.fail(with: DiskFull())
     await #expect(throws: DiskFull.self) { _ = try await library.entries() }
     await #expect(throws: DiskFull.self) { _ = try await library.inUse() }
     #expect(FileManager.default.fileExists(atPath: folder.legacy.path))
 
-    await library.failIndexWrites(with: nil)
+    folder.writes.fail(with: nil)
     let inUse = try await library.inUse()
     #expect(try await library.load(inUse) == contract.avatar("Mine", marker: 9))
     // The copy made before is the one used: no second one.
     #expect(try await library.entries().count == 2)
     #expect(!FileManager.default.fileExists(atPath: folder.legacy.path))
     #expect(try await self.library(folder).inUse() == inUse)
+  }
+
+  @Test("An old folder that cannot be moved away is taken once, and the user's choice stands")
+  func legacyStuck() async throws {
+    let folder = TemporaryFolder()
+    try FileManager.default.createDirectory(at: folder.library, withIntermediateDirectories: true)
+    try writeLegacy(contract.avatar("Mine"), in: folder)
+    // Its parent is read-only: the old folder can be read, not moved.
+    try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.url.path)
+
+    let library = library(folder, legacy: true)
+    let mine = try await library.inUse()
+    #expect(mine != .default)
+    #expect(FileManager.default.fileExists(atPath: folder.legacy.path))
+    try await library.setInUse(.default)
+    _ = try await library.duplicate(.default)
+    #expect(try await library.inUse() == .default)
+    #expect(try await library.entries().count == 3)
+
+    // Relaunched: still the same old folder, not taken again.
+    let relaunched = self.library(folder, legacy: true)
+    #expect(try await relaunched.entries().count == 3)
+    #expect(try await relaunched.inUse() == .default)
+    try await relaunched.setInUse(mine)
+    #expect(try await relaunched.entries().count == 3)
+  }
+
+  @Test("A reading sees what another instance wrote, and an old folder written meanwhile")
+  func readsFollowTheDisk() async throws {
+    let folder = TemporaryFolder()
+    let first = library(folder, legacy: true)
+    let second = library(folder, legacy: true)
+    #expect(try await first.entries().count == 1)
+    let fox = try await second.duplicate(.default)
+    try await second.setInUse(fox)
+    #expect(try await first.entries().map(\.id) == [.default, fox])
+    #expect(try await first.inUse() == fox)
+
+    // An earlier version, run meanwhile, wrote its single avatar.
+    try writeLegacy(contract.avatar("Later", marker: 8), in: folder)
+    let later = try await first.inUse()
+    #expect(later != fox)
+    #expect(try await first.load(later) == contract.avatar("Later", marker: 8))
+    #expect(try await second.inUse() == later)
+    #expect(!FileManager.default.fileExists(atPath: folder.legacy.path))
+  }
+
+  @Test("An index that cannot be read, rather than decoded, is left alone, and said")
+  func indexReadError() async throws {
+    let folder = TemporaryFolder()
+    let fox = try Self.writeFolder(contract.avatar("Fox"), in: folder)
+    try Data("{}".utf8).write(to: folder.index)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o000], ofItemAtPath: folder.index.path)
+
+    let library = library(folder)
+    await #expect(throws: (any Error).self) { _ = try await library.entries() }
+    await #expect(throws: (any Error).self) { _ = try await library.duplicate(.stored(fox)) }
+    #expect(try names(in: folder.library) == ["library.json", fox.uuidString])
+  }
+
+  @Test("A damaged index that cannot be set aside: read from the folders, and nothing changed")
+  func readOnlyLibrary() async throws {
+    let folder = TemporaryFolder()
+    let fox = try Self.writeFolder(contract.avatar("Fox"), in: folder)
+    try Data("{ not json".utf8).write(to: folder.index)
+    // The lock of an earlier launch, then a folder nothing can be renamed in.
+    try Data().write(to: folder.library.appendingPathComponent("library.lock"))
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o500], ofItemAtPath: folder.library.path)
+
+    let library = library(folder)
+    #expect(try await library.entries().map(\.id) == [.default, .stored(fox)])
+    #expect(try await library.load(.stored(fox)).isComplete)
+    await #expect(throws: (any Error).self) { try await library.setInUse(.stored(fox)) }
+    #expect(String(decoding: try Data(contentsOf: folder.index), as: UTF8.self) == "{ not json")
+  }
+
+  @Test("A library another instance holds too long says so, rather than waiting forever")
+  func busy() async throws {
+    let folder = TemporaryFolder()
+    _ = try await library(folder).entries()
+    let descriptor = open(
+      folder.library.appendingPathComponent("library.lock").path, O_RDWR | O_CLOEXEC)
+    #expect(descriptor >= 0)
+    defer { close(descriptor) }
+    #expect(flock(descriptor, LOCK_EX) == 0)
+
+    let library = FileAvatarLibrary(directory: folder.library, lockTimeout: .milliseconds(100))
+    await #expect(throws: FileAvatarLibrary.Busy.self) {
+      _ = try await library.duplicate(.default)
+    }
+  }
+
+  @Test("An old folder that cannot be copied is left, and the diagnostics say so, without its name")
+  func legacyCopyFailure() async throws {
+    let folder = TemporaryFolder()
+    try FileManager.default.createDirectory(at: folder.library, withIntermediateDirectories: true)
+    try writeLegacy(contract.avatar("Mine"), in: folder)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o000], ofItemAtPath: folder.legacy.path)
+    let log = RecordingDiagnosticLog()
+    let library = FileAvatarLibrary(
+      directory: folder.library, legacy: folder.legacy,
+      diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()))
+
+    #expect(try await library.inUse() == .default)
+    #expect(log.events(named: "avatar.legacyCopyFailed").count >= 1)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o700], ofItemAtPath: folder.legacy.path)
+    #expect(try await library.inUse() != .default)
   }
 
   @Test("An avatar in use that lost a file since says which, as the single avatar did")
