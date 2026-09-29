@@ -24,9 +24,13 @@ struct MarkdownBlocksView: View {
   var spacing: Double?
   var secondary = false
   @Environment(\.conversationAppearance) private var appearance
+  @Environment(\.conversationTheme) private var theme
 
   var body: some View {
-    VStack(alignment: .leading, spacing: spacing ?? (appearance.density == .compact ? 6 : 10)) {
+    VStack(
+      alignment: .leading,
+      spacing: spacing ?? theme.layout.at(appearance.density).paragraphSpacing
+    ) {
       ForEach(Array(MarkdownProse.segments(blocks).enumerated()), id: \.offset) { _, segment in
         switch segment {
         case .prose(let blocks):
@@ -132,8 +136,8 @@ struct MarkdownTableView: View {
       }
       .foregroundStyle(theme.text.color)
     }
-    .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border.color))
+    .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.layout.innerRadius).stroke(theme.border.color))
   }
 }
 
@@ -185,8 +189,8 @@ struct CodeBlockView: View {
       .padding(12)
     }
     .background(theme.codeBackground.color)
-    .clipShape(RoundedRectangle(cornerRadius: 10))
-    .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.border.color))
+    .clipShape(RoundedRectangle(cornerRadius: theme.layout.blockRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.layout.blockRadius).stroke(theme.border.color))
     .onChange(of: code) { copied = false }
   }
 

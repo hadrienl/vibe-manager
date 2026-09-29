@@ -62,12 +62,12 @@ struct ConversationThemeFileTests {
       ConversationThemeFile.encode(.systemDark) == ConversationThemeFile.encode(.systemDark))
     let text = String(decoding: ConversationThemeFile.encode(.systemDark), as: UTF8.self)
     #expect(text.contains("\"bubbleBorder\" : null"))
-    #expect(text.contains("\"format\" : 1"))
+    #expect(text.contains("\"format\" : 2"))
   }
 
   @Test("A format this version does not know, or none, is refused")
   func format() {
-    #expect(problem(themeFile { $0["format"] = 2 }) == .unknownFormat)
+    #expect(problem(themeFile { $0["format"] = 3 }) == .unknownFormat)
     #expect(problem(themeFile { $0["format"] = "1" }) == .unknownFormat)
     #expect(problem(themeFile { $0["format"] = true }) == .unknownFormat)
     #expect(problem(themeFile { $0["format"] = nil }) == .missingKey("format"))
@@ -151,12 +151,107 @@ struct ConversationThemeFileTests {
   }
 }
 
+@Suite("Fonts and layout in a theme's file (#118)")
+struct ConversationThemeFontsAndLayoutTests {
+  private func layout(_ change: @escaping (inout [String: Any]) -> Void) -> Data {
+    themeFile { object in
+      var layout = object["layout"] as? [String: Any] ?? [:]
+      change(&layout)
+      object["layout"] = layout
+    }
+  }
+
+  private func fonts(_ message: Any, _ code: Any = NSNull()) -> Data {
+    themeFile { $0["fonts"] = ["message": message, "code": code] }
+  }
+
+  @Test("A file of format 1 is still read, with the system's fonts and the built-in layout")
+  func formatOne() throws {
+    let data = themeFile {
+      $0["format"] = 1
+      $0["fonts"] = nil
+      $0["layout"] = nil
+    }
+    let theme = try ConversationThemeFile.theme(from: data, id: "personal-old")
+    #expect(theme.fonts == ConversationTheme.Fonts())
+    #expect(theme.layout == ConversationTheme.Layout())
+    #expect(problem(themeFile { $0["layout"] = nil }) == .missingKey("layout"))
+  }
+
+  @Test("Fonts and layout come back as they were written")
+  func roundTrip() throws {
+    var theme = ConversationThemeLibraryRules.kept(.night, name: "Serré")
+    theme.fonts = ConversationTheme.Fonts(message: "Inter", code: "JetBrains Mono")
+    theme.layout.blockSpacing = 8
+    theme.layout.lineHeight = 1.5
+    theme.layout.contentWidth = 1000
+    theme.layout.bubbleRadius = 0
+    let read = try ConversationThemeFile.theme(
+      from: ConversationThemeFile.encode(theme), id: theme.id)
+    #expect(read.fonts == theme.fonts)
+    #expect(read.layout == theme.layout)
+  }
+
+  @Test("A number of the layout out of its range, or not a number, is refused")
+  func layoutValues() {
+    #expect(
+      problem(layout { $0["blockSpacing"] = 200 })
+        == .outOfRange("layout.blockSpacing", 4...48))
+    #expect(problem(layout { $0["lineHeight"] = "1.4" }) == .invalidValue("layout.lineHeight"))
+    #expect(problem(layout { $0["lineHeight"] = true }) == .invalidValue("layout.lineHeight"))
+    #expect(problem(layout { $0["gutter"] = 4 }) == .unknownKey("layout.gutter"))
+    #expect(problem(layout { $0["sideMargin"] = nil }) == .missingKey("layout.sideMargin"))
+    let details = ThemeFileProblem.outOfRange("layout.lineHeight", 1...1.8).details
+    #expect(details == ["\"layout.lineHeight\" must be a number from 1 to 1.8."])
+  }
+
+  @Test("A family is a name, never a path or a query")
+  func families() {
+    #expect(problem(fonts("Inter", "JetBrains Mono")) == nil)
+    for bad in [
+      "", " Inter", "../../etc", "Inter&text=x", "Inter\n", String(repeating: "a", count: 65),
+    ] {
+      #expect(problem(fonts(bad)) == .invalidValue("fonts.message"), "\(bad.debugDescription)")
+    }
+    #expect(problem(fonts(12)) == .invalidValue("fonts.message"))
+    #expect(
+      problem(themeFile { $0["fonts"] = ["message": NSNull(), "code": NSNull(), "ui": "A"] })
+        == .unknownKey("fonts.ui"))
+  }
+
+  @Test("Compact tightens the theme's spaces as it tightened the built-in ones")
+  func density() {
+    let comfortable = ConversationTheme.Layout()
+    let compact = comfortable.at(.compact)
+    #expect(compact.blockSpacing == 10)
+    #expect(compact.paragraphSpacing == 6)
+    #expect(compact.topPadding == 14)
+    #expect(compact.contentWidth == comfortable.contentWidth)
+    #expect(comfortable.at(.comfortable) == comfortable)
+    #expect(comfortable.innerRadius == 8)
+  }
+
+  @Test("The theme's fonts apply unless the user chose theirs")
+  func fontsApplied() {
+    var theme = ConversationTheme.night
+    theme.fonts = ConversationTheme.Fonts(message: "Inter", code: "Fira Code")
+    let own = theme.applying(ConversationAppearance())
+    #expect(own.messageFontFamily == "Inter")
+    #expect(own.codeFontFamily == "Fira Code")
+    let users = theme.applying(ConversationAppearance(messageFont: "Charter", codeFont: "SF Mono"))
+    #expect(users.messageFontFamily == "Charter")
+    #expect(users.codeFontFamily == nil)
+    theme.fonts.message = "New York"
+    #expect(theme.applying(ConversationAppearance()).fontStyle == .serif)
+  }
+}
+
 @Suite("The schema of a theme (#118)")
 struct ConversationThemeSchemaTests {
   static let documentURL = URL(filePath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent()
-    .appending(path: "docs/schemas/conversation-theme-1.schema.json")
+    .appending(path: "docs/schemas/conversation-theme-2.schema.json")
 
   @Test("The repository's schema is the one the application holds agents to")
   func repositoryDocument() throws {
@@ -178,7 +273,7 @@ struct ConversationThemeSchemaTests {
     #expect(schema["additionalProperties"] as? Bool == false)
     #expect(
       Set(schema["required"] as? [String] ?? [])
-        == ["format", "name", "isDark", "fontStyle", "colors"])
+        == ["format", "name", "isDark", "fontStyle", "colors", "fonts", "layout"])
     let properties = try #require(schema["properties"] as? [String: Any])
     let colors = try #require(properties["colors"] as? [String: Any])
     #expect(colors["additionalProperties"] as? Bool == false)
@@ -329,6 +424,25 @@ struct GenerateConversationThemeTests {
     #expect(await generator.requests.count == 1)
   }
 
+  @Test("A font that exists nowhere sends the answer back; Google out of reach keeps it")
+  func fonts() async throws {
+    let invented = themeFile { $0["fonts"] = ["message": "Zz Invented", "code": NSNull()] }
+    let real = themeFile { $0["fonts"] = ["message": "Inter", "code": NSNull()] }
+    let generator = ScriptedThemeGenerator([.success(invented), .success(real)])
+    let theme = try await GenerateConversationTheme(
+      generator: generator, fonts: Families(["Inter": .available, "Zz Invented": .unknown]))(
+        request)
+    #expect(theme.fonts.message == "Inter")
+    let problems = await generator.requests.last?.correction?.problems ?? []
+    #expect(problems.first?.hasPrefix("\"fonts.message\": \"Zz Invented\" is neither") == true)
+
+    let offline = ScriptedThemeGenerator([.success(real)])
+    let kept = try await GenerateConversationTheme(
+      generator: offline, fonts: Families(["Inter": .unreachable]))(request)
+    #expect(kept.fonts.message == "Inter")
+    #expect(await offline.requests.count == 1)
+  }
+
   @Test("The next version keeps the identifier of the one it changes")
   func sameIdentifier() async throws {
     var current = ConversationTheme.night
@@ -339,6 +453,16 @@ struct GenerateConversationThemeTests {
         description: "plus clair", isDark: true, language: "fr", current: current))
     #expect(theme.id == current.id)
   }
+}
+
+private struct Families: ThemeFontResolving {
+  let answers: [String: FontAvailability]
+
+  init(_ answers: [String: FontAvailability]) {
+    self.answers = answers
+  }
+
+  func prepare(_ family: String) async -> FontAvailability { answers[family] ?? .unknown }
 }
 
 private final class Events: @unchecked Sendable {

@@ -89,9 +89,14 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
   /// localized.
   public var personalName: String?
   public var fontStyle: FontStyle
-  /// A font family chosen by the user, in place of the theme's.
+  /// The family the messages and the code are drawn with, once the user's choices are applied:
+  /// the user's, or else the theme's own (`fonts`).
   public var messageFontFamily: String?
   public var codeFontFamily: String?
+  /// The families the theme itself asks for (#118): installed, or fetched from Google Fonts.
+  public var fonts = Fonts()
+  /// Its spaces, widths and corners (#118).
+  public var layout = Layout()
 
   public var background: ThemeColor
   public var surface: ThemeColor
@@ -123,6 +128,101 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
   public var warningBackground: ThemeColor
 
   public var isPersonal: Bool { id.hasPrefix(Self.personalPrefix) }
+
+  /// The families a theme asks for; `nil` keeps the system's family of its `fontStyle`.
+  public struct Fonts: Hashable, Sendable {
+    public var message: String?
+    public var code: String?
+
+    public init(message: String? = nil, code: String? = nil) {
+      self.message = message
+      self.code = code
+    }
+  }
+
+  /// How the conversation is laid out, in points, as the Comfortable density draws it: Compact
+  /// tightens the spaces.
+  public struct Layout: Hashable, Sendable {
+    /// Between two messages or tool calls.
+    public var blockSpacing: Double = 18
+    /// Between two paragraphs of a message.
+    public var paragraphSpacing: Double = 10
+    /// Above the first message.
+    public var topPadding: Double = 28
+    /// The height of a line of the messages, as a multiple of the text's size.
+    public var lineHeight: Double = 1.25
+    /// The widest the column of messages gets.
+    public var contentWidth: Double = 820
+    /// On each side of the column.
+    public var sideMargin: Double = 32
+    /// The corners of the user's messages.
+    public var bubbleRadius: Double = 16
+    /// The corners of the tool calls and of the code blocks.
+    public var blockRadius: Double = 10
+
+    public init() {}
+
+    /// The corners of what sits inside a block — an output, a table, an image —, a little
+    /// tighter than the block's: 8 for the built-in 10.
+    public var innerRadius: Double { (blockRadius * 0.8).rounded() }
+
+    public enum Key: String, CaseIterable, Sendable {
+      case blockSpacing, paragraphSpacing, topPadding, lineHeight, contentWidth, sideMargin
+      case bubbleRadius, blockRadius
+
+      /// What a theme may give it: what still reads, and still lays out.
+      public var range: ClosedRange<Double> {
+        switch self {
+        case .blockSpacing: 4...48
+        case .paragraphSpacing: 2...24
+        case .topPadding: 0...64
+        case .lineHeight: 1...1.8
+        case .contentWidth: 560...1200
+        case .sideMargin: 8...80
+        case .bubbleRadius: 0...24
+        case .blockRadius: 0...20
+        }
+      }
+    }
+
+    public subscript(key: Key) -> Double {
+      get {
+        switch key {
+        case .blockSpacing: blockSpacing
+        case .paragraphSpacing: paragraphSpacing
+        case .topPadding: topPadding
+        case .lineHeight: lineHeight
+        case .contentWidth: contentWidth
+        case .sideMargin: sideMargin
+        case .bubbleRadius: bubbleRadius
+        case .blockRadius: blockRadius
+        }
+      }
+      set {
+        switch key {
+        case .blockSpacing: blockSpacing = newValue
+        case .paragraphSpacing: paragraphSpacing = newValue
+        case .topPadding: topPadding = newValue
+        case .lineHeight: lineHeight = newValue
+        case .contentWidth: contentWidth = newValue
+        case .sideMargin: sideMargin = newValue
+        case .bubbleRadius: bubbleRadius = newValue
+        case .blockRadius: blockRadius = newValue
+        }
+      }
+    }
+
+    /// The layout at a density: Compact tightens the spaces as it always did — 18 to 10 between
+    /// blocks, 10 to 6 between paragraphs, 28 to 14 above the first message.
+    public func at(_ density: ConversationAppearance.Density) -> Layout {
+      guard density == .compact else { return self }
+      var layout = self
+      layout.blockSpacing = (blockSpacing * 10 / 18).rounded()
+      layout.paragraphSpacing = (paragraphSpacing * 0.6).rounded()
+      layout.topPadding = (topPadding * 0.5).rounded()
+      return layout
+    }
+  }
 
   /// A theme whose every required colour is given; `nil` when one is missing.
   public init?(
@@ -289,13 +389,15 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
       let black: ThemeColor = "#000000"
       theme.onAccent = custom.contrast(with: white) >= custom.contrast(with: black) ? white : black
     }
-    // The system's own families are reached by their design: SwiftUI does not know them by name.
-    switch appearance.messageFont {
+    // The user's fonts win over the theme's. The system's own families are reached by their
+    // design: SwiftUI does not know them by name.
+    switch appearance.messageFont ?? fonts.message {
     case "SF Pro": theme.fontStyle = .system
     case "New York": theme.fontStyle = .serif
     case let family: theme.messageFontFamily = family
     }
-    theme.codeFontFamily = appearance.codeFont == "SF Mono" ? nil : appearance.codeFont
+    let code = appearance.codeFont ?? fonts.code
+    theme.codeFontFamily = code == "SF Mono" ? nil : code
     return theme
   }
 

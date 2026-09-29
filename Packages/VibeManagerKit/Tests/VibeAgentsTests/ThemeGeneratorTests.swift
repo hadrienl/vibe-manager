@@ -120,7 +120,7 @@ struct CodexThemeCommandTests {
     #expect(!arguments.contains("-m"))
     #expect(arguments.last == "-")
     let input = String(decoding: sent.standardInput?.data ?? Data(), as: UTF8.self)
-    #expect(input.hasPrefix("You design colour themes"))
+    #expect(input.hasPrefix("You design themes"))
     #expect(input.contains("<description>\nune forêt la nuit\n</description>"))
   }
 
@@ -192,19 +192,27 @@ struct ThemeGeneratorOptionsTests {
   "A theme drawn by the real agents",
   .enabled(if: ProcessInfo.processInfo.environment["VIBE_THEME_INTEGRATION"] == "1"))
 struct ThemeIntegrationTests {
+  let styled = ThemeGenerationRequest(
+    description: "une forêt la nuit, avec la police Lobster pour les messages, très aéré et large",
+    isDark: true, language: "fr-FR")
+
   @Test("Claude Code draws a legible dark theme")
   func claude() async throws {
     let theme = try await GenerateConversationTheme(
-      generator: ClaudeCodeAgentProvider.make().themeGenerator())(request)
+      generator: ClaudeCodeAgentProvider.make().themeGenerator())(styled)
     #expect(theme.isDark)
     #expect(theme.legibilityFailures.isEmpty)
+    #expect(theme.fonts.message == "Lobster")
+    #expect(theme.layout.blockSpacing > ConversationTheme.Layout().blockSpacing)
   }
 
   @Test("Codex draws a legible dark theme")
   func codex() async throws {
     let theme = try await GenerateConversationTheme(
-      generator: CodexAgentProvider.make().themeGenerator())(request)
+      generator: CodexAgentProvider.make().themeGenerator())(styled)
     #expect(theme.isDark)
     #expect(theme.legibilityFailures.isEmpty)
+    #expect(theme.fonts.message == "Lobster")
+    #expect(theme.layout.blockSpacing > ConversationTheme.Layout().blockSpacing)
   }
 }

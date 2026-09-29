@@ -107,6 +107,7 @@ public final class ConversationThemesModel {
 
   @ObservationIgnored private let library: any ConversationThemeLibrary
   @ObservationIgnored private let generators: (any ThemeGeneratorResolving)?
+  @ObservationIgnored private let fonts: (any ThemeFontResolving)?
   @ObservationIgnored private let diagnostics: Diagnostics
   @ObservationIgnored private let language: String
   @ObservationIgnored private(set) var task: Task<Void, Never>?
@@ -117,11 +118,13 @@ public final class ConversationThemesModel {
 
   public init(
     library: any ConversationThemeLibrary = InMemoryConversationThemeLibrary(),
-    generators: (any ThemeGeneratorResolving)? = nil, diagnostics: Diagnostics = .disabled,
+    generators: (any ThemeGeneratorResolving)? = nil, fonts: (any ThemeFontResolving)? = nil,
+    diagnostics: Diagnostics = .disabled,
     language: String = Locale.preferredLanguages.first ?? "en"
   ) {
     self.library = library
     self.generators = generators
+    self.fonts = fonts
     self.diagnostics = diagnostics
     self.language = language
   }
@@ -145,13 +148,24 @@ public final class ConversationThemesModel {
   public func displayed(
     _ appearance: ConversationAppearance, isDark: Bool, increasedContrast: Bool
   ) -> ConversationTheme {
+    var theme: ConversationTheme
     if let trial {
       var own = appearance
       own.accent = .theme
-      return trial.applying(own)
+      theme = trial.applying(own)
+    } else {
+      theme = ConversationTheme.resolve(
+        appearance, isDark: isDark, increasedContrast: increasedContrast, personal: personal)
     }
-    return ConversationTheme.resolve(
-      appearance, isDark: isDark, increasedContrast: increasedContrast, personal: personal)
+    // A family the theme asks for that is not there — not fetched yet, or out of reach — gives
+    // way to the system's family of its style.
+    if let family = theme.messageFontFamily, !ConversationFonts.isInstalled(family) {
+      theme.messageFontFamily = nil
+    }
+    if let family = theme.codeFontFamily, !ConversationFonts.isInstalled(family) {
+      theme.codeFontFamily = nil
+    }
+    return theme
   }
 
   /// A theme by identifier, built in or the user's.
@@ -238,7 +252,7 @@ public final class ConversationThemesModel {
       versions.isEmpty
         ? LocalizedStringResource("\(agent) is making the theme.", bundle: .module)
         : LocalizedStringResource("\(agent) is changing the theme.", bundle: .module))
-    let generate = GenerateConversationTheme(generator: option.generator)
+    let generate = GenerateConversationTheme(generator: option.generator, fonts: fonts)
     let started = ContinuousClock.now
     let attempts = AttemptCounter()
     // Held for the generation only: the model is not let go of while an agent works for it.

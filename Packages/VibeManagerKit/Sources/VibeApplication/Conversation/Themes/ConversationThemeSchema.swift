@@ -1,7 +1,7 @@
 import Foundation
 
 /// The JSON schema of a theme's file (#118): what documents the format in the repository
-/// (`docs/schemas/conversation-theme-1.schema.json`, held equal to `document` by a test), and what
+/// (`docs/schemas/conversation-theme-2.schema.json`, held equal to `document` by a test), and what
 /// an agent's answer is held to.
 public enum ConversationThemeSchema {
   /// What each colour is for, as the agent is told.
@@ -36,6 +36,41 @@ public enum ConversationThemeSchema {
     case .failure: "Symbol of a tool call that failed, on the surface."
     case .warning: "Symbol of a warning, on the surface."
     case .warningBackground: "Background of a warning banner; its text is the main text colour."
+    }
+  }
+
+  /// What each number of the layout is, as the agent is told.
+  public static func purpose(of key: ConversationTheme.Layout.Key) -> String {
+    let base = ConversationTheme.Layout()[key]
+    let range = key.range
+    let what: String =
+      switch key {
+      case .blockSpacing: "Points between two messages or tool calls."
+      case .paragraphSpacing: "Points between two paragraphs of a message."
+      case .topPadding: "Points above the first message."
+      case .lineHeight: "Height of a line of the messages, as a multiple of the text size."
+      case .contentWidth: "Widest the column of messages gets, in points."
+      case .sideMargin: "Points on each side of the column of messages."
+      case .bubbleRadius: "Corner radius of the user's messages, in points."
+      case .blockRadius: "Corner radius of the tool calls and code blocks, in points."
+      }
+    return
+      "\(what) From \(ConversationThemeFile.number(range.lowerBound)) to "
+      + "\(ConversationThemeFile.number(range.upperBound)); the built-in themes use "
+      + "\(ConversationThemeFile.number(base))."
+  }
+
+  /// What each font is, as the agent is told.
+  static func purpose(of key: ConversationThemeFile.FontKey) -> String {
+    switch key {
+    case .message:
+      "The family of the messages: a font every Mac has (SF Pro, New York, Avenir Next, Charter, "
+        + "Iowan Old Style, Helvetica Neue, Georgia…) or the exact name of any Google Fonts family, "
+        + "which the application downloads. null keeps the system family of fontStyle."
+    case .code:
+      "The monospaced family of the code: SF Mono, Menlo, Monaco, or the exact name of a "
+        + "monospaced Google Fonts family (JetBrains Mono, Fira Code, IBM Plex Mono…). null keeps "
+        + "SF Mono."
     }
   }
 
@@ -81,6 +116,26 @@ public enum ConversationThemeSchema {
       name["minLength"] = 1
       name["maxLength"] = ConversationThemeFile.maximumNameLength
     }
+    var fonts: [String: Any] = [:]
+    for key in ConversationThemeFile.FontKey.allCases {
+      var property: [String: Any] = [
+        "type": ["string", "null"] as [Any], "description": purpose(of: key),
+      ]
+      if !forAgent {
+        property["pattern"] = "^[A-Za-z0-9-]([A-Za-z0-9 -]*[A-Za-z0-9-])?$"
+        property["maxLength"] = ConversationThemeFile.maximumFontNameLength
+      }
+      fonts[key.rawValue] = property
+    }
+    var layout: [String: Any] = [:]
+    for key in ConversationTheme.Layout.Key.allCases {
+      var property: [String: Any] = ["type": "number", "description": purpose(of: key)]
+      if !forAgent {
+        property["minimum"] = key.range.lowerBound
+        property["maximum"] = key.range.upperBound
+      }
+      layout[key.rawValue] = property
+    }
     var dark: [String: Any] = ["type": "boolean", "description": "Whether the theme is dark."]
     // Said rather than pinned with `enum`, which not every strict mode takes on a boolean: the
     // answer is checked against the mode asked for anyway.
@@ -111,6 +166,18 @@ public enum ConversationThemeSchema {
           "additionalProperties": false,
           "required": ConversationTheme.ColorRole.allCases.map(\.rawValue),
           "properties": colors,
+        ] as [String: Any],
+        "fonts": [
+          "type": "object",
+          "additionalProperties": false,
+          "required": ConversationThemeFile.FontKey.allCases.map(\.rawValue),
+          "properties": fonts,
+        ] as [String: Any],
+        "layout": [
+          "type": "object",
+          "additionalProperties": false,
+          "required": ConversationTheme.Layout.Key.allCases.map(\.rawValue),
+          "properties": layout,
         ] as [String: Any],
       ] as [String: Any],
     ]

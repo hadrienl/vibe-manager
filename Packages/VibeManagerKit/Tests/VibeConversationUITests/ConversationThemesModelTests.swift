@@ -186,6 +186,18 @@ struct ConversationThemesModelTests {
     #expect(trial.accent == fixture.model.trial?.accent)
   }
 
+  @Test("A family the theme asks for is drawn when it is there, and gives way when it is not")
+  func fonts() async {
+    var present = ConversationThemeLibraryRules.kept(.night, name: "Menlo")
+    present.fonts = ConversationTheme.Fonts(message: "Menlo", code: "Zz Absent Mono")
+    let fixture = Fixture(themes: [present])
+    await fixture.model.load()
+    let theme = fixture.model.displayed(
+      ConversationAppearance(darkTheme: present.id), isDark: true, increasedContrast: false)
+    #expect(theme.messageFontFamily == "Menlo")
+    #expect(theme.codeFontFamily == nil)
+  }
+
   @Test("Saving keeps the theme, gives it to the mode it was made for, and folds the panel")
   func save() async throws {
     let fixture = Fixture()

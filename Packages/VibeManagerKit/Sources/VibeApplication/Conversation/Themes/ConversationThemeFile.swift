@@ -18,11 +18,15 @@ public enum ThemeFileProblem: Error, Hashable, Sendable {
   case wrongMode(expectedDark: Bool)
   /// Pairs a reader could not read.
   case illegible([ThemeContrastFailure])
+  /// A number of the layout outside what it may be.
+  case outOfRange(String, ClosedRange<Double>)
+  /// A font family neither installed on the Mac nor on Google Fonts.
+  case unknownFont(String, family: String)
 
   /// What kind of problem it is, for the diagnostics, where nothing the file holds is written.
   public enum Code: String, Hashable, Sendable, DiagnosticTokenConvertible {
     case tooLarge, notJSON, unknownFormat, unknownKey, missingKey, invalidValue, invalidName
-    case wrongMode, illegible
+    case wrongMode, illegible, outOfRange, unknownFont
   }
 
   public var code: Code {
@@ -36,6 +40,8 @@ public enum ThemeFileProblem: Error, Hashable, Sendable {
     case .invalidName: .invalidName
     case .wrongMode: .wrongMode
     case .illegible: .illegible
+    case .outOfRange: .outOfRange
+    case .unknownFont: .unknownFont
     }
   }
 
@@ -64,6 +70,16 @@ public enum ThemeFileProblem: Error, Hashable, Sendable {
       ]
     case .illegible(let failures):
       failures.map(\.description)
+    case .outOfRange(let key, let range):
+      [
+        "\"\(key)\" must be a number from \(ConversationThemeFile.number(range.lowerBound)) to "
+          + "\(ConversationThemeFile.number(range.upperBound))."
+      ]
+    case .unknownFont(let key, let family):
+      [
+        "\"\(key)\": \"\(family)\" is neither a font installed on every Mac nor a family of Google "
+          + "Fonts. Give the exact name of a Google Fonts family, or null."
+      ]
     }
   }
 }
@@ -103,24 +119,41 @@ extension ConversationTheme {
   }
 }
 
-/// The file of a personal theme, version 1 (#118), which is also what an agent answers:
+/// The file of a personal theme (#118), which is also what an agent answers. Version 2:
 ///
 /// ```json
-/// { "format": 1, "name": "…", "isDark": true, "fontStyle": "system",
-///   "colors": { "background": "#RRGGBB", …, "bubbleBorder": null } }
+/// { "format": 2, "name": "…", "isDark": true, "fontStyle": "system",
+///   "colors": { "background": "#RRGGBB", …, "bubbleBorder": null },
+///   "fonts": { "message": "Inter", "code": null },
+///   "layout": { "blockSpacing": 18, …, "blockRadius": 10 } }
 /// ```
+///
+/// Version 1, without `fonts` and `layout`, is still read: its theme has the system's fonts and
+/// the layout of the built-in themes.
 ///
 /// Its identifier is not in it: the library names a theme by its file. Read strictly — every key
 /// known, every colour given — then held to the contrasts of every theme: what the agent writes is
 /// only ever data, and a theme shown can always be read.
 public enum ConversationThemeFile {
-  public static let format = 1
+  public static let format = 2
+  /// The versions this one reads.
+  public static let readableFormats: Set<Int> = [1, 2]
+  public static let maximumFontNameLength = 64
   public static let maximumNameLength = 40
   /// Far above what a theme weighs (under 2 KiB), far below what could cost anything to read.
   public static let maximumSize = 64 * 1024
 
   enum Key: String, CaseIterable {
-    case format, name, isDark, fontStyle, colors
+    case format, name, isDark, fontStyle, colors, fonts, layout
+
+    /// What a file of `version` must hold.
+    static func required(in version: Int) -> [Key] {
+      version >= 2 ? allCases : [.format, .name, .isDark, .fontStyle, .colors]
+    }
+  }
+
+  enum FontKey: String, CaseIterable {
+    case message, code
   }
 
   /// The theme `data` defines, checked whole: its form, then its contrasts. `expectedDark`, when
@@ -148,12 +181,12 @@ public enum ConversationThemeFile {
     for key in object.keys.sorted() where Key(rawValue: key) == nil {
       throw .unknownKey(key)
     }
-    for key in Key.allCases where object[key.rawValue] == nil {
+    guard let number = object[Key.format.rawValue] as? NSNumber, !isBoolean(number),
+      let version = readableFormats.first(where: { Double($0) == number.doubleValue })
+    else { throw object[Key.format.rawValue] == nil ? .missingKey("format") : .unknownFormat }
+    for key in Key.required(in: version) where object[key.rawValue] == nil {
       throw .missingKey(key.rawValue)
     }
-    guard let version = object[Key.format.rawValue] as? NSNumber, !isBoolean(version),
-      version.doubleValue == Double(format)
-    else { throw .unknownFormat }
     guard let rawName = object[Key.name.rawValue] as? String, let name = sanitizedName(rawName)
     else { throw .invalidName }
     guard let dark = object[Key.isDark.rawValue] as? NSNumber, isBoolean(dark) else {
@@ -182,10 +215,65 @@ public enum ConversationThemeFile {
       colors[role] = color
     }
     guard
-      let theme = ConversationTheme(
+      var theme = ConversationTheme(
         id: id, isDark: dark.boolValue, fontStyle: style, personalName: name, colors: colors)
     else { throw .invalidValue(Key.colors.rawValue) }
+    if let fonts = object[Key.fonts.rawValue] { theme.fonts = try decodeFonts(fonts) }
+    if let layout = object[Key.layout.rawValue] { theme.layout = try decodeLayout(layout) }
     return theme
+  }
+
+  private static func decodeFonts(_ value: Any) throws(ThemeFileProblem) -> ConversationTheme.Fonts
+  {
+    guard let values = value as? [String: Any] else { throw .invalidValue(Key.fonts.rawValue) }
+    for key in values.keys.sorted() where FontKey(rawValue: key) == nil {
+      throw .unknownKey("fonts.\(key)")
+    }
+    var families: [FontKey: String] = [:]
+    for key in FontKey.allCases {
+      let path = "fonts.\(key.rawValue)"
+      guard let value = values[key.rawValue] else { throw .missingKey(path) }
+      if value is NSNull { continue }
+      guard let family = value as? String, isFontFamily(family) else { throw .invalidValue(path) }
+      families[key] = family
+    }
+    return ConversationTheme.Fonts(message: families[.message], code: families[.code])
+  }
+
+  private static func decodeLayout(_ value: Any) throws(ThemeFileProblem)
+    -> ConversationTheme.Layout
+  {
+    guard let values = value as? [String: Any] else { throw .invalidValue(Key.layout.rawValue) }
+    for key in values.keys.sorted() where ConversationTheme.Layout.Key(rawValue: key) == nil {
+      throw .unknownKey("layout.\(key)")
+    }
+    var layout = ConversationTheme.Layout()
+    for key in ConversationTheme.Layout.Key.allCases {
+      let path = "layout.\(key.rawValue)"
+      guard let value = values[key.rawValue] else { throw .missingKey(path) }
+      guard let number = value as? NSNumber, !isBoolean(number), number.doubleValue.isFinite else {
+        throw .invalidValue(path)
+      }
+      guard key.range.contains(number.doubleValue) else { throw .outOfRange(path, key.range) }
+      layout[key] = number.doubleValue
+    }
+    return layout
+  }
+
+  /// A family name as Google Fonts and macOS write them: letters, digits, spaces and hyphens.
+  /// Nothing else can reach a URL or a folder built from it.
+  public static func isFontFamily(_ name: String) -> Bool {
+    guard (1...maximumFontNameLength).contains(name.count), name.first != " ", name.last != " "
+    else { return false }
+    return name.unicodeScalars.allSatisfy {
+      ("a"..."z").contains($0) || ("A"..."Z").contains($0) || ("0"..."9").contains($0)
+        || $0 == " " || $0 == "-"
+    }
+  }
+
+  /// A number as the agent is told it: without a useless fraction.
+  static func number(_ value: Double) -> String {
+    value == value.rounded() ? String(Int(value)) : String(value)
   }
 
   /// The file of `theme`: its keys sorted, so that the same theme is always the same bytes.
@@ -200,6 +288,14 @@ public enum ConversationThemeFile {
       Key.isDark.rawValue: theme.isDark,
       Key.fontStyle.rawValue: theme.fontStyle.rawValue,
       Key.colors.rawValue: colors,
+      Key.fonts.rawValue: [
+        FontKey.message.rawValue: theme.fonts.message ?? NSNull(),
+        FontKey.code.rawValue: theme.fonts.code ?? NSNull(),
+      ] as [String: Any],
+      Key.layout.rawValue: Dictionary(
+        uniqueKeysWithValues: ConversationTheme.Layout.Key.allCases.map {
+          ($0.rawValue, theme.layout[$0])
+        }),
     ]
     // A dictionary of strings, numbers, booleans and nulls always serializes.
     return

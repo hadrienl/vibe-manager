@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import SwiftUI
 import VibeApplication
 import VibeDomain
@@ -24,7 +25,11 @@ public enum ConversationFonts {
   @MainActor public static func isInstalled(_ family: String) -> Bool {
     // The system's own families are not always listed under their marketing names.
     if ["SF Pro", "SF Mono", "New York"].contains(family) { return true }
-    return NSFontManager.shared.availableFontFamilies.contains(family)
+    if NSFontManager.shared.availableFontFamilies.contains(family) { return true }
+    // A family a theme fetched is active for this process only, and `NSFontManager` keeps the
+    // list it read first: CoreText sees it (#118).
+    let active = CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []
+    return active.contains(family)
   }
 
   /// The appearance with every font that is no longer installed given back to the theme.
@@ -575,7 +580,7 @@ struct ConversationPreview: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: appearance.density == .compact ? 10 : 16) {
+      VStack(alignment: .leading, spacing: theme.layout.at(appearance.density).blockSpacing) {
         ForEach(model.blocks) { block in
           BlockView(block: block, model: model)
         }

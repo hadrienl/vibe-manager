@@ -2279,6 +2279,16 @@
         }
       }
     },
+    "the font “%@” cannot be found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la police « %@ » est introuvable"
+          }
+        }
+      }
+    },
     "theme.terminal" : {
       "comment" : "The name of a theme that looks like a terminal.",
       "localizations" : {
@@ -2332,6 +2342,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » n’est pas valide"
+          }
+        }
+      }
+    },
+    "“%@” is out of range" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est hors des limites"
           }
         }
       }

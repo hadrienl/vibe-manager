@@ -357,6 +357,10 @@ struct ThemeLoadProblemsView: View {
       LocalizedStringResource("not of the mode expected", bundle: .module)
     case .illegible:
       LocalizedStringResource("some of its colours cannot be read on each other", bundle: .module)
+    case .outOfRange(let key, _):
+      LocalizedStringResource("“\(key)” is out of range", bundle: .module)
+    case .unknownFont(_, let family):
+      LocalizedStringResource("the font “\(family)” cannot be found", bundle: .module)
     }
   }
 }

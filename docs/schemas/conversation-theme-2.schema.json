@@ -177,6 +177,34 @@
       ],
       "type" : "object"
     },
+    "fonts" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "code" : {
+          "description" : "The monospaced family of the code: SF Mono, Menlo, Monaco, or the exact name of a monospaced Google Fonts family (JetBrains Mono, Fira Code, IBM Plex Mono…). null keeps SF Mono.",
+          "maxLength" : 64,
+          "pattern" : "^[A-Za-z0-9-]([A-Za-z0-9 -]*[A-Za-z0-9-])?$",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "message" : {
+          "description" : "The family of the messages: a font every Mac has (SF Pro, New York, Avenir Next, Charter, Iowan Old Style, Helvetica Neue, Georgia…) or the exact name of any Google Fonts family, which the application downloads. null keeps the system family of fontStyle.",
+          "maxLength" : 64,
+          "pattern" : "^[A-Za-z0-9-]([A-Za-z0-9 -]*[A-Za-z0-9-])?$",
+          "type" : [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required" : [
+        "message",
+        "code"
+      ],
+      "type" : "object"
+    },
     "fontStyle" : {
       "description" : "The family of the messages' font: the system's sans serif, a serif, or monospaced.",
       "enum" : [
@@ -189,13 +217,77 @@
     "format" : {
       "description" : "The version of the format.",
       "enum" : [
-        1
+        2
       ],
       "type" : "integer"
     },
     "isDark" : {
       "description" : "Whether the theme is dark.",
       "type" : "boolean"
+    },
+    "layout" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "blockRadius" : {
+          "description" : "Corner radius of the tool calls and code blocks, in points. From 0 to 20; the built-in themes use 10.",
+          "maximum" : 20,
+          "minimum" : 0,
+          "type" : "number"
+        },
+        "blockSpacing" : {
+          "description" : "Points between two messages or tool calls. From 4 to 48; the built-in themes use 18.",
+          "maximum" : 48,
+          "minimum" : 4,
+          "type" : "number"
+        },
+        "bubbleRadius" : {
+          "description" : "Corner radius of the user's messages, in points. From 0 to 24; the built-in themes use 16.",
+          "maximum" : 24,
+          "minimum" : 0,
+          "type" : "number"
+        },
+        "contentWidth" : {
+          "description" : "Widest the column of messages gets, in points. From 560 to 1200; the built-in themes use 820.",
+          "maximum" : 1200,
+          "minimum" : 560,
+          "type" : "number"
+        },
+        "lineHeight" : {
+          "description" : "Height of a line of the messages, as a multiple of the text size. From 1 to 1.8; the built-in themes use 1.25.",
+          "maximum" : 1.8,
+          "minimum" : 1,
+          "type" : "number"
+        },
+        "paragraphSpacing" : {
+          "description" : "Points between two paragraphs of a message. From 2 to 24; the built-in themes use 10.",
+          "maximum" : 24,
+          "minimum" : 2,
+          "type" : "number"
+        },
+        "sideMargin" : {
+          "description" : "Points on each side of the column of messages. From 8 to 80; the built-in themes use 32.",
+          "maximum" : 80,
+          "minimum" : 8,
+          "type" : "number"
+        },
+        "topPadding" : {
+          "description" : "Points above the first message. From 0 to 64; the built-in themes use 28.",
+          "maximum" : 64,
+          "minimum" : 0,
+          "type" : "number"
+        }
+      },
+      "required" : [
+        "blockSpacing",
+        "paragraphSpacing",
+        "topPadding",
+        "lineHeight",
+        "contentWidth",
+        "sideMargin",
+        "bubbleRadius",
+        "blockRadius"
+      ],
+      "type" : "object"
     },
     "name" : {
       "description" : "The theme's name, in the user's language: a few evocative words, 40 characters at most.",
@@ -209,8 +301,10 @@
     "name",
     "isDark",
     "fontStyle",
-    "colors"
+    "colors",
+    "fonts",
+    "layout"
   ],
-  "title" : "Vibe Manager conversation theme, format 1",
+  "title" : "Vibe Manager conversation theme, format 2",
   "type" : "object"
 }

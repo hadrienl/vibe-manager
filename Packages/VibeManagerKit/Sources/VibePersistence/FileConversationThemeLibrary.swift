@@ -21,17 +21,23 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
   private let diagnostics: Diagnostics
   /// The built-in themes' names as the user reads them: a personal theme takes none.
   private let localizedBuiltInNames: [String]
+  /// The families fetched from Google Fonts: activated when the library is read, and carried by
+  /// an export.
+  private let fonts: GoogleThemeFonts?
 
   public init(
-    directory: URL, diagnostics: Diagnostics = .disabled, localizedBuiltInNames: [String] = []
+    directory: URL, diagnostics: Diagnostics = .disabled, localizedBuiltInNames: [String] = [],
+    fonts: GoogleThemeFonts? = nil
   ) {
     self.directory = directory
     self.diagnostics = diagnostics
     self.localizedBuiltInNames = localizedBuiltInNames
+    self.fonts = fonts
   }
 
   public func load() async -> ThemeLibraryContents {
-    read(recording: true)
+    await fonts?.activateAll()
+    return read(recording: true)
   }
 
   public func save(_ theme: ConversationTheme, name: String) async throws -> ConversationTheme {
@@ -83,6 +89,16 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
     guard let data = contents(of: file(of: id)) else { throw ThemeLibraryError.notFound }
     var files = [DiagnosticFile(name: "theme.json", contents: data)]
     if let preview { files.append(DiagnosticFile(name: "preview.png", contents: preview)) }
+    // The families fetched for it: whoever imports the theme has them without Google.
+    if let fonts, let theme = try? ConversationThemeFile.decode(data, id: id) {
+      for family in Set([theme.fonts.message, theme.fonts.code].compactMap { $0 }).sorted() {
+        for file in await fonts.files(of: family) {
+          guard let contents = try? Data(contentsOf: file) else { continue }
+          files.append(
+            DiagnosticFile(name: "fonts/\(family)/\(file.lastPathComponent)", contents: contents))
+        }
+      }
+    }
     return ZipArchiveWriter.archive(files)
   }
 

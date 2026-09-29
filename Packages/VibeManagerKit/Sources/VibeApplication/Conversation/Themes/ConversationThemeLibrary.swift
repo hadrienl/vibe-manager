@@ -88,6 +88,8 @@ public enum ConversationThemeLibraryRules {
         ConversationTheme(
           id: ConversationTheme.personalPrefix + UUID().uuidString.lowercased(),
           isDark: theme.isDark, fontStyle: theme.fontStyle, colors: colors) ?? theme
+      kept.fonts = theme.fonts
+      kept.layout = theme.layout
     }
     kept.personalName = name
     // What the user chose apart from the theme is not the theme's.

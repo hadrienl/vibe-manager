@@ -97,7 +97,10 @@ public struct ConversationView: View {
     if claimsKeyboardOnActivation { model.requestComposerFocus() }
   }
 
-  private var spacing: Double { appearance.density == .compact ? 10 : 18 }
+  /// The theme's layout, at the density the user chose (#118).
+  private var layout: ConversationTheme.Layout { theme.layout.at(appearance.density) }
+
+  private var spacing: Double { layout.blockSpacing }
 
   private var conversation: some View {
     ScrollViewReader { proxy in
@@ -119,9 +122,9 @@ public struct ConversationView: View {
             .frame(height: 1)
             .id(Self.bottomID)
         }
-        .frame(maxWidth: 820)
-        .padding(.horizontal, 32)
-        .padding(.top, appearance.density == .compact ? 14 : 28)
+        .frame(maxWidth: layout.contentWidth)
+        .padding(.horizontal, layout.sideMargin)
+        .padding(.top, layout.topPadding)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
         .onGeometryChange(for: CGRect.self) {
@@ -198,8 +201,8 @@ public struct ConversationView: View {
       }
       PromptComposer(model: model, isActive: isActive)
     }
-    .frame(maxWidth: 820)
-    .padding(.horizontal, 32)
+    .frame(maxWidth: layout.contentWidth)
+    .padding(.horizontal, layout.sideMargin)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity)
   }

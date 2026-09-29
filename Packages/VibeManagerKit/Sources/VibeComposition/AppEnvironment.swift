@@ -318,13 +318,10 @@ public final class AppEnvironment {
       store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),
       agents: registry,
       // The user's own themes (#118), beside the avatars, made by the agents that can.
-      themes: ConversationThemesModel(
-        library: FileConversationThemeLibrary(
-          directory: data.store.deletingLastPathComponent()
-            .appendingPathComponent("Themes", isDirectory: true),
-          diagnostics: diagnostics,
-          localizedBuiltInNames: ConversationTheme.builtIn.map(\.displayName)),
-        generators: AgentThemeGenerators(agents: registry), diagnostics: diagnostics))
+      themes: Self.conversationThemes(
+        directory: data.store.deletingLastPathComponent()
+          .appendingPathComponent("Themes", isDirectory: true),
+        agents: registry, diagnostics: diagnostics))
     appModel = AppModel(
       repository: repository,
       recovery: repository,
@@ -410,6 +407,22 @@ public final class AppEnvironment {
       library: avatarLibrary, generators: AgentAvatarGenerators(agents: registry))
     appModel.avatars = avatars
     Task { await avatars.load() }
+  }
+
+  /// The user's own themes (#118), beside the avatars, made by the agents that can, with the
+  /// fonts of Google Fonts they ask for.
+  @MainActor
+  private static func conversationThemes(
+    directory: URL, agents: AgentProviderRegistry, diagnostics: Diagnostics
+  ) -> ConversationThemesModel {
+    let fonts = GoogleThemeFonts(
+      directory: directory.appendingPathComponent("Fonts", isDirectory: true),
+      diagnostics: diagnostics)
+    return ConversationThemesModel(
+      library: FileConversationThemeLibrary(
+        directory: directory, diagnostics: diagnostics,
+        localizedBuiltInNames: ConversationTheme.builtIn.map(\.displayName), fonts: fonts),
+      generators: AgentThemeGenerators(agents: agents), fonts: fonts, diagnostics: diagnostics)
   }
 
   /// Everything the export gathers besides the model.
