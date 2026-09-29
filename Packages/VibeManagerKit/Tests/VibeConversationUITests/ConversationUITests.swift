@@ -501,6 +501,83 @@ struct ConversationModelTests {
     #expect(!stopped.canSend)
   }
 
+  private static func prompts(_ texts: String...) -> ConversationSnapshot {
+    ConversationSnapshot(
+      entries: texts.map {
+        ConversationEntry(id: $0, content: .userPrompt($0, attachments: 0))
+      }, availability: .available)
+  }
+
+  @Test("↑ recalls the messages of the transcript, ↓ gives the draft back (#123)")
+  func recall() {
+    let (model, _) = model()
+    model.apply(Self.prompts("typed in the terminal", "last"))
+    model.draft = "unfinished"
+    #expect(model.recallOlderPrompt())
+    #expect(model.draft == "last")
+    #expect(model.recallOlderPrompt())
+    #expect(model.draft == "typed in the terminal")
+    #expect(!model.recallOlderPrompt())
+    #expect(model.recallNewerPrompt())
+    #expect(model.recallNewerPrompt())
+    #expect(model.draft == "unfinished")
+    #expect(!model.recallNewerPrompt())
+  }
+
+  @Test("A message sent is in the history at once, and once only when the transcript has it (#123)")
+  func recallSent() async {
+    let (model, _) = model()
+    model.draft = "just sent"
+    #expect(await model.send())
+    #expect(model.recallOlderPrompt())
+    #expect(model.draft == "just sent")
+    model.apply(Self.prompts("just sent"))
+    #expect(model.promptHistory.prompts == ["just sent"])
+  }
+
+  @Test("A recalled message edited then sent is added, the original kept (#123)")
+  func recallEdited() async {
+    let (model, _) = model()
+    model.apply(Self.prompts("original"))
+    #expect(model.recallOlderPrompt())
+    model.draft += " edited"
+    #expect(await model.send())
+    #expect(model.promptHistory.prompts == ["original", "original edited"])
+    #expect(model.recallOlderPrompt())
+    #expect(model.draft == "original edited")
+  }
+
+  @Test("The attachments stay through the navigation; Escape gives the draft back (#123)")
+  func recallKeepsAttachments() {
+    let (model, _) = model()
+    let file = URL(fileURLWithPath: "/Users/me/a.png")
+    model.apply(Self.prompts("earlier"))
+    model.attach([file])
+    model.draft = "with a file"
+    #expect(!model.cancelPromptRecall())
+    #expect(model.recallOlderPrompt())
+    #expect(model.attachments == [file])
+    #expect(model.cancelPromptRecall())
+    #expect(model.draft == "with a file")
+    #expect(model.attachments == [file])
+  }
+
+  @Test("Each session has its own history, and a closed composer recalls nothing (#123)")
+  func recallPerSession() {
+    let (first, _) = model()
+    first.apply(Self.prompts("first session"))
+    let (second, _) = model()
+    #expect(!second.recallOlderPrompt())
+    let (stopped, _) = model(running: false)
+    stopped.apply(Self.prompts("hello"))
+    #expect(!stopped.recallOlderPrompt())
+    first.activity = .awaitingUser(.approval)
+    #expect(!first.recallOlderPrompt())
+    first.activity = nil
+    #expect(first.recallOlderPrompt())
+    #expect(first.draft == "first session")
+  }
+
   private final class Answers: @unchecked Sendable {
     var given: [(AgentAnswer, AgentRequestID)] = []
     var sends = true
