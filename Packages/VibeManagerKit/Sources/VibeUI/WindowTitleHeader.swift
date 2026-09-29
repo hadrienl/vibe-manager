@@ -256,7 +256,11 @@ final class ToolbarRoomView: NSView {
       }
       let width = widths[item.itemIdentifier] ?? view.fittingSize.width
       if toolbar.centeredItemIdentifiers.contains(item.itemIdentifier) {
-        centredWidth = width
+        // Both pickers can be centred at once — the conversation's and the web view's in a narrow
+        // window — side by side; an item left empty takes nothing.
+        if width > 0 {
+          centredWidth = centredWidth.map { $0 + ToolbarTitleLayout.spacing + width } ?? width
+        }
       } else if index < ownIndex {
         // An item before the title sent to the » menu — the sidebar's button, as the sidebar
         // folds — left its place to the title, and must find it again.
