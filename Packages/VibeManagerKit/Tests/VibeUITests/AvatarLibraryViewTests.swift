@@ -370,7 +370,6 @@ struct AvatarLibraryViewTests {
     avatars.description = "Une chouette"
     let (window, host) = window(avatars, isCreating: true, language: "fr", dark: false)
     defer { window.close() }
-    window.makeKeyAndOrderFront(nil)
     var editor: NSTextView?
     await settle(window, "the description") {
       editor = Self.descendants(of: host.view).lazy.compactMap { $0 as? NSTextView }.first
@@ -400,7 +399,6 @@ struct AvatarLibraryViewTests {
     await avatars.select(.avatar(robot.id))
     let (window, host) = window(avatars, isCreating: false, language: "fr", dark: false)
     defer { window.close() }
-    window.makeKeyAndOrderFront(nil)
     await settle(window, "the list") { Self.table(in: host.view) != nil }
     let table = try #require(Self.table(in: host.view))
     await settle(window, "the keyboard in the list") {
