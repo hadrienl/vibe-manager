@@ -145,9 +145,13 @@ usual question.
 ### After the relaunch
 
 The host keeps running the binary it was started from, which no longer has a name. The new
-version finds its socket, and verifies it: `SecCodeCheckValidity` fails with
-`errSecCSStaticCodeChanged`, and the check falls back on what the kernel says of the running
-process — the fallback ADR 0017 added for a rebuild, with the same team. `hello` and `welcome`
+version finds its socket, and verifies it. Sparkle deleted the old bundle, so the system cannot
+even find the host's code any more: `SecCodeCopyGuestWithAttributes` fails with `ENOENT`, where a
+rebuild, which writes a new file in the old one's place, gives `errSecCSStaticCodeChanged`. Both
+fall back on what the kernel says of the running process — the fallback ADR 0017 added for a
+rebuild, with the same identifier and team. Measured on the first update tested by hand (0.9.0 to
+0.9.1): before `ENOENT` was part of it, the host was refused, the kept agent was killed as a
+leftover and resumed natively, its turn lost. `hello` and `welcome`
 speak the frozen core; the older host names its capabilities, and is asked for nothing it did not
 name. The verdict is `detached`, and the sessions are adopted.
 

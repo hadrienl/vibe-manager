@@ -99,6 +99,17 @@ struct TerminalHostWireTests {
     #expect(TerminalHostFrame.control(message).decode(TerminalHostMessage.self) == message)
   }
 
+  @Test("A peer whose binary was rebuilt, or deleted by an update, is asked of the kernel")
+  func codeGoneFromDisk() {
+    #expect(CodeSigningPeerVerifier.isGoneFromDisk(errSecCSStaticCodeChanged))
+    // What `SecCodeCopyGuestWithAttributes` answers once Sparkle has deleted the old bundle.
+    #expect(CodeSigningPeerVerifier.isGoneFromDisk(100_002))
+    #expect(CodeSigningPeerVerifier.isGoneFromDisk(errSecCSStaticCodeNotFound))
+    // A signature that does not satisfy the requirement is refused, whatever the kernel says.
+    #expect(!CodeSigningPeerVerifier.isGoneFromDisk(errSecCSReqFailed))
+    #expect(!CodeSigningPeerVerifier.isGoneFromDisk(errSecCSUnsigned))
+  }
+
   @Test("The kernel says what a running process was signed as, whatever is on disk now")
   func kernelIdentityOfThisProcess() throws {
     var token = audit_token_t()
