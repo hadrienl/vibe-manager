@@ -56,7 +56,8 @@ struct ConversationLinkMenuTests {
     var opened: [(URL, LinkGesture)] = []
     view.links = ConversationLinks(
       open: { opened.append(($0, $1)) }, hasWebView: { true })
-    let menu = try #require(view.menu(for: rightClick(at: point(ofCharacter: 5, in: view), in: view)))
+    let menu = try #require(
+      view.menu(for: rightClick(at: point(ofCharacter: 5, in: view), in: view)))
     let titles = menu.items.prefix(4).map(\.title)
     #expect(
       titles == [
@@ -64,12 +65,58 @@ struct ConversationLinkMenuTests {
         LinkMenuAction.openInExternalBrowser.title, LinkMenuAction.copy.title,
       ])
     // Only ours speak of links: the text view's own Open Link and Copy Link are gone.
-    #expect(menu.items.dropFirst(4).filter { $0.title.localizedCaseInsensitiveContains("link") }.isEmpty)
+    #expect(
+      menu.items.dropFirst(4).filter { $0.title.localizedCaseInsensitiveContains("link") }.isEmpty)
     let external = menu.items[2]
     _ = external.target?.perform(external.action, with: external)
     #expect(opened.map(\.1) == [.browser])
 
     let elsewhere = view.menu(for: rightClick(at: point(ofCharacter: 1, in: view), in: view))
     #expect(elsewhere?.items.contains { $0.title == LinkMenuAction.openInNewTab.title } != true)
+  }
+}
+
+@Suite("Bare addresses in a message are links (#186)")
+struct BareAddressLinkTests {
+  private func runs(_ text: String) -> [InlineRun] {
+    guard case .paragraph(let runs) = MarkdownDocument.blocks(from: text).first else { return [] }
+    return runs
+  }
+
+  @Test("An address written as is becomes a link, the text around it stays text")
+  func bareAddress() {
+    let runs = runs("Ouvert ici : https://github.com/hadrienl/vibe-manager/issues/189. Voilà")
+    #expect(
+      runs.map(\.text).joined()
+        == "Ouvert ici : https://github.com/hadrienl/vibe-manager/issues/189. Voilà")
+    let links = runs.compactMap(\.link)
+    #expect(links == [URL(string: "https://github.com/hadrienl/vibe-manager/issues/189")!])
+    #expect(
+      runs.first { $0.link != nil }?.text == "https://github.com/hadrienl/vibe-manager/issues/189")
+  }
+
+  @Test("Two addresses, bold kept, and a paragraph of its own")
+  func severalAddresses() {
+    let runs = runs("**voir http://a.example/x et https://b.example/y**")
+    #expect(
+      runs.compactMap(\.link).map(\.absoluteString) == [
+        "http://a.example/x", "https://b.example/y",
+      ])
+    #expect(runs.allSatisfy { $0.isBold })
+    #expect(self.runs("https://github.com/o/r/pull/3").compactMap(\.link).count == 1)
+  }
+
+  @Test("What has no scheme, another scheme, or is code stays text")
+  func notAddresses() {
+    #expect(runs("example.com and github.com/o/r").compactMap(\.link).isEmpty)
+    #expect(runs("ftp://files.example/a and javascript://x").compactMap(\.link).isEmpty)
+    #expect(runs("`https://example.com/a`").compactMap(\.link).isEmpty)
+  }
+
+  @Test("A written link keeps its own address")
+  func writtenLink() {
+    let runs = runs("[the PR](https://github.com/o/r/pull/3)")
+    #expect(runs.compactMap(\.link) == [URL(string: "https://github.com/o/r/pull/3")!])
+    #expect(runs.map(\.text) == ["the PR"])
   }
 }

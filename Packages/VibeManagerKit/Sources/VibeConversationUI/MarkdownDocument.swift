@@ -97,7 +97,11 @@ public enum MarkdownDocument {
     switch markup {
     case let text as Markdown.Text:
       run.text = text.string
-      runs.append(run)
+      if run.link == nil {
+        runs.append(contentsOf: linkingAddresses(in: run))
+      } else {
+        runs.append(run)
+      }
     case is SoftBreak:
       run.text = " "
       runs.append(run)
@@ -123,6 +127,50 @@ public enum MarkdownDocument {
       for child in markup.children { collect(child, style: run, into: &runs) }
     }
   }
+
+  /// A bare address in the text — `https://github.com/o/r/issues/3` an agent wrote as is — is a
+  /// link too (#186): the parser only makes one of `<…>` and `[…](…)`. Only what starts with its
+  /// scheme: `example.com` alone stays text.
+  static func linkingAddresses(in run: InlineRun) -> [InlineRun] {
+    let text = run.text
+    guard text.contains("://") else { return [run] }
+    let whole = NSRange(text.startIndex..., in: text)
+    var result: [InlineRun] = []
+    var cursor = text.startIndex
+    for match in addressDetector.matches(in: text, range: whole) {
+      guard let range = Range(match.range, in: text), range.lowerBound >= cursor else { continue }
+      let written = String(text[range])
+      let lowered = written.lowercased()
+      guard lowered.hasPrefix("http://") || lowered.hasPrefix("https://"),
+        let url = safeLink(written)
+      else { continue }
+      if cursor < range.lowerBound {
+        var before = run
+        before.text = String(text[cursor..<range.lowerBound])
+        result.append(before)
+      }
+      var link = run
+      link.text = written
+      link.link = url
+      result.append(link)
+      cursor = range.upperBound
+    }
+    guard !result.isEmpty else { return [run] }
+    if cursor < text.endIndex {
+      var after = run
+      after.text = String(text[cursor...])
+      result.append(after)
+    }
+    return result
+  }
+
+  private static let addressDetector: NSDataDetector = {
+    do {
+      return try NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    } catch {
+      preconditionFailure("The link detector could not be made: \(error)")
+    }
+  }()
 
   static func safeLink(_ destination: String?) -> URL? {
     guard let destination, let url = URL(string: destination),
