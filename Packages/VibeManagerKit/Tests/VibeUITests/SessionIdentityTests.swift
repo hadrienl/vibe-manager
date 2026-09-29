@@ -297,4 +297,19 @@ struct SessionIdentityTests {
     #expect(!SessionSidebar.isDoubleClick(returnKey))
     #expect(!SessionSidebar.isDoubleClick(nil))
   }
+
+  @Test("A double-click on the badge changes the icon, anywhere else on the row renames")
+  func badgeOrName() throws {
+    func click(at x: CGFloat) throws -> NSEvent {
+      try #require(
+        NSEvent.mouseEvent(
+          with: .leftMouseDown, location: NSPoint(x: x, y: 10), modifierFlags: [], timestamp: 0,
+          windowNumber: 0, context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
+    }
+    #expect(SessionSidebar.isOnBadge(try click(at: 30), badgeTrailingEdge: 52))
+    #expect(SessionSidebar.isOnBadge(try click(at: 52), badgeTrailingEdge: 52))
+    #expect(!SessionSidebar.isOnBadge(try click(at: 80), badgeTrailingEdge: 52))
+    // Before the badges have been measured, a double-click renames.
+    #expect(!SessionSidebar.isOnBadge(try click(at: 30), badgeTrailingEdge: nil))
+  }
 }

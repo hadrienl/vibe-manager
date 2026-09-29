@@ -24,6 +24,8 @@ struct SessionSidebar: View {
   @State private var slidingSessionIDs: Set<SessionID> = []
   /// The row under the pointer, for when no row is drawn under the fingers.
   @State private var hoveredSessionID: SessionID?
+  /// Where the rows' badges end, in the window: a double-click left of it is on a badge (#183).
+  @State private var badgeTrailingEdge: CGFloat?
   /// The group whose header is being dragged, and the one it is over (#44).
   @State private var draggedGroup: SessionFolderKey?
   @State private var targetedGroup: SessionFolderKey?
@@ -64,6 +66,13 @@ struct SessionSidebar: View {
   static func isDoubleClick(_ event: NSEvent?) -> Bool {
     guard let event, [.leftMouseDown, .leftMouseUp].contains(event.type) else { return false }
     return event.clickCount == 2
+  }
+
+  /// Whether a click landed on a row's badge: left of where the badges end, in the window. Every
+  /// row draws its badge at the same place.
+  static func isOnBadge(_ event: NSEvent, badgeTrailingEdge: CGFloat?) -> Bool {
+    guard let badgeTrailingEdge else { return false }
+    return event.locationInWindow.x <= badgeTrailingEdge
   }
 
   /// `nil` when there is nothing to undo: ⌘Z then reaches the window, as it did before.
@@ -164,13 +173,18 @@ struct SessionSidebar: View {
     .contextMenu(forSelectionType: SessionID.self) { ids in
       SessionSelectionMenu(model: model, ids: ids)
     } primaryAction: { ids in
-      // A double-click renames the row (#183). Return comes here too, and is left to the key
-      // handler below, which hands the keyboard to the session.
-      guard Self.isDoubleClick(NSApp.currentEvent), ids.count == 1, let id = ids.first else {
-        return
+      // A double-click on a row renames it, on its badge changes its icon (#183). Return comes
+      // here too, and is left to the key handler below, which hands the keyboard to the session.
+      guard let event = NSApp.currentEvent, Self.isDoubleClick(event), ids.count == 1,
+        let id = ids.first
+      else { return }
+      if Self.isOnBadge(event, badgeTrailingEdge: badgeTrailingEdge) {
+        model.beginAppearanceEditing(id, in: .sidebar)
+      } else {
+        model.beginRename(id, in: .sidebar)
       }
-      model.beginRename(id, in: .sidebar)
     }
+    .onPreferenceChange(SessionBadgeEdgeKey.self) { badgeTrailingEdge = $0 }
     .focused($isListFocused)
     // ⌘Z and ⇧⌘Z undo a rename or a change of icon while the keyboard is in the list (#183);
     // anywhere else, they go on to what holds it. A field being edited keeps its own.

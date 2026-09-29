@@ -2080,6 +2080,14 @@ struct SessionCommandButtons: View {
   }
 }
 
+/// Where the badges of the sidebar's rows end, in the window (#183).
+struct SessionBadgeEdgeKey: PreferenceKey {
+  static let defaultValue: CGFloat? = nil
+  static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+    value = value ?? nextValue()
+  }
+}
+
 struct SessionRow: View {
   let session: WorkSession
   /// The badge drawn: the session's, or the one previewed in its Change Icon popover (#183).
@@ -2098,6 +2106,12 @@ struct SessionRow: View {
   var body: some View {
     HStack(spacing: 10) {
       SessionBadge(appearance: appearance, icon: icon)
+        .background {
+          GeometryReader { proxy in
+            Color.clear.preference(
+              key: SessionBadgeEdgeKey.self, value: proxy.frame(in: .global).maxX)
+          }
+        }
         .sessionAppearancePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       VStack(alignment: .leading, spacing: 2) {
         if commands.isRenaming {

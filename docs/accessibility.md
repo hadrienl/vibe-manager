@@ -153,8 +153,8 @@ alone; so is an expression the avatar lacks, said "missing".
 | Restart | ⌃⌘R | Session |
 | Restart in a new process, from anywhere in its sheet | ⌘↩ | — |
 | Switch Agent… | ⌃⌘M | Session |
-| Rename…: the name becomes a field, on its row or in the inspector's header; Return keeps it, Escape does not | ⌃⌘E, or a double-click on the row | Session, and the row's context menu |
-| Change Icon…: symbol, colour, the project's icon, Revert to Default Icon; Escape leaves it as it was | ⌃⌘I, or a click on the inspector's badge | Session, and the row's context menu |
+| Rename…: the name becomes a field, on its row or in the inspector's header; Return keeps it, Escape does not | ⌃⌘E, or a double-click on the row, off its badge | Session, and the row's context menu |
+| Change Icon…: symbol, colour, the project's icon, Revert to Default Icon; Escape leaves it as it was | ⌃⌘I, a double-click on the row's badge, or a click on the inspector's badge | Session, and the row's context menu |
 | Undo / Redo the last rename or change of icon, with the keyboard in the sidebar or the inspector | ⌘Z / ⇧⌘Z | Edit |
 | Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
 | Close Session | ⇧⌘W | Session |

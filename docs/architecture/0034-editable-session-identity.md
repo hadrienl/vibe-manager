@@ -58,7 +58,9 @@ open. Leaving the field then drops it, rather than holding the keyboard the user
 In place, on the session's row: a double-click on the row — through the list's
 `contextMenu(forSelectionType:primaryAction:)`, never a gesture on the row, which kept the clicks
 the list needs (#96) — or its context menu. The primary action also receives Return, which hands the
-keyboard to the session; only a double-click renames.
+keyboard to the session; only a double-click renames. A double-click on the row's badge opens the
+Change Icon popover instead: the rows report where their badges end with a preference, and the click
+is compared with it, the list saying only which row was clicked.
 
 The inspector gains a fixed header above its sections: the badge, which opens the popover, and the
 name, renamed by a double-click or its pencil. Rename… (⌃⌘E) and Change Icon… (⌃⌘I) in the Session
