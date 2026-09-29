@@ -205,6 +205,26 @@ struct SubagentFollowTests {
     #expect(missing != nil)
   }
 
+  @Test("Under a sub-agent that ended, one still waiting is stopped, and not followed")
+  func underAnEndedSubagent() async throws {
+    let tail = RecordingTail([
+      root: ["sub:s1:done"], ScriptProvider.transcript("s1"): ["sub:s2:running"],
+      ScriptProvider.transcript("s2"): ["tool:Read"],
+    ])
+    let follow = follow(tail)
+    let session = session()
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    _ = await next(&iterator) { $0.entries.count == 1 }
+    await follow.setUnfoldedSubagents(["s1"], for: session.id)
+    let read = await next(&iterator) { run("s1", in: $0)?.activityEntries?.count == 1 }
+    let inner = run("s1", in: read)?.activityEntries?.first?.toolCall
+    #expect(inner?.state == .interrupted)
+    let running = ConversationEntry.runningSubagents(in: read?.entries ?? [])
+    #expect(running.isEmpty)
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await tail.opened.contains(ScriptProvider.transcript("s2")) == false)
+  }
+
   @Test("In a session whose agent stopped, a sub-agent that never ended is not opened")
   func stoppedAgent() async throws {
     let tail = RecordingTail([root: ["sub:s1:running"], ScriptProvider.transcript("s1"): ["tool:Read"]])

@@ -76,6 +76,8 @@ public struct ConversationView: View {
         _ = model.takePendingFocusRequest()
       }
     }
+    // Read through the terminal's observable state: the end of the process reaches the model.
+    .onChange(of: model.isProcessRunning) { model.processStateChanged() }
     .onChange(of: model.pendingCall?.callID) { _, id in
       guard id != nil else { return }
       let said =

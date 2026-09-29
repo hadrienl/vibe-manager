@@ -304,6 +304,13 @@ public final class ConversationModel {
     if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }
   }
 
+  /// The session's process started or ended. Its activity may say nothing of it — an agent idle
+  /// while its sub-agents work in the background stays idle when the CLI quits — so the view that
+  /// observes the terminal tells: sub-agents that will not end are settled, and the reader told.
+  public func processStateChanged() {
+    if isProcessRunning != reportedAgentRunning { rebuild() }
+  }
+
   /// Entries laid out as blocks, with the settings of the view: the conversation's, and a
   /// sub-agent's activity alike (#180).
   public func displayedBlocks(of entries: [ConversationEntry]) -> [ConversationBlock] {

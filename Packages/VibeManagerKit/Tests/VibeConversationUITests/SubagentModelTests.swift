@@ -81,6 +81,25 @@ struct SubagentModelTests {
     #expect(told == [true, false])
   }
 
+  @Test("The process ending with the agent idle still settles its sub-agents")
+  func processEndsWhileIdle() {
+    var running = true
+    let model = ConversationModel(sessionID: SessionID())
+    model.processRunning = { running }
+    var told: [Bool] = []
+    model.agentRunningChanged = { told.append($0) }
+    model.activity = .idle
+    show([subagent("a")], in: model)
+    #expect(model.trayItems.map(\.id) == ["a"])
+    running = false
+    model.processStateChanged()
+    #expect(model.shownEntries.first?.toolCall?.state == .interrupted)
+    #expect(model.trayItems.allSatisfy { $0.hasEnded })
+    #expect(told == [true, false])
+    model.processStateChanged()
+    #expect(told == [true, false])
+  }
+
   @Test("A permission a sub-agent asks for is answered under its own call")
   func permissionInsideASubagent() {
     let model = model()

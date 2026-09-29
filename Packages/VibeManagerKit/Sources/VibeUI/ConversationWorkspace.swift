@@ -196,6 +196,7 @@ public final class ConversationWorkspace {
   private func apply(_ state: AgentActivityState?, to model: ConversationModel) {
     model.activity = state?.activity
     model.isAgentReady = Self.isReady(state)
+    model.processStateChanged()
   }
 
   /// Ready once the agent's hooks have spoken, or once the activity falls back on the terminal's

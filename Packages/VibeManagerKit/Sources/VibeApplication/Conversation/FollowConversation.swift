@@ -189,10 +189,11 @@ public actor FollowConversation {
     }
   }
 
-  /// A sub-agent at work, as far as reading it goes: not done, in a session followed live whose
-  /// agent runs.
-  private func isRunning(_ call: ToolCall, in following: Following) -> Bool {
-    !call.state.isFinished && following.live && !stoppedAgents.contains(following.session.id)
+  /// A sub-agent at work, as far as reading it goes: not done, under no sub-agent that ended —
+  /// its own calls end with it, results or not — in a session followed live whose agent runs.
+  private func isRunning(_ call: ToolCall, in following: Following, underEnded: Bool) -> Bool {
+    !underEnded && !call.state.isFinished && following.live
+      && !stoppedAgents.contains(following.session.id)
   }
 
   private func run(_ key: UUID) async {
@@ -256,20 +257,20 @@ public actor FollowConversation {
       guard let reporter = chapter.reporter else { continue }
       for root in chapter.readings {
         refreshSubagents(
-          of: root, root: root.file, depth: 1, reporter: reporter, wanted: wanted,
-          following: following, key: key)
+          of: root, root: root.file, depth: 1, underEnded: false, reporter: reporter,
+          wanted: wanted, following: following, key: key)
       }
     }
   }
 
   private func refreshSubagents(
-    of reading: Reading, root: URL, depth: Int, reporter: any AgentConversationReporting,
-    wanted: Set<String>, following: Following, key: UUID
+    of reading: Reading, root: URL, depth: Int, underEnded: Bool,
+    reporter: any AgentConversationReporting, wanted: Set<String>, following: Following, key: UUID
   ) {
     guard depth <= SubagentRun.maximumShownDepth else { return }
     var needed: [ToolCall] = []
     for call in reading.decoder.entries.compactMap(\.subagentCall) {
-      let running = isRunning(call, in: following)
+      let running = isRunning(call, in: following, underEnded: underEnded)
       let isWanted = running || wanted.contains(call.callID)
       guard let sub = reading.subreadings[call.callID] else {
         // One that is done and was not found once will not be.
@@ -284,7 +285,8 @@ public actor FollowConversation {
         restart(sub, key: key, follows: true)
       }
       refreshSubagents(
-        of: sub, root: root, depth: depth + 1, reporter: reporter, wanted: wanted,
+        of: sub, root: root, depth: depth + 1,
+        underEnded: underEnded || call.state.isFinished, reporter: reporter, wanted: wanted,
         following: following, key: key)
     }
     guard !needed.isEmpty else { return }
@@ -307,7 +309,7 @@ public actor FollowConversation {
       firstPrompt: reporter.firstPrompt(ofSubagent:))
     for call in needed {
       guard let transcript = links[call.callID] else {
-        if !isRunning(call, in: following) {
+        if !isRunning(call, in: following, underEnded: underEnded) {
           reading.notFound.insert(call.callID)
           following.isDirty = true
         }
@@ -318,7 +320,7 @@ public actor FollowConversation {
         reporter.subagentDecoder(for: file, root: root)
       }
       reading.subreadings[call.callID] = sub
-      start(sub, key: key, live: isRunning(call, in: following))
+      start(sub, key: key, live: isRunning(call, in: following, underEnded: underEnded))
       following.isDirty = true
     }
   }
@@ -326,15 +328,20 @@ public actor FollowConversation {
   /// A sub-agent runs, within the depth shown, whose transcript was not found yet: it is looked
   /// for often.
   private func hasUnreadRunningSubagent(_ following: Following) -> Bool {
-    func unread(_ reading: Reading, depth: Int) -> Bool {
+    func unread(_ reading: Reading, depth: Int, underEnded: Bool) -> Bool {
       guard depth <= SubagentRun.maximumShownDepth else { return false }
       return reading.decoder.entries.contains { entry in
         guard let call = entry.subagentCall else { return false }
-        if let sub = reading.subreadings[call.callID] { return unread(sub, depth: depth + 1) }
-        return isRunning(call, in: following)
+        if let sub = reading.subreadings[call.callID] {
+          return unread(
+            sub, depth: depth + 1, underEnded: underEnded || call.state.isFinished)
+        }
+        return isRunning(call, in: following, underEnded: underEnded)
       }
     }
-    return following.chapters.flatMap(\.readings).contains { unread($0, depth: 1) }
+    return following.chapters.flatMap(\.readings).contains {
+      unread($0, depth: 1, underEnded: false)
+    }
   }
 
   /// Read again from its start — once to its end, or followed — what it showed staying until the
@@ -466,7 +473,8 @@ public actor FollowConversation {
       guard chapter.reporter != nil else { continue }
       let chapterEntries = chapter.readings.flatMap {
         shownEntries(
-          of: $0, depth: 1, wanted: unfolded[following.session.id] ?? [], following: following)
+          of: $0, depth: 1, underEnded: false, wanted: unfolded[following.session.id] ?? [],
+          following: following)
       }
       if showsChapters, index > 0, !chapterEntries.isEmpty {
         entries.append(
@@ -490,15 +498,19 @@ public actor FollowConversation {
   }
 
   /// A transcript's entries, each sub-agent carrying its depth and, when its transcript was read,
-  /// its activity (#180).
+  /// its activity (#180). Under a sub-agent that ended, a call still waiting for its result will
+  /// not have it: it is shown stopped.
   private func shownEntries(
-    of reading: Reading, depth: Int, wanted: Set<String>, following: Following
+    of reading: Reading, depth: Int, underEnded: Bool, wanted: Set<String>, following: Following
   ) -> [ConversationEntry] {
     var entries = reading.decoder.entries
     for index in entries.indices {
-      guard case .tool(var call) = entries[index].content, call.kind == .subagent else {
-        continue
+      guard case .tool(var call) = entries[index].content else { continue }
+      if underEnded, !call.state.isFinished {
+        call.state = .interrupted
+        entries[index].content = .tool(call)
       }
+      guard call.kind == .subagent else { continue }
       var run = call.subagent ?? SubagentRun()
       run.depth = depth
       if let sub = reading.subreadings[call.callID] {
@@ -507,7 +519,8 @@ public actor FollowConversation {
         if run.agentID == nil { run.agentID = sub.agentID }
         if sub.hasLoaded {
           let inner = shownEntries(
-            of: sub, depth: depth + 1, wanted: wanted, following: following)
+            of: sub, depth: depth + 1, underEnded: underEnded || call.state.isFinished,
+            wanted: wanted, following: following)
           run.activity = .read(inner)
           // What it said last is its answer, when the main transcript does not carry it: Codex
           // writes it in the sub-agent's rollout only.
@@ -525,7 +538,7 @@ public actor FollowConversation {
       } else if reading.notFound.contains(call.callID) {
         run.activity = .notFound
       } else if depth <= SubagentRun.maximumShownDepth,
-        isRunning(call, in: following) || wanted.contains(call.callID)
+        isRunning(call, in: following, underEnded: underEnded) || wanted.contains(call.callID)
       {
         run.activity = .loading
       }
