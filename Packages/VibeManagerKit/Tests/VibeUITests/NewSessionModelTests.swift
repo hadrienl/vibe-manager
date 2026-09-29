@@ -62,6 +62,23 @@ struct NewSessionModelTests {
     #expect(model.draft.name == "Mine")
   }
 
+  @Test("A draft refused for its folder is not blamed for its name too (#177)")
+  func refusalDoesNotBlameTheName() async {
+    let model = makeModel()
+    await model.load()
+    model.draft.workingDirectoryPath = "relative/path"
+
+    #expect(await model.refusesBeforeCreating())
+
+    #expect(model.draft.name.isEmpty)
+    #expect(model.issues.contains(.workingDirectoryNotAbsolute))
+    #expect(!model.issues.contains(.nameMissing))
+    // Fixed, and edited on: the name still goes unmentioned.
+    model.draft.workingDirectoryPath = "/workspace"
+    await model.revalidate()
+    #expect(model.issues.isEmpty)
+  }
+
   @Test("A draft is pristine until the user changes something in it, a choice included")
   func pristineUntilChanged() async {
     let written = makeModel()
@@ -150,14 +167,15 @@ struct NewSessionModelTests {
     let model = makeModel()
     await model.load()
     model.draft.workingDirectoryPath = "/workspace"
+    model.draft.initialPrompt = "colour \u{1B}[31m"
     _ = await model.submit()
-    #expect(model.issues(for: .name) == [.nameMissing])
+    #expect(model.issues(for: .initialPrompt) == [.promptControlCharacters])
 
-    model.draft.name = "Refactor the webhook"
-    // What the sheet does on every field change, once the user has asked for the session.
+    model.draft.initialPrompt = "colour"
+    // What the draft does on every field change, once the user has asked for the session.
     await model.revalidateIfSubmitted()
 
-    #expect(model.issues(for: .name).isEmpty)
+    #expect(model.issues(for: .initialPrompt).isEmpty)
   }
 
   @Test("Before the first Create, editing a field reports nothing")
@@ -180,11 +198,14 @@ struct NewSessionModelTests {
     )
     model.draft.workingDirectoryPath = "/workspace"
     await model.load()
+    model.draft.initialPrompt = "colour \u{1B}[31m"
     _ = await model.submit()
     let beforeTyping = await plans.count
 
+    model.draft.initialPrompt = ""
+    model.draftChanged()
     for character in "Refactor the webhook" {
-      model.draft.name.append(character)
+      model.draft.initialPrompt.append(character)
       model.draftChanged()
     }
     await waitUntil { model.issues.isEmpty }
@@ -318,12 +339,13 @@ struct NewSessionModelTests {
     let folders = GatedFolders()
     let model = makeModel(folders: folders, revalidationDelay: .milliseconds(10))
     await model.load()
+    model.draft.initialPrompt = "colour \u{1B}[31m"
     _ = await model.submit()
-    #expect(model.issues.contains(.nameMissing))
+    #expect(model.issues.contains(.promptControlCharacters))
 
     let choosing = Task { await model.folderChosen("/workspace") }
     await Task.yield()
-    model.draft.name = "Refactor the webhook"
+    model.draft.initialPrompt = "colour"
     model.draftChanged()
     await folders.open()
     await choosing.value
@@ -358,11 +380,12 @@ struct NewSessionModelTests {
     let model = makeModel(revalidationDelay: .milliseconds(40))
     model.draft.workingDirectoryPath = "/workspace"
     await model.load()
+    model.draft.initialPrompt = "colour \u{1B}[31m"
     _ = await model.submit()
-    #expect(model.issues == [.nameMissing])
+    #expect(model.issues == [.promptControlCharacters])
 
     // A keystroke, then Create pressed before the debounce fires.
-    model.draft.name = "Refactor the webhook"
+    model.draft.initialPrompt = "colour"
     model.draftChanged()
     let creation = await model.submit()
     try await Task.sleep(for: .milliseconds(200))

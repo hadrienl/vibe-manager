@@ -82,6 +82,8 @@ public struct NewSessionDraftView: View {
         .defaultScrollAnchor(.bottom)
       }
       composer
+        // On its way while another session is made: what is typed now would be lost.
+        .disabled(model.isSubmitting)
         .frame(maxWidth: 800)
         .padding(.horizontal, 24)
         .padding(.top, 8)
@@ -110,7 +112,7 @@ public struct NewSessionDraftView: View {
     // A file dropped anywhere on the draft joins its prompt, as the composer of a conversation
     // takes one.
     .dropDestination(for: URL.self) { urls, _ in
-      guard model.draft.templateFill == nil else { return false }
+      guard model.draft.templateFill == nil, !model.isSubmitting else { return false }
       model.attach(urls.filter(\.isFileURL))
       return true
     }

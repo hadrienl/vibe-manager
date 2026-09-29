@@ -372,6 +372,9 @@ public struct RootView: View {
                   openSettings()
                 }
               )
+              // One view per draft: another draft brought on screen starts with its own folds,
+              // popover and caret, not the ones left by the previous.
+              .id(draft.draftID)
             }
           }
       }

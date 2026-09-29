@@ -179,6 +179,12 @@ public final class NewSessionModel {
       && draft.ticketText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  /// The problems of a draft, less the missing name: the name is not asked for (#177), and one is
+  /// given at Send. A draft refused for something else must not come back blamed for it too.
+  static func namelessAllowed(_ issues: [SessionDraftIssue]) -> [SessionDraftIssue] {
+    issues.filter { $0 != .nameMissing }
+  }
+
   /// Gives the draft the name it would be created with, if none was typed. Done at Send, so the
   /// name keeps following the prompt until then.
   public func settleName() {
@@ -460,7 +466,7 @@ public final class NewSessionModel {
     draft.workingDirectoryPath = path
     lookForIcon()
     let checked = draft
-    let found = await create.problems(with: checked, checkingFolder: true)
+    let found = Self.namelessAllowed(await create.problems(with: checked, checkingFolder: true))
     guard checkedFolderPath == path else { return }
 
     // The whole verdict is only published when it still describes the form on screen. A check on
@@ -532,10 +538,11 @@ public final class NewSessionModel {
     // Skipping it instead made a folder that had disappeared vanish from the list of problems as
     // soon as the next field was edited, and come back only at the following Create.
     let path = checked.workingDirectoryPath
-    let found = await create.problems(
-      with: checked,
-      checkingFolder: path != nil && path == checkedFolderPath
-    )
+    let found = Self.namelessAllowed(
+      await create.problems(
+        with: checked,
+        checkingFolder: path != nil && path == checkedFolderPath
+      ))
     // The draft may have moved on while the checks ran, so a verdict on an older one is
     // dropped rather than shown over what the user is looking at now.
     guard !Task.isCancelled, checked == draft else { return }
@@ -559,6 +566,7 @@ public final class NewSessionModel {
   /// Returns the created session and the plan to launch, or `nil` when the draft was refused.
   public func submit() async -> SessionCreation? {
     guard !isSubmitting else { return nil }
+    settleName()
     // A pending debounce would otherwise land after the verdict of this submit and replace it.
     revalidation?.cancel()
     revalidation = nil
@@ -575,7 +583,7 @@ public final class NewSessionModel {
       issues = []
       return creation
     } catch let rejection as SessionCreationRejected {
-      issues = rejection.issues
+      issues = Self.namelessAllowed(rejection.issues)
       unsettleName()
       return nil
     } catch {
