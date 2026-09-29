@@ -18,8 +18,18 @@ public final class CodexConversationDecoder: ConversationDecoding {
   private var hasItems = false
   /// Calls whose output has not been written yet, by `call_id`.
   private var pendingCalls: [String: Int] = [:]
+  /// Sub-agents by thread (#180): `SubAgentActivity` says when each starts, is given work and
+  /// completes.
+  private var subagentIndexByThread: [String: Int] = [:]
+  /// A sub-agent's rollout (0.157): a fork, which first copies its parent's whole history — its
+  /// turns keeping their own start — before its own. Lines are left out until a turn starts after
+  /// the rollout itself did.
+  private var isInCopiedHistory: Bool
+  private var forkedAt: Date?
 
-  public init() {}
+  public init(isFork: Bool = false) {
+    isInCopiedHistory = isFork
+  }
 
   public var entries: [ConversationEntry] {
     if hasItems { return items }
@@ -32,6 +42,10 @@ public final class CodexConversationDecoder: ConversationDecoding {
       let payload = object["payload"] as? [String: Any]
     else { return }
     let date = (object["timestamp"] as? String).flatMap(TranscriptDates.parse)
+    if isInCopiedHistory {
+      skipCopiedHistory(object, payload: payload)
+      if isInCopiedHistory { return }
+    }
     switch (object["type"] as? String, payload["type"] as? String) {
     case ("event_msg", "item_completed"):
       guard let item = payload["item"] as? [String: Any] else { return }
@@ -97,13 +111,7 @@ public final class CodexConversationDecoder: ConversationDecoding {
         parameters: path.map { [ToolParameter(.path, $0)] } ?? [])
       append(ConversationEntry(id: id, date: date, content: .tool(call)))
     case "SubAgentActivity":
-      guard item["kind"] as? String == "started" else { return }
-      let path = item["agent_path"] as? String ?? ""
-      let name = (path as NSString).lastPathComponent.replacingOccurrences(of: "_", with: " ")
-      let call = ToolCall(
-        callID: id, kind: .subagent, state: .succeeded,
-        parameters: [ToolParameter(.description, name)])
-      append(ConversationEntry(id: id, date: date, content: .tool(call)))
+      readSubagentActivity(item, id: id, date: date)
     case "Extension":
       // Codex's image generation: the image is saved to a file, whose path is kept. The image
       // itself, in base64 in the same item, is never decoded here.
@@ -238,6 +246,59 @@ public final class CodexConversationDecoder: ConversationDecoding {
     return call
   }
 
+  // MARK: - Sub-agents
+
+  /// `started` adds the sub-agent; `interacted` — a message or a new task — sets it running again
+  /// once done; `completed` ends a task. What it answered is in its own rollout only.
+  private func readSubagentActivity(_ item: [String: Any], id: String, date: Date?) {
+    let thread = item["agent_thread_id"] as? String ?? id
+    switch item["kind"] as? String {
+    case "started":
+      guard subagentIndexByThread[thread] == nil else { return }
+      let path = item["agent_path"] as? String ?? ""
+      let name = (path as NSString).lastPathComponent.replacingOccurrences(of: "_", with: " ")
+      let call = ToolCall(
+        callID: id, kind: .subagent, state: .running,
+        parameters: [ToolParameter(.description, name)],
+        subagent: SubagentRun(agentID: thread, mode: .background, startedAt: date, taskCount: 0))
+      subagentIndexByThread[thread] = items.count
+      append(ConversationEntry(id: id, date: date, content: .tool(call)))
+    case "interacted":
+      updateSubagent(thread) { call in
+        if call.state.isFinished { call.state = .running }
+      }
+    case "completed":
+      updateSubagent(thread) { call in
+        call.state = .succeeded
+        call.subagent?.taskCount += 1
+      }
+    default:
+      return
+    }
+  }
+
+  private func updateSubagent(_ thread: String, _ change: (inout ToolCall) -> Void) {
+    guard let index = subagentIndexByThread[thread], index < items.count,
+      case .tool(var call) = items[index].content
+    else { return }
+    change(&call)
+    items[index].content = .tool(call)
+  }
+
+  private func skipCopiedHistory(_ object: [String: Any], payload: [String: Any]) {
+    if object["type"] as? String == "session_meta" {
+      forkedAt = (payload["timestamp"] as? String).flatMap(TranscriptDates.parse)
+      return
+    }
+    guard object["type"] as? String == "event_msg", payload["type"] as? String == "task_started",
+      let forkedAt, let started = (payload["started_at"] as? NSNumber)?.doubleValue
+    else { return }
+    // `started_at` is in whole seconds.
+    if started >= forkedAt.timeIntervalSince1970.rounded(.down) {
+      isInCopiedHistory = false
+    }
+  }
+
   // MARK: - Calls still running
 
   private func startCall(_ payload: [String: Any], date: Date?) {
@@ -254,6 +315,9 @@ public final class CodexConversationDecoder: ConversationDecoding {
     guard let index = pendingCalls.removeValue(forKey: callID) else { return }
     items.remove(at: index)
     for (key, value) in pendingCalls where value > index { pendingCalls[key] = value - 1 }
+    for (key, value) in subagentIndexByThread where value > index {
+      subagentIndexByThread[key] = value - 1
+    }
   }
 
   private func interruptPending() {

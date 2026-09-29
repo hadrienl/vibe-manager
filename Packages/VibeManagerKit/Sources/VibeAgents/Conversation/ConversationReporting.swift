@@ -31,6 +31,20 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
     ClaudeCodeConversationDecoder(file: file)
   }
 
+  public func subagentTranscripts(beside root: URL, agentIDs: Set<String>)
+    -> [SubagentTranscriptInfo]
+  {
+    SubagentTranscripts.claudeCode(beside: root)
+  }
+
+  public func subagentDecoder(for file: URL, root: URL) -> any ConversationDecoding {
+    ClaudeCodeConversationDecoder(subagentFile: file)
+  }
+
+  public func firstPrompt(ofSubagent file: URL) -> String? {
+    SubagentTranscripts.claudeCodeFirstPrompt(of: file)
+  }
+
   /// Claude Code keeps a prompt sent during a turn for when the turn ends, whatever the key. It
   /// wraps any paste in `<pasted_content>` (2.1.283), and takes 4 kB arriving at once for one:
   /// typed 256 bytes every 20 ms, a prompt arrives as written.
@@ -58,6 +72,17 @@ extension CodexAgentProvider: AgentConversationReporting {
 
   public func conversationDecoder(for file: URL) -> any ConversationDecoding {
     CodexConversationDecoder()
+  }
+
+  public func subagentTranscripts(beside root: URL, agentIDs: Set<String>)
+    -> [SubagentTranscriptInfo]
+  {
+    SubagentTranscripts.codex(beside: root, agentIDs: agentIDs)
+  }
+
+  /// A sub-agent's rollout starts with a copy of its parent's history: left out.
+  public func subagentDecoder(for file: URL, root: URL) -> any ConversationDecoding {
+    CodexConversationDecoder(isFork: true)
   }
 
   /// Return during a turn steers the turn under way; Tab queues the prompt for the next one, which
