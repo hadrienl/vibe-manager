@@ -100,6 +100,24 @@ The avatar is decorative: VoiceOver skips it, the bubble says everything. With R
 avatar neither blinks nor moves its mouth: it shows one still expression per state, and changes
 at once.
 
+## Settings › Conversation › Theme
+
+The grid of themes ends with the card "Create My Theme" (#118, ADR 0033), which unfolds a panel
+under the grid: the description of the theme, a button per agent that can make it, the versions
+made, a name and "Save and Apply the Theme".
+
+| Action | Keys |
+|---|---|
+| Unfold or fold the panel; the keyboard goes to its description | Space or Return on the card |
+| Stop a generation | Escape, or Cancel |
+| Delete a theme of yours — always asked first | ⌫ on its card, or its Delete action |
+| Export a theme of yours | its Export action, or its context menu |
+
+VoiceOver announces, without moving its cursor: a generation that starts, a second attempt, a
+version on trial, a failure and why, a cancellation, a return to a version, a theme dropped,
+saved — with its final name and its mode — or deleted. The card says Folded or Unfolded; each
+version reads its number, its request and its agent; a card of the user's own says so.
+
 ## Settings › Requests › Avatars
 
 The library of avatars (#154, ADR 0032): a native list, then the preview of the avatar selected.
