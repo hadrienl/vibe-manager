@@ -7485,7 +7485,7 @@
       }
     },
     "More Options" : {
-      "comment" : "Unfolds the ticket and the appearance.",
+      "comment" : "Unfolds the ticket.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -13317,17 +13317,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Onglet du ticket, %@"
-          }
-        }
-      }
-    },
-    "Ticket, appearance" : {
-      "comment" : "What More Options unfolds.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, apparence"
           }
         }
       }

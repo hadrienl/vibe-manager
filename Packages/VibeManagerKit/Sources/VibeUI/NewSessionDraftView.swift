@@ -18,9 +18,10 @@ public struct NewSessionDraftView: View {
   /// The prompt areas are AppKit text views, which SwiftUI's focus does not reach: where the caret
   /// was sent is kept here too, and they take it themselves.
   @State private var editorRequest: FocusTarget?
-  /// The ticket and the appearance, folded away until asked for — or until one of them has
-  /// something to say.
+  /// The ticket, folded away until asked for — or until there is one.
   @State private var showsMoreOptions = false
+  /// The symbol and the colour, in a popover from the badge next to the name.
+  @State private var showsAppearancePicker = false
 
   /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
   enum FocusTarget: Hashable {
@@ -93,14 +94,13 @@ public struct NewSessionDraftView: View {
       model.draftChanged()
     }
     .onChange(of: model.issues) {
-      if !model.issues(for: .appearance).isEmpty { showsMoreOptions = true }
+      if !model.issues(for: .appearance).isEmpty { showsAppearancePicker = true }
     }
     .onChange(of: focusRequest) {
       placeCaret()
     }
     .task {
-      showsMoreOptions =
-        !model.draft.ticketText.isEmpty || !model.issues(for: .appearance).isEmpty
+      showsMoreOptions = !model.draft.ticketText.isEmpty
       // At once, so that nothing typed meanwhile goes elsewhere; again once the agents and the
       // folders are there, for a draft that came back refused.
       placeCaret()
@@ -130,9 +130,7 @@ public struct NewSessionDraftView: View {
   private var header: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 10) {
-        SessionBadge(
-          appearance: model.draft.effectiveAppearance,
-          icon: model.icons?.image(for: model.draft.effectiveAppearance.iconID), size: 26)
+        appearanceButton
         TextField(
           text: $model.draft.name,
           prompt: Text(verbatim: model.placeholderName)
@@ -156,7 +154,7 @@ public struct NewSessionDraftView: View {
         .help(Text("Discard this draft. No session is created.", bundle: .module))
         .accessibilityIdentifier("new-session-discard")
       }
-      ForEach(model.issues(for: .name)) { issue in
+      ForEach(model.issues(for: .name) + model.issues(for: .appearance)) { issue in
         IssueLabel(issue: issue)
       }
     }
@@ -207,15 +205,12 @@ public struct NewSessionDraftView: View {
 
   private var moreOptions: some View {
     DisclosureGroup(isExpanded: $showsMoreOptions) {
-      VStack(alignment: .leading, spacing: 14) {
-        ticketField
-        appearanceField
-      }
-      .padding(.top, 10)
+      ticketField
+        .padding(.top, 10)
     } label: {
       HStack(spacing: 6) {
-        Text("More Options", bundle: .module, comment: "Unfolds the ticket and the appearance.")
-        Text("Ticket, appearance", bundle: .module, comment: "What More Options unfolds.")
+        Text("More Options", bundle: .module, comment: "Unfolds the ticket.")
+        Text("Ticket", bundle: .module, comment: "The ticket the new session works on.")
           .foregroundStyle(.secondary)
       }
       .font(.callout)
@@ -398,54 +393,80 @@ public struct NewSessionDraftView: View {
     }
   }
 
-  private var appearanceField: some View {
-    LabeledField(
-      Text("Appearance", bundle: .module, comment: "The symbol and colour of the session."),
-      help: model.usesProjectIcon
-        ? Text("From the project folder until you pick one.", bundle: .module)
-        : model.draft.appearance == nil
-          ? Text("Derived from the name until you pick one.", bundle: .module)
-          : model.appearanceComesFromTemplate
-            ? Text("Given by the template — pick another if needed.", bundle: .module) : nil,
-      issues: model.issues(for: .appearance)
-    ) {
-      HStack(alignment: .top, spacing: 14) {
+  /// The session's badge, next to its name: a click opens its symbol and colour, as the chevron
+  /// says.
+  private var appearanceButton: some View {
+    Button {
+      showsAppearancePicker.toggle()
+    } label: {
+      HStack(spacing: 3) {
         SessionBadge(
           appearance: model.draft.effectiveAppearance,
-          icon: model.icons?.image(for: model.draft.effectiveAppearance.iconID), size: 46)
+          icon: model.icons?.image(for: model.draft.effectiveAppearance.iconID), size: 26)
+        Image(systemName: "chevron.down")
+          .font(.system(size: 9, weight: .bold))
+          .foregroundStyle(.secondary)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .popover(isPresented: $showsAppearancePicker, arrowEdge: .bottom) {
+      appearancePicker
+        .padding(16)
+    }
+    .help(Text("Appearance", bundle: .module, comment: "The symbol and colour of the session."))
+    .accessibilityLabel(
+      Text("Appearance", bundle: .module, comment: "The symbol and colour of the session.")
+    )
+    .accessibilityIdentifier("new-session-appearance")
+  }
 
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 6) {
-            // Offered only when the folder has one, to come back to it after picking something
-            // else.
-            if let icon = model.draft.projectIcon {
-              ProjectIconChoice(
-                image: model.icons?.image(for: icon.id),
-                isSelected: model.usesProjectIcon,
-                select: { model.useProjectIcon() }
-              )
-            }
-            ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
-              SymbolChoice(
-                symbol: symbol,
-                isSelected: !model.usesProjectIcon
-                  && model.draft.effectiveAppearance.symbolName == symbol,
-                select: { pickSymbol(symbol) }
-              )
-            }
-          }
-          HStack(spacing: 6) {
-            ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
-              ColorChoice(
-                hex: hex,
-                isSelected: !model.usesProjectIcon
-                  && model.draft.effectiveAppearance.colorHex == hex,
-                select: { pickColor(hex) }
-              )
-            }
-          }
+  private var appearancePicker: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text("Appearance", bundle: .module, comment: "The symbol and colour of the session.")
+        .font(.headline)
+      HStack(spacing: 6) {
+        // Offered only when the folder has one, to come back to it after picking something else.
+        if let icon = model.draft.projectIcon {
+          ProjectIconChoice(
+            image: model.icons?.image(for: icon.id),
+            isSelected: model.usesProjectIcon,
+            select: { model.useProjectIcon() }
+          )
+        }
+        ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
+          SymbolChoice(
+            symbol: symbol,
+            isSelected: !model.usesProjectIcon
+              && model.draft.effectiveAppearance.symbolName == symbol,
+            select: { pickSymbol(symbol) }
+          )
         }
       }
+      HStack(spacing: 6) {
+        ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
+          ColorChoice(
+            hex: hex,
+            isSelected: !model.usesProjectIcon
+              && model.draft.effectiveAppearance.colorHex == hex,
+            select: { pickColor(hex) }
+          )
+        }
+      }
+      ForEach(model.issues(for: .appearance)) { issue in
+        IssueLabel(issue: issue)
+      }
+      Group {
+        if model.usesProjectIcon {
+          Text("From the project folder until you pick one.", bundle: .module)
+        } else if model.draft.appearance == nil {
+          Text("Derived from the name until you pick one.", bundle: .module)
+        } else if model.appearanceComesFromTemplate {
+          Text("Given by the template — pick another if needed.", bundle: .module)
+        }
+      }
+      .font(.caption)
+      .foregroundStyle(.secondary)
     }
   }
 
