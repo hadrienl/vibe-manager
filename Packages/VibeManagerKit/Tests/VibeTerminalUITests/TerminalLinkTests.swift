@@ -74,13 +74,12 @@ private func makeTerminal(text: String) -> (AccessibleTerminalView, NSWindow) {
   return (view, window)
 }
 
-/// Where a cell of the screen is, in the window.
+/// Where a cell of the screen is, in the window: measured on the caret, which SwiftTerm sizes to one
+/// cell exactly, unrounded.
 @MainActor
 private func point(of cell: Position, in view: AccessibleTerminalView) -> NSPoint {
-  let size = view.cellSizeInPixels(source: view.getTerminal())!
-  let scale = view.window?.backingScaleFactor ?? 1
-  let width = CGFloat(size.width) / scale
-  let height = CGFloat(size.height) / scale
+  let width = view.caretFrame.width
+  let height = view.caretFrame.height
   let local = NSPoint(
     x: (CGFloat(cell.col) + 0.5) * width, y: view.frame.height - (CGFloat(cell.row) + 0.5) * height)
   return view.convert(local, to: nil)
@@ -111,14 +110,18 @@ struct TerminalLinkViewTests {
     #expect(view.linkHighlightMode == .hover)
   }
 
-  @Test("The link under the pointer is found in the cell it is written in")
+  @Test("The link under the pointer is found in the cell it is written in, far right too")
   func findsTheLinkUnderThePointer() {
-    let (view, window) = makeTerminal(text: "see https://example.com/a here")
+    let padding = String(repeating: " ", count: 50)
+    let (view, window) = makeTerminal(text: "see https://example.com/a here\r\n\(padding)https://far.example")
     defer { window.close() }
     #expect(view.link(atScreen: Position(col: 8, row: 0)) == "https://example.com/a")
     #expect(view.link(atScreen: Position(col: 1, row: 0)) == nil)
-    let local = view.convert(point(of: Position(col: 8, row: 0), in: view), from: nil)
-    #expect(view.cell(at: local) == Position(col: 8, row: 0))
+    let cols = view.getTerminal().cols
+    for cell in [Position(col: 8, row: 0), Position(col: cols - 1, row: 1), Position(col: 55, row: 1)] {
+      let local = view.convert(point(of: cell, in: view), from: nil)
+      #expect(view.cell(at: local) == cell)
+    }
   }
 
   @Test("The menu of a link offers the external browser; elsewhere there is none")

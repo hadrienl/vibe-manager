@@ -159,18 +159,29 @@ public final class AccessibleTerminalView: TerminalView {
   /// The cell under a point of the view, on the screen rather than in the scrollback.
   func cell(at point: NSPoint) -> Position? {
     let terminal = getTerminal()
-    guard let size = cellSizeInPixels(source: terminal), size.width > 0, size.height > 0 else {
-      return nil
-    }
-    let scale = window?.backingScaleFactor ?? 1
-    let width = CGFloat(size.width) / scale
-    let height = CGFloat(size.height) / scale
+    guard let (width, height) = cellSize, width > 0, height > 0 else { return nil }
     let column = Int(point.x / width)
     let row = Int((frame.height - point.y) / height)
     guard (0..<terminal.cols).contains(column), (0..<terminal.rows).contains(row) else {
       return nil
     }
     return Position(col: column, row: row)
+  }
+
+  /// The size of a cell, exactly as SwiftTerm lays them out: its own size is not public, and
+  /// `cellSizeInPixels` rounds it to the pixel, which puts a click far right several columns off.
+  /// The optimal frame is the cells' size times the grid, plus the scroller when it shows.
+  private var cellSize: (width: CGFloat, height: CGFloat)? {
+    let terminal = getTerminal()
+    guard terminal.cols > 0, terminal.rows > 0 else { return nil }
+    let frame = getOptimalFrameSize()
+    // The width SwiftTerm reserves for its scroller, unless it hides it.
+    let scroller = subviews.lazy.compactMap { $0 as? NSScroller }.first
+    let reserved =
+      scroller.map { $0.isHidden ? 0 : NSScroller.scrollerWidth(for: .regular, scrollerStyle: scrollerStyle) }
+      ?? 0
+    let width = frame.width - reserved
+    return (width / CGFloat(terminal.cols), frame.height / CGFloat(terminal.rows))
   }
 
   /// The link at a cell of the screen: an OSC 8 address, or text that reads as one.
@@ -187,8 +198,6 @@ public final class AccessibleTerminalView: TerminalView {
   /// SwiftTerm shows the I-beam everywhere, and its `mouseMoved` cannot be overridden from here: a
   /// tracking area of our own shows the pointing hand over what a click opens.
   private var linkPointer: LinkPointer?
-  private var pointerCell: Position?
-  private var pointerIsOnLink = false
   private var showsHand = false
 
   private func installLinkPointer() {
@@ -205,11 +214,10 @@ public final class AccessibleTerminalView: TerminalView {
   fileprivate func pointerMoved(_ event: NSEvent) {
     syncLinkMode()
     let cell = cell(at: convert(event.locationInWindow, from: nil))
-    // The implicit lookup runs a regular expression over the line: not again in the same cell.
-    if cell != pointerCell {
-      pointerCell = cell
-      pointerIsOnLink = cell.flatMap(link(atScreen:)).map(TerminalPaneModel.opensOnClick) ?? false
-    }
+    // Looked up at every move, as SwiftTerm does for its underline: output scrolling under a still
+    // pointer changes what is under it.
+    let pointerIsOnLink =
+      cell.flatMap(link(atScreen:)).map(TerminalPaneModel.opensOnClick) ?? false
     let clickable =
       pointerIsOnLink && (!programFollowsMouse || event.modifierFlags.contains(.command))
     if clickable {
@@ -221,8 +229,6 @@ public final class AccessibleTerminalView: TerminalView {
   }
 
   fileprivate func pointerExited() {
-    pointerCell = nil
-    pointerIsOnLink = false
     showsHand = false
   }
 

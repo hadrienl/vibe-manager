@@ -57,6 +57,13 @@ struct BrowserLinkGestureTests {
     #expect(view.followsPress(with: [.command], now: 10.2))
     #expect(!view.followsPress(with: [.command, .shift], now: 10.2))
     #expect(!view.followsPress(with: [.command], now: 12))
+    // WebKit follows the link on the release: a long press still counts from it.
+    let release = try #require(
+      NSEvent.mouseEvent(
+        with: .leftMouseUp, location: .zero, modifierFlags: [.command], timestamp: 13,
+        windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0))
+    view.mouseUp(with: release)
+    #expect(view.followsPress(with: [.command], now: 13.1))
   }
 
   @Test("A link to a file, under the pointer on a site's page, is not offered")

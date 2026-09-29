@@ -109,8 +109,9 @@ final class SessionWebView: WKWebView {
   var hoveredLink: URL?
   var openInBackgroundTab: ((URL) -> Void)?
   var openExternally: ((URL) -> Void)?
-  /// When the user last pressed a button over the page, and with which keys: a gesture that opens
-  /// a tab must follow one, not a click the page's script made up.
+  /// When the user last pressed or let go of a button over the page, and with which keys pressed:
+  /// a gesture that opens a tab must follow one, not a click the page's script made up. WebKit
+  /// follows a link on the release, however long the press lasted.
   private(set) var lastPress: (time: TimeInterval, modifiers: NSEvent.ModifierFlags)?
 
   /// The hovered link, when the page may have it opened: an address of this Mac only from a page
@@ -135,6 +136,16 @@ final class SessionWebView: WKWebView {
   override func otherMouseDown(with event: NSEvent) {
     lastPress = (event.timestamp, event.modifierFlags)
     super.otherMouseDown(with: event)
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    lastPress?.time = event.timestamp
+    super.mouseUp(with: event)
+  }
+
+  override func otherMouseUp(with event: NSEvent) {
+    lastPress?.time = event.timestamp
+    super.otherMouseUp(with: event)
   }
 
   override func mouseExited(with event: NSEvent) {
