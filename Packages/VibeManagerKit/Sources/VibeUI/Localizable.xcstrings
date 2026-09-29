@@ -4613,6 +4613,28 @@
         }
       }
     },
+    "Asked by a sub-agent" : {
+      "comment" : "On a request's card: one of the agent's sub-agents asks, not the agent itself.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandé par un sous-agent"
+          }
+        }
+      }
+    },
+    "Asked by the sub-agent “%@”" : {
+      "comment" : "On a request's card: which of the agent's sub-agents asks.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandé par le sous-agent « %@ »"
+          }
+        }
+      }
+    },
     "Attach Files…" : {
       "comment" : "Joins files to the prompt.",
       "localizations" : {

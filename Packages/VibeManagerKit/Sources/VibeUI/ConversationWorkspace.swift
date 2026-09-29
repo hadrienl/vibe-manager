@@ -107,6 +107,12 @@ public final class ConversationWorkspace {
     } else {
       model = ConversationModel(sessionID: session.id)
       model.appearance = appearance
+      if let follow {
+        let id = session.id
+        model.unfoldSubagents = { callIDs in
+          Task { await follow.setUnfoldedSubagents(callIDs, for: id) }
+        }
+      }
       models[session.id] = model
       connect?(model, session)
       if pendingComposerFocus == session.id {

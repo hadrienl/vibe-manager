@@ -57,7 +57,11 @@ extension AppModel {
             agentName: session.agent.map { agentNames[$0.providerID] ?? $0.providerID },
             folderName: folder.map { URL(fileURLWithPath: $0).lastPathComponent },
             folderPath: folder,
-            branch: branch(of: session)
+            branch: branch(of: session),
+            subagentDescription: request.reference.agentID.flatMap { agent in
+              conversations.existingModel(for: session.id)?.subagent(agentID: agent)
+                .map { $0.parameter(.description) ?? $0.subagent?.type ?? agent }
+            }
           ))
       }
     }

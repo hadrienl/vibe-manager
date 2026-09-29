@@ -50,7 +50,7 @@ struct ToolBlockView: View {
     case .entry(let entry):
       return entry.toolCall.map { ToolCallSummary.title(for: $0) }
         ?? ToolCallTitle(symbolName: "wrench.and.screwdriver", title: "")
-    case .toolGroup(_, let calls):
+    case .toolGroup(_, let calls), .subagentGroup(_, let calls):
       return ToolCallSummary.title(forGroup: calls.compactMap(\.toolCall))
     }
   }
@@ -104,12 +104,7 @@ struct ToolBlockView: View {
     .contentShape(Rectangle())
   }
 
-  private var calls: [ToolCall] {
-    switch block {
-    case .entry(let entry): return entry.toolCall.map { [$0] } ?? []
-    case .toolGroup(_, let calls): return calls.compactMap(\.toolCall)
-    }
-  }
+  private var calls: [ToolCall] { block.calls }
 
   private var lineCounts: (added: Int, removed: Int)? {
     let edits = calls.filter { $0.kind == .edit || $0.kind == .create }
@@ -139,7 +134,7 @@ struct ToolBlockView: View {
         }
         .padding(12)
       }
-    case .toolGroup(_, let entries):
+    case .toolGroup(_, let entries), .subagentGroup(_, let entries):
       VStack(alignment: .leading, spacing: 6) {
         ForEach(entries) { entry in
           ToolBlockView(block: .entry(entry), model: model)

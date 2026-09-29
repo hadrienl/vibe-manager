@@ -154,6 +154,10 @@ public struct ConversationView: View {
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
       }
+      .onChange(of: model.revealRequest) {
+        guard let id = model.revealedBlockID else { return }
+        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .top) }
+      }
       .overlay(alignment: .bottom) {
         if model.scroll.unseenCount > 0 {
           Button {
@@ -186,11 +190,25 @@ public struct ConversationView: View {
           AccessibilityRotorEntry(Text(verbatim: block.id), id: block.id)
         }
       }
+      .accessibilityRotor(Text("Sub-agents", bundle: .module)) {
+        ForEach(model.blocks.filter(Self.holdsSubagents)) { block in
+          AccessibilityRotorEntry(
+            Text(
+              verbatim: block.calls.map(SubagentPresentation.description(of:))
+                .joined(separator: ", ")),
+            id: block.id)
+        }
+      }
     }
   }
 
   private var footer: some View {
     VStack(alignment: .leading, spacing: 8) {
+      // Out of the messages that scroll: a sub-agent in the background runs long after its block
+      // has gone up (#180).
+      if !model.trayItems.isEmpty {
+        SubagentTray(model: model)
+      }
       if model.isAgentWorking {
         ActivityLine(model: model)
       }
@@ -260,6 +278,10 @@ public struct ConversationView: View {
     return false
   }
 
+  private static func holdsSubagents(_ block: ConversationBlock) -> Bool {
+    block.calls.contains { $0.kind == .subagent }
+  }
+
   private static func isFailure(_ block: ConversationBlock) -> Bool {
     if case .failed = block.toolState { return true }
     return false
@@ -273,15 +295,19 @@ public struct ConversationView: View {
   }
 }
 
-/// One block of the conversation.
+/// One block of the conversation, or of a sub-agent's activity.
 struct BlockView: View {
   let block: ConversationBlock
   let model: ConversationModel
+  /// Inside a sub-agent's activity.
+  var isNested = false
 
   var body: some View {
     switch block {
     case .toolGroup:
       ToolBlockView(block: block, model: model)
+    case .subagentGroup:
+      SubagentGroupView(block: block, model: model)
     case .entry(let entry):
       switch entry.content {
       case .userPrompt(let text, let attachments):
@@ -290,6 +316,8 @@ struct BlockView: View {
         AgentTextView(text: text)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
+      case .tool(let call) where call.kind == .subagent:
+        SubagentBlockView(call: call, model: model, isNested: isNested)
       case .tool:
         ToolBlockView(block: block, model: model)
       case .notice(.shell(let run)):
