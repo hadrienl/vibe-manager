@@ -212,8 +212,13 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
 
 /// Behind a row of the list, says which session it draws, so that `HorizontalSwipeMonitor` can
 /// find the row under the fingers where it is really drawn.
+///
+/// It also carries the row's selection while the row slides. The list draws that rounded
+/// background itself, in the table row behind the cell, where SwiftUI's offset does not reach:
+/// without it the content of a selected row left its background behind, alone under the buttons.
 struct SwipeRowMarker: NSViewRepresentable {
   let sessionID: SessionID
+  var carriesSelection = false
 
   func makeNSView(context: Context) -> MarkerView {
     let view = MarkerView()
@@ -223,11 +228,117 @@ struct SwipeRowMarker: NSViewRepresentable {
 
   func updateNSView(_ view: MarkerView, context: Context) {
     view.sessionID = sessionID
+    view.carriesSelection = carriesSelection
+  }
+
+  static func dismantleNSView(_ view: MarkerView, coordinator: ()) {
+    view.carriesSelection = false
   }
 
   final class MarkerView: NSView {
     var sessionID: SessionID?
+    var carriesSelection = false {
+      didSet { if carriesSelection != oldValue { followRow() } }
+    }
+    /// Stands in for the list's selection, hidden meanwhile. A subview of this view, which SwiftUI
+    /// moves with the row, frame for frame, animations included: the list's own selection is laid
+    /// out and its layer reset by the table whenever it likes, and a card of its own moved beside
+    /// the row lags behind it.
+    private var card: NSVisualEffectView?
+    private weak var hiddenSelection: NSView?
+    /// Where the table row is, seen from here while the row is at rest: the card is drawn where
+    /// the selection is drawn then.
+    private var restingRowOrigin: NSPoint?
+    /// The row selected or not, focused or not, while the card stands in for its selection.
+    private var rowObservations: [NSKeyValueObservation] = []
+
+    override var isFlipped: Bool { true }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+      super.layout()
+      if !carriesSelection { restingRowOrigin = row.map { convert(NSPoint.zero, from: $0) } }
+    }
+
+    override func viewDidMoveToSuperview() {
+      super.viewDidMoveToSuperview()
+      needsLayout = true
+    }
+
+    /// A row the table takes back, or hands to another session, never keeps a hidden selection.
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+      if newSuperview == nil { carriesSelection = false }
+      super.viewWillMove(toSuperview: newSuperview)
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+      if newWindow == nil { carriesSelection = false }
+      super.viewWillMove(toWindow: newWindow)
+    }
+
+    /// The selection can come to an open row, or leave it, from the keyboard, and the list draws
+    /// it dimmer once the keyboard or the window is elsewhere: the card follows. The table draws
+    /// the selection after it says so.
+    private func followRow() {
+      rowObservations = []
+      if carriesSelection, let row {
+        let changed: @Sendable (NSTableRowView, NSKeyValueObservedChange<Bool>) -> Void = {
+          [weak self] _, _ in
+          Task { @MainActor in self?.updateCard() }
+        }
+        rowObservations = [
+          row.observe(\.isSelected, changeHandler: changed),
+          row.observe(\.isEmphasized, changeHandler: changed),
+        ]
+      }
+      updateCard()
+    }
+
+    /// On a system that draws the selection otherwise, nothing moves.
+    private func updateCard() {
+      guard carriesSelection, let row, row.isSelected, let origin = restingRowOrigin,
+        let selection = row.subviews.first(where: { $0 is NSVisualEffectView })
+      else {
+        card?.removeFromSuperview()
+        card = nil
+        hiddenSelection?.alphaValue = 1
+        hiddenSelection = nil
+        return
+      }
+      let card = self.card ?? NSVisualEffectView()
+      if card.superview !== self { addSubview(card) }
+      self.card = card
+      if let effect = selection as? NSVisualEffectView {
+        card.material = effect.material
+        card.blendingMode = effect.blendingMode
+        card.state = effect.state
+        card.isEmphasized = effect.isEmphasized
+        card.maskImage =
+          effect.maskImage ?? Self.roundedMask(radius: effect.layer?.cornerRadius ?? 0)
+      }
+      card.frame = selection.frame.offsetBy(dx: origin.x, dy: origin.y)
+      selection.alphaValue = 0
+      hiddenSelection = selection
+    }
+
+    private var row: NSTableRowView? {
+      var ancestor = superview
+      while let view = ancestor, !(view is NSTableRowView) { ancestor = view.superview }
+      return ancestor as? NSTableRowView
+    }
+
+    private static func roundedMask(radius: CGFloat) -> NSImage? {
+      guard radius > 0 else { return nil }
+      let side = radius * 2 + 1
+      let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+        NSColor.black.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        return true
+      }
+      image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+      image.resizingMode = .stretch
+      return image
+    }
   }
 }
