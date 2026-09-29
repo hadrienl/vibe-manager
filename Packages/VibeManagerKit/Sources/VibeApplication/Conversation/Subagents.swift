@@ -91,6 +91,8 @@ public enum SubagentActivity: Hashable, Sendable {
   /// Asked for, not read yet: its transcript is being found or read.
   case loading
   case read([ConversationEntry])
+  /// Done, and no transcript of its own was found: a call the CLI refused, a folder cleaned up.
+  case notFound
 }
 
 /// What a sub-agent's activity amounts to, for its folded block.
@@ -122,18 +124,12 @@ public struct SubagentTranscriptInfo: Hashable, Sendable {
   public let toolUseID: String?
   public let file: URL
   public let createdAt: Date?
-  /// Stopped by the user from the CLI's list of tasks.
-  public let stoppedByUser: Bool
 
-  public init(
-    agentID: String, toolUseID: String? = nil, file: URL, createdAt: Date? = nil,
-    stoppedByUser: Bool = false
-  ) {
+  public init(agentID: String, toolUseID: String? = nil, file: URL, createdAt: Date? = nil) {
     self.agentID = agentID
     self.toolUseID = toolUseID
     self.file = file
     self.createdAt = createdAt
-    self.stoppedByUser = stoppedByUser
   }
 }
 
@@ -216,6 +212,15 @@ extension ConversationEntry {
   public var subagentCall: ToolCall? {
     guard let call = toolCall, call.kind == .subagent else { return nil }
     return call
+  }
+
+  /// Every tool call, those in sub-agents' activities included, each after the sub-agent that
+  /// made it.
+  public static func allCalls(in entries: [ConversationEntry]) -> [ToolCall] {
+    entries.flatMap { entry -> [ToolCall] in
+      guard let call = entry.toolCall else { return [] }
+      return [call] + (call.subagent?.activityEntries.map(allCalls(in:)) ?? [])
+    }
   }
 
   /// Every sub-agent still running, at any depth, in the order they started.

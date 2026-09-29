@@ -28,7 +28,7 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
   }
 
   public func conversationDecoder(for file: URL) -> any ConversationDecoding {
-    ClaudeCodeConversationDecoder(file: file)
+    ClaudeCodeConversationDecoder()
   }
 
   public func subagentTranscripts(beside root: URL, agentIDs: Set<String>)
@@ -38,7 +38,7 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
   }
 
   public func subagentDecoder(for file: URL, root: URL) -> any ConversationDecoding {
-    ClaudeCodeConversationDecoder(subagentFile: file)
+    ClaudeCodeConversationDecoder(isSubagent: true)
   }
 
   public func firstPrompt(ofSubagent file: URL) -> String? {

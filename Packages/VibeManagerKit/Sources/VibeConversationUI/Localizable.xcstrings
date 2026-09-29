@@ -1523,6 +1523,26 @@
         }
       }
     },
+    "Its activity was not found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité introuvable"
+          }
+        }
+      }
+    },
+    "Its answer was not found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat introuvable"
+          }
+        }
+      }
+    },
     "Its file is deleted." : {
       "localizations" : {
         "fr" : {

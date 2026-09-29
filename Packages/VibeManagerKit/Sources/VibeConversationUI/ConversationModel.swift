@@ -286,7 +286,12 @@ public final class ConversationModel {
       agentID: activity == .awaitingUser(.approval)
         ? pendingRequest()?.request.reference.agentID : nil)
     // A sub-agent whose end never came, in a session whose agent no longer runs, will not end.
-    if !isProcessRunning, snapshot.availability != .loading {
+    let isRunning = isProcessRunning
+    if isRunning != reportedAgentRunning {
+      reportedAgentRunning = isRunning
+      agentRunningChanged?(isRunning)
+    }
+    if !isRunning, snapshot.availability != .loading {
       entries = Self.settlingSubagents(entries)
     }
     shownEntries = entries
@@ -339,7 +344,11 @@ public final class ConversationModel {
   /// The bar over the composer: the sub-agents running, and those that just ended, for a moment.
   public private(set) var trayItems: [SubagentTrayItem] = []
   /// How long a sub-agent that ended stays in the bar.
-  static let trayLinger = Duration.seconds(4)
+  @ObservationIgnored public var trayLinger = Duration.seconds(4)
+  /// Tells the reader whether the session's agent runs: a sub-agent whose end never came is not
+  /// followed once it does not.
+  @ObservationIgnored public var agentRunningChanged: ((Bool) -> Void)?
+  @ObservationIgnored private var reportedAgentRunning: Bool?
   @ObservationIgnored private var lingering: [String: (call: ToolCall, until: ContinuousClock.Instant)] =
     [:]
   @ObservationIgnored private var lingerTask: Task<Void, Never>?
@@ -357,7 +366,7 @@ public final class ConversationModel {
     for item in trayItems where !item.hasEnded && !runningIDs.contains(item.call.callID) {
       let ended = ConversationEntry.subagentCalls([item.call.callID], in: shownEntries).first
       if let ended, ended.state.isFinished {
-        lingering[ended.callID] = (ended, now + Self.trayLinger)
+        lingering[ended.callID] = (ended, now + trayLinger)
       }
     }
     lingering = lingering.filter { $0.value.until > now && !runningIDs.contains($0.key) }
@@ -388,9 +397,13 @@ public final class ConversationModel {
 
   /// A sub-agent whose answer only its own transcript holds — Codex's — is read when its block is
   /// unfolded.
-  public func subagentBlockExpanded(_ call: ToolCall, isExpanded: Bool) {
-    guard call.subagent?.result == nil, call.state.isFinished else { return }
-    requestSubagentReading(call.callID, isExpanded)
+  private func subagentBlockExpanded(_ call: ToolCall, isExpanded: Bool) {
+    if isExpanded {
+      guard call.subagent?.result == nil, call.state.isFinished else { return }
+      requestSubagentReading(call.callID, true)
+    } else if !self.isExpanded(id: Self.activityToggleID(call.callID), default: false) {
+      requestSubagentReading(call.callID, false)
+    }
   }
 
   private func requestSubagentReading(_ callID: String, _ isRead: Bool) {
@@ -457,15 +470,13 @@ public final class ConversationModel {
     ConversationEntry.subagent(agentID: agentID, in: snapshot.entries)
   }
 
-  /// The call the agent waits on, for the banner.
+  /// The call the agent waits on, for the banner: one of a sub-agent's included — the deepest
+  /// marked, the sub-agent's own call rather than the sub-agent, when one asks (#180).
   public var pendingCall: ToolCall? {
     guard case .awaitingUser = activity else { return nil }
-    return blocks.reversed().lazy.compactMap { block -> ToolCall? in
-      guard case .entry(let entry) = block, let call = entry.toolCall,
-        call.state == .awaitingPermission || (call.kind == .question && !call.state.isFinished)
-      else { return nil }
-      return call
-    }.first
+    return ConversationEntry.allCalls(in: shownEntries).last {
+      $0.state == .awaitingPermission || ($0.kind == .question && !$0.state.isFinished)
+    }
   }
 
   /// The call still running, for the activity line. Not a sub-agent: the bar over the composer
@@ -676,7 +687,7 @@ public final class ConversationModel {
     guard case .permission(let permission) = request.request.content,
       let subject = permission.subject
     else { return pendingCall }
-    let unfinished = blocks.flatMap(\.calls)
+    let unfinished = ConversationEntry.allCalls(in: shownEntries)
       .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
     return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
   }

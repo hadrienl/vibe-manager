@@ -28,15 +28,10 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   private let isSubagent: Bool
   private var hasSeenMission = false
 
-  /// A conversation's own transcript.
-  public init(file: URL? = nil) {
-    isSubagent = false
-  }
-
-  /// A sub-agent's own transcript, written beside the conversation's under
-  /// `<session id>/subagents/`.
-  public init(subagentFile file: URL) {
-    isSubagent = true
+  /// - Parameter isSubagent: a sub-agent's own transcript, written beside the conversation's under
+  ///   `<session id>/subagents/`, rather than the conversation's.
+  public init(isSubagent: Bool = false) {
+    self.isSubagent = isSubagent
   }
 
   public func consume(_ line: Data) {

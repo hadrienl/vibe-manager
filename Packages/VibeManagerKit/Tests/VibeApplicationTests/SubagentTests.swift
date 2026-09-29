@@ -192,6 +192,35 @@ struct SubagentFollowTests {
     #expect(run("s1", in: read)?.activity == .unread)
     #expect(await tail.opened.contains(ScriptProvider.transcript("s1")) == false)
   }
+
+  @Test("A sub-agent that is done and has no transcript says so, and is not looked for again")
+  func notFound() async throws {
+    let tail = RecordingTail([root: ["sub:zz:done"]])
+    let follow = follow(tail)
+    let session = session()
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    _ = await next(&iterator) { $0.entries.count == 1 }
+    await follow.setUnfoldedSubagents(["zz"], for: session.id)
+    let missing = await next(&iterator) { run("zz", in: $0)?.activity == .notFound }
+    #expect(missing != nil)
+  }
+
+  @Test("In a session whose agent stopped, a sub-agent that never ended is not opened")
+  func stoppedAgent() async throws {
+    let tail = RecordingTail([root: ["sub:s1:running"], ScriptProvider.transcript("s1"): ["tool:Read"]])
+    let follow = follow(tail)
+    let session = session()
+    await follow.setAgentRunning(false, for: session.id)
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    let snapshot = await next(&iterator) { $0.entries.count == 1 }
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(run("s1", in: snapshot)?.activity == .unread)
+    #expect(await tail.opened == [root])
+    // Running again: followed.
+    await follow.setAgentRunning(true, for: session.id)
+    let followed = await next(&iterator) { run("s1", in: $0)?.activityEntries?.count == 1 }
+    #expect(followed != nil)
+  }
 }
 
 @Suite("Tying sub-agents to their transcripts")

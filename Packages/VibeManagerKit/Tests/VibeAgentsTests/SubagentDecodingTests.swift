@@ -12,7 +12,7 @@ struct ClaudeCodeSubagentTests {
   private func decode(_ lines: [String], subagent: Bool = false) -> [ConversationEntry] {
     let decoder =
       subagent
-      ? ClaudeCodeConversationDecoder(subagentFile: URL(fileURLWithPath: "/s/agent-a1.jsonl"))
+      ? ClaudeCodeConversationDecoder(isSubagent: true)
       : ClaudeCodeConversationDecoder()
     for line in lines { decoder.consume(Data(line.utf8)) }
     return decoder.entries
@@ -214,7 +214,6 @@ struct ClaudeCodeSubagentTests {
     #expect(found.map(\.agentID) == ["a1", "a2", "a3"])
     #expect(found.map(\.toolUseID) == ["t1", nil, nil])
     #expect(found[0].file.lastPathComponent == "agent-a1.jsonl")
-    #expect(found[1].stoppedByUser)
     #expect(SubagentTranscripts.claudeCodeFirstPrompt(of: found[2].file) == "Old prompt")
   }
 }

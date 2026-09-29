@@ -9,8 +9,8 @@ import VibeDomain
 /// 0.156 and 0.157, with their words replaced: nothing a user wrote is kept in the repository.
 @Suite("Reading a Claude Code transcript into a conversation")
 struct ClaudeCodeConversationDecoderTests {
-  private func decode(_ lines: [String], file: URL? = nil) -> [ConversationEntry] {
-    let decoder = ClaudeCodeConversationDecoder(file: file)
+  private func decode(_ lines: [String]) -> [ConversationEntry] {
+    let decoder = ClaudeCodeConversationDecoder()
     for line in lines { decoder.consume(Data(line.utf8)) }
     return decoder.entries
   }

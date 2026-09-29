@@ -40,6 +40,12 @@ struct SubagentBlockView: View {
       if !call.state.isFinished {
         LastActions(run: run)
       }
+      // Asked by the sub-agent while its activity is not read: answered on its block.
+      if let request = model.request(for: call) {
+        RequestActions(model: model, request: request, call: call)
+          .padding(.horizontal, 12)
+          .padding(.bottom, 10)
+      }
       if isExpanded {
         Rectangle().fill(theme.border.color).frame(height: 1)
         SubagentSections(call: call, model: model)
@@ -89,6 +95,11 @@ struct SubagentHeader: View {
           .lineLimit(1)
       }
       Spacer(minLength: 8)
+      if run.mode == .background, !call.state.isFinished {
+        Image(systemName: "hourglass")
+          .foregroundStyle(theme.secondaryText.color)
+          .help(Text("in the background", bundle: .module))
+      }
       SubagentFigures(call: call)
         .font(theme.interfaceFont(size: size * 0.9))
         .foregroundStyle(theme.secondaryText.color)
@@ -222,7 +233,7 @@ struct SubagentSections: View {
   }
 
   @ViewBuilder private var activity: some View {
-    if run.depth >= SubagentRun.maximumShownDepth {
+    if run.depth > SubagentRun.maximumShownDepth {
       sectionNote(
         Text("Activity", bundle: .module),
         Text("Not shown at this depth", bundle: .module))
@@ -260,6 +271,10 @@ struct SubagentSections: View {
       } content: {
         AgentTextView(text: result)
       }
+    } else if call.state == .succeeded, run.activity == .notFound {
+      Text("Its answer was not found", bundle: .module)
+        .font(theme.interfaceFont(size: 12))
+        .foregroundStyle(theme.secondaryText.color)
     } else if call.state == .succeeded, run.activity == .loading {
       HStack(spacing: 8) {
         ProgressView().controlSize(.small)
@@ -338,6 +353,10 @@ struct SubagentActivityView: View {
 
   var body: some View {
     switch run.activity {
+    case .notFound:
+      Text("Its activity was not found", bundle: .module)
+        .font(theme.interfaceFont(size: 12))
+        .foregroundStyle(theme.secondaryText.color)
     case .unread, .loading:
       HStack(spacing: 8) {
         ProgressView().controlSize(.small)
@@ -489,9 +508,13 @@ struct SubagentTray: View {
     .onChange(of: items.filter(\.hasEnded).map(\.id)) { before, after in
       for id in after where !before.contains(id) {
         guard let item = items.first(where: { $0.id == id }) else { continue }
-        let said = String(
-          localized: "Sub-agent \(SubagentPresentation.description(of: item.call)) \(StateSymbol.label(for: item.call.state))",
-          bundle: .module)
+        var said = AttributedString(
+          String(
+            localized:
+              "Sub-agent \(SubagentPresentation.description(of: item.call)) \(StateSymbol.label(for: item.call.state))",
+            bundle: .module))
+        // Said once, after what is being read: the end of a sub-agent does not interrupt.
+        said.accessibilitySpeechAnnouncementPriority = .low
         AccessibilityNotification.Announcement(said).post()
       }
     }

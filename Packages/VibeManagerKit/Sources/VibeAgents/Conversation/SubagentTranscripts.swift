@@ -5,7 +5,7 @@ import VibeApplication
 enum SubagentTranscripts {
   /// Claude Code writes, beside `<session id>.jsonl`, a folder `<session id>/subagents/` holding for
   /// each sub-agent `agent-<id>.jsonl` and, from the moment it starts, `agent-<id>.meta.json`
-  /// naming the call that started it (`toolUseId`), its type and depth. Every sub-agent of the
+  /// naming the call that started it (`toolUseId`). Every sub-agent of the
   /// session is there, however deep. A skill run apart has no `toolUseId`: its call returns the
   /// sub-agent's identifier instead.
   static func claudeCode(beside root: URL) -> [SubagentTranscriptInfo] {
@@ -36,7 +36,7 @@ enum SubagentTranscripts {
         ?? (try? manager.attributesOfItem(atPath: transcript.path))?[.creationDate] as? Date
       found[agent] = SubagentTranscriptInfo(
         agentID: agent, toolUseID: record["toolUseId"] as? String, file: transcript,
-        createdAt: created, stoppedByUser: record["stoppedByUser"] as? Bool == true)
+        createdAt: created)
     }
     return Array(found.values)
   }

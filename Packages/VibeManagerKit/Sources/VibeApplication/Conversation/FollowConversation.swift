@@ -61,9 +61,19 @@ public actor FollowConversation {
     /// The transcripts of the sub-agents this one started, by the call that started each (#180):
     /// only those running, or unfolded by the user.
     var subreadings: [String: Reading] = [:]
+    /// Sub-agent calls whose transcript was looked for once they were done, and not found: not
+    /// looked for again.
+    var notFound: Set<String> = []
+    /// The sub-agent this transcript is the own of, when it is one.
+    var agentID: String?
+    /// Read again from its start: what was read stays shown until the new reading replaces it.
+    var isRereading = false
 
-    init(file: URL, makeDecoder: @escaping () -> any ConversationDecoding) {
+    init(
+      file: URL, agentID: String? = nil, makeDecoder: @escaping () -> any ConversationDecoding
+    ) {
       self.file = file
+      self.agentID = agentID
       self.makeDecoder = makeDecoder
       decoder = makeDecoder()
     }
@@ -109,6 +119,9 @@ public actor FollowConversation {
   /// The sub-agents whose activity the user unfolded, by session: their transcripts are read,
   /// whether they run or not. Kept across the follows of a session.
   private var unfolded: [SessionID: Set<String>] = [:]
+  /// Sessions whose agent does not run: a sub-agent that never said it ended there will not, and
+  /// is not followed.
+  private var stoppedAgents: Set<SessionID> = []
   /// How often, at most, the sub-agents of one transcript are looked for.
   static let subagentLookInterval = Duration.seconds(1)
 
@@ -162,6 +175,24 @@ public actor FollowConversation {
       following.isDirty = true
       if following.live { schedulePublish(following, key: key) }
     }
+  }
+
+  /// Whether the session's agent runs. Its sub-agents that never said they ended are not followed
+  /// while it does not: they will not end (#180).
+  public func setAgentRunning(_ isRunning: Bool, for session: SessionID) {
+    guard stoppedAgents.contains(session) == isRunning else { return }
+    if isRunning { stoppedAgents.remove(session) } else { stoppedAgents.insert(session) }
+    for (key, following) in followings where following.session.id == session {
+      refreshSubagents(following, key: key)
+      following.isDirty = true
+      if following.live { schedulePublish(following, key: key) }
+    }
+  }
+
+  /// A sub-agent at work, as far as reading it goes: not done, in a session followed live whose
+  /// agent runs.
+  private func isRunning(_ call: ToolCall, in following: Following) -> Bool {
+    !call.state.isFinished && following.live && !stoppedAgents.contains(following.session.id)
   }
 
   private func run(_ key: UUID) async {
@@ -238,10 +269,11 @@ public actor FollowConversation {
     guard depth <= SubagentRun.maximumShownDepth else { return }
     var needed: [ToolCall] = []
     for call in reading.decoder.entries.compactMap(\.subagentCall) {
-      let running = !call.state.isFinished && following.live
+      let running = isRunning(call, in: following)
       let isWanted = running || wanted.contains(call.callID)
       guard let sub = reading.subreadings[call.callID] else {
-        if isWanted { needed.append(call) }
+        // One that is done and was not found once will not be.
+        if isWanted, running || !reading.notFound.contains(call.callID) { needed.append(call) }
         continue
       }
       if sub.isFollowed, !running {
@@ -265,7 +297,6 @@ public actor FollowConversation {
     following.lastSubagentLook[reading.file] = now
     let transcripts = reporter.subagentTranscripts(
       beside: root, agentIDs: Set(needed.compactMap { $0.subagent?.agentID }))
-    guard !transcripts.isEmpty else { return }
     let links = SubagentLinker.link(
       needed.map {
         SubagentLinker.Call(
@@ -275,29 +306,42 @@ public actor FollowConversation {
       among: transcripts, taken: Set(following.allReadings.map(\.file)),
       firstPrompt: reporter.firstPrompt(ofSubagent:))
     for call in needed {
-      guard let transcript = links[call.callID] else { continue }
+      guard let transcript = links[call.callID] else {
+        if !isRunning(call, in: following) {
+          reading.notFound.insert(call.callID)
+          following.isDirty = true
+        }
+        continue
+      }
       let file = transcript.file
-      let sub = Reading(file: file) { reporter.subagentDecoder(for: file, root: root) }
+      let sub = Reading(file: file, agentID: transcript.agentID) {
+        reporter.subagentDecoder(for: file, root: root)
+      }
       reading.subreadings[call.callID] = sub
-      start(sub, key: key, live: !call.state.isFinished && following.live)
+      start(sub, key: key, live: isRunning(call, in: following))
       following.isDirty = true
     }
   }
 
-  /// A sub-agent runs whose transcript was not found yet: it is looked for often.
+  /// A sub-agent runs, within the depth shown, whose transcript was not found yet: it is looked
+  /// for often.
   private func hasUnreadRunningSubagent(_ following: Following) -> Bool {
-    following.allReadings.contains { reading in
-      reading.decoder.entries.contains { entry in
+    func unread(_ reading: Reading, depth: Int) -> Bool {
+      guard depth <= SubagentRun.maximumShownDepth else { return false }
+      return reading.decoder.entries.contains { entry in
         guard let call = entry.subagentCall else { return false }
-        return !call.state.isFinished && reading.subreadings[call.callID] == nil
+        if let sub = reading.subreadings[call.callID] { return unread(sub, depth: depth + 1) }
+        return isRunning(call, in: following)
       }
     }
+    return following.chapters.flatMap(\.readings).contains { unread($0, depth: 1) }
   }
 
+  /// Read again from its start — once to its end, or followed — what it showed staying until the
+  /// new reading replaces it: an activity does not blink when its sub-agent ends.
   private func restart(_ reading: Reading, key: UUID, follows: Bool) {
     reading.task?.cancel()
-    reading.decoder = reading.makeDecoder()
-    reading.hasLoaded = false
+    reading.isRereading = true
     start(reading, key: key, live: follows)
   }
 
@@ -385,9 +429,17 @@ public actor FollowConversation {
     else { return }
     switch chunk {
     case .reset:
-      reading.decoder = reading.makeDecoder()
+      if !reading.isRereading { reading.decoder = reading.makeDecoder() }
     case .lines(let lines):
-      for line in lines { reading.decoder.consume(line) }
+      if reading.isRereading {
+        // The whole file again, read apart before it replaces what was shown.
+        let decoder = reading.makeDecoder()
+        for line in lines { decoder.consume(line) }
+        reading.decoder = decoder
+        reading.isRereading = false
+      } else {
+        for line in lines { reading.decoder.consume(line) }
+      }
       reading.hasLoaded = true
     }
     following.isDirty = true
@@ -413,8 +465,8 @@ public actor FollowConversation {
     for (index, chapter) in following.chapters.enumerated() {
       guard chapter.reporter != nil else { continue }
       let chapterEntries = chapter.readings.flatMap {
-        shownEntries(of: $0, depth: 1, wanted: unfolded[following.session.id] ?? [],
-          live: following.live)
+        shownEntries(
+          of: $0, depth: 1, wanted: unfolded[following.session.id] ?? [], following: following)
       }
       if showsChapters, index > 0, !chapterEntries.isEmpty {
         entries.append(
@@ -439,9 +491,9 @@ public actor FollowConversation {
 
   /// A transcript's entries, each sub-agent carrying its depth and, when its transcript was read,
   /// its activity (#180).
-  private func shownEntries(of reading: Reading, depth: Int, wanted: Set<String>, live: Bool)
-    -> [ConversationEntry]
-  {
+  private func shownEntries(
+    of reading: Reading, depth: Int, wanted: Set<String>, following: Following
+  ) -> [ConversationEntry] {
     var entries = reading.decoder.entries
     for index in entries.indices {
       guard case .tool(var call) = entries[index].content, call.kind == .subagent else {
@@ -451,8 +503,11 @@ public actor FollowConversation {
       run.depth = depth
       if let sub = reading.subreadings[call.callID] {
         run.transcript = sub.file
+        // A sub-agent in front says who it is only when it returns: its transcript says it first.
+        if run.agentID == nil { run.agentID = sub.agentID }
         if sub.hasLoaded {
-          let inner = shownEntries(of: sub, depth: depth + 1, wanted: wanted, live: live)
+          let inner = shownEntries(
+            of: sub, depth: depth + 1, wanted: wanted, following: following)
           run.activity = .read(inner)
           // What it said last is its answer, when the main transcript does not carry it: Codex
           // writes it in the sub-agent's rollout only.
@@ -467,8 +522,10 @@ public actor FollowConversation {
         } else {
           run.activity = .loading
         }
+      } else if reading.notFound.contains(call.callID) {
+        run.activity = .notFound
       } else if depth <= SubagentRun.maximumShownDepth,
-        (live && !call.state.isFinished) || wanted.contains(call.callID)
+        isRunning(call, in: following) || wanted.contains(call.callID)
       {
         run.activity = .loading
       }
