@@ -139,7 +139,7 @@ struct ConversationThemeFileTests {
     let line = try #require(found.details.first)
     #expect(line.hasPrefix("keyword #2A2A2C on codeBackground #161618 is 1."))
     #expect(line.hasSuffix("it needs at least 4.5:1."))
-    #expect(found.code == "illegible")
+    #expect(found.code == .illegible)
   }
 
   @Test("A ratio just under its minimum is never written as the minimum")
@@ -305,7 +305,7 @@ struct GenerateConversationThemeTests {
     #expect(requests[1].correction?.problems.first?.hasPrefix("keyword #2A2A2C") == true)
     #expect(requests[1].description == "une forêt")
     #expect(
-      events.all == [.attempt(1), .rejected(attempt: 1, code: "illegible"), .attempt(2)])
+      events.all == [.attempt(1), .rejected(attempt: 1, code: .illegible), .attempt(2)])
   }
 
   @Test("Two bad answers say what was wrong the second time")

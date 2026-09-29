@@ -19,18 +19,23 @@ public enum ThemeFileProblem: Error, Hashable, Sendable {
   /// Pairs a reader could not read.
   case illegible([ThemeContrastFailure])
 
-  /// A short code for the diagnostics, where nothing the file holds is written.
-  public var code: String {
+  /// What kind of problem it is, for the diagnostics, where nothing the file holds is written.
+  public enum Code: String, Hashable, Sendable, DiagnosticTokenConvertible {
+    case tooLarge, notJSON, unknownFormat, unknownKey, missingKey, invalidValue, invalidName
+    case wrongMode, illegible
+  }
+
+  public var code: Code {
     switch self {
-    case .tooLarge: "tooLarge"
-    case .notJSON: "notJSON"
-    case .unknownFormat: "unknownFormat"
-    case .unknownKey: "unknownKey"
-    case .missingKey: "missingKey"
-    case .invalidValue: "invalidValue"
-    case .invalidName: "invalidName"
-    case .wrongMode: "wrongMode"
-    case .illegible: "illegible"
+    case .tooLarge: .tooLarge
+    case .notJSON: .notJSON
+    case .unknownFormat: .unknownFormat
+    case .unknownKey: .unknownKey
+    case .missingKey: .missingKey
+    case .invalidValue: .invalidValue
+    case .invalidName: .invalidName
+    case .wrongMode: .wrongMode
+    case .illegible: .illegible
     }
   }
 

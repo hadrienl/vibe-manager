@@ -124,7 +124,7 @@ public struct GenerateConversationTheme: Sendable {
   /// What the diagnostics are told: never the description, the name nor the answer.
   public enum Event: Hashable, Sendable {
     case attempt(Int)
-    case rejected(attempt: Int, code: String)
+    case rejected(attempt: Int, code: ThemeFileProblem.Code)
   }
 
   private let generator: any ConversationThemeGenerating
