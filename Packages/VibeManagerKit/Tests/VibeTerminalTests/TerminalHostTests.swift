@@ -24,7 +24,9 @@ final class InProcessTerminalHost: @unchecked Sendable {
   init(
     idleGracePeriod: Duration = .seconds(60),
     maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions,
-    fullDiskAccess: (any FullDiskAccessProbe)? = nil
+    fullDiskAccess: (any FullDiskAccessProbe)? = nil,
+    build: String = TerminalHostServer.currentBuild,
+    offeredCapabilities: Set<String>? = nil
   ) throws {
     location = TerminalHostLocation(
       directory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -36,7 +38,8 @@ final class InProcessTerminalHost: @unchecked Sendable {
     server = TerminalHostServer(
       configuration: TerminalHostServer.Configuration(
         verifier: SameUserPeerVerifier(), idleGracePeriod: idleGracePeriod,
-        maximumRunningSessions: maximumRunningSessions, fullDiskAccess: fullDiskAccess),
+        build: build, maximumRunningSessions: maximumRunningSessions,
+        fullDiskAccess: fullDiskAccess, offeredCapabilities: offeredCapabilities),
       // Gone from the socket, as the real host is when it leaves.
       onIdle: {
         unlink(socketPath)
@@ -313,6 +316,39 @@ struct TerminalHostTests {
     #expect(await transcript.waitForEnd())
     #expect(await adopted.state() == .exited(code: 0))
     await second.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("A host left by an earlier version is taken back, and asked nothing it did not offer")
+  func reattachesToAnOlderHost() async throws {
+    // What an update finds (#92): the host of the version before, still running its agent on the
+    // binary the update replaced, speaking the frozen core and none of what came after it.
+    let host = try InProcessTerminalHost(build: "1.0.0-rc.1 (700)", offeredCapabilities: [])
+    let first = host.supervisor()
+    let id = TerminalID()
+    let session = try await first.start(
+      TerminalTestSupport.spec(script: "printf 'before\\n'; read go; printf 'after\\n'"), for: id)
+    try #require(session is HostedTerminalSession)
+    #expect(await Transcript.follow(session).waitFor("before"))
+    await first.relinquish(keepRunning: true)
+
+    let updated = host.supervisor()
+    guard case .connected(_, let sessions) = await updated.reconnect() else {
+      Issue.record("The older host was not found again")
+      return
+    }
+    #expect(sessions.map(\.id) == [id])
+    let adopted = try #require(await updated.session(for: id))
+    let transcript = await Transcript.follow(adopted)
+    #expect(await transcript.text.contains("before"))
+    // What it did not offer is not asked: its cost, and its access, are said to be unknown.
+    #expect(await updated.hostFootprint() == nil)
+    #expect(await host.server.unofferedRequestCount == 0)
+    await adopted.write("go\r")
+    #expect(await transcript.waitFor("after"))
+    #expect(await transcript.waitForEnd())
+    #expect(await adopted.state() == .exited(code: 0))
+    await updated.relinquish(keepRunning: false)
     await host.shutDown()
   }
 
@@ -659,6 +695,77 @@ struct TerminalHostProcessTests {
     // Nothing left to hold and nobody attached: the host goes, and its socket with it.
     await relaunched.relinquish(keepRunning: false)
     #expect(await eventually { !FileManager.default.fileExists(atPath: location.socketPath) })
+  }
+
+  @Test("A host whose binary is replaced on disk, as an update does, keeps its agent")
+  func survivesItsBinaryReplaced() async throws {
+    // Sparkle moves the new bundle over the old one (#92): the host keeps running the file it was
+    // started from, which no longer has a name, and the next version takes back its agent.
+    let folder = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+      .appendingPathComponent("vmu-\(UUID().uuidString.prefix(8))", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let installed = folder.appendingPathComponent("VibeTerminalHostFixture")
+    try FileManager.default.copyItem(at: try Self.fixtureURL(), to: installed)
+    let location = TerminalHostLocation(directory: folder.appendingPathComponent("host"))
+    let launcher = ExecutableTerminalHostLauncher(
+      executableURL: installed,
+      disclaimsResponsibility: TerminalTestSupport.disclaimsResponsibility)
+    let application = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
+    let id = TerminalID()
+    let session = try await application.start(
+      TerminalTestSupport.spec(script: "printf 'before\\n'; read go; printf 'after\\n'"), for: id)
+    try #require(session is HostedTerminalSession)
+    #expect(await Transcript.follow(session).waitFor("before"))
+    await application.relinquish(keepRunning: true)
+
+    // The new version, moved into place in one rename.
+    let staged = folder.appendingPathComponent("staged")
+    try FileManager.default.copyItem(at: try Self.fixtureURL(), to: staged)
+    #expect(rename(staged.path, installed.path) == 0)
+
+    let updated = HostedTerminalSupervisor(
+      configuration: HostedTerminalSupervisor.Configuration(
+        location: location, launcher: launcher, verifier: SameUserPeerVerifier(),
+        launchTimeout: Self.launchTimeout, replyTimeout: .seconds(30)))
+    guard case .connected(_, let sessions) = await updated.reconnect() else {
+      Issue.record("The host did not survive the replacement of its binary")
+      return
+    }
+    #expect(sessions.map(\.id) == [id])
+    let adopted = try #require(await updated.session(for: id))
+    let transcript = await Transcript.follow(adopted)
+    await adopted.write("go\r")
+    #expect(await transcript.waitFor("after"))
+    #expect(await transcript.waitForEnd())
+    await updated.relinquish(keepRunning: false)
+    #expect(await eventually { !FileManager.default.fileExists(atPath: location.socketPath) })
+  }
+
+  /// A host left running by the version before starts its side terminals' shells through the
+  /// binary now at the application's path — the new one (#43, #92). `<binary> --terminal-exec
+  /// <path> <argv0> <arguments…>` is part of the frozen core, like the frames: started that way,
+  /// this build's binary becomes the program asked for, in its terminal.
+  @Test("The trampoline, called as an older host calls it, becomes the program asked for")
+  func trampolineContract() async throws {
+    let session = try PTYTerminalSession.start(
+      id: TerminalID(),
+      spec: TerminalSpec(
+        executableURL: try Self.fixtureURL(),
+        arguments: [
+          "--terminal-exec", "/bin/sh", "sh", "-c",
+          "[ -t 0 ] && printf 'trampolined %s\\n' \"$0\"",
+        ],
+        environment: TerminalEnvironment.make(),
+        workingDirectoryURL: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
+        initialSize: .default, initialInput: nil, scrollback: .default))
+    let transcript = await Transcript.follow(session)
+    #expect(await transcript.waitFor("trampolined sh"))
+    #expect(await transcript.waitForEnd())
+    #expect(await session.state() == .exited(code: 0))
   }
 
   @Test("A host told to stop says so as it goes, and the next host clears it")
