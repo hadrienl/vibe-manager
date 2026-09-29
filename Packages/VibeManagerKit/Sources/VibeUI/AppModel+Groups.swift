@@ -101,6 +101,20 @@ extension AppModel {
     setExpanded(false, group: group)
   }
 
+  public func newSessionAvailability(
+    in group: SessionGroup, isRenaming: Bool = false
+  ) -> GroupNewSession {
+    GroupNewSession.availability(
+      for: group, canCreateSession: canCreateSession, isRenaming: isRenaming)
+  }
+
+  /// New Session in This Folder: the draft opens on the group's folder, or nothing happens when
+  /// the header says it cannot (#106).
+  public func beginNewSession(in group: SessionGroup) {
+    guard case .enabled(let folder) = newSessionAvailability(in: group) else { return }
+    beginNewSession(folder: folder)
+  }
+
   public func expandSelectedGroup() {
     guard let group = selectedGroup else { return }
     setExpanded(true, group: group)

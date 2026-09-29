@@ -219,7 +219,8 @@ struct SessionSidebar: View {
   /// dropped anywhere else in the system would mean.
   @ViewBuilder
   private func groupHeader(_ group: SessionGroup) -> some View {
-    let header = SessionGroupHeader(model: model, group: group)
+    // Not `draggedGroup`: a header dropped out of the window leaves it behind.
+    let header = SessionGroupHeader(model: model, group: group, isDragging: targetedGroup != nil)
       .overlay(alignment: .top) {
         if let folder = group.id, targetedGroup == folder, let draggedGroup,
           draggedGroup != folder

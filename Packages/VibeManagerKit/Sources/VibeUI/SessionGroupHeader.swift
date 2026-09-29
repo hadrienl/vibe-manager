@@ -8,7 +8,10 @@ import VibeDomain
 struct SessionGroupHeader: View {
   let model: AppModel
   let group: SessionGroup
+  /// A header is being dragged over the list: its + stays hidden (#106).
+  var isDragging = false
   @State private var isRenaming = false
+  @State private var isHovering = false
   @State private var name = ""
   @FocusState private var isNameFocused: Bool
 
@@ -17,6 +20,7 @@ struct SessionGroupHeader: View {
     let isExpanded = model.isExpanded(group)
     let containsSelection =
       !isExpanded && group.sessions.contains { $0.id == model.selectedSessionID }
+    let newSession = model.newSessionAvailability(in: group, isRenaming: isRenaming)
     HStack(spacing: 6) {
       badge
       if isRenaming {
@@ -41,9 +45,7 @@ struct SessionGroupHeader: View {
           .foregroundStyle(.secondary)
       }
       Spacer(minLength: 4)
-      Text(verbatim: "\(group.sessions.count)")
-        .monospacedDigit()
-        .foregroundStyle(.secondary)
+      countOrNewSession(newSession)
       if let headline = summary.headline {
         Image(systemName: headline.symbolName)
           .foregroundStyle(tint(headline.severity))
@@ -53,6 +55,7 @@ struct SessionGroupHeader: View {
     .font(.subheadline.weight(.semibold))
     .lineLimit(1)
     .help(helpText)
+    .onHover { isHovering = $0 }
     .contextMenu { menu(isExpanded: isExpanded) }
     .accessibilityElement(children: .ignore)
     .accessibilityAddTraits(.isHeader)
@@ -74,6 +77,13 @@ struct SessionGroupHeader: View {
     }
     // Dragging the header, without the drag (#44).
     .accessibilityActions {
+      if newSession.isEnabled {
+        Button {
+          model.beginNewSession(in: group)
+        } label: {
+          Text("New Session in This Folder", bundle: .module)
+        }
+      }
       if model.canMoveGroup(group, by: -1) {
         Button {
           Task { await model.moveGroup(group, by: -1) }
@@ -88,6 +98,59 @@ struct SessionGroupHeader: View {
           Text("Move Group Down", bundle: .module)
         }
       }
+    }
+  }
+
+  /// The + takes the count's place on hover, in a slot as wide as the wider of the two, so that
+  /// neither the title nor the state moves when it shows (#106).
+  private func countOrNewSession(_ newSession: GroupNewSession) -> some View {
+    let showsButton = isHovering && !isDragging && newSession.isShown
+    return ZStack(alignment: .trailing) {
+      Text(verbatim: "\(group.sessions.count)")
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .opacity(showsButton ? 0 : 1)
+      if group.id != nil {
+        newSessionButton(newSession)
+          .opacity(showsButton ? 1 : 0)
+          .allowsHitTesting(showsButton)
+      }
+    }
+  }
+
+  /// Never `.disabled`: the help tag of a disabled control does not show, and it is what says why
+  /// nothing happens. VoiceOver has the header's action instead.
+  private func newSessionButton(_ newSession: GroupNewSession) -> some View {
+    Button {
+      model.beginNewSession(in: group)
+    } label: {
+      // On the image: a borderless button tints its label with its own style.
+      Image(systemName: "plus")
+        .foregroundStyle(
+          newSession.isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary)
+        )
+        .frame(width: 16, height: 16)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.borderless)
+    .help(newSessionHelp(newSession))
+    .accessibilityHidden(true)
+  }
+
+  private func newSessionHelp(_ newSession: GroupNewSession) -> Text {
+    switch newSession {
+    case .disabled(.folderMissing):
+      return Text(
+        "Folder not found: \(group.displayPath)", bundle: .module,
+        comment: "The help tag of the + of a group whose folder was moved or deleted.")
+    case .disabled(.creationUnavailable):
+      return Text(
+        "No agent available to create a session", bundle: .module,
+        comment: "The help tag of the + of a group when no session can be created.")
+    case .hidden, .enabled:
+      return Text(
+        "New Session in “\(group.title)”\n\(group.displayPath)", bundle: .module,
+        comment: "The help tag of the + of a group: its name, then its folder's path.")
     }
   }
 
@@ -130,11 +193,11 @@ struct SessionGroupHeader: View {
 
   @ViewBuilder
   private func menu(isExpanded: Bool) -> some View {
-    if let folder = group.id {
+    if group.id != nil {
       Button(LocalizedStringResource("New Session in This Folder", bundle: .module)) {
-        model.beginNewSession(folder: folder.path)
+        model.beginNewSession(in: group)
       }
-      .disabled(!model.canCreateSession || group.isMissing)
+      .disabled(!model.newSessionAvailability(in: group).isEnabled)
       Divider()
       Button(LocalizedStringResource("Rename Group…", bundle: .module)) { beginRename() }
       if group.isRenamed {
