@@ -139,7 +139,7 @@ private final class Fixture {
       library: library, generators: agents ? Agents(generators: [("Claude Code", agent)]) : nil,
       fonts: fonts, images: images, pictureAgents: painter,
       diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()), language: "fr-FR")
-    model.announce = { [unowned self] in spoken.append(String(localized: $0)) }
+    model.announce = { [weak self] in self?.spoken.append(String(localized: $0)) }
   }
 
   var option: ThemeGeneratorOption {
