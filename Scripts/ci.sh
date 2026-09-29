@@ -19,11 +19,17 @@ xcrun swift-format lint --recursive \
   UITests \
   Packages/VibeManagerKit/Sources \
   Packages/VibeManagerKit/Tests \
-  Packages/VibeManagerKit/Package.swift
+  Packages/VibeManagerKit/Package.swift \
+  Packages/ReleaseTools/Sources \
+  Packages/ReleaseTools/Tests \
+  Packages/ReleaseTools/Package.swift
 
 echo "Checking the French translations"
 Scripts/test-check-localizations.sh
 Scripts/check-localizations.sh
+
+echo "Testing the appcast generator"
+swift test --package-path "$repository_root/Packages/ReleaseTools"
 
 echo "Running package tests"
 # Validate package sources with warnings promoted to errors here. Do not pass the equivalent

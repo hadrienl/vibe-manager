@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0-rc.2",
+  "build": "118",
+  "archive": "VibeManager-1.0.0-rc.2.zip",
+  "length": 38000000,
+  "edSignature": "c2lnbmF0dXJlLXJjMg==",
+  "minimumSystemVersion": "14.0",
+  "hostProtocol": 1
+}

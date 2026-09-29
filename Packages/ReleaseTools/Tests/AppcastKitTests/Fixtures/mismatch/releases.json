@@ -1,0 +1,21 @@
+[
+  {
+    "url": "https://api.github.com/repos/hadrienl/vibe-manager/releases/16845",
+    "tag_name": "v1.1.0",
+    "name": "1.1.0",
+    "draft": false,
+    "prerelease": false,
+    "html_url": "https://github.com/hadrienl/vibe-manager/releases/tag/v1.1.0",
+    "published_at": "2026-10-12T08:30:00Z",
+    "created_at": "2026-09-01T10:00:00Z",
+    "body": "Notes.\n<!-- release-checklist -->",
+    "assets": [
+      {
+        "name": "VibeManager-1.1.0.zip",
+        "size": 40999998,
+        "content_type": "application/zip",
+        "browser_download_url": "https://github.com/hadrienl/vibe-manager/releases/download/v1.1.0/VibeManager-1.1.0.zip"
+      }
+    ]
+  }
+]
