@@ -137,7 +137,6 @@ struct SwipeRowMarkerTests {
       backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     window.contentView = NSHostingView(rootView: Sidebar(board: board))
-    window.orderFrontRegardless()
     return window
   }
 
