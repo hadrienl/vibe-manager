@@ -48,7 +48,11 @@ public enum ConversationThemeLibraryRules {
   /// `name`, or `name 2`, `name 3`… — the first that no theme has, whatever the case and the
   /// accents. `reserved` are the names already taken.
   public static func uniqueName(_ name: String, among reserved: [String]) -> String {
-    let base = ConversationThemeFile.sanitizedName(name) ?? fallbackName
+    // A name too long is cut rather than lost.
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let base =
+      ConversationThemeFile.sanitizedName(
+        String(trimmed.prefix(ConversationThemeFile.maximumNameLength))) ?? fallbackName
     let taken = Set(reserved.map(folded))
     guard taken.contains(folded(base)) else { return base }
     var index = 2

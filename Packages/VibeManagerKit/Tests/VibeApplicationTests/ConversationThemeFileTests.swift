@@ -365,6 +365,8 @@ struct ConversationThemeLibraryRulesTests {
     #expect(unique.count == 40)
     #expect(unique.hasSuffix(" 2"))
     #expect(ConversationThemeLibraryRules.uniqueName(" \n", among: []) == "Theme")
+    let tooLong = String(repeating: "b", count: 45)
+    #expect(ConversationThemeLibraryRules.uniqueName(tooLong, among: []).count == 40)
   }
 
   @Test("A theme kept is personal, named, and without the user's fonts")
@@ -381,9 +383,9 @@ struct ConversationThemeLibraryRulesTests {
   @Test("The library in memory names, replaces, removes and archives")
   func inMemory() async throws {
     let library = InMemoryConversationThemeLibrary()
-    let first = try await library.save(.night, name: "Paper")
+    let first = await library.save(.night, name: "Paper")
     #expect(first.personalName == "Paper 2")
-    let again = try await library.save(first, name: "Nuit")
+    let again = await library.save(first, name: "Nuit")
     #expect(again.id == first.id)
     #expect(await library.load().themes.map(\.personalName) == ["Nuit"])
     let archive = try await library.archive(first.id, preview: nil)

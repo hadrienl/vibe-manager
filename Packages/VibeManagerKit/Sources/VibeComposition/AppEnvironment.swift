@@ -3,6 +3,7 @@ import VibeAgents
 import VibeApplication
 import VibeAvatar
 import VibeBrowser
+import VibeConversationUI
 import VibeDomain
 import VibeGit
 import VibePersistence
@@ -315,7 +316,15 @@ public final class AppEnvironment {
         hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) },
         current: { [repository] id in try? await repository.session(id: id) }),
       store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),
-      agents: registry)
+      agents: registry,
+      // The user's own themes (#118), beside the avatars, made by the agents that can.
+      themes: ConversationThemesModel(
+        library: FileConversationThemeLibrary(
+          directory: data.store.deletingLastPathComponent()
+            .appendingPathComponent("Themes", isDirectory: true),
+          diagnostics: diagnostics,
+          localizedBuiltInNames: ConversationTheme.builtIn.map(\.displayName)),
+        generators: AgentThemeGenerators(agents: registry), diagnostics: diagnostics))
     appModel = AppModel(
       repository: repository,
       recovery: repository,

@@ -106,10 +106,21 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
       let urls = try? FileManager.default.contentsOfDirectory(
         at: directory, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])
     else { return ThemeLibraryContents(themes: [], problems: []) }
+    var themes: [ConversationTheme] = []
+    var problems: [ThemeLoadProblem] = []
     var files: [(url: URL, created: Date)] = []
     for url in urls where url.pathExtension == Self.fileExtension {
-      guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true
-      else { continue }
+      guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
+      // A link, or a folder, is never followed: said like a file that is not a theme.
+      guard values.isRegularFile == true else {
+        problems.append(ThemeLoadProblem(fileName: url.lastPathComponent, problem: .notJSON))
+        if recording {
+          diagnostics.record(
+            .store, .notice, "theme.unreadable",
+            ["problem": .token(ThemeFileProblem.Code.notJSON.diagnosticToken)])
+        }
+        continue
+      }
       files.append((url, values.creationDate ?? .distantPast))
     }
     files.sort { first, second in
@@ -117,8 +128,6 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
         ? first.url.lastPathComponent < second.url.lastPathComponent
         : first.created < second.created
     }
-    var themes: [ConversationTheme] = []
-    var problems: [ThemeLoadProblem] = []
     for (url, _) in files {
       let id = ConversationTheme.personalPrefix + url.deletingPathExtension().lastPathComponent
       do throws(ThemeFileProblem) {

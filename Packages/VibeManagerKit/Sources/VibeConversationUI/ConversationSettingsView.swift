@@ -48,14 +48,20 @@ public enum ConversationFonts {
 }
 
 /// Settings › Conversation (#38): every preference of the conversation view, in a tab of its own,
-/// with a preview that follows each change.
+/// with a preview that follows each change. The user's own themes (#118) sit in the grid beside
+/// the built-in ones, and the card at its end unfolds the panel that makes one.
 public struct ConversationSettingsView: View {
   @Binding var appearance: ConversationAppearance
+  @Bindable var themes: ConversationThemesModel
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var contrast
+  @State private var deleting: ConversationTheme?
+  @State private var exportDocument: ThemeArchiveDocument?
+  @State private var exportName = ""
 
-  public init(appearance: Binding<ConversationAppearance>) {
+  public init(appearance: Binding<ConversationAppearance>, themes: ConversationThemesModel) {
     _appearance = appearance
+    self.themes = themes
   }
 
   public var body: some View {
@@ -82,11 +88,35 @@ public struct ConversationSettingsView: View {
           themeGrid
           if appearance.followsSystemAppearance {
             Text(
-              "In light mode: \(themeName(appearance.lightTheme)). In dark mode: \(themeName(appearance.darkTheme)). Choosing a theme gives it to the mode macOS is in.",
+              "In light mode: \(themeName(appearance.lightTheme, isDark: false)). In dark mode: \(themeName(appearance.darkTheme, isDark: true)). Choosing a theme gives it to the mode macOS is in.",
               bundle: .module
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+          }
+          if !themes.loadProblems.isEmpty {
+            ThemeLoadProblemsView(themes: themes)
+          }
+          // A failure to export or delete, said where the user acted: the panel may be folded.
+          if !themes.isOpen, let problem = themes.problem {
+            Label {
+              Text(problem.message)
+            } icon: {
+              Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+            .font(.callout)
+          }
+          if let saved = themes.lastSaved {
+            Label {
+              Text(ConversationThemesModel.savedSentence(saved.name, saved.mode))
+            } icon: {
+              Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            }
+            .font(.callout)
+          }
+          if themes.isOpen {
+            ThemeWorkshopPanel(
+              themes: themes, appearance: $appearance, systemIsDark: colorScheme == .dark)
           }
         } header: {
           Text("Theme", bundle: .module)
@@ -163,22 +193,39 @@ public struct ConversationSettingsView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10) {
-        Text("Preview", bundle: .module).font(.headline)
+        HStack {
+          Text("Preview", bundle: .module).font(.headline)
+          Spacer()
+          if themes.trial != nil {
+            Text("On trial — not saved", bundle: .module)
+              .font(.caption)
+              .padding(.horizontal, 6)
+              .padding(.vertical, 2)
+              .background(Capsule().fill(Color.orange.opacity(0.2)))
+          }
+        }
         ConversationPreview(theme: currentTheme, appearance: installedAppearance)
           .frame(width: 360, height: 420)
           .clipShape(RoundedRectangle(cornerRadius: 12))
           .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.3)))
-        Text(
-          "The theme applies to the conversation view of every session. The terminal keeps the colours the agent sends it.",
-          bundle: .module
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+        (themes.trial != nil
+          ? Text(
+            "The theme on trial also applies to the conversations of the main window. Folding the panel, choosing another card or leaving the tab without saving brings back the theme in force.",
+            bundle: .module)
+          : Text(
+            "The theme applies to the conversation view of every session. The terminal keeps the colours the agent sends it.",
+            bundle: .module))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
       }
       .padding(20)
       .frame(width: 400)
     }
+    // The library is read again each time the tab appears: another instance may have changed it.
+    .task { await themes.load() }
+    // Leaving the tab, or closing the window, drops the theme on trial.
+    .onDisappear { themes.close() }
   }
 
   private var installedAppearance: ConversationAppearance {
@@ -186,35 +233,149 @@ public struct ConversationSettingsView: View {
   }
 
   private var currentTheme: ConversationTheme {
-    ConversationTheme.resolve(
+    themes.displayed(
       installedAppearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased)
   }
 
-  private func themeName(_ id: String) -> String {
-    ConversationTheme.named(id).map { String(localized: $0.localizedName) } ?? id
+  /// A theme no longer there is named as the one drawn in its place: the mode's default.
+  private func themeName(_ id: String, isDark: Bool) -> String {
+    (themes.theme(id) ?? (isDark ? .systemDark : .systemLight)).displayName
   }
 
   private var themeGrid: some View {
     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10)
     {
-      ForEach(ConversationTheme.builtIn) { theme in
-        let isLight = appearance.lightTheme == theme.id
-        let isDark = appearance.followsSystemAppearance && appearance.darkTheme == theme.id
-        let isCurrent =
-          appearance.followsSystemAppearance && colorScheme == .dark ? isDark : isLight
+      ForEach(ConversationTheme.builtIn + themes.personal) { theme in
+        themeCard(theme)
+      }
+      if themes.canCreate {
         Button {
-          if appearance.followsSystemAppearance, colorScheme == .dark {
-            appearance.darkTheme = theme.id
-          } else {
-            appearance.lightTheme = theme.id
-          }
+          themes.toggle(systemIsDark: colorScheme == .dark)
         } label: {
-          ThemeCard(theme: theme, isCurrent: isCurrent, isOther: !isCurrent && (isLight || isDark))
+          CreateThemeCard(isOpen: themes.isOpen)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(theme.localizedName))
-        .accessibilityAddTraits(isCurrent ? .isSelected : [])
+        .accessibilityLabel(Text("Create My Theme", bundle: .module))
+        .accessibilityValue(
+          themes.isOpen ? Text("Unfolded", bundle: .module) : Text("Folded", bundle: .module)
+        )
+        .help(Text("Describe a theme to an agent, and see each version applied", bundle: .module))
       }
+    }
+    .alert(
+      Text("Delete the Theme “\(deleting?.displayName ?? "")”?", bundle: .module),
+      isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+      presenting: deleting
+    ) { theme in
+      Button(role: .destructive) {
+        Task {
+          if let updated = await themes.delete(theme.id, from: appearance) { appearance = updated }
+        }
+      } label: {
+        Text("Delete", bundle: .module)
+      }
+      Button(role: .cancel) {
+      } label: {
+        Text("Cancel", bundle: .module)
+      }
+    } message: { theme in
+      deletionMessage(theme)
+    }
+    .fileExporter(
+      isPresented: Binding(
+        get: { exportDocument != nil }, set: { if !$0 { exportDocument = nil } }),
+      document: exportDocument, contentType: .zip, defaultFilename: exportName
+    ) { _ in
+      exportDocument = nil
+    }
+  }
+
+  private func themeCard(_ theme: ConversationTheme) -> some View {
+    let isLight = appearance.lightTheme == theme.id
+    let isDark = appearance.followsSystemAppearance && appearance.darkTheme == theme.id
+    let isCurrent =
+      appearance.followsSystemAppearance && colorScheme == .dark ? isDark : isLight
+    return Button {
+      themes.close()
+      themes.dismissConfirmation()
+      if appearance.followsSystemAppearance, colorScheme == .dark {
+        appearance.darkTheme = theme.id
+      } else {
+        appearance.lightTheme = theme.id
+      }
+    } label: {
+      ThemeCard(theme: theme, isCurrent: isCurrent, isOther: !isCurrent && (isLight || isDark))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(
+      theme.isPersonal
+        ? Text("\(theme.displayName), a theme of yours", bundle: .module)
+        : Text(theme.localizedName)
+    )
+    .accessibilityAddTraits(isCurrent ? .isSelected : [])
+    .contextMenu {
+      if theme.isPersonal {
+        Button {
+          export(theme)
+        } label: {
+          Text("Export…", bundle: .module)
+        }
+        Divider()
+        Button {
+          deleting = theme
+        } label: {
+          Text("Delete…", bundle: .module)
+        }
+      }
+    }
+    .accessibilityActions {
+      if theme.isPersonal {
+        Button {
+          export(theme)
+        } label: {
+          Text("Export…", bundle: .module)
+        }
+        Button {
+          deleting = theme
+        } label: {
+          Text("Delete…", bundle: .module)
+        }
+      }
+    }
+    .onDeleteCommand {
+      if theme.isPersonal { deleting = theme }
+    }
+  }
+
+  private func deletionMessage(_ theme: ConversationTheme) -> Text {
+    let usedLight = appearance.lightTheme == theme.id
+    let usedDark = appearance.followsSystemAppearance && appearance.darkTheme == theme.id
+    let lightDefault = ConversationTheme.systemLight.displayName
+    let darkDefault = ConversationTheme.systemDark.displayName
+    switch (usedLight, usedDark) {
+    case (true, true):
+      return Text(
+        "It is used in light and dark mode: the conversations go back to \(lightDefault) and \(darkDefault). Its file is deleted.",
+        bundle: .module)
+    case (true, false):
+      return Text(
+        "It is used in light mode: the conversations go back to \(lightDefault). Its file is deleted.",
+        bundle: .module)
+    case (false, true):
+      return Text(
+        "It is used in dark mode: the conversations go back to \(darkDefault). Its file is deleted.",
+        bundle: .module)
+    case (false, false):
+      return Text("Its file is deleted.", bundle: .module)
+    }
+  }
+
+  private func export(_ theme: ConversationTheme) {
+    let preview = ThemePreviewImage.png(of: theme)
+    Task {
+      guard let data = await themes.archive(theme.id, preview: preview) else { return }
+      exportName = "\(theme.displayName).zip"
+      exportDocument = ThemeArchiveDocument(data: data)
     }
   }
 
@@ -275,8 +436,7 @@ public struct ConversationSettingsView: View {
     guard let colors = ConversationTheme.accentColors[accent] else {
       // The theme's own accent, as the current theme draws it.
       let base =
-        ConversationTheme.named(
-          appearance.themeIdentifier(isDark: colorScheme == .dark))
+        themes.theme(appearance.themeIdentifier(isDark: colorScheme == .dark))
         ?? (colorScheme == .dark ? .systemDark : .systemLight)
       return AnyShapeStyle(base.accent.color)
     }
@@ -379,9 +539,22 @@ struct ThemeCard: View {
       .frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading)
       .background(theme.background.color, in: RoundedRectangle(cornerRadius: 6))
       .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.border.color))
-      Text(theme.localizedName)
-        .font(.caption.weight(.semibold))
-        .lineLimit(1)
+      HStack(spacing: 4) {
+        if let name = theme.personalName {
+          Text(verbatim: name)
+            .lineLimit(1)
+          Text("Mine", bundle: .module, comment: "A mark on the card of a theme the user made.")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 4)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.5)))
+            .accessibilityHidden(true)
+        } else {
+          Text(theme.localizedName)
+            .lineLimit(1)
+        }
+      }
+      .font(.caption.weight(.semibold))
     }
     .padding(6)
     .background(

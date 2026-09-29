@@ -84,7 +84,10 @@ struct SettingsWidthTests {
       case .templates: AnyView(PromptTemplatesView(model: model.templates))
       case .tickets: AnyView(TicketSettingsView(model: model.ticketTitles))
       default:
-        AnyView(ConversationSettingsView(appearance: Bindable(model.conversations).appearance))
+        AnyView(
+          ConversationSettingsView(
+            appearance: Bindable(model.conversations).appearance,
+            themes: model.conversations.themes))
       }
     let alone = NSHostingController(rootView: page.environment(\.locale, locale))
     #expect(least.width >= alone.sizeThatFits(in: .zero).width)

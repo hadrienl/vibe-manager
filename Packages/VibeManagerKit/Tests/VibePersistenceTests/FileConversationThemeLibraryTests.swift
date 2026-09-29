@@ -83,6 +83,9 @@ struct FileConversationThemeLibraryTests {
     try JSONSerialization.data(withJSONObject: object).write(to: broken)
     try Data("{".utf8).write(to: directory.appendingPathComponent("garbage.json"))
     try Data("ignored".utf8).write(to: directory.appendingPathComponent("notes.txt"))
+    try FileManager.default.createSymbolicLink(
+      at: directory.appendingPathComponent("link.json"),
+      withDestinationURL: library().file(of: saved.id))
 
     let contents = await library().load()
     #expect(contents.themes.map(\.id) == [saved.id])
@@ -90,10 +93,11 @@ struct FileConversationThemeLibraryTests {
       Set(contents.problems) == [
         ThemeLoadProblem(fileName: "broken.json", problem: .missingKey("colors.keyword")),
         ThemeLoadProblem(fileName: "garbage.json", problem: .notJSON),
+        ThemeLoadProblem(fileName: "link.json", problem: .notJSON),
       ])
     #expect(FileManager.default.fileExists(atPath: broken.path))
     let unreadable = log.events(named: "theme.unreadable")
-    #expect(unreadable.count == 2)
+    #expect(unreadable.count == 3)
     #expect(unreadable.allSatisfy { $0.value(of: "problem") != nil })
   }
 

@@ -11,6 +11,36 @@
         }
       }
     },
+    "%@ can no longer be found. Check that it is installed, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est introuvable. Vérifiez qu’il est installé, puis réessayez."
+          }
+        }
+      }
+    },
+    "%@ could not make the theme. The theme on screen is unchanged." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas pu créer le thème. Le thème affiché ne change pas."
+          }
+        }
+      }
+    },
+    "%@ did not answer in time. The theme on screen is unchanged." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas répondu à temps. Le thème affiché ne change pas."
+          }
+        }
+      }
+    },
     "%@ has not written anything yet." : {
       "localizations" : {
         "fr" : {
@@ -27,6 +57,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ vous pose une question"
+          }
+        }
+      }
+    },
+    "%@ is changing the theme." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ modifie le thème."
+          }
+        }
+      }
+    },
+    "%@ is changing the theme…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ modifie le thème…"
+          }
+        }
+      }
+    },
+    "%@ is deleted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est supprimé."
+          }
+        }
+      }
+    },
+    "%@ is making the theme." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ compose le thème."
+          }
+        }
+      }
+    },
+    "%@ is making the theme…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ compose le thème…"
           }
         }
       }
@@ -57,12 +137,62 @@
         }
       }
     },
+    "%@ is saved and applied." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est enregistré et appliqué."
+          }
+        }
+      }
+    },
+    "%@ is saved and used in dark mode." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est enregistré et utilisé en mode sombre."
+          }
+        }
+      }
+    },
+    "%@ is saved and used in light mode." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est enregistré et utilisé en mode clair."
+          }
+        }
+      }
+    },
+    "%@ is signed out. Sign in from a terminal, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est déconnecté. Connectez-vous depuis un terminal, puis réessayez."
+          }
+        }
+      }
+    },
     "%@ is starting. If it asks something first, answer in the terminal." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ démarre. S’il pose une question d’abord, répondez dans le terminal."
+          }
+        }
+      }
+    },
+    "%@ is too old to make a theme. Update it, then try again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est trop ancien pour créer un thème. Mettez-le à jour, puis réessayez."
           }
         }
       }
@@ -84,6 +214,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ omis au milieu"
+          }
+        }
+      }
+    },
+    "%@ twice gave a theme that could not be read. The theme on screen is unchanged: try again, or say it differently." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a rendu deux fois un thème illisible. Le thème affiché ne change pas : réessayez, ou formulez la demande autrement."
+          }
+        }
+      }
+    },
+    "%@, a theme of yours" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, un de vos thèmes"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ : %2$@"
           }
         }
       }
@@ -222,6 +388,16 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "A forest at night: moss greens, quiet, easy on the eyes…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une forêt la nuit : verts mousse, sobre, reposant pour les yeux…"
           }
         }
       }
@@ -401,6 +577,26 @@
         }
       }
     },
+    "Cancel" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler"
+          }
+        }
+      }
+    },
+    "Check Again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier à nouveau"
+          }
+        }
+      }
+    },
     "Choose a colour of your own" : {
       "localizations" : {
         "fr" : {
@@ -521,6 +717,16 @@
         }
       }
     },
+    "Create My Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer mon thème"
+          }
+        }
+      }
+    },
     "Custom" : {
       "localizations" : {
         "fr" : {
@@ -541,12 +747,72 @@
         }
       }
     },
+    "Dark" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sombre"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer"
+          }
+        }
+      }
+    },
+    "Delete the Theme “%@”?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le thème « %@ » ?"
+          }
+        }
+      }
+    },
+    "Delete…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer…"
+          }
+        }
+      }
+    },
     "Density" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Densité"
+          }
+        }
+      }
+    },
+    "Describe a theme to an agent, and see each version applied" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrire un thème à un agent, et voir chaque version appliquée"
+          }
+        }
+      }
+    },
+    "Describe the theme you want" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez le thème que vous voulez"
           }
         }
       }
@@ -612,6 +878,16 @@
         }
       }
     },
+    "Export…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter…"
+          }
+        }
+      }
+    },
     "Extra Large" : {
       "localizations" : {
         "fr" : {
@@ -632,6 +908,36 @@
         }
       }
     },
+    "Fold the panel" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier le panneau"
+          }
+        }
+      }
+    },
+    "Fold the panel: a theme not saved is dropped" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier le panneau : un thème non enregistré est abandonné"
+          }
+        }
+      }
+    },
+    "Folded" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replié"
+          }
+        }
+      }
+    },
     "Folder" : {
       "localizations" : {
         "fr" : {
@@ -648,6 +954,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suivre le mode clair ou sombre"
+          }
+        }
+      }
+    },
+    "For" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour le mode"
+          }
+        }
+      }
+    },
+    "Generate with %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générer avec %@"
+          }
+        }
+      }
+    },
+    "Go Back to the Previous Version" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir à la version précédente"
           }
         }
       }
@@ -718,6 +1054,16 @@
         }
       }
     },
+    "Install Claude Code or Codex and sign in from a terminal, then check again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez Claude Code ou Codex et connectez-vous depuis un terminal, puis vérifiez à nouveau."
+          }
+        }
+      }
+    },
     "Interrupted" : {
       "localizations" : {
         "fr" : {
@@ -728,12 +1074,68 @@
         }
       }
     },
+    "It is used in dark mode: the conversations go back to %@. Its file is deleted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il est utilisé en mode sombre : les conversations reprendront %@. Son fichier sera supprimé."
+          }
+        }
+      }
+    },
+    "It is used in light and dark mode: the conversations go back to %@ and %@. Its file is deleted." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "It is used in light and dark mode: the conversations go back to %1$@ and %2$@. Its file is deleted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il est utilisé en mode clair et en mode sombre : les conversations reprendront %1$@ et %2$@. Son fichier sera supprimé."
+          }
+        }
+      }
+    },
+    "It is used in light mode: the conversations go back to %@. Its file is deleted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il est utilisé en mode clair : les conversations reprendront %@. Son fichier sera supprimé."
+          }
+        }
+      }
+    },
+    "Its file is deleted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son fichier sera supprimé."
+          }
+        }
+      }
+    },
     "Large" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grand"
+          }
+        }
+      }
+    },
+    "Light" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clair"
           }
         }
       }
@@ -798,6 +1200,47 @@
         }
       }
     },
+    "Mine" : {
+      "comment" : "A mark on the card of a theme the user made.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perso"
+          }
+        }
+      }
+    },
+    "More contrast, a green accent, darker code…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus contrasté, un accent vert, du code plus sombre…"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
+          }
+        }
+      }
+    },
+    "Name of the theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom du thème"
+          }
+        }
+      }
+    },
     "Night" : {
       "localizations" : {
         "fr" : {
@@ -808,12 +1251,42 @@
         }
       }
     },
+    "No agent can make a theme now" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun agent disponible pour créer un thème"
+          }
+        }
+      }
+    },
+    "No version is on trial any more." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus aucune version n’est à l’essai."
+          }
+        }
+      }
+    },
     "Not confirmed by the agent yet" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas encore confirmé par l’agent"
+          }
+        }
+      }
+    },
+    "On trial — not saved" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À l’essai — non enregistré"
           }
         }
       }
@@ -874,6 +1347,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autre réponse à %@"
+          }
+        }
+      }
+    },
+    "Otherwise your accent, %@, replaces the one generated." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sinon, votre accent (%@) remplace celui du thème généré."
           }
         }
       }
@@ -1080,6 +1563,16 @@
         }
       }
     },
+    "Save and Apply the Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer et appliquer le thème"
+          }
+        }
+      }
+    },
     "Send" : {
       "localizations" : {
         "fr" : {
@@ -1190,6 +1683,36 @@
         }
       }
     },
+    "Some theme files could not be read, and are not offered:" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des fichiers de thème n’ont pas pu être lus et ne sont pas proposés :"
+          }
+        }
+      }
+    },
+    "Start Over" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommencer"
+          }
+        }
+      }
+    },
+    "Start over to make a theme for the other mode" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommencez pour créer un thème de l’autre mode"
+          }
+        }
+      }
+    },
     "Stop" : {
       "localizations" : {
         "fr" : {
@@ -1270,12 +1793,42 @@
         }
       }
     },
+    "The first answer could not be used: it is asked once more." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La première réponse était inutilisable : l’agent est sollicité une seconde fois."
+          }
+        }
+      }
+    },
+    "The generation was cancelled." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La génération est annulée."
+          }
+        }
+      }
+    },
     "The image is no longer where the agent saved it." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’image n’est plus là où l’agent l’a enregistrée."
+          }
+        }
+      }
+    },
+    "The mode the theme is made for" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode auquel le thème est destiné"
           }
         }
       }
@@ -1306,6 +1859,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le thème s’applique à la vue conversation de toutes les sessions. Le terminal garde les couleurs que l’agent lui envoie."
+          }
+        }
+      }
+    },
+    "The theme could not be deleted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le thème n’a pas pu être supprimé."
+          }
+        }
+      }
+    },
+    "The theme could not be exported." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le thème n’a pas pu être exporté."
+          }
+        }
+      }
+    },
+    "The theme could not be saved." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le thème n’a pas pu être enregistré."
+          }
+        }
+      }
+    },
+    "The theme could not be used as it was: it is asked again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le thème était inutilisable tel quel : il est redemandé."
+          }
+        }
+      }
+    },
+    "The theme on trial also applies to the conversations of the main window. Folding the panel, choosing another card or leaving the tab without saving brings back the theme in force." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le thème à l’essai s’applique aussi aux conversations de la fenêtre principale. Replier le panneau, choisir une autre carte ou quitter l’onglet sans enregistrer rétablit le thème en vigueur."
+          }
+        }
+      }
+    },
+    "The theme on trial was dropped." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le thème à l’essai est abandonné."
           }
         }
       }
@@ -1410,6 +2023,72 @@
         }
       }
     },
+    "Unfolded" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplié"
+          }
+        }
+      }
+    },
+    "Use the theme's accent" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser l’accent du thème"
+          }
+        }
+      }
+    },
+    "Version %lld is on trial." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La version %lld est à l’essai."
+          }
+        }
+      }
+    },
+    "Version %lld, %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$lld, %2$@, %3$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %1$lld, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "Versions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versions"
+          }
+        }
+      }
+    },
+    "What should change?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Que faut-il changer ?"
+          }
+        }
+      }
+    },
     "Wrap lines in code blocks" : {
       "localizations" : {
         "fr" : {
@@ -1510,6 +2189,36 @@
         }
       }
     },
+    "its name cannot be used" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "son nom est inutilisable"
+          }
+        }
+      }
+    },
+    "made by a later version of Vibe Manager" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "créé par une version plus récente de Vibe Manager"
+          }
+        }
+      }
+    },
+    "not a theme file" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ce n’est pas un fichier de thème"
+          }
+        }
+      }
+    },
     "not allowed" : {
       "localizations" : {
         "fr" : {
@@ -1520,12 +2229,42 @@
         }
       }
     },
+    "not of the mode expected" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il n’est pas du mode attendu"
+          }
+        }
+      }
+    },
+    "on trial" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à l’essai"
+          }
+        }
+      }
+    },
     "running" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "en cours"
+          }
+        }
+      }
+    },
+    "some of its colours cannot be read on each other" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "certaines de ses couleurs ne se lisent pas l’une sur l’autre"
           }
         }
       }
@@ -1557,12 +2296,52 @@
         }
       }
     },
+    "too large to be a theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trop volumineux pour être un thème"
+          }
+        }
+      }
+    },
     "waiting for your permission" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente de votre autorisation"
+          }
+        }
+      }
+    },
+    "“%@” is missing" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » manque"
+          }
+        }
+      }
+    },
+    "“%@” is not valid" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » n’est pas valide"
+          }
+        }
+      }
+    },
+    "“%@” is unknown" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est inconnu"
           }
         }
       }
