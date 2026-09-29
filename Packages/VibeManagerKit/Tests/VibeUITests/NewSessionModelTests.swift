@@ -750,6 +750,27 @@ struct NewSessionProjectIconTests {
       projectIcons: StubIcons(icons: icons, delay: delay))
   }
 
+  @Test("The folder proposed from the recent ones offers its icon at once (#177)")
+  func preselectedFolderOffersItsIcon() async throws {
+    let icon = projectIcon("b")
+    let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
+    let model = NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(), agents: registry, folders: StubFolders(status: .usable)),
+      registry: registry,
+      fullDiskAccess: .granted,
+      projectIcons: StubIcons(icons: ["/work/api": icon]),
+      recentFolders: recent("/work/api"),
+      folderProbe: MappedFolders(),
+      recentFolderProbeBudget: .seconds(3_600))
+
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == "/work/api")
+    await waitUntil { model.draft.projectIcon == icon }
+    #expect(model.usesProjectIcon)
+  }
+
   @Test("A folder's icon is the default, in place of what the name gives")
   func iconIsTheDefault() async throws {
     let icon = projectIcon("a")

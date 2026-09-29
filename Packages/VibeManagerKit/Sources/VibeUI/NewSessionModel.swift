@@ -698,6 +698,11 @@ extension NewSessionModel {
     skippedRecentFolder = index > 0 ? recentFolders[0] : nil
     preselectedFolder = option.folder.path
     draft.workingDirectoryPath = option.folder.path
+    // Its icon is offered at once when the folder was just looked at without an alert: reading it
+    // again asks the system nothing. A folder macOS guards, left unverified, waits for a gesture.
+    if option.availability == .available {
+      lookForIcon()
+    }
   }
 
   /// Looks at each recent folder once, within a budget, without raising a consent alert.
