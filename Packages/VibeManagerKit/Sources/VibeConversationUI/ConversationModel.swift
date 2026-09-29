@@ -192,6 +192,8 @@ public final class ConversationModel {
   /// A request made while the composer was not on screen to take it, consumed once: shown later,
   /// it takes the keyboard then, and never again for having been asked once long ago.
   @ObservationIgnored private var hasPendingFocusRequest = false
+  /// Where ↑ and ↓ stand in the messages sent (#123).
+  @ObservationIgnored private var historyNavigation = PromptHistoryNavigation()
 
   public init(sessionID: SessionID) {
     self.sessionID = sessionID
@@ -542,6 +544,7 @@ public final class ConversationModel {
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
     attachments = []
+    historyNavigation = PromptHistoryNavigation()
     scroll.jumpedToBottom()
     scrollToBottomRequest += 1
     for (index, keys) in keystrokes.writes.enumerated() {
@@ -551,6 +554,41 @@ public final class ConversationModel {
     try? await Task.sleep(for: submitDelay)
     await write(keystrokes.submit)
     scheduleEchoCheck()
+    return true
+  }
+
+  // MARK: - History
+
+  /// The messages sent in this session: those of its transcript, then those on their way to it.
+  public var promptHistory: PromptHistory {
+    PromptHistory(entries: snapshot.entries, pending: echoes.map(\.text))
+  }
+
+  /// ↑ in the composer: shows the message sent before the one shown, the draft put aside.
+  /// Returns whether the key was used; the attachments stay where they are.
+  public func recallOlderPrompt() -> Bool {
+    guard composerState == .ready,
+      let text = historyNavigation.older(in: promptHistory, draft: draft)
+    else { return false }
+    draft = text
+    return true
+  }
+
+  /// ↓ in the composer: the next message, and past the most recent, the draft as it was.
+  public func recallNewerPrompt() -> Bool {
+    guard composerState == .ready,
+      let text = historyNavigation.newer(in: promptHistory, draft: draft)
+    else { return false }
+    draft = text
+    return true
+  }
+
+  /// Escape in the composer: the draft as it was before ↑, while a message recalled is shown.
+  public func cancelPromptRecall() -> Bool {
+    guard composerState == .ready,
+      let text = historyNavigation.cancel(in: promptHistory, draft: draft)
+    else { return false }
+    draft = text
     return true
   }
 
