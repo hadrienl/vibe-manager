@@ -246,7 +246,7 @@ struct SessionBatchTests {
 
   // MARK: - Status
 
-  @Test("Moving a selection asks once, and says which agents will start")
+  @Test("Moving a selection In Progress asks once, says which agents will start, and follows")
   func movingSeveral() async throws {
     let planned = (1...2).map {
       SessionDraft(
@@ -263,15 +263,100 @@ struct SessionBatchTests {
     let plan = model.batchPlan(.move(to: .doing), for: model.commandTargets)
     await model.requestBatch(plan)
     let confirmation = try #require(model.pendingBatch)
-    #expect(confirmation.message.contains("2 sessions that never ran") == true)
+    #expect(confirmation.message.contains("2 sessions will start their agent again") == true)
+    #expect(confirmation.withoutRestartTitle == nil)
     await model.confirmBatch(confirmation)
 
     for session in planned {
       #expect(await repository.session(id: session.id)?.taskStatus == .doing)
       #expect(launcher.isRunning(session.id))
     }
-    // The column being sorted stays on screen.
-    #expect(model.filter.column == .todo)
+    // In Progress is where the user went back to work (#192): the column follows them.
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == planned[1].id)
+  }
+
+  @Test("Moving sessions that ran In Progress restarts the closed ones, and only those")
+  func movingInProgressRestarts() async throws {
+    let finished = session("Finished", in: .waiting, updatedAt: 300)
+    let running = session("Running", in: .waiting, status: .active, updatedAt: 200)
+    let unresumable = session("Unresumable", in: .waiting, updatedAt: 100, resumable: false)
+    let all = [finished, running, unresumable]
+    let (model, launcher, repository) = makeWorkspace(all)
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.waiting)
+    selectAll(all, in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .doing), for: model.commandTargets))
+    await model.confirmBatch(try #require(model.pendingBatch))
+
+    for session in all {
+      #expect(await repository.session(id: session.id)?.taskStatus == .doing)
+    }
+    #expect(launcher.isRunning(finished.id))
+    #expect(!launcher.isRunning(unresumable.id))
+    #expect(model.pendingRestart == nil)
+    // Moved, and told as moved without its agent: its summary is read on its own.
+    #expect(model.batchReport?.lines.map(\.id) == [unresumable.id])
+    #expect(model.filter.column == .doing)
+  }
+
+  @Test("A session moved In Progress while another is on screen takes the selection")
+  func movingInProgressSelectsTheFirstMoved() async {
+    let shown = session("Shown", in: .done, updatedAt: 300)
+    let moved = session("Moved", in: .done, updatedAt: 200)
+    let (model, _, _) = makeWorkspace([shown, moved])
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+    model.select(shown.id)
+
+    await model.requestBatch(model.batchPlan(.move(to: .doing), for: [moved.id]))
+
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == moved.id)
+  }
+
+  @Test("Past five agents to restart, moving without restarting is offered first")
+  func manyRestartsOfferToMoveOnly() async throws {
+    let finished = (1...6).map { session("F\($0)", in: .done, updatedAt: TimeInterval(400 - $0)) }
+    let (model, launcher, repository) = makeWorkspace(finished)
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+    selectAll(finished, in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .doing), for: model.commandTargets))
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.withoutRestartTitle == "Move Without Restarting")
+    #expect(confirmation.confirmTitle == "Move and Restart")
+    #expect(confirmation.message.contains("one after the other") == true)
+
+    await model.confirmBatch(confirmation, restarting: false)
+
+    for session in finished {
+      #expect(await repository.session(id: session.id)?.taskStatus == .doing)
+      #expect(!launcher.isRunning(session.id))
+    }
+    #expect(model.batchReport == nil)
+    #expect(model.filter.column == .doing)
+  }
+
+  @Test("Five agents to restart are asked about as usual")
+  func fiveRestartsAskAsUsual() async throws {
+    let finished = (1...5).map { session("F\($0)", in: .done, updatedAt: TimeInterval(400 - $0)) }
+    let (model, _, _) = makeWorkspace(finished)
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+    selectAll(finished, in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .doing), for: model.commandTargets))
+
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.withoutRestartTitle == nil)
+    #expect(confirmation.confirmTitle == "Move Sessions")
   }
 
   @Test("A move whose agent does not start is told as moved, not as left where it was")

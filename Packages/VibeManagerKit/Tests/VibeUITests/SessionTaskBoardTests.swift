@@ -17,31 +17,32 @@ struct SessionTaskBoardTests {
   /// A session that ran and is stopped, in the column given.
   private func session(
     _ name: String, in column: SessionTaskStatus = .doing, updatedAt seconds: TimeInterval = 100,
-    path: String = "/workspace"
+    path: String = "/workspace", status: SessionStatus = .closed, resumable: Bool = true
   ) -> WorkSession {
     let date = Date(timeIntervalSince1970: seconds)
     return WorkSession(
       name: name,
       initialPrompt: "Do \(name)",
       // A conversation to resume, so that a restart starts without a summary to confirm.
-      agent: SessionAgentConfiguration(providerID: "stub", resumeIdentifier: "kept-identifier"),
-      status: .closed,
+      agent: SessionAgentConfiguration(
+        providerID: "stub", resumeIdentifier: resumable ? "kept-identifier" : nil),
+      status: status,
       createdAt: Date(timeIntervalSince1970: 1),
       updatedAt: date,
-      closedAt: date,
+      closedAt: status == .closed ? date : nil,
       startedAt: Date(timeIntervalSince1970: 1),
       repositories: [RepositoryContext(path: path)],
       taskStatus: column
     )
   }
 
-  private func makeWorkspace(_ sessions: [WorkSession])
-    -> (AppModel, SessionLauncher, WorkspaceRepository)
-  {
+  private func makeWorkspace(
+    _ sessions: [WorkSession], supervisor: WorkspaceSupervisor = WorkspaceSupervisor()
+  ) -> (AppModel, SessionLauncher, WorkspaceRepository) {
     let repository = WorkspaceRepository(sessions: sessions)
     let registry = WorkspaceRegistry(providers: [WorkspaceProvider()])
     let launcher = SessionLauncher(
-      supervisor: WorkspaceSupervisor(), repository: repository, agents: registry,
+      supervisor: supervisor, repository: repository, agents: registry,
       viewportTimeout: .zero)
     let model = AppModel(repository: repository, agents: registry, launcher: launcher)
     return (model, launcher, repository)
@@ -186,7 +187,7 @@ struct SessionTaskBoardTests {
 
   // MARK: - Starting from To Do
 
-  @Test("Moving a session that never ran In Progress starts its agent, and the column stays")
+  @Test("Moving a session that never ran In Progress starts its agent, and the column follows")
   func startingFromToDo() async throws {
     let path = folder()
     let planned = SessionDraft(
@@ -205,22 +206,158 @@ struct SessionTaskBoardTests {
     #expect(stored.taskStatus == .doing)
     #expect(stored.status == .active)
     #expect(launcher.isRunning(planned.id))
-    #expect(model.filter.column == .todo)
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == planned.id)
   }
 
-  @Test("A session moved elsewhere starts nothing")
-  func movingStartsNothing() async {
+  // MARK: - Moving In Progress (#192)
+
+  @Test(
+    "A closed session moved In Progress from any column is shown there, selected, and restarted",
+    arguments: [SessionTaskStatus.todo, .waiting, .done])
+  func movingInProgressRestarts(from column: SessionTaskStatus) async throws {
+    let path = folder()
+    let other = session("Other", in: column, updatedAt: 300, path: path)
+    let subject = session("Subject", in: column, updatedAt: 200, path: path)
+    let (model, launcher, repository) = makeWorkspace([other, subject])
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(column)
+    model.select(subject.id)
+
+    await model.setTaskStatus(.doing, for: subject.id)
+
+    let stored = try #require(await repository.session(id: subject.id))
+    #expect(stored.taskStatus == .doing)
+    #expect(stored.status == .active)
+    #expect(launcher.isRunning(subject.id))
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == subject.id)
+    #expect(model.visibleSessions.map(\.id) == [subject.id])
+  }
+
+  @Test("A session moved In Progress from another row's selection is the one selected")
+  func movingAnotherRowInProgressSelectsIt() async {
+    let path = folder()
+    let shown = session("Shown", in: .done, updatedAt: 300, path: path)
+    let moved = session("Moved", in: .done, updatedAt: 200, path: path)
+    let (model, _, _) = makeWorkspace([shown, moved])
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+    model.select(shown.id)
+
+    // A swipe on a row that is not the selected one.
+    await model.setTaskStatus(.doing, for: moved.id)
+
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == moved.id)
+  }
+
+  @Test("A session whose agent runs is moved In Progress and shown, and nothing is restarted")
+  func movingARunningSessionRestartsNothing() async {
+    let path = folder()
+    let running = session("Running", in: .waiting, path: path, status: .active)
+    let supervisor = WorkspaceSupervisor()
+    let (model, _, repository) = makeWorkspace([running], supervisor: supervisor)
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.waiting)
+
+    await model.setTaskStatus(.doing, for: running.id)
+
+    #expect(await repository.session(id: running.id)?.taskStatus == .doing)
+    #expect(await supervisor.startCount == 0)
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == running.id)
+  }
+
+  @Test("A restart that fails leaves the session In Progress, selected, and says why")
+  func failedRestartKeepsTheMove() async {
+    let path = folder()
+    let subject = session("Subject", in: .done, path: path)
+    let (model, launcher, repository) = makeWorkspace(
+      [subject], supervisor: WorkspaceSupervisor(failure: .resourceLimitReached(code: 35)))
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+
+    await model.setTaskStatus(.doing, for: subject.id)
+
+    #expect(await repository.session(id: subject.id)?.taskStatus == .doing)
+    #expect(!launcher.isRunning(subject.id))
+    #expect(model.restartFailure != nil)
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == subject.id)
+  }
+
+  @Test("A restart that needs its summary read asks for it, and the session is In Progress")
+  func summaryToReadKeepsTheMove() async {
+    let path = folder()
+    let subject = session("Subject", in: .done, path: path, resumable: false)
+    let (model, launcher, repository) = makeWorkspace([subject])
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+
+    await model.setTaskStatus(.doing, for: subject.id)
+
+    #expect(model.pendingRestart?.sessionID == subject.id)
+    #expect(!launcher.isRunning(subject.id))
+    #expect(await repository.session(id: subject.id)?.taskStatus == .doing)
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == subject.id)
+  }
+
+  @Test("A search that hides the session moved In Progress is left as it is")
+  func movingInProgressKeepsTheSearch() async {
+    let path = folder()
+    let subject = session("Webhook", in: .done, path: path)
+    let (model, _, _) = makeWorkspace([subject])
+    await model.load()
+    await model.refreshResolutions()
+    model.setColumn(.done)
+    model.select(subject.id)
+    // Typed after the session was chosen: it hides the session, which stays on screen.
+    model.setSearchText("signature")
+
+    await model.setTaskStatus(.doing, for: subject.id)
+
+    #expect(model.filter.searchText == "signature")
+    #expect(model.filter.column == .doing)
+    #expect(model.selectedSessionID == subject.id)
+  }
+
+  @Test("An archived session only comes back through Unarchive, never straight In Progress")
+  func archivedIsNotMovedInProgress() async {
+    let path = folder()
+    var archived = session("Archived", in: .done, path: path)
+    try? archived.archive(at: Date(timeIntervalSince1970: 500))
+    let (model, launcher, repository) = makeWorkspace([archived])
+    await model.load()
+
+    #expect(model.nextTaskStatuses(of: archived).isEmpty)
+    await model.setTaskStatus(.doing, for: archived.id)
+
+    #expect(await repository.session(id: archived.id)?.taskStatus == .done)
+    #expect(!launcher.isRunning(archived.id))
+  }
+
+  @Test("A session moved elsewhere starts nothing", arguments: [SessionTaskStatus.waiting, .done])
+  func movingStartsNothing(to status: SessionTaskStatus) async {
     let path = folder()
     let planned = SessionDraft(
       name: "Planned", initialPrompt: "Later.", providerID: "stub", workingDirectoryPath: path
     ).session(createdAt: Date(timeIntervalSince1970: 1_699_000_000))
     let (model, launcher, repository) = makeWorkspace([planned])
     await model.load()
+    model.setColumn(.todo)
 
-    await model.setTaskStatus(.waiting, for: planned.id)
+    await model.setTaskStatus(status, for: planned.id)
 
-    #expect(await repository.session(id: planned.id)?.taskStatus == .waiting)
+    #expect(await repository.session(id: planned.id)?.taskStatus == status)
     #expect(!launcher.isRunning(planned.id))
+    #expect(model.filter.column == .todo)
   }
 
   @Test("Restarting a finished session puts it back In Progress, and the column follows")

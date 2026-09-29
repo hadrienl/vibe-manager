@@ -971,8 +971,8 @@ public final class AppModel {
   /// Starting a planned session, or restarting a finished one, puts it In Progress (#80). Left
   /// alone, the session the user just started would vanish from the list under their pointer and
   /// the selection would fall to whatever row took its place. The column follows the session
-  /// instead, and the session stays selected. A status changed by hand does not follow: see
-  /// `setTaskStatus(_:for:)`.
+  /// instead, and the session stays selected. A session moved In Progress by hand follows too
+  /// (#192); every other status changed by hand does not: see `setTaskStatus(_:for:)`.
   ///
   /// Only the column is moved. A search or a facet that also hides it is a narrowing the user
   /// typed themselves, and clearing it would undo work they can see.
@@ -1146,9 +1146,12 @@ public final class AppModel {
     }
   }
 
-  /// One session of a batch move (#77): the status is written, and a session that never ran and
-  /// goes In Progress starts its agent, as it does on its own.
-  func moveInBatch(_ id: SessionID, to status: SessionTaskStatus) async -> SessionBatchItemResult {
+  /// One session of a batch move (#77): the status is written, and a closed session that goes In
+  /// Progress is restarted, as it is on its own (#192) — unless the user chose to move the batch
+  /// without restarting it.
+  func moveInBatch(
+    _ id: SessionID, to status: SessionTaskStatus, restarting: Bool = true
+  ) async -> SessionBatchItemResult {
     guard let session = sessions.first(where: { $0.id == id }) else {
       return .failed(
         message: Self.message(for: ChangeSessionStatusError.sessionNotFound(id)), suggestion: nil)
@@ -1162,20 +1165,29 @@ public final class AppModel {
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
     }
-    guard Self.startsWhenMoved(session, to: status), canRestart(session) else { return .done }
+    guard restarting, Self.restartsWhenMoved(session, to: status), canRestart(session) else {
+      return .done
+    }
     // The status is written whatever the start does: the session is in its new column, and a
     // failed start is told as such rather than as a move that did not happen.
     switch await performRestart(id: id, follows: false, inBatch: true) {
     case .failed(let message, let suggestion):
       return .movedWithoutStart(message: message, suggestion: suggestion)
+    case .skipped(.needsSummary):
+      // Moved all the same: the summary is read on its own, never as one of several.
+      return .movedWithoutStart(
+        message: String(
+          localized: "Its summary has to be read first: restart it on its own.", bundle: .module),
+        suggestion: nil)
     default:
       return .done
     }
   }
 
-  /// A session created and never started goes to work when it is moved In Progress.
-  static func startsWhenMoved(_ session: WorkSession, to status: SessionTaskStatus) -> Bool {
-    status == .doing && !session.hasEverStarted && session.status == .closed
+  /// A closed session goes back to work when it is moved In Progress (#192): started with its
+  /// prompt when it never ran, restarted otherwise. One whose agent runs has nothing to restart.
+  static func restartsWhenMoved(_ session: WorkSession, to status: SessionTaskStatus) -> Bool {
+    status == .doing && session.status == .closed
   }
 
   /// One session of a batch restart (#77). A restart that would send a summary is left out
@@ -1277,13 +1289,15 @@ public final class AppModel {
   /// Moves a session to another status (#80): a swipe button, the Status menu, ⌥⌘← and ⌥⌘→.
   ///
   /// Archiving keeps its confirmation and goes through `ArchiveSession`, and unarchiving through
-  /// `RestoreSession`: they stop or release a process. Moving a session that never ran In
-  /// Progress starts its agent with its prompt — To Do is where a task waits to be launched.
-  /// Every other move writes the status and nothing else.
+  /// `RestoreSession`: they stop or release a process.
   ///
-  /// The column on screen stays where it is: the user sorting a column keeps their place in it.
-  /// A session that leaves the column hands the selection to the row that takes its place, as
-  /// closing one does.
+  /// Moving a session In Progress is getting back to it (#192): the column follows it, it stays
+  /// selected, and a closed one is restarted — started with its prompt when it never ran. The
+  /// status is written whatever the restart does.
+  ///
+  /// Every other move writes the status and nothing else, and the column on screen stays where
+  /// it is: the user sorting a column keeps their place in it. A session that leaves the column
+  /// hands the selection to the row that takes its place, as closing one does.
   public func setTaskStatus(_ status: SessionTaskStatus, for id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), session.taskStatus != status
     else { return }
@@ -1311,14 +1325,26 @@ public final class AppModel {
       await report(error)
       return
     }
-    prepareHandOff(from: id, listedBefore: visible)
-    await reload()
-    handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
-
-    if Self.startsWhenMoved(session, to: status), canRestart(session) {
-      // Started from the store rather than from the value above: the status was just written.
-      await performRestart(id: id, follows: false)
+    guard status == .doing else {
+      prepareHandOff(from: id, listedBefore: visible)
+      await reload()
+      handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
+      return
     }
+
+    // On screen before the restart, which can take seconds: the user sees the session they
+    // went back to while its agent comes up.
+    leaveNewSessionDraft()
+    await reload()
+    follow(id)
+    if Self.restartsWhenMoved(session, to: status), canRestart(session) {
+      // Started from the store rather than from the value above: the status was just written.
+      await performRestart(id: id)
+    }
+    // A summary to read holds the keyboard itself. Otherwise, as Open Quickly does: the agent
+    // that runs takes it, and a stopped one's row does.
+    guard pendingRestart?.sessionID != id else { return }
+    if launcher?.isRunning(id) != true || !focusSession() { focusSidebar() }
   }
 
   /// A selected session that has just left the column hands the selection to the row that took
