@@ -14,6 +14,8 @@ final class FakeUpdater: SoftwareUpdating {
   var canCheck = true
   var lastCheck: Date?
   var waitingVersion: String?
+  var readyToInstall: UpdateCandidate?
+  private(set) var offers = 0
   var onChange: (() -> Void)?
   private(set) var checks = 0
 
@@ -24,6 +26,10 @@ final class FakeUpdater: SoftwareUpdating {
   func checkNow() {
     checks += 1
     canCheck = false
+  }
+
+  func offerReadyUpdate() {
+    offers += 1
   }
 }
 
@@ -62,6 +68,13 @@ struct UpdatesSettingsTests {
     #expect(model.canCheck)
     #expect(model.lastCheck == checked)
     #expect(model.waitingVersion == "1.1.0")
+
+    // Set aside by Later: said, and offered again from the menu.
+    updater.readyToInstall = UpdateCandidate(version: "1.1.0", hostProtocol: 1)
+    updater.onChange?()
+    #expect(model.readyToInstall?.version == "1.1.0")
+    model.offerReadyUpdate()
+    #expect(updater.offers == 1)
   }
 
   @Test("The tab is there once the application gave the workspace an updater, wide enough")

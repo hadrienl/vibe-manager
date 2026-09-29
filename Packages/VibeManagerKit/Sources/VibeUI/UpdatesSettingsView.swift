@@ -70,7 +70,11 @@ struct UpdatesSettingsView: View {
           }
           .disabled(!updates.canCheck)
         } label: {
-          if let waiting = updates.waitingVersion {
+          if let ready = updates.readyToInstall {
+            Text(
+              "Version \(ready.version) will be installed when you quit Vibe Manager.",
+              bundle: .module)
+          } else if let waiting = updates.waitingVersion {
             Text("Version \(waiting) is available.", bundle: .module)
           } else if let last = updates.lastCheck {
             Text("Last checked \(last.formatted(.relative(presentation: .named)))", bundle: .module)

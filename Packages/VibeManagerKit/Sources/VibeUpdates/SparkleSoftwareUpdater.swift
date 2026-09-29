@@ -18,9 +18,16 @@ public final class SparkleSoftwareUpdater: NSObject, SoftwareUpdating {
   /// gentle reminder, said in the menu rather than by a window that would take the focus.
   public private(set) var waitingVersion: String?
 
-  /// Asked when an update is ready to relaunch the application. It calls `install` once the user
-  /// agreed and nothing is in the way — or never, and the update is installed at the next quit.
-  public var relaunchGate: ((UpdateCandidate, _ install: @escaping () -> Void) -> Void)?
+  /// A version downloaded and ready, whose relaunch waits for the application's answer: asked
+  /// now, or set aside by Later, until the menu offers it again or the application quits — Sparkle
+  /// installs it then, whatever was answered.
+  public private(set) var readyToInstall: UpdateCandidate?
+  private var installReady: (() -> Void)?
+
+  /// Asked when an update is ready to relaunch the application. It answers with
+  /// `installReadyUpdate()` once the user agreed and nothing is in the way, or
+  /// `setReadyUpdateAside()` for Later.
+  public var relaunchGate: ((UpdateCandidate) -> Void)?
   /// Told when an update was given up on, whatever the reason: a failed download, a refused
   /// signature, an installer that did not start.
   public var onAbort: (() -> Void)?
@@ -106,6 +113,26 @@ public final class SparkleSoftwareUpdater: NSObject, SoftwareUpdating {
     updater?.checkForUpdates()
   }
 
+  /// Asks again about the version set aside by Later.
+  public func offerReadyUpdate() {
+    guard let readyToInstall, let relaunchGate else { return }
+    relaunchGate(readyToInstall)
+  }
+
+  /// Quits, installs and relaunches: the answer to the question is in.
+  public func installReadyUpdate() {
+    guard let install = installReady else { return }
+    installReady = nil
+    install()
+  }
+
+  /// Later: Sparkle's window goes away rather than waiting on a relaunch nobody will start, and
+  /// the version stays ready, offered by the menu and installed when the application quits.
+  public func setReadyUpdateAside() {
+    userDriver?.dismissUpdateInstallation()
+    onChange?()
+  }
+
   /// Kept apart from Sparkle's own defaults: the channel is the application's choice, handed to
   /// Sparkle at each check.
   private var channel: UpdateChannel {
@@ -150,7 +177,11 @@ extension SparkleSoftwareUpdater: SPUUpdaterDelegate {
     untilInvokingBlock installHandler: @escaping () -> Void
   ) -> Bool {
     guard let relaunchGate else { return false }
-    relaunchGate(Self.candidate(of: item), installHandler)
+    let candidate = Self.candidate(of: item)
+    readyToInstall = candidate
+    installReady = installHandler
+    onChange?()
+    relaunchGate(candidate)
     return true
   }
 
@@ -161,6 +192,8 @@ extension SparkleSoftwareUpdater: SPUUpdaterDelegate {
   }
 
   public func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+    readyToInstall = nil
+    installReady = nil
     onAbort?()
     onChange?()
   }

@@ -14293,6 +14293,16 @@
         }
       }
     },
+    "Version %@ will be installed when you quit Vibe Manager." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La version %@ sera installée quand vous quitterez Vibe Manager."
+          }
+        }
+      }
+    },
     "Vibe Manager" : {
       "localizations" : {
         "fr" : {

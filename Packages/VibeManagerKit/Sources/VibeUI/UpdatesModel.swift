@@ -13,6 +13,7 @@ public final class UpdatesModel {
   public private(set) var canCheck: Bool
   public private(set) var lastCheck: Date?
   public private(set) var waitingVersion: String?
+  public private(set) var readyToInstall: UpdateCandidate?
 
   public init(updater: any SoftwareUpdating) {
     self.updater = updater
@@ -21,6 +22,7 @@ public final class UpdatesModel {
     canCheck = updater.canCheck
     lastCheck = updater.lastCheck
     waitingVersion = updater.waitingVersion
+    readyToInstall = updater.readyToInstall
     updater.onChange = { [weak self] in self?.refresh() }
   }
 
@@ -40,11 +42,17 @@ public final class UpdatesModel {
     refresh()
   }
 
+  public func offerReadyUpdate() {
+    updater.offerReadyUpdate()
+    refresh()
+  }
+
   func refresh() {
     availability = updater.availability
     settings = updater.settings
     canCheck = updater.canCheck
     lastCheck = updater.lastCheck
     waitingVersion = updater.waitingVersion
+    readyToInstall = updater.readyToInstall
   }
 }

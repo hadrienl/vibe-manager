@@ -369,7 +369,12 @@ private struct UpdateCommands: View {
 
   var body: some View {
     if let updates = model.updates {
-      if !updates.isAvailable {
+      if let ready = updates.readyToInstall {
+        // Set aside by Later: installed when the application quits, or now from here.
+        Button("Install Vibe Manager \(ready.version) and Relaunch…") {
+          updates.offerReadyUpdate()
+        }
+      } else if !updates.isAvailable {
         Button("Check for Updates…") {
           model.settingsTab = .updates
           openSettings()
@@ -974,6 +979,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let count = environment.hostedRunningCount
     guard count > 0, !isPoweringOff else { return false }
     if let decidedForUpdate { return decidedForUpdate }
+    // A version set aside by Later is installed as the application quits (#92). One that speaks
+    // another core of the host's protocol could not take back agents left running: not offered.
+    if let ready = updater?.readyToInstall,
+      let speaks = ready.hostProtocol, speaks != TerminalHost.protocolVersion
+    {
+      if environment.appModel.quitBehavior == .stopAll { return false }
+      return confirmStopping(for: ready) ? false : nil
+    }
     switch environment.appModel.quitBehavior {
     case .keepRunning: return true
     case .stopAll: return false
@@ -1046,8 +1059,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       defaults: environment.defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard)
     self.updater = updater
     updater.isPresentingModal = { Self.isPresentingModal }
-    updater.relaunchGate = { [weak self] candidate, install in
-      self?.relaunch(for: candidate, install: install)
+    updater.relaunchGate = { [weak self] candidate in
+      self?.relaunch(for: candidate)
     }
     // An update that failed after the question: its answer must not stand for a later quit.
     updater.onAbort = { [weak self] in self?.decidedForUpdate = nil }
@@ -1074,8 +1087,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// An update is ready to relaunch the application. Installing is quitting: the question of
   /// ADR 0017 is asked first, and its answer stands for the quit that follows. Put off while
   /// sessions are being restored or a sheet is open; never installed by "Later", until the next quit.
-  private func relaunch(for candidate: UpdateCandidate, install: @escaping () -> Void) {
-    guard let environment else { return install() }
+  private func relaunch(for candidate: UpdateCandidate) {
+    guard let updater else { return }
+    guard let environment else { return updater.installReadyUpdate() }
     let situation = UpdateRelaunchSituation(
       hostedRunningCount: environment.hostedRunningCount,
       inProcessRunningCount: environment.inProcessRunningCount,
@@ -1089,21 +1103,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       // Looked at again without a word: the user asked for it, and nothing was said yet.
       Task { [weak self] in
         try? await Task.sleep(for: .seconds(1))
-        self?.relaunch(for: candidate, install: install)
+        self?.relaunch(for: candidate)
       }
     case .proceed(let keepingAgentsRunning):
       decidedForUpdate = keepingAgentsRunning
       record(keepingAgentsRunning ? "keepRunning" : "stopAll", in: environment)
-      install()
+      updater.installReadyUpdate()
     case .ask(let question):
       guard let keepingAgentsRunning = ask(question, installing: candidate, in: environment) else {
         record("later", in: environment)
+        // Sparkle's window would otherwise wait on a relaunch nobody starts, and never close.
+        updater.setReadyUpdateAside()
         return
       }
       decidedForUpdate = keepingAgentsRunning
       record(keepingAgentsRunning ? "keepRunning" : "stopAll", in: environment)
-      install()
+      updater.installReadyUpdate()
     }
+  }
+
+  /// Quitting with a version set aside that cannot take back the running agents: stopping them is
+  /// the only way on, and it is asked. `false` is Cancel.
+  private func confirmStopping(for ready: UpdateCandidate) -> Bool {
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = String(
+      localized: "Vibe Manager \(ready.version) will be installed as Vibe Manager quits.",
+      comment: "The version about to be installed.")
+    alert.informativeText = String(
+      localized: """
+        It can't take back the running agents: they will be stopped, then resumed at the next \
+        launch where their conversation left off. The turn in progress is lost.
+        """)
+    alert.addButton(withTitle: String(localized: "Cancel"))
+    alert.addButton(withTitle: String(localized: "Stop All and Quit")).hasDestructiveAction = true
+    return alert.runModal() == .alertSecondButtonReturn
   }
 
   private func record(_ answer: DiagnosticToken, in environment: AppEnvironment) {

@@ -115,8 +115,13 @@ public protocol SoftwareUpdating: AnyObject {
   var lastCheck: Date? { get }
   /// A version a scheduled check found while the user was busy, not yet looked at.
   var waitingVersion: String? { get }
+  /// A version downloaded, whose installation the user put off: installed when the application
+  /// quits, or now through `offerReadyUpdate()`.
+  var readyToInstall: UpdateCandidate? { get }
   /// Looks now, and says what it found in a window, even that there is nothing new.
   func checkNow()
+  /// Asks again whether to install the version that is ready, and relaunch.
+  func offerReadyUpdate()
   /// Called whenever `canCheck`, `lastCheck` or `settings` changed on the updater's side.
   var onChange: (() -> Void)? { get set }
 }

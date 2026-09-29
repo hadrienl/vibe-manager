@@ -139,8 +139,12 @@ before relaunching (`shouldPostponeRelaunchForUpdate`), and `DecideUpdateRelaunc
 
 The answer is handed to the quit that follows, which does not ask again; everything after it is
 the quit as it was — templates, notes, the six-second deadline, `DetachForQuit` or `PrepareForQuit`.
-Later leaves the update downloaded: Sparkle installs it when the application next quits, after the
-usual question.
+Later closes Sparkle's window — left waiting on a relaunch nobody starts, it could not be closed —
+and keeps the version ready: the application menu offers **Install Vibe Manager 1.2.0 and
+Relaunch…**, which asks again, and Sparkle installs it anyway when the application next quits. If
+that version speaks another core of the host's protocol, that quit does not offer Keep Running
+either: **Vibe Manager 1.2.0 will be installed as Vibe Manager quits** — Stop All and Quit, or
+Cancel.
 
 ### After the relaunch
 
