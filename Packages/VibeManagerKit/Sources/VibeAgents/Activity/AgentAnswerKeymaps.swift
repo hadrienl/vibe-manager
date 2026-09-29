@@ -101,6 +101,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
 /// Codex's approval dialogs, as drawn by 0.157.1 (#40): `y` runs it once, `p` stops asking for
 /// commands that start the same way, `a` for the files of a patch; Escape refuses. Its questions
 /// are reported before they are drawn, and are answered in the terminal.
+///
+/// A tool of an MCP server is approved in another dialog, a form whose one field lists `Allow`
+/// first, then — only when the server allows it — `Allow for this session` and `Always allow`,
+/// then `Cancel`. It ignores `y`, which left the agent waiting on a request the card said was
+/// answered: a digit picks its option and submits the form, and `1` is always `Allow`.
 public struct CodexAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
@@ -118,7 +123,8 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
 
   public func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
     switch (answer, content) {
-    case (.allowOnce, .permission):
+    case (.allowOnce, .permission(let permission)):
+      if case .mcp = permission.tool { return [Array("1".utf8)] }
       return [Array("y".utf8)]
     case (.allowAlways, .permission(let permission)):
       return Self.alwaysKey(for: permission).map { [$0] }
