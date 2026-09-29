@@ -1,0 +1,216 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties" : false,
+  "description" : "A personal theme of the conversation view. Its file name is its identifier; every pair of colours a reader must read is also held to WCAG contrasts, which a schema cannot say.",
+  "properties" : {
+    "colors" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "accent" : {
+          "description" : "Accent: links, the active state, the send button, the agent's activity dot.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "addedBackground" : {
+          "description" : "Background of a line added in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "addedText" : {
+          "description" : "Text of a line added in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "background" : {
+          "description" : "Background of the whole conversation.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "border" : {
+          "description" : "Borders and separators.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "bubble" : {
+          "description" : "Background of the user's messages.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "bubbleBorder" : {
+          "default" : null,
+          "description" : "Border around the user's messages, only when the bubble is too close to the background to be told apart from it; null otherwise.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "bubbleText" : {
+          "description" : "Text of the user's messages.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "codeBackground" : {
+          "description" : "Background of code blocks and inline code.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "codeText" : {
+          "description" : "Plain text of code.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "comment" : {
+          "description" : "Syntax highlighting: comments.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "failure" : {
+          "description" : "Symbol of a tool call that failed, on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "function" : {
+          "description" : "Syntax highlighting: function names.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "keyword" : {
+          "description" : "Syntax highlighting: keywords.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "number" : {
+          "description" : "Syntax highlighting: number literals.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "onAccent" : {
+          "description" : "Text and symbols drawn on the accent.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "raised" : {
+          "description" : "Background of what is raised above the surface: menus, popovers.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "removedBackground" : {
+          "description" : "Background of a line removed in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "removedText" : {
+          "description" : "Text of a line removed in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "secondaryText" : {
+          "description" : "Secondary text — captions, times, hints — on the background and surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "string" : {
+          "description" : "Syntax highlighting: string literals.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "success" : {
+          "description" : "Symbol of a tool call that succeeded, on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "surface" : {
+          "description" : "Background of the rows of tool calls and of the cards drawn on the background.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "text" : {
+          "description" : "Main text, on the background and on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "type" : {
+          "description" : "Syntax highlighting: type names.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "warning" : {
+          "description" : "Symbol of a warning, on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "warningBackground" : {
+          "description" : "Background of a warning banner; its text is the main text colour.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "background",
+        "surface",
+        "raised",
+        "text",
+        "secondaryText",
+        "border",
+        "accent",
+        "onAccent",
+        "bubble",
+        "bubbleText",
+        "bubbleBorder",
+        "codeBackground",
+        "codeText",
+        "keyword",
+        "string",
+        "comment",
+        "number",
+        "type",
+        "function",
+        "addedBackground",
+        "addedText",
+        "removedBackground",
+        "removedText",
+        "success",
+        "failure",
+        "warning",
+        "warningBackground"
+      ],
+      "type" : "object"
+    },
+    "fontStyle" : {
+      "description" : "The family of the messages' font: the system's sans serif, a serif, or monospaced.",
+      "enum" : [
+        "system",
+        "serif",
+        "monospaced"
+      ],
+      "type" : "string"
+    },
+    "format" : {
+      "description" : "The version of the format.",
+      "enum" : [
+        1
+      ],
+      "type" : "integer"
+    },
+    "isDark" : {
+      "description" : "Whether the theme is dark.",
+      "type" : "boolean"
+    },
+    "name" : {
+      "description" : "The theme's name, in the user's language: a few evocative words, 40 characters at most.",
+      "maxLength" : 40,
+      "minLength" : 1,
+      "type" : "string"
+    }
+  },
+  "required" : [
+    "format",
+    "name",
+    "isDark",
+    "fontStyle",
+    "colors"
+  ],
+  "title" : "Vibe Manager conversation theme, format 1",
+  "type" : "object"
+}
