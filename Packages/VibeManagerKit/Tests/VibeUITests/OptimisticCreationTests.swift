@@ -392,6 +392,38 @@ struct NewSessionDraftTests {
     #expect(model.setAsideDrafts.first === second)
   }
 
+  @Test("The + of a group opens the draft on its folder and leaves the selection alone (#106)")
+  func groupButtonPreselectsItsFolder() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+    let group = SessionGroup(
+      id: SessionFolderKey(path: folder), folderName: "tmp", displayPath: folder,
+      sessions: [previous])
+
+    model.beginNewSession(in: group)
+
+    let draft = try #require(model.newSessionModel)
+    #expect(model.isPresentingNewSession)
+    #expect(model.selectedSessionID == previous.id)
+    await waitUntil("the group's folder is in the draft") {
+      draft.draft.workingDirectoryPath == folder
+    }
+  }
+
+  @Test("The + of a group whose folder is gone opens nothing")
+  func groupButtonOnAMissingFolder() async throws {
+    let model = await makeModel(sessions: [])
+    let group = SessionGroup(
+      id: SessionFolderKey(path: "/nowhere/gone"), folderName: "gone",
+      displayPath: "/nowhere/gone", isMissing: true, sessions: [])
+
+    model.beginNewSession(in: group)
+
+    #expect(model.newSessionModel == nil)
+    #expect(!model.isPresentingNewSession)
+  }
+
   @Test("A draft nothing was changed in takes the folder asked for")
   func pristineDraftTakesTheFolder() async throws {
     let model = await makeModel(sessions: [])

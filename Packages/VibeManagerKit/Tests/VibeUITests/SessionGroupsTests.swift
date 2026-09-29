@@ -82,6 +82,54 @@ struct SessionGroupStatusTests {
   }
 }
 
+@Suite("The + of a group's header (#106)")
+struct GroupNewSessionTests {
+  private func group(missing: Bool = false, folder: String? = "/work/api") -> SessionGroup {
+    SessionGroup(
+      id: folder.map { SessionFolderKey(path: $0) }, folderName: "api",
+      displayPath: folder ?? "", isMissing: missing, sessions: [WorkSession(name: "A")])
+  }
+
+  @Test("A group with a folder offers to start a session in it")
+  func enabled() {
+    #expect(
+      GroupNewSession.availability(for: group(), canCreateSession: true)
+        == .enabled(folder: "/work/api"))
+  }
+
+  @Test("No Folder and a header being renamed have no button")
+  func hidden() {
+    #expect(
+      GroupNewSession.availability(for: group(folder: nil), canCreateSession: true) == .hidden)
+    #expect(
+      GroupNewSession.availability(for: group(), canCreateSession: true, isRenaming: true)
+        == .hidden)
+  }
+
+  @Test("A folder not found, or no way to create a session, disables it and says why")
+  func disabled() {
+    #expect(
+      GroupNewSession.availability(for: group(missing: true), canCreateSession: true)
+        == .disabled(.folderMissing))
+    #expect(
+      GroupNewSession.availability(for: group(missing: true), canCreateSession: false)
+        == .disabled(.folderMissing))
+    #expect(
+      GroupNewSession.availability(for: group(), canCreateSession: false)
+        == .disabled(.creationUnavailable))
+  }
+
+  @Test("Its help tag names the group and its folder, in both languages")
+  func help() {
+    #expect(
+      Localization.string("New Session in “\("AIK")”\n\("~/work/aik")", module: "VibeUI", in: "fr")
+        == "Nouvelle session dans «\u{00A0}AIK\u{00A0}»\n~/work/aik")
+    #expect(
+      Localization.string("Folder not found: \("~/gone")", module: "VibeUI", in: "fr")
+        == "Dossier introuvable\u{00A0}: ~/gone")
+  }
+}
+
 /// A store that hands back what it was built with, newest first.
 private actor GroupsRepository: SessionRepository {
   private var stored: [WorkSession]
@@ -132,6 +180,20 @@ struct SidebarGroupsTests {
       folderLabels: InMemoryFolderLabelStore(labels: labels))
     await model.load()
     return model
+  }
+
+  @Test("Without agents to start, the + of a group opens nothing (#106)")
+  func groupButtonWithoutAgents() async throws {
+    let model = await makeModel()
+    // A folder that exists: the ones of the sessions above are reported missing once the disk
+    // has answered, which would win over the lack of agents.
+    let folder = FileManager.default.temporaryDirectory.path
+    let group = SessionGroup(
+      id: SessionFolderKey(path: folder), folderName: "tmp", displayPath: folder, sessions: [])
+
+    #expect(model.newSessionAvailability(in: group) == .disabled(.creationUnavailable))
+    model.beginNewSession(in: group)
+    #expect(model.newSessionModel == nil)
   }
 
   @Test("The grouped view lists the same sessions as the flat one, group by group")

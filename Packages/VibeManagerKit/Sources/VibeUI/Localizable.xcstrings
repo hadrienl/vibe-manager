@@ -6458,6 +6458,17 @@
         }
       }
     },
+    "Folder not found: %@" : {
+      "comment" : "The help tag of the + of a group whose folder was moved or deleted.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossier introuvable : %@"
+          }
+        }
+      }
+    },
     "Form to fill in" : {
       "comment" : "The title of a request of an agent: a form an MCP server asks for.",
       "localizations" : {
@@ -7863,6 +7874,17 @@
         }
       }
     },
+    "New Session in “%@”\n%@" : {
+      "comment" : "The help tag of the + of a group: its name, then its folder's path.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle session dans « %@ »\n%@"
+          }
+        }
+      }
+    },
     "New Tab" : {
       "localizations" : {
         "fr" : {
@@ -7948,6 +7970,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sans dossier"
+          }
+        }
+      }
+    },
+    "No agent available to create a session" : {
+      "comment" : "The help tag of the + of a group when no session can be created.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun agent disponible pour créer une session"
           }
         }
       }

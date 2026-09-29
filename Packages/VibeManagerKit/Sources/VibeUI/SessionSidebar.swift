@@ -219,24 +219,24 @@ struct SessionSidebar: View {
   /// dropped anywhere else in the system would mean.
   @ViewBuilder
   private func groupHeader(_ group: SessionGroup) -> some View {
-    let header = SessionGroupHeader(model: model, group: group)
-      .overlay(alignment: .top) {
-        if let folder = group.id, targetedGroup == folder, let draggedGroup,
-          draggedGroup != folder
-        {
-          Rectangle()
-            .fill(Color.accentColor)
-            .frame(height: 2)
-            .accessibilityHidden(true)
-        }
+    // Not `draggedGroup`: a header dropped out of the window leaves it behind.
+    let canMove = group.id != nil && model.canReorder
+    let header = SessionGroupHeader(
+      model: model, group: group, isDragging: targetedGroup != nil,
+      startDrag: canMove ? { startDragging(group) } : nil
+    )
+    .overlay(alignment: .top) {
+      if let folder = group.id, targetedGroup == folder, let draggedGroup,
+        draggedGroup != folder
+      {
+        Rectangle()
+          .fill(Color.accentColor)
+          .frame(height: 2)
+          .accessibilityHidden(true)
       }
-    if let folder = group.id, model.canReorder {
+    }
+    if let folder = group.id, canMove {
       header
-        .onDrag {
-          closeSwipe(animated: false)
-          draggedGroup = folder
-          return NSItemProvider(object: folder.path as NSString)
-        }
         .onDrop(
           of: [.text],
           delegate: GroupDropDelegate(
@@ -249,6 +249,13 @@ struct SessionSidebar: View {
     } else {
       header
     }
+  }
+
+  private func startDragging(_ group: SessionGroup) -> NSItemProvider {
+    guard let folder = group.id else { return NSItemProvider() }
+    closeSwipe(animated: false)
+    draggedGroup = folder
+    return NSItemProvider(object: folder.path as NSString)
   }
 
   /// The group dropped takes the place of the one it was dropped on: above it when it came from
