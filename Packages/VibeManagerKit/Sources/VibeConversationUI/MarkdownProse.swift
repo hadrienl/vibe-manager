@@ -289,6 +289,7 @@ struct MarkdownTextView: NSViewRepresentable {
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
   @Environment(\.openURL) private var openURL
+  @Environment(\.conversationLinks) private var links
 
   struct Input: Equatable {
     var blocks: [MarkdownBlock]
@@ -301,14 +302,20 @@ struct MarkdownTextView: NSViewRepresentable {
   final class Coordinator: NSObject, NSTextViewDelegate {
     var input: Input?
     var openURL: OpenURLAction?
+    var links: ConversationLinks?
 
     func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
       guard let url = link as? URL ?? (link as? String).flatMap(URL.init(string:)) else {
         return false
       }
-      // Only what the parser let through is a link; `openURL` is what SwiftUI's links used.
+      // Only what the parser let through is a link. The session's rule when there is one (#186),
+      // else `openURL`, which is what SwiftUI's links used.
       guard MarkdownDocument.safeLink(url.absoluteString) != nil else { return true }
-      openURL?(url)
+      if let links {
+        links.click(url)
+      } else {
+        openURL?(url)
+      }
       return true
     }
   }
@@ -323,6 +330,8 @@ struct MarkdownTextView: NSViewRepresentable {
 
   func updateNSView(_ view: ProseTextView, context: Context) {
     context.coordinator.openURL = openURL
+    context.coordinator.links = links
+    view.links = links
     view.markdown = markdown
     let size = appearance.textSize.pointSize
     let input = Input(
@@ -361,6 +370,8 @@ final class ProseTextView: NSTextView {
     didSet { if FocusedMarkdown.shared.holder == ObjectIdentifier(self) { claimFocus() } }
   }
   var quoteBarColor = NSColor.separatorColor
+  /// The session's rule for the menu of a link (#186).
+  var links: ConversationLinks?
 
   convenience init() {
     // TextKit 1: the quotes' bars are drawn from its layout manager.
@@ -476,6 +487,15 @@ final class ProseTextView: NSTextView {
 
   override func menu(for event: NSEvent) -> NSMenu? {
     let menu = super.menu(for: event) ?? NSMenu()
+    if let url = link(at: convert(event.locationInWindow, from: nil)) {
+      // A link's actions, the same everywhere (#186), in place of the text view's own.
+      for item in menu.items where LinkMenuItems.isTextViewLinkItem(item) {
+        menu.removeItem(item)
+      }
+      let items = LinkMenuItems.items(for: url, links: links)
+      for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
+      if menu.items.count > items.count { menu.insertItem(.separator(), at: items.count) }
+    }
     guard let markdown else { return menu }
     let item = NSMenuItem(
       title: String(localized: "Copy as Markdown", bundle: .module),
@@ -485,6 +505,24 @@ final class ProseTextView: NSTextView {
     let copyIndex = menu.items.firstIndex { $0.action == #selector(copy(_:)) }
     menu.insertItem(item, at: copyIndex.map { $0 + 1 } ?? 0)
     return menu
+  }
+
+  /// The link under a point of the view, if the parser let it through.
+  func link(at point: NSPoint) -> URL? {
+    guard let layoutManager, let textContainer, let textStorage, textStorage.length > 0 else {
+      return nil
+    }
+    let inContainer = NSPoint(
+      x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+    let glyph = layoutManager.glyphIndex(for: inContainer, in: textContainer)
+    let rect = layoutManager.boundingRect(
+      forGlyphRange: NSRange(location: glyph, length: 1), in: textContainer)
+    guard rect.contains(inContainer) else { return nil }
+    let index = layoutManager.characterIndexForGlyph(at: glyph)
+    guard index < textStorage.length else { return nil }
+    let value = textStorage.attribute(.link, at: index, effectiveRange: nil)
+    let url = value as? URL ?? (value as? String).flatMap(URL.init(string:))
+    return url.flatMap { MarkdownDocument.safeLink($0.absoluteString) }
   }
 
   @objc private func copyMarkdown(_ sender: NSMenuItem) {

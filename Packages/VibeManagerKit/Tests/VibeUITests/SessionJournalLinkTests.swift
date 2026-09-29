@@ -34,60 +34,63 @@ private func makeJournal(opener: FakeOpener) -> SessionJournalModel {
 @Suite("The links of the summary", .timeLimit(.minutes(2)))
 @MainActor
 struct SessionJournalLinkTests {
-  @Test("A link of the summary opens in the session's web view, not in the default browser")
-  func opensInWebView() async {
+  @Test("A link of the summary follows the session's rule, ⌥ read from the click (#186)")
+  func followsTheRule() async {
     let opener = FakeOpener()
     let journal = makeJournal(opener: opener)
     let session = SessionID()
-    var shown: [(URL, SessionID)] = []
-    journal.openInWebView = { url, id in
-      shown.append((url, id))
-      return true
-    }
+    var routed: [(URL, LinkGesture, SessionID)] = []
+    journal.route = { routed.append(($0, $1, $2)) }
     let url = URL(string: "https://github.com/o/r/pull/3")!
     journal.openLink(url, from: session)
-    #expect(shown.map(\.0) == [url])
-    #expect(shown.map(\.1) == [session])
+    journal.isOptionKeyDown = { true }
+    journal.openLink(url, from: session)
+    #expect(routed.map(\.0) == [url, url])
+    #expect(routed.map(\.1) == [.click(alternate: false), .click(alternate: true)])
+    #expect(routed.map(\.2) == [session, session])
     try? await Task.sleep(for: .milliseconds(50))
     #expect(opener.opened.isEmpty)
   }
 
-  @Test("Without a web view, the default browser shows the link")
+  @Test("Without the session's rule, the default browser shows the link")
   func fallsBackToBrowser() async {
     let opener = FakeOpener()
     let journal = makeJournal(opener: opener)
-    journal.openInWebView = { _, _ in false }
     journal.openLink(URL(string: "https://example.com/a")!, from: SessionID())
     await waitUntil("the first link is opened") { opener.opened == ["/a"] }
   }
 
-  @Test("Open in Browser keeps going to the default browser")
-  func openInBrowser() async {
-    let opener = FakeOpener()
-    let journal = makeJournal(opener: opener)
-    var shown = 0
-    journal.openInWebView = { _, _ in
-      shown += 1
-      return true
-    }
-    journal.openInBrowser(URL(string: "https://example.com/b")!)
-    await waitUntil("the second link is opened") { opener.opened == ["/b"] }
-    #expect(shown == 0)
+  @Test("A link's menu offers the web view only when the session has one, and says where")
+  func menuActions() {
+    let journal = makeJournal(opener: FakeOpener())
+    let session = SessionID()
+    let url = URL(string: "https://example.com/b")!
+    #expect(journal.linkActions(for: url, in: session) == [.openInExternalBrowser, .copy])
+    journal.hasWebView = { $0 == session }
+    #expect(
+      journal.linkActions(for: url, in: session) == [
+        .openInWebView, .openInNewTab, .openInExternalBrowser, .copy,
+      ])
+    var routed: [LinkGesture] = []
+    journal.route = { _, gesture, _ in routed.append(gesture) }
+    journal.perform(.openInExternalBrowser, on: url, from: session)
+    journal.perform(.openInNewTab, on: url, from: session)
+    journal.perform(.openInWebView, on: url, from: session)
+    #expect(routed == [.browser, .newTab, .webView])
   }
 
   @Test("A link that is not of the web opens nowhere")
   func refusesOtherSchemes() async {
     let opener = FakeOpener()
     let journal = makeJournal(opener: opener)
-    var shown = 0
-    journal.openInWebView = { _, _ in
-      shown += 1
-      return true
-    }
+    var routed = 0
+    journal.route = { _, _, _ in routed += 1 }
     journal.openLink(URL(string: "file:///Applications/Calculator.app")!, from: SessionID())
     journal.openLink(URL(string: "x-apple.systempreferences:com.apple")!, from: SessionID())
+    journal.openLink(URL(string: "mailto:a@example.com")!, from: SessionID())
     try? await Task.sleep(for: .milliseconds(50))
-    #expect(shown == 0)
+    #expect(routed == 0)
     #expect(opener.opened.isEmpty)
+    #expect(journal.linkActions(for: URL(string: "mailto:a@example.com")!, in: SessionID()) == [.copy])
   }
 }

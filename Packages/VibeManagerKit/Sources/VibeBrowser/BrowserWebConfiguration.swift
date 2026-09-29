@@ -12,6 +12,7 @@ import WebKit
 public final class BrowserWebConfiguration {
   private let dataStore: WKWebsiteDataStore
   private let agentWorld = WKContentWorld.world(name: PageScripts.agentWorldName)
+  private let linksWorld = WKContentWorld.world(name: PageScripts.linksWorldName)
   /// Where pages wait when no panel shows them: in a window, so that they keep laying out, running
   /// and answering a screenshot. Absent where there is no application to own a window (tests).
   private var parking: NSWindow?
@@ -26,7 +27,7 @@ public final class BrowserWebConfiguration {
     }
   }
 
-  func makeWebView() -> WKWebView {
+  func makeWebView() -> SessionWebView {
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = dataStore
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -37,7 +38,7 @@ public final class BrowserWebConfiguration {
     configuration.userContentController = makeContentController()
     // A web view the user browses with: it goes wherever they, or their agent, send it. What an
     // agent may do there is bounded by `BrowserActionPolicy` (ADR 0023), not by where it can go.
-    let webView = WKWebView(
+    let webView = SessionWebView(
       frame: NSRect(x: 0, y: 0, width: 1_024, height: 768), configuration: configuration)
     webView.allowsBackForwardNavigationGestures = true
     webView.allowsMagnification = true
@@ -60,7 +61,18 @@ public final class BrowserWebConfiguration {
       WKUserScript(
         source: PageScripts.agent, injectionTime: .atDocumentStart, forMainFrameOnly: true,
         in: agentWorld))
+    controller.addUserScript(
+      WKUserScript(
+        source: PageScripts.hoveredLink, injectionTime: .atDocumentEnd, forMainFrameOnly: false,
+        in: linksWorld))
     return controller
+  }
+
+  /// The link under the pointer reaches the view, from the links' world only (#186).
+  func attachHoveredLink(to webView: SessionWebView) {
+    webView.configuration.userContentController.add(
+      HoveredLinkHandler(webView: webView), contentWorld: linksWorld,
+      name: PageScripts.hoveredLinkHandlerName)
   }
 
   func attachConsole(to webView: WKWebView, handler: any WKScriptMessageHandler) {

@@ -83,9 +83,11 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// could be told "still running" about a process that had already exited.
   public var sessionDidClose: (@MainActor (SessionID, TerminalProcessState) -> Void)?
 
-  /// Told of an address ⌘-clicked in a session's terminal, and whether ⌥ was held (#69). Unset, it
-  /// opens in the default browser.
-  public var openLink: (@MainActor (SessionID, URL, _ alternate: Bool) -> Void)?
+  /// Told of an address clicked in a session's terminal, or chosen from its menu (#69, #186).
+  /// Unset, it opens in the default browser.
+  public var openLink: (@MainActor (SessionID, URL, LinkGesture) -> Void)?
+  /// Whether a session has a web view, for the menu of a link in its terminal (#186).
+  public var hasWebView: (@MainActor (SessionID) -> Bool)?
 
   /// Told of each agent process as soon as it is known — started, or adopted from the terminal
   /// host — so that what it is can be read before its number could be given to another (#69).
@@ -629,9 +631,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
         Task { await activity.userInput(id, bytes) }
       }
     }
-    pane.onOpenLink = { [weak self] url, alternate in
-      self?.openLink?(id, url, alternate)
+    pane.onOpenLink = { [weak self] url, gesture in
+      self?.openLink?(id, url, gesture)
     }
+    pane.hasWebView = { [weak self] in self?.hasWebView?(id) ?? false }
     panes[id] = pane
     return pane
   }

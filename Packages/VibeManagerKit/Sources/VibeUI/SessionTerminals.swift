@@ -118,6 +118,16 @@ struct DrawerDependencies {
   let sessionFolder: @MainActor (SessionID) async -> String?
   let viewportTimeout: Duration
   let timing: SessionTerminals.Timing
+  /// Where a link clicked in a side terminal goes: set by the workspace after assembly (#186).
+  let links: LinkOpener
+}
+
+/// Where the links of the side terminals go, set once the workspace is assembled (#186). Unset,
+/// they open in the default browser, as from any terminal.
+@MainActor
+final class LinkOpener {
+  var open: (@MainActor (SessionID, URL, LinkGesture) -> Void)?
+  var hasWebView: (@MainActor (SessionID) -> Bool)?
 }
 
 /// A session's drawer of side terminals: its tabs, which one is in front, whether it is shown and
@@ -602,6 +612,14 @@ public final class SessionTerminalDrawer {
       terminalID: id, supervisor: dependencies.supervisor, spec: nil,
       viewportTimeout: dependencies.viewportTimeout)
     let terminal = DrawerTerminal(id: id, pane: pane)
+    // Read at each click: the workspace can be connected after the drawer made its terminals.
+    let links = dependencies.links
+    let sessionID = self.sessionID
+    pane.onOpenLink = { url, gesture in
+      guard let open = links.open else { return TerminalPaneModel.openOutside(url) }
+      open(sessionID, url, gesture)
+    }
+    pane.hasWebView = { links.hasWebView?(sessionID) ?? false }
     pane.onReportedDirectory = { [weak self, weak terminal] path in
       guard let terminal, terminal.currentDirectory != path else { return }
       terminal.currentDirectory = path
@@ -787,8 +805,21 @@ public final class SessionTerminals: SessionSideTerminals {
     dependencies = DrawerDependencies(
       supervisor: supervisor, store: store, inspector: inspector, probe: probe,
       recorder: recorder, preferences: preferences, clock: clock, diagnostics: diagnostics,
-      sessionFolder: sessionFolder, viewportTimeout: viewportTimeout, timing: timing)
+      sessionFolder: sessionFolder, viewportTimeout: viewportTimeout, timing: timing,
+      links: LinkOpener())
     keepsScrollback = preferences.keepsScrollback
+  }
+
+  /// Where a link clicked in a side terminal goes (#186).
+  public var openLink: (@MainActor (SessionID, URL, LinkGesture) -> Void)? {
+    get { dependencies.links.open }
+    set { dependencies.links.open = newValue }
+  }
+
+  /// Whether a session has a web view, for the menu of a link in a side terminal (#186).
+  public var hasWebView: (@MainActor (SessionID) -> Bool)? {
+    get { dependencies.links.hasWebView }
+    set { dependencies.links.hasWebView = newValue }
   }
 
   /// The session's drawer, made at the first use. Nothing is read or started by asking.

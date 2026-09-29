@@ -117,6 +117,7 @@ struct MarkdownTableView: View {
         GridRow {
           ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
             Text(MarkdownDocument.attributed(cell, theme: theme, size: size, weight: .semibold))
+              .modifier(CellLinkMenu(cell: cell))
               .padding(.horizontal, 10)
               .padding(.vertical, 6)
           }
@@ -128,6 +129,7 @@ struct MarkdownTableView: View {
             ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
               Text(MarkdownDocument.attributed(cell, theme: theme, size: size))
                 .textSelection(.enabled)
+                .modifier(CellLinkMenu(cell: cell))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
             }
@@ -138,6 +140,39 @@ struct MarkdownTableView: View {
     }
     .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
     .overlay(RoundedRectangle(cornerRadius: theme.layout.innerRadius).stroke(theme.border.color))
+  }
+}
+
+/// A table's cell drawn by SwiftUI, whose links have no menu of their own: the cell's menu carries
+/// them (#186) — the actions of its one link, or one submenu per link. A cell without a link keeps
+/// the menu of its text.
+private struct CellLinkMenu: ViewModifier {
+  let cell: [InlineRun]
+
+  func body(content: Content) -> some View {
+    let urls = cell.compactMap(\.link).reduce(into: [URL]()) { urls, url in
+      if !urls.contains(url) { urls.append(url) }
+    }
+    if urls.isEmpty {
+      content
+    } else {
+      content.contextMenu {
+        if urls.count == 1 {
+          LinkMenuButtons(url: urls[0])
+        } else {
+          ForEach(urls, id: \.self) { url in
+            Menu(url.absoluteString) { LinkMenuButtons(url: url) }
+          }
+        }
+        Divider()
+        Button {
+          NSPasteboard.general.clearContents()
+          NSPasteboard.general.setString(cell.map(\.text).joined(), forType: .string)
+        } label: {
+          Text("Copy", bundle: .module)
+        }
+      }
+    }
   }
 }
 

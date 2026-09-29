@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import VibeApplication
@@ -48,9 +49,13 @@ public final class SessionJournalModel {
   @ObservationIgnored var showSettingsTab: (() -> Void)?
   /// The editor chosen in the settings, for Open in Editor.
   @ObservationIgnored var editor: EditorChoice?
-  /// Shows a page in the session's web view; false when it has none, and the default browser
-  /// shows it instead.
-  @ObservationIgnored var openInWebView: ((URL, SessionID) -> Bool)?
+  /// Opens a link of a session as every link of it is (#186): where Settings say, ⌥ doing the other,
+  /// or where its menu says. Unset, the default browser shows it.
+  @ObservationIgnored var route: ((URL, LinkGesture, SessionID) -> Void)?
+  /// Whether a session has a web view, for the menu of a link.
+  @ObservationIgnored var hasWebView: ((SessionID) -> Bool)?
+  /// Whether ⌥ is held, read when a link is clicked.
+  @ObservationIgnored var isOptionKeyDown: () -> Bool = { NSEvent.modifierFlags.contains(.option) }
   /// Told of every journal that arrives, for Open Quickly's index (#37).
   @ObservationIgnored var journalDidChange: ((SessionID, SessionJournal) -> Void)?
 
@@ -201,11 +206,29 @@ public final class SessionJournalModel {
     }
   }
 
-  /// In the session's web view, beside its terminal, when it has one.
+  /// A click on a link, or its row activated: where Settings say, ⌥ doing the other.
   func openLink(_ url: URL, from id: SessionID) {
+    openLink(url, from: id, gesture: .click(alternate: isOptionKeyDown()))
+  }
+
+  func openLink(_ url: URL, from id: SessionID, gesture: LinkGesture) {
     guard Self.isWeb(url) else { return }
-    if openInWebView?(url, id) == true { return }
-    openInBrowser(url)
+    guard let route else { return openInBrowser(url) }
+    route(url, gesture, id)
+  }
+
+  /// The actions of a link's menu, the same as everywhere else (#186).
+  func linkActions(for url: URL, in id: SessionID) -> [LinkMenuAction] {
+    guard Self.isWeb(url) else { return [.copy] }
+    return LinkMenuAction.actions(for: url, hasWebView: hasWebView?(id) ?? false)
+  }
+
+  func perform(_ action: LinkMenuAction, on url: URL, from id: SessionID) {
+    if let gesture = action.gesture {
+      openLink(url, from: id, gesture: gesture)
+    } else {
+      copy(url.absoluteString)
+    }
   }
 
   /// In the default browser, whatever the session has.

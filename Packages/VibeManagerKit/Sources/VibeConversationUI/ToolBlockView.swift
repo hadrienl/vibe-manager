@@ -258,15 +258,31 @@ struct ToolCallDetails: View {
             Text(Self.name(of: parameter.key))
               .font(theme.interfaceFont(size: size, weight: .medium))
               .foregroundStyle(theme.secondaryText.color)
-            Text(verbatim: parameter.value)
-              .font(theme.codeFont(size: size))
-              .foregroundStyle(theme.text.color)
-              .textSelection(.enabled)
-              .lineLimit(12)
+            if parameter.key == .url, let url = MarkdownDocument.safeLink(parameter.value) {
+              // The address a tool fetched, opened as any link of the conversation (#186).
+              Text(Self.link(url))
+                .font(theme.codeFont(size: size))
+                .tint(theme.accent.color)
+                .textSelection(.enabled)
+                .lineLimit(12)
+                .contextMenu { LinkMenuButtons(url: url) }
+            } else {
+              Text(verbatim: parameter.value)
+                .font(theme.codeFont(size: size))
+                .foregroundStyle(theme.text.color)
+                .textSelection(.enabled)
+                .lineLimit(12)
+            }
           }
         }
       }
     }
+  }
+
+  private static func link(_ url: URL) -> AttributedString {
+    var text = AttributedString(url.absoluteString)
+    text.link = url
+    return text
   }
 
   private func outputView(_ output: ToolOutput, size: Double) -> some View {

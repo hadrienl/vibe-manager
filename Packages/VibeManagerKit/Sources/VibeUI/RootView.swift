@@ -957,6 +957,7 @@ public struct RootView: View {
               appearance: model.conversations.appearance, isActive: isActive,
               claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation
             )
+            .conversationLinks(of: id, in: model)
             // The terminal's bar, and its button of the drawer, whichever form the session is
             // shown in.
             if let pane = model.pane(for: id) {
@@ -2281,5 +2282,24 @@ private struct PresentationPicker: View {
     .labelsHidden()
     .fixedSize()
     .help(Text("Switch between the conversation and the terminal (⌥⌘T)", bundle: .module))
+  }
+}
+
+extension View {
+  /// The conversation's links follow the session's rule (#186): its text views ask for them, and
+  /// the links SwiftUI draws — a table's cells, a tool's address — go through `openURL`.
+  func conversationLinks(of id: SessionID, in model: AppModel) -> some View {
+    let links = ConversationLinks(
+      open: { [weak model] url, gesture in model?.openLink(url, from: id, gesture: gesture) },
+      hasWebView: { [weak model] in model?.hasWebView(id) ?? false })
+    return
+      self
+      .environment(\.conversationLinks, links)
+      .environment(
+        \.openURL,
+        OpenURLAction { url in
+          links.click(url)
+          return .handled
+        })
   }
 }

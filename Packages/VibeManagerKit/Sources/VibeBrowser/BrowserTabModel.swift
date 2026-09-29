@@ -78,12 +78,17 @@ public final class BrowserTabModel: NSObject, Identifiable {
 
   /// Told when the address or the title changed, so the session can be kept.
   @ObservationIgnored var didChange: (@MainActor () -> Void)?
-  /// Asked when a page wants a new window: it becomes a tab of the same session.
-  @ObservationIgnored var openInNewTab: (@MainActor (URL, _ byAgent: Bool) -> Void)?
+  /// Asked when a page wants a new window, or the user a new tab (#186): it becomes a tab of the
+  /// same session, after this one, in front or behind.
+  @ObservationIgnored var openInNewTab: (@MainActor (URL, _ byAgent: Bool, _ activate: Bool) -> Void)?
   /// Given the web view WebKit made for a window a page opened — a sign-in pop-up — to show as a
   /// tab of the same session. It stays that page's opener's: the pop-up hands the sign-in back to
   /// it through `window.opener`, which a tab opened on the same address would not have.
-  @ObservationIgnored var openPopup: (@MainActor (WKWebView, URL, _ byAgent: Bool) -> Void)?
+  @ObservationIgnored var openPopup:
+    (@MainActor (WKWebView, URL, _ byAgent: Bool, _ activate: Bool) -> Void)?
+  /// The tab this one was opened from, while the user has not turned to another: the tabs it opens
+  /// line up after it in the order they were opened, as in a browser (#186).
+  @ObservationIgnored var openerID: BrowserTabID?
   /// Told when the page closes its own window, as a pop-up does once it is done.
   @ObservationIgnored var didCloseWindow: (@MainActor () -> Void)?
   /// Asked before a download or another application's address that an agent caused.
@@ -157,6 +162,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     webView.navigationDelegate = self
     webView.uiDelegate = self
     configuration.attachConsole(to: webView, handler: ConsoleMessageHandler(tab: self))
+    connectLinks(of: webView)
     self.webView = webView
     observe(webView)
     configuration.park(webView)
@@ -169,9 +175,23 @@ public final class BrowserTabModel: NSObject, Identifiable {
     webView.navigationDelegate = self
     webView.uiDelegate = self
     configuration.attachConsole(to: webView, handler: ConsoleMessageHandler(tab: self))
+    if let webView = webView as? SessionWebView { connectLinks(of: webView) }
     self.webView = webView
     observe(webView)
     configuration.park(webView)
+  }
+
+  /// A three-finger tap on a link, and the menu of one, open a tab behind this one or the external
+  /// browser (#186).
+  private func connectLinks(of webView: SessionWebView) {
+    configuration.attachHoveredLink(to: webView)
+    webView.openInBackgroundTab = { [weak self] url in
+      self?.openInNewTab?(url, false, false)
+    }
+    webView.openExternally = { url in
+      guard LinkRouting.isPage(url) else { return }
+      NSWorkspace.shared.open(url)
+    }
   }
 
   public func load(_ url: URL) {
@@ -431,6 +451,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
 
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
     committedURL = webView.url
+    (webView as? SessionWebView)?.hoveredLink = nil
     console.reset()
     stopRetrying()
   }
@@ -466,6 +487,21 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
   ) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
     guard let target = navigationAction.request.url, let scheme = target.scheme?.lowercased() else {
       return (.allow, preferences)
+    }
+    // ⌘-click, ⇧⌘-click and the middle button on a link: a new tab, as in a browser (#186). A link
+    // meant for a new window reaches `createWebViewWith` instead, which decides the same way.
+    // Only after a press of the user's with the same keys — a click the page's script dispatched
+    // carries keys too — and to a file only from a file.
+    if ["http", "https", "file"].contains(scheme), navigationAction.targetFrame != nil,
+      case .newTab(let activate) = BrowserLinkGesture.decide(
+        navigationAction, isAgentDriven: isAgentDriven),
+      let sessionView = webView as? SessionWebView,
+      sessionView.followsPress(
+        with: navigationAction.modifierFlags, now: ProcessInfo.processInfo.systemUptime),
+      BrowserLinkGesture.mayOpen(target, from: webView.url)
+    {
+      openInNewTab?(target, false, activate)
+      return (.cancel, preferences)
     }
     if ["http", "https", "file", "about", "blob", "data"].contains(scheme) {
       // `data:` and `blob:` are refused as a top-level destination by the agent's tools, but a
@@ -529,17 +565,26 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures
   ) -> WKWebView? {
     let target = navigationAction.request.url ?? URL(string: "about:blank")!
+    // A window a page opens comes to the front, unless the user ⌘-clicked the link that opens it.
+    let activate: Bool
+    if case .newTab(let inFront) = BrowserLinkGesture.decide(
+      navigationAction, isAgentDriven: isAgentDriven)
+    {
+      activate = inFront
+    } else {
+      activate = true
+    }
     guard let openPopup else {
-      openInNewTab?(target, isAgentDriven)
+      openInNewTab?(target, isAgentDriven, activate)
       return nil
     }
     // WebKit must be handed a view made with the configuration it gives: that is what ties the
     // pop-up to its opener. Its scripts are its own, so that its console reaches its own tab.
     configuration.userContentController = self.configuration.makeContentController()
-    let popup = WKWebView(frame: webView.bounds, configuration: configuration)
+    let popup = SessionWebView(frame: webView.bounds, configuration: configuration)
     popup.allowsBackForwardNavigationGestures = true
     popup.allowsMagnification = true
-    openPopup(popup, target, isAgentDriven)
+    openPopup(popup, target, isAgentDriven, activate)
     return popup
   }
 

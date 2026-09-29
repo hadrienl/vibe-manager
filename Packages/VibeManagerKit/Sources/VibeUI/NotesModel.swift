@@ -273,6 +273,13 @@ public final class NotesModel {
   @ObservationIgnored private let sleep: NotesSleep
   @ObservationIgnored private let now: @MainActor () -> Date
   @ObservationIgnored let opener: (any FileOpening)?
+  /// Opens a web or mail link of a session's notes as every link of the session is (#186). Unset,
+  /// the default browser shows it.
+  @ObservationIgnored var route: ((URL, LinkGesture, SessionID) -> Void)?
+  /// Whether a session has a web view, for the menu of a link.
+  @ObservationIgnored var hasWebView: ((SessionID) -> Bool)?
+  /// Whether ⌥ is held, read when a link is clicked.
+  @ObservationIgnored var isOptionKeyDown: () -> Bool = { NSEvent.modifierFlags.contains(.option) }
   @ObservationIgnored private let fileLocation: (@Sendable (SessionID) -> URL)?
 
   init(
@@ -404,12 +411,20 @@ public final class NotesModel {
     wantsFocus = false
   }
 
-  /// Opens a link clicked in the notes. A file is revealed rather than opened: a click in a note
-  /// must not launch whatever a document happens to be associated with.
-  func openLink(_ url: URL) {
+  /// Opens a link clicked in a session's notes. A file is revealed rather than opened: a click in a
+  /// note must not launch whatever a document happens to be associated with.
+  func openLink(_ url: URL, in id: SessionID) {
+    openLink(url, in: id, gesture: .click(alternate: isOptionKeyDown()))
+  }
+
+  func openLink(_ url: URL, in id: SessionID, gesture: LinkGesture) {
     guard NotesLinks.isAllowed(url) else { return }
     if url.isFileURL {
       reveal(url)
+      return
+    }
+    if let route {
+      route(url, gesture, id)
       return
     }
     guard let opener else {
@@ -417,6 +432,24 @@ public final class NotesModel {
       return
     }
     Task { _ = await opener.open(url, with: .defaultApplication) }
+  }
+}
+
+extension NotesModel {
+  /// The actions of a link's menu, as every link has them (#186); none for a file, which a click
+  /// reveals.
+  func linkActions(for url: URL, in id: SessionID) -> [LinkMenuAction] {
+    guard NotesLinks.isAllowed(url), !url.isFileURL else { return [] }
+    return LinkMenuAction.actions(for: url, hasWebView: hasWebView?(id) ?? false)
+  }
+
+  func perform(_ action: LinkMenuAction, on url: URL, in id: SessionID) {
+    if let gesture = action.gesture {
+      openLink(url, in: id, gesture: gesture)
+    } else {
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(url.absoluteString, forType: .string)
+    }
   }
 }
 

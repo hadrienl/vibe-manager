@@ -781,6 +781,17 @@
         }
       }
     },
+    "Copy Link" : {
+      "comment" : "A link's menu.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier le lien"
+          }
+        }
+      }
+    },
     "Create a new session in the folder you want to work in." : {
       "localizations" : {
         "fr" : {
@@ -1178,6 +1189,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rouvrez « Changer d’agent » pour revoir ce qui sera transmis."
+          }
+        }
+      }
+    },
+    "Open in a New Tab" : {
+      "comment" : "A link's menu.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans un nouvel onglet"
+          }
+        }
+      }
+    },
+    "Open in the External Browser" : {
+      "comment" : "A link's menu.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans le navigateur externe"
+          }
+        }
+      }
+    },
+    "Open in the Web View" : {
+      "comment" : "A link's menu.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans la vue web"
           }
         }
       }
