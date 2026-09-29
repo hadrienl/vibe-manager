@@ -63,15 +63,20 @@ struct ComposerHistoryKeysTests {
       for _ in 0..<5 { await Task.yield() }
     }
 
+    /// An arrow as the keyboard sends it: flagged as a function key of the numeric pad, which
+    /// SwiftUI reports among the modifiers.
     func up(_ modifiers: NSEvent.ModifierFlags = []) async {
-      await press(126, NSUpArrowFunctionKey, modifiers: modifiers)
+      await press(126, NSUpArrowFunctionKey, modifiers: modifiers.union([.numericPad, .function]))
     }
-    func down() async { await press(125, NSDownArrowFunctionKey) }
+    func down() async {
+      await press(125, NSDownArrowFunctionKey, modifiers: [.numericPad, .function])
+    }
     func escape() async { await press(53, 0x1B) }
 
     /// Waits for a state, never for a delay: a runner may stall for seconds.
     func until(_ condition: @escaping () -> Bool) async {
-      while !condition() { await Task.yield() }
+      // Cancelled by the time limit: the test fails then, rather than spinning on.
+      while !condition(), !Task.isCancelled { await Task.yield() }
     }
 
     var cursor: Int { textView.selectedRange().location }

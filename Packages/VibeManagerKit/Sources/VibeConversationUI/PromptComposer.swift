@@ -63,7 +63,10 @@ struct PromptComposer: View {
           // with a modifier, over a selection or while an input method composes, they move the
           // cursor as always (#123).
           .onKeyPress(keys: [.upArrow, .downArrow], phases: .down) { press in
-            guard press.modifiers.isEmpty, !Self.isComposingText,
+            // An arrow comes flagged as a function key of the numeric pad: only the modifiers the
+            // user holds count.
+            guard press.modifiers.isDisjoint(with: [.shift, .command, .option, .control]),
+              !Self.isComposingText,
               let caret = ComposerCaret.current(showing: model.draft)
             else { return .ignored }
             let recalled =
