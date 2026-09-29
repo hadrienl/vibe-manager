@@ -102,6 +102,16 @@ private func pictured(prompt: String? = "blurred pines", url: String? = nil) -> 
   return theme
 }
 
+/// Fonts that could not be fetched when the theme was made, and can now.
+private actor LateFonts: ThemeFontResolving {
+  private(set) var asked: [String] = []
+
+  func prepare(_ family: String) async -> FontAvailability {
+    asked.append(family)
+    return .available
+  }
+}
+
 @MainActor
 private final class Fixture {
   let agent: ThemeAgent
@@ -112,6 +122,7 @@ private final class Fixture {
 
   let images: InMemoryThemeImageStore
   let painter: Painter
+  let fonts = LateFonts()
 
   init(
     _ answers: [ThemeAgent.Answer] = [], themes: [ConversationTheme] = [],
@@ -126,7 +137,7 @@ private final class Fixture {
     library = InMemoryConversationThemeLibrary(themes: themes)
     model = ConversationThemesModel(
       library: library, generators: agents ? Agents(generators: [("Claude Code", agent)]) : nil,
-      images: images, pictureAgents: painter,
+      fonts: fonts, images: images, pictureAgents: painter,
       diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()), language: "fr-FR")
     model.announce = { [unowned self] in spoken.append(String(localized: $0)) }
   }
@@ -249,6 +260,16 @@ struct ConversationThemesModelTests {
       ConversationAppearance(darkTheme: present.id), isDark: true, increasedContrast: false)
     #expect(theme.messageFontFamily == "Menlo")
     #expect(theme.codeFontFamily == nil)
+  }
+
+  @Test("A family missing when the theme was made is asked for again when the themes are read")
+  func lateFonts() async throws {
+    var theme = ConversationThemeLibraryRules.kept(.night, name: "Hors ligne")
+    theme.fonts = ConversationTheme.Fonts(message: "Zz Later Sans", code: "Menlo")
+    let fixture = Fixture(themes: [theme])
+    await fixture.model.load()
+    try await fixture.until { fixture.model.fontsGeneration == 1 }
+    #expect(await fixture.fonts.asked == ["Zz Later Sans"])
   }
 
   @Test("Saving keeps the theme, gives it to the mode it was made for, and folds the panel")

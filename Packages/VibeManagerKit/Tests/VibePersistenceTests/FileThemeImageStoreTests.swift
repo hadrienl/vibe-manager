@@ -84,6 +84,12 @@ struct FileThemeImageStoreTests {
     await #expect(throws: ThemeImageError.unreachable) {
       try await store.fetch(URL(fileURLWithPath: "/etc/hosts"))
     }
+    let huge = FileThemeImageStore(directory: directory) { _ in
+      (Data(count: FileThemeImageStore.maximumDownload + 1), 200)
+    }
+    await #expect(throws: ThemeImageError.tooLarge) {
+      try await huge.fetch(URL(string: "https://example.com/huge.png")!)
+    }
   }
 
   @Test("A theme read finds its picture, and its export carries it")

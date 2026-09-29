@@ -112,6 +112,9 @@ public final class ConversationThemesModel {
   /// Whether the picture of the version on trial is being fetched or drawn: the version is on
   /// trial meanwhile, without it.
   public private(set) var isMakingPicture = false
+  /// Changes when a family was fetched after the themes were read: what draws with them is drawn
+  /// again.
+  public private(set) var fontsGeneration = 0
   public private(set) var problem: Problem?
   /// The last theme saved, until something else happens: what the confirmation under the grid
   /// says.
@@ -175,6 +178,7 @@ public final class ConversationThemesModel {
   public func displayed(
     _ appearance: ConversationAppearance, isDark: Bool, increasedContrast: Bool
   ) -> ConversationTheme {
+    _ = fontsGeneration
     var theme: ConversationTheme
     if let trial {
       var own = appearance
@@ -203,8 +207,26 @@ public final class ConversationThemesModel {
   /// Reads the library again: when the tab appears, and after each change.
   public func load() async {
     let contents = await library.load()
+    ConversationFonts.familiesDidChange()
     personal = contents.themes
     loadProblems = contents.problems
+    fetchMissingFonts()
+  }
+
+  /// Asks again for the families the themes kept could not have when they were made — Google out
+  /// of reach then —, and draws them once they are there.
+  private func fetchMissingFonts() {
+    guard let fonts else { return }
+    let families = Set(personal.flatMap { [$0.fonts.message, $0.fonts.code] }.compactMap { $0 })
+    let missing = families.filter { !ConversationFonts.isInstalled($0) }.sorted()
+    guard !missing.isEmpty else { return }
+    Task { [weak self] in
+      var found = false
+      for family in missing where await fonts.prepare(family) == .available { found = true }
+      guard found, let self else { return }
+      ConversationFonts.familiesDidChange()
+      self.fontsGeneration += 1
+    }
   }
 
   /// Asks which agents can make a theme now: each time the panel unfolds, and when asked again.
@@ -376,6 +398,8 @@ public final class ConversationThemesModel {
     switch result {
     case .success(let theme):
       outcome = currentRun == run ? .applied : .cancelled
+      // Its families were fetched and activated while it was checked.
+      ConversationFonts.familiesDidChange()
       if currentRun == run {
         versions.append(Version(request: description, agentName: agent, theme: theme))
         prompt = ""

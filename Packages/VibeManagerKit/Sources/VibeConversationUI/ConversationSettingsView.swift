@@ -27,9 +27,19 @@ public enum ConversationFonts {
     if ["SF Pro", "SF Mono", "New York"].contains(family) { return true }
     if NSFontManager.shared.availableFontFamilies.contains(family) { return true }
     // A family a theme fetched is active for this process only, and `NSFontManager` keeps the
-    // list it read first: CoreText sees it (#118).
-    let active = CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []
-    return active.contains(family)
+    // list it read first: CoreText sees it (#118). Its list is read once, and again only when a
+    // family was activated since: this is asked at every drawing of a conversation.
+    if activeFamilies == nil {
+      activeFamilies = Set(CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? [])
+    }
+    return activeFamilies?.contains(family) ?? false
+  }
+
+  @MainActor private static var activeFamilies: Set<String>?
+
+  /// Families were activated: the next question reads CoreText's list again.
+  @MainActor public static func familiesDidChange() {
+    activeFamilies = nil
   }
 
   /// The appearance with every font that is no longer installed given back to the theme.

@@ -37,13 +37,25 @@ public struct FileThemeImageStore: ThemeImageStoring {
     self.fetchData = fetch
   }
 
+  /// Reads the answer as it comes, and stops past `maximumDownload`: a link to a file of several
+  /// gigabytes is refused before it fills the memory.
   public static let urlSession: Fetch = { url in
     let request = URLRequest(
       url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (bytes, response) = try await URLSession.shared.bytes(for: request)
     // A redirection elsewhere than https is not followed into: the final address is checked.
     guard response.url?.scheme?.lowercased() == "https" else { return (Data(), 0) }
-    return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard status == 200 else { return (Data(), status) }
+    guard response.expectedContentLength <= Int64(maximumDownload) else {
+      throw ThemeImageError.tooLarge
+    }
+    var data = Data()
+    for try await byte in bytes {
+      data.append(byte)
+      if data.count > maximumDownload { throw ThemeImageError.tooLarge }
+    }
+    return (data, status)
   }
 
   public func fetch(_ url: URL) async throws -> String {
@@ -55,6 +67,9 @@ public struct FileThemeImageStore: ThemeImageStoring {
       let (body, status) = try await fetchData(url)
       guard status == 200, !body.isEmpty else { throw ThemeImageError.unreachable }
       data = body
+    } catch ThemeImageError.tooLarge {
+      diagnostics.record(.store, .notice, "theme.imageTooLarge")
+      throw ThemeImageError.tooLarge
     } catch let error as ThemeImageError {
       diagnostics.record(.store, .notice, "theme.imageUnreachable")
       throw error
