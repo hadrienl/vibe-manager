@@ -38,7 +38,7 @@ struct PromptComposer: View {
             .padding(.leading, 5)
             .allowsHitTesting(false)
         }
-        TextEditor(text: $model.draft)
+        ReplaceableTextEditor(text: $model.draft)
           .font(theme.messageFont(size: size))
           .foregroundStyle(theme.text.color)
           .scrollContentBackground(.hidden)
@@ -51,7 +51,8 @@ struct PromptComposer: View {
           .accessibilityLabel(
             state == .answeringQuestion
               ? Text("Other answer to \(model.agentName)", bundle: .module)
-              : Text("Message to \(model.agentName)", bundle: .module))
+              : Text("Message to \(model.agentName)", bundle: .module)
+          )
           .onKeyPress(.return, phases: .down) { press in
             guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option),
               !Self.isComposingText

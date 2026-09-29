@@ -79,6 +79,51 @@ struct PromptTextEditorTests {
     #expect(abs(thirty - PromptTextStyle.height(forLines: 10)) <= 2)
   }
 
+  @Observable final class Draft {
+    var text = ""
+  }
+
+  private struct DraftHost: View {
+    let draft: Draft
+
+    var body: some View {
+      @Bindable var draft = draft
+      PromptTextEditor(text: $draft.text, accessibilityLabel: "Prompt")
+    }
+  }
+
+  @Test("A text replaced from outside leaves nothing for ⌘Z to undo")
+  func replacedTextDropsUndo() async throws {
+    let draft = Draft()
+    let host = NSHostingView(rootView: DraftHost(draft: draft).frame(width: 300))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+      styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer {
+      window.contentView = nil
+      window.close()
+    }
+    host.layoutSubtreeIfNeeded()
+    let textView = try #require(Self.textView(in: host))
+    window.makeFirstResponder(textView)
+    let undoManager = try #require(textView.undoManager)
+    undoManager.groupsByEvent = false
+    undoManager.beginUndoGrouping()
+    textView.insertText("a template filled in", replacementRange: textView.selectedRange())
+    textView.breakUndoCoalescing()
+    undoManager.endUndoGrouping()
+    #expect(draft.text == "a template filled in")
+    #expect(undoManager.canUndo)
+    draft.text = ""
+    while !textView.string.isEmpty {
+      host.layoutSubtreeIfNeeded()
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(!undoManager.canUndo)
+  }
+
   @Test("A line that wraps counts as the lines it takes on screen")
   func wrappedLinesCount() async throws {
     let long = String(repeating: "word ", count: 60)
