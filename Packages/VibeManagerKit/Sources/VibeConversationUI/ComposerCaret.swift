@@ -12,8 +12,7 @@ struct ComposerCaret: Hashable {
 
   /// The composer's text view, when it has the keyboard and shows `draft`.
   @MainActor static func current(showing draft: String) -> ComposerCaret? {
-    guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
-      textView.string == draft
+    guard let textView = PromptComposer.focusedTextView(), textView.string == draft
     else { return nil }
     return ComposerCaret(textView: textView)
   }

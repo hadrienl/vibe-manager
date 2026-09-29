@@ -59,7 +59,27 @@ struct PromptComposer: View {
             Task { await model.send() }
             return .handled
           }
+          // ↑ and ↓ recall the messages sent, from the first and the last line only: elsewhere,
+          // with a modifier, over a selection or while an input method composes, they move the
+          // cursor as always (#123).
+          .onKeyPress(keys: [.upArrow, .downArrow], phases: .down) { press in
+            guard press.modifiers.isEmpty, !Self.isComposingText,
+              let caret = ComposerCaret.current(showing: model.draft)
+            else { return .ignored }
+            let recalled =
+              press.key == .upArrow
+              ? caret.isOnFirstLine && model.recallOlderPrompt()
+              : caret.isOnLastLine && model.recallNewerPrompt()
+            guard recalled else { return .ignored }
+            Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+            return .handled
+          }
           .onKeyPress(.escape) {
+            // A message recalled is put back first: the draft, then the agent.
+            if !Self.isComposingText, model.cancelPromptRecall() {
+              Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+              return .handled
+            }
             guard model.isAgentWorking else { return .ignored }
             Task { await model.interrupt() }
             return .handled
@@ -142,7 +162,7 @@ struct PromptComposer: View {
 
   /// Back in a draft, the user carries on where it ends — not at its first letter.
   @MainActor static func placeCursorAtEnd(of draft: String) {
-    guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+    guard let textView = focusedTextView(),
       textView.string == draft
     else { return }
     let end = NSRange(location: (textView.string as NSString).length, length: 0)
@@ -153,7 +173,13 @@ struct PromptComposer: View {
   /// An input method — Japanese, Chinese — is still composing: Return confirms its text, and
   /// must not send the prompt.
   @MainActor static var isComposingText: Bool {
-    (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() ?? false
+    focusedTextView()?.hasMarkedText() ?? false
+  }
+
+  /// The text view that has the keyboard: the composer's, when it is typed into. Replaced by the
+  /// tests, whose window is never on screen and so never the key window.
+  @MainActor static var focusedTextView: () -> NSTextView? = {
+    NSApp.keyWindow?.firstResponder as? NSTextView
   }
 
   @ViewBuilder
