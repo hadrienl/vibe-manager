@@ -18,7 +18,8 @@ public final class ConversationThemesModel {
     public let id = UUID()
     public let request: String
     public let agentName: String
-    public let theme: ConversationTheme
+    /// Its picture comes in later than its colours: it is set then.
+    public internal(set) var theme: ConversationTheme
   }
 
   /// Why the last thing asked did not happen. The theme on screen is untouched.
@@ -30,6 +31,11 @@ public final class ConversationThemesModel {
     case couldNotSave
     case couldNotDelete
     case couldNotExport
+    /// The address of the picture could not be fetched, or was not a picture.
+    case pictureUnreachable
+    /// No agent available can draw the picture.
+    case noPictureAgent
+    case pictureFailed(agent: String)
 
     public var message: LocalizedStringResource {
       switch self {
@@ -59,6 +65,18 @@ public final class ConversationThemesModel {
         LocalizedStringResource("The theme could not be deleted.", bundle: .module)
       case .couldNotExport:
         LocalizedStringResource("The theme could not be exported.", bundle: .module)
+      case .pictureUnreachable:
+        LocalizedStringResource(
+          "The picture could not be fetched from its address: the theme is on trial without it.",
+          bundle: .module)
+      case .noPictureAgent:
+        LocalizedStringResource(
+          "No agent available can draw the picture: the theme is on trial without it. Codex draws pictures.",
+          bundle: .module)
+      case .pictureFailed(let agent):
+        LocalizedStringResource(
+          "\(agent) could not draw the picture: the theme is on trial without it.",
+          bundle: .module)
       }
     }
   }
@@ -91,6 +109,9 @@ public final class ConversationThemesModel {
   public private(set) var generatingAgent: String?
   /// Whether the agent's first answer was refused and it is asked again.
   public private(set) var isRetrying = false
+  /// Whether the picture of the version on trial is being fetched or drawn: the version is on
+  /// trial meanwhile, without it.
+  public private(set) var isMakingPicture = false
   public private(set) var problem: Problem?
   /// The last theme saved, until something else happens: what the confirmation under the grid
   /// says.
@@ -108,6 +129,9 @@ public final class ConversationThemesModel {
   @ObservationIgnored private let library: any ConversationThemeLibrary
   @ObservationIgnored private let generators: (any ThemeGeneratorResolving)?
   @ObservationIgnored private let fonts: (any ThemeFontResolving)?
+  @ObservationIgnored private let images: (any ThemeImageStoring)?
+  /// The agents that draw — Codex —, asked for the pictures described.
+  @ObservationIgnored private let pictureAgents: (any AvatarGeneratorResolving)?
   @ObservationIgnored private let diagnostics: Diagnostics
   @ObservationIgnored private let language: String
   @ObservationIgnored private(set) var task: Task<Void, Never>?
@@ -119,12 +143,15 @@ public final class ConversationThemesModel {
   public init(
     library: any ConversationThemeLibrary = InMemoryConversationThemeLibrary(),
     generators: (any ThemeGeneratorResolving)? = nil, fonts: (any ThemeFontResolving)? = nil,
-    diagnostics: Diagnostics = .disabled,
+    images: (any ThemeImageStoring)? = nil,
+    pictureAgents: (any AvatarGeneratorResolving)? = nil, diagnostics: Diagnostics = .disabled,
     language: String = Locale.preferredLanguages.first ?? "en"
   ) {
     self.library = library
     self.generators = generators
     self.fonts = fonts
+    self.images = images
+    self.pictureAgents = pictureAgents
     self.diagnostics = diagnostics
     self.language = language
   }
@@ -132,7 +159,7 @@ public final class ConversationThemesModel {
   /// The version on trial: the last one, while the panel is unfolded.
   public var trial: ConversationTheme? { isOpen ? versions.last?.theme : nil }
 
-  public var isGenerating: Bool { generatingAgent != nil }
+  public var isGenerating: Bool { generatingAgent != nil || isMakingPicture }
 
   /// Whether this build can make themes at all: a workspace assembled without agents cannot.
   public var canCreate: Bool { generators != nil }
@@ -268,10 +295,69 @@ public final class ConversationThemesModel {
       } catch {
         result = .failure(error)
       }
-      self?.finish(
+      guard let self else { return }
+      let picture = self.needsPicture(result)
+      self.finish(
         run: run, description: description, agent: agent, result: result,
-        attempts: attempts.count, duration: ContinuousClock.now - started)
+        attempts: attempts.count, duration: ContinuousClock.now - started, continues: picture)
+      if picture, case .success(let theme) = result { await self.makePicture(of: theme, run: run) }
     }
+  }
+
+  /// Whether a theme generated asks for a picture it does not have yet.
+  private func needsPicture(_ result: Result<ConversationTheme, any Error>) -> Bool {
+    guard images != nil, case .success(let theme) = result else { return false }
+    return theme.backdrop.image == nil
+      && (theme.backdrop.imageURL != nil || theme.backdrop.imagePrompt != nil)
+  }
+
+  /// Fetches the picture at the address the user gave, or has one drawn, and gives it to the
+  /// version on trial. Stopped — cancelled, the panel folded — nothing is changed.
+  private func makePicture(of theme: ConversationTheme, run: UUID) async {
+    guard let images, currentRun == run else { return }
+    isMakingPicture = true
+    var name: String?
+    var failure: Problem?
+    if let address = theme.backdrop.imageURL, let url = URL(string: address) {
+      generatingAgent = nil
+      announce(LocalizedStringResource("The picture is being fetched.", bundle: .module))
+      do {
+        name = try await images.fetch(url)
+      } catch {
+        failure = .pictureUnreachable
+      }
+    } else if let description = theme.backdrop.imagePrompt {
+      let option = await pictureAgents?.options().first { $0.unavailability == nil }
+      if let option, let generator = option.generator {
+        let agent = option.descriptor.displayName
+        generatingAgent = agent
+        announce(LocalizedStringResource("\(agent) is drawing the picture.", bundle: .module))
+        do {
+          let data = try await generator.generate(
+            AvatarGenerationRequest(
+              prompt: ThemeInstructions.backdropImagePrompt(description, isDark: theme.isDark)))
+          name = try await images.keep(data)
+        } catch {
+          failure = .pictureFailed(agent: agent)
+        }
+      } else {
+        failure = .noPictureAgent
+      }
+    }
+    guard currentRun == run else { return }
+    if let name, let index = versions.lastIndex(where: { $0.theme.id == theme.id }) {
+      versions[index].theme.backdrop.image = name
+      versions[index].theme.backdrop.localImage = images.location(of: name)
+      announce(LocalizedStringResource("The picture is on trial.", bundle: .module))
+    }
+    if let failure {
+      problem = failure
+      announce(failure.message)
+    }
+    currentRun = nil
+    generatingAgent = nil
+    isMakingPicture = false
+    task = nil
   }
 
   private func hear(_ event: GenerateConversationTheme.Event, run: UUID) {
@@ -284,7 +370,7 @@ public final class ConversationThemesModel {
 
   private func finish(
     run: UUID, description: String, agent: String, result: Result<ConversationTheme, any Error>,
-    attempts: Int, duration: Duration
+    attempts: Int, duration: Duration, continues: Bool = false
   ) {
     let outcome: Outcome
     switch result {
@@ -317,9 +403,11 @@ public final class ConversationThemesModel {
         "duration": .duration(duration), "descriptionLength": .count(description.count),
       ])
     guard currentRun == run else { return }
+    isRetrying = false
+    // The picture comes next: the generation is not over, and nothing is saved meanwhile.
+    guard !continues else { return }
     currentRun = nil
     generatingAgent = nil
-    isRetrying = false
     task = nil
   }
 
@@ -345,6 +433,7 @@ public final class ConversationThemesModel {
     currentRun = nil
     generatingAgent = nil
     isRetrying = false
+    isMakingPicture = false
   }
 
   /// Back to the version before the last, the request that made the last one given back to be

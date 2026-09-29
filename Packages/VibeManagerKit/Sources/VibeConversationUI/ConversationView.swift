@@ -58,7 +58,8 @@ public struct ConversationView: View {
       // one (#105).
       if showsComposer { footer }
     }
-    .background(theme.background.color)
+    // The theme's picture, when it has one, stays where it is while the messages scroll (#118).
+    .background(ThemeBackdropView(theme: theme))
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)
@@ -205,6 +206,8 @@ public struct ConversationView: View {
     .padding(.horizontal, layout.sideMargin)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity)
+    // Behind the messages only: the composer keeps the plain background.
+    .background(theme.backdrop.area == .messages ? theme.background.color : .clear)
   }
 
   @ViewBuilder

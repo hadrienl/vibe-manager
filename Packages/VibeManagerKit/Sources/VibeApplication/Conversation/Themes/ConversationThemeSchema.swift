@@ -1,7 +1,7 @@
 import Foundation
 
 /// The JSON schema of a theme's file (#118): what documents the format in the repository
-/// (`docs/schemas/conversation-theme-2.schema.json`, held equal to `document` by a test), and what
+/// (`docs/schemas/conversation-theme-3.schema.json`, held equal to `document` by a test), and what
 /// an agent's answer is held to.
 public enum ConversationThemeSchema {
   /// What each colour is for, as the agent is told.
@@ -74,6 +74,29 @@ public enum ConversationThemeSchema {
     }
   }
 
+  /// What each key of the backdrop is, as the agent is told.
+  static func purpose(of key: ConversationThemeFile.BackdropKey) -> String {
+    switch key {
+    case .image:
+      "Set by the application: the name of the picture it kept. Never given by an agent."
+    case .imageURL:
+      "An https address of a picture that the user wrote in their description, copied exactly; "
+        + "the application downloads it. null otherwise: never make an address up."
+    case .imagePrompt:
+      "When the user wants a picture behind the conversation and gave no address: what it shows, "
+        + "in English, for an image generation model — subject, mood, colours, blur, landscape "
+        + "16:10, no text. null for no picture, or when imageURL is given."
+    case .veil:
+      "How much of colors.background covers the picture, from 0 (the picture as it is) to 1 "
+        + "(hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable."
+    case .blur:
+      "How blurred the picture is, in points, from 0 to 40."
+    case .area:
+      "\"conversation\": behind the messages and the composer; \"messages\": behind the "
+        + "messages only."
+    }
+  }
+
   /// The schema of the file, as the repository documents it.
   public static var document: String {
     render(
@@ -136,6 +159,30 @@ public enum ConversationThemeSchema {
       }
       layout[key.rawValue] = property
     }
+    var backdrop: [String: Any] = [:]
+    for key in ConversationThemeFile.BackdropKey.allCases where !(forAgent && key == .image) {
+      var property: [String: Any] = ["description": purpose(of: key)]
+      switch key {
+      case .image, .imageURL, .imagePrompt:
+        property["type"] = ["string", "null"] as [Any]
+      case .veil, .blur:
+        property["type"] = "number"
+        if !forAgent {
+          let range =
+            key == .veil
+            ? ConversationTheme.Backdrop.veilRange : ConversationTheme.Backdrop.blurRange
+          property["minimum"] = range.lowerBound
+          property["maximum"] = range.upperBound
+        }
+      case .area:
+        property["type"] = "string"
+        property["enum"] = ConversationTheme.Backdrop.Area.allCases.map(\.rawValue)
+      }
+      backdrop[key.rawValue] = property
+    }
+    // `image` is the application's, and only there when a picture was kept: never required.
+    let backdropKeys = ConversationThemeFile.BackdropKey.allCases.filter { $0 != .image }
+      .map(\.rawValue)
     var dark: [String: Any] = ["type": "boolean", "description": "Whether the theme is dark."]
     // Said rather than pinned with `enum`, which not every strict mode takes on a boolean: the
     // answer is checked against the mode asked for anyway.
@@ -178,6 +225,12 @@ public enum ConversationThemeSchema {
           "additionalProperties": false,
           "required": ConversationTheme.Layout.Key.allCases.map(\.rawValue),
           "properties": layout,
+        ] as [String: Any],
+        "backdrop": [
+          "type": "object",
+          "additionalProperties": false,
+          "required": backdropKeys,
+          "properties": backdrop,
         ] as [String: Any],
       ] as [String: Any],
     ]

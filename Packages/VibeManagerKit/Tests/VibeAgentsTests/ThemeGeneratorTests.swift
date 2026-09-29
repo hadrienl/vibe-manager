@@ -216,3 +216,21 @@ struct ThemeIntegrationTests {
     #expect(theme.layout.blockSpacing > ConversationTheme.Layout().blockSpacing)
   }
 }
+
+/// The real Codex drawing the picture behind a theme: opt in with `VIBE_THEME_INTEGRATION=1`.
+@Suite(
+  "A picture drawn by the real Codex",
+  .enabled(if: ProcessInfo.processInfo.environment["VIBE_THEME_INTEGRATION"] == "1"))
+struct ThemePictureIntegrationTests {
+  @Test("Codex draws the picture behind a theme")
+  func codex() async throws {
+    let image = try await CodexAgentProvider.make().avatarGenerator().generate(
+      AvatarGenerationRequest(
+        prompt: ThemeInstructions.backdropImagePrompt(
+          "a forest of tall pines at dusk, heavily blurred, deep greens", isDark: true)))
+    #expect(image.count > 1_000)
+    if let folder = ProcessInfo.processInfo.environment["VIBE_THEME_OUTPUT"] {
+      try image.write(to: URL(fileURLWithPath: folder).appendingPathComponent("backdrop.png"))
+    }
+  }
+}

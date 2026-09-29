@@ -58,6 +58,50 @@ private struct Agents: ThemeGeneratorResolving {
   }
 }
 
+/// Draws pictures, or not, and keeps what it was asked.
+private final class Painter: AvatarGeneratorResolving, AvatarGenerating, @unchecked Sendable {
+  enum Behaviour { case draws, fails, absent, hangs }
+  let behaviour: Behaviour
+  private let lock = NSLock()
+  private var asked: [String] = []
+
+  init(_ behaviour: Behaviour = .draws) {
+    self.behaviour = behaviour
+  }
+
+  var prompts: [String] { lock.withLock { asked } }
+
+  func options() async -> [AvatarGeneratorOption] {
+    guard behaviour != .absent else { return [] }
+    return [
+      AvatarGeneratorOption(
+        descriptor: AgentDescriptor(id: AgentProviderID("codex"), displayName: "Codex"),
+        unavailability: nil, generator: self)
+    ]
+  }
+
+  func generate(_ request: AvatarGenerationRequest) async throws -> Data {
+    lock.withLock { asked.append(request.prompt) }
+    switch behaviour {
+    case .draws, .absent: return Data("png".utf8)
+    case .fails: throw AvatarGenerationError.noImage
+    case .hangs:
+      while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+      throw CancellationError()
+    }
+  }
+}
+
+/// A theme that asks for a picture.
+private func pictured(prompt: String? = "blurred pines", url: String? = nil) -> ConversationTheme {
+  var theme = ConversationTheme.night
+  theme.personalName = "Forêt"
+  theme.backdrop.imagePrompt = prompt
+  theme.backdrop.imageURL = url
+  theme.backdrop.veil = 0.7
+  return theme
+}
+
 @MainActor
 private final class Fixture {
   let agent: ThemeAgent
@@ -66,14 +110,23 @@ private final class Fixture {
   let model: ConversationThemesModel
   var spoken: [String] = []
 
+  let images: InMemoryThemeImageStore
+  let painter: Painter
+
   init(
     _ answers: [ThemeAgent.Answer] = [], themes: [ConversationTheme] = [],
-    agents: Bool = true
+    agents: Bool = true, painter: Painter = Painter(), fetched: Data? = Data("jpg".utf8)
   ) {
     agent = ThemeAgent(answers)
+    self.painter = painter
+    images = InMemoryThemeImageStore { url in
+      guard let fetched, url.host == "example.com" else { throw ThemeImageError.unreachable }
+      return fetched
+    }
     library = InMemoryConversationThemeLibrary(themes: themes)
     model = ConversationThemesModel(
       library: library, generators: agents ? Agents(generators: [("Claude Code", agent)]) : nil,
+      images: images, pictureAgents: painter,
       diagnostics: Diagnostics(log: log, pseudonym: .ephemeral()), language: "fr-FR")
     model.announce = { [unowned self] in spoken.append(String(localized: $0)) }
   }
@@ -243,6 +296,63 @@ struct ConversationThemesModelTests {
     #expect(fixture.spoken == ["Nuit is deleted."])
     let untouched = ConversationAppearance(lightTheme: "paper")
     #expect(await fixture.model.delete("personal-gone", from: untouched) == untouched)
+  }
+
+  @Test("A picture described is drawn by the agent that draws, and put on the version on trial")
+  func drawnPicture() async throws {
+    let fixture = Fixture([.theme(pictured())])
+    try await fixture.generate("des arbres flous")
+    let backdrop = try #require(fixture.model.trial?.backdrop)
+    #expect(backdrop.image != nil)
+    #expect(backdrop.localImage != nil)
+    #expect(fixture.painter.prompts.first?.contains("blurred pines") == true)
+    #expect(fixture.painter.prompts.first?.contains("sheet.png") == true)
+    #expect(fixture.spoken.contains("Codex is drawing the picture."))
+    #expect(fixture.spoken.last == "The picture is on trial.")
+    #expect(!fixture.model.isGenerating)
+  }
+
+  @Test("A picture at an address the user gave is fetched")
+  func fetchedPicture() async throws {
+    let fixture = Fixture([.theme(pictured(prompt: nil, url: "https://example.com/a.jpg"))])
+    try await fixture.generate("avec https://example.com/a.jpg en fond")
+    #expect(fixture.model.trial?.backdrop.image != nil)
+    #expect(fixture.painter.prompts.isEmpty)
+    #expect(await fixture.images.count == 1)
+  }
+
+  @Test("Without a picture, the version is on trial all the same, and why is said")
+  func noPicture() async throws {
+    let absent = Fixture([.theme(pictured())], painter: Painter(.absent))
+    try await absent.generate("des arbres flous")
+    #expect(absent.model.trial != nil)
+    #expect(absent.model.trial?.backdrop.image == nil)
+    #expect(absent.model.problem == .noPictureAgent)
+
+    let failing = Fixture([.theme(pictured())], painter: Painter(.fails))
+    try await failing.generate("des arbres flous")
+    #expect(failing.model.problem == .pictureFailed(agent: "Codex"))
+
+    let unreachable = Fixture(
+      [.theme(pictured(prompt: nil, url: "https://example.com/a.jpg"))], fetched: nil)
+    try await unreachable.generate("avec https://example.com/a.jpg")
+    #expect(unreachable.model.problem == .pictureUnreachable)
+  }
+
+  @Test("While the picture is drawn, nothing is saved; cancelled, the version stays without it")
+  func cancelPicture() async throws {
+    let fixture = Fixture([.theme(pictured())], painter: Painter(.hangs))
+    fixture.model.open(systemIsDark: true)
+    try await fixture.until { fixture.model.optionsLoaded }
+    fixture.model.prompt = "des arbres flous"
+    fixture.model.generate(with: await fixture.option)
+    try await fixture.until { fixture.model.isMakingPicture }
+    #expect(fixture.model.trial != nil)
+    #expect(!fixture.model.canSave)
+    fixture.model.cancel()
+    #expect(!fixture.model.isGenerating)
+    #expect(fixture.model.canSave)
+    #expect(fixture.model.trial?.backdrop.image == nil)
   }
 
   @Test("A failure leaves the version on trial, and says why")

@@ -62,12 +62,13 @@ struct ConversationThemeFileTests {
       ConversationThemeFile.encode(.systemDark) == ConversationThemeFile.encode(.systemDark))
     let text = String(decoding: ConversationThemeFile.encode(.systemDark), as: UTF8.self)
     #expect(text.contains("\"bubbleBorder\" : null"))
-    #expect(text.contains("\"format\" : 2"))
+    #expect(text.contains("\"format\" : 3"))
+    #expect(!text.contains("\"image\""))
   }
 
   @Test("A format this version does not know, or none, is refused")
   func format() {
-    #expect(problem(themeFile { $0["format"] = 3 }) == .unknownFormat)
+    #expect(problem(themeFile { $0["format"] = 4 }) == .unknownFormat)
     #expect(problem(themeFile { $0["format"] = "1" }) == .unknownFormat)
     #expect(problem(themeFile { $0["format"] = true }) == .unknownFormat)
     #expect(problem(themeFile { $0["format"] = nil }) == .missingKey("format"))
@@ -246,12 +247,88 @@ struct ConversationThemeFontsAndLayoutTests {
   }
 }
 
+@Suite("The backdrop of a theme (#118)")
+struct ConversationThemeBackdropTests {
+  private func backdrop(_ change: @escaping (inout [String: Any]) -> Void) -> Data {
+    themeFile { object in
+      var backdrop = object["backdrop"] as? [String: Any] ?? [:]
+      change(&backdrop)
+      object["backdrop"] = backdrop
+    }
+  }
+
+  @Test("A backdrop comes back as it was written; files of format 2 have none")
+  func roundTrip() throws {
+    var theme = ConversationThemeLibraryRules.kept(.night, name: "Forêt")
+    theme.backdrop.image = String(repeating: "a", count: 64) + ".jpg"
+    theme.backdrop.imagePrompt = "blurred pines at dusk"
+    theme.backdrop.veil = 0.6
+    theme.backdrop.blur = 14
+    theme.backdrop.area = .messages
+    let read = try ConversationThemeFile.theme(
+      from: ConversationThemeFile.encode(theme), id: theme.id)
+    #expect(read.backdrop == theme.backdrop)
+    let old = themeFile {
+      $0["format"] = 2
+      $0["backdrop"] = nil
+    }
+    #expect(
+      try ConversationThemeFile.theme(from: old, id: "personal-old").backdrop.wantsImage == false)
+    #expect(problem(themeFile { $0["backdrop"] = nil }) == .missingKey("backdrop"))
+  }
+
+  @Test("Only an https address, without credentials, can be fetched")
+  func addresses() {
+    #expect(problem(backdrop { $0["imageURL"] = "https://example.com/forest.jpg" }) == nil)
+    for bad in [
+      "http://example.com/a.jpg", "file:///etc/passwd", "https://user:pw@example.com/a.jpg",
+      "ftp://example.com/a.jpg", "forest.jpg", "https:///a.jpg",
+    ] {
+      #expect(
+        problem(backdrop { $0["imageURL"] = bad }) == .invalidValue("backdrop.imageURL"), "\(bad)")
+    }
+  }
+
+  @Test("The name of a picture is the application's: a digest, never a path")
+  func imageNames() {
+    let good = String(repeating: "0", count: 64) + ".jpg"
+    #expect(problem(backdrop { $0["image"] = good }) == nil)
+    for bad in [
+      "../../x.jpg", "forest.jpg", String(repeating: "A", count: 64) + ".jpg", good + ".gif",
+    ] {
+      #expect(problem(backdrop { $0["image"] = bad }) == .invalidValue("backdrop.image"), "\(bad)")
+    }
+  }
+
+  @Test("The veil, the blur and the area are bounded")
+  func bounds() {
+    #expect(problem(backdrop { $0["veil"] = 1.5 }) == .outOfRange("backdrop.veil", 0...1))
+    #expect(problem(backdrop { $0["blur"] = -1 }) == .outOfRange("backdrop.blur", 0...40))
+    #expect(problem(backdrop { $0["area"] = "window" }) == .invalidValue("backdrop.area"))
+    #expect(problem(backdrop { $0["imagePrompt"] = "  " }) == .invalidValue("backdrop.imagePrompt"))
+    #expect(problem(backdrop { $0["frame"] = 1 }) == .unknownKey("backdrop.frame"))
+  }
+
+  @Test("The agent is never asked for the name of the picture")
+  func agentSchema() throws {
+    let schema = try #require(
+      try JSONSerialization.jsonObject(
+        with: Data(ConversationThemeSchema.forAgent(isDark: true).utf8))
+        as? [String: Any])
+    let properties = try #require(schema["properties"] as? [String: Any])
+    let backdrop = try #require(properties["backdrop"] as? [String: Any])
+    let keys = try #require(backdrop["properties"] as? [String: Any]).keys
+    #expect(Set(keys) == ["imageURL", "imagePrompt", "veil", "blur", "area"])
+    #expect(Set(backdrop["required"] as? [String] ?? []) == Set(keys))
+  }
+}
+
 @Suite("The schema of a theme (#118)")
 struct ConversationThemeSchemaTests {
   static let documentURL = URL(filePath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent()
-    .appending(path: "docs/schemas/conversation-theme-2.schema.json")
+    .appending(path: "docs/schemas/conversation-theme-3.schema.json")
 
   @Test("The repository's schema is the one the application holds agents to")
   func repositoryDocument() throws {
@@ -273,7 +350,7 @@ struct ConversationThemeSchemaTests {
     #expect(schema["additionalProperties"] as? Bool == false)
     #expect(
       Set(schema["required"] as? [String] ?? [])
-        == ["format", "name", "isDark", "fontStyle", "colors", "fonts", "layout"])
+        == ["format", "name", "isDark", "fontStyle", "colors", "fonts", "layout", "backdrop"])
     let properties = try #require(schema["properties"] as? [String: Any])
     let colors = try #require(properties["colors"] as? [String: Any])
     #expect(colors["additionalProperties"] as? Bool == false)
@@ -441,6 +518,54 @@ struct GenerateConversationThemeTests {
       generator: offline, fonts: Families(["Inter": .unreachable]))(request)
     #expect(kept.fonts.message == "Inter")
     #expect(await offline.requests.count == 1)
+  }
+
+  @Test("An address the user never wrote is sent back; one they wrote is kept")
+  func imageAddresses() async throws {
+    let invented = themeFile {
+      $0["backdrop"] = [
+        "imageURL": "https://example.com/made-up.jpg", "imagePrompt": NSNull(), "veil": 0.8,
+        "blur": 0, "area": "conversation",
+      ]
+    }
+    let generator = ScriptedThemeGenerator([.success(invented), .success(themeFile())])
+    _ = try await GenerateConversationTheme(generator: generator)(request)
+    let problems = await generator.requests.last?.correction?.problems ?? []
+    #expect(problems.first?.hasPrefix("\"backdrop.imageURL\"") == true)
+
+    let given = ThemeGenerationRequest(
+      description: "des arbres flous, avec https://example.com/made-up.jpg", isDark: true,
+      language: "fr")
+    let kept = try await GenerateConversationTheme(
+      generator: ScriptedThemeGenerator([.success(invented)]))(given)
+    #expect(kept.backdrop.imageURL == "https://example.com/made-up.jpg")
+  }
+
+  @Test("The picture of the current version is kept when the same one is asked again")
+  func samePicture() async throws {
+    var current = ConversationThemeLibraryRules.kept(.systemDark, name: "Forêt")
+    current.backdrop.imagePrompt = "blurred pines"
+    current.backdrop.image = String(repeating: "b", count: 64) + ".jpg"
+    let same = themeFile {
+      $0["backdrop"] = [
+        "imageURL": NSNull(), "imagePrompt": "blurred pines", "veil": 0.7, "blur": 8,
+        "area": "conversation",
+      ]
+    }
+    let other = themeFile {
+      $0["backdrop"] = [
+        "imageURL": NSNull(), "imagePrompt": "a beach", "veil": 0.7, "blur": 8,
+        "area": "conversation",
+      ]
+    }
+    let next = ThemeGenerationRequest(
+      description: "plus flou", isDark: true, language: "fr", current: current)
+    let kept = try await GenerateConversationTheme(
+      generator: ScriptedThemeGenerator([.success(same)]))(next)
+    #expect(kept.backdrop.image == current.backdrop.image)
+    let changed = try await GenerateConversationTheme(
+      generator: ScriptedThemeGenerator([.success(other)]))(next)
+    #expect(changed.backdrop.image == nil)
   }
 
   @Test("The next version keeps the identifier of the one it changes")

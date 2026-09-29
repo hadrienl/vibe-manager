@@ -97,6 +97,8 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
   public var fonts = Fonts()
   /// Its spaces, widths and corners (#118).
   public var layout = Layout()
+  /// A picture behind the conversation, under a veil of `background` (#118).
+  public var backdrop = Backdrop()
 
   public var background: ThemeColor
   public var surface: ThemeColor
@@ -138,6 +140,39 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
       self.message = message
       self.code = code
     }
+  }
+
+  /// A picture behind the conversation: fetched from an address the user gave, or drawn by an
+  /// agent, then kept beside the themes. How much it shows, and where, is the theme's to say.
+  public struct Backdrop: Hashable, Sendable {
+    public enum Area: String, Hashable, Sendable, CaseIterable {
+      /// Behind the messages and the composer.
+      case conversation
+      /// Behind the messages only: the composer keeps the plain background.
+      case messages
+    }
+
+    /// The name of the picture kept in the library's folder of images; `nil` without one.
+    public var image: String?
+    /// Where the user said the picture is, when they gave an address.
+    public var imageURL: String?
+    /// What the picture shows, when an agent draws it.
+    public var imagePrompt: String?
+    /// How much of `background` covers the picture, from 0 (the picture as it is) to 1 (hidden).
+    public var veil: Double = 0.75
+    /// How blurred the picture is, in points.
+    public var blur: Double = 0
+    public var area: Area = .conversation
+    /// Where the picture is on this Mac, found when the theme is read; never written in a file.
+    public var localImage: URL?
+
+    public init() {}
+
+    /// Whether the theme asks for a picture at all.
+    public var wantsImage: Bool { imageURL != nil || imagePrompt != nil || image != nil }
+
+    public static let veilRange: ClosedRange<Double> = 0...1
+    public static let blurRange: ClosedRange<Double> = 0...40
   }
 
   /// How the conversation is laid out, in points, as the Comfortable density draws it: Compact

@@ -99,13 +99,11 @@ struct ThemeWorkshopPanel: View {
       .disabled(themes.isGenerating)
     }
 
-    if let agent = themes.generatingAgent {
+    if themes.isGenerating {
       HStack(alignment: .top, spacing: 10) {
         ProgressView().controlSize(.small)
         VStack(alignment: .leading, spacing: 2) {
-          (themes.versions.isEmpty
-            ? Text("\(agent) is making the theme…", bundle: .module)
-            : Text("\(agent) is changing the theme…", bundle: .module))
+          busyText
           if themes.isRetrying {
             Text(
               "The first answer could not be used: it is asked once more.", bundle: .module
@@ -175,6 +173,19 @@ struct ThemeWorkshopPanel: View {
         .disabled(!themes.canSave)
       }
     }
+  }
+
+  /// What is under way: the theme, then its picture.
+  private var busyText: Text {
+    let agent = themes.generatingAgent ?? ""
+    if themes.isMakingPicture {
+      return themes.generatingAgent == nil
+        ? Text("Fetching the picture…", bundle: .module)
+        : Text("\(agent) is drawing the picture… It takes a minute or two.", bundle: .module)
+    }
+    return themes.versions.isEmpty
+      ? Text("\(agent) is making the theme…", bundle: .module)
+      : Text("\(agent) is changing the theme…", bundle: .module)
   }
 
   private var versions: some View {
@@ -361,6 +372,9 @@ struct ThemeLoadProblemsView: View {
       LocalizedStringResource("“\(key)” is out of range", bundle: .module)
     case .unknownFont(_, let family):
       LocalizedStringResource("the font “\(family)” cannot be found", bundle: .module)
+    case .inventedImageURL:
+      LocalizedStringResource(
+        "the address of its picture was not given by the user", bundle: .module)
     }
   }
 }

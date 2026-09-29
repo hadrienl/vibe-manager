@@ -3,6 +3,60 @@
   "additionalProperties" : false,
   "description" : "A personal theme of the conversation view. Its file name is its identifier; every pair of colours a reader must read is also held to WCAG contrasts, which a schema cannot say.",
   "properties" : {
+    "backdrop" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "area" : {
+          "description" : "\"conversation\": behind the messages and the composer; \"messages\": behind the messages only.",
+          "enum" : [
+            "conversation",
+            "messages"
+          ],
+          "type" : "string"
+        },
+        "blur" : {
+          "description" : "How blurred the picture is, in points, from 0 to 40.",
+          "maximum" : 40,
+          "minimum" : 0,
+          "type" : "number"
+        },
+        "image" : {
+          "description" : "Set by the application: the name of the picture it kept. Never given by an agent.",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "imagePrompt" : {
+          "description" : "When the user wants a picture behind the conversation and gave no address: what it shows, in English, for an image generation model — subject, mood, colours, blur, landscape 16:10, no text. null for no picture, or when imageURL is given.",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "imageURL" : {
+          "description" : "An https address of a picture that the user wrote in their description, copied exactly; the application downloads it. null otherwise: never make an address up.",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "veil" : {
+          "description" : "How much of colors.background covers the picture, from 0 (the picture as it is) to 1 (hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable.",
+          "maximum" : 1,
+          "minimum" : 0,
+          "type" : "number"
+        }
+      },
+      "required" : [
+        "imageURL",
+        "imagePrompt",
+        "veil",
+        "blur",
+        "area"
+      ],
+      "type" : "object"
+    },
     "colors" : {
       "additionalProperties" : false,
       "properties" : {
@@ -217,7 +271,7 @@
     "format" : {
       "description" : "The version of the format.",
       "enum" : [
-        2
+        3
       ],
       "type" : "integer"
     },
@@ -303,8 +357,9 @@
     "fontStyle",
     "colors",
     "fonts",
-    "layout"
+    "layout",
+    "backdrop"
   ],
-  "title" : "Vibe Manager conversation theme, format 2",
+  "title" : "Vibe Manager conversation theme, format 3",
   "type" : "object"
 }

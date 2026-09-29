@@ -21,6 +21,16 @@
         }
       }
     },
+    "%@ could not draw the picture: the theme is on trial without it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas pu dessiner l’image : le thème est à l’essai sans elle."
+          }
+        }
+      }
+    },
     "%@ could not make the theme. The theme on screen is unchanged." : {
       "localizations" : {
         "fr" : {
@@ -87,6 +97,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ est supprimé."
+          }
+        }
+      }
+    },
+    "%@ is drawing the picture." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ dessine l’image de fond."
+          }
+        }
+      }
+    },
+    "%@ is drawing the picture… It takes a minute or two." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ dessine l’image de fond… Cela prend une à deux minutes."
           }
         }
       }
@@ -908,6 +938,16 @@
         }
       }
     },
+    "Fetching the picture…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téléchargement de l’image…"
+          }
+        }
+      }
+    },
     "Fold the panel" : {
       "localizations" : {
         "fr" : {
@@ -1247,6 +1287,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nuit"
+          }
+        }
+      }
+    },
+    "No agent available can draw the picture: the theme is on trial without it. Codex draws pictures." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun agent disponible ne sait dessiner l’image : le thème est à l’essai sans elle. Codex dessine des images."
           }
         }
       }
@@ -1833,6 +1883,36 @@
         }
       }
     },
+    "The picture could not be fetched from its address: the theme is on trial without it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image n’a pas pu être téléchargée depuis son adresse : le thème est à l’essai sans elle."
+          }
+        }
+      }
+    },
+    "The picture is being fetched." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image est en cours de téléchargement."
+          }
+        }
+      }
+    },
+    "The picture is on trial." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image de fond est à l’essai."
+          }
+        }
+      }
+    },
     "The session is stopped." : {
       "localizations" : {
         "fr" : {
@@ -2275,6 +2355,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "réussi"
+          }
+        }
+      }
+    },
+    "the address of its picture was not given by the user" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’adresse de son image n’a pas été donnée par l’utilisateur"
           }
         }
       }

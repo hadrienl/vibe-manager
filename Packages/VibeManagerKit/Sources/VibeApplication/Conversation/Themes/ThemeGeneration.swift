@@ -167,7 +167,7 @@ public struct GenerateConversationTheme: Sendable {
     report(.attempt(1))
     let first = try await generator.generate(request)
     do {
-      return try await check(first, id: id, isDark: request.isDark)
+      return try await check(first, id: id, request: request)
     } catch {
       report(.rejected(attempt: 1, code: error.code))
       try Task.checkCancellation()
@@ -175,7 +175,7 @@ public struct GenerateConversationTheme: Sendable {
       let second = try await generator.generate(
         request.correcting(Self.bounded(first), problems: error.details))
       do {
-        return try await check(second, id: id, isDark: request.isDark)
+        return try await check(second, id: id, request: request)
       } catch {
         report(.rejected(attempt: 2, code: error.code))
         throw ThemeGenerationError.invalid(error.details)
@@ -185,10 +185,27 @@ public struct GenerateConversationTheme: Sendable {
 
   /// The theme an answer defines, its fonts made usable. A family that exists nowhere is the
   /// agent's mistake; Google Fonts out of reach is not, and keeps the theme.
-  private func check(_ answer: Data, id: String, isDark: Bool) async throws(ThemeFileProblem)
-    -> ConversationTheme
+  private func check(_ answer: Data, id: String, request: ThemeGenerationRequest)
+    async throws(ThemeFileProblem) -> ConversationTheme
   {
-    let theme = try ConversationThemeFile.theme(from: answer, id: id, expectedDark: isDark)
+    var theme = try ConversationThemeFile.theme(from: answer, id: id, expectedDark: request.isDark)
+    // An address is fetched only when the user wrote it: the agent never picks what is downloaded.
+    if let address = theme.backdrop.imageURL {
+      let written = [request.description] + request.earlierRequests
+      guard written.contains(where: { $0.contains(address) }) else {
+        throw .inventedImageURL(address)
+      }
+    }
+    // The picture of the version it changes, when it asks for the same one: not fetched or drawn
+    // again.
+    if let current = request.current?.backdrop, current.image != nil,
+      current.imageURL == theme.backdrop.imageURL, current.imagePrompt == theme.backdrop.imagePrompt
+    {
+      theme.backdrop.image = current.image
+      theme.backdrop.localImage = current.localImage
+    } else {
+      theme.backdrop.image = nil
+    }
     guard let fonts else { return theme }
     for (key, family) in [("fonts.message", theme.fonts.message), ("fonts.code", theme.fonts.code)]
     {
@@ -221,6 +238,9 @@ public enum ThemeInstructions {
     let layout = ConversationTheme.Layout.Key.allCases.map {
       "- \($0.rawValue): \(ConversationThemeSchema.purpose(of: $0))"
     }
+    let backdrop = ConversationThemeFile.BackdropKey.allCases.filter { $0 != .image }.map {
+      "- \($0.rawValue): \(ConversationThemeSchema.purpose(of: $0))"
+    }
     return """
       You design themes — colours, fonts and layout — for the conversation view of a macOS application where a user \
       reads what a coding agent does: their messages in bubbles, the agent's answers, rows of \
@@ -246,6 +266,11 @@ public enum ThemeInstructions {
       space, density, width, air or corners, keep the built-in values otherwise:
       \(layout.joined(separator: "\n"))
 
+      The backdrop, a picture behind the conversation — only when the description asks for one; \
+      otherwise imageURL and imagePrompt are null. When the current theme has a picture the \
+      description does not change, keep its imageURL or imagePrompt exactly as it is:
+      \(backdrop.joined(separator: "\n"))
+
       Give the theme a short evocative name in the language whose BCP 47 tag is \(language). \
       Answer with the JSON object of the schema only.
       """
@@ -261,7 +286,7 @@ public enum ThemeInstructions {
     if let current = request.current {
       parts.append(
         "The current theme, to change rather than start again:\n"
-          + String(decoding: ConversationThemeFile.encode(current), as: UTF8.self))
+          + String(decoding: ConversationThemeFile.encode(forAgent(current)), as: UTF8.self))
       if !request.earlierRequests.isEmpty {
         parts.append(
           "What was asked before, oldest first:\n"
@@ -278,6 +303,14 @@ public enum ThemeInstructions {
     }
     parts.append("<description>\n\(fenced(request.description))\n</description>")
     return parts.joined(separator: "\n\n")
+  }
+
+  /// A theme as the agent sees it: without the name of the picture kept, which is the
+  /// application's.
+  static func forAgent(_ theme: ConversationTheme) -> ConversationTheme {
+    var theme = theme
+    theme.backdrop.image = nil
+    return theme
   }
 
   /// The description, unable to close its delimiters early.

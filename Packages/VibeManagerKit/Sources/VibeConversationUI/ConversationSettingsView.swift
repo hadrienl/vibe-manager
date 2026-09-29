@@ -542,7 +542,7 @@ struct ThemeCard: View {
       }
       .padding(7)
       .frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading)
-      .background(theme.background.color, in: RoundedRectangle(cornerRadius: 6))
+      .background(ThemeBackdropView(theme: theme).clipShape(RoundedRectangle(cornerRadius: 6)))
       .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.border.color))
       HStack(spacing: 4) {
         if let name = theme.personalName {
@@ -587,7 +587,7 @@ struct ConversationPreview: View {
       }
       .padding(16)
     }
-    .background(theme.background.color)
+    .background(ThemeBackdropView(theme: theme))
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)

@@ -24,15 +24,18 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
   /// The families fetched from Google Fonts: activated when the library is read, and carried by
   /// an export.
   private let fonts: GoogleThemeFonts?
+  /// The pictures behind the themes: found when a theme is read, and carried by an export.
+  private let images: (any ThemeImageStoring)?
 
   public init(
     directory: URL, diagnostics: Diagnostics = .disabled, localizedBuiltInNames: [String] = [],
-    fonts: GoogleThemeFonts? = nil
+    fonts: GoogleThemeFonts? = nil, images: (any ThemeImageStoring)? = nil
   ) {
     self.directory = directory
     self.diagnostics = diagnostics
     self.localizedBuiltInNames = localizedBuiltInNames
     self.fonts = fonts
+    self.images = images
   }
 
   public func load() async -> ThemeLibraryContents {
@@ -89,8 +92,14 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
     guard let data = contents(of: file(of: id)) else { throw ThemeLibraryError.notFound }
     var files = [DiagnosticFile(name: "theme.json", contents: data)]
     if let preview { files.append(DiagnosticFile(name: "preview.png", contents: preview)) }
+    let theme = try? ConversationThemeFile.decode(data, id: id)
+    if let name = theme?.backdrop.image, let url = images?.location(of: name),
+      let picture = try? Data(contentsOf: url)
+    {
+      files.append(DiagnosticFile(name: "backdrop.jpg", contents: picture))
+    }
     // The families fetched for it: whoever imports the theme has them without Google.
-    if let fonts, let theme = try? ConversationThemeFile.decode(data, id: id) {
+    if let fonts, let theme {
       for family in Set([theme.fonts.message, theme.fonts.code].compactMap { $0 }).sorted() {
         for file in await fonts.files(of: family) {
           guard let contents = try? Data(contentsOf: file) else { continue }
@@ -148,7 +157,10 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
       let id = ConversationTheme.personalPrefix + url.deletingPathExtension().lastPathComponent
       do throws(ThemeFileProblem) {
         guard let data = contents(of: url) else { throw .tooLarge }
-        themes.append(try ConversationThemeFile.theme(from: data, id: id))
+        var theme = try ConversationThemeFile.theme(from: data, id: id)
+        // A picture gone is not a reason to lose the theme: it is drawn without it.
+        theme.backdrop.localImage = theme.backdrop.image.flatMap { images?.location(of: $0) }
+        themes.append(theme)
       } catch {
         problems.append(ThemeLoadProblem(fileName: url.lastPathComponent, problem: error))
         if recording {

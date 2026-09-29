@@ -90,6 +90,7 @@ public enum ConversationThemeLibraryRules {
           isDark: theme.isDark, fontStyle: theme.fontStyle, colors: colors) ?? theme
       kept.fonts = theme.fonts
       kept.layout = theme.layout
+      kept.backdrop = theme.backdrop
     }
     kept.personalName = name
     // What the user chose apart from the theme is not the theme's.
