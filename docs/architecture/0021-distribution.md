@@ -1,6 +1,7 @@
 # 0021 — Distribution: Developer ID, notarized, a disk image on GitHub Releases
 
-- Status: accepted
+- Status: accepted; amended by [0033](0033-automatic-updates.md): the application updates itself
+  with Sparkle, from a feed computed from the published releases
 - Date: 2026-09-24
 - Issue: [#19](https://github.com/hadrienl/vibe-manager/issues/19)
 
@@ -37,7 +38,8 @@ beside it. It is attached to a **draft** release on GitHub; the draft is publish
 [release checklist](../release-checklist.md) is ticked.
 
 There is no Sparkle in V1: it is a dependency, an EdDSA key to keep and an appcast to host, for a
-release rhythm that does not need it yet. A ticket of its own reopens it after the V1.
+release rhythm that does not need it yet. A ticket of its own reopens it after the V1. *(Reopened by
+#92: ADR 0033 adds Sparkle. The disk image stays what a first installation downloads.)*
 
 ### Built by a tag, in a protected environment
 
@@ -92,7 +94,8 @@ review A8).
 ## Consequences
 
 - A release is a tag, an approval, and the time of two notarizations.
-- Users update by downloading the next image. Agents kept running survive it.
+- Users update by downloading the next image. Agents kept running survive it. *(Since ADR 0033,
+  the application updates itself.)*
 - The first release candidate is drafted by pushing a tag such as `v1.0.0-rc.1`; it is
   marked as a pre-release.
 
