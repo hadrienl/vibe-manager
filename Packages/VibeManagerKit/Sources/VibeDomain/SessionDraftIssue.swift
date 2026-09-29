@@ -49,6 +49,16 @@ public struct SessionDraftIssue: Hashable, Sendable, Identifiable, LocalizedErro
       bundle: .module)
   )
 
+  public static let nameTooLong = SessionDraftIssue(
+    field: .name,
+    message: String(
+      localized: "A name holds \(SessionName.maximumLength) characters at most.", bundle: .module,
+      comment: "The longest name a session may have, in characters."),
+    remedy: String(
+      localized: "Shorten it: it is shown whole in the sidebar and in the window's title.",
+      bundle: .module)
+  )
+
   public static let workingDirectoryMissing = SessionDraftIssue(
     field: .workingDirectory,
     message: String(localized: "No working folder was chosen.", bundle: .module),
