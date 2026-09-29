@@ -727,16 +727,6 @@
         }
       }
     },
-    "Copy as Markdown" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copier en Markdown"
-          }
-        }
-      }
-    },
     "Copy the code" : {
       "localizations" : {
         "fr" : {

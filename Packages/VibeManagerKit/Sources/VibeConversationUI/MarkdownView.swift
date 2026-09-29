@@ -5,15 +5,17 @@ import VibeApplication
 /// A message's Markdown, block by block (#38).
 ///
 /// Its prose — headings, paragraphs, lists and quotes that follow one another — is one text view,
-/// selectable from one paragraph to the next (`MarkdownProse`); code blocks, tables and rules are
-/// views of their own between them. A selection does not cross those, nor go from one message to
-/// the next: the message's Copy as Markdown makes up for it.
+/// selectable from one paragraph to the next (`MarkdownProse`); code blocks and tables are text
+/// views of their own, rules plain views, between them. One selection runs across all of them
+/// (`MessageSelection`, #189), but not from one message to the next: Copy Message makes up for it.
 struct MarkdownView: View {
   let text: String
+  @State private var selection = MessageSelection()
 
   var body: some View {
     MarkdownBlocksView(blocks: MarkdownCache.shared.blocks(for: text), markdown: text)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .environment(\.messageSelection, selection)
   }
 }
 
@@ -34,7 +36,7 @@ struct MarkdownBlocksView: View {
       ForEach(Array(MarkdownProse.segments(blocks).enumerated()), id: \.offset) { _, segment in
         switch segment {
         case .prose(let blocks):
-          MarkdownTextView(blocks: blocks, markdown: markdown, secondary: secondary)
+          SegmentView(content: .prose(blocks, secondary: secondary), markdown: markdown)
         case .block(let block):
           MarkdownBlockView(block: block, markdown: markdown, secondary: secondary)
         }
@@ -56,7 +58,7 @@ struct MarkdownBlockView: View {
   var body: some View {
     switch block {
     case .heading, .paragraph:
-      MarkdownTextView(blocks: [block], markdown: markdown, secondary: secondary)
+      SegmentView(content: .prose([block], secondary: secondary), markdown: markdown)
     case .list(let ordered, let start, let items):
       VStack(alignment: .leading, spacing: 4) {
         ForEach(Array(items.enumerated()), id: \.offset) { index, item in
@@ -75,9 +77,9 @@ struct MarkdownBlockView: View {
         MarkdownBlocksView(blocks: blocks, markdown: markdown, spacing: 6, secondary: true)
       }
     case .code(let language, let code):
-      CodeBlockView(language: language, code: code)
+      CodeBlockView(language: language, code: code, markdown: markdown)
     case .table(let header, let rows):
-      MarkdownTableView(header: header, rows: rows)
+      MarkdownTableView(header: header, rows: rows, markdown: markdown)
     case .rule:
       Rectangle().fill(theme.border.color).frame(height: 1).padding(.vertical, 4)
     }
@@ -107,72 +109,16 @@ struct MarkdownBlockView: View {
 struct MarkdownTableView: View {
   let header: [[InlineRun]]
   let rows: [[[InlineRun]]]
+  var markdown: String?
   @Environment(\.conversationTheme) private var theme
-  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
-    let size = appearance.textSize.pointSize * 0.92
     ScrollView(.horizontal, showsIndicators: true) {
-      Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
-        GridRow {
-          ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-            Text(MarkdownDocument.attributed(cell, theme: theme, size: size, weight: .semibold))
-              .modifier(CellLinkMenu(cell: cell))
-              .padding(.horizontal, 10)
-              .padding(.vertical, 6)
-          }
-        }
-        .background(theme.surface.color)
-        ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-          Divider().overlay(theme.border.color)
-          GridRow {
-            ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-              Text(MarkdownDocument.attributed(cell, theme: theme, size: size))
-                .textSelection(.enabled)
-                .modifier(CellLinkMenu(cell: cell))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-            }
-          }
-        }
-      }
-      .foregroundStyle(theme.text.color)
+      SegmentView(content: .table(header: header, rows: rows), markdown: markdown)
+        .fixedSize()
     }
     .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
     .overlay(RoundedRectangle(cornerRadius: theme.layout.innerRadius).stroke(theme.border.color))
-  }
-}
-
-/// A table's cell drawn by SwiftUI, whose links have no menu of their own: the cell's menu carries
-/// them (#186) — the actions of its one link, or one submenu per link. A cell without a link keeps
-/// the menu of its text.
-private struct CellLinkMenu: ViewModifier {
-  let cell: [InlineRun]
-
-  func body(content: Content) -> some View {
-    let urls = cell.compactMap(\.link).reduce(into: [URL]()) { urls, url in
-      if !urls.contains(url) { urls.append(url) }
-    }
-    if urls.isEmpty {
-      content
-    } else {
-      content.contextMenu {
-        if urls.count == 1 {
-          LinkMenuButtons(url: urls[0])
-        } else {
-          ForEach(urls, id: \.self) { url in
-            Menu(url.absoluteString) { LinkMenuButtons(url: url) }
-          }
-        }
-        Divider()
-        Button {
-          NSPasteboard.general.clearContents()
-          NSPasteboard.general.setString(cell.map(\.text).joined(), forType: .string)
-        } label: {
-          Text("Copy", bundle: .module)
-        }
-      }
-    }
   }
 }
 
@@ -181,12 +127,12 @@ private struct CellLinkMenu: ViewModifier {
 struct CodeBlockView: View {
   let language: String?
   let code: String
+  var markdown: String?
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
   @State private var copied = false
 
   var body: some View {
-    let size = appearance.textSize.pointSize * 0.88
     VStack(alignment: .leading, spacing: 0) {
       HStack {
         Text(verbatim: language ?? "")
@@ -214,10 +160,10 @@ struct CodeBlockView: View {
       Rectangle().fill(theme.border.color).frame(height: 1)
       Group {
         if appearance.wrapsCode {
-          highlighted(size: size).fixedSize(horizontal: false, vertical: true)
+          highlighted().fixedSize(horizontal: false, vertical: true)
         } else {
           ScrollView(.horizontal, showsIndicators: true) {
-            highlighted(size: size).fixedSize()
+            highlighted().fixedSize()
           }
         }
       }
@@ -229,27 +175,14 @@ struct CodeBlockView: View {
     .onChange(of: code) { copied = false }
   }
 
-  private func highlighted(size: Double) -> some View {
-    Text(Self.attributed(code, language: language, theme: theme, size: size))
-      .textSelection(.enabled)
-      .lineSpacing(2)
+  private func highlighted() -> some View {
+    SegmentView(content: .code(code, language: language), markdown: markdown)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  static func attributed(
-    _ code: String, language: String?, theme: ConversationTheme, size: Double
-  ) -> AttributedString {
-    var result = AttributedString()
-    for segment in SyntaxHighlighter.segments(of: code, language: language) {
-      var piece = AttributedString(segment.text)
-      piece.font = theme.codeFont(size: size)
-      piece.foregroundColor = color(for: segment.kind, theme: theme).color
-      result += piece
-    }
-    return result
-  }
-
-  static func color(for kind: SyntaxHighlighter.Kind, theme: ConversationTheme) -> ThemeColor {
+  nonisolated static func color(for kind: SyntaxHighlighter.Kind, theme: ConversationTheme)
+    -> ThemeColor
+  {
     switch kind {
     case .plain: return theme.codeText
     case .keyword: return theme.keyword

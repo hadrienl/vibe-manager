@@ -134,6 +134,21 @@ last release whose manifest the Swift 6.1 of CI's Xcode 16.4 reads, and confined
 `VibeConversationUI`. Code is coloured by a lexical highlighter of our own for a dozen languages,
 which never changes the text.
 
+### One selection per message
+
+A message is drawn by several read-only text views (TextKit 1): one per run of prose, one per
+code block, one per table (an `NSTextTable`), rules being plain views between them. AppKit keeps a
+selection per view, so the message keeps its own (#189): a click and a drag are followed by the
+message, which gives each view the part it draws, and a copy puts the passage together in the
+message's order — code as it is, a table as tab-separated lines, rich text without the theme's
+colours. Starting a selection clears any other, in this message or another; the views without the
+keyboard draw the selection in the active colour while their message has it. A double or triple
+click, the keyboard and the menus stay the text view's own, within one view. ⌘A selects the
+message, and its context menu copies its Markdown.
+
+A selection does not go from one message to the next: the list is lazy, and a message scrolled far
+away no longer has its views.
+
 ## Consequences
 
 - A session whose agent has not written yet shows "has not written anything yet"; one whose agent
@@ -157,3 +172,5 @@ which never changes the text.
 - `AttributedString(markdown:)` alone: no headings, tables or code blocks as blocks. MarkdownUI:
   in maintenance.
 - A second executable or a web view for rendering: nothing the SwiftUI views cannot do.
+- One text view per message, code blocks and tables included: a code block could no longer scroll
+  sideways on its own, all lines of a text view sharing its width.
