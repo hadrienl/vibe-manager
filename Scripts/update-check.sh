@@ -53,7 +53,7 @@ sparkle_tool() {
   local tools="$repository_root/build/sparkle-2.10.0"
   if [[ ! -x "$tools/bin/$tool" ]]; then
     mkdir -p "$tools"
-    curl --fail --silent --show-error --location --output "$tools.tar.xz" \
+    curl --fail --silent --show-error --proto '=https' --proto-redir '=https' --location --output "$tools.tar.xz" \
       "https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz"
     [[ "$(shasum -a 256 "$tools.tar.xz" | cut -d ' ' -f 1)" \
       == "c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c" ]] \

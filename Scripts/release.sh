@@ -285,7 +285,7 @@ sparkle_tools="$repository_root/build/sparkle-$sparkle_version"
 if [[ ! -x "$sparkle_tools/bin/sign_update" ]]; then
   rm -rf "$sparkle_tools"
   mkdir -p "$sparkle_tools"
-  curl --fail --silent --show-error --location --output "$sparkle_tools.tar.xz" \
+  curl --fail --silent --show-error --proto '=https' --proto-redir '=https' --location --output "$sparkle_tools.tar.xz" \
     "https://github.com/sparkle-project/Sparkle/releases/download/$sparkle_version/Sparkle-$sparkle_version.tar.xz"
   [[ "$(shasum -a 256 "$sparkle_tools.tar.xz" | cut -d ' ' -f 1)" == "$sparkle_digest" ]] \
     || fail "the Sparkle $sparkle_version archive is not the one expected"
