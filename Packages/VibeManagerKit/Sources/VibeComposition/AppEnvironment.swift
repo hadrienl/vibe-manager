@@ -404,6 +404,22 @@ public final class AppEnvironment {
       library: avatarLibrary, generators: AgentAvatarGenerators(agents: registry))
     appModel.avatars = avatars
     Task { await avatars.load() }
+    if let name = Self.bundleName() { appModel.applicationName = name }
+  }
+
+  /// The application's name as the Finder and the menu bar say it, in the user's language: what
+  /// the window's title starts with (#159).
+  nonisolated static func bundleName() -> String? {
+    let bundle = Bundle.main
+    guard bundle.bundleURL.pathExtension == "app" else { return nil }
+    for key in ["CFBundleDisplayName", "CFBundleName"] {
+      if let name = bundle.localizedInfoDictionary?[key] as? String ?? bundle.infoDictionary?[key]
+        as? String, !name.isEmpty
+      {
+        return name
+      }
+    }
+    return nil
   }
 
   /// Everything the export gathers besides the model.
