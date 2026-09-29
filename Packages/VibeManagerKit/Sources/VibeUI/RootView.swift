@@ -617,6 +617,13 @@ public struct RootView: View {
       titleVisibility: .visible,
       presenting: model.pendingBatch
     ) { confirmation in
+      // Many agents to restart (#192): moving without restarting comes first, as the default.
+      if let withoutRestartTitle = confirmation.withoutRestartTitle {
+        Button(withoutRestartTitle) {
+          Task { await model.confirmBatch(confirmation, restarting: false) }
+        }
+        .keyboardShortcut(.defaultAction)
+      }
       Button(confirmation.confirmTitle) {
         Task { await model.confirmBatch(confirmation) }
       }

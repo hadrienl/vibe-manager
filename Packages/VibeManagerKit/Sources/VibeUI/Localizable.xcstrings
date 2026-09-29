@@ -3089,52 +3089,6 @@
         }
       }
     },
-    "%lld sessions that never ran will start their agent with their prompt." : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld session that never ran will start its agent with its prompt."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sessions that never ran will start their agent with their prompt."
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Les agents de %lld sessions jamais lancées vont démarrer avec leur prompt."
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "L’agent de %lld session jamais lancée va démarrer avec son prompt."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Les agents de %lld sessions jamais lancées vont démarrer avec leur prompt."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld sessions were moved, but their agent did not start." : {
       "localizations" : {
         "en" : {
@@ -3405,6 +3359,53 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sessions n’ont pas été désarchivées."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sessions will start their agent again." : {
+      "comment" : "Moving several sessions In Progress restarts the closed ones.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session will start its agent again."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions will start their agent again."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions vont redémarrer leur agent."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session va redémarrer son agent."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions vont redémarrer leur agent."
                 }
               }
             }
@@ -7710,6 +7711,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Monter"
+          }
+        }
+      }
+    },
+    "Move Without Restarting" : {
+      "comment" : "Moves several sessions In Progress and starts no agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer sans relancer"
+          }
+        }
+      }
+    },
+    "Move and Restart" : {
+      "comment" : "Moves several sessions In Progress and restarts their agents.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer et relancer"
           }
         }
       }
@@ -12947,6 +12970,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le titre de %1$@ n’a pas été lu : le certificat de %2$@ n’est pas fiable."
+          }
+        }
+      }
+    },
+    "Their agents start one after the other, which can take several minutes and slow this Mac down." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les agents démarrent l’un après l’autre, ce qui peut prendre plusieurs minutes et ralentir ce Mac."
           }
         }
       }

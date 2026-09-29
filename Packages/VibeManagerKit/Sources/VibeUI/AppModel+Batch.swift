@@ -8,6 +8,9 @@ public struct SessionBatchConfirmation: Equatable, Identifiable {
   public let title: String
   public let message: String
   public let confirmTitle: String
+  /// A second way to answer yes, for a move In Progress that would restart many agents at once
+  /// (#192): the sessions are moved and nothing is restarted. Offered first, as the default.
+  public let withoutRestartTitle: String?
 
   public var id: SessionBatchAction { plan.action }
 
@@ -35,6 +38,10 @@ public struct SessionBatchReport: Equatable {
 /// changes is that the question is asked once, the list reloaded once, and every outcome told
 /// in one report — a failure on one session never stops the others.
 extension AppModel {
+  /// Past this many agents to restart, a move In Progress warns of the wait and defaults to
+  /// moving without restarting (#192). Restarts run one after the other, a few seconds each.
+  static let batchRestartWarningThreshold = 5
+
   // MARK: - Plan
 
   public func batchPlan(_ action: SessionBatchAction, for ids: [SessionID]) -> SessionBatchPlan {
@@ -126,12 +133,16 @@ extension AppModel {
 
   /// Takes the confirmation rather than reading `pendingBatch`, for the reason `archive(_:)`
   /// gives: SwiftUI dismisses the dialog, and clears it, before the button runs.
-  public func confirmBatch(_ confirmation: SessionBatchConfirmation, askAgain: Bool = true) async {
+  ///
+  /// `restarting: false` is the answer "Move Without Restarting" gives (#192).
+  public func confirmBatch(
+    _ confirmation: SessionBatchConfirmation, askAgain: Bool = true, restarting: Bool = true
+  ) async {
     pendingBatch = nil
     if confirmation.isClose, !askAgain {
       confirmsStoppingRunningAgent = false
     }
-    await performBatch(confirmation.plan, skipsAnnounced: true)
+    await performBatch(confirmation.plan, skipsAnnounced: true, restarting: restarting)
   }
 
   public func cancelBatch() {
@@ -147,7 +158,8 @@ extension AppModel {
     let eligible = plan.eligible.compactMap { id in sessions.first { $0.id == id } }
     var sentences: [String] = []
     let title: String
-    let confirmTitle: String
+    var confirmTitle: String
+    var withoutRestartTitle: String?
     switch plan.action {
     case .archive:
       title = String(localized: "Archive \(count) Sessions?", bundle: .module)
@@ -195,14 +207,28 @@ extension AppModel {
         comment: "How many sessions, then a task status.")
       confirmTitle = String(
         localized: "Move Sessions", bundle: .module, comment: "Moves several sessions.")
-      let starting = eligible.filter { Self.startsWhenMoved($0, to: status) && canRestart($0) }
+      let starting = eligible.filter { Self.restartsWhenMoved($0, to: status) && canRestart($0) }
         .count
       if starting > 0 {
         sentences.append(
           String(
-            localized:
-              "\(starting) sessions that never ran will start their agent with their prompt.",
+            localized: "\(starting) sessions will start their agent again.", bundle: .module,
+            comment: "Moving several sessions In Progress restarts the closed ones."))
+      }
+      if starting > Self.batchRestartWarningThreshold {
+        sentences.append(
+          String(
+            localized: """
+              Their agents start one after the other, which can take several minutes and slow \
+              this Mac down.
+              """,
             bundle: .module))
+        confirmTitle = String(
+          localized: "Move and Restart", bundle: .module,
+          comment: "Moves several sessions In Progress and restarts their agents.")
+        withoutRestartTitle = String(
+          localized: "Move Without Restarting", bundle: .module,
+          comment: "Moves several sessions In Progress and starts no agent.")
       }
     case .unarchive:
       return nil
@@ -210,12 +236,14 @@ extension AppModel {
     sentences += skipSentences(plan.skippedCounts, action: plan.action)
     return SessionBatchConfirmation(
       plan: plan, title: title, message: sentences.joined(separator: " "),
-      confirmTitle: confirmTitle)
+      confirmTitle: confirmTitle, withoutRestartTitle: withoutRestartTitle)
   }
 
   // MARK: - Running
 
-  func performBatch(_ plan: SessionBatchPlan, skipsAnnounced: Bool) async {
+  func performBatch(
+    _ plan: SessionBatchPlan, skipsAnnounced: Bool, restarting: Bool = true
+  ) async {
     // Asked again: a session may have been closed, restarted or archived since the question.
     let current = batchPlan(plan.action, for: plan.eligible)
     var results = current.skipped.mapValues { SessionBatchItemResult.skipped($0) }
@@ -239,13 +267,18 @@ extension AppModel {
       // disk is an application that stops answering.
       for id in current.eligible { results[id] = await restartInBatch(id) }
     case .move(let status):
-      for id in current.eligible { results[id] = await moveInBatch(id, to: status) }
+      for id in current.eligible {
+        results[id] = await moveInBatch(id, to: status, restarting: restarting)
+      }
     }
 
     let left = Set(results.filter { $0.value.isDone }.map(\.key))
+    // A move In Progress follows its sessions to their column rather than staying (#192).
+    let isMoveInProgress = plan.action == .move(to: .doing)
     let leavesColumn: Bool
     switch plan.action {
-    case .archive, .move: leavesColumn = true
+    case .archive: leavesColumn = true
+    case .move: leavesColumn = !isMoveInProgress
     default: leavesColumn = false
     }
     // The session on screen that left the column hands the selection to the row that takes its
@@ -259,13 +292,10 @@ extension AppModel {
       if let neighbour { preferredSelection = neighbour }
     }
     await reload()
-    // A restart puts its sessions In Progress. The column follows the one on screen, as it does
-    // for a restart on its own, rather than falling to the first row of the column it left.
-    if plan.action == .restart, let shown, left.contains(shown),
-      let session = sessions.first(where: { $0.id == shown }),
-      session.taskStatus != filter.column, session.taskStatus != .archived
-    {
-      update { $0.column = session.taskStatus }
+    if plan.action == .restart || isMoveInProgress {
+      followBatch(
+        shown: shown, moved: listedBefore.filter(left.contains),
+        handsOverSelection: isMoveInProgress)
     }
     reconcileSelection()
 
@@ -281,6 +311,24 @@ extension AppModel {
       plan.action, results: results.merging(announced) { current, _ in current },
       order: plan.eligible
         + plan.skipped.keys.sorted { $0.rawValue.uuidString < $1.rawValue.uuidString })
+  }
+
+  /// A restart puts its sessions In Progress, and so does a move there. The column follows the
+  /// session on screen, as it does for one session on its own, rather than falling to the first
+  /// row of the column it left. When the session on screen is not one of those moved, a move
+  /// hands the selection to the first of them, in the order of the sidebar (#192).
+  private func followBatch(shown: SessionID?, moved: [SessionID], handsOverSelection: Bool) {
+    let target: SessionID?
+    if let shown, moved.contains(shown) {
+      target = shown
+    } else {
+      target = handsOverSelection ? moved.first : nil
+    }
+    guard let target, let session = sessions.first(where: { $0.id == target }),
+      session.taskStatus != .archived
+    else { return }
+    if session.taskStatus != filter.column { update { $0.column = session.taskStatus } }
+    if selectedSessionID != target { select(target) }
   }
 
   private func concurrently(
