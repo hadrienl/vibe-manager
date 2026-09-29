@@ -103,14 +103,19 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   public let sentAt: Date
   /// What ↑ brings back of it into the composer.
   let recallText: String
-  /// How many prompts — or shell commands, for a command — the conversation will hold before
-  /// this one, those in the transcript and those sent before it and still coming: it is confirmed
-  /// by the next.
+  /// How many prompts the conversation will hold before this one, those in the transcript and
+  /// those sent before it and still coming: it is confirmed by the next. For a command, how many
+  /// the transcript held when it was sent: it is confirmed by the same command written after.
   let countAtSend: Int
-  /// A command its agent writes to the transcript only once it ended: however long it runs, it is
-  /// not taken for lost.
+  /// A command its agent writes to the transcript only once it ended — or once the turn it was
+  /// queued behind ended: it is given ten minutes rather than ten seconds before it is said lost,
+  /// and no longer holds back the echoes sent after it.
   let waitsForEnd: Bool
   public var state: State
+
+  var confirmationDeadline: Date {
+    sentAt.addingTimeInterval(waitsForEnd ? 600 : 10)
+  }
 }
 
 /// One session's conversation view: what it shows, and what its composer sends (#38).
@@ -458,8 +463,9 @@ public final class ConversationModel {
   /// Puts a command run before back in the composer, to change it or run it again.
   public func editAgain(_ run: ShellRun) {
     guard composerState == .ready else { return }
-    draft = PromptHistory.recalled(command: run.command)
-    historyNavigation = PromptHistoryNavigation()
+    // As if recalled with ↑: the draft put aside comes back with ↓ or Escape.
+    draft = historyNavigation.recall(
+      PromptHistory.recalled(command: run.command), in: promptHistory, draft: draft)
     requestComposerFocus()
   }
 
@@ -615,9 +621,11 @@ public final class ConversationModel {
       for: submission, format: promptFormat, whileWorking: isAgentWorking)
     // Prompts still on their way reach the transcript first: this one is confirmed only once
     // they are in too. One the agent never took past ten seconds is no longer waited for.
+    // A command is looked for among those written after it was sent; a prompt is confirmed by
+    // the count, the prompts still on their way reaching the transcript first.
     let count =
       Self.count(of: kind, in: snapshot.entries)
-      + echoes.filter { $0.state == .sending && $0.kind.isShell == kind.isShell }.count
+      + (kind.isShell ? 0 : echoes.filter { $0.state == .sending && !$0.kind.isShell }.count)
     let text: String
     let recallText: String
     switch kind {
@@ -696,8 +704,20 @@ public final class ConversationModel {
   private func confirmEchoes() {
     guard !echoes.isEmpty else { return }
     let prompts = Self.count(of: .message, in: snapshot.entries)
-    let commands = Self.count(of: .shell(command: ""), in: snapshot.entries)
-    echoes.removeAll { echo in (echo.kind.isShell ? commands : prompts) > echo.countAtSend }
+    let commands = snapshot.entries.compactMap(\.shellRun).map(\.command)
+    // Each command written confirms the oldest echo of the same command sent before it: one the
+    // agent never ran — put back in its prompt by an Escape — holds back no other.
+    var claimed = Set<Int>()
+    echoes.removeAll { echo in
+      guard echo.kind.isShell else { return prompts > echo.countAtSend }
+      guard
+        let index = commands.indices.first(where: {
+          $0 >= echo.countAtSend && !claimed.contains($0) && commands[$0] == echo.text
+        })
+      else { return false }
+      claimed.insert(index)
+      return true
+    }
   }
 
   /// The prompts of the conversation, or its shell commands: what confirms an echo of that kind.
@@ -706,18 +726,21 @@ public final class ConversationModel {
       ? entries.filter { $0.shellRun != nil }.count : entries.filter(\.isUserPrompt).count
   }
 
+  /// Wakes at the next echo past its wait, marks those past theirs, and waits for the next one.
   private func scheduleEchoCheck() {
     echoTimer?.cancel()
+    guard
+      let next = echoes.filter({ $0.state == .sending }).map(\.confirmationDeadline).min()
+    else { return }
     echoTimer = Task { [weak self] in
-      try? await Task.sleep(for: .seconds(10))
+      try? await Task.sleep(for: .seconds(max(0, next.timeIntervalSinceNow)))
       guard !Task.isCancelled, let self else { return }
       let now = Date()
       for index in self.echoes.indices
-      where !self.echoes[index].waitsForEnd
-        && now.timeIntervalSince(self.echoes[index].sentAt) >= 10
-      {
+      where self.echoes[index].state == .sending && self.echoes[index].confirmationDeadline <= now {
         self.echoes[index].state = .unconfirmed
       }
+      self.scheduleEchoCheck()
     }
   }
 

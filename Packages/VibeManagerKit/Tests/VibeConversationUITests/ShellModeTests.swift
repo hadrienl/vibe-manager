@@ -129,6 +129,38 @@ struct ShellModeTests {
     #expect(!model.leaveShellMode())
   }
 
+  @Test("A command never run — put back in the agent's prompt — holds back no other")
+  func strandedCommand() async {
+    let (model, _) = model()
+    model.draft = "!make"
+    await model.send()
+    model.draft = "!ls"
+    await model.send()
+    model.apply(
+      ConversationSnapshot(entries: [shellEntry("s", "ls")], availability: .available))
+    #expect(model.echoes.map(\.text) == ["make"])
+    // An older run of the same command confirms nothing sent after it.
+    model.apply(
+      ConversationSnapshot(
+        entries: [shellEntry("s", "ls"), shellEntry("t", "make")], availability: .available))
+    #expect(model.echoes.isEmpty)
+  }
+
+  @Test("Edit Again puts the draft aside, as ↑ would: Escape gives it back")
+  func editAgain() {
+    let (model, _) = model()
+    let run = ShellRun(command: "make", state: .succeeded)
+    model.apply(
+      ConversationSnapshot(
+        entries: [ConversationEntry(id: "s", content: .notice(.shell(run)))],
+        availability: .available))
+    model.draft = "a long message"
+    model.editAgain(run)
+    #expect(model.draft == "!make")
+    #expect(model.cancelPromptRecall())
+    #expect(model.draft == "a long message")
+  }
+
   @Test("A command queued during a turn is not taken for lost while the turn goes on")
   func queued() async {
     var shell = ShellEntry(switchDelay: .zero, chunkDelay: .zero)

@@ -121,8 +121,11 @@ public final class ConversationWorkspace {
     let agent = session.conversationAgents.last.flatMap { readableAgents[$0.providerID] }
     model.agentName = agent?.name ?? ""
     model.promptFormat = agent?.format ?? AgentPromptFormat()
+    // Where the agent runs: the worktree of a session that has one.
     model.workingDirectoryName =
-      session.repositories.first.map { URL(fileURLWithPath: $0.path).lastPathComponent } ?? ""
+      RestartSession.workingDirectoryPath(of: session).map {
+        URL(fileURLWithPath: $0).lastPathComponent
+      } ?? ""
     if followed[session.id] != session.conversationAgents, let follow {
       followed[session.id] = session.conversationAgents
       let generation = (generations[session.id] ?? 0) + 1

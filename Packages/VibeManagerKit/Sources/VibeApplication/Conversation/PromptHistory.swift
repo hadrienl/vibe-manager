@@ -91,6 +91,15 @@ public struct PromptHistoryNavigation: Hashable, Sendable {
     return prompts[current - 1]
   }
 
+  /// Shows one message of the history chosen elsewhere than with ↑ — a command run again from the
+  /// conversation — the draft put aside as ↑ would. Returns the text to show.
+  public mutating func recall(_ text: String, in history: PromptHistory, draft: String) -> String {
+    guard let shown = history.prompts.lastIndex(of: text) else { return text }
+    if currentIndex(in: history, draft: draft) == nil { savedDraft = draft }
+    index = shown
+    return text
+  }
+
   /// ↓: the next message, or the draft put aside past the most recent one, which ends the
   /// navigation. `nil` outside a navigation.
   public mutating func newer(in history: PromptHistory, draft: String) -> String? {
