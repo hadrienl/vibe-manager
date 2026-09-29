@@ -133,7 +133,7 @@ struct RequestsSettingsTests {
   func tabs() {
     #expect(SettingsTab.requests.symbolName == "person.bubble")
     #expect(SettingsTab.privacy.symbolName == "hand.raised")
-    #expect(SettingsTab.allCases.count == 10)
+    #expect(SettingsTab.allCases.count == 11)
     #expect(!SettingsTab.allCases.map(\.rawValue).contains("avatar"))
     #expect(NSImage(systemSymbolName: "person.bubble", accessibilityDescription: nil) != nil)
   }

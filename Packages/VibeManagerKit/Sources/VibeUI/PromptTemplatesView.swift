@@ -12,6 +12,8 @@ public struct PromptTemplatesView: View {
   @State private var isImporting = false
   @State private var export: ExportRequest?
   @FocusState private var isNameFocused: Bool
+  /// What the pickers offer (#199), handed down by the Settings.
+  @Environment(\.sessionAppearancePalette) private var palette
 
   public init(model: PromptTemplateLibraryModel) {
     _model = Bindable(model)
@@ -657,40 +659,27 @@ public struct PromptTemplatesView: View {
   /// own. Picking one of the two when there is none yet starts from the template's name.
   private func appearancePicker(_ editing: PromptTemplate) -> some View {
     let current = editing.appearance
-    let base = current ?? SessionAppearanceCatalog.derived(forName: editing.trimmedName)
+    let base = current ?? palette.derived(forName: editing.trimmedName)
     return HStack(alignment: .top, spacing: 14) {
       SessionBadge(appearance: current ?? SessionAppearanceCatalog.placeholder, size: 40)
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(spacing: 6) {
-          ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
-            SymbolChoice(
-              symbol: symbol,
-              isSelected: current?.symbolName == symbol,
-              select: {
-                model.editing?.appearance = SessionAppearance(
-                  symbolName: symbol, colorHex: base.colorHex)
-              }
-            )
-          }
+      SessionAppearanceChoices(
+        palette: palette,
+        current: current,
+        pickSymbol: { symbol in
+          model.editing?.appearance = SessionAppearance(symbolName: symbol, colorHex: base.colorHex)
+        },
+        pickColor: { hex in
+          model.editing?.appearance = SessionAppearance(symbolName: base.symbolName, colorHex: hex)
         }
-        HStack(spacing: 6) {
-          ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
-            ColorChoice(
-              hex: hex,
-              isSelected: current?.colorHex == hex,
-              select: {
-                model.editing?.appearance = SessionAppearance(
-                  symbolName: base.symbolName, colorHex: hex)
-              }
-            )
+      ) {
+        EmptyView()
+      } trailingColors: {
+        if current != nil {
+          Button(LocalizedStringResource("None", bundle: .module)) {
+            model.editing?.appearance = nil
           }
-          if current != nil {
-            Button(LocalizedStringResource("None", bundle: .module)) {
-              model.editing?.appearance = nil
-            }
-            .controlSize(.small)
-            .help(Text("Sessions made from it keep their own symbol and colour.", bundle: .module))
-          }
+          .controlSize(.small)
+          .help(Text("Sessions made from it keep their own symbol and colour.", bundle: .module))
         }
       }
     }

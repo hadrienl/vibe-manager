@@ -230,8 +230,10 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     if let folder, !(folder.hasPrefix("/") || folder == "~" || folder.hasPrefix("~/")) {
       issues.append(.folderNotAbsolute)
     }
-    if let appearance, !SessionAppearanceCatalog.contains(appearance) {
-      issues.append(.appearanceNotOffered)
+    // Only its shape (#199): the lists the pickers offer can change after the template was saved,
+    // and a template must not become invalid because the Settings no longer offer its colour.
+    if let appearance, !SessionAppearanceCatalog.isWellFormed(appearance) {
+      issues.append(.appearanceMalformed)
     }
     let byteCount = body.utf8.count
     if byteCount > PromptTemplateLimits.bodyByteLimit {
@@ -384,10 +386,11 @@ public struct PromptTemplateIssue: Hashable, Sendable, Identifiable {
     )
   }
 
-  public static let appearanceNotOffered = PromptTemplateIssue(
+  public static let appearanceMalformed = PromptTemplateIssue(
     field: .appearance,
     message: String(
-      localized: "This symbol or colour is not one Vibe Manager offers.", bundle: .module),
+      localized: "This symbol or colour cannot be read.", bundle: .module,
+      comment: "A template's appearance, as written in its file, is not a symbol and a colour."),
     remedy: String(localized: "Pick one of those shown, or none.", bundle: .module)
   )
 

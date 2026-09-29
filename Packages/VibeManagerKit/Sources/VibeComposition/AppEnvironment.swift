@@ -395,7 +395,8 @@ public final class AppEnvironment {
       folderLabels: FileFolderLabelStore(url: data.folders),
       projectIcons: FileSystemProjectIconFinder(),
       iconStore: FileSessionIconStore(directory: data.icons),
-      dropStore: FileSessionDropStore(directory: data.drops)
+      dropStore: FileSessionDropStore(directory: data.drops),
+      appearancePalette: UserDefaultsSessionAppearancePaletteStore(suiteName: data.defaultsSuite)
     )
     // The requests above the other applications, and the avatar that presents them (#41).
     appModel.floatingPanel = FloatingRequestPanelModel(

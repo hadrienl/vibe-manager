@@ -104,8 +104,9 @@ extension AppModel {
       editing: SessionIdentityEditing(sessionID: id, place: place), original: session.appearance)
     appearanceEditor = editor
     let edits = identityEdits
+    let palette = appearancePalette.palette
     Task { [weak self] in
-      let (appearance, icon) = await edits.defaultAppearance(for: session)
+      let (appearance, icon) = await edits.defaultAppearance(for: session, palette: palette)
       if let icon { self?.icons.insert(icon) }
       editor.found(default: appearance, icon: icon)
     }

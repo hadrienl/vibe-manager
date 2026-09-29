@@ -22,6 +22,8 @@ public struct SessionDraft: Hashable, Sendable {
   /// The icon found in the working folder, already turned into the PNG that will be stored. Found
   /// by the application, never typed: it is the identity a session gets when the user picks none.
   public var projectIcon: ProjectIcon?
+  /// What a name is given when nothing is picked (#199): the lists the Settings offer.
+  public var palette: SessionAppearancePalette
 
   public init(
     name: String = "",
@@ -32,7 +34,8 @@ public struct SessionDraft: Hashable, Sendable {
     workingDirectoryPath: String? = nil,
     templateFill: PromptTemplateFill? = nil,
     ticketText: String = "",
-    projectIcon: ProjectIcon? = nil
+    projectIcon: ProjectIcon? = nil,
+    palette: SessionAppearancePalette = .default
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
@@ -43,6 +46,7 @@ public struct SessionDraft: Hashable, Sendable {
     self.templateFill = templateFill
     self.ticketText = ticketText
     self.projectIcon = projectIcon
+    self.palette = palette
   }
 
   /// The name of the template field that names the ticket, whatever its case.
@@ -112,7 +116,7 @@ public struct SessionDraft: Hashable, Sendable {
   /// falls back on if the icon's file ever goes missing.
   public var effectiveAppearance: SessionAppearance {
     if let appearance { return appearance }
-    return SessionAppearanceCatalog.defaultAppearance(
+    return palette.defaultAppearance(
       forName: trimmedName.isEmpty ? suggestedName : name, projectIcon: projectIcon?.id)
   }
 

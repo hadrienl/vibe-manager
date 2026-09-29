@@ -537,12 +537,13 @@
         }
       }
     },
-    "This symbol or colour is not one Vibe Manager offers." : {
+    "This symbol or colour cannot be read." : {
+      "comment" : "A template's appearance, as written in its file, is not a symbol and a colour.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager ne propose pas ce symbole ou cette couleur."
+            "value" : "Ce symbole ou cette couleur est illisible."
           }
         }
       }

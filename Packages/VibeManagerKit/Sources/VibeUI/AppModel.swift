@@ -593,6 +593,8 @@ public final class AppModel {
   var folderResolutionTask: Task<Void, Never>?
   /// A rename that could not be written, until the user has read why.
   public internal(set) var folderLabelFailure: String?
+  /// The symbols and colours the pickers offer, as the Settings edit them (#199).
+  public let appearancePalette: SessionAppearancePaletteModel
 
   // MARK: Identity (#183)
 
@@ -680,8 +682,11 @@ public final class AppModel {
     /// Where the project icons of the sessions are copied.
     iconStore: any SessionIconStore = InMemorySessionIconStore(),
     /// Where a drop writes what has no file of its own (#42). Absent, such a drop is refused.
-    dropStore: (any SessionDropStore)? = nil
+    dropStore: (any SessionDropStore)? = nil,
+    /// Where the symbols and colours the pickers offer are kept (#199).
+    appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore()
   ) {
+    self.appearancePalette = SessionAppearancePaletteModel(store: appearancePalette)
     self.dropStore = dropStore
     self.journal = journal
     journal?.editor = fileOpeningPreferences.editor
@@ -816,6 +821,14 @@ public final class AppModel {
           guard let self else { return }
           self.apply(update)
         }
+      }
+    }
+
+    // A draft open, or set aside, while the Settings change the lists offers them as they now are.
+    self.appearancePalette.changed = { [weak self] palette in
+      guard let self else { return }
+      for draft in [self.newSessionModel].compactMap({ $0 }) + self.setAsideDrafts {
+        draft.draft.palette = palette
       }
     }
   }
@@ -2529,7 +2542,8 @@ public final class AppModel {
       projectIcons: projectIcons,
       icons: icons,
       recentFolders: offeredRecentFolders,
-      forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) }
+      forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) },
+      palette: appearancePalette.palette
     )
     if let template {
       model.selectTemplate(template)

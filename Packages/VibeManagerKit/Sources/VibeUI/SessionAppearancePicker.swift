@@ -12,6 +12,8 @@ struct SessionAppearancePicker: View {
   }
 
   let appearance: SessionAppearance
+  /// The symbols and colours the Settings offer (#199).
+  let palette: SessionAppearancePalette
   let projectIcon: ProjectIconOffer?
   let usesProjectIcon: Bool
   let pickSymbol: (String) -> Void
@@ -24,27 +26,18 @@ struct SessionAppearancePicker: View {
     VStack(alignment: .leading, spacing: 10) {
       Text("Appearance", bundle: .module, comment: "The symbol and colour of the session.")
         .font(.headline)
-      HStack(spacing: 6) {
+      SessionAppearanceChoices(
+        palette: palette,
+        current: usesProjectIcon ? nil : appearance,
+        pickSymbol: pickSymbol,
+        pickColor: pickColor
+      ) {
         if let projectIcon {
           ProjectIconChoice(
             image: projectIcon.image, isSelected: usesProjectIcon, select: useProjectIcon)
         }
-        ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
-          SymbolChoice(
-            symbol: symbol,
-            isSelected: !usesProjectIcon && appearance.symbolName == symbol,
-            select: { pickSymbol(symbol) }
-          )
-        }
-      }
-      HStack(spacing: 6) {
-        ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
-          ColorChoice(
-            hex: hex,
-            isSelected: !usesProjectIcon && appearance.colorHex == hex,
-            select: { pickColor(hex) }
-          )
-        }
+      } trailingColors: {
+        EmptyView()
       }
       ForEach(issues) { issue in
         IssueLabel(issue: issue)
@@ -53,6 +46,53 @@ struct SessionAppearancePicker: View {
         caption
           .font(.caption)
           .foregroundStyle(.secondary)
+      }
+    }
+  }
+}
+
+/// The rows of symbols and colours every picker of a badge shows (#199): the lists of the Settings,
+/// then the symbol or colour `current` keeps when they no longer offer it, drawn dashed so that it
+/// can be kept — nothing already made is ever changed by the lists.
+struct SessionAppearanceChoices<LeadingSymbols: View, TrailingColors: View>: View {
+  let palette: SessionAppearancePalette
+  /// What is chosen now; `nil` when nothing of the lists is (the project's icon, or no appearance).
+  let current: SessionAppearance?
+  let pickSymbol: (String) -> Void
+  let pickColor: (String) -> Void
+  @ViewBuilder let leadingSymbols: LeadingSymbols
+  @ViewBuilder let trailingColors: TrailingColors
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      AppearanceChoiceGrid {
+        leadingSymbols
+        // A symbol this Mac cannot draw — added on a later macOS — would be an empty square.
+        ForEach(
+          palette.symbolChoices(keeping: current?.symbolName).filter(SymbolCatalog.isDrawable),
+          id: \.self
+        ) { symbol in
+          SymbolChoice(
+            symbol: symbol,
+            isSelected: current?.symbolName == symbol,
+            isOffered: palette.containsSymbol(symbol),
+            select: { pickSymbol(symbol) }
+          )
+        }
+      }
+      HStack(alignment: .top, spacing: 6) {
+        AppearanceChoiceGrid {
+          ForEach(palette.swatchChoices(keeping: current?.colorHex)) { swatch in
+            ColorChoice(
+              swatch: swatch,
+              isSelected: current.map { SessionAppearancePalette.normalizedHex($0.colorHex) }
+                == swatch.hex,
+              isOffered: palette.containsColor(swatch.hex),
+              select: { pickColor(swatch.hex) }
+            )
+          }
+        }
+        trailingColors
       }
     }
   }
@@ -68,6 +108,7 @@ struct SessionAppearancePopover: View {
     VStack(alignment: .leading, spacing: 12) {
       SessionAppearancePicker(
         appearance: editor.current,
+        palette: model.appearancePalette.palette,
         projectIcon: editor.projectIconID.map { .init(image: model.icons.image(for: $0)) },
         usesProjectIcon: editor.usesProjectIcon,
         pickSymbol: editor.pickSymbol,
