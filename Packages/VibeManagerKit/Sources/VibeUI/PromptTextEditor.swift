@@ -7,7 +7,8 @@ import VibeDomain
 /// It grows with the lines on screen — wrapped lines included, not only the `\n` — from
 /// `minimumLines` up to `maximumLines`, then scrolls inside, so a short prompt is read whole and a
 /// long one does not push the rest of the form off the screen. Return goes to the line; the form
-/// around it decides what ⌘↩ does.
+/// around it decides what ⌘↩ does — unless it hands an `onSubmit`, which Return then calls, the
+/// line being ⇧↩, as in a conversation's composer.
 ///
 /// An `NSTextView` rather than `TextEditor`, which cannot say how tall its content is, or
 /// `TextField(axis: .vertical)`, which grows by itself but submits on Return.
@@ -22,6 +23,9 @@ public struct PromptTextEditor: View {
   private let highlightsPlaceholders: Bool
   private let focusRequested: Bool
   private let isEditable: Bool
+  private let isBordered: Bool
+  private let onSubmit: (() -> Void)?
+  private let onCancel: (() -> Void)?
   @State private var height: CGFloat?
 
   public init(
@@ -32,7 +36,10 @@ public struct PromptTextEditor: View {
     accessibilityLabel: String,
     highlightsPlaceholders: Bool = false,
     focusRequested: Bool = false,
-    isEditable: Bool = true
+    isEditable: Bool = true,
+    isBordered: Bool = true,
+    onSubmit: (() -> Void)? = nil,
+    onCancel: (() -> Void)? = nil
   ) {
     _text = text
     self.minimumLines = minimumLines
@@ -42,6 +49,9 @@ public struct PromptTextEditor: View {
     self.highlightsPlaceholders = highlightsPlaceholders
     self.focusRequested = focusRequested
     self.isEditable = isEditable
+    self.isBordered = isBordered
+    self.onSubmit = onSubmit
+    self.onCancel = onCancel
   }
 
   public var body: some View {
@@ -53,7 +63,9 @@ public struct PromptTextEditor: View {
       accessibilityLabel: accessibilityLabel,
       highlightsPlaceholders: highlightsPlaceholders,
       focusRequested: focusRequested,
-      isEditable: isEditable
+      isEditable: isEditable,
+      onSubmit: onSubmit,
+      onCancel: onCancel
     )
     .frame(height: height ?? PromptTextStyle.height(forLines: minimumLines))
     .overlay(alignment: .topLeading) {
@@ -67,9 +79,14 @@ public struct PromptTextEditor: View {
           .accessibilityHidden(true)
       }
     }
-    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+    .background(
+      isBordered ? Color(nsColor: .textBackgroundColor) : Color.clear,
+      in: RoundedRectangle(cornerRadius: 6)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
+      if isBordered {
+        RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
+      }
     }
   }
 }
@@ -122,6 +139,8 @@ private struct GrowingTextView: NSViewRepresentable {
   /// time this turns true.
   let focusRequested: Bool
   let isEditable: Bool
+  let onSubmit: (() -> Void)?
+  let onCancel: (() -> Void)?
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
@@ -203,6 +222,26 @@ private struct GrowingTextView: NSViewRepresentable {
         }
         window.makeFirstResponder(textView)
       }
+    }
+
+    /// Return submits when the editor was given something to submit to. ⇧↩ and ⌥↩ still go to the
+    /// line, and so does Return while an input method is composing: it confirms the characters.
+    func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+      // Escape, which a text view otherwise keeps for completion, goes to `onCancel` when given.
+      if selector == #selector(NSResponder.cancelOperation(_:))
+        || selector == #selector(NSTextView.complete(_:)),
+        let onCancel = parent?.onCancel, !textView.hasMarkedText()
+      {
+        onCancel()
+        return true
+      }
+      guard selector == #selector(NSResponder.insertNewline(_:)), let onSubmit = parent?.onSubmit,
+        !textView.hasMarkedText()
+      else { return false }
+      let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+      guard modifiers.isDisjoint(with: [.shift, .option]) else { return false }
+      onSubmit()
+      return true
     }
 
     func textDidChange(_ notification: Notification) {

@@ -48,7 +48,8 @@ extension AppModel {
     !quickOpen.isPresented && !isPresentingSheet
   }
 
-  /// Whether one of the window's sheets asks to be shown — the ones `RootView` presents.
+  /// Whether one of the window's sheets asks to be shown — the ones `RootView` presents — or the
+  /// new session's draft, which holds the keyboard as a sheet would (#177).
   public var isPresentingSheet: Bool {
     permissions?.isPresentingStep == true || isPresentingNewSession || pendingRestart != nil
       || pendingSwitch != nil || diagnosticsExport != nil || hookConsentRequest != nil
@@ -67,7 +68,7 @@ extension AppModel {
   /// made and used; it is the keyboard leaving the sidebar that brings the selection back to
   /// the session on screen, so that ⇧⌘W never closes sessions nobody is looking at.
   public var terminalClaimsKeyboardOnActivation: Bool {
-    !hasMultipleSelection
+    !hasMultipleSelection && canClaimKeyboard
   }
 
   /// View › Show Conversation / Show Terminal (⌥⌘T), for the selected session.
@@ -79,7 +80,7 @@ extension AppModel {
   }
 
   public var canTogglePresentation: Bool {
-    selectedSession.map(conversations.canShowConversation) ?? false
+    !isPresentingNewSession && (selectedSession.map(conversations.canShowConversation) ?? false)
   }
 
   /// Hooks each conversation model up to its session's terminal.

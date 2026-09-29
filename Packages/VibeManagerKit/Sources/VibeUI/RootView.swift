@@ -120,18 +120,6 @@ public struct RootView: View {
             skip: { Task { await permissions.skipStep() } }
           )
         }
-      case .newSession:
-        if let sheetModel = model.newSessionModel {
-          NewSessionSheet(
-            model: sheetModel,
-            submitted: { launching in model.submitNewSession(launching: launching) },
-            cancelled: { model.cancelNewSession() },
-            manageTemplates: {
-              model.settingsTab = .templates
-              openSettings()
-            }
-          )
-        }
       case .restartContext:
         // A fresh start is the one restart that sends something: the text is shown before it
         // goes, and the sheet is where it can still be changed or called off.
@@ -204,7 +192,6 @@ public struct RootView: View {
   /// `AppModel.isPresentingSheet` asks the same questions: a new one goes in both.
   private var presentedSheet: RootSheet? {
     if model.permissions?.isPresentingStep == true { return .fullDiskAccess }
-    if model.isPresentingNewSession { return .newSession }
     if model.pendingRestart != nil { return .restartContext }
     if model.pendingSwitch != nil { return .agentSwitch }
     if model.diagnosticsExport != nil { return .diagnosticsExport }
@@ -220,8 +207,6 @@ public struct RootView: View {
     case .fullDiskAccess:
       guard let permissions = model.permissions else { return }
       Task { await permissions.skipStep() }
-    case .newSession:
-      model.cancelNewSession()
     case .restartContext:
       model.cancelRestart()
     case .agentSwitch:
@@ -240,7 +225,6 @@ public struct RootView: View {
   /// creating a session, which is precisely where this question must never be asked.
   private enum RootSheet: Identifiable {
     case fullDiskAccess
-    case newSession
     /// Presented from the root rather than from the workspace: attached to the loaded column it
     /// was torn down by a refresh that failed, leaving a pending restart nobody could answer or
     /// call off — and a session whose Restart command stayed withheld.
@@ -358,9 +342,39 @@ public struct RootView: View {
           Divider()
         }
         detail
+          // The whole area, whatever it shows: an overlay is only as large as what it covers, and
+          // over the small "No session yet" the draft was squeezed to its composer (#177).
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          // Under the draft, neither Tab nor VoiceOver reaches the session's web view or drawer.
+          .disabled(model.isPresentingNewSession)
+          .accessibilityHidden(model.isPresentingNewSession)
           .overlay {
             if let creation = model.shownCreation {
               SessionCreationPlaceholder(creation: creation)
+            }
+          }
+          // Over the session selected rather than in its place: every terminal stays mounted
+          // underneath, and leaving the draft finds the session exactly as it was (#177).
+          .overlay {
+            if model.isPresentingNewSession, let draft = model.newSessionModel {
+              NewSessionDraftView(
+                model: draft,
+                focusRequest: model.newSessionFocusRequest,
+                submitted: { launching in model.submitNewSession(launching: launching) },
+                dismissed: { model.dismissNewSessionDraft() },
+                discarded: {
+                  model.cancelNewSession()
+                  model.focusSession()
+                },
+                chooseFiles: { model.beginAttachingFiles() },
+                manageTemplates: {
+                  model.settingsTab = .templates
+                  openSettings()
+                }
+              )
+              // One view per draft: another draft brought on screen starts with its own folds,
+              // popover and caret, not the ones left by the previous.
+              .id(draft.draftID)
             }
           }
       }
@@ -378,12 +392,16 @@ public struct RootView: View {
         }
         // Where the work on the session on screen stands, and a way to change it (#80).
         ToolbarItem(placement: .primaryAction) {
-          if let session = model.selectedSession, session.taskStatus != .archived {
+          if !model.isPresentingNewSession, let session = model.selectedSession,
+            session.taskStatus != .archived
+          {
             TaskStatusMenu(commands: SessionCommands(model: model, session: session))
           }
         }
         ToolbarItem(placement: .principal) {
-          if let session = model.selectedSession, model.conversations.canShowConversation(session) {
+          if !model.isPresentingNewSession, let session = model.selectedSession,
+            model.conversations.canShowConversation(session)
+          {
             PresentationPicker(
               selection: Binding(
                 get: { model.presentation(of: session) },
@@ -401,7 +419,7 @@ public struct RootView: View {
         if model.browser != nil {
           // In a window too narrow for both, the terminal and the web view take turns, and this
           // is where the user picks which one (#69).
-          if model.layout.columns.browser == .alternating {
+          if model.layout.columns.browser == .alternating, !model.isPresentingNewSession {
             ToolbarItem(placement: .principal) {
               Picker(
                 selection: Binding(
@@ -465,7 +483,7 @@ public struct RootView: View {
       }
       .inspector(isPresented: inspectorPresented) {
         Group {
-          if let session = model.selectedSession {
+          if !model.isPresentingNewSession, let session = model.selectedSession {
             SessionContextInspector(
               session: session,
               resolution: model.resolution(forID: session.id),
@@ -879,9 +897,9 @@ public struct RootView: View {
   @ViewBuilder
   private func terminalStack(for session: WorkSession) -> some View {
     let presentation = model.presentation(of: session)
-    // Under the placeholder of a session being made, nothing keeps the keyboard: typed into, the
-    // session left would take what was meant for the new one.
-    let isCovered = model.shownCreation != nil
+    // Under the placeholder of a session being made, or a new session's draft (#177), nothing
+    // keeps the keyboard: typed into, the session left would take what was meant for the new one.
+    let isCovered = model.shownCreation != nil || model.isPresentingNewSession
     ZStack {
       ForEach(model.sessions) { listed in
         if let pane = model.pane(for: listed.id) {

@@ -6,6 +6,9 @@ import VibeDomain
 @MainActor
 @Observable
 public final class NewSessionModel {
+  /// Tells drafts apart in a list.
+  public var draftID: ObjectIdentifier { ObjectIdentifier(self) }
+
   /// Shared with the switch of agent: one list, one wording, whichever sheet shows it.
   public typealias AgentOption = VibeUI.AgentOption
 
@@ -31,6 +34,10 @@ public final class NewSessionModel {
   /// The name the template made last. The name follows the template as long as it is empty or
   /// still that name: once the user types their own, it is theirs.
   private var generatedName: String?
+  /// The agent the form picked by itself: choosing it is not a change the user made.
+  private var defaultProviderID: String?
+  /// The name `settleName()` gave the draft for sending, taken back if it is refused.
+  private var settledName: String?
   /// The folder a template put in the field last, and the one that was there before any did.
   /// Like the name, the folder follows the template until the user picks their own.
   private var presetFolder: String?
@@ -123,9 +130,88 @@ public final class NewSessionModel {
     return agents.first { $0.id.rawValue == providerID }
   }
 
+  /// The name is not asked for (#177): left empty, the session is named after its prompt, its
+  /// template or its folder. What must be chosen is where the agent works, and which agent.
   public var canSubmit: Bool {
-    !isSubmitting && !draft.trimmedName.isEmpty && draft.resolvedWorkingDirectoryPath != nil
-      && (draft.templateFill?.missingRequiredFields.isEmpty ?? true)
+    !isSubmitting && missingRequirement == nil
+  }
+
+  /// What still keeps the draft from being sent, said as what to do: the first one only, since the
+  /// composer has room for one line. `nil` once everything required is there.
+  public var missingRequirement: String? {
+    if draft.resolvedWorkingDirectoryPath == nil {
+      return String(
+        localized: "Choose a working folder to send.", bundle: .module,
+        comment: "Next to the Send button of a new session.")
+    }
+    if draft.providerID?.isEmpty ?? true {
+      return String(
+        localized: "Choose an agent to send.", bundle: .module,
+        comment: "Next to the Send button of a new session.")
+    }
+    if let field = draft.templateFill?.missingRequiredFields.first {
+      return String(
+        localized: "Fill in “\(field.label)” to send.", bundle: .module,
+        comment: "Next to the Send button of a new session. The label of a template's field.")
+    }
+    return nil
+  }
+
+  /// The name shown where the name is typed, until one is: the one the session would be given.
+  public var placeholderName: String {
+    let suggested = draft.suggestedName
+    return suggested.isEmpty
+      ? String(localized: "New Session", bundle: .module, comment: "An unnamed new session.")
+      : suggested
+  }
+
+  /// Whether the user has changed anything in the draft yet: a draft still pristine is dropped
+  /// rather than kept when the user goes elsewhere. The folder and the agent the form proposed
+  /// itself are not changes; any other folder, agent, model or appearance is.
+  public var isPristine: Bool {
+    let folder = draft.workingDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return draft.trimmedName.isEmpty
+      && (folder.isEmpty || draft.workingDirectoryPath == preselectedFolder)
+      && (draft.providerID == nil || draft.providerID == defaultProviderID)
+      && draft.modelID == nil && draft.appearance == nil
+      && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && draft.templateFill == nil
+      && draft.ticketText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  /// The problems of a draft, less the missing name: the name is not asked for (#177), and one is
+  /// given at Send. A draft refused for something else must not come back blamed for it too.
+  static func namelessAllowed(_ issues: [SessionDraftIssue]) -> [SessionDraftIssue] {
+    issues.filter { $0 != .nameMissing }
+  }
+
+  /// Gives the draft the name it would be created with, if none was typed. Done at Send, so the
+  /// name keeps following the prompt until then.
+  public func settleName() {
+    guard draft.trimmedName.isEmpty else { return }
+    draft.name = draft.suggestedName
+    settledName = draft.name
+  }
+
+  /// A draft refused comes back unnamed if it was only named for sending: its name follows its
+  /// prompt, or its template, again.
+  private func unsettleName() {
+    if let settledName, draft.name == settledName, settledName != generatedName {
+      draft.name = ""
+    }
+    settledName = nil
+  }
+
+  /// Files joined to the prompt: their paths, as the agent reads them in a terminal, at the end
+  /// of the text. A template's prompt is its own; nothing is added to it.
+  public func attach(_ files: [URL]) {
+    guard draft.templateFill == nil else { return }
+    let paths = files.map(\.path).filter(PathInsertion.isWritablePath)
+      .map(PathInsertion.shellEscaped)
+    guard !paths.isEmpty else { return }
+    let text = draft.initialPrompt
+    let separator = text.isEmpty || text.last?.isWhitespace == true ? "" : " "
+    draft.initialPrompt = text + separator + paths.joined(separator: " ")
   }
 
   // MARK: - Templates
@@ -302,6 +388,7 @@ public final class NewSessionModel {
     // user nothing. Only the default selection skips them.
     if draft.providerID == nil, let first = agents.first(where: \.isUsable) {
       draft.providerID = first.id.rawValue
+      defaultProviderID = first.id.rawValue
     }
     await loadModels()
     if hasSubmitted {
@@ -379,7 +466,7 @@ public final class NewSessionModel {
     draft.workingDirectoryPath = path
     lookForIcon()
     let checked = draft
-    let found = await create.problems(with: checked, checkingFolder: true)
+    let found = Self.namelessAllowed(await create.problems(with: checked, checkingFolder: true))
     guard checkedFolderPath == path else { return }
 
     // The whole verdict is only published when it still describes the form on screen. A check on
@@ -451,10 +538,11 @@ public final class NewSessionModel {
     // Skipping it instead made a folder that had disappeared vanish from the list of problems as
     // soon as the next field was edited, and come back only at the following Create.
     let path = checked.workingDirectoryPath
-    let found = await create.problems(
-      with: checked,
-      checkingFolder: path != nil && path == checkedFolderPath
-    )
+    let found = Self.namelessAllowed(
+      await create.problems(
+        with: checked,
+        checkingFolder: path != nil && path == checkedFolderPath
+      ))
     // The draft may have moved on while the checks ran, so a verdict on an older one is
     // dropped rather than shown over what the user is looking at now.
     guard !Task.isCancelled, checked == draft else { return }
@@ -465,7 +553,9 @@ public final class NewSessionModel {
   /// nothing, so they are asked with the sheet still open; the rest waits for `submit()`.
   public func refusesBeforeCreating() async -> Bool {
     guard !isSubmitting else { return true }
+    settleName()
     guard !draft.validate().isEmpty else { return false }
+    unsettleName()
     revalidation?.cancel()
     revalidation = nil
     hasSubmitted = true
@@ -476,6 +566,7 @@ public final class NewSessionModel {
   /// Returns the created session and the plan to launch, or `nil` when the draft was refused.
   public func submit() async -> SessionCreation? {
     guard !isSubmitting else { return nil }
+    settleName()
     // A pending debounce would otherwise land after the verdict of this submit and replace it.
     revalidation?.cancel()
     revalidation = nil
@@ -492,7 +583,8 @@ public final class NewSessionModel {
       issues = []
       return creation
     } catch let rejection as SessionCreationRejected {
-      issues = rejection.issues
+      issues = Self.namelessAllowed(rejection.issues)
+      unsettleName()
       return nil
     } catch {
       issues = [
@@ -504,6 +596,7 @@ public final class NewSessionModel {
             localized: "Try again, and report the failure if it persists.", bundle: .module)
         )
       ]
+      unsettleName()
       return nil
     }
   }
@@ -613,6 +706,11 @@ extension NewSessionModel {
     skippedRecentFolder = index > 0 ? recentFolders[0] : nil
     preselectedFolder = option.folder.path
     draft.workingDirectoryPath = option.folder.path
+    // Its icon is offered at once when the folder was just looked at without an alert: reading it
+    // again asks the system nothing. A folder macOS guards, left unverified, waits for a gesture.
+    if option.availability == .available {
+      lookForIcon()
+    }
   }
 
   /// Looks at each recent folder once, within a budget, without raising a consent alert.

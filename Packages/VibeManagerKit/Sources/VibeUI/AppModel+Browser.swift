@@ -6,9 +6,10 @@ import VibeDomain
 
 /// The session's web view, as the workspace drives it (#69).
 extension AppModel {
-  /// The selected session's web view, when there is one.
+  /// The selected session's web view, when there is one — and when it is on screen: under a new
+  /// session's draft, the Web menu has no page to act on (#177).
   public var selectedBrowser: SessionBrowser? {
-    guard let browser, let id = selectedSessionID else { return nil }
+    guard let browser, let id = selectedSessionID, !isPresentingNewSession else { return nil }
     return browser.browser(for: id)
   }
 
@@ -56,7 +57,9 @@ extension AppModel {
   }
 
   public var isWebViewAvailable: Bool {
-    browser != nil && selectedSession.map { $0.status != .archived } == true
+    // Over a new session's draft, the session underneath is not the one on screen (#177).
+    browser != nil && !isPresentingNewSession
+      && selectedSession.map { $0.status != .archived } == true
   }
 
   /// Whether the selected session's web view is open, whatever room the window gives it.

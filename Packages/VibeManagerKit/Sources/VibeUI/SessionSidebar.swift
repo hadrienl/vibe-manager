@@ -108,6 +108,14 @@ struct SessionSidebar: View {
         get: { model.selectedSessionIDs },
         set: { model.selectFromList($0, byKeyboard: isListFocused && Self.isBrowsingKeyPress) })
     ) {
+      // The new session's draft (#177), above everything: it is not a session yet, and the one
+      // way back to it once the user went elsewhere.
+      ForEach(model.newSessionDrafts, id: \.draftID) { draft in
+        NewSessionDraftRow(
+          draft: draft,
+          isShown: model.isPresentingNewSession && draft === model.newSessionModel,
+          show: { model.showNewSessionDraft(draft) })
+      }
       // At the top, where the user looks after pressing Create, whatever the order below.
       if let creation = model.creationRow {
         SessionCreationRow(creation: creation)
@@ -177,7 +185,7 @@ struct SessionSidebar: View {
       Text(verbatim: model.folderLabelFailure ?? "")
     }
     .overlay {
-      if model.visibleSessions.isEmpty, model.creationRow == nil {
+      if model.visibleSessions.isEmpty, model.creationRow == nil, model.newSessionDrafts.isEmpty {
         emptyState
       }
     }

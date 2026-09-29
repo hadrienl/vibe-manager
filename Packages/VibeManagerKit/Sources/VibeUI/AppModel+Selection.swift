@@ -8,12 +8,20 @@ import VibeDomain
 /// inspector. The selection only says what the next command applies to.
 extension AppModel {
   /// What the sidebar's list draws as selected.
+  /// Empty over a new session's draft (#177): the draft's row is the one on screen.
   public var selectedSessionIDs: Set<SessionID> {
+    guard !isPresentingNewSession else { return [] }
     guard selection.isMultiple else { return Set(selectedSessionID.map { [$0] } ?? []) }
     return selection.ids
   }
 
   public var hasMultipleSelection: Bool { selection.isMultiple }
+
+  /// Whether a session is what the main area shows: one is selected, and no new session's draft
+  /// covers it (#177).
+  public var isSessionOnScreen: Bool {
+    selectedSessionID != nil && !isPresentingNewSession
+  }
 
   /// The sessions a command of the Session menu applies to, in the order the sidebar draws them:
   /// the selection, or the session on screen.
@@ -28,6 +36,11 @@ extension AppModel {
   /// What the list asks for after a click, a ⇧-click, a ⌘-click or ⌘A — or an arrow key,
   /// `byKeyboard`: the session reached then leaves the keyboard in the list (#105).
   public func selectFromList(_ ids: Set<SessionID>, byKeyboard: Bool = false) {
+    // The list shows no selection over a new session's draft (#177): whatever the user picks in
+    // it — the session underneath included — is where they go. Nothing picked is the list
+    // clearing itself, not the user leaving.
+    guard !ids.isEmpty || !isPresentingNewSession else { return }
+    leaveNewSessionDraft()
     defer { if byKeyboard { keepsKeyboardInSidebar = true } }
     var ids = ids
     // The outline view drops the selection of a row it folds away: folding the group of the

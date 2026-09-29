@@ -112,16 +112,24 @@ extension AppModel {
   }
 
   /// Session › Attach Files… (⌘O): the files chosen, for the selected session.
+  /// Over a new session's draft, the files join its initial prompt (#177).
   public func beginAttachingFiles() {
-    guard let id = selectedSessionID, !dropRoute(for: id).isRefused else { return }
+    guard canAttachFiles else { return }
     isChoosingFilesToAttach = true
   }
 
   public var canAttachFiles: Bool {
-    selectedSessionID.map { !dropRoute(for: $0).isRefused } ?? false
+    if isPresentingNewSession {
+      return newSessionModel.map { $0.draft.templateFill == nil && !$0.isSubmitting } ?? false
+    }
+    return selectedSessionID.map { !dropRoute(for: $0).isRefused } ?? false
   }
 
   public func attachChosenFiles(_ files: [URL]) async {
+    if isPresentingNewSession {
+      newSessionModel?.attach(files)
+      return
+    }
     guard let id = selectedSessionID, !files.isEmpty else { return }
     guard !announceRefusal(for: id) else { return }
     await deliver(files.map { .file($0, isTemporary: false) }, unreadable: 0, to: id)

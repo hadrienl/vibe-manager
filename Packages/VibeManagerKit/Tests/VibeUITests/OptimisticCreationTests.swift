@@ -203,12 +203,221 @@ struct OptimisticCreationTests {
   func localProblemsStayInTheSheet() async throws {
     let repository = GatedRepository(sessions: [], open: true)
     let model = await makeModel(repository)
-    let sheet = try openSheet(in: model, name: "   ", folder: folder)
+    let sheet = try openSheet(in: model, name: "Relative", folder: "relative/path")
 
     #expect(await sheet.refusesBeforeCreating())
     #expect(!sheet.issues.isEmpty)
     #expect(model.isPresentingNewSession)
     #expect(model.sessionInCreation == nil)
+  }
+}
+
+@MainActor
+@Suite("The new session's draft, in the main area (#177)", .timeLimit(.minutes(2)))
+struct NewSessionDraftTests {
+  private let folder = FileManager.default.temporaryDirectory.path
+
+  private func makeModel(sessions: [WorkSession]) async -> AppModel {
+    let repository = GatedRepository(sessions: sessions, open: true)
+    let launcher = SessionLauncher(
+      supervisor: FakeSupervisor(), repository: repository, agents: OneAgent(),
+      viewportTimeout: .zero)
+    let model = AppModel(repository: repository, agents: OneAgent(), launcher: launcher)
+    await model.load()
+    return model
+  }
+
+  private func existing() -> WorkSession {
+    SessionDraft(name: "Existing", providerID: "stub", workingDirectoryPath: folder).session()
+  }
+
+  @Test("⌘N shows the draft over the session, which stays selected, and the list shows none")
+  func draftCoversTheSession() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+
+    model.beginNewSession()
+
+    #expect(model.isPresentingNewSession)
+    #expect(model.newSessionModel != nil)
+    #expect(model.selectedSessionID == previous.id)
+    #expect(model.selectedSessionIDs.isEmpty)
+    #expect(!model.isSessionOnScreen)
+    #expect(!model.canTogglePresentation)
+  }
+
+  @Test("Going to a session sets a draft with something in it aside, and ⌘N brings it back")
+  func writtenDraftIsKept() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+    draft.draft.initialPrompt = "Half a thought"
+
+    model.select(previous.id)
+
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionModel === draft)
+
+    model.beginNewSession()
+    #expect(model.isPresentingNewSession)
+    #expect(model.newSessionModel === draft)
+    #expect(draft.draft.initialPrompt == "Half a thought")
+  }
+
+  @Test("An empty draft left for a session goes: there is nothing to come back to")
+  func pristineDraftGoes() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+    model.beginNewSession()
+
+    // The session underneath, picked in the list: it is where the user goes.
+    model.selectFromList([previous.id])
+
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionModel == nil)
+    #expect(model.selectedSessionIDs == [previous.id])
+  }
+
+  @Test("The list clearing its selection under the draft does not leave it")
+  func emptyListSelectionKeepsTheDraft() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+    model.beginNewSession()
+
+    model.selectFromList([])
+
+    #expect(model.isPresentingNewSession)
+    #expect(model.selectedSessionID == previous.id)
+  }
+
+  @Test("A selection the application moves by itself leaves the draft on screen")
+  func automaticSelectionKeepsTheDraft() async throws {
+    let first = existing()
+    let second = existing()
+    let model = await makeModel(sessions: [first, second])
+    model.beginNewSession()
+
+    model.select(second.id, leavingDraft: false)
+
+    #expect(model.isPresentingNewSession)
+    #expect(model.selectedSessionID == second.id)
+  }
+
+  @Test("Files chosen over the draft join its prompt, not the session underneath")
+  func attachedFilesGoToTheDraft() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+
+    #expect(model.canAttachFiles)
+    await model.attachChosenFiles([URL(fileURLWithPath: "/tmp/notes.md")])
+
+    #expect(draft.draft.initialPrompt == "/tmp/notes.md")
+  }
+
+  @Test("Open Quickly leaves the draft for the session chosen")
+  func openQuicklyLeavesTheDraft() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.beginNewSession()
+    try #require(model.newSessionModel).draft.initialPrompt = "Kept"
+
+    model.goToSession(previous.id)
+
+    #expect(!model.isPresentingNewSession)
+    #expect(model.selectedSessionID == previous.id)
+    #expect(model.newSessionModel != nil)
+  }
+
+  @Test("Nothing of the session underneath is within reach of the menus")
+  func hiddenSessionIsOutOfReach() async throws {
+    let first = existing()
+    let second = existing()
+    let model = await makeModel(sessions: [first, second])
+    model.select(second.id)
+    model.beginNewSession()
+
+    #expect(model.selectedBrowser == nil)
+    #expect(model.selectedGroup == nil)
+    #expect(!model.canMoveSelection(by: -1))
+    #expect(!model.terminalClaimsKeyboardOnActivation)
+  }
+
+  @Test("A refused draft comes back over an empty one begun meanwhile, unnamed again")
+  func refusedDraftWinsOverAnEmptyOne() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let refused = try #require(model.newSessionModel)
+    refused.draft = SessionDraft(
+      initialPrompt: "Somewhere gone", providerID: "stub",
+      workingDirectoryPath: "/nonexistent/\(UUID())")
+
+    model.submitNewSession(launching: true)
+    model.beginNewSession()
+    #expect(model.newSessionModel !== refused)
+    await waitUntil("the creation is over") { model.sessionInCreation == nil }
+
+    #expect(model.newSessionModel === refused)
+    #expect(model.isPresentingNewSession)
+    #expect(refused.draft.initialPrompt == "Somewhere gone")
+    #expect(refused.draft.name.isEmpty)
+  }
+
+  @Test("A folder asked for over a draft with something in it starts another; both are kept")
+  func folderStartsAnotherDraft() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let first = try #require(model.newSessionModel)
+    first.draft.initialPrompt = "First"
+
+    model.beginNewSession(folder: folder)
+
+    let second = try #require(model.newSessionModel)
+    #expect(second !== first)
+    #expect(model.setAsideDrafts.first === first)
+    #expect(model.newSessionDrafts.count == 2)
+
+    // Its row brings the first back; the second, changed by its folder, is put aside in turn.
+    await waitUntil("the folder is in the second draft") {
+      second.draft.workingDirectoryPath == folder
+    }
+    model.showNewSessionDraft(first)
+    #expect(model.newSessionModel === first)
+    #expect(model.setAsideDrafts.first === second)
+  }
+
+  @Test("A draft nothing was changed in takes the folder asked for")
+  func pristineDraftTakesTheFolder() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+
+    model.beginNewSession(folder: folder)
+
+    #expect(model.newSessionModel === draft)
+    #expect(model.setAsideDrafts.isEmpty)
+  }
+
+  @Test("Sent without a name, the session is named after its prompt")
+  func unnamedDraftIsNamedAfterItsPrompt() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+    draft.draft = SessionDraft(
+      initialPrompt: "Fix the blank conversation", providerID: "stub",
+      workingDirectoryPath: folder)
+
+    model.submitNewSession(launching: false)
+
+    #expect(model.creationRow?.name == "Fix the blank conversation")
+    await waitUntil("the session is stored") { model.sessionInCreation == nil }
+    #expect(model.sessions.contains { $0.name == "Fix the blank conversation" })
   }
 }
 

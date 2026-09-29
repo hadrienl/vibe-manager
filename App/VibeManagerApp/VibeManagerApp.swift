@@ -143,7 +143,7 @@ struct VibeManagerApp: App {
           environment.appModel.focusNotes()
         }
         .keyboardShortcut("n", modifiers: [.command, .option])
-        .disabled(environment.appModel.selectedSessionID == nil)
+        .disabled(!environment.appModel.isSessionOnScreen)
 
         // The same session, as a conversation or as its raw terminal (#38).
         Button(
@@ -251,13 +251,13 @@ struct VibeManagerApp: App {
           environment.appModel.focusSession()
         }
         .keyboardShortcut("2", modifiers: [.command, .option])
-        .disabled(environment.appModel.selectedSessionID == nil)
+        .disabled(!environment.appModel.isSessionOnScreen)
 
         Button("Focus Inspector") {
           environment.appModel.focusInspector()
         }
         .keyboardShortcut("3", modifiers: [.command, .option])
-        .disabled(environment.appModel.selectedSessionID == nil)
+        .disabled(!environment.appModel.isSessionOnScreen)
 
         Button("Focus Web View") {
           environment.appModel.focusWebView()
@@ -449,33 +449,13 @@ private struct SessionHistoryCommands: Commands {
 
   var body: some Commands {
     CommandMenu("Session") {
-      // The label follows the session: one that was created and never ran is started, not
-      // restarted, and the menu is where a keyboard-only user reads which of the two this is.
-      // With several sessions selected in the sidebar, each command applies to all of them and
-      // says how many it will act on (#77).
-      if let plan = batchPlan(.restart) {
-        Button(model.batchTitle(for: plan)) { request(plan) }
-          .keyboardShortcut("r", modifiers: [.command, .control])
-      } else {
-        Button(
-          model.selectedSession.map(model.restartTitle) ?? String(localized: "Restart Session")
-        ) {
-          guard let session = model.selectedSession else { return }
-          Task { await model.restart(session.id) }
-        }
-        .keyboardShortcut("r", modifiers: [.command, .control])
-        .disabled(!(model.selectedSession.map(model.canRestart) ?? false))
+      // Over a new session's draft, the session underneath is not the one on screen: nothing here
+      // acts on it, as nothing did under the sheet the draft replaced (#177). Attach Files… is
+      // the exception, and joins the files to the draft's prompt.
+      Group {
+        sessionCommands
       }
-
-      // Another agent or another model for the same work. Offered on a running session too: the
-      // sheet says the agent will be stopped, and nothing is stopped before it is confirmed.
-      Button("Switch Agent…") {
-        guard let session = model.selectedSession else { return }
-        model.beginAgentSwitch(session.id)
-      }
-      .keyboardShortcut("m", modifiers: [.command, .control])
-      .disabled(
-        model.hasMultipleSelection || !(model.selectedSession.map(model.canSwitchAgent) ?? false))
+      .disabled(model.isPresentingNewSession)
 
       // The keyboard's way to a drop (#42): chips in a conversation, paths in a terminal.
       Button("Attach Files…") {
@@ -484,51 +464,90 @@ private struct SessionHistoryCommands: Commands {
       .keyboardShortcut("o", modifiers: .command)
       .disabled(!model.canAttachFiles)
 
-      Divider()
+      Group {
+        statusMenu
 
-      // The swipe's keyboard equivalent (#80): the shortcut is the decision, so it asks nothing.
-      Menu("Status") {
-        if model.hasMultipleSelection {
-          ForEach(SessionTaskStatus.columns, id: \.self) { status in
-            let plan = model.batchPlan(.move(to: status), for: model.commandTargets)
-            Button {
-              request(plan)
-            } label: {
-              // The column the selection is already in reads as itself, and stays unavailable.
-              plan.isEmpty ? Text(status.label) : Text(verbatim: model.batchTitle(for: plan))
-            }
-            .disabled(plan.isEmpty)
-          }
-        } else {
-          statusToggles
-        }
         Divider()
-        Button("Move to Next Status") {
-          if let plan = model.batchMovePlan(forward: true), model.hasMultipleSelection {
-            request(plan)
-            return
-          }
-          guard let session = model.selectedSession else { return }
-          Task { await model.moveTaskStatus(of: session.id, forward: true) }
-        }
-        .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-        Button("Move to Previous Status") {
-          if let plan = model.batchMovePlan(forward: false), model.hasMultipleSelection {
-            request(plan)
-            return
-          }
-          guard let session = model.selectedSession else { return }
-          Task { await model.moveTaskStatus(of: session.id, forward: false) }
-        }
-        .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+
+        closeButton
+        archiveButtons
       }
-      .disabled(model.selectedSession.map { $0.taskStatus == .archived } ?? true)
-
-      Divider()
-
-      closeButton
-      archiveButtons
+      .disabled(model.isPresentingNewSession)
     }
+  }
+
+  @ViewBuilder
+  private var sessionCommands: some View {
+    // The label follows the session: one that was created and never ran is started, not
+    // restarted, and the menu is where a keyboard-only user reads which of the two this is.
+    // With several sessions selected in the sidebar, each command applies to all of them and
+    // says how many it will act on (#77).
+    if let plan = batchPlan(.restart) {
+      Button(model.batchTitle(for: plan)) { request(plan) }
+        .keyboardShortcut("r", modifiers: [.command, .control])
+    } else {
+      Button(
+        model.selectedSession.map(model.restartTitle) ?? String(localized: "Restart Session")
+      ) {
+        guard let session = model.selectedSession else { return }
+        Task { await model.restart(session.id) }
+      }
+      .keyboardShortcut("r", modifiers: [.command, .control])
+      .disabled(!(model.selectedSession.map(model.canRestart) ?? false))
+    }
+
+    // Another agent or another model for the same work. Offered on a running session too: the
+    // sheet says the agent will be stopped, and nothing is stopped before it is confirmed.
+    Button("Switch Agent…") {
+      guard let session = model.selectedSession else { return }
+      model.beginAgentSwitch(session.id)
+    }
+    .keyboardShortcut("m", modifiers: [.command, .control])
+    .disabled(
+      model.hasMultipleSelection || !(model.selectedSession.map(model.canSwitchAgent) ?? false))
+  }
+
+  @ViewBuilder
+  private var statusMenu: some View {
+    Divider()
+
+    // The swipe's keyboard equivalent (#80): the shortcut is the decision, so it asks nothing.
+    Menu("Status") {
+      if model.hasMultipleSelection {
+        ForEach(SessionTaskStatus.columns, id: \.self) { status in
+          let plan = model.batchPlan(.move(to: status), for: model.commandTargets)
+          Button {
+            request(plan)
+          } label: {
+            // The column the selection is already in reads as itself, and stays unavailable.
+            plan.isEmpty ? Text(status.label) : Text(verbatim: model.batchTitle(for: plan))
+          }
+          .disabled(plan.isEmpty)
+        }
+      } else {
+        statusToggles
+      }
+      Divider()
+      Button("Move to Next Status") {
+        if let plan = model.batchMovePlan(forward: true), model.hasMultipleSelection {
+          request(plan)
+          return
+        }
+        guard let session = model.selectedSession else { return }
+        Task { await model.moveTaskStatus(of: session.id, forward: true) }
+      }
+      .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+      Button("Move to Previous Status") {
+        if let plan = model.batchMovePlan(forward: false), model.hasMultipleSelection {
+          request(plan)
+          return
+        }
+        guard let session = model.selectedSession else { return }
+        Task { await model.moveTaskStatus(of: session.id, forward: false) }
+      }
+      .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+    }
+    .disabled(model.selectedSession.map { $0.taskStatus == .archived } ?? true)
   }
 
   @ViewBuilder

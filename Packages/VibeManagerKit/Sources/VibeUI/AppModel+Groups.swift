@@ -87,9 +87,12 @@ extension AppModel {
     pruneSelection()
   }
 
-  /// The group of the selected session, in the grouped view.
+  /// The group of the selected session, in the grouped view. None under a new session's draft,
+  /// whose row belongs to no group (#177).
   public var selectedGroup: SessionGroup? {
-    guard case .grouped(let groups) = sidebarContent, let selectedSessionID else { return nil }
+    guard case .grouped(let groups) = sidebarContent, let selectedSessionID,
+      !isPresentingNewSession
+    else { return nil }
     return groups.first { group in group.sessions.contains { $0.id == selectedSessionID } }
   }
 
