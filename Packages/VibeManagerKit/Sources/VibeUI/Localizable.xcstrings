@@ -10472,6 +10472,17 @@
         }
       }
     },
+    "Session title" : {
+      "comment" : "Placeholder of a new session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre de la session"
+          }
+        }
+      }
+    },
     "Sessions" : {
       "comment" : "A section of the Settings window.",
       "localizations" : {

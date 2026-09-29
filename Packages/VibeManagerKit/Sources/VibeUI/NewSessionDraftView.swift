@@ -148,15 +148,16 @@ public struct NewSessionDraftView: View {
   // MARK: - Options
 
   /// The options, as the first message of the thread, headed by the session's badge and name.
-  /// Left empty, the name shows the one the session will be given.
   private var optionsCard: some View {
     VStack(alignment: .leading, spacing: 14) {
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 10) {
           appearanceButton
+          // Left empty, the session is named at Send after its prompt, its template or its folder.
           TextField(
             text: $model.draft.name,
-            prompt: Text(verbatim: model.placeholderName)
+            prompt: Text(
+              "Session title", bundle: .module, comment: "Placeholder of a new session's name.")
           ) {
             Text("Name", bundle: .module, comment: "The name of the new session.")
           }
