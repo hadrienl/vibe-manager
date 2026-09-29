@@ -77,9 +77,19 @@ public final class SessionBrowser {
     isRestored = true
   }
 
-  func append(_ tab: BrowserTabModel, activate: Bool, after anchor: BrowserTabID? = nil) {
+  /// A new tab after `anchor`, and after the tabs `anchor` opened before it since the user last
+  /// turned to a tab: three links ⌘-clicked in a page line up in the order they were clicked (#186).
+  /// `isOpener`: the tab was opened from `anchor`'s page, rather than only placed after it — a
+  /// terminal's link, an agent's page — and later ones from that page line up after it.
+  func append(
+    _ tab: BrowserTabModel, activate: Bool, after anchor: BrowserTabID? = nil,
+    isOpener: Bool = false
+  ) {
     if let anchor, let index = tabs.firstIndex(where: { $0.id == anchor }) {
-      tabs.insert(tab, at: index + 1)
+      var position = index + 1
+      while position < tabs.count, tabs[position].openerID == anchor { position += 1 }
+      if isOpener { tab.openerID = anchor }
+      tabs.insert(tab, at: position)
     } else {
       tabs.append(tab)
     }
@@ -100,6 +110,9 @@ public final class SessionBrowser {
 
   public func activate(_ id: BrowserTabID) {
     guard tab(id) != nil else { return }
+    // Turning to a tab ends the run of tabs opened from the one before: the next ones line up
+    // after their opener again.
+    for tab in tabs { tab.openerID = nil }
     activeTabID = ticketTab?.id == id ? nil : id
     stateDidChange?()
   }

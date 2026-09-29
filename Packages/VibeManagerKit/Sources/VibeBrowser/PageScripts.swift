@@ -9,6 +9,35 @@ import Foundation
 enum PageScripts {
   static let consoleHandlerName = "vibeConsole"
   static let agentWorldName = "vibe-agent"
+  /// The world of the script that follows the links under the pointer (#186).
+  static let linksWorldName = "vibe-links"
+  static let hoveredLinkHandlerName = "vibeHoveredLink"
+
+  /// Says which link the pointer enters, and when it leaves every link: in every frame, from a
+  /// world of its own, so that the page can neither read nor post it — and only from what the
+  /// pointer did: an event the page dispatched itself would name the link of its choice.
+  static let hoveredLink = #"""
+    (() => {
+      const handler = window.webkit && window.webkit.messageHandlers
+        && window.webkit.messageHandlers.vibeHoveredLink;
+      if (!handler) { return; }
+      let current = null;
+      const post = (href) => {
+        if (href === current) { return; }
+        current = href;
+        try { handler.postMessage(href); } catch (error) {}
+      };
+      document.addEventListener('pointerover', (event) => {
+        if (!event.isTrusted) { return; }
+        const target = event.target;
+        const anchor = target instanceof Element ? target.closest('a[href]') : null;
+        post(anchor ? anchor.href : null);
+      }, true);
+      document.addEventListener('pointerout', (event) => {
+        if (event.isTrusted && !event.relatedTarget) { post(null); }
+      }, true);
+    })();
+    """#
 
   static let console = #"""
     (() => {

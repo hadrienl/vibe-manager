@@ -192,18 +192,17 @@ public final class BrowserWorkspace {
 
   // MARK: - Tabs
 
-  /// Opens an address in a new tab of a session, after the tab in front.
+  /// Opens an address in a new tab of a session, after the tab it was opened from — the tab in
+  /// front unless said — and after the tabs that one already opened (#186).
   @discardableResult
   public func open(
-    _ url: URL, in id: SessionID, openedBy: BrowserTab.Opener, activate: Bool = true
+    _ url: URL, in id: SessionID, openedBy: BrowserTab.Opener, activate: Bool = true,
+    from origin: BrowserTabID? = nil
   ) -> BrowserTabModel {
     let browser = browser(for: id)
     let tab = makeTab(url, openedBy: openedBy, in: id)
     browser.append(
-      tab, activate: activate,
-      after: browser.activeTab.flatMap {
-        $0.isPinnedTicket ? nil : $0.id
-      })
+      tab, activate: activate, after: anchor(origin, in: browser), isOpener: origin != nil)
     if activate || openedBy != .agent { tab.ensureWebView() }
     touch(tab)
     if !browser.isVisible {
@@ -214,17 +213,25 @@ public final class BrowserWorkspace {
     return tab
   }
 
-  /// A window a page opened, shown as a tab after its opener's, in front.
-  private func adoptPopup(_ popup: WKWebView, url: URL, byAgent: Bool, in id: SessionID) {
+  /// A window a page opened, shown as a tab after its opener's: in front, unless the user
+  /// ⌘-clicked the link that opened it.
+  private func adoptPopup(
+    _ popup: WKWebView, url: URL, byAgent: Bool, activate: Bool, from origin: BrowserTabID?,
+    in id: SessionID
+  ) {
     let browser = browser(for: id)
     let tab = makeTab(url, openedBy: byAgent ? .agent : .user, in: id)
     tab.adopt(popup)
     browser.append(
-      tab, activate: true,
-      after: browser.activeTab.flatMap {
-        $0.isPinnedTicket ? nil : $0.id
-      })
+      tab, activate: activate, after: anchor(origin, in: browser), isOpener: origin != nil)
     touch(tab)
+  }
+
+  /// The tab a new one follows: the one it was opened from, else the one in front — never the
+  /// ticket's, which stays first.
+  private func anchor(_ origin: BrowserTabID?, in browser: SessionBrowser) -> BrowserTabID? {
+    let tab = origin.flatMap { browser.tab($0) } ?? browser.activeTab
+    return tab.flatMap { $0.isPinnedTicket ? nil : $0.id }
   }
 
   /// A link from a terminal: the tab that already shows it comes forward, else a new one opens.
@@ -281,11 +288,12 @@ public final class BrowserWorkspace {
       guard !isPinnedTicket else { return }
       self?.scheduleSave(id)
     }
-    tab.openInNewTab = { [weak self] url, byAgent in
-      self?.open(url, in: id, openedBy: byAgent ? .agent : .user)
+    tab.openInNewTab = { [weak self] url, byAgent, activate in
+      self?.open(url, in: id, openedBy: byAgent ? .agent : .user, activate: activate, from: tabID)
     }
-    tab.openPopup = { [weak self] popup, url, byAgent in
-      self?.adoptPopup(popup, url: url, byAgent: byAgent, in: id)
+    tab.openPopup = { [weak self] popup, url, byAgent, activate in
+      self?.adoptPopup(
+        popup, url: url, byAgent: byAgent, activate: activate, from: tabID, in: id)
     }
     tab.didCloseWindow = { [weak self, weak tab] in
       guard let self, let tab, !tab.isPinnedTicket else { return }
