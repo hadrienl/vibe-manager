@@ -65,14 +65,20 @@ public struct NewSessionDraftView: View {
     VStack(spacing: 0) {
       header
       Divider()
-      ScrollView {
-        optionsCard
-          // On its way while another session is made: nothing more is changed in it.
-          .disabled(model.isSubmitting)
-          .frame(maxWidth: 760)
-          .padding(.horizontal, 24)
-          .padding(.vertical, 24)
-          .frame(maxWidth: .infinity)
+      // Laid out as a conversation's thread: the card is the last message, just above the
+      // composer, and a card taller than the window starts scrolled to its foot.
+      GeometryReader { viewport in
+        ScrollView {
+          optionsCard
+            // On its way while another session is made: nothing more is changed in it.
+            .disabled(model.isSubmitting)
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: viewport.size.height, alignment: .bottom)
+        }
+        .defaultScrollAnchor(.bottom)
       }
       composer
         .frame(maxWidth: 800)
