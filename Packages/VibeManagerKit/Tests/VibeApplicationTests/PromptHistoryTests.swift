@@ -37,6 +37,12 @@ struct PromptHistoryTests {
     ])
     #expect(history.prompts == ["kept"])
   }
+
+  @Test("A command sent from the composer is left out while on its way, as once written")
+  func pendingCommands() {
+    let history = PromptHistory(entries: [prompt("a")], pending: [" /compact", "!ls", "b"])
+    #expect(history.prompts == ["a", "b"])
+  }
 }
 
 @Suite("Moving through the history with ↑ and ↓ (#123)")
@@ -94,6 +100,19 @@ struct PromptHistoryNavigationTests {
     _ = last.older(in: grown, draft: "")
     #expect(last.index == 3)
     #expect(last.older(in: PromptHistory(prompts: ["one", "four"]), draft: "four") == "one")
+  }
+
+  @Test("The history moving under the message shown keeps it, and the draft put aside")
+  func historyMoves() {
+    var navigation = PromptHistoryNavigation()
+    let before = PromptHistory(prompts: ["a", "pending", "b", "c"])
+    _ = navigation.older(in: before, draft: "draft")
+    _ = navigation.older(in: before, draft: "c")
+    // "pending" left the history: "b" is now where "pending" was.
+    let after = PromptHistory(prompts: ["a", "b", "c"])
+    #expect(navigation.older(in: after, draft: "b") == "a")
+    #expect(navigation.newer(in: after, draft: "a") == "b")
+    #expect(navigation.cancel(in: after, draft: "b") == "draft")
   }
 
   @Test("A recalled message edited is a draft: ↑ puts it aside and starts from the most recent")

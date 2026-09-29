@@ -17,17 +17,27 @@ public struct PromptHistory: Hashable, Sendable {
       guard case .userPrompt(let text, _) = entry.content else { return nil }
       return text
     }
+    // A command sent from the composer — `/compact`, `!ls` — is a notice once written, not a
+    // prompt: left out while it is on its way too, or it would leave the history once there.
+    let prompts = pending.filter {
+      let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+      return !trimmed.hasPrefix("/") && !trimmed.hasPrefix("!")
+    }
+    self.init(texts: written + prompts)
+  }
+
+  public init(prompts: [String]) {
+    self.init(texts: prompts)
+  }
+
+  private init(texts: [String]) {
     var prompts: [String] = []
-    for text in written + pending {
+    for text in texts {
       let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty, trimmed != prompts.last else { continue }
       prompts.append(trimmed)
     }
     self.prompts = prompts
-  }
-
-  public init(prompts: [String]) {
-    self.init(entries: [], pending: prompts)
   }
 }
 
@@ -85,11 +95,14 @@ public struct PromptHistoryNavigation: Hashable, Sendable {
 
   /// The message shown, if the composer still shows it as recalled. Edited, it is a draft: the
   /// navigation ends, and the next ↑ starts again from the most recent message.
+  ///
+  /// The history may have moved meanwhile — a message sent and not written yet leaves its place
+  /// to the transcript's: the message shown is looked for where it went, nearest first.
   private mutating func currentIndex(in history: PromptHistory, draft: String) -> Int? {
     guard let index else { return nil }
     let prompts = history.prompts
-    let shown = min(index, prompts.count - 1)
-    guard shown >= 0, prompts[shown] == draft else {
+    let before = prompts.prefix(index + 1)
+    guard let shown = before.lastIndex(of: draft) ?? prompts.firstIndex(of: draft) else {
       self = PromptHistoryNavigation()
       return nil
     }

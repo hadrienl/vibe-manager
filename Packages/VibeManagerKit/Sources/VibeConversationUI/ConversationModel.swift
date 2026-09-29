@@ -585,7 +585,9 @@ public final class ConversationModel {
 
   /// Escape in the composer: the draft as it was before ↑, while a message recalled is shown.
   public func cancelPromptRecall() -> Bool {
-    guard let text = historyNavigation.cancel(in: promptHistory, draft: draft) else { return false }
+    guard composerState == .ready,
+      let text = historyNavigation.cancel(in: promptHistory, draft: draft)
+    else { return false }
     draft = text
     return true
   }

@@ -573,6 +573,7 @@ struct ConversationModelTests {
     #expect(!stopped.recallOlderPrompt())
     first.activity = .awaitingUser(.approval)
     #expect(!first.recallOlderPrompt())
+    #expect(!first.cancelPromptRecall())
     first.activity = nil
     #expect(first.recallOlderPrompt())
     #expect(first.draft == "first session")
