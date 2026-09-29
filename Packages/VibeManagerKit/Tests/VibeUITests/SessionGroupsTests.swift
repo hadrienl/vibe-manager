@@ -185,10 +185,14 @@ struct SidebarGroupsTests {
   @Test("Without agents to start, the + of a group opens nothing (#106)")
   func groupButtonWithoutAgents() async throws {
     let model = await makeModel()
-    let api = try #require(model.groups.first)
+    // A folder that exists: the ones of the sessions above are reported missing once the disk
+    // has answered, which would win over the lack of agents.
+    let folder = FileManager.default.temporaryDirectory.path
+    let group = SessionGroup(
+      id: SessionFolderKey(path: folder), folderName: "tmp", displayPath: folder, sessions: [])
 
-    #expect(model.newSessionAvailability(in: api) == .disabled(.creationUnavailable))
-    model.beginNewSession(in: api)
+    #expect(model.newSessionAvailability(in: group) == .disabled(.creationUnavailable))
+    model.beginNewSession(in: group)
     #expect(model.newSessionModel == nil)
   }
 
