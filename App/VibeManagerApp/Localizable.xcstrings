@@ -93,6 +93,62 @@
         }
       }
     },
+    "Agents are running in %lld sessions. They can keep working during the update, and you will find them as they are after the relaunch." : {
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Des agents sont en cours dans %lld session. Ils peuvent continuer pendant la mise à jour, et vous les retrouverez tels quels après la relance."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Des agents sont en cours dans %lld sessions. Ils peuvent continuer pendant la mise à jour, et vous les retrouverez tels quels après la relance."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Des agents sont en cours dans %lld sessions. Ils peuvent continuer pendant la mise à jour, et vous les retrouverez tels quels après la relance."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Agents are running in %lld session. They can keep working during the update, and you will find them as they are after the relaunch."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Agents are running in %lld sessions. They can keep working during the update, and you will find them as they are after the relaunch."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "An agent is running. It can keep working during the update, and you will find it as it is after the relaunch." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un agent est en cours. Il peut continuer pendant la mise à jour, et vous le retrouverez tel quel après la relance."
+          }
+        }
+      }
+    },
     "An agent is still running." : {
       "localizations" : {
         "fr" : {
@@ -139,6 +195,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler"
+          }
+        }
+      }
+    },
+    "Check for Updates…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher les mises à jour…"
           }
         }
       }
@@ -316,22 +382,22 @@
         }
       }
     },
-    "Focus Side Terminals" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aller aux terminaux annexes"
-          }
-        }
-      }
-    },
     "Focus Session" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aller à la session"
+          }
+        }
+      }
+    },
+    "Focus Side Terminals" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aller aux terminaux annexes"
           }
         }
       }
@@ -419,12 +485,43 @@
         }
       }
     },
+    "Install Vibe Manager %@ and relaunch?" : {
+      "comment" : "The version about to be installed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer Vibe Manager %@ et relancer ?"
+          }
+        }
+      }
+    },
     "Keep Running" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Laisser tourner"
+          }
+        }
+      }
+    },
+    "Keep Running and Install" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laisser tourner et installer"
+          }
+        }
+      }
+    },
+    "Later" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus tard"
           }
         }
       }
@@ -807,12 +904,68 @@
         }
       }
     },
+    "Stop All and Install" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout arrêter et installer"
+          }
+        }
+      }
+    },
     "Switch Agent…" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changer d’agent…"
+          }
+        }
+      }
+    },
+    "The %lld running agents will be stopped, then resumed after the relaunch where their conversation left off. The turn in progress is lost." : {
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’agent en cours sera arrêté, puis repris après la relance là où sa conversation s’était arrêtée. Le tour en cours sera perdu."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les %lld agents en cours seront arrêtés, puis repris après la relance là où leur conversation s’était arrêtée. Le tour en cours sera perdu."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Les %lld agents en cours seront arrêtés, puis repris après la relance là où leur conversation s’était arrêtée. Le tour en cours sera perdu."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The running agent will be stopped, then resumed after the relaunch where its conversation left off. The turn in progress is lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The %lld running agents will be stopped, then resumed after the relaunch where their conversation left off. The turn in progress is lost."
+                }
+              }
+            }
           }
         }
       }
@@ -942,6 +1095,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utilisation"
+          }
+        }
+      }
+    },
+    "Version %@ Is Available…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La version %@ est disponible…"
+          }
+        }
+      }
+    },
+    "Vibe Manager %@ can't take back the running agents." : {
+      "comment" : "The version about to be installed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager %@ ne peut pas reprendre les agents en cours."
           }
         }
       }
