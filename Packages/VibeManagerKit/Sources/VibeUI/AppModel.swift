@@ -108,6 +108,9 @@ public final class AppModel {
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?
+  /// The application's name, as its bundle gives it, at the head of the window's title (#159).
+  /// A workspace assembled without a bundle — the tests' — goes by the product's name.
+  public var applicationName = "Vibe Manager"
   /// Brings the application forward: "Open Session" from the floating panel, while another
   /// application is in front.
   @ObservationIgnored public var activateApplication: @MainActor () -> Void = {

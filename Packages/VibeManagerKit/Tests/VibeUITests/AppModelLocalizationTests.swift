@@ -36,6 +36,18 @@ struct AppModelLocalizationTests {
         == "3 agents kept running while Vibe Manager was closed; 1 has finished since.")
   }
 
+  @Test("The window's title reads the same in French, placeholder of a draft included (#159)")
+  func windowTitle() {
+    let (application, session) = ("Vibe Manager", "Refonte")
+    #expect(
+      Localization.string("\(application) › \(session)", module: "VibeUI", in: "fr")
+        == "Vibe Manager › Refonte")
+    #expect(
+      Localization.string("\(application), \(session)", module: "VibeUI", in: "fr")
+        == "Vibe Manager, Refonte")
+    #expect(Localization.string("New Session", module: "VibeUI", in: "fr") == "Nouvelle session")
+  }
+
   @Test("The detached notice agrees in French too")
   func detached() {
     #expect(

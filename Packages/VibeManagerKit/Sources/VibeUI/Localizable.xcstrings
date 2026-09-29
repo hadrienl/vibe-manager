@@ -616,6 +616,40 @@
         }
       }
     },
+    "%@ › %@" : {
+      "comment" : "The window's title: the application's name, then the session on screen.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ › %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ › %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "comment" : "VoiceOver's reading of the window's header: the application, then the session.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
     "%@, %@. Folder not found" : {
       "comment" : "VoiceOver: a recent folder that has gone. Its name, then its path.",
       "localizations" : {
