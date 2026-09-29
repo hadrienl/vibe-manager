@@ -59,7 +59,9 @@ public struct ConversationView: View {
       if showsComposer { footer }
     }
     // The theme's picture, when it has one, stays where it is while the messages scroll (#118).
-    .background(ThemeBackdropView(theme: theme))
+    // Under the toolbar too, where the messages scroll: a view, unlike the colour it replaced,
+    // stops at the safe area, and the window's grey showed there instead of the theme.
+    .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)
