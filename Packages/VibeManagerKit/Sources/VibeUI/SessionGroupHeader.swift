@@ -10,12 +10,28 @@ struct SessionGroupHeader: View {
   let group: SessionGroup
   /// A header is being dragged over the list: its + stays hidden (#106).
   var isDragging = false
+  /// What the header carries when it is dragged to move its group; `nil` when it cannot move.
+  var startDrag: (() -> NSItemProvider)? = nil
   @State private var isRenaming = false
   @State private var isHovering = false
   @State private var name = ""
   @FocusState private var isNameFocused: Bool
 
   var body: some View {
+    if let startDrag {
+      // A drag takes the pointer without a hover ending: the + would stay, in the drag's image
+      // and on the header once dropped.
+      header.onDrag {
+        isHovering = false
+        return startDrag()
+      }
+    } else {
+      header
+    }
+  }
+
+  @ViewBuilder
+  private var header: some View {
     let summary = model.summary(of: group)
     let isExpanded = model.isExpanded(group)
     let containsSelection =
