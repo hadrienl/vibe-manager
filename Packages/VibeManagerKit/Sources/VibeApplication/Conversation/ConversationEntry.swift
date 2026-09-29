@@ -37,6 +37,11 @@ public struct ConversationEntry: Identifiable, Hashable, Sendable {
     guard case .userPrompt = content else { return false }
     return true
   }
+
+  public var shellRun: ShellRun? {
+    guard case .notice(.shell(let run)) = content else { return nil }
+    return run
+  }
 }
 
 /// Something that happened to the conversation rather than in it.
@@ -47,8 +52,8 @@ public enum ConversationNotice: Hashable, Sendable {
   case compacted
   /// A command of the CLI itself — `/clear`, `/model` — or its output. Shown as it was typed.
   case command(String)
-  /// A shell command the user ran from the agent's prompt (`!ls`), with what it printed.
-  case shell(command: String, output: String?)
+  /// A shell command the user ran from the agent's prompt (`!ls`), with what it printed (#188).
+  case shell(ShellRun)
   /// The provider could not answer: the text it wrote about it.
   case error(String)
   /// Something the CLI wrote for the user that is not the agent speaking — a summary written
@@ -59,6 +64,29 @@ public enum ConversationNotice: Hashable, Sendable {
   case chapter(providerName: String, date: Date?)
   /// The transcript is older than the shapes this reader knows: only the messages are shown.
   case olderFormat
+}
+
+/// A shell command the user ran through the agent's shell mode — `!` typed first in its prompt —
+/// rather than one the agent ran with its tools (#188). The agent reads the command and what it
+/// printed as part of the conversation.
+public struct ShellRun: Hashable, Sendable {
+  public var command: String
+  /// Running until its output is written. Claude Code writes no exit code: a command of its is
+  /// never said to have failed, only its error output is shown as such.
+  public var state: ToolCallState
+  public var output: ToolOutput?
+  /// What it printed on the error stream, apart from the rest.
+  public var errorOutput: ToolOutput?
+
+  public init(
+    command: String, state: ToolCallState = .running, output: ToolOutput? = nil,
+    errorOutput: ToolOutput? = nil
+  ) {
+    self.command = command
+    self.state = state
+    self.output = output
+    self.errorOutput = errorOutput
+  }
 }
 
 /// One call an agent made to one of its tools.

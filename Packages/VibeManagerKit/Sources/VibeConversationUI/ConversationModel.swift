@@ -96,12 +96,20 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   }
 
   public let id: UUID
+  /// The message, or the command without its `!`.
   public let text: String
+  public let kind: PromptKind
   public let attachmentCount: Int
   public let sentAt: Date
-  /// How many prompts the conversation will hold before this one — those in the transcript, and
-  /// those sent before it and still coming: it is confirmed by the next.
-  let promptCountAtSend: Int
+  /// What ↑ brings back of it into the composer.
+  let recallText: String
+  /// How many prompts — or shell commands, for a command — the conversation will hold before
+  /// this one, those in the transcript and those sent before it and still coming: it is confirmed
+  /// by the next.
+  let countAtSend: Int
+  /// A command its agent writes to the transcript only once it ended: however long it runs, it is
+  /// not taken for lost.
+  let waitsForEnd: Bool
   public var state: State
 }
 
@@ -395,11 +403,72 @@ public final class ConversationModel {
     switch composerState {
     case .ready:
       return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
+        && shellHold == nil
     case .answeringQuestion:
       return request?.isSending == false && !freeAnswer.isEmpty
     default:
       return false
     }
+  }
+
+  // MARK: - Shell mode
+
+  /// What the composer sends (#188).
+  public enum ComposerMode: Hashable, Sendable {
+    case message
+    /// The draft opens on `!`, and the agent runs it as a shell command.
+    case shell
+  }
+
+  /// Read from the draft, never kept apart: typing, pasting, erasing the `!` or recalling a
+  /// command all give the right mode by themselves.
+  public var composerMode: ComposerMode {
+    composerState == .ready && promptFormat.shellEntry != nil && draft.hasPrefix("!")
+      ? .shell : .message
+  }
+
+  /// A draft opening on `!` for an agent that has no shell mode: it goes as a message.
+  public var opensOnBangWithoutShellMode: Bool {
+    promptFormat.shellEntry == nil && draft.hasPrefix("!")
+  }
+
+  /// The name of the folder a command runs in, for the composer to say it.
+  public var workingDirectoryName = ""
+
+  /// Why the command written cannot be sent now.
+  public enum ShellHold: Hashable, Sendable {
+    /// Only the `!`.
+    case empty
+    /// Files joined before the draft became a command: a command takes none.
+    case attachments
+    /// The agent works, and would not keep the command for the end of its turn.
+    case working
+  }
+
+  public var shellHold: ShellHold? {
+    guard composerMode == .shell, let shell = promptFormat.shellEntry else { return nil }
+    if !attachments.isEmpty { return .attachments }
+    if isAgentWorking && !shell.queuesWhileWorking { return .working }
+    guard case .shell(let command) = PromptSubmission(text: draft).kind(shell: shell),
+      !command.isEmpty
+    else { return .empty }
+    return nil
+  }
+
+  /// Puts a command run before back in the composer, to change it or run it again.
+  public func editAgain(_ run: ShellRun) {
+    guard composerState == .ready else { return }
+    draft = PromptHistory.recalled(command: run.command)
+    historyNavigation = PromptHistoryNavigation()
+    requestComposerFocus()
+  }
+
+  /// Escape in shell mode: the draft becomes a message again, its text kept. Returns whether the
+  /// key was used.
+  public func leaveShellMode() -> Bool {
+    guard composerState == .ready, composerMode == .shell else { return false }
+    draft.removeFirst()
+    return true
   }
 
   private var freeAnswer: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -494,8 +563,18 @@ public final class ConversationModel {
   public var isAgentWorking: Bool { activity == .working && isProcessRunning }
 
   public func attach(_ files: [URL]) {
-    for file in files where !attachments.contains(file) && PathInsertion.isWritablePath(file.path) {
-      attachments.append(file)
+    let writable = files.filter { PathInsertion.isWritablePath($0.path) }
+    if composerMode == .shell {
+      // A command takes no attachment: the files are named in it, escaped for the shell.
+      let paths = writable.map { PathInsertion.shellEscaped($0.path) }
+      if !paths.isEmpty {
+        let separator = draft == "!" || draft.hasSuffix(" ") ? "" : " "
+        draft += separator + paths.joined(separator: " ")
+      }
+    } else {
+      for file in writable where !attachments.contains(file) {
+        attachments.append(file)
+      }
     }
     requestComposerFocus()
   }
@@ -529,18 +608,34 @@ public final class ConversationModel {
     guard canSend, let write else { return false }
     isSubmitting = true
     defer { isSubmitting = false }
+    let shell = promptFormat.shellEntry
     let submission = PromptSubmission(text: draft, attachments: attachments)
+    let kind = submission.kind(shell: shell)
     let keystrokes = PromptEncoding.keystrokes(
       for: submission, format: promptFormat, whileWorking: isAgentWorking)
     // Prompts still on their way reach the transcript first: this one is confirmed only once
     // they are in too. One the agent never took past ten seconds is no longer waited for.
-    let promptCount =
-      snapshot.entries.filter(\.isUserPrompt).count + echoes.filter { $0.state == .sending }.count
+    let count =
+      Self.count(of: kind, in: snapshot.entries)
+      + echoes.filter { $0.state == .sending && $0.kind.isShell == kind.isShell }.count
+    let text: String
+    let recallText: String
+    switch kind {
+    case .shell(let command):
+      text = command
+      recallText = PromptHistory.recalled(command: command)
+    case .message:
+      text = PromptEncoding.sanitized(submission.messageText(shell: shell))
+      recallText =
+        shell == nil ? text : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
+    }
     echoes.append(
       PendingEcho(
-        id: UUID(), text: PromptEncoding.sanitized(submission.text),
-        attachmentCount: attachments.count,
-        sentAt: Date(), promptCountAtSend: promptCount, state: .sending))
+        id: UUID(), text: text, kind: kind, attachmentCount: attachments.count,
+        sentAt: Date(), recallText: recallText, countAtSend: count,
+        // Queued, a command is written once the turn ended, then run.
+        waitsForEnd: kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
+        state: .sending))
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
     attachments = []
@@ -548,7 +643,7 @@ public final class ConversationModel {
     scroll.jumpedToBottom()
     scrollToBottomRequest += 1
     for (index, keys) in keystrokes.writes.enumerated() {
-      if index > 0 { try? await Task.sleep(for: keystrokes.interval) }
+      if index > 0 { try? await Task.sleep(for: keystrokes.delay(before: index)) }
       await write(keys)
     }
     try? await Task.sleep(for: submitDelay)
@@ -561,7 +656,9 @@ public final class ConversationModel {
 
   /// The messages sent in this session: those of its transcript, then those on their way to it.
   public var promptHistory: PromptHistory {
-    PromptHistory(entries: snapshot.entries, pending: echoes.map(\.text))
+    PromptHistory(
+      entries: snapshot.entries, pending: echoes.map(\.recallText),
+      hasShellMode: promptFormat.shellEntry != nil)
   }
 
   /// ↑ in the composer: shows the message sent before the one shown, the draft put aside.
@@ -598,8 +695,15 @@ public final class ConversationModel {
 
   private func confirmEchoes() {
     guard !echoes.isEmpty else { return }
-    let prompts = snapshot.entries.filter(\.isUserPrompt)
-    echoes.removeAll { echo in prompts.count > echo.promptCountAtSend }
+    let prompts = Self.count(of: .message, in: snapshot.entries)
+    let commands = Self.count(of: .shell(command: ""), in: snapshot.entries)
+    echoes.removeAll { echo in (echo.kind.isShell ? commands : prompts) > echo.countAtSend }
+  }
+
+  /// The prompts of the conversation, or its shell commands: what confirms an echo of that kind.
+  private static func count(of kind: PromptKind, in entries: [ConversationEntry]) -> Int {
+    kind.isShell
+      ? entries.filter { $0.shellRun != nil }.count : entries.filter(\.isUserPrompt).count
   }
 
   private func scheduleEchoCheck() {
@@ -608,7 +712,9 @@ public final class ConversationModel {
       try? await Task.sleep(for: .seconds(10))
       guard !Task.isCancelled, let self else { return }
       let now = Date()
-      for index in self.echoes.indices where now.timeIntervalSince(self.echoes[index].sentAt) >= 10
+      for index in self.echoes.indices
+      where !self.echoes[index].waitsForEnd
+        && now.timeIntervalSince(self.echoes[index].sentAt) >= 10
       {
         self.echoes[index].state = .unconfirmed
       }

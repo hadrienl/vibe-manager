@@ -59,7 +59,9 @@ public final class CodexConversationDecoder: ConversationDecoding {
     let id = item["id"] as? String ?? UUID().uuidString
     switch item["type"] as? String {
     case "UserMessage":
-      let texts = Self.texts(item["content"]).filter { !Self.isContext($0) }
+      let texts = Self.texts(item["content"]).filter { !Self.isContext($0) }.map {
+        $0.hasPrefix(Self.messageGuard + "!") ? String($0.dropFirst()) : $0
+      }
       let images = (item["content"] as? [[String: Any]] ?? []).filter {
         ($0["type"] as? String)?.lowercased().contains("image") == true
       }.count
@@ -76,6 +78,8 @@ public final class CodexConversationDecoder: ConversationDecoding {
       let summary = (item["summary_text"] as? [String] ?? []).joined(separator: "\n\n")
       append(
         ConversationEntry(id: id, date: date, content: .reasoning(summary.isEmpty ? nil : summary)))
+    case "CommandExecution" where item["source"] as? String == "user_shell":
+      append(ConversationEntry(id: id, date: date, content: .notice(.shell(Self.userShell(item)))))
     case "CommandExecution":
       append(ConversationEntry(id: id, date: date, content: .tool(Self.command(item, id: id))))
     case "FileChange":
@@ -165,6 +169,23 @@ public final class CodexConversationDecoder: ConversationDecoding {
       call.facts.resultCount = output.split(separator: "\n").count
     }
     return call
+  }
+
+  /// A command the user ran with `!` (#188). Measured against 0.159: written once it ended, with
+  /// its streams apart and its exit code; the model is handed it again as a user message,
+  /// `<user_shell_command>`, which is left out.
+  static func userShell(_ item: [String: Any]) -> ShellRun {
+    let exitCode = (item["exit_code"] as? NSNumber).map { Int32(truncating: $0) }
+    let failed = item["status"] as? String == "failed" || (exitCode ?? 0) != 0
+    return ShellRun(
+      command: script(of: item["command"]),
+      state: failed ? .failed(exitCode: exitCode) : .succeeded,
+      output: (item["stdout"] as? String).flatMap {
+        ClaudeCodeConversationDecoder.shellOutput($0)
+      },
+      errorOutput: (item["stderr"] as? String).flatMap {
+        ClaudeCodeConversationDecoder.shellOutput($0, isError: true)
+      })
   }
 
   static func fileChange(_ item: [String: Any], id: String) -> ToolCall {
@@ -266,6 +287,9 @@ public final class CodexConversationDecoder: ConversationDecoding {
 
   // MARK: - Helpers
 
+  /// Put by the composer before a message opening on `!`, which Codex would run otherwise (#188).
+  public static let messageGuard = "\u{200B}"
+
   static func texts(_ content: Any?) -> [String] {
     guard let blocks = content as? [[String: Any]] else {
       return (content as? String).map { [$0] } ?? []
@@ -276,8 +300,11 @@ public final class CodexConversationDecoder: ConversationDecoding {
   /// What Codex hands the model about its environment, dressed as a user message.
   static func isContext(_ text: String) -> Bool {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    return ["<environment_context>", "<user_instructions>", "<permissions", "# AGENTS.md"]
-      .contains { trimmed.hasPrefix($0) }
+    return [
+      "<environment_context>", "<user_instructions>", "<permissions", "# AGENTS.md",
+      "<user_shell_command>",
+    ]
+    .contains { trimmed.hasPrefix($0) }
   }
 
   /// `["/bin/zsh", "-lc", "swift test"]` reads as `swift test`.

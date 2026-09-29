@@ -51,6 +51,16 @@
         }
       }
     },
+    "%@ has no shell mode: sent as a message" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas de mode shell : envoyé comme message"
+          }
+        }
+      }
+    },
     "%@ has not written anything yet." : {
       "localizations" : {
         "fr" : {
@@ -717,6 +727,16 @@
         }
       }
     },
+    "Copy Command" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier la commande"
+          }
+        }
+      }
+    },
     "Copy Message" : {
       "localizations" : {
         "fr" : {
@@ -743,6 +763,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copier le code"
+          }
+        }
+      }
+    },
+    "Copy the command and its output" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier la commande et sa sortie"
           }
         }
       }
@@ -897,6 +927,17 @@
         }
       }
     },
+    "Edit Again" : {
+      "comment" : "Puts a shell command back in the composer.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier à nouveau"
+          }
+        }
+      }
+    },
     "Esc" : {
       "comment" : "The Escape key.",
       "localizations" : {
@@ -904,6 +945,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échap"
+          }
+        }
+      }
+    },
+    "Exit code %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code de sortie %@"
           }
         }
       }
@@ -1311,6 +1362,16 @@
         }
       }
     },
+    "No output" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune sortie"
+          }
+        }
+      }
+    },
     "No version is on trial any more." : {
       "localizations" : {
         "fr" : {
@@ -1573,6 +1634,16 @@
         }
       }
     },
+    "Remove the attachments to run a command" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirez les pièces jointes pour lancer une commande"
+          }
+        }
+      }
+    },
     "Removed: %@" : {
       "localizations" : {
         "fr" : {
@@ -1603,12 +1674,42 @@
         }
       }
     },
+    "Run" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exécuter"
+          }
+        }
+      }
+    },
+    "Run (Return)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exécuter (Retour)"
+          }
+        }
+      }
+    },
     "Run the tail's tests." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lance les tests du tail."
+          }
+        }
+      }
+    },
+    "Running…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours…"
           }
         }
       }
@@ -1679,6 +1780,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plusieurs choix"
+          }
+        }
+      }
+    },
+    "Shell command" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commande shell"
+          }
+        }
+      }
+    },
+    "Shell command in %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commande shell dans %@"
+          }
+        }
+      }
+    },
+    "Shell command in %@ · ↩ run · \\! for a message" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commande shell dans %@ · ↩ exécuter · \\! pour un message"
+          }
+        }
+      }
+    },
+    "Shell command · ↩ run · \\! for a message" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commande shell · ↩ exécuter · \\! pour un message"
+          }
+        }
+      }
+    },
+    "Show All %lld Lines" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show All %lld Line"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show All %lld Lines"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Afficher les %lld lignes"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Afficher la ligne"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Afficher les %lld lignes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Show Less" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher moins"
           }
         }
       }
@@ -2159,6 +2356,16 @@
         }
       }
     },
+    "Wait for the end of %@'s turn to run a command" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attendez la fin du tour de %@ pour lancer une commande"
+          }
+        }
+      }
+    },
     "What should change?" : {
       "localizations" : {
         "fr" : {
@@ -2205,6 +2412,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous"
+          }
+        }
+      }
+    },
+    "You ran %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "You ran %1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez lancé %@, %@"
           }
         }
       }

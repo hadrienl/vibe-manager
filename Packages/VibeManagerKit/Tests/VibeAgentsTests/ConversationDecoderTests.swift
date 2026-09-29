@@ -147,7 +147,9 @@ struct ClaudeCodeConversationDecoderTests {
     #expect(
       entries.map(\.content) == [
         .notice(.command("/model opus")),
-        .notice(.shell(command: "ls", output: "a.swift")),
+        .notice(
+          .shell(
+            ShellRun(command: "ls", state: .succeeded, output: ToolOutput(text: "a.swift")))),
         .notice(.error("API Error: overloaded")),
         .notice(.compacted),
         .notice(.information("While you were away")),
@@ -225,6 +227,36 @@ struct ClaudeCodeConversationDecoderTests {
   func garbage() {
     #expect(decode(["not json", #"{"type":"user","uuid":"x","message":{"content":"#]).isEmpty)
   }
+
+  @Test("A `!` command runs from its input, and ends with its output (#188)")
+  func shellRun() {
+    let input =
+      #"{"type":"user","uuid":"b","message":{"content":"<bash-input>sleep 4; echo fin</bash-input>"}}"#
+    #expect(decode([input]).first?.shellRun == ShellRun(command: "sleep 4; echo fin"))
+    let entries = decode([
+      input,
+      #"{"type":"user","uuid":"o","turnOrigin":"human","message":{"content":"<bash-stdout>fin</bash-stdout><bash-stderr></bash-stderr>"}}"#,
+      #"{"type":"user","uuid":"b2","message":{"content":"<bash-input>cat nope</bash-input>"}}"#,
+      #"{"type":"user","uuid":"o2","message":{"content":"<bash-stdout></bash-stdout><bash-stderr>cat: nope: No such file</bash-stderr>"}}"#,
+    ])
+    #expect(
+      entries.map(\.shellRun) == [
+        ShellRun(command: "sleep 4; echo fin", state: .succeeded, output: ToolOutput(text: "fin")),
+        // No exit code is written: an error output is shown as such, never a failure.
+        ShellRun(
+          command: "cat nope", state: .succeeded,
+          errorOutput: ToolOutput(text: "cat: nope: No such file", isError: true)),
+      ])
+  }
+
+  @Test("A `!` command running when the turn is stopped is interrupted")
+  func shellInterrupted() {
+    let entries = decode([
+      #"{"type":"user","uuid":"b","message":{"content":"<bash-input>sleep 60</bash-input>"}}"#,
+      #"{"type":"user","uuid":"i","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}"#,
+    ])
+    #expect(entries.first?.shellRun?.state == .interrupted)
+  }
 }
 
 @Suite("Reading a Codex rollout into a conversation")
@@ -254,6 +286,44 @@ struct CodexConversationDecoderTests {
       entries.map(\.content) == [
         .userPrompt("Fix it", attachments: 0), .reasoning(nil), .agentText("Done."),
       ])
+  }
+
+  @Test(
+    "A command the user ran with `!` is theirs, with its exit code; its copy for the model is not a prompt (#188)"
+  )
+  func userShell() {
+    let entries = decode([
+      item(
+        #"{"type":"CommandExecution","id":"e1","command":["/bin/zsh","-lc","echo vibe188"],"source":"user_shell","status":"completed","stdout":"vibe188\n","stderr":"","exit_code":0}"#
+      ),
+      #"{"timestamp":"2026-09-25T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<user_shell_command>\n<command>\necho vibe188\n</command>\n</user_shell_command>"}]}}"#,
+      item(
+        #"{"type":"UserMessage","id":"u","content":[{"type":"text","text":"<user_shell_command>x</user_shell_command>"}]}"#
+      ),
+      item(
+        #"{"type":"CommandExecution","id":"e2","command":["/bin/zsh","-lc","sh -c 'exit 3'"],"source":"user_shell","status":"completed","stdout":"","stderr":"err\n","exit_code":3}"#
+      ),
+      item(
+        #"{"type":"CommandExecution","id":"e3","command":["/bin/zsh","-lc","pwd"],"source":"unified_exec_startup","status":"completed","exit_code":0}"#
+      ),
+    ])
+    #expect(entries.count == 3)
+    #expect(
+      entries[0].shellRun
+        == ShellRun(command: "echo vibe188", state: .succeeded, output: ToolOutput(text: "vibe188"))
+    )
+    #expect(
+      entries[1].shellRun
+        == ShellRun(
+          command: "sh -c 'exit 3'", state: .failed(exitCode: 3),
+          errorOutput: ToolOutput(text: "err", isError: true)))
+    #expect(entries[2].toolCall?.kind == .shell)
+    // The zero-width space the composer puts before a message opening on `!` is not shown.
+    let message = decode([
+      item(
+        #"{"type":"UserMessage","id":"u","content":[{"type":"text","text":"\u200b!important"}]}"#)
+    ])
+    #expect(message.map(\.content) == [.userPrompt("!important", attachments: 0)])
   }
 
   @Test("A command is a read, a search or a listing when Codex parsed it as one")
@@ -468,5 +538,39 @@ struct MockConversationTests {
       .userPrompt("hello", attachments: 0), .agentText("Mock received: hello"),
     ]
     #expect(decoder.entries.map(\.content) == expected)
+  }
+
+  @Test("A line typed opening on `!` runs as a command, written as Claude Code writes one (#188)")
+  func shellCommand() async throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeMockTranscript-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let script = try #require(MockAgentProvider.defaultScriptURL())
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = [
+      script.path, "--session-id", "m2", "--transcript-dir", folder.path, "--hold",
+    ]
+    let input = Pipe()
+    process.standardInput = input
+    process.standardOutput = FileHandle.nullDevice
+    try process.run()
+    let lines = "!printf 'a\\nb \"c\"'\n\u{1B}[200~!pasted\u{1B}[201~\n"
+    input.fileHandleForWriting.write(Data(lines.utf8))
+    try input.fileHandleForWriting.close()
+    process.waitUntilExit()
+    let file = folder.appendingPathComponent("m2.jsonl")
+    let decoder = ClaudeCodeConversationDecoder(file: file)
+    for line in await FileTranscriptTail().read(file) { decoder.consume(line) }
+    #expect(
+      decoder.entries.map(\.content) == [
+        .notice(
+          .shell(
+            ShellRun(
+              command: #"printf 'a\nb "c"'"#, state: .succeeded,
+              output: ToolOutput(text: "a\nb \"c\"")))),
+        // Pasted, a `!` is text.
+        .userPrompt("!pasted", attachments: 0), .agentText("echo: !pasted"),
+      ])
   }
 }

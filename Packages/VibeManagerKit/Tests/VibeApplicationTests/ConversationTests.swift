@@ -384,9 +384,10 @@ struct PromptEncodingTests {
       for: PromptSubmission(
         text: "look", attachments: [URL(fileURLWithPath: "/Users/a/My Shot (1).png")]),
       format: AgentPromptFormat(textEntry: .plain), whileWorking: false)
-    #expect(keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
-      #"look /Users/a/My\ Shot\ \(1\).png"#
-    ])
+    #expect(
+      keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
+        #"look /Users/a/My\ Shot\ \(1\).png"#
+      ])
     #expect(PromptSubmission(text: "  \n").isEmpty)
     #expect(!PromptSubmission(text: "", attachments: [URL(fileURLWithPath: "/a")]).isEmpty)
   }
@@ -398,9 +399,10 @@ struct PromptEncodingTests {
   func typedText() {
     let keys = PromptEncoding.keystrokes(
       for: PromptSubmission(text: "1. oui\n2. été\tok"), format: typed, whileWorking: false)
-    #expect(keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
-      "1. oui\n2", ". été ", "   ok",
-    ])
+    #expect(
+      keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
+        "1. oui\n2", ". été ", "   ok",
+      ])
     #expect(keys.writes.allSatisfy { $0.count <= 8 })
     #expect(!keys.writes.joined().contains(0x1B))
     #expect(keys.interval == .milliseconds(20))
@@ -420,6 +422,55 @@ struct PromptEncodingTests {
     let keys = PromptEncoding.keystrokes(
       for: PromptSubmission(text: "!important"), format: typed, whileWorking: false)
     #expect(keys.writes == [Array("\u{1B}[200~!important\u{1B}[201~".utf8)])
+  }
+
+  private let shell = AgentPromptFormat(
+    textEntry: .typed(chunkSize: 8, chunkDelay: .milliseconds(20)),
+    shellEntry: ShellEntry(switchDelay: .milliseconds(80), chunkSize: 6))
+
+  @Test("A `!` command: the trigger alone, a pause, the command typed, then Return (#188)")
+  func shellCommand() {
+    let keys = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "!git status\t-s \u{1B}[A"), format: shell, whileWorking: false)
+    #expect(
+      keys.writes.map { String(decoding: $0, as: UTF8.self) } == [
+        "!", "git st", "atus  ", "  -s [", "A",
+      ])
+    #expect(keys.delay(before: 0) == .zero)
+    #expect(keys.delay(before: 1) == .milliseconds(80))
+    #expect(keys.delay(before: 2) == .milliseconds(20))
+    #expect(keys.submit == [0x0D])
+    let queued = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "!ls"),
+      format: AgentPromptFormat(queueKey: [0x09], shellEntry: ShellEntry()), whileWorking: true)
+    #expect(queued.writes == [Array("!".utf8), Array("ls".utf8)])
+    #expect(queued.submit == [0x09])
+  }
+
+  @Test("`\\!` sends the message \"!…\"; without a shell mode, `!` is only text")
+  func literalBang() {
+    let escaped = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "\\!important"), format: shell, whileWorking: false)
+    #expect(escaped.writes == [Array("\u{1B}[200~!important\u{1B}[201~".utf8)])
+    let plain = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "\\!x"), format: AgentPromptFormat(textEntry: .plain),
+      whileWorking: false)
+    #expect(plain.writes == [Array("\\!x".utf8)])
+    // Codex runs a pasted `!` as well, spaces before it trimmed: a zero-width space keeps it text.
+    let codex = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: " \\!x"),
+      format: AgentPromptFormat(shellEntry: ShellEntry(messageGuard: "\u{200B}")),
+      whileWorking: false)
+    #expect(codex.writes == [Array(("\u{1B}[200~\\!x\u{1B}[201~").utf8)])
+    let guarded = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: " !x"),
+      format: AgentPromptFormat(shellEntry: ShellEntry(messageGuard: "\u{200B}")),
+      whileWorking: false)
+    #expect(guarded.writes == [Array("\u{1B}[200~\u{200B}!x\u{1B}[201~".utf8)])
+    #expect(PromptSubmission(text: "!ls").kind(shell: nil) == .message)
+    #expect(PromptSubmission(text: " !ls").kind(shell: ShellEntry()) == .message)
+    #expect(PromptSubmission(text: "! ls \n").kind(shell: ShellEntry()) == .shell(command: "ls"))
+    #expect(PromptSubmission(text: "!").kind(shell: ShellEntry()) == .shell(command: ""))
   }
 
   @Test("Each joined file gives the agent more time before the key that sends the prompt")

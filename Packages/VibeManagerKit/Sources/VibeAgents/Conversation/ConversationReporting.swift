@@ -34,8 +34,12 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
   /// Claude Code keeps a prompt sent during a turn for when the turn ends, whatever the key. It
   /// wraps any paste in `<pasted_content>` (2.1.283), and takes 4 kB arriving at once for one:
   /// typed 256 bytes every 20 ms, a prompt arrives as written.
+  /// A command sent with `!` during a turn is queued as well, and run as a command once the turn
+  /// ends (2.1.285).
   public var promptFormat: AgentPromptFormat {
-    AgentPromptFormat(textEntry: .typed(chunkSize: 256, chunkDelay: .milliseconds(20)))
+    AgentPromptFormat(
+      textEntry: .typed(chunkSize: 256, chunkDelay: .milliseconds(20)),
+      shellEntry: ShellEntry(queuesWhileWorking: true))
   }
 }
 
@@ -58,7 +62,11 @@ extension CodexAgentProvider: AgentConversationReporting {
 
   /// Return during a turn steers the turn under way; Tab queues the prompt for the next one, which
   /// is what a prompt typed while the agent works means here.
+  /// Its `!` command is written to the rollout once it ended (0.159).
   public var promptFormat: AgentPromptFormat {
-    AgentPromptFormat(queueKey: [0x09])
+    AgentPromptFormat(
+      queueKey: [0x09],
+      shellEntry: ShellEntry(
+        isRecordedAtStart: false, messageGuard: CodexConversationDecoder.messageGuard))
   }
 }

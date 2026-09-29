@@ -11,19 +11,39 @@ public struct PromptHistory: Hashable, Sendable {
 
   /// - Parameters:
   ///   - entries: the conversation as read from the transcript.
-  ///   - pending: prompts sent that the transcript does not hold yet, in the order sent.
-  public init(entries: [ConversationEntry], pending: [String] = []) {
+  ///   - pending: prompts sent that the transcript does not hold yet, in the order sent, as
+  ///     `recalled(_:)` gives them.
+  ///   - hasShellMode: whether the agent runs a `!` typed first as a shell command (#188). Its
+  ///     commands are then recalled with their `!`, and a message that opened on `!` with `\!`,
+  ///     for each to be sent again as it was.
+  public init(entries: [ConversationEntry], pending: [String] = [], hasShellMode: Bool = false) {
     let written = entries.compactMap { entry -> String? in
-      guard case .userPrompt(let text, _) = entry.content else { return nil }
-      return text
+      switch entry.content {
+      case .userPrompt(let text, _):
+        return hasShellMode ? Self.recalled(message: text) : text
+      case .notice(.shell(let run)) where hasShellMode:
+        return Self.recalled(command: run.command)
+      default:
+        return nil
+      }
     }
-    // A command sent from the composer — `/compact`, `!ls` — is a notice once written, not a
+    // A command of the CLI sent from the composer — `/compact` — is a notice once written, not a
     // prompt: left out while it is on its way too, or it would leave the history once there.
     let prompts = pending.filter {
-      let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
-      return !trimmed.hasPrefix("/") && !trimmed.hasPrefix("!")
+      !$0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("/")
     }
     self.init(texts: written + prompts)
+  }
+
+  /// A message as the composer sends it again, for an agent with a shell mode.
+  public static func recalled(message: String) -> String {
+    let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.hasPrefix("!") ? "\\" + trimmed : trimmed
+  }
+
+  /// A shell command as the composer sends it again.
+  public static func recalled(command: String) -> String {
+    "!" + command
   }
 
   public init(prompts: [String]) {

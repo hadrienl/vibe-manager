@@ -20,6 +20,7 @@ struct PromptComposer: View {
   var body: some View {
     let size = appearance.textSize.pointSize
     let state = model.composerState
+    let isShell = state == .ready && model.composerMode == .shell
     VStack(alignment: .leading, spacing: 10) {
       if !model.attachments.isEmpty {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -39,7 +40,7 @@ struct PromptComposer: View {
             .allowsHitTesting(false)
         }
         ReplaceableTextEditor(text: $model.draft)
-          .font(theme.messageFont(size: size))
+          .font(isShell ? theme.codeFont(size: size * 0.92) : theme.messageFont(size: size))
           .foregroundStyle(theme.text.color)
           .scrollContentBackground(.hidden)
           .frame(minHeight: size * 1.6, maxHeight: size * 1.5 * 8)
@@ -51,7 +52,9 @@ struct PromptComposer: View {
           .accessibilityLabel(
             state == .answeringQuestion
               ? Text("Other answer to \(model.agentName)", bundle: .module)
-              : Text("Message to \(model.agentName)", bundle: .module)
+              : isShell
+                ? shellLabel
+                : Text("Message to \(model.agentName)", bundle: .module)
           )
           .onKeyPress(.return, phases: .down) { press in
             guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option),
@@ -79,41 +82,28 @@ struct PromptComposer: View {
             return .handled
           }
           .onKeyPress(.escape) {
-            // A message recalled is put back first: the draft, then the agent.
+            // A message recalled is put back first: the draft, then the shell mode, then the agent.
             if !Self.isComposingText, model.cancelPromptRecall() {
               Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
               return .handled
             }
+            if !Self.isComposingText, model.leaveShellMode() { return .handled }
             guard model.isAgentWorking else { return .ignored }
             Task { await model.interrupt() }
             return .handled
           }
       }
       HStack(spacing: 8) {
-        Menu {
-          Button {
-            model.chooseFiles?()
-          } label: {
-            Label {
-              Text("Attach Files…", bundle: .module)
-            } icon: {
-              Image(systemName: "paperclip")
-            }
-          }
-        } label: {
-          Image(systemName: "plus")
+        if isShell {
+          // A command takes no attachment: a file dropped is named in it.
+          Image(systemName: "terminal")
             .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.warning.color)
             .frame(width: 28, height: 28)
-            .background(theme.surface.color, in: Circle())
-            .overlay(Circle().stroke(theme.border.color))
+            .accessibilityHidden(true)
+        } else {
+          attachMenu(state)
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .fixedSize()
-        .foregroundStyle(theme.text.color)
-        .disabled(state != .ready)
-        .accessibilityLabel(Text("Add", bundle: .module))
         if state == .awaitingAnswer || state == .answeringQuestion {
           RequestHint(model: model)
         } else {
@@ -126,7 +116,7 @@ struct PromptComposer: View {
         Button {
           Task { await model.send() }
         } label: {
-          Image(systemName: "arrow.up")
+          Image(systemName: isShell ? "return" : "arrow.up")
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(model.canSend ? theme.onAccent.color : theme.secondaryText.color)
             .frame(width: 28, height: 28)
@@ -134,14 +124,21 @@ struct PromptComposer: View {
         }
         .buttonStyle(.plain)
         .disabled(!model.canSend)
-        .accessibilityLabel(Text("Send", bundle: .module))
-        .help(Text("Send (Return)", bundle: .module))
+        .accessibilityLabel(isShell ? Text("Run", bundle: .module) : Text("Send", bundle: .module))
+        .help(
+          isShell ? Text("Run (Return)", bundle: .module) : Text("Send (Return)", bundle: .module))
       }
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
-    .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 14))
-    .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.border.color))
+    .background(
+      isShell ? theme.warningBackground.color : theme.raised.color,
+      in: RoundedRectangle(cornerRadius: 14)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 14)
+        .stroke(isShell ? theme.warning.color : theme.border.color, lineWidth: isShell ? 1.5 : 1)
+    )
     .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
     // A request waits for the composer to be on screen, and is spent once: made before the view
     // existed, it is honoured when it appears (#105).
@@ -186,6 +183,39 @@ struct PromptComposer: View {
     NSApp.keyWindow?.firstResponder as? NSTextView
   }
 
+  private func attachMenu(_ state: ConversationModel.ComposerState) -> some View {
+    Menu {
+      Button {
+        model.chooseFiles?()
+      } label: {
+        Label {
+          Text("Attach Files…", bundle: .module)
+        } icon: {
+          Image(systemName: "paperclip")
+        }
+      }
+    } label: {
+      Image(systemName: "plus")
+        .font(.system(size: 13, weight: .semibold))
+        .frame(width: 28, height: 28)
+        .background(theme.surface.color, in: Circle())
+        .overlay(Circle().stroke(theme.border.color))
+    }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .buttonStyle(.plain)
+    .fixedSize()
+    .foregroundStyle(theme.text.color)
+    .disabled(state != .ready)
+    .accessibilityLabel(Text("Add", bundle: .module))
+  }
+
+  private var shellLabel: Text {
+    model.workingDirectoryName.isEmpty
+      ? Text("Shell command", bundle: .module)
+      : Text("Shell command in \(model.workingDirectoryName)", bundle: .module)
+  }
+
   @ViewBuilder
   private func placeholder(_ state: ConversationModel.ComposerState) -> some View {
     switch state {
@@ -204,7 +234,24 @@ struct PromptComposer: View {
 
   @ViewBuilder
   private func hint(_ state: ConversationModel.ComposerState) -> some View {
-    if state == .ready {
+    if state == .ready, model.composerMode == .shell {
+      switch model.shellHold {
+      case .attachments:
+        Text("Remove the attachments to run a command", bundle: .module)
+      case .working:
+        Text("Wait for the end of \(model.agentName)'s turn to run a command", bundle: .module)
+      case .empty, nil:
+        if model.workingDirectoryName.isEmpty {
+          Text("Shell command · ↩ run · \\! for a message", bundle: .module)
+        } else {
+          Text(
+            "Shell command in \(model.workingDirectoryName) · ↩ run · \\! for a message",
+            bundle: .module)
+        }
+      }
+    } else if state == .ready, model.opensOnBangWithoutShellMode {
+      Text("\(model.agentName) has no shell mode: sent as a message", bundle: .module)
+    } else if state == .ready {
       if model.isAgentWorking {
         Text("↩ send · ⇧↩ new line · sent when the turn ends", bundle: .module)
       } else {

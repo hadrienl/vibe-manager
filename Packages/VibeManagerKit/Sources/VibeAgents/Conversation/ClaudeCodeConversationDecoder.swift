@@ -164,21 +164,26 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       append(ConversationEntry(id: uuid, date: date, content: .notice(.command(command))))
       return
     }
+    // A command run with `!` (#188): measured against 2.1.285, its input is written when it
+    // starts, its output when it ends — stdout and stderr both, the latter most often empty, the
+    // shell sending both streams to the first. No exit code is written.
     if trimmed.hasPrefix("<bash-input>") {
       let command = Self.tag("bash-input", in: trimmed) ?? ""
       append(
         ConversationEntry(
-          id: uuid, date: date, content: .notice(.shell(command: command, output: nil))))
+          id: uuid, date: date, content: .notice(.shell(ShellRun(command: command)))))
       return
     }
     if trimmed.hasPrefix("<bash-stdout>") || trimmed.hasPrefix("<bash-stderr>") {
-      let output = [Self.tag("bash-stdout", in: trimmed), Self.tag("bash-stderr", in: trimmed)]
-        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
-      if let index = entries.lastIndex(where: {
-        if case .notice(.shell(_, nil)) = $0.content { return true }
-        return false
-      }), case .notice(.shell(let command, _)) = entries[index].content {
-        entries[index].content = .notice(.shell(command: command, output: output))
+      if let index = entries.lastIndex(where: { $0.shellRun?.state == .running }),
+        var run = entries[index].shellRun
+      {
+        run.state = .succeeded
+        run.output = Self.tag("bash-stdout", in: trimmed).flatMap { Self.shellOutput($0) }
+        run.errorOutput = Self.tag("bash-stderr", in: trimmed).flatMap {
+          Self.shellOutput($0, isError: true)
+        }
+        entries[index].content = .notice(.shell(run))
       }
       return
     }
@@ -322,7 +327,9 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     var result: [ToolParameter] = []
     var question: String?
     func close() {
-      if let question, let answer = answers[question] { result.append(ToolParameter(.answer, answer)) }
+      if let question, let answer = answers[question] {
+        result.append(ToolParameter(.answer, answer))
+      }
     }
     for parameter in parameters where parameter.key != .answer {
       if parameter.key == .question {
@@ -337,6 +344,11 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
 
   private func interruptRunningCalls() {
     for index in entries.indices {
+      if var run = entries[index].shellRun, run.state == .running {
+        run.state = .interrupted
+        entries[index].content = .notice(.shell(run))
+        continue
+      }
       guard case .tool(var call) = entries[index].content, !call.state.isFinished else { continue }
       call.state = .interrupted
       entries[index].content = .tool(call)
@@ -488,6 +500,11 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     guard text.hasPrefix("Exit code ") else { return nil }
     let digits = text.dropFirst("Exit code ".count).prefix { $0.isNumber || $0 == "-" }
     return Int32(digits)
+  }
+
+  static func shellOutput(_ text: String, isError: Bool = false) -> ToolOutput? {
+    let trimmed = text.trimmingCharacters(in: .newlines)
+    return trimmed.isEmpty ? nil : ToolOutput.bounded(trimmed, isError: isError)
   }
 
   static func tag(_ name: String, in text: String) -> String? {

@@ -32,16 +32,30 @@ struct PromptHistoryTests {
     let history = PromptHistory(entries: [
       prompt("  \n"), prompt("", attachments: 2),
       ConversationEntry(id: "c", content: .notice(.command("/model"))),
-      ConversationEntry(id: "s", content: .notice(.shell(command: "ls", output: nil))),
+      ConversationEntry(id: "s", content: .notice(.shell(ShellRun(command: "ls")))),
       prompt("kept\n"),
     ])
     #expect(history.prompts == ["kept"])
   }
 
-  @Test("A command sent from the composer is left out while on its way, as once written")
+  @Test("A command of the CLI sent from the composer is left out while on its way, as once written")
   func pendingCommands() {
-    let history = PromptHistory(entries: [prompt("a")], pending: [" /compact", "!ls", "b"])
+    let history = PromptHistory(entries: [prompt("a")], pending: [" /compact", "b"])
     #expect(history.prompts == ["a", "b"])
+  }
+
+  @Test(
+    "With a shell mode, `!` commands are recalled with their `!`, a `!` message with `\\!` (#188)")
+  func shellCommands() {
+    let entries = [
+      prompt("fix it"),
+      ConversationEntry(id: "s", content: .notice(.shell(ShellRun(command: "git status")))),
+      prompt("!important"),
+    ]
+    let history = PromptHistory(entries: entries, pending: ["!ls"], hasShellMode: true)
+    #expect(history.prompts == ["fix it", "!git status", "\\!important", "!ls"])
+    // Without one, `!` is text: nothing is escaped, and no command was ever run.
+    #expect(PromptHistory(entries: entries).prompts == ["fix it", "!important"])
   }
 }
 
