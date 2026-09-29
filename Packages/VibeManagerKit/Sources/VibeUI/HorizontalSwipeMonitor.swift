@@ -231,10 +231,14 @@ struct SwipeRowMarker: NSViewRepresentable {
     view.carriesSelection = carriesSelection
   }
 
+  static func dismantleNSView(_ view: MarkerView, coordinator: ()) {
+    view.carriesSelection = false
+  }
+
   final class MarkerView: NSView {
     var sessionID: SessionID?
     var carriesSelection = false {
-      didSet { if carriesSelection != oldValue { updateCard() } }
+      didSet { if carriesSelection != oldValue { followRow() } }
     }
     /// Stands in for the list's selection, hidden meanwhile. A subview of this view, which SwiftUI
     /// moves with the row, frame for frame, animations included: the list's own selection is laid
@@ -245,6 +249,8 @@ struct SwipeRowMarker: NSViewRepresentable {
     /// Where the table row is, seen from here while the row is at rest: the card is drawn where
     /// the selection is drawn then.
     private var restingRowOrigin: NSPoint?
+    /// The row selected or not, focused or not, while the card stands in for its selection.
+    private var rowObservations: [NSKeyValueObservation] = []
 
     override var isFlipped: Bool { true }
 
@@ -252,7 +258,7 @@ struct SwipeRowMarker: NSViewRepresentable {
 
     override func layout() {
       super.layout()
-      if card == nil { restingRowOrigin = row.map { convert(NSPoint.zero, from: $0) } }
+      if !carriesSelection { restingRowOrigin = row.map { convert(NSPoint.zero, from: $0) } }
     }
 
     override func viewDidMoveToSuperview() {
@@ -260,9 +266,33 @@ struct SwipeRowMarker: NSViewRepresentable {
       needsLayout = true
     }
 
+    /// A row the table takes back, or hands to another session, never keeps a hidden selection.
     override func viewWillMove(toSuperview newSuperview: NSView?) {
       if newSuperview == nil { carriesSelection = false }
       super.viewWillMove(toSuperview: newSuperview)
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+      if newWindow == nil { carriesSelection = false }
+      super.viewWillMove(toWindow: newWindow)
+    }
+
+    /// The selection can come to an open row, or leave it, from the keyboard, and the list draws
+    /// it dimmer once the keyboard or the window is elsewhere: the card follows. The table draws
+    /// the selection after it says so.
+    private func followRow() {
+      rowObservations = []
+      if carriesSelection, let row {
+        let changed: @Sendable (NSTableRowView, NSKeyValueObservedChange<Bool>) -> Void = {
+          [weak self] _, _ in
+          Task { @MainActor in self?.updateCard() }
+        }
+        rowObservations = [
+          row.observe(\.isSelected, changeHandler: changed),
+          row.observe(\.isEmphasized, changeHandler: changed),
+        ]
+      }
+      updateCard()
     }
 
     /// On a system that draws the selection otherwise, nothing moves.

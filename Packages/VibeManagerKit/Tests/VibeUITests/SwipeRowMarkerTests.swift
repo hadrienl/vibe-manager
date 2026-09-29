@@ -6,7 +6,11 @@ import VibeDomain
 
 @testable import VibeUI
 
-@MainActor @Observable private final class Slide {
+@MainActor @Observable private final class Board {
+  var ids = [SessionID(), SessionID(), SessionID()]
+  var selection: SessionID?
+  /// The row that slides, and how far.
+  var slid: SessionID?
   var offset: CGFloat = 0
 }
 
@@ -16,18 +20,15 @@ import VibeDomain
 @Suite("A swiped row takes its selection along", .serialized, .timeLimit(.minutes(1)))
 struct SwipeRowMarkerTests {
   private struct Sidebar: View {
-    let ids: [SessionID]
-    let slide: Slide
-    @State var selection: SessionID?
+    @Bindable var board: Board
 
     var body: some View {
-      List(selection: $selection) {
-        ForEach(ids, id: \.self) { id in
+      List(selection: $board.selection) {
+        ForEach(board.ids, id: \.self) { id in
+          let offset = id == board.slid ? board.offset : 0
           Text(verbatim: "Session")
-            .background(
-              SwipeRowMarker(sessionID: id, carriesSelection: id == ids[1] && slide.offset != 0)
-            )
-            .offset(x: id == ids[1] ? slide.offset : 0)
+            .background(SwipeRowMarker(sessionID: id, carriesSelection: offset != 0))
+            .offset(x: offset)
             .tag(id)
         }
       }
@@ -36,19 +37,11 @@ struct SwipeRowMarkerTests {
   }
 
   @Test func theSelectionSlidesWithTheRowAndComesBack() async throws {
-    let ids = [SessionID(), SessionID(), SessionID()]
-    let slide = Slide()
-    let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 260, height: 200), styleMask: [.titled],
-      backing: .buffered, defer: false)
-    window.isReleasedWhenClosed = false
-    window.contentView = NSHostingView(
-      rootView: Sidebar(ids: ids, slide: slide, selection: ids[1]))
-    window.orderFrontRegardless()
-    defer {
-      window.contentView = nil
-      window.close()
-    }
+    let board = Board()
+    board.selection = board.ids[1]
+    board.slid = board.ids[1]
+    let window = Self.window(showing: board)
+    defer { Self.close(window) }
 
     await waitUntil("the list draws the row's selection") { selection(in: window) != nil }
     let selection = try #require(selection(in: window))
@@ -56,17 +49,101 @@ struct SwipeRowMarkerTests {
 
     // As the fingers move: a few points first, then further, then the other way.
     for offset: CGFloat in [-4, -30, -120, 60] {
-      slide.offset = offset
+      board.offset = offset
       await waitUntil("the card follows the row to \(offset)") {
         guard let card = card(in: window) else { return false }
         return card.convert(card.bounds, to: nil) == home.offsetBy(dx: offset, dy: 0)
           && selection.alphaValue == 0
       }
     }
-    slide.offset = 0
+    board.offset = 0
     await waitUntil("the selection comes back") {
       card(in: window) == nil && selection.alphaValue == 1
     }
+  }
+
+  @Test func theSelectionComingToAnOpenRowOrLeavingItIsFollowed() async throws {
+    let board = Board()
+    board.selection = board.ids[0]
+    board.slid = board.ids[1]
+    let window = Self.window(showing: board)
+    defer { Self.close(window) }
+    // A row slides from where it rests.
+    await waitUntil("the list draws its rows") { selectedRow(in: window) != nil }
+    board.offset = -120
+
+    await waitUntil("the list draws the first row's selection") { selection(in: window) != nil }
+    #expect(card(in: window) == nil)
+
+    board.selection = board.ids[1]
+    await waitUntil("the open row takes the selection along") {
+      guard let card = card(in: window), let selection = selection(in: window) else {
+        return false
+      }
+      return selection.alphaValue == 0
+        && card.convert(card.bounds, to: nil)
+          == selection.convert(selection.bounds, to: nil).offsetBy(dx: -120, dy: 0)
+    }
+
+    board.selection = board.ids[2]
+    await waitUntil("the card goes with the selection") {
+      card(in: window) == nil && selection(in: window)?.alphaValue == 1
+    }
+  }
+
+  @Test func theCardDimsWithTheListsSelection() async throws {
+    let board = Board()
+    board.selection = board.ids[1]
+    board.slid = board.ids[1]
+    let window = Self.window(showing: board)
+    defer { Self.close(window) }
+    // A row slides from where it rests.
+    await waitUntil("the list draws its rows") { selectedRow(in: window) != nil }
+    board.offset = -120
+
+    await waitUntil("a card stands in for the selection") { card(in: window) != nil }
+    let row = try #require(selectedRow(in: window))
+    for emphasized in [!row.isEmphasized, row.isEmphasized] {
+      row.isEmphasized = emphasized
+      await waitUntil("the card is drawn \(emphasized ? "bright" : "dim")") {
+        (card(in: window) as? NSVisualEffectView)?.isEmphasized
+          == (selection(in: window) as? NSVisualEffectView)?.isEmphasized
+      }
+    }
+  }
+
+  @Test func aRowTakenAwayGivesItsSelectionBack() async throws {
+    let board = Board()
+    board.selection = board.ids[1]
+    board.slid = board.ids[1]
+    let window = Self.window(showing: board)
+    defer { Self.close(window) }
+    // A row slides from where it rests.
+    await waitUntil("the list draws its rows") { selectedRow(in: window) != nil }
+    board.offset = -120
+
+    await waitUntil("a card stands in for the selection") { card(in: window) != nil }
+    let selection = try #require(selection(in: window))
+
+    board.ids.remove(at: 1)
+    await waitUntil("the hidden selection is shown again") {
+      card(in: window) == nil && selection.alphaValue == 1
+    }
+  }
+
+  private static func window(showing board: Board) -> NSWindow {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 260, height: 200), styleMask: [.titled],
+      backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = NSHostingView(rootView: Sidebar(board: board))
+    window.orderFrontRegardless()
+    return window
+  }
+
+  private static func close(_ window: NSWindow) {
+    window.contentView = nil
+    window.close()
   }
 
   /// The rounded background the list draws behind a selected row.
@@ -83,11 +160,7 @@ struct SwipeRowMarkerTests {
 
   private func selectedRow(in window: NSWindow) -> NSTableRowView? {
     window.contentView?.layoutSubtreeIfNeeded()
-    return Self.rows(in: window.contentView).first(where: \.isSelected)
-  }
-
-  private static func rows(in view: NSView?) -> [NSTableRowView] {
-    all(NSTableRowView.self, in: view)
+    return Self.all(NSTableRowView.self, in: window.contentView).first(where: \.isSelected)
   }
 
   private static func all<V: NSView>(_ type: V.Type, in view: NSView?) -> [V] {
