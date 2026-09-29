@@ -333,6 +333,19 @@ struct AnswerKeymapTests {
     #expect(codex.answers(for: .questions([])).isEmpty)
   }
 
+  @Test("Codex: a tool of an MCP server is allowed with its form's first option, `y` it ignores")
+  func codexMCPTool() {
+    let codex = CodexAnswerKeymap()
+    let tool = AgentRequestContent.permission(
+      AgentRequestReading.permission(
+        toolName: "mcp__prisme_ai_builder__call_api", input: ["path": "/me"],
+        workingDirectory: nil, alwaysAllow: CodexAnswerKeymap.alwaysAllow(for: "mcp__x__y")))
+    #expect(codex.answers(for: tool) == [.allowOnce, .deny])
+    #expect(codex.keystrokes(for: .allowOnce, to: tool) == [Array("1".utf8)])
+    #expect(codex.keystrokes(for: .allowAlways, to: tool) == nil)
+    #expect(codex.keystrokes(for: .deny, to: tool) == [[0x1B]])
+  }
+
   @Test("A pasted answer can neither close its paste nor send a control key")
   func paste() {
     let bytes = TerminalKeys.bracketedPaste("a\u{1B}[201~\u{03}b\nc\td")
