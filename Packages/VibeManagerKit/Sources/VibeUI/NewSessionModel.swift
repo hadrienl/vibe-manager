@@ -296,6 +296,7 @@ public final class NewSessionModel {
       presetFolder = nil
       folderBeforePreset = nil
     }
+    lookForIconOfRecentFolder()
   }
 
   public func setValue(_ value: String, for key: String) {
@@ -629,7 +630,8 @@ extension NewSessionModel {
   /// A card clicked: the same gesture as a folder handed back by the open panel, and checked the
   /// same way — except a folder macOS guards, without Full Disk Access. The open panel grants
   /// access to what it hands back; a card does not, so looking at that folder now could raise the
-  /// consent alert in the middle of the form. It is checked at creation, like a typed path.
+  /// consent alert in the middle of the form. It is checked at creation, like a typed path; only
+  /// its icon is read now, which sessions run there have already been allowed to do.
   public func chooseRecentFolder(_ option: RecentFolderOption) async {
     let folder = option.folder
     var mayRead = mayProbe(folder)
@@ -641,6 +643,7 @@ extension NewSessionModel {
     guard mayRead else {
       preselectedFolder = nil
       draft.workingDirectoryPath = option.folder.path
+      lookForIconOfRecentFolder()
       return
     }
     await folderChosen(option.folder.path)
@@ -706,11 +709,16 @@ extension NewSessionModel {
     skippedRecentFolder = index > 0 ? recentFolders[0] : nil
     preselectedFolder = option.folder.path
     draft.workingDirectoryPath = option.folder.path
-    // Its icon is offered at once when the folder was just looked at without an alert: reading it
-    // again asks the system nothing. A folder macOS guards, left unverified, waits for a gesture.
-    if option.availability == .available {
-      lookForIcon()
-    }
+    lookForIconOfRecentFolder()
+  }
+
+  /// Looks for the icon of the recent folder in the field, even one macOS guards: sessions
+  /// already ran there, so the system has already answered for it — the reasoning of New Session
+  /// in This Folder. Only its icon is read, never checked as a whole, and only the one folder.
+  func lookForIconOfRecentFolder() {
+    guard recentFolders.contains(where: { $0.availability != .missing && isSelected($0) })
+    else { return }
+    lookForIcon()
   }
 
   /// Looks at each recent folder once, within a budget, without raising a consent alert.

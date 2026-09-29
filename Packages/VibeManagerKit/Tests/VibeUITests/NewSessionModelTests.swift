@@ -945,6 +945,7 @@ struct NewSessionRecentFolderTests {
     budget: Duration = .seconds(3_600),
     fullDiskAccess: FullDiskAccessStatus? = .notGranted,
     templates: [PromptTemplate] = [],
+    projectIcons: any ProjectIconFinding = NoProjectIcons(),
     forgotten: @escaping @MainActor (RecentFolder) -> Void = { _ in }
   ) -> NewSessionModel {
     let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
@@ -954,6 +955,7 @@ struct NewSessionRecentFolderTests {
       registry: registry,
       fullDiskAccess: fullDiskAccess,
       templates: templates,
+      projectIcons: projectIcons,
       recentFolders: recentFolders,
       folderProbe: probe,
       recentFolderProbeBudget: budget,
@@ -1040,6 +1042,28 @@ struct NewSessionRecentFolderTests {
     #expect(model.recentFolders.first?.availability == .available)
   }
 
+  @Test("A protected recent folder offers its icon, without being checked, even without access")
+  func protectedRecentFolderOffersItsIcon() async {
+    let documents = NSHomeDirectory() + "/Documents/api"
+    let icon = projectIcon("a")
+    let probe = MappedFolders()
+    let model = makeModel(
+      recentFolders: recent(documents, "/work/web"), probe: probe,
+      projectIcons: StubIcons(icons: [documents: icon]))
+
+    await model.load()
+    await waitUntil { model.draft.projectIcon == icon }
+
+    #expect(model.recentFolders.first?.availability == .unverified)
+    #expect(await probe.inspected == ["/work/web"])
+
+    // A card clicked is the same folder, read for its icon the same way.
+    await model.chooseRecentFolder(model.recentFolders[1])
+    await waitUntil { model.draft.projectIcon == nil }
+    await model.chooseRecentFolder(model.recentFolders[0])
+    await waitUntil { model.draft.projectIcon == icon }
+  }
+
   @Test("A folder too slow to answer is offered unverified, without holding the sheet")
   func slowFolderStaysUnverified() async {
     // Far longer than any busy runner could stretch the budget: the sheet not waiting for this
@@ -1081,6 +1105,26 @@ struct NewSessionRecentFolderTests {
     // A template without a folder gives back the one that was there before.
     model.selectTemplate(templateFeedback.id)
     #expect(model.draft.workingDirectoryPath == "/work/web")
+  }
+
+  @Test("A template bringing a recent folder offers its icon, and gives back the previous one")
+  func templateFolderOffersItsIcon() async {
+    var app = templateReview
+    app.workingDirectoryPath = "/work/app"
+    let model = makeModel(
+      recentFolders: recent("/work/web", "/work/app"), templates: [app, templateFeedback],
+      projectIcons: StubIcons(icons: [
+        "/work/web": projectIcon("a"), "/work/app": projectIcon("b"),
+      ]))
+    await model.load()
+    await waitUntil { model.draft.projectIcon == projectIcon("a") }
+
+    model.selectTemplate(app.id)
+    await waitUntil { model.draft.projectIcon == projectIcon("b") }
+
+    model.selectTemplate(templateFeedback.id)
+    await waitUntil { model.draft.projectIcon == projectIcon("a") }
+    #expect(model.usesProjectIcon)
   }
 
   @Test("A folder the user picked is theirs: a template no longer replaces it")
