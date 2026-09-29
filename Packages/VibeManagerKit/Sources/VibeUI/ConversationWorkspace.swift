@@ -28,6 +28,8 @@ public final class ConversationWorkspace {
   @ObservationIgnored private let follow: FollowConversation?
   @ObservationIgnored private let store: any ConversationAppearanceStore
   @ObservationIgnored private let agents: (any AgentProviderResolving)?
+  /// The user's own themes, and the one on trial (#118).
+  public let themes: ConversationThemesModel
 
   public var appearance: ConversationAppearance {
     didSet {
@@ -63,16 +65,21 @@ public final class ConversationWorkspace {
   public init(
     follow: FollowConversation? = nil,
     store: any ConversationAppearanceStore = InMemoryConversationAppearanceStore(),
-    agents: (any AgentProviderResolving)? = nil
+    agents: (any AgentProviderResolving)? = nil,
+    themes: ConversationThemesModel = ConversationThemesModel()
   ) {
     self.follow = follow
     self.store = store
     self.agents = agents
+    self.themes = themes
     appearance = store.appearance
   }
 
   /// Learns which agents write a transcript the view can read.
   public func prepare() async {
+    // The user's own themes first: a conversation drawn with one of them needs it at launch, not
+    // only once the settings are opened (#118).
+    await themes.load()
     guard follow != nil, let agents else { return }
     var readable: [String: Agent] = [:]
     for descriptor in await agents.descriptors() {

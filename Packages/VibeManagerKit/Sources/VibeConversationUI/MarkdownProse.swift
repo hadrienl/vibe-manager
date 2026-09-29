@@ -100,7 +100,7 @@ enum MarkdownProse {
         emit(runs, size: size * scale, bold: true, context: context, style: style)
       case .paragraph(let runs):
         let style = paragraphStyle(context)
-        style.lineSpacing = size * 0.25
+        style.lineSpacing = size * (theme.layout.lineHeight - 1)
         emit(runs, size: size, bold: false, context: context, style: style)
       case .list(let ordered, let start, let items):
         let markers = items.enumerated().map { index, item in
@@ -327,7 +327,7 @@ struct MarkdownTextView: NSViewRepresentable {
     let size = appearance.textSize.pointSize
     let input = Input(
       blocks: blocks, theme: theme, size: size,
-      spacing: appearance.density == .compact ? 6 : 10, secondary: secondary)
+      spacing: theme.layout.at(appearance.density).paragraphSpacing, secondary: secondary)
     // Rebuilt only when what it shows changed: rebuilding would drop the reader's selection.
     guard context.coordinator.input != input else { return }
     context.coordinator.input = input

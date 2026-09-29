@@ -898,9 +898,10 @@ public struct RootView: View {
       comment: "What VoiceOver calls a terminal: the session's name, then its state.")
   }
 
-  /// The theme of the conversation views, for the system's appearance of the moment.
+  /// The theme of the conversation views, for the system's appearance of the moment — or the one
+  /// on trial in the settings (#118).
   private var conversationTheme: ConversationTheme {
-    ConversationTheme.resolve(
+    model.conversations.themes.displayed(
       ConversationFonts.installedOnly(model.conversations.appearance),
       isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
   }

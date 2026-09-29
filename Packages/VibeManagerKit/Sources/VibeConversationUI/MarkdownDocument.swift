@@ -1,6 +1,7 @@
 import Foundation
 import Markdown
 import SwiftUI
+import VibeApplication
 
 /// A piece of text inside a block, with its emphasis.
 public struct InlineRun: Hashable, Sendable {

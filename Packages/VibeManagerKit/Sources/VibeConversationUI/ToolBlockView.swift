@@ -39,9 +39,9 @@ struct ToolBlockView: View {
       }
     }
     .background(theme.surface.color)
-    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .clipShape(RoundedRectangle(cornerRadius: theme.layout.blockRadius))
     .overlay(
-      RoundedRectangle(cornerRadius: 10)
+      RoundedRectangle(cornerRadius: theme.layout.blockRadius)
         .stroke(borderColor(state).color, lineWidth: state.severity >= 4 ? 1.5 : 1))
   }
 
@@ -282,7 +282,7 @@ struct ToolCallDetails: View {
       }
       .frame(maxHeight: 280)
       .background(theme.codeBackground.color)
-      .clipShape(RoundedRectangle(cornerRadius: 8))
+      .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
       if output.omittedByteCount > 0 {
         Text(
           "\(ByteCountFormatter.string(fromByteCount: Int64(output.omittedByteCount), countStyle: .file)) left out of the middle",
@@ -454,8 +454,8 @@ struct DiffView: View {
       }
     }
     .background(theme.codeBackground.color)
-    .clipShape(RoundedRectangle(cornerRadius: 8))
-    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border.color))
+    .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.layout.innerRadius).stroke(theme.border.color))
   }
 
   /// Drawn at most: a view of thousands of lines, unfolded in a conversation, costs more than it
@@ -525,7 +525,7 @@ struct ProducedImageView: View {
           .resizable()
           .scaledToFit()
           .frame(maxWidth: 480, maxHeight: 360, alignment: .leading)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
           .accessibilityLabel(Text(verbatim: call.parameter(.prompt) ?? url.lastPathComponent))
         HStack(spacing: 14) {
           if let open = model?.openInWebView {
@@ -664,7 +664,8 @@ struct RequestActions: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       // What would be allowed, unless the block above shows exactly that.
-      if case .permission(let permission) = request.request.content, let subject = permission.subject,
+      if case .permission(let permission) = request.request.content,
+        let subject = permission.subject,
         !ConversationModel.isAbout(call, subject)
       {
         Text(verbatim: DisplaySafeText.visible(subject))

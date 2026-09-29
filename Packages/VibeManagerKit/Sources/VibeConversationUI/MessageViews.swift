@@ -11,6 +11,8 @@ struct UserPromptView: View {
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
+  private var bubbleRadius: Double { theme.layout.bubbleRadius }
+
   var body: some View {
     let size = appearance.textSize.pointSize
     Group {
@@ -24,14 +26,14 @@ struct UserPromptView: View {
               .background(theme.bubble.color)
               .clipShape(
                 UnevenRoundedRectangle(
-                  topLeadingRadius: 16, bottomLeadingRadius: 16, bottomTrailingRadius: 4,
-                  topTrailingRadius: 16)
+                  topLeadingRadius: bubbleRadius, bottomLeadingRadius: bubbleRadius,
+                  bottomTrailingRadius: min(4, bubbleRadius), topTrailingRadius: bubbleRadius)
               )
               .overlay {
                 if let border = theme.bubbleBorder {
                   UnevenRoundedRectangle(
-                    topLeadingRadius: 16, bottomLeadingRadius: 16, bottomTrailingRadius: 4,
-                    topTrailingRadius: 16
+                    topLeadingRadius: bubbleRadius, bottomLeadingRadius: bubbleRadius,
+                    bottomTrailingRadius: min(4, bubbleRadius), topTrailingRadius: bubbleRadius
                   ).stroke(border.color, lineWidth: 1.5)
                 }
               }

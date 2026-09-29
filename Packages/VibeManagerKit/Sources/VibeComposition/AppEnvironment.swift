@@ -3,6 +3,7 @@ import VibeAgents
 import VibeApplication
 import VibeAvatar
 import VibeBrowser
+import VibeConversationUI
 import VibeDomain
 import VibeGit
 import VibePersistence
@@ -318,7 +319,12 @@ public final class AppEnvironment {
         hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) },
         current: { [repository] id in try? await repository.session(id: id) }),
       store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),
-      agents: registry)
+      agents: registry,
+      // The user's own themes (#118), beside the avatars, made by the agents that can.
+      themes: Self.conversationThemes(
+        directory: data.store.deletingLastPathComponent()
+          .appendingPathComponent("Themes", isDirectory: true),
+        agents: registry, diagnostics: diagnostics))
     appModel = AppModel(
       repository: repository,
       recovery: repository,
@@ -420,6 +426,27 @@ public final class AppEnvironment {
       }
     }
     return nil
+  }
+
+  /// The user's own themes (#118), beside the avatars, made by the agents that can, with the
+  /// fonts of Google Fonts they ask for and the pictures Codex draws or the user points at.
+  @MainActor
+  private static func conversationThemes(
+    directory: URL, agents: AgentProviderRegistry, diagnostics: Diagnostics
+  ) -> ConversationThemesModel {
+    let fonts = GoogleThemeFonts(
+      directory: directory.appendingPathComponent("Fonts", isDirectory: true),
+      diagnostics: diagnostics)
+    let images = FileThemeImageStore(
+      directory: directory.appendingPathComponent("Images", isDirectory: true),
+      diagnostics: diagnostics)
+    return ConversationThemesModel(
+      library: FileConversationThemeLibrary(
+        directory: directory, diagnostics: diagnostics,
+        localizedBuiltInNames: ConversationTheme.builtIn.map(\.displayName), fonts: fonts,
+        images: images),
+      generators: AgentThemeGenerators(agents: agents), fonts: fonts, images: images,
+      pictureAgents: AgentAvatarGenerators(agents: agents), diagnostics: diagnostics)
   }
 
   /// Everything the export gathers besides the model.

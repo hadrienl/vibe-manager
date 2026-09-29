@@ -1,0 +1,365 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties" : false,
+  "description" : "A personal theme of the conversation view. Its file name is its identifier; every pair of colours a reader must read is also held to WCAG contrasts, which a schema cannot say.",
+  "properties" : {
+    "backdrop" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "area" : {
+          "description" : "\"conversation\": behind the messages and the composer; \"messages\": behind the messages only.",
+          "enum" : [
+            "conversation",
+            "messages"
+          ],
+          "type" : "string"
+        },
+        "blur" : {
+          "description" : "How blurred the picture is, in points, from 0 to 40.",
+          "maximum" : 40,
+          "minimum" : 0,
+          "type" : "number"
+        },
+        "image" : {
+          "description" : "Set by the application: the name of the picture it kept. Never given by an agent.",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "imagePrompt" : {
+          "description" : "When the user wants a picture behind the conversation and gave no address: what it shows, in English, for an image generation model — subject, mood, colours, blur, landscape 16:10, no text. null for no picture, or when imageURL is given.",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "imageURL" : {
+          "description" : "An https address of a picture that the user wrote in their description, copied exactly; the application downloads it. null otherwise: never make an address up.",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "veil" : {
+          "description" : "How much of colors.background covers the picture, from 0 (the picture as it is) to 1 (hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable.",
+          "maximum" : 1,
+          "minimum" : 0,
+          "type" : "number"
+        }
+      },
+      "required" : [
+        "imageURL",
+        "imagePrompt",
+        "veil",
+        "blur",
+        "area"
+      ],
+      "type" : "object"
+    },
+    "colors" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "accent" : {
+          "description" : "Accent: links, the active state, the send button, the agent's activity dot.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "addedBackground" : {
+          "description" : "Background of a line added in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "addedText" : {
+          "description" : "Text of a line added in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "background" : {
+          "description" : "Background of the whole conversation.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "border" : {
+          "description" : "Borders and separators.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "bubble" : {
+          "description" : "Background of the user's messages.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "bubbleBorder" : {
+          "default" : null,
+          "description" : "Border around the user's messages, only when the bubble is too close to the background to be told apart from it; null otherwise.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "bubbleText" : {
+          "description" : "Text of the user's messages.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "codeBackground" : {
+          "description" : "Background of code blocks and inline code.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "codeText" : {
+          "description" : "Plain text of code.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "comment" : {
+          "description" : "Syntax highlighting: comments.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "failure" : {
+          "description" : "Symbol of a tool call that failed, on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "function" : {
+          "description" : "Syntax highlighting: function names.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "keyword" : {
+          "description" : "Syntax highlighting: keywords.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "number" : {
+          "description" : "Syntax highlighting: number literals.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "onAccent" : {
+          "description" : "Text and symbols drawn on the accent.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "raised" : {
+          "description" : "Background of what is raised above the surface: menus, popovers.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "removedBackground" : {
+          "description" : "Background of a line removed in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "removedText" : {
+          "description" : "Text of a line removed in a diff.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "secondaryText" : {
+          "description" : "Secondary text — captions, times, hints — on the background and surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "string" : {
+          "description" : "Syntax highlighting: string literals.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "success" : {
+          "description" : "Symbol of a tool call that succeeded, on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "surface" : {
+          "description" : "Background of the rows of tool calls and of the cards drawn on the background.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "text" : {
+          "description" : "Main text, on the background and on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "type" : {
+          "description" : "Syntax highlighting: type names.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "warning" : {
+          "description" : "Symbol of a warning, on the surface.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        },
+        "warningBackground" : {
+          "description" : "Background of a warning banner; its text is the main text colour.",
+          "pattern" : "^#[0-9A-Fa-f]{6}$",
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "background",
+        "surface",
+        "raised",
+        "text",
+        "secondaryText",
+        "border",
+        "accent",
+        "onAccent",
+        "bubble",
+        "bubbleText",
+        "bubbleBorder",
+        "codeBackground",
+        "codeText",
+        "keyword",
+        "string",
+        "comment",
+        "number",
+        "type",
+        "function",
+        "addedBackground",
+        "addedText",
+        "removedBackground",
+        "removedText",
+        "success",
+        "failure",
+        "warning",
+        "warningBackground"
+      ],
+      "type" : "object"
+    },
+    "fonts" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "code" : {
+          "description" : "The monospaced family of the code: SF Mono, Menlo, Monaco, or the exact name of a monospaced Google Fonts family (JetBrains Mono, Fira Code, IBM Plex Mono…). null keeps SF Mono.",
+          "maxLength" : 64,
+          "pattern" : "^[A-Za-z0-9-]([A-Za-z0-9 -]*[A-Za-z0-9-])?$",
+          "type" : [
+            "string",
+            "null"
+          ]
+        },
+        "message" : {
+          "description" : "The family of the messages: a font every Mac has (SF Pro, New York, Avenir Next, Charter, Iowan Old Style, Helvetica Neue, Georgia…) or the exact name of any Google Fonts family, which the application downloads. null keeps the system family of fontStyle.",
+          "maxLength" : 64,
+          "pattern" : "^[A-Za-z0-9-]([A-Za-z0-9 -]*[A-Za-z0-9-])?$",
+          "type" : [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required" : [
+        "message",
+        "code"
+      ],
+      "type" : "object"
+    },
+    "fontStyle" : {
+      "description" : "The family of the messages' font: the system's sans serif, a serif, or monospaced.",
+      "enum" : [
+        "system",
+        "serif",
+        "monospaced"
+      ],
+      "type" : "string"
+    },
+    "format" : {
+      "description" : "The version of the format.",
+      "enum" : [
+        3
+      ],
+      "type" : "integer"
+    },
+    "isDark" : {
+      "description" : "Whether the theme is dark.",
+      "type" : "boolean"
+    },
+    "layout" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "blockRadius" : {
+          "description" : "Corner radius of the tool calls and code blocks, in points. From 0 to 20; the built-in themes use 10.",
+          "maximum" : 20,
+          "minimum" : 0,
+          "type" : "number"
+        },
+        "blockSpacing" : {
+          "description" : "Points between two messages or tool calls. From 4 to 48; the built-in themes use 18.",
+          "maximum" : 48,
+          "minimum" : 4,
+          "type" : "number"
+        },
+        "bubbleRadius" : {
+          "description" : "Corner radius of the user's messages, in points. From 0 to 24; the built-in themes use 16.",
+          "maximum" : 24,
+          "minimum" : 0,
+          "type" : "number"
+        },
+        "contentWidth" : {
+          "description" : "Widest the column of messages gets, in points. From 560 to 1200; the built-in themes use 820.",
+          "maximum" : 1200,
+          "minimum" : 560,
+          "type" : "number"
+        },
+        "lineHeight" : {
+          "description" : "Height of a line of the messages, as a multiple of the text size. From 1 to 1.8; the built-in themes use 1.25.",
+          "maximum" : 1.8,
+          "minimum" : 1,
+          "type" : "number"
+        },
+        "paragraphSpacing" : {
+          "description" : "Points between two paragraphs of a message. From 2 to 24; the built-in themes use 10.",
+          "maximum" : 24,
+          "minimum" : 2,
+          "type" : "number"
+        },
+        "sideMargin" : {
+          "description" : "Points on each side of the column of messages. From 8 to 80; the built-in themes use 32.",
+          "maximum" : 80,
+          "minimum" : 8,
+          "type" : "number"
+        },
+        "topPadding" : {
+          "description" : "Points above the first message. From 0 to 64; the built-in themes use 28.",
+          "maximum" : 64,
+          "minimum" : 0,
+          "type" : "number"
+        }
+      },
+      "required" : [
+        "blockSpacing",
+        "paragraphSpacing",
+        "topPadding",
+        "lineHeight",
+        "contentWidth",
+        "sideMargin",
+        "bubbleRadius",
+        "blockRadius"
+      ],
+      "type" : "object"
+    },
+    "name" : {
+      "description" : "The theme's name, in the user's language: a few evocative words, 40 characters at most.",
+      "maxLength" : 40,
+      "minLength" : 1,
+      "type" : "string"
+    }
+  },
+  "required" : [
+    "format",
+    "name",
+    "isDark",
+    "fontStyle",
+    "colors",
+    "fonts",
+    "layout",
+    "backdrop"
+  ],
+  "title" : "Vibe Manager conversation theme, format 3",
+  "type" : "object"
+}

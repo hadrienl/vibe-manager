@@ -144,7 +144,9 @@ which never changes the text.
   had started a line in the terminal is appended to it.
 - A transcript the CLI deleted (Claude Code, after 30 days by default) leaves the conversation
   empty; the terminal's own history is not kept either (ADR 0004).
-- Personal themes — duplicating one to edit it, importing one — are left to a later issue.
+- Personal themes — duplicating one to edit it, importing one — are left to a later issue. #118
+  lets the user make one with an agent, keep it and export it: ADR
+  [0033](0033-personal-conversation-themes.md).
 
 ## Rejected alternatives
 

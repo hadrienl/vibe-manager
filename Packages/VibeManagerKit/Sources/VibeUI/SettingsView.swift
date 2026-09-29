@@ -57,8 +57,11 @@ public struct SettingsView: View {
           ActivitySettings(journal: journal)
             .settingsPage(.activity)
         }
-        ConversationSettingsView(appearance: Bindable(model.conversations).appearance)
-          .settingsPage(.conversation)
+        ConversationSettingsView(
+          appearance: Bindable(model.conversations).appearance,
+          themes: model.conversations.themes
+        )
+        .settingsPage(.conversation)
         RequestsSettingsView(model: model)
           .settingsPage(.requests)
         if let updates = model.updates {
