@@ -2101,7 +2101,9 @@ struct SessionRow: View {
         .sessionAppearancePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       VStack(alignment: .leading, spacing: 2) {
         if commands.isRenaming {
-          SessionNameField(model: commands.model, session: session)
+          SessionNameField(
+            model: commands.model, session: session,
+            font: .systemFont(ofSize: NSFont.systemFontSize, weight: .medium))
         } else {
           Text(session.name)
             .fontWeight(.medium)

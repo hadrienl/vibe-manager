@@ -122,6 +122,33 @@ struct SessionIdentityWindowTests {
     #expect(workspace.model.sessions.first?.name == "Alpha")
   }
 
+  @Test("The field takes the keyboard by itself, and leaving it keeps the name typed")
+  func fieldTakesTheKeyboard() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    await waitUntil("the list") { workspace.list != nil }
+    let list = try #require(workspace.list)
+    workspace.window.makeFirstResponder(list)
+
+    workspace.model.beginRename(workspace.session.id, in: .sidebar)
+    // No click in it first: the name is selected, ready to be typed over, as in the Finder.
+    await waitUntil("the field has the keyboard") {
+      guard let field = workspace.nameFields.first else { return false }
+      return field.currentEditor() != nil
+    }
+    let field = try #require(workspace.nameFields.first)
+    let editor = try #require(field.currentEditor() as? NSTextView)
+    #expect(editor.selectedRange() == NSRange(location: 0, length: 5))
+    editor.insertText("Bravo", replacementRange: editor.selectedRange())
+
+    // A click elsewhere: the list takes the keyboard back.
+    workspace.window.makeFirstResponder(list)
+    await waitUntil("the name typed is kept") {
+      await workspace.repository.session(id: workspace.session.id)?.name == "Bravo"
+    }
+    #expect(workspace.model.renaming == nil)
+  }
+
   @Test("⌘Z in the sidebar undoes a rename; in the terminal, it does not")
   func undoOnlyInTheSidebar() async throws {
     let workspace = try await workspace()

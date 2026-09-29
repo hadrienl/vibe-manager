@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import VibeApplication
 import VibeDomain
@@ -11,35 +12,39 @@ import VibeDomain
 struct SessionNameField: View {
   let model: AppModel
   let session: WorkSession
-  var font: Font = .body
+  var font: NSFont = .systemFont(ofSize: NSFont.systemFontSize)
   @State private var name = ""
   @State private var issue: SessionDraftIssue?
   @State private var isCommitting = false
-  @FocusState private var isFocused: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
-      TextField(text: $name) {
-        Text("Session name", bundle: .module, comment: "The field that renames a session.")
+      NameTextField(
+        text: $name,
+        font: font,
+        placeholder: String(
+          localized: "Session name", bundle: .module,
+          comment: "The field that renames a session."),
+        submit: { commit(leaving: false) },
+        cancel: { model.cancelRename() },
+        leave: { commit(leaving: true) }
+      )
+      // As tall as the name it replaces: a bordered field would make the row grow. Its frame is
+      // drawn around it, outside the layout.
+      .background {
+        RoundedRectangle(cornerRadius: 4)
+          .fill(Color(nsColor: .textBackgroundColor))
+          .overlay {
+            RoundedRectangle(cornerRadius: 4)
+              .strokeBorder(
+                issue == nil ? Color(nsColor: .keyboardFocusIndicatorColor) : Color.red,
+                lineWidth: issue == nil ? 1 : 1.5)
+          }
+          .padding(.horizontal, -4)
+          .padding(.vertical, -1)
+          .allowsHitTesting(false)
       }
-      .textFieldStyle(.roundedBorder)
-      .font(font)
-      .overlay {
-        if issue != nil {
-          RoundedRectangle(cornerRadius: 5)
-            .strokeBorder(Color.red, lineWidth: 1.5)
-            .allowsHitTesting(false)
-        }
-      }
-      .focused($isFocused)
       .onAppear { name = session.name }
-      // Once the field exists: asked for in the update that inserts it, the focus is dropped.
-      .task { isFocused = true }
-      .onSubmit { commit(leaving: false) }
-      .onExitCommand { model.cancelRename() }
-      .onChange(of: isFocused) { _, isFocused in
-        if !isFocused { commit(leaving: true) }
-      }
       .onChange(of: name) { issue = nil }
       .accessibilityIdentifier("session-name-field")
       .accessibilityHint(issue.map { Text(verbatim: $0.message) } ?? Text(verbatim: ""))
@@ -80,5 +85,100 @@ struct SessionNameField: View {
       LocalizedStringResource(
         "Name refused: \(refusal.message)", bundle: .module,
         comment: "Said by VoiceOver when a session's new name is refused. The reason."))
+  }
+}
+
+/// The field itself, in AppKit: it takes the keyboard as soon as it is in the window, the name
+/// selected, as the Finder does.
+///
+/// SwiftUI's focus, asked for as the field appears, does not hold in a row of the sidebar: the
+/// list takes the keyboard back as the double-click ends, and a field that never had it cannot be
+/// left — a click elsewhere did nothing until the user had clicked in it first.
+private struct NameTextField: NSViewRepresentable {
+  @Binding var text: String
+  let font: NSFont
+  let placeholder: String
+  let submit: () -> Void
+  let cancel: () -> Void
+  let leave: () -> Void
+
+  func makeNSView(context: Context) -> FocusingTextField {
+    let field = FocusingTextField()
+    field.isBordered = false
+    field.drawsBackground = false
+    field.focusRingType = .none
+    field.lineBreakMode = .byTruncatingTail
+    field.usesSingleLineMode = true
+    field.cell?.isScrollable = true
+    field.textColor = .textColor
+    field.placeholderString = placeholder
+    field.setAccessibilityLabel(placeholder)
+    field.delegate = context.coordinator
+    field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    return field
+  }
+
+  func updateNSView(_ field: FocusingTextField, context: Context) {
+    context.coordinator.parent = self
+    field.font = font
+    if field.currentEditor() == nil, field.stringValue != text {
+      field.stringValue = text
+    }
+  }
+
+  func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+  @MainActor
+  final class Coordinator: NSObject, NSTextFieldDelegate {
+    var parent: NameTextField
+    /// Escape has already said how the editing ends.
+    private var cancelled = false
+
+    init(parent: NameTextField) {
+      self.parent = parent
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+      guard let field = notification.object as? NSTextField else { return }
+      parent.text = field.stringValue
+    }
+
+    func control(
+      _ control: NSControl, textView: NSTextView, doCommandBy selector: Selector
+    ) -> Bool {
+      switch selector {
+      case #selector(NSResponder.insertNewline(_:)):
+        parent.text = control.stringValue
+        parent.submit()
+        return true
+      case #selector(NSResponder.cancelOperation(_:)):
+        cancelled = true
+        parent.cancel()
+        return true
+      default:
+        return false
+      }
+    }
+
+    /// The keyboard went elsewhere: a click on another row, in the terminal, another window.
+    func controlTextDidEndEditing(_ notification: Notification) {
+      guard !cancelled else { return }
+      if let field = notification.object as? NSTextField { parent.text = field.stringValue }
+      parent.leave()
+    }
+  }
+}
+
+/// Takes the keyboard once it is in a window, after the event that inserted it is over.
+final class FocusingTextField: NSTextField {
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    guard window != nil else { return }
+    DispatchQueue.main.async { [weak self] in
+      guard let self, let window = self.window else { return }
+      window.makeFirstResponder(self)
+      self.currentEditor()?.selectAll(nil)
+    }
   }
 }

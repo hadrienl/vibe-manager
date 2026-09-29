@@ -31,7 +31,8 @@ struct SessionIdentityHeader: View {
 
       VStack(alignment: .leading, spacing: 2) {
         if isRenaming {
-          SessionNameField(model: model, session: session, font: .headline)
+          SessionNameField(
+            model: model, session: session, font: NSFont.preferredFont(forTextStyle: .headline))
         } else {
           HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(session.name)
