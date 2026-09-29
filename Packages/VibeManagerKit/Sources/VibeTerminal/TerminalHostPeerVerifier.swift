@@ -62,16 +62,30 @@ public final class CodeSigningPeerVerifier: TerminalHostPeerVerifier, @unchecked
     let tokenData = withUnsafeBytes(of: &token) { Data($0) }
     let attributes = [kSecGuestAttributeAudit: tokenData] as CFDictionary
     var guest: SecCode?
-    guard SecCodeCopyGuestWithAttributes(nil, attributes, [], &guest) == errSecSuccess,
-      let guest
-    else { return false }
-    let status = SecCodeCheckValidity(guest, [], requirement)
+    let found = SecCodeCopyGuestWithAttributes(nil, attributes, [], &guest)
+    let status =
+      if found == errSecSuccess, let guest {
+        SecCodeCheckValidity(guest, [], requirement)
+      } else {
+        found
+      }
     if status == errSecSuccess { return true }
     // The peer's binary was replaced on disk after it started — a rebuild, an update — which is
     // exactly the host this design exists to keep. Checking what is on disk would reject the very
     // process that is running; the kernel's view of it is what it was launched as, and validated.
-    guard status == errSecCSStaticCodeChanged, let identity else { return false }
+    guard Self.isGoneFromDisk(status), let identity else { return false }
     return KernelCodeIdentity.read(token) == identity
+  }
+
+  /// Whether a check failed only because the peer's code is no longer what is on disk.
+  ///
+  /// A rebuild writes a new file where the old one was: the code is found, and has changed. An
+  /// update by Sparkle (#92) moves a new bundle into place and deletes the old one: the running
+  /// process's file no longer exists, and the system cannot even find its code (`ENOENT`, measured
+  /// on a host left running by 0.9.0 and reached by 0.9.1).
+  static func isGoneFromDisk(_ status: OSStatus) -> Bool {
+    status == errSecCSStaticCodeChanged || status == errSecCSStaticCodeNotFound
+      || status == OSStatus(kPOSIXErrorBase) + OSStatus(ENOENT)
   }
 
   private static func ownSignature() -> (requirement: SecRequirement, identity: Identity)? {

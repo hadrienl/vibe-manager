@@ -33,6 +33,9 @@ public actor TerminalHostServer {
     /// How the host reads its own Full Disk Access, which every agent it runs inherits. `nil`
     /// leaves `fullDiskAccess` out of the capabilities: the host cannot say.
     public var fullDiskAccess: (any FullDiskAccessProbe)?
+    /// The capabilities offered, when fewer than this build can serve: a host left running by an
+    /// earlier version offers only what it knew, and the tests play one (#92). `nil` offers all.
+    public var offeredCapabilities: Set<String>?
 
     public init(
       verifier: any TerminalHostPeerVerifier,
@@ -41,8 +44,10 @@ public actor TerminalHostServer {
       build: String = TerminalHostServer.currentBuild,
       maximumRunningSessions: Int = TerminalHostServer.defaultMaximumRunningSessions,
       diagnostics: Diagnostics = .disabled,
-      fullDiskAccess: (any FullDiskAccessProbe)? = nil
+      fullDiskAccess: (any FullDiskAccessProbe)? = nil,
+      offeredCapabilities: Set<String>? = nil
     ) {
+      self.offeredCapabilities = offeredCapabilities
       self.diagnostics = diagnostics
       self.fullDiskAccess = fullDiskAccess
       self.verifier = verifier
@@ -200,6 +205,7 @@ public actor TerminalHostServer {
   /// without a probe to ask, nor start side terminals properly without the trampoline.
   private var capabilities: [String] {
     TerminalHostCapability.all.filter {
+      if let offered = configuration.offeredCapabilities, !offered.contains($0) { return false }
       switch $0 {
       case TerminalHostCapability.fullDiskAccess: return configuration.fullDiskAccess != nil
       case TerminalHostCapability.sideTerminals: return ControllingTerminal.trampolinePath != nil
@@ -218,9 +224,18 @@ public actor TerminalHostServer {
       return
     case .control:
       guard let request = frame.decode(TerminalHostRequest.self) else { return }
+      // A request for a capability this host did not offer is one an older host could not have
+      // read: it goes unanswered, as it would have there.
+      if let capability = request.body.capability, !capabilities.contains(capability) {
+        unofferedRequestCount += 1
+        return
+      }
       await handle(request, from: client)
     }
   }
+
+  /// Requests for a capability this host did not offer, which a well-behaved client never sends.
+  private(set) var unofferedRequestCount = 0
 
   private func handle(_ request: TerminalHostRequest, from client: Client) async {
     let number = request.request

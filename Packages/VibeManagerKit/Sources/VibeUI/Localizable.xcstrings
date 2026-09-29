@@ -3812,6 +3812,16 @@
         }
       }
     },
+    "A new version is downloaded in the background and installed the next time you quit Vibe Manager. Turned off, you are told first." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une nouvelle version est téléchargée en arrière-plan et installée la prochaine fois que vous quittez Vibe Manager. Sinon, vous êtes prévenu d’abord."
+          }
+        }
+      }
+    },
     "A page of this Mac: the agent may act on it without asking." : {
       "localizations" : {
         "fr" : {
@@ -4068,6 +4078,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pour l’instant, les agents tournent dans Vibe Manager lui-même. Quittez puis rouvrez Vibe Manager pour leur donner l’accès."
+          }
+        }
+      }
+    },
+    "Agents running when an update is installed keep running if you choose to: you are asked first, as when quitting, and they are back on screen after the relaunch." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les agents en cours au moment d’installer une mise à jour continuent de tourner si vous le choisissez : la question vous est posée d’abord, comme en quittant, et vous les retrouvez à l’écran après la relance."
           }
         }
       }
@@ -4760,6 +4780,17 @@
         }
       }
     },
+    "Channel" : {
+      "comment" : "Which versions are offered as updates.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal"
+          }
+        }
+      }
+    },
     "Chart" : {
       "comment" : "What the chart of the Usage window shows.",
       "localizations" : {
@@ -4771,12 +4802,43 @@
         }
       }
     },
+    "Check" : {
+      "comment" : "Followed by how often: Daily, Weekly, Monthly.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher"
+          }
+        }
+      }
+    },
     "Check Activity Monitor for a leftover process." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cherchez un processus restant dans le Moniteur d’activité."
+          }
+        }
+      }
+    },
+    "Check Now" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher maintenant"
+          }
+        }
+      }
+    },
+    "Check for updates automatically" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher automatiquement les mises à jour"
           }
         }
       }
@@ -5474,6 +5536,17 @@
         }
       }
     },
+    "Daily" : {
+      "comment" : "How often to check for updates.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque jour"
+          }
+        }
+      }
+    },
     "Day" : {
       "localizations" : {
         "fr" : {
@@ -5853,6 +5926,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Double-cliquez pour renommer"
+          }
+        }
+      }
+    },
+    "Download and install updates automatically" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Télécharger et installer automatiquement les mises à jour"
           }
         }
       }
@@ -7321,6 +7404,16 @@
         }
       }
     },
+    "Last checked %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière recherche : %@"
+          }
+        }
+      }
+    },
     "Leave empty to follow the shell's folder or command." : {
       "localizations" : {
         "fr" : {
@@ -7472,6 +7565,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changement de modèle"
+          }
+        }
+      }
+    },
+    "Monthly" : {
+      "comment" : "How often to check for updates.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque mois"
           }
         }
       }
@@ -7841,6 +7945,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neutre"
+          }
+        }
+      }
+    },
+    "Never checked" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune recherche pour l’instant"
           }
         }
       }
@@ -11188,6 +11302,17 @@
         }
       }
     },
+    "Stable" : {
+      "comment" : "An update channel: final versions only.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable"
+          }
+        }
+      }
+    },
     "Staged" : {
       "comment" : "A list of the Git inspector: staged files.",
       "localizations" : {
@@ -13146,12 +13271,42 @@
         }
       }
     },
+    "This build has no key to check updates with, so it does not look for any." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce build n’a pas de clé pour vérifier les mises à jour : il n’en recherche donc aucune."
+          }
+        }
+      }
+    },
     "This conversation can’t be written to from here: the drop was typed into the terminal." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible d’écrire dans cette conversation depuis ici : le dépôt a été saisi dans le terminal."
+          }
+        }
+      }
+    },
+    "This copy keeps its data apart (VIBE_DATA_DIRECTORY), and does not update itself: the copy it runs beside does." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette copie garde ses données à part (VIBE_DATA_DIRECTORY) et ne se met pas à jour : c’est la copie à côté de laquelle elle tourne qui le fait."
+          }
+        }
+      }
+    },
+    "This copy of Vibe Manager was built from its source, and is never replaced by a release. Updates come to the copies downloaded from GitHub." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette copie de Vibe Manager a été compilée depuis ses sources et n’est jamais remplacée par une version publiée. Les mises à jour arrivent aux copies téléchargées depuis GitHub."
           }
         }
       }
@@ -13868,6 +14023,27 @@
         }
       }
     },
+    "Unstable" : {
+      "comment" : "An update channel: release candidates as well as final versions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instable"
+          }
+        }
+      }
+    },
+    "Unstable also offers the release candidates: versions still being tested before they are final, which may have defects." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le canal Instable propose aussi les versions candidates : des versions encore en test avant d’être finales, qui peuvent contenir des défauts."
+          }
+        }
+      }
+    },
     "Unstaged" : {
       "comment" : "A list of the Git inspector: unstaged files.",
       "localizations" : {
@@ -13928,6 +14104,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les dossiers non suivis ne peuvent pas être lus ici."
+          }
+        }
+      }
+    },
+    "Updates" : {
+      "comment" : "A section of the Settings window.\nA tab of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mises à jour"
+          }
+        }
+      }
+    },
+    "Updates are turned off for this copy (VIBE_UPDATES=off)." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les mises à jour sont désactivées pour cette copie (VIBE_UPDATES=off)."
+          }
+        }
+      }
+    },
+    "Updates could not be started in this copy. The next version can still be downloaded from GitHub." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les mises à jour n’ont pas pu démarrer dans cette copie. La version suivante peut toujours être téléchargée depuis GitHub."
           }
         }
       }
@@ -14072,6 +14279,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les valeurs à essayer apparaissent ici pour chaque champ du modèle."
+          }
+        }
+      }
+    },
+    "Version %@ is available." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La version %@ est disponible."
+          }
+        }
+      }
+    },
+    "Version %@ will be installed when you quit Vibe Manager." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La version %@ sera installée quand vous quitterez Vibe Manager."
           }
         }
       }
@@ -14222,6 +14449,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vue web"
+          }
+        }
+      }
+    },
+    "Weekly" : {
+      "comment" : "How often to check for updates.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque semaine"
           }
         }
       }

@@ -105,6 +105,9 @@ public final class AppModel {
   }
   /// The library of avatars: the one in use, and those being made (#41, #154).
   public var avatars: AvatarLibraryModel?
+  /// The updater (#92). Set by the application, which has the bundle an update replaces: a
+  /// workspace assembled without it has no Updates tab.
+  public var updates: UpdatesModel?
   /// Brings the application forward: "Open Session" from the floating panel, while another
   /// application is in front.
   @ObservationIgnored public var activateApplication: @MainActor () -> Void = {

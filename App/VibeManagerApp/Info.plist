@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  What the generated Info.plist cannot hold: Sparkle's keys (#92, ADR 0033). Xcode merges this
+  file with the keys it generates. The feed and the public key are build settings, so that
+  Scripts/update-check.sh can build a pair of versions against a feed and a key of its own.
+-->
+<plist version="1.0">
+<dict>
+	<key>SUFeedURL</key>
+	<string>$(VIBE_UPDATE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(VIBE_UPDATE_PUBLIC_KEY)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+</dict>
+</plist>

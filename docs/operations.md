@@ -106,11 +106,39 @@ The copy has its own store, runtime document, notes, logs (`<folder>/Logs`), pre
 terminal host. `VIBE_ENABLE_MOCK_AGENT=1` adds an agent that needs no account, `only` offers it
 alone.
 
+### An update is not offered
+
+Vibe Manager → Check for Updates…, or Settings → Updates, says why when this copy does not update
+itself: a build of the source (only a copy downloaded from GitHub does), an isolated copy
+(`VIBE_DATA_DIRECTORY`), or `VIBE_UPDATES=off`. A release candidate is only offered on the
+Unstable channel. The feed is `https://hadrienl.github.io/vibe-manager/appcast.xml`: a version
+missing from it was not published, or the Appcast workflow failed — run it again from the Actions
+tab. An update that cannot be installed can always be downloaded as a disk image from GitHub
+Releases and dragged over the application.
+
 ### Something else
 
 Help → Export Diagnostics…, then open an issue with the file. `defaults write
 eu.hadrien.VibeManager DiagnosticsVerbose -bool YES` adds debug events to the log — made of the
 same types as the others: verbose is not indiscreet — and turns on the main-thread hang detector.
+
+## Rotating the update key
+
+The EdDSA key signs every update (ADR 0033). Its private half is in the maintainer's login
+keychain, in a copy kept offline, and in the secret `SPARKLE_ED_PRIVATE_KEY` of the `release`
+environment. If it is lost or leaked:
+
+1. `generate_keys --account vibe-manager-next` (from the Sparkle release pinned in
+   `Scripts/release.sh`) makes a new pair; keep the private half offline and put it in the secret.
+2. Put the new public key in `VIBE_UPDATE_PUBLIC_KEY` (`Configuration/Shared.xcconfig`) and
+   release. Sparkle accepts that version from the copies in the field on the strength of its
+   Developer ID signature, which has not changed; `release.sh` checks its archive against the new
+   key it carries.
+3. Every later version is signed with the new key alone.
+
+Never change the key on the day the Developer ID certificate is renewed: Sparkle lets one of the
+two change at a time, not both. The designated requirement names the team, not the certificate,
+so renewing the certificate alone changes nothing.
 
 ## Uninstalling completely
 

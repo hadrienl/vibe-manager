@@ -22,6 +22,7 @@ let package = Package(
     .library(name: "VibeAvatar", targets: ["VibeAvatar"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
     .library(name: "VibeComposition", targets: ["VibeComposition"]),
+    .library(name: "VibeUpdates", targets: ["VibeUpdates"]),
   ],
   dependencies: [
     // Pinned exactly: the emulator parses untrusted output, so its version is a deliberate
@@ -30,6 +31,9 @@ let package = Package(
     // Pinned exactly for the same reason: it parses what an agent wrote. 0.6.0 is the last release
     // whose manifest the Swift 6.1 of CI's Xcode 16.4 can read; later ones ask for tools 6.2.
     .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.6.0"),
+    // Pinned exactly: it replaces the application on disk, and `Scripts/release.sh` signs the
+    // archives with the `sign_update` of this very version (#92).
+    .package(url: "https://github.com/sparkle-project/Sparkle.git", exact: "2.10.0"),
   ],
   targets: [
     // Every target whose text reaches the user carries its own string catalog.
@@ -109,6 +113,12 @@ let package = Package(
         "VibeUI",
       ]
     ),
+    // The application's updater (#92): Sparkle, behind the `SoftwareUpdating` port. Linked by the
+    // application alone, which has the bundle an updater replaces; the composition never sees it.
+    .target(
+      name: "VibeUpdates",
+      dependencies: ["VibeApplication", .product(name: "Sparkle", package: "Sparkle")]
+    ),
     // The terminal host in a process of its own, for the tests that need one to outlive their
     // client or to be killed. The application runs the same code from its own binary.
     .executableTarget(
@@ -153,6 +163,7 @@ let package = Package(
       // happens between a provider and a process.
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain", "VibeTerminal"]
     ),
+    .testTarget(name: "VibeUpdatesTests", dependencies: ["VibeUpdates", "VibeApplication"]),
     .testTarget(
       name: "VibeGitTests",
       dependencies: ["VibeGit", "VibeApplication", "VibeDomain"]

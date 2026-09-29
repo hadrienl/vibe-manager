@@ -88,6 +88,8 @@ public final class AppEnvironment {
   private let diagnosticsFile: FileDiagnosticLog
   /// Where this copy keeps what it writes.
   public let dataDirectory: URL
+  /// The user defaults suite of an isolated copy, `nil` for the application's own defaults.
+  public let defaultsSuite: String?
   public let terminalSupervisor: HostedTerminalSupervisor
   public let launcher: SessionLauncher
   /// Each session's drawer of side terminals (#43).
@@ -109,6 +111,7 @@ public final class AppEnvironment {
       defaultsSuite: configuration.defaultsSuite
         ?? configuration.environment["VIBE_DEFAULTS_SUITE"].flatMap { $0.isEmpty ? nil : $0 })
     dataDirectory = data.store.deletingLastPathComponent()
+    defaultsSuite = data.defaultsSuite
     // A folder made by an early build or restored from a backup keeps whatever mode it had; the
     // application's own are brought back to owner only before anything is read from them.
     let repaired = DataDirectoryPermissions.repair([

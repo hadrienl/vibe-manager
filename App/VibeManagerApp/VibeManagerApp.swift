@@ -7,6 +7,7 @@ import VibeDomain
 import VibePersistence
 import VibeTerminal
 import VibeUI
+import VibeUpdates
 
 /// The one binary is six programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
 /// given `--browser-bridge` or `--browser-cli`, the web view's bridge an agent starts or the `vibe`
@@ -67,11 +68,20 @@ struct VibeManagerApp: App {
           if appDelegate.floatingPanel == nil {
             appDelegate.floatingPanel = FloatingRequestPanelController(model: environment.appModel)
           }
+          // The updater replaces the bundle this process runs from (#92): made here, not in the
+          // package, whose tests have no bundle of their own to replace.
+          if environment.appModel.updates == nil {
+            environment.appModel.updates = appDelegate.startUpdates(in: environment)
+          }
         }
         .background(WorkspaceWindowReader(focus: windowFocus))
     }
     .defaultSize(width: 1_180, height: 760)
     .commands {
+      CommandGroup(after: .appInfo) {
+        UpdateCommands(model: environment.appModel)
+      }
+
       CommandGroup(replacing: .newItem) {
         Button("New Session") {
           environment.appModel.beginNewSession()
@@ -347,6 +357,39 @@ private struct TemplateCommands: View {
     Button("Manage Prompt Templates…") {
       model.settingsTab = .templates
       openSettings()
+    }
+  }
+}
+
+/// Vibe Manager → Check for Updates… (#92). A copy that does not update itself still has the item:
+/// it opens the Updates tab, which says why.
+private struct UpdateCommands: View {
+  let model: AppModel
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    if let updates = model.updates {
+      if let ready = updates.readyToInstall, updates.canOfferReadyUpdate {
+        // Set aside by Later: installed when the application quits, or now from here.
+        Button("Install Vibe Manager \(ready.version) and Relaunch…") {
+          updates.offerReadyUpdate()
+        }
+      } else if !updates.isAvailable {
+        Button("Check for Updates…") {
+          model.settingsTab = .updates
+          openSettings()
+        }
+      } else if let waiting = updates.waitingVersion {
+        Button("Version \(waiting) Is Available…") {
+          updates.checkNow()
+        }
+        .disabled(!updates.canCheck)
+      } else {
+        Button("Check for Updates…") {
+          updates.checkNow()
+        }
+        .disabled(!updates.canCheck)
+      }
     }
   }
 }
@@ -764,6 +807,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private static let shutdownDeadline: Duration = .seconds(6)
 
   private var hasRepliedToTermination = false
+  /// The updater (#92), held for the life of the application: Sparkle keeps only a weak reference
+  /// to its delegate.
+  private var updater: SparkleSoftwareUpdater?
+  /// Whether to leave the agents running, answered before an update relaunched the application:
+  /// the quit that follows does not ask a second time.
+  private var decidedForUpdate: Bool?
+  /// A relaunch being decided — waiting on a sheet, or its question on screen: Sparkle and the
+  /// menu can both ask, and the question is asked once.
+  private var isDecidingRelaunch = false
 
   /// Whether this quit is the Mac shutting down, restarting or logging out: nothing survives that,
   /// and a question on screen would hold the logout up for an answer that changes nothing.
@@ -787,7 +839,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard !hasRepliedToTermination else { return .terminateNow }
     // A quit already on its way — flushing the notes, or asking about them — answers for this one.
     guard !isFlushingNotes else { return .terminateCancel }
-    guard let keepingAgentsRunning = decideAboutRunningAgents(in: environment) else {
+    // Answered before an update relaunched the application, for this quit alone: taken whatever
+    // happens next, so that a quit cancelled later never leaves an old answer for the next one.
+    let decidedForUpdate = self.decidedForUpdate
+    self.decidedForUpdate = nil
+    guard
+      let keepingAgentsRunning = decideAboutRunningAgents(
+        in: environment, decidedForUpdate: decidedForUpdate)
+    else {
       return .terminateCancel
     }
     isFlushingNotes = true
@@ -917,9 +976,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   ///
   /// Asked only when there is something to leave: an agent running in the terminal host. The
   /// answer remembered by "Don't ask again" is changed in the settings.
-  private func decideAboutRunningAgents(in environment: AppEnvironment) -> Bool? {
+  private func decideAboutRunningAgents(
+    in environment: AppEnvironment, decidedForUpdate: Bool?
+  ) -> Bool? {
     let count = environment.hostedRunningCount
     guard count > 0, !isPoweringOff else { return false }
+    if let decidedForUpdate { return decidedForUpdate }
+    // A version set aside by Later is installed as the application quits (#92). One that speaks
+    // another core of the host's protocol could not take back agents left running: not offered.
+    if let ready = updater?.readyToInstall,
+      let speaks = ready.hostProtocol, speaks != TerminalHost.protocolVersion
+    {
+      if environment.appModel.quitBehavior == .stopAll { return false }
+      return confirmStopping(for: ready) ? false : nil
+    }
     switch environment.appModel.quitBehavior {
     case .keepRunning: return true
     case .stopAll: return false
@@ -980,6 +1050,196 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       environment.appModel.quitBehavior = keep ? .keepRunning : .stopAll
     }
     return keep
+  }
+
+  // MARK: - Updates (#92)
+
+  /// Starts the updater, or says why this copy has none.
+  func startUpdates(in environment: AppEnvironment) -> UpdatesModel {
+    // The channel is kept with the copy's other choices: an isolated copy testing an update must
+    // not move the real application to another channel.
+    let updater = SparkleSoftwareUpdater(
+      defaults: environment.defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard)
+    self.updater = updater
+    updater.isPresentingModal = { Self.isPresentingModal }
+    updater.relaunchGate = { [weak self] candidate in
+      self?.relaunch(for: candidate)
+    }
+    // An update that failed after the question: its answer must not stand for a later quit.
+    updater.onAbort = { [weak self] in self?.decidedForUpdate = nil }
+    let availability: DiagnosticToken =
+      switch updater.availability {
+      case .available: "available"
+      case .unavailable(.developmentBuild): "developmentBuild"
+      case .unavailable(.isolatedCopy): "isolatedCopy"
+      case .unavailable(.turnedOff): "turnedOff"
+      case .unavailable(.notConfigured): "notConfigured"
+      case .unavailable(.failed): "failed"
+      }
+    environment.diagnostics.record(
+      .lifecycle, updater.availability == .available ? .info : .notice, "update.availability",
+      ["state": .token(availability)])
+    return UpdatesModel(updater: updater)
+  }
+
+  /// A sheet or an alert is open somewhere: the user is in the middle of something.
+  private static var isPresentingModal: Bool {
+    NSApp.modalWindow != nil || NSApp.windows.contains { $0.attachedSheet != nil }
+  }
+
+  /// An update is ready to relaunch the application. Installing is quitting: the question of
+  /// ADR 0017 is asked first, and its answer stands for the quit that follows. Put off while
+  /// sessions are being restored or a sheet is open; never installed by "Later", until the next quit.
+  private func relaunch(for candidate: UpdateCandidate) {
+    guard !isDecidingRelaunch else { return }
+    isDecidingRelaunch = true
+    decideRelaunch(for: candidate)
+  }
+
+  private func decideRelaunch(for candidate: UpdateCandidate) {
+    // Given up on meanwhile, or already on its way: nothing is left to answer for.
+    guard let updater, updater.readyToInstall == candidate, updater.canOfferReadyUpdate else {
+      isDecidingRelaunch = false
+      return
+    }
+    guard let environment else {
+      isDecidingRelaunch = false
+      updater.installReadyUpdate()
+      return
+    }
+    let situation = UpdateRelaunchSituation(
+      hostedRunningCount: environment.hostedRunningCount,
+      inProcessRunningCount: environment.inProcessRunningCount,
+      quitBehavior: environment.appModel.quitBehavior,
+      isRestoring: environment.appModel.restoration != nil,
+      isPresentingModal: Self.isPresentingModal,
+      currentHostProtocol: TerminalHost.protocolVersion,
+      candidate: candidate)
+    switch DecideUpdateRelaunch.decide(situation) {
+    case .wait:
+      // Looked at again without a word: the user asked for it, and nothing was said yet.
+      Task { [weak self] in
+        try? await Task.sleep(for: .seconds(1))
+        self?.decideRelaunch(for: candidate)
+      }
+    case .proceed(let keepingAgentsRunning):
+      install(keepingAgentsRunning: keepingAgentsRunning, in: environment)
+    case .ask(let question):
+      let answer = ask(question, installing: candidate, in: environment)
+      // Given up on while the question was on screen: the answer has nothing to apply to.
+      guard updater.readyToInstall == candidate, updater.canOfferReadyUpdate else {
+        isDecidingRelaunch = false
+        return
+      }
+      guard let keepingAgentsRunning = answer else {
+        isDecidingRelaunch = false
+        record("later", in: environment)
+        // Sparkle's window would otherwise wait on a relaunch nobody starts, and never close.
+        updater.setReadyUpdateAside()
+        return
+      }
+      install(keepingAgentsRunning: keepingAgentsRunning, in: environment)
+    }
+  }
+
+  /// The answer stands for the quit that follows only if the installation really starts it: an
+  /// answer left behind would be applied, unasked, to a later quit of the user's own.
+  private func install(keepingAgentsRunning: Bool, in environment: AppEnvironment) {
+    isDecidingRelaunch = false
+    decidedForUpdate = keepingAgentsRunning
+    guard updater?.installReadyUpdate() == true else {
+      decidedForUpdate = nil
+      return
+    }
+    record(keepingAgentsRunning ? "keepRunning" : "stopAll", in: environment)
+  }
+
+  /// Quitting with a version set aside that cannot take back the running agents: stopping them is
+  /// the only way on, and it is asked. `false` is Cancel.
+  private func confirmStopping(for ready: UpdateCandidate) -> Bool {
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = String(
+      localized: "Vibe Manager \(ready.version) will be installed as Vibe Manager quits.",
+      comment: "The version about to be installed.")
+    alert.informativeText = String(
+      localized: """
+        It can't take back the running agents: they will be stopped, then resumed at the next \
+        launch where their conversation left off. The turn in progress is lost.
+        """)
+    alert.addButton(withTitle: String(localized: "Cancel"))
+    alert.addButton(withTitle: String(localized: "Stop All and Quit")).hasDestructiveAction = true
+    return alert.runModal() == .alertSecondButtonReturn
+  }
+
+  private func record(_ answer: DiagnosticToken, in environment: AppEnvironment) {
+    environment.diagnostics.record(
+      .lifecycle, .notice, "update.relaunch",
+      ["answer": .token(answer), "running": .count(environment.hostedRunningCount)])
+  }
+
+  /// The quit question, said of an update. `nil` is Later.
+  private func ask(
+    _ question: UpdateRelaunchDecision.Question, installing candidate: UpdateCandidate,
+    in environment: AppEnvironment
+  ) -> Bool? {
+    let alert = NSAlert()
+    switch question {
+    case .keepOrStop(let running, let inProcess):
+      alert.messageText = String(
+        localized: "Install Vibe Manager \(candidate.version) and relaunch?",
+        comment: "The version about to be installed.")
+      var information =
+        running == 1
+        ? String(
+          localized: """
+            An agent is running. It can keep working during the update, and you will find it as it \
+            is after the relaunch.
+            """)
+        : String(
+          localized: """
+            Agents are running in \(running) sessions. They can keep working during the update, \
+            and you will find them as they are after the relaunch.
+            """)
+      if environment.terminals.runningTerminalCount > 0 {
+        information +=
+          "\n\n"
+          + String(
+            localized: """
+              Their side terminals follow them: left running with them, or stopped with them.
+              """)
+      }
+      if inProcess > 0 {
+        information +=
+          "\n\n"
+          + String(
+            localized: "\(inProcess) other agents run inside Vibe Manager and will stop either way."
+          )
+      }
+      alert.informativeText = information
+      alert.addButton(withTitle: String(localized: "Keep Running and Install"))
+      alert.addButton(withTitle: String(localized: "Stop All and Install"))
+      alert.addButton(withTitle: String(localized: "Later"))
+      switch alert.runModal() {
+      case .alertFirstButtonReturn: return true
+      case .alertSecondButtonReturn: return false
+      default: return nil
+      }
+    case .mustStop(let running):
+      alert.alertStyle = .warning
+      alert.messageText = String(
+        localized: "Vibe Manager \(candidate.version) can't take back the running agents.",
+        comment: "The version about to be installed.")
+      alert.informativeText = String(
+        localized: """
+          The \(running) running agents will be stopped, then resumed after the relaunch where \
+          their conversation left off. The turn in progress is lost.
+          """)
+      alert.addButton(withTitle: String(localized: "Later"))
+      alert.addButton(withTitle: String(localized: "Stop All and Install"))
+        .hasDestructiveAction = true
+      return alert.runModal() == .alertSecondButtonReturn ? false : nil
+    }
   }
 
   /// Answered once, whichever of the two tasks gets here first.

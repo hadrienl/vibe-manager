@@ -7,7 +7,7 @@ import VibeConversationUI
 import VibeDomain
 
 /// The application's settings, in tabs: General, Privacy, the prompt templates, the web view, the
-/// activity, the conversation view and the requests.
+/// activity, the conversation view, the requests and the updates.
 ///
 /// Several lines are ways back to a question asked once. The Full Disk Access step at launch is
 /// not asked again by the same identity, and neither is the close confirmation once "Don't ask
@@ -61,6 +61,10 @@ public struct SettingsView: View {
           .settingsPage(.conversation)
         RequestsSettingsView(model: model)
           .settingsPage(.requests)
+        if let updates = model.updates {
+          UpdatesSettingsView(updates: updates)
+            .settingsPage(.updates)
+        }
       }
     } else {
       general
@@ -169,6 +173,8 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
   /// How the requests of background sessions are signalled (#40), the floating panel (#41), and
   /// its avatars (#154), in two pages.
   case requests
+  /// Whether and how the application updates itself, and on which channel (#92).
+  case updates
 
   /// The label of the tab in the toolbar.
   var title: LocalizedStringResource {
@@ -197,6 +203,8 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .requests:
       LocalizedStringResource(
         "Requests", bundle: .module, comment: "A tab of the Settings window.")
+    case .updates:
+      LocalizedStringResource("Updates", bundle: .module, comment: "A tab of the Settings window.")
     }
   }
 
@@ -213,6 +221,7 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .conversation: "bubble.left.and.text.bubble.right"
     // Not Privacy's hand: a person speaking in a bubble, as the avatar of the panel does.
     case .requests: "person.bubble"
+    case .updates: "arrow.down.circle"
     }
   }
 }

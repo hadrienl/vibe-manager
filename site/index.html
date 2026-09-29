@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  The site served by GitHub Pages at https://hadrienl.github.io/vibe-manager/. The landing page
+  will come here. `appcast.xml`, the Sparkle feed, is generated beside this file by the Appcast
+  workflow (Scripts/publish-appcast.sh) and never committed.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>Vibe Manager</title>
+    <style>
+      :root {
+        --background: #fbfbfd;
+        --text: #1d1d1f;
+        --secondary: #6e6e73;
+        --accent: #0066cc;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #161617;
+          --text: #f5f5f7;
+          --secondary: #a1a1a6;
+          --accent: #2997ff;
+        }
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--background);
+        color: var(--text);
+        font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      }
+      main {
+        max-width: 34rem;
+        padding: 2rem 1rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 2.5rem;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0 0 1.5rem;
+      }
+      .links a {
+        margin-right: 1.25rem;
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .links a:hover {
+        text-decoration: underline;
+      }
+      .requirements {
+        margin-top: 2rem;
+        color: var(--secondary);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Vibe Manager</h1>
+      <p>
+        A native macOS application to run several command-line coding agents, such as Claude Code
+        and Codex, side by side.
+      </p>
+      <p class="links">
+        <a href="https://github.com/hadrienl/vibe-manager/releases/latest">Download the latest release</a>
+        <a href="https://github.com/hadrienl/vibe-manager">Source code</a>
+      </p>
+      <p class="requirements">Requires macOS 14 or later.</p>
+    </main>
+  </body>
+</html>

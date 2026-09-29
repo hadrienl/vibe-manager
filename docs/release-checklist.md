@@ -4,7 +4,9 @@ Reproducible, in two parts: what the scripts check, and what a person has to. A 
 draft on GitHub Releases until every box of both is ticked; the draft's notes get the filled-in
 copy of this list, figures included.
 
-Copy this into the draft, then tick as you go.
+Copy this into the draft, **below** the line `<!-- release-checklist -->`, then tick as you go.
+What is above that line is what the update window shows (ADR 0033); what is below stays on
+GitHub.
 
 ## Before
 
@@ -18,8 +20,10 @@ Copy this into the draft, then tick as you go.
       and followed by `rc.2`; its draft is deleted.
 - [ ] The `release` environment holds `DEVELOPER_ID_CERTIFICATE_P12`,
       `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `NOTARY_API_KEY_P8`, `NOTARY_API_KEY_ID`,
-      `NOTARY_API_ISSUER_ID`, and the variable `VIBE_TEAM_ID`; it requires a reviewer and only
-      accepts `v*` tags.
+      `NOTARY_API_ISSUER_ID`, `SPARKLE_ED_PRIVATE_KEY`, and the variable `VIBE_TEAM_ID`; it
+      requires a reviewer and only accepts `v*` tags.
+- [ ] Settings → Pages → Source is **GitHub Actions** (once), and the last run of the Appcast
+      workflow is green.
 
 ## Automatic
 
@@ -28,14 +32,19 @@ Copy this into the draft, then tick as you go.
       checks, and stops at the first failure:
   - a clean tree, the tag on the commit being built and that commit on `main`, CI green on it;
   - a Developer ID Application certificate of the team;
-  - the archive, built with `MARKETING_VERSION=<version>` and
-    `CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD)`, nothing written to the repository;
+  - the archive, built with `MARKETING_VERSION=<version>` and `CURRENT_PROJECT_VERSION` the
+    number of commits — followed by `.1` for a final version, so that it comes after the release
+    candidate of the same commit — nothing written to the repository;
   - `codesign --verify --deep --strict`, no entitlement at all, the hardened runtime, a designated
-    requirement naming the team (security review A6), the bundle identifier and version;
+    requirement naming the team (security review A6) and equal to
+    `Configuration/DesignatedRequirement.txt`, the bundle identifier and version, an
+    `SUPublicEDKey`;
   - `mock-agent.sh` sealed in the bundle, no `Local.xcconfig`;
   - the application notarized and stapled, Gatekeeper accepting it;
+  - the update archive `VibeManager-<version>.zip`, signed with the EdDSA key and verified with
+    the key the application carries, and its entry `VibeManager-<version>.appcast.json`;
   - the disk image built by `hdiutil`, signed, notarized, stapled, accepted by Gatekeeper;
-  - the SHA-256 of the image, and a **draft** release with both files.
+  - the SHA-256 of the image, and a **draft** release with the four files.
 - [ ] `Scripts/clean-install-check.sh VibeManager-<version>.dmg`, on the image downloaded from the
       draft, passed:
       Gatekeeper and staples, installation in a folder of its own, TCC reset for the bundle, the
@@ -77,9 +86,13 @@ Copy this into the draft, then tick as you go.
       under 1 %, host included (Activity Monitor, 60 s). The transcript probes of Claude Code and
       Codex poll every 500 ms: if idle CPU is over budget with them, they move to file events
       before the release.
-- [ ] **Update with agents kept running**: with version N installed and a session running, quit
-      with Keep Running, install N+1 over it, open it: the session is taken back, running, its
-      history on screen.
+- [ ] **Update by Sparkle from the version before**, with `Scripts/update-check.sh` (two builds of
+      this commit signed with the Developer ID, a feed of its own on this Mac, a copy of its own):
+      with N running a session, Vibe Manager → Check for Updates… offers N+1, Install and Relaunch
+      asks the question, Keep Running and Install relaunches N+1, and the session is taken back,
+      running, its history on screen. Full Disk Access is still granted, and the TCC log below
+      still attributes the agent's access to Vibe Manager. The script also shows an archive with a
+      wrong signature refused, and a release candidate offered only on the Unstable channel.
 - [ ] **What TCC attributes to the terminal host** (ADR 0017 left this to measure). Grant Full
       Disk Access, start an agent in a session, quit with Keep Running, then have the agent read
       `~/Documents` while watching:
@@ -100,5 +113,11 @@ Copy this into the draft, then tick as you go.
 
 ## Publishing
 
-- [ ] The draft's notes: what changed, this list filled in, the SHA-256.
+- [ ] The draft's notes: what changed, then `<!-- release-checklist -->`, then this list filled in
+      and the SHA-256.
 - [ ] Publish the draft.
+- [ ] The Appcast workflow went green, and `https://hadrienl.github.io/vibe-manager/appcast.xml`
+      lists the version — without a channel for a final version, on `unstable` for a release
+      candidate — and no draft.
+- [ ] A copy of the version before, on the right channel, offers this one (Vibe Manager → Check
+      for Updates…).

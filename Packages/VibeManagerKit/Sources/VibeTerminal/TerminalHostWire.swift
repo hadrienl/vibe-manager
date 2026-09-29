@@ -164,6 +164,18 @@ struct TerminalHostRequest: Codable, Equatable, Sendable {
   }
 }
 
+extension TerminalHostRequest.Body {
+  /// The capability a request needs, `nil` for the frozen core.
+  var capability: String? {
+    switch self {
+    case .stats: TerminalHostCapability.stats
+    case .fullDiskAccess: TerminalHostCapability.fullDiskAccess
+    case .retire: TerminalHostCapability.retire
+    case .hello, .list, .start, .attach, .resize, .redraw, .stop, .kill, .release, .goodbye: nil
+    }
+  }
+}
+
 /// Why a host would not serve a client. None of these says the host is not ours: it proved it is,
 /// or the client would not have sent a byte.
 enum TerminalHostRefusal: String, Codable, Equatable, Sendable {

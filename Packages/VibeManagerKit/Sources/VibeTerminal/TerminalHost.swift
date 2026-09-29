@@ -89,6 +89,9 @@ public struct TerminalHostLocation: Hashable, Sendable {
 /// The terminal host process: the application's own binary, started with `--terminal-host`.
 public enum TerminalHost {
   public static let argument = "--terminal-host"
+  /// The frozen core this build speaks. An update that speaks another cannot take back the agents
+  /// left running, and says so before it is installed (#92).
+  public static let protocolVersion = TerminalHostWire.protocolVersion
   private static let logger = Logger(
     subsystem: "eu.hadrien.VibeManager.terminal-host", category: "host")
 
