@@ -9,8 +9,8 @@ struct NewSessionLocalizationTests {
     #expect(
       Localization.string("Create & Launch", module: "VibeUI", in: "fr") == "Créer et lancer")
     #expect(
-      Localization.string("Where, and with which agent?", module: "VibeUI", in: "fr")
-        == "Où, et avec quel agent\u{00A0}?")
+      Localization.string("Nothing starts before you send.", module: "VibeUI", in: "fr")
+        == "Rien ne démarre avant l’envoi.")
     #expect(
       Localization.string("Fill in “\("URL")” to send.", module: "VibeUI", in: "fr")
         == "Remplissez «\u{00A0}URL\u{00A0}» pour envoyer.")

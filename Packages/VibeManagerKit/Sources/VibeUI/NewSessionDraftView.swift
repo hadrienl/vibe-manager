@@ -125,81 +125,67 @@ public struct NewSessionDraftView: View {
 
   // MARK: - Header
 
-  /// The name, typed where a session shows its name. Left empty, it shows the one the session will
-  /// be given.
+  /// What the draft is, and the way out of it: the name sits with the options it goes with.
   private var header: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 10) {
-        appearanceButton
-        TextField(
-          text: $model.draft.name,
-          prompt: Text(verbatim: model.placeholderName)
-        ) {
-          Text("Name", bundle: .module, comment: "The name of the new session.")
-        }
-        .textFieldStyle(.plain)
-        .font(.title3.weight(.semibold))
-        .focused($focus, equals: .draft(.name))
-        .accessibilityIdentifier("new-session-name")
-        Spacer(minLength: 12)
-        Text("Nothing starts before you send.", bundle: .module)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-        Button(role: .destructive, action: discarded) {
-          Text("Discard", bundle: .module, comment: "Discards the new session's draft.")
-        }
-        .controlSize(.small)
-        .disabled(model.isSubmitting)
-        .help(Text("Discard this draft. No session is created.", bundle: .module))
-        .accessibilityIdentifier("new-session-discard")
+    HStack(spacing: 10) {
+      Spacer(minLength: 12)
+      Text("Nothing starts before you send.", bundle: .module)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+      Button(role: .destructive, action: discarded) {
+        Text("Discard", bundle: .module, comment: "Discards the new session's draft.")
       }
-      ForEach(model.issues(for: .name) + model.issues(for: .appearance)) { issue in
-        IssueLabel(issue: issue)
-      }
+      .controlSize(.small)
+      .disabled(model.isSubmitting)
+      .help(Text("Discard this draft. No session is created.", bundle: .module))
+      .accessibilityIdentifier("new-session-discard")
     }
     .padding(.horizontal, 20)
-    .padding(.vertical, 12)
+    .padding(.vertical, 10)
   }
 
   // MARK: - Options
 
-  /// The options, as the first message of the thread.
+  /// The options, as the first message of the thread, headed by the session's badge and name.
+  /// Left empty, the name shows the one the session will be given.
   private var optionsCard: some View {
-    HStack(alignment: .top, spacing: 12) {
-      Image(systemName: "terminal")
-        .font(.system(size: 14))
-        .foregroundStyle(.secondary)
-        .frame(width: 28, height: 28)
-        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-        .accessibilityHidden(true)
-
-      VStack(alignment: .leading, spacing: 14) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("Where, and with which agent?", bundle: .module)
-            .font(.headline)
-          Text("What you write below is the agent’s first message.", bundle: .module)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+    VStack(alignment: .leading, spacing: 14) {
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 10) {
+          appearanceButton
+          TextField(
+            text: $model.draft.name,
+            prompt: Text(verbatim: model.placeholderName)
+          ) {
+            Text("Name", bundle: .module, comment: "The name of the new session.")
+          }
+          .textFieldStyle(.plain)
+          .font(.title3.weight(.semibold))
+          .focused($focus, equals: .draft(.name))
+          .accessibilityIdentifier("new-session-name")
         }
-        // The template first, and its fields with it: it may propose the folder, the name and the
-        // appearance, and what it needs filled in is what Send waits for.
-        templateField
-        templateFields
-        Divider()
-        folderField
-        agentField
-        modelField
-        moreOptions
+        ForEach(model.issues(for: .name) + model.issues(for: .appearance)) { issue in
+          IssueLabel(issue: issue)
+        }
       }
-      .padding(16)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: 14).strokeBorder(.separator)
-      }
+      // The template first, and its fields with it: it may propose the folder, the name and the
+      // appearance, and what it needs filled in is what Send waits for.
+      templateField
+      templateFields
+      Divider()
+      folderField
+      agentField
+      modelField
+      moreOptions
+    }
+    .padding(16)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 14).strokeBorder(.separator)
     }
   }
 

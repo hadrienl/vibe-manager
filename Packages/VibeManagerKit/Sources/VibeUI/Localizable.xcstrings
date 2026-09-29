@@ -14210,16 +14210,6 @@
         }
       }
     },
-    "What you write below is the agent’s first message." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce que vous écrivez ci-dessous sera le premier message de l’agent."
-          }
-        }
-      }
-    },
     "When Vibe Manager is not in front, an avatar presents the requests in a bubble. Notifications are then not needed." : {
       "localizations" : {
         "fr" : {
@@ -14256,16 +14246,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En quittant avec des agents en cours d’exécution"
-          }
-        }
-      }
-    },
-    "Where, and with which agent?" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Où, et avec quel agent ?"
           }
         }
       }
