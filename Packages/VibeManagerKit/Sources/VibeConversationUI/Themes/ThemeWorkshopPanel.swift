@@ -298,7 +298,7 @@ struct ThemeArchiveDocument: FileDocument {
     data = configuration.file.regularFileContents ?? Data()
   }
 
-  func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+  func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
     FileWrapper(regularFileWithContents: data)
   }
 }

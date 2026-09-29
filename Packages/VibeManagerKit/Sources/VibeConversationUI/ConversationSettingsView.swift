@@ -290,6 +290,7 @@ public struct ConversationSettingsView: View {
         Text("Delete", bundle: .module)
       }
       Button(role: .cancel) {
+        // The alert goes away by itself: nothing is deleted.
       } label: {
         Text("Cancel", bundle: .module)
       }

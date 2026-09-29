@@ -166,7 +166,9 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
     /// Where the picture is on this Mac, found when the theme is read; never written in a file.
     public var localImage: URL?
 
-    public init() {}
+    public init() {
+      // Every value has its default: the built-in themes'.
+    }
 
     /// Whether the theme asks for a picture at all.
     public var wantsImage: Bool { imageURL != nil || imagePrompt != nil || image != nil }
@@ -195,7 +197,9 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
     /// The corners of the tool calls and of the code blocks.
     public var blockRadius: Double = 10
 
-    public init() {}
+    public init() {
+      // Every value has its default: the built-in themes'.
+    }
 
     /// The corners of what sits inside a block — an output, a table, an image —, a little
     /// tighter than the block's: 8 for the built-in 10.

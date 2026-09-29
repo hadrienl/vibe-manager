@@ -136,12 +136,13 @@ public actor InMemoryConversationThemeLibrary: ConversationThemeLibrary {
     themes.removeAll { $0.id == id }
   }
 
-  public func archive(_ id: String, preview: Data?) throws -> Data {
+  /// The theme's file alone: a library in memory keeps no picture.
+  public func archive(_ id: String, preview _: Data?) throws -> Data {
     guard let theme = themes.first(where: { $0.id == id }) else {
       throw ThemeLibraryError.notFound
     }
     return ConversationThemeFile.encode(theme)
   }
 
-  public nonisolated func location(ofFile fileName: String) -> URL? { nil }
+  public nonisolated func location(ofFile _: String) -> URL? { nil }
 }

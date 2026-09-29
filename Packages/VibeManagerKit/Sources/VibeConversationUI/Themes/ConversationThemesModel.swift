@@ -506,8 +506,12 @@ public final class ConversationThemesModel {
     if usesThemeAccent { updated.accent = .theme }
     await load()
     let savedName = kept.personalName ?? name
-    let mode: SavedMode =
-      !updated.followsSystemAppearance ? .always : targetDark ? .dark : .light
+    let mode: SavedMode
+    if !updated.followsSystemAppearance {
+      mode = .always
+    } else {
+      mode = targetDark ? .dark : .light
+    }
     versions = []
     close()
     lastSaved = (savedName, mode)

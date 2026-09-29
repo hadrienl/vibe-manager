@@ -161,7 +161,7 @@ public struct GenerateConversationTheme: Sendable {
   /// A legible theme for the mode asked for. `report` hears each attempt, and why one was
   /// rejected — a code, never the words.
   public func callAsFunction(
-    _ request: ThemeGenerationRequest, report: Report = { _ in }
+    _ request: ThemeGenerationRequest, report: Report = GenerateConversationTheme.ignore
   ) async throws -> ConversationTheme {
     let id = request.current?.id ?? makeIdentifier()
     report(.attempt(1))
@@ -213,6 +213,11 @@ public struct GenerateConversationTheme: Sendable {
       if await fonts.prepare(family) == .unknown { throw .unknownFont(key, family: family) }
     }
     return theme
+  }
+
+  /// What `report` is when nobody listens.
+  public static let ignore: Report = { _ in
+    // Nobody listens: the events are dropped.
   }
 
   /// An answer sent back to the agent: never more than a file may weigh.

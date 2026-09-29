@@ -3,10 +3,15 @@ import Testing
 
 @testable import VibeApplication
 
+/// A file left as it is.
+private func unchanged(_: inout [String: Any]) {
+  // Nothing changed: the file of the theme as it is.
+}
+
 /// The file of a theme of `base`, as a dictionary to change, then as bytes.
 private func themeFile(
   _ base: ConversationTheme = .systemDark, name: String = "Forêt de nuit",
-  _ change: (inout [String: Any]) -> Void = { _ in }
+  _ change: (inout [String: Any]) -> Void = unchanged
 ) -> Data {
   var theme = base
   theme.personalName = name
@@ -58,8 +63,9 @@ struct ConversationThemeFileTests {
 
   @Test("The same theme is always the same bytes, with a null border when it has none")
   func stableEncoding() {
-    #expect(
-      ConversationThemeFile.encode(.systemDark) == ConversationThemeFile.encode(.systemDark))
+    let first = ConversationThemeFile.encode(.systemDark)
+    let again = ConversationThemeFile.encode(ConversationTheme.builtIn[1])
+    #expect(first == again)
     let text = String(decoding: ConversationThemeFile.encode(.systemDark), as: UTF8.self)
     #expect(text.contains("\"bubbleBorder\" : null"))
     #expect(text.contains("\"format\" : 3"))
@@ -592,13 +598,13 @@ private struct Families: ThemeFontResolving {
 
 private final class Events: @unchecked Sendable {
   private let lock = NSLock()
-  private var events: [GenerateConversationTheme.Event] = []
+  private var heard: [GenerateConversationTheme.Event] = []
 
   func append(_ event: GenerateConversationTheme.Event) {
-    lock.withLock { events.append(event) }
+    lock.withLock { heard.append(event) }
   }
 
-  var all: [GenerateConversationTheme.Event] { lock.withLock { events } }
+  var all: [GenerateConversationTheme.Event] { lock.withLock { heard } }
 }
 
 @Suite("The names and the library of personal themes (#118)")

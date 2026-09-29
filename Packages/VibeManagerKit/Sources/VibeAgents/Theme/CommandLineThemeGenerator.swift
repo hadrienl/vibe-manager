@@ -86,10 +86,12 @@ public struct CommandLineThemeGenerator: ConversationThemeGenerating {
 public struct ClaudeCodeThemeCommand: ThemeCommand {
   public static let model = "sonnet"
 
-  public init() {}
+  public init() {
+    // Nothing to set: the command is the same for every theme.
+  }
 
   public func arguments(
-    for request: ThemeGenerationRequest, in workspace: URL, models: [AgentModel]
+    for request: ThemeGenerationRequest, in _: URL, models _: [AgentModel]
   ) throws -> [String] {
     [
       "-p", "--model", Self.model, "--tools", "", "--strict-mcp-config",
@@ -107,7 +109,7 @@ public struct ClaudeCodeThemeCommand: ThemeCommand {
     Data(ThemeInstructions.input(for: request).utf8)
   }
 
-  public func answer(from result: BoundedProcessResult, in workspace: URL) throws -> Data {
+  public func answer(from result: BoundedProcessResult, in _: URL) throws -> Data {
     let answer = (try? JSONSerialization.jsonObject(with: result.standardOutput)) as? [String: Any]
     guard result.exitCode == 0, let answer, answer["is_error"] as? Bool != true else {
       throw CommandLineThemeGenerator.failure(of: result)
@@ -127,10 +129,12 @@ public struct CodexThemeCommand: ThemeCommand {
   static let schemaFile = "schema.json"
   static let answerFile = "answer.json"
 
-  public init() {}
+  public init() {
+    // Nothing to set: the command is the same for every theme.
+  }
 
   public func arguments(
-    for request: ThemeGenerationRequest, in workspace: URL, models: [AgentModel]
+    for request: ThemeGenerationRequest, in workspace: URL, models _: [AgentModel]
   ) throws -> [String] {
     let schema = workspace.appendingPathComponent(Self.schemaFile)
     do {
