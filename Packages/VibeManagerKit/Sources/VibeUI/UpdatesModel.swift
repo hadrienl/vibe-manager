@@ -14,6 +14,7 @@ public final class UpdatesModel {
   public private(set) var lastCheck: Date?
   public private(set) var waitingVersion: String?
   public private(set) var readyToInstall: UpdateCandidate?
+  public private(set) var canOfferReadyUpdate = false
 
   public init(updater: any SoftwareUpdating) {
     self.updater = updater
@@ -23,6 +24,7 @@ public final class UpdatesModel {
     lastCheck = updater.lastCheck
     waitingVersion = updater.waitingVersion
     readyToInstall = updater.readyToInstall
+    canOfferReadyUpdate = updater.canOfferReadyUpdate
     updater.onChange = { [weak self] in self?.refresh() }
   }
 
@@ -54,5 +56,6 @@ public final class UpdatesModel {
     lastCheck = updater.lastCheck
     waitingVersion = updater.waitingVersion
     readyToInstall = updater.readyToInstall
+    canOfferReadyUpdate = updater.canOfferReadyUpdate
   }
 }

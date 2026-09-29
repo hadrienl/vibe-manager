@@ -144,7 +144,11 @@ and keeps the version ready: the application menu offers **Install Vibe Manager 
 Relaunch…**, which asks again, and Sparkle installs it anyway when the application next quits. If
 that version speaks another core of the host's protocol, that quit does not offer Keep Running
 either: **Vibe Manager 1.2.0 will be installed as Vibe Manager quits** — Stop All and Quit, or
-Cancel.
+Cancel. A version downloaded by itself (the setting that downloads and installs
+automatically) is ready the same way (`willInstallUpdateOnQuit`), and the same quit guards it.
+The answer to the question is kept for the quit only once the installation has really started
+it: an answer left behind by an update given up on would otherwise stop, or keep, the agents of a
+later quit without asking.
 
 ### After the relaunch
 

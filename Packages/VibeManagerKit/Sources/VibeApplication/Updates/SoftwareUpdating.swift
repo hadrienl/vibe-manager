@@ -118,6 +118,8 @@ public protocol SoftwareUpdating: AnyObject {
   /// A version downloaded, whose installation the user put off: installed when the application
   /// quits, or now through `offerReadyUpdate()`.
   var readyToInstall: UpdateCandidate? { get }
+  /// Whether that version can be installed now, with a relaunch.
+  var canOfferReadyUpdate: Bool { get }
   /// Looks now, and says what it found in a window, even that there is nothing new.
   func checkNow()
   /// Asks again whether to install the version that is ready, and relaunch.

@@ -369,7 +369,7 @@ private struct UpdateCommands: View {
 
   var body: some View {
     if let updates = model.updates {
-      if let ready = updates.readyToInstall {
+      if let ready = updates.readyToInstall, updates.canOfferReadyUpdate {
         // Set aside by Later: installed when the application quits, or now from here.
         Button("Install Vibe Manager \(ready.version) and Relaunch…") {
           updates.offerReadyUpdate()
@@ -813,6 +813,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// Whether to leave the agents running, answered before an update relaunched the application:
   /// the quit that follows does not ask a second time.
   private var decidedForUpdate: Bool?
+  /// A relaunch being decided — waiting on a sheet, or its question on screen: Sparkle and the
+  /// menu can both ask, and the question is asked once.
+  private var isDecidingRelaunch = false
 
   /// Whether this quit is the Mac shutting down, restarting or logging out: nothing survives that,
   /// and a question on screen would hold the logout up for an answer that changes nothing.
@@ -1088,8 +1091,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// ADR 0017 is asked first, and its answer stands for the quit that follows. Put off while
   /// sessions are being restored or a sheet is open; never installed by "Later", until the next quit.
   private func relaunch(for candidate: UpdateCandidate) {
-    guard let updater else { return }
-    guard let environment else { return updater.installReadyUpdate() }
+    guard !isDecidingRelaunch else { return }
+    isDecidingRelaunch = true
+    decideRelaunch(for: candidate)
+  }
+
+  private func decideRelaunch(for candidate: UpdateCandidate) {
+    // Given up on meanwhile, or already on its way: nothing is left to answer for.
+    guard let updater, updater.readyToInstall == candidate, updater.canOfferReadyUpdate else {
+      isDecidingRelaunch = false
+      return
+    }
+    guard let environment else {
+      isDecidingRelaunch = false
+      updater.installReadyUpdate()
+      return
+    }
     let situation = UpdateRelaunchSituation(
       hostedRunningCount: environment.hostedRunningCount,
       inProcessRunningCount: environment.inProcessRunningCount,
@@ -1103,23 +1120,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       // Looked at again without a word: the user asked for it, and nothing was said yet.
       Task { [weak self] in
         try? await Task.sleep(for: .seconds(1))
-        self?.relaunch(for: candidate)
+        self?.decideRelaunch(for: candidate)
       }
     case .proceed(let keepingAgentsRunning):
-      decidedForUpdate = keepingAgentsRunning
-      record(keepingAgentsRunning ? "keepRunning" : "stopAll", in: environment)
-      updater.installReadyUpdate()
+      install(keepingAgentsRunning: keepingAgentsRunning, in: environment)
     case .ask(let question):
-      guard let keepingAgentsRunning = ask(question, installing: candidate, in: environment) else {
+      let answer = ask(question, installing: candidate, in: environment)
+      // Given up on while the question was on screen: the answer has nothing to apply to.
+      guard updater.readyToInstall == candidate, updater.canOfferReadyUpdate else {
+        isDecidingRelaunch = false
+        return
+      }
+      guard let keepingAgentsRunning = answer else {
+        isDecidingRelaunch = false
         record("later", in: environment)
         // Sparkle's window would otherwise wait on a relaunch nobody starts, and never close.
         updater.setReadyUpdateAside()
         return
       }
-      decidedForUpdate = keepingAgentsRunning
-      record(keepingAgentsRunning ? "keepRunning" : "stopAll", in: environment)
-      updater.installReadyUpdate()
+      install(keepingAgentsRunning: keepingAgentsRunning, in: environment)
     }
+  }
+
+  /// The answer stands for the quit that follows only if the installation really starts it: an
+  /// answer left behind would be applied, unasked, to a later quit of the user's own.
+  private func install(keepingAgentsRunning: Bool, in environment: AppEnvironment) {
+    isDecidingRelaunch = false
+    decidedForUpdate = keepingAgentsRunning
+    guard updater?.installReadyUpdate() == true else {
+      decidedForUpdate = nil
+      return
+    }
+    record(keepingAgentsRunning ? "keepRunning" : "stopAll", in: environment)
   }
 
   /// Quitting with a version set aside that cannot take back the running agents: stopping them is

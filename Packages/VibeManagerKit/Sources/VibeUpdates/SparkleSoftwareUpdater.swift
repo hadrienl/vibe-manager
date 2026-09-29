@@ -113,17 +113,27 @@ public final class SparkleSoftwareUpdater: NSObject, SoftwareUpdating {
     updater?.checkForUpdates()
   }
 
+  /// Whether the version that is ready can be installed now, with a relaunch: `false` once that
+  /// was started — a quit then cancelled leaves it to be installed at the next quit.
+  public var canOfferReadyUpdate: Bool {
+    readyToInstall != nil && installReady != nil
+  }
+
   /// Asks again about the version set aside by Later.
   public func offerReadyUpdate() {
-    guard let readyToInstall, let relaunchGate else { return }
+    guard canOfferReadyUpdate, let readyToInstall, let relaunchGate else { return }
     relaunchGate(readyToInstall)
   }
 
-  /// Quits, installs and relaunches: the answer to the question is in.
-  public func installReadyUpdate() {
-    guard let install = installReady else { return }
+  /// Quits, installs and relaunches: the answer to the question is in. `false` when there was
+  /// nothing left to start — the update was given up on, or is already on its way.
+  @discardableResult
+  public func installReadyUpdate() -> Bool {
+    guard let install = installReady else { return false }
     installReady = nil
+    onChange?()
     install()
+    return true
   }
 
   /// Later: Sparkle's window goes away rather than waiting on a relaunch nobody will start, and
@@ -189,6 +199,18 @@ extension SparkleSoftwareUpdater: SPUUpdaterDelegate {
     _ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?
   ) {
     onChange?()
+  }
+
+  /// Downloaded by itself, to be installed as the application quits: the same version is ready as
+  /// one set aside by Later, and the same question guards it — at that quit, or from the menu.
+  public func updater(
+    _ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
+    immediateInstallationBlock immediateInstallHandler: @escaping () -> Void
+  ) -> Bool {
+    readyToInstall = Self.candidate(of: item)
+    installReady = immediateInstallHandler
+    onChange?()
+    return true
   }
 
   public func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {

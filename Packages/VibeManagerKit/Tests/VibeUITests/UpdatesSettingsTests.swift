@@ -15,6 +15,7 @@ final class FakeUpdater: SoftwareUpdating {
   var lastCheck: Date?
   var waitingVersion: String?
   var readyToInstall: UpdateCandidate?
+  var canOfferReadyUpdate: Bool { readyToInstall != nil }
   private(set) var offers = 0
   var onChange: (() -> Void)?
   private(set) var checks = 0
