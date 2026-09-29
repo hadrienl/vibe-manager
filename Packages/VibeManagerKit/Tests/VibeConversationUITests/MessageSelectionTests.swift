@@ -197,6 +197,40 @@ struct MessageSelectionTests {
     #expect(SelectionText.plain([SelectionText.Piece(kind: .table, text: first)]) == "Name")
   }
 
+  @Test("A table's emoji and empty cells survive the copy")
+  func tableCharacters() {
+    let table = MarkdownProse.table(
+      header: [[InlineRun(text: "🚀 done")], [InlineRun(text: "b")], [], []], rows: [],
+      theme: .systemLight, size: 13)
+    #expect(
+      SelectionText.plain([SelectionText.Piece(kind: .table, text: table)]) == "🚀 done\tb\t\t")
+  }
+
+  @Test("New text in a segment — a streamed token — leaves the rest of the selection alone")
+  func streaming() {
+    let harness = Harness()
+    let message = harness.messages[0]
+    harness.drag(
+      from: (message.last, NSPoint(x: 40, y: 8)), to: (message.code, NSPoint(x: 20, y: 5)))
+    #expect(harness.window.firstResponder === message.last)
+    message.last.show(NSAttributedString(string: "Last paragraph, and more."))
+    #expect(message.code.selectedRange().length > 0)
+  }
+
+  @Test("Another window keeps its selection")
+  func windows() {
+    let first = Harness()
+    let second = Harness()
+    first.drag(
+      from: (first.messages[0].first, NSPoint(x: 5, y: 8)),
+      to: (first.messages[0].code, NSPoint(x: 20, y: 5)))
+    second.drag(
+      from: (second.messages[0].first, NSPoint(x: 5, y: 8)),
+      to: (second.messages[0].first, NSPoint(x: 60, y: 8)))
+    #expect(first.messages[0].selection.hasSelection)
+    #expect(second.messages[0].selection.hasSelection)
+  }
+
   @Test("A click on a link opens it; a drag that starts on it only selects")
   func links() {
     let harness = Harness()
@@ -280,9 +314,6 @@ private final class Harness {
 
   init() {
     _ = NSApplication.shared
-    MessageSelection.nextEvent = { [unowned self] _ in
-      queue.isEmpty ? nil : queue.removeFirst()
-    }
     let content = Flipped(frame: NSRect(x: 0, y: 0, width: 420, height: 900))
     window.contentView = content
     let theme = ConversationTheme.systemLight
@@ -363,6 +394,9 @@ private final class Harness {
     on view: SegmentTextView, at location: NSPoint, count: Int = 1,
     flags: NSEvent.ModifierFlags = []
   ) {
+    MessageSelection.nextEvent = { [unowned self] _ in
+      queue.isEmpty ? nil : queue.removeFirst()
+    }
     let hit = window.contentView?.superview?.hitTest(location)
     #expect(hit === view)
     hit?.mouseDown(with: event(.leftMouseDown, at: location, count: count, flags: flags))

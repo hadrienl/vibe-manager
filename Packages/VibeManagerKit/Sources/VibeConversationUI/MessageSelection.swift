@@ -66,6 +66,10 @@ final class MessageSelection {
     return members.contains { $0.view != nil && $0.view === window.firstResponder }
   }
 
+  var window: NSWindow? {
+    members.lazy.compactMap(\.view?.window).first
+  }
+
   var hasSelection: Bool {
     members.contains { ($0.view?.selectedRange().length ?? 0) > 0 }
   }
@@ -257,16 +261,28 @@ final class MessageSelection {
   }
 }
 
-/// Makes sure only one selection shows in the window: starting one clears the one before, in
-/// another message or in this one.
+/// Makes sure only one selection shows in a window: starting one clears the one before, in
+/// another message or in this one. Another window keeps its own, as macOS does.
 @MainActor
 final class SelectionOwner {
   static let shared = SelectionOwner()
-  private weak var current: MessageSelection?
+
+  private struct Owner {
+    weak var window: NSWindow?
+    weak var selection: MessageSelection?
+  }
+
+  private var owners: [Owner] = []
 
   func claim(_ selection: MessageSelection) {
-    if let current, current !== selection { current.clear() }
-    current = selection
+    owners.removeAll { $0.window == nil || $0.selection == nil }
+    guard let window = selection.window else { return }
+    if let index = owners.firstIndex(where: { $0.window === window }) {
+      if let current = owners[index].selection, current !== selection { current.clear() }
+      owners[index].selection = selection
+    } else {
+      owners.append(Owner(window: window, selection: selection))
+    }
   }
 }
 
@@ -325,12 +341,22 @@ enum SelectionText {
   static func tabulated(_ text: NSAttributedString) -> String {
     let string = text.string as NSString
     var result = ""
-    var index = 0
-    while index < string.length {
-      let character = string.character(at: index)
-      if character == 0x0A {
+    var start = 0
+    while start < string.length {
+      let rest = NSRange(location: start, length: string.length - start)
+      let newline = string.range(of: "\n", range: rest)
+      guard newline.location != NSNotFound else {
+        result += string.substring(with: rest)
+        break
+      }
+      // A cell's text as a whole: a character outside the BMP is two units.
+      result += string.substring(
+        with: NSRange(location: start, length: newline.location - start))
+      // A passage that stops after a cell does not end with its separator — only that one: the
+      // row's empty cells before it keep theirs.
+      if newline.location < string.length - 1 {
         let style =
-          text.attribute(.paragraphStyle, at: index, effectiveRange: nil)
+          text.attribute(.paragraphStyle, at: newline.location, effectiveRange: nil)
           as? NSParagraphStyle
         if let block = style?.textBlocks.last as? NSTextTableBlock,
           block.startingColumn + block.columnSpan < block.table.numberOfColumns
@@ -339,13 +365,9 @@ enum SelectionText {
         } else {
           result += "\n"
         }
-      } else {
-        result += String(utf16CodeUnits: [character], count: 1)
       }
-      index += 1
+      start = newline.location + 1
     }
-    // A passage that stops after a cell ends with its separator.
-    while result.hasSuffix("\n") || result.hasSuffix("\t") { result.removeLast() }
     return result
   }
 }

@@ -182,9 +182,15 @@ final class SegmentTextView: NSTextView {
   private var measured: [CGFloat: CGSize] = [:]
 
   func show(_ text: NSAttributedString) {
+    showing = true
+    defer { showing = false }
     textStorage?.setAttributedString(text)
     measured.removeAll()
   }
+
+  /// While new text replaces the old — a streamed token, another theme —, which moves the
+  /// selection without the reader asking.
+  private var showing = false
 
   func height(forWidth width: CGFloat) -> CGFloat {
     size(forWidth: width).height
@@ -286,7 +292,9 @@ final class SegmentTextView: NSTextView {
   ) {
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
     // Moved by the keyboard — an arrow, ⇧-arrow —, the selection is this segment's alone now.
-    if let selection, !selection.applying, !stillSelecting, window?.firstResponder === self {
+    if let selection, !selection.applying, !showing, !stillSelecting,
+      window?.firstResponder === self
+    {
       selection.selectedWithin(self)
     }
   }
