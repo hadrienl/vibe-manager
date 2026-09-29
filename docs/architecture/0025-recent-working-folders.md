@@ -51,6 +51,14 @@ took out of this sheet. Those, and the folders a slow volume has not answered fo
 *unverified*: offered as they are, and checked at creation like any folder. A folder counts as
 guarded when its path or its canonical key is: a link to `~/Documents` leads into `~/Documents`.
 
+The one exception is the icon of the folder in the field (#27), preselected, brought by a
+template or clicked: it is read even in a guarded place. Sessions already ran in a recent folder,
+so the system has already answered for it — the reasoning of New Session in This Folder. Without
+that exception, a repository kept in `~/Documents` only showed its icon once picked again through
+the open panel. Only that folder's icon is read, never the others', and the folder itself stays
+unverified. The alert can only come back if the consent was withdrawn since, or given to another
+identity of the application (ADR 0010).
+
 `FileManagerWorkingDirectoryProbe` answers from a Dispatch queue, not from the cooperative pool:
 `stat` on a network volume that went away blocks its thread for as long as it takes, and ten such
 threads taken from the pool would starve every task and actor of the application — the budget
