@@ -153,6 +153,9 @@ alone; so is an expression the avatar lacks, said "missing".
 | Restart | ⌃⌘R | Session |
 | Restart in a new process, from anywhere in its sheet | ⌘↩ | — |
 | Switch Agent… | ⌃⌘M | Session |
+| Rename…: the name becomes a field, on its row or in the inspector's header; Return keeps it, Escape does not | ⌃⌘E, or a double-click on the row | Session, and the row's context menu |
+| Change Icon…: symbol, colour, the project's icon, Revert to Default Icon; Escape leaves it as it was | ⌃⌘I, or a click on the inspector's badge | Session, and the row's context menu |
+| Undo / Redo the last rename or change of icon, with the keyboard in the sidebar or the inspector | ⌘Z / ⇧⌘Z | Edit |
 | Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
 | Close Session | ⇧⌘W | Session |
 | Archive… / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
@@ -184,7 +187,10 @@ closing the window is in Safari, and asks first while the agent is at work. Over
 | An expression of the preview | its name; "Worried, missing" when the avatar lacks it | — | its button, "Generate Worried again" or "Generate Worried" | — |
 | Avatar preview, in Settings › Requests › Avatars | "Animated preview of the avatar"; the request's bubble beside it is hidden | — | — | — |
 | A request's card | session, agent, folder, branch, age, then what it asks ("Refactor, Claude Code, app, branch feat/40, 2 minutes ago. Shell command: swift test") | — | Allow, Always, Refuse — each only when the agent's dialog can take it from here; Open Session | `request-card` |
-| A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
+| A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Rename, Change Icon, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
+| A session's name, being renamed | "Session name", the reason as the hint when it is refused; "Session renamed: ‹name›" or "Name refused: ‹reason›" is announced | the name typed | editable | `session-name-field` |
+| The inspector's header | its badge, "Change Icon"; its pencil, "Rename" | — | activate | `inspector-session-badge`, `inspector-session-rename` |
+| Change Icon popover | the symbols by their names ("Tools", "Lightning"), the colours by their code, "Project icon" | selected | activate; Revert to Default Icon, Done | `session-appearance-popover`, `session-appearance-revert` |
 | Swipe buttons | "Move to ‹status›", "Archive…" | — | — | `swipe-‹status›` |
 | Archived sessions | "Archived (N)", opens the list | — | Show, Unarchive | `archived-sessions` |
 | Terminal | "Terminal — ‹session› — ‹status›" | the visible screen, as text, read-only | Read Last Output (⌃⌥⌘O) | `terminal` |

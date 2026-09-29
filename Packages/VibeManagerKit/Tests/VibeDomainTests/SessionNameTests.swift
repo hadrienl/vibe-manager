@@ -44,7 +44,8 @@ struct SessionNameTests {
     #expect(short.hasSuffix("word…"))
   }
 
-  @Test("A session stored with a longer name still validates: the rule is checked where names come in")
+  @Test(
+    "A session stored with a longer name still validates: the rule is checked where names come in")
   func storedLongNameStillValidates() throws {
     let session = WorkSession(name: String(repeating: "a", count: 200))
     try session.validate()
@@ -67,7 +68,9 @@ struct SessionDefaultAppearanceTests {
       forName: "Refactor the webhook", projectIcon: icon)
     #expect(appearance == draft.effectiveAppearance)
     #expect(appearance.iconID == icon)
-    #expect(appearance.symbolName == SessionAppearanceCatalog.derived(forName: "Refactor the webhook").symbolName)
+    #expect(
+      appearance.symbolName
+        == SessionAppearanceCatalog.derived(forName: "Refactor the webhook").symbolName)
   }
 }
 

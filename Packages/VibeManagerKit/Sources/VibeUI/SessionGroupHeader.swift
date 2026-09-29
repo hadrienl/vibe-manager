@@ -173,7 +173,8 @@ struct SessionGroupHeader: View {
   @ViewBuilder
   private var badge: some View {
     // The icon of the first session that has one, so the group wears its project's icon.
-    if let appearance = group.sessions.first(where: { $0.appearance.iconID != nil })?.appearance,
+    if let appearance = group.sessions.lazy.map(model.displayedAppearance(of:))
+      .first(where: { $0.iconID != nil }),
       let icon = model.icons.image(for: appearance.iconID)
     {
       SessionBadge(appearance: appearance, icon: icon, size: 16)

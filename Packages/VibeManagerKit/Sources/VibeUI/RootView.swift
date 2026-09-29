@@ -499,28 +499,21 @@ public struct RootView: View {
       .inspector(isPresented: inspectorPresented) {
         Group {
           if !model.isPresentingNewSession, let session = model.selectedSession {
-            SessionContextInspector(
-              session: session,
-              resolution: model.resolution(forID: session.id),
-              branchReport: model.branchReport(for: session.id),
-              repositoryStatuses: model.repositoryStatuses,
-              sessionNames: Dictionary(
-                model.sessions.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
-              refreshBranches: model.reportsBranches
-                ? { Task { await model.refreshBranchReport() } } : nil,
-              git: model.gitInspector,
-              layout: model.layout,
-              openPrivacySettings: model.permissions.map { permissions in
-                { permissions.openSystemSettings() }
-              },
-              agentNames: model.agentNames,
-              switchAgent: model.canSwitchAgent(session)
-                ? { model.beginAgentSwitch(session.id) } : nil,
-              notes: model.notes,
-              ticketTitles: model.ticketTitles,
-              leaveNotes: { model.focusSession() },
-              usage: model.usage,
-              journal: model.journal
+            VStack(spacing: 0) {
+              SessionIdentityHeader(model: model, session: session)
+              Divider()
+              inspector(for: session)
+            }
+            // ⌘Z undoes a rename or a change of icon here too (#183).
+            .onCommand(
+              Selector(("undo:")),
+              perform: model.canUndoIdentityChange
+                ? { Task { await model.undoIdentityChange() } } : nil
+            )
+            .onCommand(
+              Selector(("redo:")),
+              perform: model.canRedoIdentityChange
+                ? { Task { await model.redoIdentityChange() } } : nil
             )
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
@@ -686,6 +679,33 @@ public struct RootView: View {
         guard !isPresented else { return }
         model.cancelBatch()
       }
+    )
+  }
+
+  /// The sections of the inspector, under the session's header.
+  private func inspector(for session: WorkSession) -> some View {
+    SessionContextInspector(
+      session: session,
+      resolution: model.resolution(forID: session.id),
+      branchReport: model.branchReport(for: session.id),
+      repositoryStatuses: model.repositoryStatuses,
+      sessionNames: Dictionary(
+        model.sessions.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
+      refreshBranches: model.reportsBranches
+        ? { Task { await model.refreshBranchReport() } } : nil,
+      git: model.gitInspector,
+      layout: model.layout,
+      openPrivacySettings: model.permissions.map { permissions in
+        { permissions.openSystemSettings() }
+      },
+      agentNames: model.agentNames,
+      switchAgent: model.canSwitchAgent(session)
+        ? { model.beginAgentSwitch(session.id) } : nil,
+      notes: model.notes,
+      ticketTitles: model.ticketTitles,
+      leaveNotes: { model.focusSession() },
+      usage: model.usage,
+      journal: model.journal
     )
   }
 
@@ -981,7 +1001,11 @@ public struct RootView: View {
       if presentation == .conversation {
         EmptyView()
       } else if session.status == .archived {
-        ArchivedSessionDetail(session: session) {
+        let appearance = model.displayedAppearance(of: session)
+        ArchivedSessionDetail(
+          session: session, appearance: appearance,
+          icon: model.icons.image(for: appearance.iconID)
+        ) {
           Task { await model.restore(session.id) }
         }
       } else if model.pane(for: session.id) == nil {
@@ -1733,6 +1757,9 @@ private struct DetachWarningBanner: View {
 /// column states the facts, says plainly that nothing was deleted, and offers the way back.
 private struct ArchivedSessionDetail: View {
   let session: WorkSession
+  /// Its badge as drawn: the one previewed while its icon is being changed (#183).
+  let appearance: SessionAppearance
+  let icon: NSImage?
   let restore: () -> Void
 
   var body: some View {
@@ -1758,7 +1785,7 @@ private struct ArchivedSessionDetail: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
           HStack(spacing: 10) {
-            SessionBadge(appearance: session.appearance)
+            SessionBadge(appearance: appearance, icon: icon)
             VStack(alignment: .leading, spacing: 2) {
               Text(session.name)
                 .font(.title3)
@@ -1969,6 +1996,11 @@ struct SessionCommands {
   /// Spoken rather than read, so it says what the command will actually do.
   var restartAnnouncement: String { model.expectedRestartMode(for: session) }
   var canSwitchAgent: Bool { model.canSwitchAgent(session) }
+  /// Renaming and changing the badge (#183), in any state, archived included.
+  var canEditIdentity: Bool { model.canEditIdentity(of: session.id) }
+  var isRenaming: Bool {
+    model.renaming == SessionIdentityEditing(sessionID: session.id, place: .sidebar)
+  }
   /// Whether the order can be arranged at all: the Manual sort, nothing narrowing the list (#44).
   var canReorder: Bool { model.canReorder }
   var canMoveUp: Bool { model.canMove(session.id, by: -1) }
@@ -1985,6 +2017,8 @@ struct SessionCommands {
   func restore() { Task { await model.restore(session.id) } }
   func restart() { Task { await model.restart(session.id) } }
   func switchAgent() { model.beginAgentSwitch(session.id) }
+  func rename() { model.beginRename(session.id, in: .sidebar) }
+  func changeIcon() { model.beginAppearanceEditing(session.id, in: .sidebar) }
   func moveUp() { Task { await model.move(session.id, by: -1) } }
   func moveDown() { Task { await model.move(session.id, by: 1) } }
   func setTaskStatus(_ status: SessionTaskStatus) {
@@ -1996,6 +2030,13 @@ struct SessionCommandButtons: View {
   let commands: SessionCommands
 
   var body: some View {
+    if commands.canEditIdentity {
+      Button(LocalizedStringResource("Rename", bundle: .module, comment: "Renames a session.")) {
+        commands.rename()
+      }
+      Button(LocalizedStringResource("Change Icon…", bundle: .module)) { commands.changeIcon() }
+      Divider()
+    }
     if !commands.movableStatuses.isEmpty {
       Menu {
         ForEach(commands.movableStatuses, id: \.self) { status in
@@ -2041,6 +2082,8 @@ struct SessionCommandButtons: View {
 
 struct SessionRow: View {
   let session: WorkSession
+  /// The badge drawn: the session's, or the one previewed in its Change Icon popover (#183).
+  let appearance: SessionAppearance
   let icon: NSImage?
   let status: SessionStatusPresentation
   /// The one row the restoration is working on. Said on the row rather than only in the banner,
@@ -2054,11 +2097,16 @@ struct SessionRow: View {
 
   var body: some View {
     HStack(spacing: 10) {
-      SessionBadge(appearance: session.appearance, icon: icon)
+      SessionBadge(appearance: appearance, icon: icon)
+        .sessionAppearancePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       VStack(alignment: .leading, spacing: 2) {
-        Text(session.name)
-          .fontWeight(.medium)
-          .lineLimit(1)
+        if commands.isRenaming {
+          SessionNameField(model: commands.model, session: session)
+        } else {
+          Text(session.name)
+            .fontWeight(.medium)
+            .lineLimit(1)
+        }
         if let agent = session.agent {
           Text(agent.providerID)
             .font(.caption)
@@ -2105,7 +2153,8 @@ struct SessionRow: View {
     }
     .padding(.vertical, 4)
     // The menu is the list's (#77): it knows whether the click landed in a selection of several.
-    .accessibilityElement(children: .combine)
+    // Its name field, while it is renamed, is reached on its own.
+    .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
     .accessibilityIdentifier("session-row")
     .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
     .accessibilityValue(accessibilityValue)
@@ -2117,6 +2166,14 @@ struct SessionRow: View {
     .accessibilityAction(named: Text("Switch Agent", bundle: .module)) {
       guard commands.canSwitchAgent else { return }
       commands.switchAgent()
+    }
+    .accessibilityAction(named: Text("Rename", bundle: .module, comment: "Renames a session.")) {
+      guard commands.canEditIdentity else { return }
+      commands.rename()
+    }
+    .accessibilityAction(named: Text("Change Icon", bundle: .module)) {
+      guard commands.canEditIdentity else { return }
+      commands.changeIcon()
     }
     .accessibilityAction(named: Text("Close Session", bundle: .module)) {
       guard commands.canClose else { return }

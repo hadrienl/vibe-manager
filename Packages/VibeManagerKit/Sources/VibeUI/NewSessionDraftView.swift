@@ -411,51 +411,28 @@ public struct NewSessionDraftView: View {
   }
 
   private var appearancePicker: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text("Appearance", bundle: .module, comment: "The symbol and colour of the session.")
-        .font(.headline)
-      HStack(spacing: 6) {
-        // Offered only when the folder has one, to come back to it after picking something else.
-        if let icon = model.draft.projectIcon {
-          ProjectIconChoice(
-            image: model.icons?.image(for: icon.id),
-            isSelected: model.usesProjectIcon,
-            select: { model.useProjectIcon() }
-          )
-        }
-        ForEach(SessionAppearanceCatalog.symbolNames, id: \.self) { symbol in
-          SymbolChoice(
-            symbol: symbol,
-            isSelected: !model.usesProjectIcon
-              && model.draft.effectiveAppearance.symbolName == symbol,
-            select: { pickSymbol(symbol) }
-          )
-        }
-      }
-      HStack(spacing: 6) {
-        ForEach(SessionAppearanceCatalog.colorHexValues, id: \.self) { hex in
-          ColorChoice(
-            hex: hex,
-            isSelected: !model.usesProjectIcon
-              && model.draft.effectiveAppearance.colorHex == hex,
-            select: { pickColor(hex) }
-          )
-        }
-      }
-      ForEach(model.issues(for: .appearance)) { issue in
-        IssueLabel(issue: issue)
-      }
-      Group {
-        if model.usesProjectIcon {
-          Text("From the project folder until you pick one.", bundle: .module)
-        } else if model.draft.appearance == nil {
-          Text("Derived from the name until you pick one.", bundle: .module)
-        } else if model.appearanceComesFromTemplate {
-          Text("Given by the template — pick another if needed.", bundle: .module)
-        }
-      }
-      .font(.caption)
-      .foregroundStyle(.secondary)
+    SessionAppearancePicker(
+      appearance: model.draft.effectiveAppearance,
+      // Offered only when the folder has one, to come back to it after picking something else.
+      projectIcon: model.draft.projectIcon.map { .init(image: model.icons?.image(for: $0.id)) },
+      usesProjectIcon: model.usesProjectIcon,
+      pickSymbol: pickSymbol,
+      pickColor: pickColor,
+      useProjectIcon: { model.useProjectIcon() },
+      issues: model.issues(for: .appearance),
+      caption: appearanceCaption
+    )
+  }
+
+  private var appearanceCaption: Text? {
+    if model.usesProjectIcon {
+      Text("From the project folder until you pick one.", bundle: .module)
+    } else if model.draft.appearance == nil {
+      Text("Derived from the name until you pick one.", bundle: .module)
+    } else if model.appearanceComesFromTemplate {
+      Text("Given by the template — pick another if needed.", bundle: .module)
+    } else {
+      nil
     }
   }
 
@@ -907,7 +884,7 @@ private struct LabeledField<Content: View>: View {
   }
 }
 
-private struct IssueLabel: View {
+struct IssueLabel: View {
   let issue: SessionDraftIssue
 
   var body: some View {
@@ -1085,7 +1062,8 @@ struct SymbolChoice: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(Text(symbol))
+    .help(Text(SessionSymbolName.label(for: symbol)))
+    .accessibilityLabel(Text(SessionSymbolName.label(for: symbol)))
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
   }
 }

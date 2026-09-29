@@ -200,7 +200,8 @@ struct EditSessionIdentityTests {
     #expect(found == icon)
     #expect(
       appearance
-        == SessionAppearanceCatalog.defaultAppearance(forName: "Fix the login", projectIcon: iconID))
+        == SessionAppearanceCatalog.defaultAppearance(forName: "Fix the login", projectIcon: iconID)
+    )
   }
 
   @Test("Without an icon in its folder, or without a folder, the name alone decides")

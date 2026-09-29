@@ -199,6 +199,16 @@
         }
       }
     },
+    "Change Icon…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer l’icône…"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "localizations" : {
         "fr" : {
@@ -752,6 +762,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recharger la page"
+          }
+        }
+      }
+    },
+    "Rename…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer…"
           }
         }
       }

@@ -73,7 +73,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
-      content.sound = .default
+      content.sound = notification.isSilent ? nil : .default
       content.threadIdentifier = notification.id.sessionID.rawValue.uuidString
       content.categoryIdentifier =
         notification.offersAllow

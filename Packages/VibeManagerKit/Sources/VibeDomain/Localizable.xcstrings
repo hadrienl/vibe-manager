@@ -46,6 +46,17 @@
         }
       }
     },
+    "A name holds %lld characters at most." : {
+      "comment" : "The longest name a session may have, in characters.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un nom tient en %lld caractères au plus."
+          }
+        }
+      }
+    },
     "A name is required." : {
       "localizations" : {
         "fr" : {
@@ -393,6 +404,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raccourcissez-le."
+          }
+        }
+      }
+    },
+    "Shorten it: it is shown whole in the sidebar and in the window's title." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcissez-le : il s’affiche en entier dans la barre latérale et le titre de la fenêtre."
           }
         }
       }
