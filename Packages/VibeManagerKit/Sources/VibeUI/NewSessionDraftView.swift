@@ -81,6 +81,7 @@ public struct NewSessionDraftView: View {
         .padding(.bottom, 14)
         .frame(maxWidth: .infinity)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(.background)
     .onChange(of: model.draft) {
       model.draftChanged()

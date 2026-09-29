@@ -342,6 +342,9 @@ public struct RootView: View {
           Divider()
         }
         detail
+          // The whole area, whatever it shows: an overlay is only as large as what it covers, and
+          // over the small "No session yet" the draft was squeezed to its composer (#177).
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
           // Under the draft, neither Tab nor VoiceOver reaches the session's web view or drawer.
           .disabled(model.isPresentingNewSession)
           .accessibilityHidden(model.isPresentingNewSession)
