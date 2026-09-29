@@ -19,7 +19,11 @@
 #   DEVELOPER_ID_CERTIFICATE_PASSWORD   the password of that .p12
 #   NOTARY_API_KEY_P8                   an App Store Connect API key (role Developer), as base64
 #   NOTARY_API_KEY_ID, NOTARY_API_ISSUER_ID
+#   SPARKLE_ED_PRIVATE_KEY              the EdDSA key updates are signed with (#92), as
+#                                       `generate_keys -x` exports it
 #   GH_TOKEN                            to read the CI runs and create the draft
+#
+# By hand, the EdDSA key is the one `generate_keys` keeps in the login keychain.
 #
 # The team is `VIBE_TEAM_ID`, or `DEVELOPMENT_TEAM` in Configuration/Local.xcconfig, then Shared.xcconfig.
 #
@@ -30,6 +34,10 @@ set -euo pipefail
 readonly repository_root="${0:A:h:h}"
 readonly notary_profile="vibe-manager-notary"
 readonly bundle_identifier="eu.hadrien.VibeManager"
+# The Sparkle whose `sign_update` signs the update archive: the version the application embeds,
+# pinned by digest like the Apple intermediates. Nothing runs here that cannot be named.
+readonly sparkle_version="2.10.0"
+readonly sparkle_digest="c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c"
 
 version="${1:-}"
 dry_run=0
@@ -67,6 +75,9 @@ readonly app="$exported/Vibe Manager.app"
 # No space in the name: GitHub turns spaces of a release asset into dots, and the checksum file
 # would name a file nobody downloads.
 readonly dmg="$work/VibeManager-$version.dmg"
+# What Sparkle downloads and installs (#92, ADR 0033), and what the feed says of it.
+readonly update_archive="$work/VibeManager-$version.zip"
+readonly appcast_item="$work/VibeManager-$version.appcast.json"
 
 # The workflow's signing material: a keychain of its own, and the notarization key in a file, both
 # removed on the way out. On the maintainer's Mac, the login keychain and the stored profile.
@@ -74,6 +85,8 @@ secrets="${RUNNER_TEMP:-$repository_root/build}/release-secrets.$$"
 keychain=""
 saved_keychains=()
 notary_credentials=(--keychain-profile "$notary_profile")
+# By hand, `sign_update` reads the key from the login keychain.
+sparkle_key=()
 
 cleanup() {
   if [[ -n "$keychain" ]]; then
@@ -87,7 +100,7 @@ trap cleanup EXIT
 if (( in_ci )); then
   step "Preparing a temporary keychain"
   for variable in DEVELOPER_ID_CERTIFICATE_P12 DEVELOPER_ID_CERTIFICATE_PASSWORD \
-    NOTARY_API_KEY_P8 NOTARY_API_KEY_ID NOTARY_API_ISSUER_ID GH_TOKEN; do
+    NOTARY_API_KEY_P8 NOTARY_API_KEY_ID NOTARY_API_ISSUER_ID SPARKLE_ED_PRIVATE_KEY GH_TOKEN; do
     [[ -n "${(P)variable:-}" ]] || fail "$variable is not set in the release environment"
   done
   mkdir -p "$secrets"
@@ -121,6 +134,8 @@ if (( in_ci )); then
   notary_credentials=(
     --key "$secrets/notary.p8" --key-id "$NOTARY_API_KEY_ID" --issuer "$NOTARY_API_ISSUER_ID"
   )
+  print -rn -- "$SPARKLE_ED_PRIVATE_KEY" > "$secrets/sparkle.key"
+  sparkle_key=(--ed-key-file "$secrets/sparkle.key")
 fi
 
 # 1. The tree is what CI tested.
@@ -168,8 +183,15 @@ if [[ -z "$identity" ]]; then
   fail "no valid Developer ID Application certificate for team $team in the keychain"
 fi
 
-# 2. The version is given to the build, not written into the repository.
-readonly build_number="$(git rev-list --count HEAD)"
+# 2. The version is given to the build, not written into the repository. A final version is built
+# from the commit of its last release candidate, so it has the same number of commits: `.1` makes
+# it the later of the two, and Sparkle offers it to whoever runs that candidate (#92).
+commits="$(git rev-list --count HEAD)"
+if [[ "$version" == *-* ]]; then
+  readonly build_number="$commits"
+else
+  readonly build_number="$commits.1"
+fi
 step "Version $version ($build_number)"
 rm -rf "$work"
 mkdir -p "$work"
@@ -216,6 +238,15 @@ requirement="$(codesign -d -r- "$app" 2>&1)"
 [[ "$requirement" == *"certificate leaf[subject.OU] = \"$team\""* \
   || "$requirement" == *"certificate leaf[subject.OU] = $team"* ]] \
   || fail "the designated requirement does not name team $team, so an ad hoc binary could pass for the terminal host's peer (security review A6)"
+# The same requirement from one version to the next: TCC keys Full Disk Access to it, the host
+# requires it of the application, and Sparkle of the update (#92). A change is a reviewed change
+# of Configuration/DesignatedRequirement.txt, never an accident of the build.
+[[ "$(print -r -- "$requirement" | sed -n 's/^designated => //p')" \
+  == "$(<Configuration/DesignatedRequirement.txt)" ]] \
+  || fail "the designated requirement is not the one of Configuration/DesignatedRequirement.txt: $requirement"
+readonly update_key="$(defaults read "$app/Contents/Info.plist" SUPublicEDKey 2>/dev/null || true)"
+[[ -n "$update_key" ]] || (( dry_run )) \
+  || fail "the application carries no SUPublicEDKey, and would never update"
 [[ "$(defaults read "$app/Contents/Info.plist" CFBundleIdentifier)" == "$bundle_identifier" ]] \
   || fail "unexpected bundle identifier"
 [[ "$(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString)" == "$version" ]] \
@@ -247,7 +278,43 @@ else
   spctl -a -vvv -t exec "$app" || fail "Gatekeeper rejects the application"
 fi
 
-# 6. The disk image: built by hdiutil, signed, notarized and stapled in turn.
+# 6. The update archive: the application as stapled, signed with the EdDSA key, and checked
+# against the key the application carries, which is the one Sparkle will check it with.
+step "Signing the update archive"
+sparkle_tools="$repository_root/build/sparkle-$sparkle_version"
+if [[ ! -x "$sparkle_tools/bin/sign_update" ]]; then
+  rm -rf "$sparkle_tools"
+  mkdir -p "$sparkle_tools"
+  curl --fail --silent --show-error --location --output "$sparkle_tools.tar.xz" \
+    "https://github.com/sparkle-project/Sparkle/releases/download/$sparkle_version/Sparkle-$sparkle_version.tar.xz"
+  [[ "$(shasum -a 256 "$sparkle_tools.tar.xz" | cut -d ' ' -f 1)" == "$sparkle_digest" ]] \
+    || fail "the Sparkle $sparkle_version archive is not the one expected"
+  tar -xf "$sparkle_tools.tar.xz" -C "$sparkle_tools" ./bin/sign_update
+  rm -f "$sparkle_tools.tar.xz"
+fi
+ditto -c -k --sequesterRsrc --keepParent "$app" "$update_archive"
+if ! update_signature="$("$sparkle_tools/bin/sign_update" "${sparkle_key[@]}" -p "$update_archive")"
+then
+  (( dry_run )) || fail "the update archive could not be signed: no EdDSA key"
+  print "Dry run: no EdDSA key, the update archive is left unsigned"
+  update_signature=""
+fi
+if [[ -n "$update_signature" && -n "$update_key" ]]; then
+  xcrun swift Scripts/check-update-signature.swift "$update_key" "$update_signature" \
+    "$update_archive" || fail "the update archive would be refused by the application"
+fi
+readonly host_protocol="$(sed -n 's/^ *static let protocolVersion = \([0-9]*\)$/\1/p' \
+  Packages/VibeManagerKit/Sources/VibeTerminal/TerminalHostWire.swift)"
+[[ "$host_protocol" =~ '^[0-9]+$' ]] || fail "the terminal host's protocol version was not found"
+readonly minimum_system="$(defaults read "$app/Contents/Info.plist" LSMinimumSystemVersion)"
+# What the feed says of this version, read by Scripts/publish-appcast.sh once the release is
+# published: the Pages workflow holds no key, everything signed is signed here.
+print -r -- "{\"version\":\"$version\",\"build\":\"$build_number\",\"archive\":\"${update_archive:t}\",\"length\":$(stat -f %z "$update_archive"),\"edSignature\":\"$update_signature\",\"minimumSystemVersion\":\"$minimum_system\",\"hostProtocol\":$host_protocol}" \
+  > "$appcast_item"
+plutil -convert json -o /dev/null "$appcast_item" || fail "the appcast item is not valid JSON"
+cat "$appcast_item"
+
+# 7. The disk image: built by hdiutil, signed, notarized and stapled in turn.
 step "Building the disk image"
 staging="$work/dmg"
 mkdir -p "$staging"
@@ -263,7 +330,7 @@ if (( ! dry_run )); then
     || fail "Gatekeeper rejects the disk image"
 fi
 
-# 7. The checksum, and a draft: published only once the checklist is ticked.
+# 8. The checksum, and a draft: published only once the checklist is ticked.
 step "Checksum"
 (cd "$work" && shasum -a 256 "$(basename "$dmg")" > "$(basename "$dmg").sha256")
 cat "$dmg.sha256"
@@ -282,6 +349,7 @@ else
 fi
 # A version with a suffix — 1.0.0-rc.1 — is a release candidate.
 if [[ "$version" == *-* ]]; then release_options+=(--prerelease); fi
-gh release create "v$version" "$dmg" "$dmg.sha256" "${release_options[@]}"
+gh release create "v$version" "$dmg" "$dmg.sha256" "$update_archive" "$appcast_item" \
+  "${release_options[@]}"
 
 print "\nDraft v$version created. Work through docs/release-checklist.md, then publish it."
