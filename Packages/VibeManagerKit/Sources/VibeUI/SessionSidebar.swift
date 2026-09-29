@@ -19,6 +19,9 @@ struct SessionSidebar: View {
   /// Focus Sidebar, ⌥⌘1, gives the list the keyboard.
   @FocusState private var isListFocused: Bool
   @State private var swipe: SessionSwipe?
+  /// The rows whose selection is drawn by the row itself, from the start of a swipe to the end of
+  /// the animation that brings the row back.
+  @State private var slidingSessionIDs: Set<SessionID> = []
   /// The row under the pointer, for when no row is drawn under the fingers.
   @State private var hoveredSessionID: SessionID?
   /// The group whose header is being dragged, and the one it is over (#44).
@@ -266,8 +269,12 @@ struct SessionSidebar: View {
       commands: commands
     )
     // Moves with the row: a click on the buttons a swipe uncovered is not a click on the row. It
-    // slides the row's selection too, which the list draws out of SwiftUI's reach.
-    .background(SwipeRowMarker(sessionID: session.id, offset: rowOffset))
+    // carries the row's selection too, which the list draws out of SwiftUI's reach.
+    .background(
+      SwipeRowMarker(
+        sessionID: session.id,
+        carriesSelection: !reduceMotion && slidingSessionIDs.contains(session.id))
+    )
     // Only the swiped row moves, out of the way of its buttons. With Reduce Motion it stays,
     // and the buttons fade in over it.
     .offset(x: rowOffset)
@@ -342,6 +349,7 @@ struct SessionSidebar: View {
     // A swipe on the row already open takes it from where it is.
     if swipe?.sessionID != session.id {
       swipe = makeSwipe(for: session, width: width)
+      slidingSessionIDs.insert(session.id)
     }
     return true
   }
@@ -349,7 +357,7 @@ struct SessionSidebar: View {
   private func settleSwipe() {
     guard let current = swipe else { return }
     let settled = current.settledTranslation
-    withAnimation(reduceMotion ? nil : .snappy) {
+    animateSwipe(reduceMotion ? nil : .snappy) {
       if settled == 0 {
         swipe = nil
       } else {
@@ -360,7 +368,19 @@ struct SessionSidebar: View {
 
   private func closeSwipe(animated: Bool) {
     guard swipe != nil else { return }
-    withAnimation(animated && !reduceMotion ? .snappy : nil) { swipe = nil }
+    animateSwipe(animated && !reduceMotion ? .snappy : nil) { swipe = nil }
+  }
+
+  /// A row put back gives its selection back to the list once it is home, not before.
+  private func animateSwipe(_ animation: Animation?, _ change: () -> Void) {
+    let putBack = {
+      slidingSessionIDs = slidingSessionIDs.filter { $0 == swipe?.sessionID }
+    }
+    guard let animation else {
+      change()
+      return putBack()
+    }
+    withAnimation(animation, completionCriteria: .logicallyComplete, change, completion: putBack)
   }
 
   /// The click that decides. The columns go back as the row leaves for the tab it was sent to.

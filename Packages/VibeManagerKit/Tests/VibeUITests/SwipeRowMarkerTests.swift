@@ -24,7 +24,9 @@ struct SwipeRowMarkerTests {
       List(selection: $selection) {
         ForEach(ids, id: \.self) { id in
           Text(verbatim: "Session")
-            .background(SwipeRowMarker(sessionID: id, offset: id == ids[1] ? slide.offset : 0))
+            .background(
+              SwipeRowMarker(sessionID: id, carriesSelection: id == ids[1] && slide.offset != 0)
+            )
             .offset(x: id == ids[1] ? slide.offset : 0)
             .tag(id)
         }
@@ -50,15 +52,16 @@ struct SwipeRowMarkerTests {
 
     await waitUntil("the list draws the row's selection") { selection(in: window) != nil }
     let selection = try #require(selection(in: window))
-    let home = selection.frame
+    let home = selection.convert(selection.bounds, to: nil)
 
-    slide.offset = -120
-    await waitUntil("a card slides left in place of the selection") {
-      card(in: window)?.frame == home.offsetBy(dx: -120, dy: 0) && selection.alphaValue == 0
-    }
-    slide.offset = 60
-    await waitUntil("the card slides right") {
-      card(in: window)?.frame == home.offsetBy(dx: 60, dy: 0)
+    // As the fingers move: a few points first, then further, then the other way.
+    for offset: CGFloat in [-4, -30, -120, 60] {
+      slide.offset = offset
+      await waitUntil("the card follows the row to \(offset)") {
+        guard let card = card(in: window) else { return false }
+        return card.convert(card.bounds, to: nil) == home.offsetBy(dx: offset, dy: 0)
+          && selection.alphaValue == 0
+      }
     }
     slide.offset = 0
     await waitUntil("the selection comes back") {
@@ -71,10 +74,11 @@ struct SwipeRowMarkerTests {
     selectedRow(in: window)?.subviews.first { $0 is NSVisualEffectView }
   }
 
-  /// What stands in for the selection, drawn just above it, while the row slides.
+  /// What stands in for the selection while the row slides, carried by the row's marker.
   private func card(in window: NSWindow) -> NSView? {
-    let effects = selectedRow(in: window)?.subviews.filter { $0 is NSVisualEffectView } ?? []
-    return effects.count > 1 ? effects[1] : nil
+    window.contentView?.layoutSubtreeIfNeeded()
+    return Self.all(SwipeRowMarker.MarkerView.self, in: window.contentView)
+      .flatMap(\.subviews).first { $0 is NSVisualEffectView }
   }
 
   private func selectedRow(in window: NSWindow) -> NSTableRowView? {
@@ -83,8 +87,12 @@ struct SwipeRowMarkerTests {
   }
 
   private static func rows(in view: NSView?) -> [NSTableRowView] {
+    all(NSTableRowView.self, in: view)
+  }
+
+  private static func all<V: NSView>(_ type: V.Type, in view: NSView?) -> [V] {
     guard let view else { return [] }
-    if let row = view as? NSTableRowView { return [row] }
-    return view.subviews.flatMap { rows(in: $0) }
+    if let match = view as? V { return [match] }
+    return view.subviews.flatMap { all(type, in: $0) }
   }
 }
