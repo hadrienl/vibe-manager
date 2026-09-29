@@ -59,17 +59,16 @@ final class WindowTitleRoom {
 struct WindowTitleHeader: View {
   let title: WindowTitle
   let room: WindowTitleRoom
-  /// The width the toolbar can give, once measured.
+  /// All the width the toolbar can give, once measured: taken whole, it holds the buttons after it
+  /// against the window's edge, as the system's title did.
   @State private var width: CGFloat?
   @State private var applicationWidth: CGFloat = 0
 
-  /// Before the first measurement: little enough never to push another item out.
-  private static let unmeasuredWidth: CGFloat = 80
   /// Below this much room for the session's name, the application's name gives way to it.
   private static let minimumNameWidth: CGFloat = 80
 
   var body: some View {
-    let width = width ?? Self.unmeasuredWidth
+    let width = width ?? ToolbarTitleLayout.unmeasuredWidth
     Group {
       if let sessionName = title.sessionName {
         HStack(spacing: 0) {
@@ -87,7 +86,7 @@ struct WindowTitleHeader: View {
     }
     .font(.headline)
     .lineLimit(1)
-    .frame(maxWidth: width, alignment: .leading)
+    .frame(width: width, alignment: .leading)
     // Measured apart, whether shown or not: whether it is shown depends on it.
     .background {
       applicationAndSeparator
@@ -123,33 +122,44 @@ struct WindowTitleHeader: View {
   }
 }
 
-/// The room the toolbar leaves the title without sending another item to its overflow menu.
+/// The room the toolbar leaves the title.
 ///
 /// `NSToolbar` gives an item the width it asks for, never less: a title as wide as its text pushed
-/// the buttons into the » menu instead of being truncated, and so did the system's own title. So
-/// the header asks for no more than what is left once the other items have theirs.
+/// the buttons into the » menu instead of being truncated, and so did the system's own title. And
+/// with the system's title removed, nothing held the buttons against the window's right edge any
+/// more: they followed the title. So the header takes exactly what is left once the other items
+/// have theirs — no more, and no less.
 struct ToolbarTitleLayout {
-  /// Between two items, as `NSToolbar` spaces them, with a little to spare.
-  static let spacing: CGFloat = 12
+  /// Between two items, as `NSToolbar` spaces them.
+  static let spacing: CGFloat = 8
   /// Between the last item and the window's edge.
-  static let trailingInset: CGFloat = 16
+  static let trailingInset: CGFloat = 8
+  /// Before the first measurement, or sent to the » menu: little enough to find a place on the bar.
+  static let unmeasuredWidth: CGFloat = 80
 
   /// - Parameters:
   ///   - titleLeading: where the title starts, after the traffic lights and the items before it.
   ///   - centredWidth: the width of the item centred in the toolbar, if there is one.
-  ///   - trailingWidths: the widths of the items after the title, the centred one excepted.
+  ///   - trailingExtent: from the first item after the title to the last, the centred one
+  ///     excepted; 0 when there is none.
   static func room(
     titleLeading: CGFloat, windowWidth: CGFloat, detailLeading: CGFloat, centredWidth: CGFloat?,
-    trailingWidths: [CGFloat]
+    trailingExtent: CGFloat
   ) -> CGFloat {
-    let trailing = trailingWidths.reduce(trailingInset) { $0 + $1 + spacing }
+    let trailing = trailingExtent > 0 ? trailingInset + trailingExtent + spacing : trailingInset
     var bound = windowWidth - trailing
     if let centredWidth {
       // Centred right of the sidebar, unless the items after it push it back.
       let centred = (detailLeading + windowWidth) / 2 - centredWidth / 2
-      bound = min(centred, bound - centredWidth)
+      bound = min(centred, bound - centredWidth) - spacing
     }
-    return max(0, bound - spacing - titleLeading).rounded(.down)
+    return max(0, bound - titleLeading).rounded(.down)
+  }
+
+  /// What the items after the title take, when they could not be seen side by side: their widths
+  /// and the spaces between them.
+  static func estimatedExtent(of widths: [CGFloat]) -> CGFloat {
+    widths.isEmpty ? 0 : widths.reduce(0, +) + spacing * CGFloat(widths.count - 1)
   }
 }
 
@@ -179,11 +189,12 @@ final class ToolbarRoomView: NSView {
   /// still see it grow to come back.
   private weak var hostWindow: NSWindow?
   private var isMeasurementScheduled = false
-  /// Where the title starts, as last seen while it was on the bar.
-  private var titleLeading: CGFloat?
   /// The width of each item as last seen on the bar: an item sent to the overflow menu is laid out
   /// there, and its width then says nothing of what it takes on the bar.
   private var widths: [NSToolbarItem.Identifier: CGFloat] = [:]
+  /// From the first item after the title to the last, as last seen all on the bar, for that set of
+  /// items: the buttons grouped under one capsule sit closer than two items apart.
+  private var trailingExtents: [[NSToolbarItem.Identifier]: CGFloat] = [:]
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
@@ -194,8 +205,10 @@ final class ToolbarRoomView: NSView {
     hostWindow = window
     observers = NotificationObservers()
     observedItemViews = []
+    // At once, not on the next turn: a window made narrower would otherwise be drawn once with
+    // its last button in the » menu.
     observers.observe(NSWindow.didResizeNotification, of: window) { [weak self] in
-      self?.scheduleMeasurement()
+      self?.measure()
     }
     for name in [NSToolbar.willAddItemNotification, NSToolbar.didRemoveItemNotification] {
       observers.observe(name, of: window.toolbar) { [weak self] in self?.scheduleMeasurement() }
@@ -214,7 +227,7 @@ final class ToolbarRoomView: NSView {
     }
   }
 
-  private func measure() {
+  func measure() {
     guard let window = hostWindow, let toolbar = window.toolbar,
       let ownIndex = toolbar.items.firstIndex(where: { item in
         item.view.map { isDescendant(of: $0) } ?? false
@@ -222,32 +235,56 @@ final class ToolbarRoomView: NSView {
     else { return }
     let visible = Set((toolbar.visibleItems ?? []).map(\.itemIdentifier))
     let own = toolbar.items[ownIndex]
-    if let view = own.view, visible.contains(own.itemIdentifier) {
-      let frame = view.convert(view.bounds, to: nil)
-      if frame.width > 0 { titleLeading = frame.minX }
+    guard let ownView = own.view, visible.contains(own.itemIdentifier) else {
+      // In the » menu itself, where it stands says nothing: made small, it comes back to the bar
+      // and is measured there.
+      measured?(ToolbarTitleLayout.unmeasuredWidth)
+      return
     }
-    guard let titleLeading else { return }
+    let ownFrame = ownView.convert(ownView.bounds, to: nil)
+    guard ownFrame.width > 0 else { return }
+    var titleLeading = ownFrame.minX
 
     var centredWidth: CGFloat?
-    var trailingWidths: [CGFloat] = []
+    var trailing: [(identifier: NSToolbarItem.Identifier, width: CGFloat, frame: NSRect?)] = []
     for (index, item) in toolbar.items.enumerated() where index != ownIndex {
       guard let view = item.view else { continue }
       observeFrame(of: view)
-      if visible.contains(item.itemIdentifier) {
+      let isOnBar = visible.contains(item.itemIdentifier)
+      if isOnBar {
         widths[item.itemIdentifier] = view.fittingSize.width
       }
       let width = widths[item.itemIdentifier] ?? view.fittingSize.width
       if toolbar.centeredItemIdentifiers.contains(item.itemIdentifier) {
         centredWidth = width
-      } else if index > ownIndex {
-        trailingWidths.append(width)
+      } else if index < ownIndex {
+        // An item before the title sent to the » menu — the sidebar's button, as the sidebar
+        // folds — left its place to the title, and must find it again.
+        if !isOnBar { titleLeading += width + ToolbarTitleLayout.spacing }
+      } else {
+        trailing.append(
+          (item.itemIdentifier, width, isOnBar ? view.convert(view.bounds, to: nil) : nil))
       }
     }
     if let view = own.view { observeFrame(of: view) }
+    // All on the bar, they are measured as they sit. Some of them in the » menu, the last
+    // measurement may be older than a width that changed since — the status menu's label — and
+    // they would never come back: the larger of it and of their widths, spaced, is taken.
+    let identifiers = trailing.map(\.identifier)
+    let frames = trailing.compactMap(\.frame)
+    let extent: CGFloat
+    if frames.count == trailing.count, let first = frames.first, let last = frames.last {
+      extent = last.maxX - first.minX
+      trailingExtents[identifiers] = extent
+    } else {
+      extent = max(
+        trailingExtents[identifiers] ?? 0,
+        ToolbarTitleLayout.estimatedExtent(of: trailing.map(\.width)))
+    }
     measured?(
       ToolbarTitleLayout.room(
         titleLeading: titleLeading, windowWidth: window.frame.width,
-        detailLeading: detailLeading, centredWidth: centredWidth, trailingWidths: trailingWidths))
+        detailLeading: detailLeading, centredWidth: centredWidth, trailingExtent: extent))
   }
 
   /// An item that moves or changes width — the task status menu's label, the title's own place

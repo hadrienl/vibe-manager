@@ -128,43 +128,59 @@ struct WindowTitleTests {
   }
 }
 
-/// The toolbar gives an item the width it asks for, never less: the title asks for what is left.
+/// The toolbar gives an item the width it asks for, never less, and nothing holds the buttons
+/// against the right edge once the system's title is gone: the title takes exactly what is left.
 @Suite("The window's title leaves the toolbar's buttons their room")
 struct ToolbarTitleLayoutTests {
-  private let buttons: [CGFloat] = [36, 35, 35, 40]
+  /// The four buttons of a session's toolbar, measured side by side.
+  private let buttons: CGFloat = 150
 
-  @Test("Without a centred item, everything up to the buttons")
+  @Test("Without a centred item, everything up to the buttons, held against the edge")
   func upToTheButtons() {
     let room = ToolbarTitleLayout.room(
       titleLeading: 152, windowWidth: 1180, detailLeading: 144, centredWidth: nil,
-      trailingWidths: buttons)
-    // 1180 − (16 + 146 + 4 × 12) − 12 − 152
-    #expect(room == 806)
+      trailingExtent: buttons)
+    // 1180 − (8 + 150 + 8) − 152
+    #expect(room == 862)
+  }
+
+  @Test("With no button after it, up to the edge")
+  func noButtons() {
+    let room = ToolbarTitleLayout.room(
+      titleLeading: 152, windowWidth: 1180, detailLeading: 144, centredWidth: nil,
+      trailingExtent: 0)
+    #expect(room == 1020)
   }
 
   @Test("With a centred picker, up to the picker")
   func upToThePicker() {
     let room = ToolbarTitleLayout.room(
       titleLeading: 152, windowWidth: 1180, detailLeading: 144, centredWidth: 204,
-      trailingWidths: buttons)
-    // Centred right of the sidebar: (144 + 1180) / 2 − 102 = 560.
-    #expect(room == 396)  // 560 − 12 − 152
+      trailingExtent: buttons)
+    // Centred right of the sidebar: (144 + 1180) / 2 − 102 = 560, less a space, less 152.
+    #expect(room == 400)
   }
 
   @Test("In a narrow window, the picker pushed back by the buttons")
   func pickerPushedBack() {
     let room = ToolbarTitleLayout.room(
       titleLeading: 152, windowWidth: 640, detailLeading: 144, centredWidth: 204,
-      trailingWidths: buttons)
-    // 640 − 210 − 204 = 226, left of where it would be centred (290).
-    #expect(room == 62)  // 226 − 12 − 152
+      trailingExtent: buttons)
+    // 640 − 166 − 204 = 270, left of where it would be centred (290); less a space, less 152.
+    #expect(room == 110)
   }
 
   @Test("Never less than nothing")
   func neverNegative() {
     let room = ToolbarTitleLayout.room(
       titleLeading: 300, windowWidth: 400, detailLeading: 0, centredWidth: 204,
-      trailingWidths: buttons)
+      trailingExtent: buttons)
     #expect(room == 0)
+  }
+
+  @Test("Buttons never seen side by side are counted with a space between each")
+  func estimatedExtent() {
+    #expect(ToolbarTitleLayout.estimatedExtent(of: []) == 0)
+    #expect(ToolbarTitleLayout.estimatedExtent(of: [36, 35, 41]) == 128)
   }
 }
