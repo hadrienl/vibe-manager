@@ -17,6 +17,8 @@ public struct RootView: View {
   /// The window this view is drawn in: the only one whose visibility says whether its sessions
   /// are in front of the user.
   @State private var hostWindow = HostWindow()
+  /// Where the detail column starts: the room of the window's title depends on it (#159).
+  @State private var titleRoom = WindowTitleRoom()
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
   @Environment(\.colorScheme) private var colorScheme
@@ -61,6 +63,10 @@ public struct RootView: View {
         }
       }
     }
+    // The window's title (#159), in every state: the Window menu, Mission Control and ⌘` read it.
+    // The toolbar draws it itself, in two styles, where the system allows it.
+    .navigationTitle(model.windowTitle.full)
+    .removingSystemDrawnTitle()
     // Open Quickly, over the whole window (#37).
     .overlay {
       if case .loaded = model.state, model.quickOpen.isPresented {
@@ -378,6 +384,11 @@ public struct RootView: View {
             }
           }
       }
+      .onGeometryChange(for: CGFloat.self) {
+        $0.frame(in: .global).minX
+      } action: { leading in
+        titleRoom.detailLeading = leading
+      }
       .restartNowConfirmation(
         permissions: model.permissions, origin: .workspace, sessionName: model.sessionName(for:)
       )
@@ -389,6 +400,10 @@ public struct RootView: View {
           if !model.layout.columns.isSidebarVisible, !model.pendingRequests.isEmpty {
             RequestPaletteToolbarButton(model: model)
           }
+        }
+        // After the palette's button: the title's room is measured from where it starts (#159).
+        if WindowTitleToolbarItem.isDrawn {
+          WindowTitleToolbarItem(title: model.windowTitle, room: titleRoom)
         }
         // Where the work on the session on screen stands, and a way to change it (#80).
         ToolbarItem(placement: .primaryAction) {
