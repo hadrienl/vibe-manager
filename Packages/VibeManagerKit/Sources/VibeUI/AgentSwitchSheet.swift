@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// Moves a session to another agent or model.
@@ -162,7 +163,7 @@ struct AgentSwitchSheet: View {
         .help(Text("Regenerate the summary, dropping your edits", bundle: .module))
         .accessibilityLabel(Text("Regenerate the summary", bundle: .module))
       }
-      TextEditor(text: $model.summaryText)
+      ReplaceableTextEditor(text: $model.summaryText)
         .font(.system(.callout, design: .monospaced))
         .frame(minHeight: 220)
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))

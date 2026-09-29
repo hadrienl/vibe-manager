@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 
 /// Settings › Requests › Avatars (#154): the library on the layout of Settings › Conversation —
 /// the avatars in a list, the one selected in a preview beside it.
@@ -953,7 +954,7 @@ struct NewAvatarCard: View {
       VStack(alignment: .leading, spacing: 4) {
         Text("Description", bundle: .module)
           .font(.callout.weight(.medium))
-        TextEditor(text: $avatars.description)
+        ReplaceableTextEditor(text: $avatars.description)
           .font(.body)
           .frame(height: 58)
           .scrollContentBackground(.hidden)

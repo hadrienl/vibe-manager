@@ -187,6 +187,11 @@ private struct GrowingTextView: NSViewRepresentable {
     coordinator.parent = self
     guard let textView = coordinator.textView else { return }
     if textView.string != text, !coordinator.isEditing {
+      // The edits recorded for ⌘Z are placed in the text replaced: kept, the next ⌘Z would raise,
+      // and the one after abort the application (see `ReplaceableTextEditor`).
+      if let storage = textView.textStorage {
+        textView.undoManager?.removeAllActions(withTarget: storage)
+      }
       textView.string = text
       coordinator.highlight()
     }
