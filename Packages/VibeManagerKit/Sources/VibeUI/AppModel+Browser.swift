@@ -30,12 +30,22 @@ extension AppModel {
       // In a window where the two take turns, the page the agent opened is what comes forward.
       self.layout.setShowsBrowserWhenAlternating(true)
     }
-    launcher?.openLink = { [weak self] id, url, alternate in
-      self?.openTerminalLink(url, from: id, alternate: alternate)
+    launcher?.openLink = { [weak self] id, url, gesture in
+      self?.openLink(url, from: id, gesture: gesture)
     }
-    journal?.openInWebView = { [weak self] url, id in
-      self?.openInWebView(url, from: id) ?? false
+    terminals?.openLink = { [weak self] id, url, gesture in
+      self?.openLink(url, from: id, gesture: gesture)
     }
+    launcher?.hasWebView = { [weak self] id in self?.hasWebView(id) ?? false }
+    terminals?.hasWebView = { [weak self] id in self?.hasWebView(id) ?? false }
+    journal?.route = { [weak self] url, gesture, id in
+      self?.openLink(url, from: id, gesture: gesture)
+    }
+    journal?.hasWebView = { [weak self] id in self?.hasWebView(id) ?? false }
+    notes.route = { [weak self] url, gesture, id in
+      self?.openLink(url, from: id, gesture: gesture)
+    }
+    notes.hasWebView = { [weak self] id in self?.hasWebView(id) ?? false }
   }
 
   func selectionDidChange(to id: SessionID?) {
@@ -205,36 +215,40 @@ extension AppModel {
     return components?.url
   }
 
-  /// ⌘-click in a terminal: the session's web view, or the default browser as Settings say; ⌥⌘-click
-  /// does the other.
-  func openTerminalLink(_ url: URL, from id: SessionID, alternate: Bool) {
-    // A link's text and its address can differ (OSC 8), and output is anybody's: only what shows a
-    // page is opened. Another application's address, or a file that is not a page — a `.command`,
-    // an app — is not run on a click.
-    let scheme = url.scheme?.lowercased() ?? ""
-    let isWeb = scheme == "http" || scheme == "https"
-    let isPage =
-      url.isFileURL && ["html", "htm", "svg", "pdf"].contains(url.pathExtension.lowercased())
-    guard isWeb || isPage || scheme == "mailto" else {
-      NSSound.beep()
-      return
-    }
-    guard let browser, scheme != "mailto" else {
+  /// A link of a session — clicked in its terminal, its conversation, its activity or its notes, or
+  /// chosen from a link's menu — where `LinkRouting` sends it (#186).
+  public func openLink(_ url: URL, from id: SessionID, gesture: LinkGesture) {
+    let preference = browser?.preferences.links ?? .webView
+    switch LinkRouting.route(
+      url, gesture: gesture, preference: preference, hasWebView: hasWebView(id))
+    {
+    case .webView:
+      _ = openInWebView(url, from: id)
+    case .newTab:
+      openInNewTab(url, from: id)
+    case .browser, .system:
       NSWorkspace.shared.open(url)
-      return
+    case .refused:
+      NSSound.beep()
     }
-    var inWebView = browser.preferences.terminalLinks == .webView
-    if alternate { inWebView.toggle() }
-    if inWebView, openInWebView(url, from: id) { return }
-    NSWorkspace.shared.open(url)
+  }
+
+  /// Whether the session has a web view a link can open in: not when archived.
+  func hasWebView(_ id: SessionID) -> Bool {
+    browser != nil && sessions.first(where: { $0.id == id })?.status != .archived
+  }
+
+  /// A new tab, even when another already shows the address, after the tab in front.
+  private func openInNewTab(_ url: URL, from id: SessionID) {
+    guard let browser, hasWebView(id) else { return }
+    browser.open(url, in: id, openedBy: .user)
+    if id == selectedSessionID { layout.setShowsBrowserWhenAlternating(true) }
   }
 
   /// The page in the session's web view, brought forward; false when the session has none — no
   /// web view, or archived.
   func openInWebView(_ url: URL, from id: SessionID) -> Bool {
-    guard let browser, sessions.first(where: { $0.id == id })?.status != .archived else {
-      return false
-    }
+    guard let browser, hasWebView(id) else { return false }
     browser.openLink(url, in: id)
     if id == selectedSessionID { layout.setShowsBrowserWhenAlternating(true) }
     return true

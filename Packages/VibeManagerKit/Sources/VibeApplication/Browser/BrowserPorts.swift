@@ -27,12 +27,6 @@ public protocol BrowserPermissionStore: AnyObject {
   func revoke(_ key: String)
 }
 
-/// Where a link clicked in a terminal goes.
-public enum TerminalLinkDestination: String, Codable, CaseIterable, Sendable {
-  case webView
-  case defaultBrowser
-}
-
 /// The choices of Settings › Web View.
 @MainActor
 public protocol BrowserPreferences: AnyObject {
@@ -40,23 +34,25 @@ public protocol BrowserPreferences: AnyObject {
   var givesAgentsWebView: Bool { get set }
   /// Whether the web view comes forward when an agent opens a page.
   var showsWebViewWhenAgentOpensPage: Bool { get set }
-  var terminalLinks: TerminalLinkDestination { get set }
+  /// Where a click sends a link of a session: its terminal, its conversation, its activity, its
+  /// notes (#186).
+  var links: LinkDestination { get set }
 }
 
 @MainActor
 public final class InMemoryBrowserPreferences: BrowserPreferences {
   public var givesAgentsWebView: Bool
   public var showsWebViewWhenAgentOpensPage: Bool
-  public var terminalLinks: TerminalLinkDestination
+  public var links: LinkDestination
 
   public init(
     givesAgentsWebView: Bool = true,
     showsWebViewWhenAgentOpensPage: Bool = true,
-    terminalLinks: TerminalLinkDestination = .webView
+    links: LinkDestination = .webView
   ) {
     self.givesAgentsWebView = givesAgentsWebView
     self.showsWebViewWhenAgentOpensPage = showsWebViewWhenAgentOpensPage
-    self.terminalLinks = terminalLinks
+    self.links = links
   }
 }
 

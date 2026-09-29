@@ -124,6 +124,7 @@ public final class UserDefaultsBrowserSettings: BrowserPermissionStore, BrowserP
   private let grantsKey = "browser.alwaysAllowedSites.v1"
   private let agentsKey = "browser.givesAgentsWebView.v1"
   private let showKey = "browser.showsWebViewWhenAgentOpensPage.v1"
+  // Named when it was only the terminal's: kept, so that the choice made then still holds (#186).
   private let linksKey = "browser.terminalLinks.v1"
 
   public init(suiteName: String? = nil) {
@@ -152,9 +153,9 @@ public final class UserDefaultsBrowserSettings: BrowserPermissionStore, BrowserP
     set { defaults.set(newValue, forKey: showKey) }
   }
 
-  public var terminalLinks: TerminalLinkDestination {
+  public var links: LinkDestination {
     get {
-      defaults.string(forKey: linksKey).flatMap(TerminalLinkDestination.init(rawValue:))
+      defaults.string(forKey: linksKey).flatMap(LinkDestination.init(rawValue:))
         ?? .webView
     }
     set { defaults.set(newValue.rawValue, forKey: linksKey) }

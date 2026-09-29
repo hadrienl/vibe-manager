@@ -914,7 +914,7 @@ private struct WebViewSettings: View {
   let browser: BrowserWorkspace
   @State private var givesAgents = true
   @State private var showsOnAgentPage = true
-  @State private var links: TerminalLinkDestination = .webView
+  @State private var links: LinkDestination = .webView
   @State private var isConfirmingClear = false
 
   var body: some View {
@@ -932,13 +932,16 @@ private struct WebViewSettings: View {
           browser.preferences.showsWebViewWhenAgentOpensPage = value
         }
         Picker(selection: $links) {
-          Text("In the web view", bundle: .module).tag(TerminalLinkDestination.webView)
+          Text("In the web view", bundle: .module).tag(LinkDestination.webView)
           Text("In the default browser", bundle: .module)
-            .tag(TerminalLinkDestination.defaultBrowser)
+            .tag(LinkDestination.defaultBrowser)
         } label: {
-          Text("Open links ⌘-clicked in the terminal", bundle: .module)
+          Text("Open links", bundle: .module)
+          Text(
+            "Of the terminal, the conversation, the activity and the notes. ⌥-click opens the other way.",
+            bundle: .module)
         }
-        .onChange(of: links) { _, value in browser.preferences.terminalLinks = value }
+        .onChange(of: links) { _, value in browser.preferences.links = value }
       }
       Section {
         if browser.grants.isEmpty {
@@ -987,7 +990,7 @@ private struct WebViewSettings: View {
     .onAppear {
       givesAgents = browser.preferences.givesAgentsWebView
       showsOnAgentPage = browser.preferences.showsWebViewWhenAgentOpensPage
-      links = browser.preferences.terminalLinks
+      links = browser.preferences.links
     }
     .confirmationDialog(
       Text("Clear the web view’s browsing data?", bundle: .module),

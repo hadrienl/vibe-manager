@@ -8994,6 +8994,16 @@
         }
       }
     },
+    "Of the terminal, the conversation, the activity and the notes. ⌥-click opens the other way." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du terminal, de la conversation, de l’activité et des notes. ⌥-clic ouvre de l’autre façon."
+          }
+        }
+      }
+    },
     "Only the first %lld changes are listed; the counts are exact." : {
       "localizations" : {
         "fr" : {
@@ -9118,12 +9128,12 @@
         }
       }
     },
-    "Open links ⌘-clicked in the terminal" : {
+    "Open links" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrir les liens ⌘-cliqués dans le terminal"
+            "value" : "Ouvrir les liens"
           }
         }
       }

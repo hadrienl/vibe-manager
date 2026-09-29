@@ -16,6 +16,9 @@ struct SessionNotesEditor: NSViewRepresentable {
   let wantsFocus: Bool
   let focusTaken: () -> Void
   let openLink: (URL) -> Void
+  /// The actions of a link's menu, and what doing one of them does (#186).
+  let linkActions: (URL) -> [LinkMenuAction]
+  let performLinkAction: (LinkMenuAction, URL) -> Void
   /// Escape: the keyboard goes back to the terminal.
   let leave: () -> Void
 
@@ -206,6 +209,36 @@ struct SessionNotesEditor: NSViewRepresentable {
       return true
     }
 
+    /// A link's actions at the top of the menu, in place of the text view's own (#186).
+    func textView(
+      _ view: NSTextView, menu: NSMenu, for event: NSEvent, at charIndex: Int
+    ) -> NSMenu? {
+      guard let parent, let storage = view.textStorage, charIndex >= 0, charIndex < storage.length
+      else { return menu }
+      let value = storage.attribute(.link, at: charIndex, effectiveRange: nil)
+      guard let url = value as? URL ?? (value as? String).flatMap(URL.init(string:)) else {
+        return menu
+      }
+      let actions = parent.linkActions(url)
+      guard !actions.isEmpty else { return menu }
+      for item in menu.items where Self.isLinkItem(item) {
+        menu.removeItem(item)
+      }
+      let perform = parent.performLinkAction
+      for (index, action) in actions.enumerated() {
+        let item = NotesMenuItem(title: action.title) { perform(action, url) }
+        menu.insertItem(item, at: index)
+      }
+      menu.insertItem(.separator(), at: actions.count)
+      return menu
+    }
+
+    /// The items a text view adds by itself over a link: Open Link, Copy Link, Edit Link…
+    private static func isLinkItem(_ item: NSMenuItem) -> Bool {
+      guard !(item is NotesMenuItem), let action = item.action else { return false }
+      return NSStringFromSelector(action).localizedCaseInsensitiveContains("link")
+    }
+
     func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
       guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
       textView.window?.makeFirstResponder(nil)
@@ -238,7 +271,9 @@ struct SessionNotesSection: View {
             comment: "What VoiceOver calls the notes editor: the session's name."),
           wantsFocus: notes.wantsFocus,
           focusTaken: { notes.focusTaken() },
-          openLink: { notes.openLink($0) },
+          openLink: { notes.openLink($0, in: session.id) },
+          linkActions: { notes.linkActions(for: $0, in: session.id) },
+          performLinkAction: { notes.perform($0, on: $1, in: session.id) },
           leave: leave
         )
         if document.isLoaded, document.byteCount == 0 {
@@ -547,5 +582,22 @@ private struct NotesUnreadable: View {
       .controlSize(.small)
     }
     .padding(10)
+  }
+}
+
+/// A menu item that runs a closure.
+private final class NotesMenuItem: NSMenuItem {
+  private let perform: () -> Void
+
+  init(title: String, perform: @escaping () -> Void) {
+    self.perform = perform
+    super.init(title: title, action: #selector(run), keyEquivalent: "")
+    target = self
+  }
+
+  required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+  @objc private func run() {
+    perform()
   }
 }

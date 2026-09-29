@@ -150,6 +150,17 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     if self.view !== view { hasFed = false }
     self.view = view
     connectPasteMode()
+    connectLinkMenu()
+  }
+
+  /// A link's menu opens through the pane, as a click does, and offers the web view when the
+  /// session has one (#186).
+  private func connectLinkMenu() {
+    guard let view = view as? AccessibleTerminalView else { return }
+    view.openLinkFromMenu = { [weak self] link, gesture in
+      self?.pane.openLink(link, gesture: gesture)
+    }
+    view.hasWebView = { [weak self] in self?.pane.hasWebView() ?? false }
   }
 
   /// Whether the program in the terminal asked for bracketed pastes: known to the view alone, and
@@ -168,6 +179,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     guard self.pane !== pane else { return }
     self.pane = pane
     connectPasteMode()
+    connectLinkMenu()
     eventTask?.cancel()
     eventTask = nil
     attachedSession = nil
@@ -316,16 +328,38 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   nonisolated public func clipboardCopy(source: TerminalView, content: Data) {}
 
-  /// ⌘-click on an address (#69). Whether ⌥ was held too is read now, from the click itself: by the
-  /// time the main actor runs, the keys may have been let go.
+  /// A click on an address (#69, #186): SwiftTerm asks from the release of the mouse, on the main
+  /// thread, so the click is the event being handled — whether ⌘ or ⌥ was held is read from it, not
+  /// later, when the keys may have been let go, and a double click's second press must find the
+  /// first click already waiting.
   nonisolated public func requestOpenLink(
     source: TerminalView,
     link: String,
     params: [String: String]
   ) {
-    let alternate = NSEvent.modifierFlags.contains(.option)
-    Task { @MainActor [weak self] in
-      self?.pane.openLink(link, alternate: alternate)
+    guard Thread.isMainThread else {
+      let alternate = NSEvent.modifierFlags.contains(.option)
+      Task { @MainActor [weak self] in
+        self?.pane.openLink(link, gesture: .click(alternate: alternate))
+      }
+      return
+    }
+    MainActor.assumeIsolated {
+      let event = NSApp.currentEvent
+      let flags = event?.modifierFlags ?? NSEvent.modifierFlags
+      let gesture = LinkGesture.click(alternate: flags.contains(.option))
+      let open: @MainActor @Sendable () -> Void = { [weak self] in
+        self?.pane.openLink(link, gesture: gesture)
+      }
+      guard let view = source as? AccessibleTerminalView else {
+        open()
+        return
+      }
+      // A plain click on what is not a page does nothing, rather than beep at each click.
+      let command = flags.contains(.command)
+      guard command || TerminalPaneModel.opensOnClick(link) else { return }
+      view.linkClicks.linkClicked(
+        clickCount: event?.clickCount ?? 1, command: command, open: open)
     }
   }
 

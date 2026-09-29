@@ -1,5 +1,6 @@
 import AppKit
 import SwiftTerm
+import VibeApplication
 
 /// SwiftTerm's view, readable by VoiceOver.
 ///
@@ -94,7 +95,135 @@ public final class AccessibleTerminalView: TerminalView {
 
   public override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    installLinkPointer()
     onWindowChange?()
+  }
+
+  // MARK: - Links (#186)
+
+  /// Whether a click without ⌘ opens a link, or reaches the waiting double click.
+  let linkClicks = TerminalLinkClicks()
+
+  /// Told of a link chosen from the terminal's menu, with how to open it.
+  var openLinkFromMenu: ((String, LinkGesture) -> Void)?
+  /// Whether the session has a web view the menu of a link can offer.
+  var hasWebView: () -> Bool = { false }
+
+  /// Whether the program in the terminal follows the mouse: then a click is its own, and a link
+  /// opens with ⌘-click only.
+  var programFollowsMouse: Bool {
+    allowMouseReporting && getTerminal().mouseMode != .off
+  }
+
+  /// A plain click opens a link, and hovering one underlines it — unless the program follows the
+  /// mouse. SwiftTerm looks for a link before it hands a release to the program: in `.hover` it
+  /// would open the link and never send the release. Called before each gesture is read, so that a
+  /// program that turns the mouse on or off is followed from the next one.
+  func syncLinkMode() {
+    let wanted: LinkHighlightMode = programFollowsMouse ? .hoverWithModifier : .hover
+    // The setter redraws the whole screen: only on a change.
+    if linkHighlightMode != wanted { linkHighlightMode = wanted }
+  }
+
+  public override func mouseDown(with event: NSEvent) {
+    linkClicks.pointerDown()
+    syncLinkMode()
+    // Under a program that follows the mouse, a ⌘-click on a link opens it on the release, which
+    // SwiftTerm then does not send on: the program would be told of a press that never ends. It
+    // is told of neither.
+    if event.modifierFlags.contains(.command), programFollowsMouse, link(at: event) != nil {
+      return
+    }
+    super.mouseDown(with: event)
+  }
+
+  public override func menu(for event: NSEvent) -> NSMenu? {
+    guard let link = link(at: event), let url = TerminalPaneModel.url(fromLink: link) else {
+      return super.menu(for: event)
+    }
+    let menu = NSMenu()
+    for action in LinkMenuAction.actions(for: url, hasWebView: hasWebView()) {
+      let item = LinkMenuItem(title: action.title) { [weak self] in
+        if let gesture = action.gesture {
+          self?.openLinkFromMenu?(link, gesture)
+        } else {
+          NSPasteboard.general.clearContents()
+          NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        }
+      }
+      menu.addItem(item)
+    }
+    return menu
+  }
+
+  /// The cell under a point of the view, on the screen rather than in the scrollback.
+  func cell(at point: NSPoint) -> Position? {
+    let terminal = getTerminal()
+    guard let size = cellSizeInPixels(source: terminal), size.width > 0, size.height > 0 else {
+      return nil
+    }
+    let scale = window?.backingScaleFactor ?? 1
+    let width = CGFloat(size.width) / scale
+    let height = CGFloat(size.height) / scale
+    let column = Int(point.x / width)
+    let row = Int((frame.height - point.y) / height)
+    guard (0..<terminal.cols).contains(column), (0..<terminal.rows).contains(row) else {
+      return nil
+    }
+    return Position(col: column, row: row)
+  }
+
+  /// The link at a cell of the screen: an OSC 8 address, or text that reads as one.
+  func link(atScreen cell: Position) -> String? {
+    getTerminal().link(at: .screen(cell), mode: .explicitAndImplicit)
+  }
+
+  func link(at event: NSEvent) -> String? {
+    cell(at: convert(event.locationInWindow, from: nil)).flatMap(link(atScreen:))
+  }
+
+  // MARK: Pointer
+
+  /// SwiftTerm shows the I-beam everywhere, and its `mouseMoved` cannot be overridden from here: a
+  /// tracking area of our own shows the pointing hand over what a click opens.
+  private var linkPointer: LinkPointer?
+  private var pointerCell: Position?
+  private var pointerIsOnLink = false
+  private var showsHand = false
+
+  private func installLinkPointer() {
+    guard window != nil, linkPointer == nil else { return }
+    let pointer = LinkPointer(view: self)
+    addTrackingArea(
+      NSTrackingArea(
+        rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+        owner: pointer))
+    linkPointer = pointer
+    syncLinkMode()
+  }
+
+  fileprivate func pointerMoved(_ event: NSEvent) {
+    syncLinkMode()
+    let cell = cell(at: convert(event.locationInWindow, from: nil))
+    // The implicit lookup runs a regular expression over the line: not again in the same cell.
+    if cell != pointerCell {
+      pointerCell = cell
+      pointerIsOnLink = cell.flatMap(link(atScreen:)).map(TerminalPaneModel.opensOnClick) ?? false
+    }
+    let clickable =
+      pointerIsOnLink && (!programFollowsMouse || event.modifierFlags.contains(.command))
+    if clickable {
+      NSCursor.pointingHand.set()
+    } else if showsHand {
+      NSCursor.iBeam.set()
+    }
+    showsHand = clickable
+  }
+
+  fileprivate func pointerExited() {
+    pointerCell = nil
+    pointerIsOnLink = false
+    showsHand = false
   }
 
   public override func accessibilityValue() -> Any? {
@@ -110,6 +239,44 @@ public final class AccessibleTerminalView: TerminalView {
       localized:
         "Read Last Output, Control-Option-Command-O, reads the last lines the agent wrote.",
       bundle: .module, comment: "Read Last Output is a command of the View menu.")
+  }
+}
+
+/// Receives the moves over the terminal for its pointer: SwiftTerm's own tracking areas send them
+/// to the view, whose handler is not ours to extend.
+private final class LinkPointer: NSResponder {
+  private weak var view: AccessibleTerminalView?
+
+  init(view: AccessibleTerminalView) {
+    self.view = view
+    super.init()
+  }
+
+  required init?(coder: NSCoder) { nil }
+
+  override func mouseMoved(with event: NSEvent) {
+    view?.pointerMoved(event)
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    view?.pointerExited()
+  }
+}
+
+/// A menu item that runs a closure.
+final class LinkMenuItem: NSMenuItem {
+  private let perform: () -> Void
+
+  init(title: String, perform: @escaping () -> Void) {
+    self.perform = perform
+    super.init(title: title, action: #selector(run), keyEquivalent: "")
+    target = self
+  }
+
+  required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+  @objc private func run() {
+    perform()
   }
 }
 

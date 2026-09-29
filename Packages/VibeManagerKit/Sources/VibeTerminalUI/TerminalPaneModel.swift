@@ -270,18 +270,45 @@ public final class TerminalPaneModel {
     return url.path
   }
 
-  /// Told of an address clicked in the terminal, with whether it was ⌥⌘-clicked (#69). Unset, the
-  /// address opens in the default browser, as it would from any terminal.
-  @ObservationIgnored public var onOpenLink: ((URL, _ alternate: Bool) -> Void)?
+  /// Told of an address clicked in the terminal, or chosen from its menu, with how (#69, #186).
+  /// Unset, the address opens in the default browser, as it would from any terminal — only when it
+  /// is a page or a mail address.
+  @ObservationIgnored public var onOpenLink: ((URL, LinkGesture) -> Void)?
 
-  func openLink(_ text: String, alternate: Bool) {
-    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let url = URL(string: trimmed), url.scheme != nil else { return }
+  /// Whether the session has a web view, for the menu of a link: set with `onOpenLink`.
+  @ObservationIgnored public var hasWebView: () -> Bool = { false }
+
+  func openLink(_ text: String, gesture: LinkGesture) {
+    guard let url = Self.url(fromLink: text) else { return }
     if let onOpenLink {
-      onOpenLink(url, alternate)
+      onOpenLink(url, gesture)
     } else {
-      NSWorkspace.shared.open(url)
+      Self.openOutside(url)
     }
+  }
+
+  /// Where a terminal's link goes when nothing else is told of it: the default browser, or the mail
+  /// application, and nothing that is neither a page nor a mail address.
+  public static func openOutside(_ url: URL) {
+    switch LinkRouting.route(url, gesture: .browser, preference: .defaultBrowser, hasWebView: false) {
+    case .browser, .system: NSWorkspace.shared.open(url)
+    case .refused: NSSound.beep()
+    case .webView, .newTab: break
+    }
+  }
+
+  /// Whether a plain click may open the link: a page or a mail address. Another application's
+  /// address still opens with ⌘-click, as it did — refused with a beep when it is not a page.
+  static func opensOnClick(_ link: String) -> Bool {
+    guard let url = url(fromLink: link) else { return false }
+    return LinkRouting.isPage(url) || LinkRouting.isMail(url)
+  }
+
+  /// A link as the terminal gives it: an OSC 8 address, or text that looks like one.
+  static func url(fromLink text: String) -> URL? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let url = URL(string: trimmed), url.scheme != nil else { return nil }
+    return url
   }
 
   /// Whether the program running asked for bracketed pastes. Set by the surface, which alone reads

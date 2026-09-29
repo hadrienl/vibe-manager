@@ -527,3 +527,45 @@ struct NotesInSummaryTests {
 private func english(_ title: LocalizedStringResource?) -> String? {
   title.map { Localization.string($0, in: "en") }
 }
+
+@Suite("The links of the notes (#186)")
+@MainActor
+struct NotesLinkRoutingTests {
+  @Test("A web or mail link follows the session's rule; a file is revealed without it")
+  func followsTheRule() async {
+    let opener = FakeOpener()
+    let notes = NotesModel(opener: opener)
+    let session = SessionID()
+    var routed: [(URL, LinkGesture, SessionID)] = []
+    notes.route = { routed.append(($0, $1, $2)) }
+    notes.isOptionKeyDown = { true }
+    let web = URL(string: "https://example.com/a")!
+    let mail = URL(string: "mailto:a@example.com")!
+    notes.openLink(web, in: session)
+    notes.openLink(mail, in: session)
+    notes.openLink(URL(fileURLWithPath: "/tmp/notes.txt"), in: session)
+    notes.openLink(URL(string: "x-apple.systempreferences:com.apple")!, in: session)
+    #expect(routed.map(\.0) == [web, mail])
+    #expect(routed.map(\.1) == [.click(alternate: true), .click(alternate: true)])
+    #expect(routed.map(\.2) == [session, session])
+    #expect(opener.revealed == ["/tmp/notes.txt"])
+    try? await Task.sleep(for: .milliseconds(50))
+    #expect(opener.opened.isEmpty)
+  }
+
+  @Test("A link's menu: the web view only when the session has one; nothing for a file")
+  func menuActions() {
+    let notes = NotesModel(opener: FakeOpener())
+    let session = SessionID()
+    let web = URL(string: "https://example.com/a")!
+    #expect(notes.linkActions(for: web, in: session) == [.openInExternalBrowser, .copy])
+    notes.hasWebView = { _ in true }
+    #expect(notes.linkActions(for: web, in: session).count == 4)
+    #expect(notes.linkActions(for: URL(fileURLWithPath: "/tmp/a.txt"), in: session).isEmpty)
+    var routed: [LinkGesture] = []
+    notes.route = { _, gesture, _ in routed.append(gesture) }
+    notes.perform(.openInExternalBrowser, on: web, in: session)
+    notes.perform(.openInNewTab, on: web, in: session)
+    #expect(routed == [.browser, .newTab])
+  }
+}

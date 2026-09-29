@@ -187,19 +187,16 @@ struct ActivityPane: View {
         } label: {
           Text("Copy", bundle: .module)
         }
+        // Each link its own menu, with the actions of every link (#186).
         ForEach(ActivityPresentation.links(in: entry.text), id: \.self) { url in
-          Button {
-            journal.openLink(url, from: session.id)
-          } label: {
-            Text(
-              "Open \(url.absoluteString)", bundle: .module,
-              comment: "Opens a link of the summary; the URL.")
+          Menu(url.absoluteString) {
+            LinkActions(url: url, session: session.id, journal: journal, includesCopy: true)
           }
         }
       }
     case .resource(let key):
       if let resource = current?.resources.first(where: { $0.key == key }) {
-        ResourceMenu(resource: resource, journal: journal)
+        ResourceMenu(resource: resource, session: session.id, journal: journal)
       }
     }
   }
@@ -282,18 +279,31 @@ private struct ResourceRow: View {
   }
 }
 
+/// The actions of a link, as every link's menu has them (#186). Copy Link is left out where the
+/// menu has its own Copy URL.
+private struct LinkActions: View {
+  let url: URL
+  let session: SessionID
+  let journal: SessionJournalModel
+  let includesCopy: Bool
+
+  var body: some View {
+    let actions = journal.linkActions(for: url, in: session).filter { includesCopy || $0 != .copy }
+    ForEach(actions, id: \.title) { action in
+      Button(action.title) { journal.perform(action, on: url, from: session) }
+    }
+  }
+}
+
 private struct ResourceMenu: View {
   let resource: SessionResource
+  let session: SessionID
   let journal: SessionJournalModel
 
   var body: some View {
     switch resource.target {
     case .web(let url):
-      Button {
-        journal.openInBrowser(url)
-      } label: {
-        Text("Open in Browser", bundle: .module)
-      }
+      LinkActions(url: url, session: session, journal: journal, includesCopy: false)
       Button {
         journal.copy(url.absoluteString)
       } label: {
@@ -306,11 +316,7 @@ private struct ResourceMenu: View {
       }
     case .branch(let path, let url):
       if let url {
-        Button {
-          journal.openInBrowser(url)
-        } label: {
-          Text("Open in Browser", bundle: .module)
-        }
+        LinkActions(url: url, session: session, journal: journal, includesCopy: false)
       }
       Button {
         journal.copy(resource.label)
