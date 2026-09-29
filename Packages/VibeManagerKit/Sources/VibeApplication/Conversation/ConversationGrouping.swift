@@ -6,11 +6,15 @@ public enum ConversationBlock: Identifiable, Hashable, Sendable {
   /// Consecutive calls of the same family. Named after its first call, so that it keeps its
   /// identity — and its place on screen — while calls are added to it.
   case toolGroup(id: String, calls: [ConversationEntry])
+  /// Sub-agents started one after the other, with nothing said between them: started together
+  /// (#180). Named after the first, like a group of tools.
+  case subagentGroup(id: String, runs: [ConversationEntry])
 
   public var id: String {
     switch self {
     case .entry(let entry): return entry.id
     case .toolGroup(let id, _): return "group:\(id)"
+    case .subagentGroup(let id, _): return "subagents:\(id)"
     }
   }
 
@@ -18,8 +22,17 @@ public enum ConversationBlock: Identifiable, Hashable, Sendable {
   public var toolState: ToolCallState? {
     switch self {
     case .entry(let entry): return entry.toolCall?.state
-    case .toolGroup(_, let calls):
+    case .toolGroup(_, let calls), .subagentGroup(_, let calls):
       return calls.compactMap(\.toolCall?.state).max { $0.severity < $1.severity }
+    }
+  }
+
+  /// The calls the block shows, one or several.
+  public var calls: [ToolCall] {
+    switch self {
+    case .entry(let entry): return entry.toolCall.map { [$0] } ?? []
+    case .toolGroup(_, let entries), .subagentGroup(_, let entries):
+      return entries.compactMap(\.toolCall)
     }
   }
 }
@@ -38,8 +51,17 @@ public enum ConversationGrouping {
     /// Reasoning without text, seen while a group was open: kept aside until it is known whether
     /// the group goes on, in which case it is folded in with it rather than shown between calls.
     var silentReasoning: [ConversationEntry] = []
+    /// Sub-agents started one after the other: folded together whatever the grouping setting,
+    /// since they run together.
+    var subagents: [ConversationEntry] = []
 
     func flush() {
+      if subagents.count > 1, let first = subagents.first {
+        blocks.append(.subagentGroup(id: first.id, runs: subagents))
+      } else if let only = subagents.first {
+        blocks.append(.entry(only))
+      }
+      subagents = []
       if pending.count > 1, let first = pending.first {
         blocks.append(.toolGroup(id: first.id, calls: pending))
       } else if let only = pending.first {
@@ -51,6 +73,11 @@ public enum ConversationGrouping {
     }
 
     for entry in entries {
+      if entry.subagentCall != nil {
+        if subagents.isEmpty { flush() }
+        subagents.append(entry)
+        continue
+      }
       if grouping, let call = entry.toolCall, call.kind.isGroupable,
         call.state != .awaitingPermission
       {
