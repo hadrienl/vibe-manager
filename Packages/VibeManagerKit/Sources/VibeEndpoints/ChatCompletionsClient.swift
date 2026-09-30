@@ -228,11 +228,11 @@ public enum ChatCompletionsClient {
 
   /// The arguments of a call, made valid JSON when only their end is missing, as a stream cut
   /// short or a small model leaves them.
-  static func validArguments(_ arguments: String) throws -> String {
+  static func validArguments(_ arguments: String, repairing: Bool = true) throws -> String {
     let trimmed = arguments.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.isEmpty { return "{}" }
     if (try? JSONValue(parsing: trimmed))?.objectValue != nil { return trimmed }
-    if let repaired = JSONRepair.closing(trimmed),
+    if repairing, let repaired = JSONRepair.closing(trimmed),
       (try? JSONValue(parsing: repaired))?.objectValue != nil
     {
       return repaired
@@ -367,7 +367,19 @@ public struct ChatCompletionsStreamDecoder: Sendable {
       throw EndpointFailure(kind: .malformedResponse, message: "The endpoint sent no answer.")
     }
     var out = closeOpenBlock()
+    // Out of tokens in the middle of a call: its arguments stop where the model did, and closing
+    // them would run the call on half its input — a file written half. The call is dropped, and
+    // the harness told the answer was cut, which it knows how to go on from.
+    let ranOut = finishReason == "length"
+    var kept: [Int] = []
     for position in callOrder {
+      guard let call = calls[position] else { continue }
+      if ranOut, (try? ChatCompletionsClient.validArguments(call.arguments, repairing: false)) == nil {
+        continue
+      }
+      kept.append(position)
+    }
+    for position in kept {
       guard let call = calls[position] else { continue }
       guard !call.name.isEmpty else {
         throw EndpointFailure(
@@ -384,7 +396,10 @@ public struct ChatCompletionsStreamDecoder: Sendable {
     }
     if let usage { out.append(.usage(usage)) }
     out.append(
-      .stop(ChatCompletionsClient.stopReason(finishReason, hasToolCalls: !callOrder.isEmpty)))
+      .stop(
+        ranOut && kept.count < callOrder.count
+          ? .maxTokens
+          : ChatCompletionsClient.stopReason(finishReason, hasToolCalls: !kept.isEmpty)))
     return out
   }
 }

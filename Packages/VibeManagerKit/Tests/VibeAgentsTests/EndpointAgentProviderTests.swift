@@ -293,6 +293,28 @@ struct EndpointAgentProviderTests {
     #expect(alone.arguments.contains("--settings"))
   }
 
+  @Test("The session's settings go in a file of its own, private, and the token is not argued")
+  func settingsFile() async throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeGatewaySettings-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let provider = EndpointAgentProvider(
+      endpoint: Self.endpoint(authentication: .none), harness: .claudeCode(Self.claude()),
+      gateway: RecordingGateway(), secrets: InMemoryEndpointSecretStore(),
+      gatewayDirectory: folder, makeToken: { "secret-token" })
+    let session = SessionID()
+    let prepared = try await provider.preparingLaunch(
+      try await provider.launchPlan(for: AgentLaunchRequest(workingDirectoryPath: "/tmp")),
+      session: session)
+    #expect(!prepared.arguments.joined(separator: " ").contains("secret-token"))
+    let index = try #require(prepared.arguments.firstIndex(of: "--settings"))
+    let file = URL(fileURLWithPath: prepared.arguments[index + 1])
+    #expect(file.lastPathComponent == "\(session.rawValue.uuidString).json")
+    let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+    #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+    #expect(try String(contentsOf: file, encoding: .utf8).contains("secret-token"))
+  }
+
   @Test("TOML strings are escaped as Codex reads them")
   func toml() {
     #expect(EndpointAgentProvider.toml(#"My "LLM" \ gw"#) == #""My \"LLM\" \\ gw""#)

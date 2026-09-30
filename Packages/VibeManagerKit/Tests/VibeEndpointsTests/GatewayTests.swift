@@ -331,6 +331,20 @@ struct GatewayTests {
     #expect(transport.requestCount == 0)
   }
 
+  @Test("Default parameters go through when nothing is translated too")
+  func passThroughParameters() async throws {
+    let transport = ScriptedTransport([
+      .answer(status: 200, headers: ["content-type": "text/event-stream"], chunks: [], thenFail: nil)
+    ])
+    let writer = RecordingWriter()
+    try await gateway(
+      transport, protocol: .messages, parameters: ["temperature": 0, "metadata": nil]
+    ).handle(request(), writer: writer)
+    let body = try transport.sentBody(0)
+    #expect(body["temperature"] == 0)
+    #expect(body["max_tokens"] == 100)
+  }
+
   @Test("A Messages endpoint gets the body as sent, with its own model, and answers byte for byte")
   func passThrough() async throws {
     let upstream = "event: message_start\ndata: {\"type\":\"message_start\"}\n\n"

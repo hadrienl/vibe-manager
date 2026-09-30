@@ -26,10 +26,20 @@ public enum EndpointGatewayService {
   ) async throws -> Outcome {
     try location.prepare()
     let lock = open(location.lockURL.path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600)
-    guard lock >= 0, flock(lock, LOCK_EX | LOCK_NB) == 0 else {
-      if lock >= 0 { close(lock) }
+    guard lock >= 0 else { return .alreadyRunning }
+    // The application checks the lock by taking it for an instant: a few more tries tell that
+    // from a gateway already running.
+    var locked = flock(lock, LOCK_EX | LOCK_NB) == 0
+    for _ in 0..<20 where !locked {
+      try await Task.sleep(for: .milliseconds(25))
+      locked = flock(lock, LOCK_EX | LOCK_NB) == 0
+    }
+    guard locked else {
+      close(lock)
       return .alreadyRunning
     }
+    // What a gateway that crashed left behind names a port that may be anyone's by now.
+    try? FileManager.default.removeItem(at: location.stateURL)
     defer {
       try? FileManager.default.removeItem(at: location.stateURL)
       flock(lock, LOCK_UN)
@@ -109,20 +119,30 @@ public actor EndpointGatewayController {
 
   /// The running gateway's base URL, after starting it when needed.
   public func ensureRunning() async throws -> URL {
-    if Self.isRunning(at: location), let state = GatewayState.read(location.stateURL) {
-      return state.baseURL
-    }
+    if let url = await runningURL() { return url }
     try location.prepare()
     try launch()
     let clock = ContinuousClock()
     let deadline = clock.now + startupLimit
     while clock.now < deadline {
       try await Task.sleep(for: .milliseconds(50))
-      if Self.isRunning(at: location), let state = GatewayState.read(location.stateURL) {
-        return state.baseURL
-      }
+      if let url = await runningURL() { return url }
     }
     throw ControlError.didNotStart
+  }
+
+  /// The gateway's address, when it runs and answers there as itself.
+  private func runningURL() async -> URL? {
+    guard Self.isRunning(at: location), let state = GatewayState.read(location.stateURL) else {
+      return nil
+    }
+    var request = URLRequest(url: state.baseURL.appendingPathComponent("health"))
+    request.httpMethod = "HEAD"
+    request.timeoutInterval = 2
+    guard let (_, response) = try? await URLSession.shared.data(for: request),
+      (response as? HTTPURLResponse)?.value(forHTTPHeaderField: Gateway.identityHeader) != nil
+    else { return nil }
+    return state.baseURL
   }
 
   /// Lets `token` through. The tokens of a previous launch of the same session are forgotten.
@@ -145,9 +165,23 @@ public actor EndpointGatewayController {
     var document = GatewayRoutesDocument.read(location.routesURL)
     let before = document.routes.count
     let dayAgo = now().addingTimeInterval(-86_400)
+    // A session is marked running only once its process started: a token given a moment ago
+    // belongs to a launch still under way.
+    let justGiven = now().addingTimeInterval(-120)
     document.routes = document.routes.filter { _, route in
+      if route.createdAt > justGiven { return true }
       if let session = route.session { return sessions.contains(session) }
       return route.createdAt > dayAgo
+    }
+    // The settings files of the sessions gone, which carried their tokens (#107).
+    let settings = location.directory.appendingPathComponent("settings", isDirectory: true)
+    let kept = Set(
+      (Array(sessions) + document.routes.values.compactMap(\.session)).map {
+        "\($0.rawValue.uuidString).json"
+      })
+    for name in (try? FileManager.default.contentsOfDirectory(atPath: settings.path)) ?? []
+    where !kept.contains(name) {
+      try? FileManager.default.removeItem(at: settings.appendingPathComponent(name))
     }
     guard document.routes.count != before else { return }
     try document.write(to: location.routesURL)

@@ -104,8 +104,10 @@ public final class Gateway: GatewayRequestHandling {
 
   public func handle(_ request: GatewayHTTPRequest, writer: any GatewayResponseWriter) async {
     // Claude Code checks that its base URL answers before its first request.
+    // The header says it is this gateway, for the application checking a port it was given.
     if request.method == "HEAD" {
-      await writer.start(status: 200, headers: ["content-length": "0"])
+      await writer.start(
+        status: 200, headers: ["content-length": "0", Self.identityHeader: "1"])
       return
     }
     let parts = request.path.split(separator: "/", omittingEmptySubsequences: true)
@@ -142,6 +144,8 @@ public final class Gateway: GatewayRequestHandling {
         status: 404, json: Self.error("not_found_error", "Unknown operation \(operation)."))
     }
   }
+
+  static let identityHeader = "x-vibe-gateway"
 
   /// The token must also come as the harness's credential: `Authorization: Bearer` for both CLIs,
   /// `x-api-key` for Claude Code when it is given an API key rather than a token.
@@ -211,6 +215,7 @@ public final class Gateway: GatewayRequestHandling {
     switch (harness, route.endpoint.wireProtocol) {
     case (.messages, .messages), (.responses, .responses):
       fields["model"] = .string(route.model)
+      fields = EndpointSide.merging(route.endpoint.defaultParameters, into: fields)
       await passThrough(
         .object(fields), harness: harness, harnessHeaders: request.headers, route: route,
         token: token, writer: writer)
@@ -398,7 +403,9 @@ public final class Gateway: GatewayRequestHandling {
       } catch {
         failure = UnexpectedFailure.wrap(error)
       }
-      if committed.isSet { return }
+      // A turn the harness gave up on: its cancellation reaches the transport as a lost request,
+      // and is neither tried again nor shown as a wait.
+      if committed.isSet || Task.isCancelled { return }
       guard
         let delay = retryPolicy.delay(
           after: number, failure: failure, waited: clock.now - started)
@@ -476,6 +483,22 @@ enum EndpointFraming: Sendable {
 }
 
 extension EndpointSide {
+  /// The endpoint's default parameters in a request body: added where the body says nothing,
+  /// and a `null` taking a field out, for an endpoint that refuses one the harness sends.
+  static func merging(_ parameters: [String: JSONValue], into body: [String: JSONValue])
+    -> [String: JSONValue]
+  {
+    var body = body
+    for (key, value) in parameters {
+      if value.isNull {
+        body[key] = nil
+      } else if body[key] == nil {
+        body[key] = value
+      }
+    }
+    return body
+  }
+
   /// Reads a streamed answer to its end, handing each group of events to `forward` as it comes.
   static func read(
     _ response: EndpointHTTPResponse, framing: EndpointFraming,
@@ -622,14 +645,7 @@ struct EndpointSide: Sendable {
       makeDecoder = { AnthropicMessagesStreamDecoder() }
       decodeWhole = { try AnthropicMessagesClient.decodeResponse($0) }
     }
-    for (key, value) in endpoint.defaultParameters {
-      // `null` takes a field out: for an endpoint that refuses one the gateway sends.
-      if value.isNull {
-        body[key] = nil
-      } else if body[key] == nil {
-        body[key] = value
-      }
-    }
+    body = Self.merging(endpoint.defaultParameters, into: body)
     var headers = endpoint.requestHeaders(secret: route.secret)
     headers["content-type"] = "application/json"
     headers["accept"] = canonical.stream ? "text/event-stream" : "application/json"

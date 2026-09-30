@@ -42,7 +42,10 @@ struct GatewayFilesTests {
       name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", wireProtocol: .chatCompletions,
       defaultParameters: #"{"provider":{"sort":"price"}}"#)
     try writeEndpoints([endpoint], to: location.endpointsURL)
-    let controller = EndpointGatewayController(location: location, launch: {})
+    let clock = SecretBox("0")
+    let controller = EndpointGatewayController(
+      location: location, launch: {},
+      now: { Date(timeIntervalSince1970: 1_000 + (Double(clock.value ?? "0") ?? 0)) })
     let session = SessionID()
     try await controller.register(
       token: "t1", endpoint: endpoint.id, model: "qwen", session: session)
@@ -68,7 +71,12 @@ struct GatewayFilesTests {
     secret.value = "sk-2"
     #expect(await router.route(for: "t2")?.secret == "sk-1")
 
+    // A token just given belongs to a launch still under way, and is kept.
+    try await controller.retain(sessions: [])
+    #expect(await router.count() == 1)
     // Ended sessions let go of their tokens, and the gateway is left with none.
+    clock.value = "300"
+    try await Task.sleep(for: .milliseconds(20))
     try await controller.retain(sessions: [])
     #expect(await router.count() == 0)
     let attributes = try FileManager.default.attributesOfItem(atPath: location.routesURL.path)

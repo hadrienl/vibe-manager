@@ -227,9 +227,11 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
   {
     guard let model = model(in: plan) ?? endpoint.agentModels.first?.id else { return plan }
     let harnessName = Self.harnessModelName(model)
-    let base = try await gateway.ensureRunning()
+    // The token first: a gateway about to stop for want of any would otherwise stop between the
+    // two, and leave the session an address nobody answers.
     let token = makeToken()
     try await gateway.register(token: token, endpoint: endpoint.id, model: model, session: session)
+    let base = try await gateway.ensureRunning()
     let root = base.appendingPathComponent("s").appendingPathComponent(token)
     switch harness {
     case .claudeCode:
@@ -261,7 +263,13 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
       // Claude Code applies the `env` of its settings over its process's environment, the
       // settings given on its command line last: an `ANTHROPIC_BASE_URL` in the user's own would
       // send the session past the gateway. The same variables go there too.
-      return Self.addingSettingsEnvironment(environment, to: prepared)
+      // In a file of the session's, private to the user: on the command line, the token would be
+      // readable by every account of this Mac.
+      let file = gatewayDirectory.map {
+        $0.appendingPathComponent("settings", isDirectory: true)
+          .appendingPathComponent("\(session.rawValue.uuidString).json")
+      }
+      return try Self.addingSettingsEnvironment(environment, to: prepared, file: file)
     case .codex:
       let provider = "vibe-endpoint"
       var options = [
@@ -285,26 +293,43 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
   static let tokenVariable = "VIBE_ENDPOINT_TOKEN"
 
   /// `environment` in the `env` of the plan's `--settings`, merged with what the hooks put there
-  /// (#45), or in a `--settings` of its own.
-  static func addingSettingsEnvironment(_ environment: [String: String], to plan: AgentLaunchPlan)
-    -> AgentLaunchPlan
-  {
+  /// (#45). Written to `file`, readable by the user alone, and given to Claude Code by its path;
+  /// without a file — in tests — given inline.
+  static func addingSettingsEnvironment(
+    _ environment: [String: String], to plan: AgentLaunchPlan, file: URL? = nil
+  ) throws -> AgentLaunchPlan {
     var arguments = plan.arguments
     let separator = arguments.firstIndex(of: "--") ?? arguments.endIndex
-    if let flag = arguments[..<separator].firstIndex(of: "--settings"), flag + 1 < separator,
-      var settings = (try? JSONSerialization.jsonObject(with: Data(arguments[flag + 1].utf8)))
+    var settings: [String: Any] = [:]
+    var flag = arguments[..<separator].firstIndex(of: "--settings")
+    if let index = flag, index + 1 < separator,
+      let existing = (try? JSONSerialization.jsonObject(with: Data(arguments[index + 1].utf8)))
         as? [String: Any]
     {
-      var env = settings["env"] as? [String: Any] ?? [:]
-      for (key, value) in environment { env[key] = value }
-      settings["env"] = env
-      if let data = try? JSONSerialization.data(withJSONObject: settings, options: [.sortedKeys]) {
-        arguments[flag + 1] = String(decoding: data, as: UTF8.self)
-      }
-    } else if let data = try? JSONSerialization.data(
-      withJSONObject: ["env": environment], options: [.sortedKeys])
-    {
-      arguments.insert(contentsOf: ["--settings", String(decoding: data, as: UTF8.self)], at: separator)
+      settings = existing
+    }
+    var env = settings["env"] as? [String: Any] ?? [:]
+    for (key, value) in environment { env[key] = value }
+    settings["env"] = env
+    let data = try JSONSerialization.data(withJSONObject: settings, options: [.sortedKeys])
+    var value = String(decoding: data, as: UTF8.self)
+    if let file {
+      let folder = file.deletingLastPathComponent()
+      try FileManager.default.createDirectory(
+        at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+      let temporary = folder.appendingPathComponent(".\(UUID().uuidString).json")
+      guard
+        FileManager.default.createFile(
+          atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600])
+      else { throw CocoaError(.fileWriteUnknown) }
+      _ = try FileManager.default.replaceItemAt(file, withItemAt: temporary)
+      value = file.path
+    }
+    if let index = flag, index + 1 < separator {
+      arguments[index + 1] = value
+    } else {
+      arguments.insert(contentsOf: ["--settings", value], at: separator)
+      flag = separator
     }
     return AgentLaunchPlan(
       providerID: plan.providerID, executablePath: plan.executablePath, arguments: arguments,

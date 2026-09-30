@@ -47,7 +47,8 @@ public struct EndpointHTTPResponse: Sendable {
 
 /// How long the gateway waits on an endpoint.
 public struct EndpointTimeouts: Hashable, Codable, Sendable {
-  /// To open the connection and send the request.
+  /// Kept for the settings written with it: `URLSession` gives no moment at which a connection is
+  /// open, so the wait for the status line — `firstByte` — covers it.
   public var connect: Duration
   /// From the request sent to the status line: a local model loading in memory takes long here.
   public var firstByte: Duration

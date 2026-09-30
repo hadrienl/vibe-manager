@@ -506,7 +506,6 @@ struct EndpointsSettingsView: View {
           Text("Timeouts, in seconds", bundle: .module)
             .font(.callout.weight(.medium))
           Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
-            timeout(Text("Connection", bundle: .module), binding.timeouts.connect)
             timeout(Text("First byte", bundle: .module), binding.timeouts.firstByte)
             timeout(
               Text("Silence in an answer", bundle: .module), binding.timeouts.idle)

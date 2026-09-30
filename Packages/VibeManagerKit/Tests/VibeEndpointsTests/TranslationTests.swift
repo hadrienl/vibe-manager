@@ -232,6 +232,18 @@ struct ChatStreamTests {
     #expect(events.last == .stop(.toolUse))
   }
 
+  @Test("Out of tokens in the middle of a call: the call is dropped, not run on half its input")
+  func truncatedCall() throws {
+    let events = try run([
+      #"data: {"choices":[{"delta":{"content":"Writing"}}]}"# + "\n\n",
+      #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c","function":{"name":"Write","arguments":"{\"file_path\":\"a.py\",\"content\":\"def f("}}]},"finish_reason":"length"}]}"#
+        + "\n\n",
+      "data: [DONE]\n\n",
+    ])
+    #expect(!events.contains { if case .toolCallStart = $0 { return true } else { return false } })
+    #expect(events.last == .stop(.maxTokens))
+  }
+
   @Test("An error object in the stream fails the answer, with the endpoint's message")
   func embeddedError() {
     #expect(throws: EndpointFailure.self) {
