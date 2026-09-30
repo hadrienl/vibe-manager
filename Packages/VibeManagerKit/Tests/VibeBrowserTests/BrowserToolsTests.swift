@@ -302,6 +302,152 @@ struct BrowserWorkspaceToolsTests {
     )
   }
 
+  /// The test server, reached through an address the policy holds for another machine: an
+  /// IPv4-mapped IPv6 address is the loopback to the network, not to `BrowserOrigin.isLocal`.
+  private func remoteURL(_ server: TestPageServer) -> URL {
+    URL(string: "http://[::ffff:127.0.0.1]:\(server.port)/")!
+  }
+
+  private func first(_ result: BrowserToolResult) throws -> JSONValue {
+    guard case .array(let items) = try object(result), let item = items.first else {
+      throw BrowserToolFailure("No tab listed: \(text(result))")
+    }
+    return item
+  }
+
+  private func answerNext(
+    _ workspace: BrowserWorkspace, in session: SessionID, with answer: BrowserPermissionAnswer
+  ) async throws -> BrowserPermissionRequest {
+    while workspace.requests(for: session).isEmpty { await Task.yield() }
+    let request = try #require(workspace.requests(for: session).first)
+    workspace.answer(request, with: answer)
+    return request
+  }
+
+  @Test("A site away from this Mac is read only once the user allows it, for the session (#239)")
+  func remoteReadIsAsked() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+
+    // Opened in the background as asked, it comes to the front all the same, without its title.
+    let opened = try object(
+      await workspace.run(
+        tool: "tab_open",
+        arguments: ["url": .string(remoteURL(server).absoluteString), "activate": false],
+        session: session))
+    #expect(opened["loaded"] == true)
+    #expect(opened["inFront"] == true)
+    #expect(opened["title"] == "")
+    let tabID = try #require(opened["id"]?.stringValue)
+    #expect(workspace.browser(for: session).activeTab?.id.description == tabID)
+    let listed = try first(await workspace.run(tool: "tabs_list", arguments: [:], session: session))
+    #expect(listed["title"] == "")
+    #expect(listed["readable"] == false)
+
+    // Refused: nothing is read, and the next read asks again.
+    let refused = Task { @MainActor in
+      await workspace.run(tool: "page_read", arguments: [:], session: session)
+    }
+    let question = try await answerNext(workspace, in: session, with: .deny)
+    #expect(question.kind == .read(tool: "page_read"))
+    #expect(question.grantKey == nil)
+    let refusal = await refused.value
+    #expect(refusal.isError)
+    #expect(!text(refusal).contains("Tasks"))
+
+    for tool in ["page_screenshot", "page_console"] {
+      let asked = Task { @MainActor in
+        await workspace.run(tool: tool, arguments: [:], session: session)
+      }
+      let request = try await answerNext(workspace, in: session, with: .deny)
+      #expect(request.kind == .read(tool: tool))
+      #expect(await asked.value.isError)
+    }
+
+    // Allowed: read now, and for the rest of the session without asking.
+    let allowed = Task { @MainActor in
+      await workspace.run(tool: "page_read", arguments: ["mode": "text"], session: session)
+    }
+    _ = try await answerNext(workspace, in: session, with: .allowOnce)
+    #expect(text(await allowed.value).contains("3 open"))
+    let again = await workspace.run(tool: "page_read", arguments: ["mode": "text"], session: session)
+    #expect(text(again).contains("3 open"))
+    #expect(workspace.pendingRequests.isEmpty)
+    let relisted = try first(
+      await workspace.run(tool: "tabs_list", arguments: [:], session: session))
+    #expect(relisted["title"] == "Tasks")
+    #expect(relisted["readable"] == true)
+
+    // Another session asks for itself; an archived session forgets what it was allowed.
+    let other = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(remoteURL(server).absoluteString)],
+      session: other)
+    let otherRead = Task { @MainActor in
+      await workspace.run(tool: "page_read", arguments: [:], session: other)
+    }
+    _ = try await answerNext(workspace, in: other, with: .deny)
+    #expect(await otherRead.value.isError)
+    workspace.release(session)
+    #expect(workspace.browser(for: session).readableSites.isEmpty)
+
+    let records = workspace.browser(for: session).actionLog.records
+    #expect(records.contains { $0.tool == "page_read" && $0.decision == .denied })
+    #expect(records.contains { $0.tool == "page_read" && $0.decision == .confirmed })
+  }
+
+  @Test("A page of this Mac is read without a question, and may wait in the background")
+  func localReadIsFree() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+      session: session)
+    let opened = try object(
+      await workspace.run(
+        tool: "tab_open",
+        arguments: ["url": .string(server.url("/").absoluteString), "activate": false],
+        session: session))
+    #expect(opened["inFront"] == nil)
+    #expect(opened["title"] == "Tasks")
+    #expect(workspace.browser(for: session).activeTab?.id.description != opened["id"]?.stringValue)
+    let read = await workspace.run(tool: "page_read", arguments: [:], session: session)
+    #expect(text(read).contains("Tasks"))
+    #expect(workspace.pendingRequests.isEmpty)
+  }
+
+  @Test("A site always allowed to act on is read without a question")
+  func grantedSiteIsRead() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(remoteURL(server).absoluteString)],
+      session: session)
+    // The site as WebKit committed it: the address comes back normalized.
+    let site = try #require(workspace.browser(for: session).activeTab?.committedOrigin)
+    #expect(!site.isLocal)
+    workspace.permissions.grant(site.grantKey)
+    let read = await workspace.run(tool: "page_read", arguments: ["mode": "text"], session: session)
+    #expect(text(read).contains("3 open"))
+    #expect(workspace.pendingRequests.isEmpty)
+  }
+
+  @Test("A tab the agent did not open shows only its site, until the site may be read")
+  func userTabsAreCutToTheirSite() {
+    #expect(
+      BrowserWorkspace.siteAddress(URL(string: "https://github.com/acme/secret/issues/1?q=x")!)
+        == "https://github.com/")
+    #expect(
+      BrowserWorkspace.siteAddress(URL(string: "http://[::1]:3000/a")!) == "http://[::1]:3000/")
+    #expect(BrowserWorkspace.siteAddress(URL(string: "about:blank")!) == "about:")
+  }
+
   @Test("The ticket's tab follows the ticket, and cannot be closed")
   func ticketTab() async throws {
     let workspace = BrowserWorkspace()

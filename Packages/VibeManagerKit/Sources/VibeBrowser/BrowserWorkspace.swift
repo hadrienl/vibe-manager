@@ -12,13 +12,16 @@ public enum BrowserPermissionAnswer: Sendable {
   case deny
 }
 
-/// An agent waiting for the user: to act on a page away from this Mac, to download a file, or to
-/// open another application (#69).
+/// An agent waiting for the user: to read or act on a page away from this Mac (#69, #239), to
+/// download a file, or to open another application.
 public struct BrowserPermissionRequest: Identifiable, Hashable, Sendable {
   public enum Kind: Hashable, Sendable {
     /// `page_click`, `page_fill`, `page_evaluate`. `value` is what would be typed, masked in a
     /// sensitive field.
     case act(tool: String, target: String, value: String?)
+    /// `page_read`, `page_screenshot`, `page_console` on a site the session may not read yet:
+    /// allowed, the site stays readable for the rest of the session (#239).
+    case read(tool: String)
     case effect(BrowserAgentEffect)
   }
 
@@ -165,6 +168,7 @@ public final class BrowserWorkspace {
   /// The session is archived: its pages are let go, what it was is kept.
   public func release(_ id: SessionID) {
     browsers[id]?.discardAll()
+    browsers[id]?.forgetReadableSites()
     cancelRequests(of: id)
   }
 

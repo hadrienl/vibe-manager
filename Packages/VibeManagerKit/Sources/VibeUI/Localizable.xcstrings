@@ -4241,6 +4241,17 @@
         }
       }
     },
+    "Allow in This Session" : {
+      "comment" : "A button of the web view's question: lets the agent read the site until the session ends.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser pour cette session"
+          }
+        }
+      }
+    },
     "Allowed" : {
       "comment" : "An agent action the user allowed once.",
       "localizations" : {
@@ -4259,6 +4270,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autorisé · %@"
+          }
+        }
+      }
+    },
+    "Allowed, it can read %@ for the rest of this session — including what you see there while signed in — and use it in what it does." : {
+      "comment" : "What allowing a read gives the agent. %@ is the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si vous l’autorisez, il pourra lire %@ jusqu’à la fin de cette session — y compris ce que vous y voyez connecté — et s’en servir dans ce qu’il fait."
           }
         }
       }
@@ -12386,6 +12408,17 @@
         }
       }
     },
+    "The agent wants to capture a page of %@." : {
+      "comment" : "The web view's question before an agent takes a screenshot of a site away from this Mac. %@ is the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent veut capturer une page de %@."
+          }
+        }
+      }
+    },
     "The agent wants to click %@ on %@." : {
       "localizations" : {
         "en" : {
@@ -12398,6 +12431,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’agent veut cliquer sur %1$@ sur %2$@."
+          }
+        }
+      }
+    },
+    "The agent wants to read a page of %@." : {
+      "comment" : "The web view's question before an agent reads a page of a site away from this Mac. %@ is the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent veut lire une page de %@."
+          }
+        }
+      }
+    },
+    "The agent wants to read the console of %@." : {
+      "comment" : "The web view's question before an agent reads the console of a site away from this Mac. %@ is the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent veut lire la console de %@."
           }
         }
       }

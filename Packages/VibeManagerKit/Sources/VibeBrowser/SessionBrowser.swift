@@ -24,6 +24,9 @@ public final class SessionBrowser {
   public internal(set) var hasUnseenAgentPage = false
   /// Whether what was kept has been read back yet.
   public internal(set) var isRestored = false
+  /// The sites away from this Mac the user let this session's agent read (#239), by
+  /// `BrowserOrigin.grantKey`. Kept for this run only: a relaunch asks again.
+  @ObservationIgnored public private(set) var readableSites: Set<String> = []
 
   @ObservationIgnored var stateDidChange: (@MainActor () -> Void)?
   @ObservationIgnored var logDidChange: (@MainActor () -> Void)?
@@ -156,6 +159,14 @@ public final class SessionBrowser {
       // A session that had its own tab in front keeps it there.
       if !wasInFront { return }
     }
+  }
+
+  func allowReading(_ site: String) {
+    readableSites.insert(site)
+  }
+
+  func forgetReadableSites() {
+    readableSites = []
   }
 
   func record(_ record: BrowserActionRecord, isRead: Bool) {

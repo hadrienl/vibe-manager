@@ -51,6 +51,9 @@ extension BrowserWorkspace: BrowserToolRunning {
         throw BrowserToolFailure(
           "The ticket's tab stays on the ticket: open the address in a new tab with tab_open.")
       }
+      // A page away from this Mac is never loaded out of sight (#239).
+      let broughtForward = Self.isRemote(url) && browser.activeTab?.id != tab.id
+      if broughtForward { browser.activate(tab.id) }
       willAct(on: tab)
       defer { didAct(on: tab) }
       tab.ensureWebView()
@@ -59,7 +62,7 @@ extension BrowserWorkspace: BrowserToolRunning {
       record(
         tool, in: browser, tab: tab, target: url.absoluteString, decision: .automatic,
         succeeded: tab.failure == nil)
-      return status(of: tab)
+      return status(of: tab, in: browser, broughtForward: broughtForward)
     case "tab_reload":
       willAct(on: tab)
       defer { didAct(on: tab) }
@@ -72,7 +75,7 @@ extension BrowserWorkspace: BrowserToolRunning {
       record(
         tool, in: browser, tab: tab, target: "", decision: .automatic,
         succeeded: tab.failure == nil)
-      return status(of: tab)
+      return status(of: tab, in: browser)
     case "tab_activate":
       browser.activate(tab.id)
       tab.ensureWebView()
@@ -87,25 +90,37 @@ extension BrowserWorkspace: BrowserToolRunning {
       return .text("Tab \(tab.id) is closed.")
     case "page_read":
       let webView = try await ready(tab)
+      let read = try await mayRead(tool, tab, webView: webView, browser: browser)
       let limit = min(
         max(arguments["maxChars"]?.intValue ?? Self.defaultReadLimit, 1_000), Self.maximumReadLimit)
       let mode = arguments["mode"]?.stringValue == "text" ? "text" : "snapshot"
+      // The page is asked for its origin in the same turn as the read: the web process may have
+      // committed a navigation the application has not heard of yet.
       let text = try await configuration.callAgent(
-        "return window.__vibeAgent.\(mode)(limit);", arguments: ["limit": limit], in: webView)
-      record(tool, in: browser, tab: tab, target: mode, decision: .automatic)
+        "if (expected !== null && location.origin !== expected) { throw new Error('The page changed before it could be read: nothing was read.'); } return window.__vibeAgent.\(mode)(limit);",
+        arguments: [
+          "limit": limit, "expected": read.origin.flatMap { Self.scriptOrigin($0) } ?? NSNull(),
+        ], in: webView)
+      try stillOn(read, tab)
+      record(tool, in: browser, tab: tab, target: mode, decision: read.decision)
       return .text((text as? String) ?? "")
     case "page_screenshot":
       let webView = try await ready(tab)
+      let read = try await mayRead(tool, tab, webView: webView, browser: browser)
       let png = try await Self.screenshot(of: webView)
-      record(tool, in: browser, tab: tab, target: "", decision: .automatic)
+      try stillOn(read, tab)
+      record(tool, in: browser, tab: tab, target: "", decision: read.decision)
       return BrowserToolResult(content: [.image(png, mimeType: "image/png")])
     case "page_console":
-      if !tab.isLoaded { _ = try await ready(tab) }
+      // A page that failed to load still has a console worth reading: it says why.
+      let webView = tab.isLoaded ? tab.ensureWebView() : try await ready(tab)
+      let read = try await mayRead(tool, tab, webView: webView, browser: browser)
+      try stillOn(read, tab)
       let minimum =
         arguments["level"]?.stringValue.flatMap(BrowserConsoleEntry.Level.init) ?? .debug
       let limit = min(max(arguments["limit"]?.intValue ?? 200, 1), 200)
       let entries = tab.console.entries.filter { $0.level >= minimum }.suffix(limit)
-      record(tool, in: browser, tab: tab, target: "\(entries.count) messages", decision: .automatic)
+      record(tool, in: browser, tab: tab, target: "\(entries.count) messages", decision: read.decision)
       guard !entries.isEmpty else { return .text("The console is empty since the page loaded.") }
       let formatter = ISO8601DateFormatter()
       formatter.formatOptions = [.withTime, .withColonSeparatorInTime]
@@ -304,8 +319,11 @@ extension BrowserWorkspace: BrowserToolRunning {
     _ arguments: JSONValue, browser: SessionBrowser, tool: BrowserToolCatalog.Tool
   ) async throws -> BrowserToolResult {
     let url = try Self.address(arguments["url"]?.stringValue)
-    let activate = arguments["activate"]?.boolValue ?? true
-    let tab = open(url, in: browser.sessionID, openedBy: .agent, activate: activate)
+    let asked = arguments["activate"]?.boolValue ?? true
+    // A page away from this Mac is never opened out of sight (#239): the user sees what the agent
+    // loads with their cookies. A preview on this Mac may still wait behind.
+    let broughtForward = !asked && Self.isRemote(url)
+    let tab = open(url, in: browser.sessionID, openedBy: .agent, activate: asked || broughtForward)
     tab.ensureWebView()
     noteAgentOpenedPage(in: browser.sessionID)
     willAct(on: tab)
@@ -314,7 +332,7 @@ extension BrowserWorkspace: BrowserToolRunning {
     record(
       tool, in: browser, tab: tab, target: url.absoluteString, decision: .automatic,
       succeeded: tab.failure == nil)
-    return status(of: tab)
+    return status(of: tab, in: browser, broughtForward: broughtForward)
   }
 
   /// An address an agent typed: `localhost:5173` is taken for `http://localhost:5173`. Only what
@@ -345,10 +363,16 @@ extension BrowserWorkspace: BrowserToolRunning {
   private func listTabs(_ browser: SessionBrowser) -> BrowserToolResult {
     let active = browser.activeTab?.id
     let tabs: [JSONValue] = browser.allTabs.map { tab in
-      [
+      // A page the agent may not read shows neither its title nor, unless the agent opened it,
+      // more of its address than its site (#239): a title says what a private page is about.
+      let readable = mayRead(tab.committedURL ?? tab.url, in: browser)
+      let shownURL =
+        readable || tab.openedBy == .agent ? tab.url.absoluteString : Self.siteAddress(tab.url)
+      return [
         "id": .string(tab.id.description),
-        "title": .string(tab.displayTitle),
-        "url": .string(tab.url.absoluteString),
+        "title": .string(readable ? tab.displayTitle : ""),
+        "url": .string(shownURL),
+        "readable": .bool(readable),
         "active": .bool(tab.id == active),
         "pinned": .bool(tab.isPinnedTicket),
         "loaded": .bool(tab.isLoaded),
@@ -360,13 +384,27 @@ extension BrowserWorkspace: BrowserToolRunning {
     return .text(JSONValue.array(tabs).jsonText)
   }
 
-  private func status(of tab: BrowserTabModel) -> BrowserToolResult {
+  private func status(
+    of tab: BrowserTabModel, in browser: SessionBrowser, broughtForward: Bool = false
+  ) -> BrowserToolResult {
+    let readable = mayRead(tab.committedURL ?? tab.url, in: browser)
     var fields: [String: JSONValue] = [
       "id": .string(tab.id.description),
-      "title": .string(tab.displayTitle),
+      "title": .string(readable ? tab.displayTitle : ""),
       "url": .string(tab.url.absoluteString),
       "loading": .bool(tab.isLoading),
     ]
+    if !readable {
+      fields["readable"] = false
+      fields["note"] =
+        "The title is withheld: page_read asks the user before anything of this site is read."
+    }
+    if broughtForward {
+      fields["inFront"] = true
+      fields["note"] = .string(
+        "Opened in front: a page away from this Mac never loads in the background."
+          + (readable ? "" : " The title is withheld: page_read asks the user first."))
+    }
     if let failure = tab.failure {
       fields["error"] = .string(failure.agentDescription)
       fields["loaded"] = false
@@ -377,6 +415,103 @@ extension BrowserWorkspace: BrowserToolRunning {
       fields["loaded"] = .bool(!tab.isLoading)
     }
     return .text(JSONValue.object(fields).jsonText)
+  }
+
+  // MARK: - Reading
+
+  /// A read the user's answer — or the policy — allowed: of which site, and how it was decided.
+  struct AllowedRead {
+    /// The document's address the decision was made on.
+    let address: URL
+    let origin: BrowserOrigin?
+    let decision: BrowserActionRecord.Decision
+  }
+
+  /// Whether the agent may read what the tab holds (#239): free on this Mac, on a site always
+  /// allowed, and on a site the user let the session read; asked anywhere else, once per site and
+  /// session. Decided on the document the page holds, never on where a navigation is heading.
+  func mayRead(
+    _ tool: BrowserToolCatalog.Tool, _ tab: BrowserTabModel, webView: WKWebView,
+    browser: SessionBrowser
+  ) async throws -> AllowedRead {
+    guard !tab.isLoading else {
+      throw BrowserToolFailure(
+        "The page is still loading: nothing was read. Wait a moment, then try again.")
+    }
+    // A load that failed leaves no document: its address is what its console speaks of.
+    let committed = tab.committedURL ?? tab.url
+    var reported: String?
+    if BrowserOrigin(url: committed) == nil {
+      reported =
+        try await configuration.callAgent(
+          "return location.origin;", arguments: [:], in: webView) as? String
+    }
+    let policyURL = Self.policyURL(committed: committed, reportedOrigin: reported)
+    let site = BrowserOrigin(url: policyURL)
+    switch BrowserActionPolicy.decide(
+      .read, url: policyURL, grants: permissions.grants, sessionReads: browser.readableSites)
+    {
+    case .allow:
+      guard let site, !site.isLocal else {
+        return AllowedRead(address: committed, origin: site, decision: .automatic)
+      }
+      let always = permissions.grants.contains(site.grantKey)
+      return AllowedRead(address: committed, origin: site, decision: always ? .always : .confirmed)
+    case .deny(let reason):
+      throw BrowserToolFailure(reason)
+    case .ask:
+      tab.isAgentActing = true
+      let outcome = await ask(.read(tool: tool.name), tab: tab, in: browser.sessionID, grantKey: nil)
+      tab.isAgentActing = false
+      switch outcome {
+      case .allowed:
+        if let site { browser.allowReading(site.grantKey) }
+      case .denied:
+        record(tool, in: browser, tab: tab, target: "", decision: .denied, succeeded: false)
+        throw BrowserToolFailure(
+          "The user refused: nothing was read on \(site?.description ?? "the page").")
+      case .expired:
+        record(tool, in: browser, tab: tab, target: "", decision: .expired, succeeded: false)
+        throw BrowserToolFailure(
+          "Nobody answered within two minutes: nothing was read. Ask the user, then try again.")
+      }
+      let read = AllowedRead(address: committed, origin: site, decision: .confirmed)
+      // What was allowed was this site: a page that moved while the question was on screen is
+      // not read.
+      try stillOn(read, tab)
+      return read
+    }
+  }
+
+  /// The page still holds the document the read was decided on — its site, at least: a local
+  /// preview that went to a signed-in site meanwhile is not read without asking.
+  func stillOn(_ read: AllowedRead, _ tab: BrowserTabModel) throws {
+    let now = tab.committedURL ?? tab.url
+    guard !tab.isLoading, BrowserOrigin(url: now) == BrowserOrigin(url: read.address) else {
+      throw BrowserToolFailure(
+        "The page changed before it could be read: nothing was read. Read it again.")
+    }
+  }
+
+  /// Whether the agent may read an address without asking, as far as the policy knows it. A blank
+  /// page is taken at its word here: this decides only what a list shows, never what is read.
+  func mayRead(_ url: URL, in browser: SessionBrowser) -> Bool {
+    BrowserActionPolicy.decide(
+      .read, url: url, grants: permissions.grants, sessionReads: browser.readableSites) == .allow
+  }
+
+  /// An address away from this Mac: a site with its own cookies.
+  static func isRemote(_ url: URL) -> Bool {
+    guard let origin = BrowserOrigin(url: url) else { return false }
+    return !origin.isLocal
+  }
+
+  /// An address cut to its site: `https://github.com/`.
+  static func siteAddress(_ url: URL) -> String {
+    guard let origin = BrowserOrigin(url: url), let script = scriptOrigin(origin) else {
+      return url.scheme.map { "\($0):" } ?? ""
+    }
+    return script + "/"
   }
 
   private func record(
