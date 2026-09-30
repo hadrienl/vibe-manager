@@ -24,6 +24,9 @@ public struct TerminalSurface: NSViewRepresentable {
   private let isMirror: Bool
   /// Escape, taken rather than sent to the program: see `AccessibleTerminalView.onEscape`.
   private let onEscape: (() -> Void)?
+  /// Told what the screen shows once output has been drawn — a tenth of a second apart at most —
+  /// for a panel's block to see the panel go (#219).
+  private let onScreen: ((String) -> Void)?
 
   public init(
     pane: TerminalPaneModel,
@@ -33,10 +36,12 @@ public struct TerminalSurface: NSViewRepresentable {
     accessibilityTitle: String? = nil,
     claimsKeyboardOnActivation: Bool = true,
     isMirror: Bool = false,
-    onEscape: (() -> Void)? = nil
+    onEscape: (() -> Void)? = nil,
+    onScreen: ((String) -> Void)? = nil
   ) {
     self.isMirror = isMirror
     self.onEscape = onEscape
+    self.onScreen = onScreen
     self.pane = pane
     self.session = session
     self.isActive = isActive
@@ -79,6 +84,7 @@ public struct TerminalSurface: NSViewRepresentable {
       (nsView as? AccessibleTerminalView)?.accessibilityTitle = accessibilityTitle
     }
     (nsView as? AccessibleTerminalView)?.onEscape = onEscape
+    context.coordinator.onScreen = onScreen
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
@@ -375,6 +381,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func unbind() {
     eventTask?.cancel()
     eventTask = nil
+    screenReport?.cancel()
+    screenReport = nil
     attachedSession = nil
     session = nil
     fedThrough = nil
@@ -656,6 +664,22 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     hasFed = true
     Signposts.interval("terminal.feed") {
       view?.feed(byteArray: bytes[...])
+    }
+    reportScreen()
+  }
+
+  /// See `TerminalSurface.onScreen`.
+  var onScreen: ((String) -> Void)?
+  private var screenReport: Task<Void, Never>?
+
+  private func reportScreen() {
+    guard onScreen != nil, screenReport == nil else { return }
+    screenReport = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(100))
+      guard let self else { return }
+      self.screenReport = nil
+      guard let view = self.view, let onScreen = self.onScreen else { return }
+      onScreen(TerminalText.visibleScreen(of: view.getTerminal()))
     }
   }
 

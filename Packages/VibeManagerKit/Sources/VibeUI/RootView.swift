@@ -2433,12 +2433,12 @@ private struct SessionConversationSlot: View {
           claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation,
           // The session's terminal, a second view of it, for a panel its agent opens (#219).
           liveTerminal: model.pane(for: id).map { pane in
-            { onEscape in
+            { onEscape, onScreen in
               AnyView(
                 TerminalSurface(
                   pane: pane, session: pane.session, isActive: isActive,
                   accessibilityTitle: terminalTitle(for: listed, pane: pane, in: model),
-                  isMirror: true, onEscape: onEscape))
+                  isMirror: true, onEscape: onEscape, onScreen: onScreen))
             }
           }
         )

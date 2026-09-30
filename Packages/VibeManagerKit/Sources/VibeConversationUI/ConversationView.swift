@@ -19,7 +19,9 @@ public struct ConversationView: View {
   /// A second view of the session's terminal, shown while a command waits in one of its panels
   /// (#219). `nil` where there is no terminal to show.
   /// It is given what Escape does in it: close the block.
-  let liveTerminal: ((_ onEscape: @escaping () -> Void) -> AnyView)?
+  /// and what to tell of what its screen shows.
+  let liveTerminal:
+    ((_ onEscape: @escaping () -> Void, _ onScreen: @escaping (String) -> Void) -> AnyView)?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
 
@@ -28,7 +30,9 @@ public struct ConversationView: View {
   public init(
     model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance,
     isActive: Bool = true, claimsKeyboardOnActivation: Bool = true,
-    liveTerminal: ((_ onEscape: @escaping () -> Void) -> AnyView)? = nil
+    liveTerminal: (
+      (_ onEscape: @escaping () -> Void, _ onScreen: @escaping (String) -> Void) -> AnyView
+    )? = nil
   ) {
     self.liveTerminal = liveTerminal
     self.model = model
@@ -251,7 +255,9 @@ public struct ConversationView: View {
       if let panel = model.terminalPanel, let liveTerminal {
         TerminalPanelBlock(
           model: model, panel: panel,
-          terminal: liveTerminal { Task { await model.closeTerminalPanel() } })
+          terminal: liveTerminal(
+            { Task { await model.closeTerminalPanel() } },
+            { model.terminalScreenChanged($0) }))
       }
       PromptComposer(model: model, isActive: isActive)
     }

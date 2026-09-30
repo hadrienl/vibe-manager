@@ -604,6 +604,7 @@ public final class ConversationModel {
   public func processStateChanged() {
     if isProcessRunning != reportedAgentRunning { rebuild(changedFrom: nil) }
     if !isProcessRunning { terminalPanel = nil }
+    openInitialPanelIfRunning()
   }
 
   /// Asks when the process started — the kernel knows, whenever the application was opened — and
@@ -1250,13 +1251,35 @@ public final class ConversationModel {
   /// shown in the conversation, live, until the transcript says the command ran, the agent starts
   /// working, or the user closes it.
   public struct TerminalPanel: Hashable, Sendable {
-    public let echoID: UUID
+    /// The echo of the command sent from the composer; `nil` for the initial prompt.
+    public let echoID: UUID?
     /// `/mcp`, without what follows it.
     public let command: String
   }
 
-  public private(set) var terminalPanel: TerminalPanel?
+  public private(set) var terminalPanel: TerminalPanel? {
+    didSet {
+      guard terminalPanel != oldValue else { return }
+      panelSeen = false
+      panelGone?.cancel()
+      panelGone = nil
+      panelFirstSight?.cancel()
+      panelFirstSight = nil
+    }
+  }
   @ObservationIgnored private var panelWatch: Task<Void, Never>?
+  /// Whether the block's terminal has shown the panel: from then on, the panel gone closes it.
+  @ObservationIgnored private var panelSeen = false
+  @ObservationIgnored private var panelGone: Task<Void, Never>?
+  @ObservationIgnored private var panelFirstSight: Task<Void, Never>?
+  /// A session started on a command (#219): its panel is looked for once the agent runs.
+  @ObservationIgnored private var initialCommand: String?
+  /// How long a block waits to see a panel before it takes the command for one that opened none.
+  static let panelFirstSightLimit = Duration.seconds(4)
+  /// An agent starting takes longer to draw its first screen.
+  static let initialPanelFirstSightLimit = Duration.seconds(10)
+  /// A panel's hint gone this long is the panel closed, not a screen being redrawn.
+  static let panelGoneDelay = Duration.milliseconds(400)
   /// How long a command may take to be written before its panel is looked for: a command that
   /// runs at once — `/compact`, a skill — never shows one.
   static let terminalPanelDelay = Duration.milliseconds(600)
@@ -1269,8 +1292,63 @@ public final class ConversationModel {
       guard !Task.isCancelled, let self, !self.isAgentWorking, self.isProcessRunning,
         self.echoes.contains(where: { $0.id == id && $0.state == .sending })
       else { return }
-      self.terminalPanel = TerminalPanel(echoID: id, command: command)
+      self.openTerminalPanel(TerminalPanel(echoID: id, command: command))
     }
+  }
+
+  private func openTerminalPanel(_ panel: TerminalPanel, firstSight: Duration? = nil) {
+    terminalPanel = panel
+    // A command that opened no panel after all: the block goes by itself.
+    panelFirstSight = Task { [weak self] in
+      try? await Task.sleep(for: firstSight ?? Self.panelFirstSightLimit)
+      guard !Task.isCancelled, let self, self.terminalPanel == panel, !self.panelSeen else {
+        return
+      }
+      self.endTerminalPanel()
+    }
+  }
+
+  /// A session started on a command of its CLI — its initial prompt — may open a panel as well:
+  /// looked for once the agent runs.
+  public func expectTerminalPanel(forInitialPrompt prompt: String) {
+    let command = String(prompt.prefix { !$0.isWhitespace })
+    guard command.hasPrefix("/"), command.count > 1 else { return }
+    initialCommand = command
+    openInitialPanelIfRunning()
+  }
+
+  private func openInitialPanelIfRunning() {
+    guard let command = initialCommand, isProcessRunning, !isAgentWorking, terminalPanel == nil
+    else { return }
+    initialCommand = nil
+    openTerminalPanel(
+      TerminalPanel(echoID: nil, command: command), firstSight: Self.initialPanelFirstSightLimit)
+  }
+
+  /// What the block's terminal shows, as it changes: the panel seen, then gone, closes the block
+  /// — the CLI writes nothing of a panel closed with Escape.
+  public func terminalScreenChanged(_ screen: String) {
+    guard terminalPanel != nil else { return }
+    if AgentPanelRecognition.showsPanel(screen: screen) {
+      panelSeen = true
+      panelGone?.cancel()
+      panelGone = nil
+    } else if panelSeen, panelGone == nil {
+      let panel = terminalPanel
+      panelGone = Task { [weak self] in
+        try? await Task.sleep(for: Self.panelGoneDelay)
+        guard !Task.isCancelled, let self, self.terminalPanel == panel else { return }
+        self.endTerminalPanel()
+      }
+    }
+  }
+
+  /// The panel is gone from the terminal: the block goes, and the keyboard back to the composer.
+  private func endTerminalPanel() {
+    guard let panel = terminalPanel else { return }
+    terminalPanel = nil
+    if let echo = panel.echoID { dismissEcho(echo) }
+    requestComposerFocus()
   }
 
   /// Closes the panel from the conversation: Escape, as in the terminal, then the block goes. The
@@ -1278,7 +1356,7 @@ public final class ConversationModel {
   public func closeTerminalPanel() async {
     guard let panel = terminalPanel else { return }
     terminalPanel = nil
-    dismissEcho(panel.echoID)
+    if let echo = panel.echoID { dismissEcho(echo) }
     await write?(promptFormat.interruptKey)
     requestComposerFocus()
   }
@@ -1288,14 +1366,14 @@ public final class ConversationModel {
   public func leaveTerminalPanel() {
     guard let panel = terminalPanel else { return }
     terminalPanel = nil
-    dismissEcho(panel.echoID)
+    if let echo = panel.echoID { dismissEcho(echo) }
   }
 
   /// The block goes once its command is no longer waited for.
   private func settleTerminalPanel() {
-    guard let panel = terminalPanel, !echoes.contains(where: { $0.id == panel.echoID }) else {
-      return
-    }
+    guard let panel = terminalPanel, let echo = panel.echoID,
+      !echoes.contains(where: { $0.id == echo })
+    else { return }
     terminalPanel = nil
     requestComposerFocus()
   }

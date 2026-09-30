@@ -137,6 +137,10 @@ public final class ConversationWorkspace {
       }
       models[session.id] = model
       connect?(model, session)
+      // Started a moment ago on a command of its CLI, the session may show one of its panels.
+      if Date().timeIntervalSince(session.createdAt) < 60 {
+        model.expectTerminalPanel(forInitialPrompt: session.initialPrompt)
+      }
       if pendingComposerFocus == session.id {
         pendingComposerFocus = nil
         model.requestComposerFocus()

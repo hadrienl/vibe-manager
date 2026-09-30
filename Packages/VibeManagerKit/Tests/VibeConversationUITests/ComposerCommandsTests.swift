@@ -267,6 +267,58 @@ struct ComposerCommandsTests {
     #expect(list.suggestions?.count == 3)
   }
 
+  @Test(
+    "The panel seen on the block's screen, then gone, closes the block", .timeLimit(.minutes(1)))
+  func panelGone() async {
+    let (model, terminal) = await readyModel()
+    model.draft = "/mcp"
+    #expect(await model.send())
+    await until { model.terminalPanel != nil }
+    model.terminalScreenChanged("❯ \n? for shortcuts")
+    try? await Task.sleep(for: ConversationModel.panelGoneDelay * 2)
+    // Not seen yet: the terminal may still be drawing it.
+    #expect(model.terminalPanel != nil)
+    model.terminalScreenChanged(
+      "Manage MCP servers\n↑/↓ to navigate · Enter to confirm · Esc to cancel")
+    model.terminalScreenChanged("❯ \n? for shortcuts")
+    model.terminalScreenChanged("Manage MCP servers\nEsc to cancel")
+    try? await Task.sleep(for: ConversationModel.panelGoneDelay * 2)
+    #expect(model.terminalPanel != nil)
+    terminal.written = []
+    model.terminalScreenChanged("❯ \n? for shortcuts")
+    await until { model.terminalPanel == nil }
+    #expect(model.echoes.isEmpty)
+    // Closed in the terminal already: nothing typed.
+    #expect(terminal.written.isEmpty)
+  }
+
+  @Test("A block that never sees a panel goes by itself", .timeLimit(.minutes(1)))
+  func panelNeverSeen() async {
+    let (model, _) = await readyModel()
+    model.draft = "/rename"
+    #expect(await model.send())
+    await until { model.terminalPanel != nil }
+    model.terminalScreenChanged("❯ \n? for shortcuts")
+    await until { model.terminalPanel == nil }
+    #expect(model.echoes.isEmpty)
+  }
+
+  @Test("A session started on a command looks for its panel; one started on a message does not")
+  func initialPrompt() async {
+    let (model, _) = await readyModel()
+    model.expectTerminalPanel(forInitialPrompt: "Refactor the parser")
+    #expect(model.terminalPanel == nil)
+    model.expectTerminalPanel(forInitialPrompt: "/mcp")
+    #expect(model.terminalPanel == ConversationModel.TerminalPanel(echoID: nil, command: "/mcp"))
+
+    let stopped = ConversationModel(sessionID: SessionID())
+    stopped.expectTerminalPanel(forInitialPrompt: "/model")
+    #expect(stopped.terminalPanel == nil)
+    stopped.processRunning = { true }
+    stopped.processStateChanged()
+    #expect(stopped.terminalPanel?.command == "/model")
+  }
+
   @Test("Another agent's list is not kept: a reading for the one before is dropped")
   func replaced() async {
     let (model, _) = await readyModel()
