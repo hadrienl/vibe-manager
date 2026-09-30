@@ -123,13 +123,19 @@ struct HostileRepositoryTests {
   func includedFilters() async throws {
     let sandbox = try Sandbox()
     defer { sandbox.remove() }
-    for key in ["include.path", "includeIf.gitdir:\(sandbox.root)/.path"] {
+    // `**/`: Git matches the real path of the repository, `/private/var/…` for a `/var/…` sandbox.
+    let folder = (sandbox.root as NSString).lastPathComponent
+    for key in ["include.path", "includeIf.gitdir:**/\(folder)/.path"] {
       let repository = sandbox.path("included-\(UUID().uuidString)")
       let (payload, marker) = try await makeFilteredRepository(at: repository, in: sandbox)
       let included = sandbox.path("included-\(UUID().uuidString).cfg")
       try Data("[filter \"evil\"]\n\tclean = \(payload)\n".utf8)
         .write(to: URL(fileURLWithPath: included))
       try await git(["config", key, included], in: repository)
+      // The control: Git does see the included driver, so only the guard keeps it from running.
+      let seen = try await git(
+        ["config", "--includes", "--get", "filter.evil.clean"], in: repository)
+      #expect(seen == payload, "\(key) did not include its file")
       try await readEverything(repository)
       #expect(!FileManager.default.fileExists(atPath: marker), "\(key) ran its filter")
     }
