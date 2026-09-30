@@ -204,7 +204,9 @@ struct AmbiguousDrawnDialogTests {
   }
 
   private func drawn(
-    _ subject: AgentDrawnDialog.Subject, to state: AgentActivityState, at seconds: TimeInterval = 600
+    _ subject: AgentDrawnDialog.Subject,
+    to state: AgentActivityState,
+    at seconds: TimeInterval = 600
   ) -> AgentActivityState {
     AgentActivityMachine.reduce(
       state, .signal(.dialogDrawn(AgentDrawnDialog(subject))),
