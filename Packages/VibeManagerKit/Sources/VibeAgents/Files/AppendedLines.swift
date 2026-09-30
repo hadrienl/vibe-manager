@@ -8,10 +8,15 @@ import VibeApplication
 /// in which case its folder is watched until it appears. A file cut short or replaced (another
 /// inode) is read again from its beginning. Reading goes by blocks of `blockSize`, so that a long
 /// catch-up, after the Mac slept, never holds more than a block and the incomplete line.
+/// Follows a file an agent appends to, line by line: only whole lines, from where the reading
+/// started, and from the beginning again when the file was replaced or cut short. It wakes when the
+/// file, or the folder it will appear in, changes, never on a clock but for a long safety net.
 struct AppendedLines: Sendable {
   enum Start: Sendable {
+    /// What the file holds already belongs to the past.
     case end
     case beginning
+    /// From this offset, what was before having been read otherwise.
     case offset(UInt64)
   }
 
@@ -66,14 +71,25 @@ struct AppendedLines: Sendable {
     case .offset(let value): offset = value
     }
     var absentSince: ContinuousClock.Instant?
+    var folder: String?
 
     while !Task.isCancelled {
       let descriptor = open(file.path, O_RDONLY | O_CLOEXEC)
       guard descriptor >= 0 else {
-        if watching != .folder {
-          watcher = FileWatcher(path: file.deletingLastPathComponent().path, wake: wake)
+        // Watches the nearest folder that exists: the file's own, or an ancestor until the missing
+        // folders appear. Armed again whenever that folder changes or is replaced, then `open` is
+        // tried once more, for a file created before the source was armed would send no event.
+        if let nearest = Self.nearestFolder(above: file),
+          watching != .folder || folder != nearest.path
+            || (watcher?.inode != nil && watcher?.inode != nearest.inode)
+        {
+          watcher = FileWatcher(path: nearest.path, wake: wake)
           watching = watcher == nil ? nil : .folder
-          if watching == .folder { onWatching?(.folder) }
+          folder = watching == .folder ? nearest.path : nil
+          if watching == .folder {
+            onWatching?(.folder)
+            continue
+          }
         }
         if watching == .folder {
           await wake.wait(timeout: safetyNet)
@@ -103,6 +119,7 @@ struct AppendedLines: Sendable {
       if watching != .file || watcher?.inode != identifier {
         watcher = FileWatcher(path: file.path, wake: wake)
         watching = watcher == nil ? nil : .file
+        folder = nil
         if watching == .file { onWatching?(.file) }
       }
 
@@ -140,6 +157,20 @@ struct AppendedLines: Sendable {
     guard elapsed >= period else { return absentRetry.lowerBound }
     let periods = min(Int(elapsed / period), 16)
     return min(absentRetry.lowerBound * (1 << periods), absentRetry.upperBound)
+  }
+
+  /// The closest folder above `file` that exists, with its inode.
+  static func nearestFolder(above file: URL) -> (path: String, inode: UInt64)? {
+    var folder = file.deletingLastPathComponent()
+    while true {
+      var status = stat()
+      if stat(folder.path, &status) == 0, status.st_mode & S_IFMT == S_IFDIR {
+        return (folder.path, UInt64(status.st_ino))
+      }
+      let parent = folder.deletingLastPathComponent()
+      guard parent.path != folder.path, !folder.path.isEmpty, folder.path != "/" else { return nil }
+      folder = parent
+    }
   }
 
   static func size(of url: URL) -> UInt64? {

@@ -1,6 +1,19 @@
 import Foundation
 import VibeApplication
 
+/// Reads the questions Codex asks with `request_user_input` from the rollout of its session (#40).
+///
+/// No hook reports them: Codex 0.157.1 sends `PreToolUse` for the tool, but only through a hook
+/// that would have to be approved again. The rollout already says it — a `function_call` named
+/// `request_user_input`, then a `function_call_output` with the same `call_id` once answered — and
+/// reading it needs nobody's approval.
+///
+/// Both are written before the question is drawn and after it is gone: nothing says when its
+/// dialog is on screen, so these questions are shown, and answered in the terminal.
+///
+/// The rollout is the one created for this working directory once the session started, the oldest
+/// of them, as `CodexRolloutSessionDiscovery` picks. Two Codex sessions started in the same folder
+/// in the same seconds could see each other's question; it would only be shown, never answered.
 public struct CodexQuestionWatch: Sendable {
   static let tool = "request_user_input"
 
@@ -50,13 +63,11 @@ public struct CodexQuestionWatch: Sendable {
     }
   }
 
-  /// The questions the rollout holds that no output has answered yet, and where its whole lines
-  /// end: what follows is followed as it comes.
   /// The words a line must hold to matter here, looked for before any JSON is decoded.
   static let needles = [Data(tool.utf8), Data("function_call_output".utf8)]
 
-  /// What the rollout already holds — read by blocks, never whole — and where its last whole line
-  /// ends, for the lines that follow.
+  /// The questions the rollout holds that no output has answered yet, and where its last whole
+  /// line ends: what follows is followed as it comes. Read by blocks, never whole.
   static func unanswered(in rollout: URL) -> (Set<String>, [AgentSignal], UInt64) {
     guard let handle = try? FileHandle(forReadingFrom: rollout) else { return ([], [], 0) }
     defer { try? handle.close() }
@@ -82,6 +93,7 @@ public struct CodexQuestionWatch: Sendable {
     return (pending, waiting, UInt64(read - splitter.pendingCount))
   }
 
+  /// What one line of a rollout says about questions: one asked, or one of those answered.
   static func signals(in line: Data, pending: inout Set<String>) -> [AgentSignal] {
     // Most lines are messages and tool output, some large: the words are looked for first.
     let isCall = line.range(of: Data(tool.utf8)) != nil

@@ -233,6 +233,56 @@ struct AppendedLinesTests {
     #expect(await received.first(2) == ["first", "second"])
   }
 
+  @Test("A file whose folders do not exist yet is seen as soon as they and it appear")
+  func foldersCreatedLater() async throws {
+    let root = try folder()
+    let outer = root.appendingPathComponent("project")
+    let inner = outer.appendingPathComponent("session")
+    let url = inner.appendingPathComponent("t.jsonl")
+    let log = WatchLog()
+    var appended = AppendedLines(file: url, start: .end)
+    appended.onWatching = { log.record($0) }
+    let received = Received(appended.lines())
+    await log.wait(for: .folder)
+
+    // Each folder that appears is watched in turn, well before the safety net would look.
+    try FileManager.default.createDirectory(at: outer, withIntermediateDirectories: false)
+    await log.wait(for: .folder, count: 2)
+    try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: false)
+    await log.wait(for: .folder, count: 3)
+    try Data("first\n".utf8).write(to: url)
+    #expect(await received.first(1) == ["first"])
+  }
+
+  @Test("A folder removed and made again is watched again")
+  func folderMadeAgain() async throws {
+    let directory = try folder().appendingPathComponent("session")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+    let url = directory.appendingPathComponent("t.jsonl")
+    let log = WatchLog()
+    var appended = AppendedLines(file: url, start: .end)
+    appended.onWatching = { log.record($0) }
+    let received = Received(appended.lines())
+    await log.wait(for: .folder)
+
+    try FileManager.default.removeItem(at: directory)
+    await log.wait(for: .folder, count: 2)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+    await log.wait(for: .folder, count: 3)
+    try Data("again\n".utf8).write(to: url)
+    #expect(await received.first(1) == ["again"])
+  }
+
+  @Test("The nearest folder is the file's own, or the closest one above that exists")
+  func nearestFolder() throws {
+    let root = try folder()
+    let own = AppendedLines.nearestFolder(above: root.appendingPathComponent("t.jsonl"))
+    #expect(own?.path == root.path)
+    let above = AppendedLines.nearestFolder(
+      above: root.appendingPathComponent("a/b/t.jsonl"))
+    #expect(above?.path == root.path)
+  }
+
   @Test("A file replaced by another is read again from its beginning")
   func replacedFile() async throws {
     let directory = try folder()
