@@ -159,6 +159,16 @@
         }
       }
     },
+    "Archive" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archiver"
+          }
+        }
+      }
+    },
     "Archive…" : {
       "localizations" : {
         "fr" : {

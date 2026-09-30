@@ -483,6 +483,9 @@ private struct GroupCommands: View {
 /// tab or a whole session depending on where the keyboard happens to be is one that ends an
 /// agent's work by accident. It still asks first when an agent is at work (#51).
 ///
+/// Archive, ⌃⌘A, is the "done with this one" gesture (#115): it asks only when the agent or a
+/// side terminal is at work, by the same rule and setting, and a burst of it empties a column.
+///
 /// Neither key falls back to closing the window: Close Window has no key, the window being the
 /// only one. The other verbs keep ⌃⌘, so every one that moves a session through its life but the
 /// most common shares one modifier.
@@ -655,9 +658,12 @@ private struct SessionHistoryCommands: Commands {
       Button(model.batchTitle(for: plan)) { request(plan) }
         .keyboardShortcut("a", modifiers: [.command, .control])
     } else {
-      Button("Archive…") {
+      // A session where nothing runs is archived at once, and the name says so: the ellipsis only
+      // when a question follows (#115).
+      let asks = model.selectedSession.map(model.archiveAsks) ?? false
+      Button(asks ? LocalizedStringKey("Archive…") : LocalizedStringKey("Archive")) {
         guard let session = model.selectedSession else { return }
-        model.requestArchive(session.id)
+        Task { await model.requestArchive(session.id) }
       }
       .keyboardShortcut("a", modifiers: [.command, .control])
       .disabled(!(model.selectedSession.map(model.canArchive) ?? false))

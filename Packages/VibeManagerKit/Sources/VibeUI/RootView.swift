@@ -12,7 +12,7 @@ public struct RootView: View {
   /// alone. Handing the measured width back as the column's ideal width would close the loop —
   /// measure, store, propose again, resize — and fight the drag the user is in the middle of.
   @State private var idealWidths: IdealColumnWidths?
-  /// The "Don't ask again" box of the close confirmation, unticked each time it opens.
+  /// The "Don't ask again" box of the close and archive confirmations, unticked each time one opens.
   @State private var suppressesCloseConfirmation = false
   /// The window this view is drawn in: the only one whose visibility says whether its sessions
   /// are in front of the user.
@@ -612,8 +612,38 @@ public struct RootView: View {
     } message: { confirmation in
       Text(verbatim: confirmation.message)
     }
-    // Before the archive dialog in the chain: the toggle reaches every dialog it wraps, and the
-    // archive question has no "Don't ask again".
+    // Asked only when archiving stops work in progress (#115), with the close question's "Don't
+    // ask again": the two share one setting. Cancel is the default button: the key that opened
+    // this must not also answer it.
+    // `presenting:` hands the session to the buttons, rather than having them read it back from
+    // the model. SwiftUI dismisses the dialog before running a button's action, and the dismissal
+    // clears the pending session — read there, Archive found nothing and did nothing.
+    .confirmationDialog(
+      model.pendingArchive.map {
+        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Archive this session?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingArchive != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelArchive()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingArchive
+    ) { session in
+      Button(LocalizedStringResource("Archive", bundle: .module)) {
+        let askAgain = !suppressesCloseConfirmation
+        Task { await model.archive(session.id, askAgain: askAgain) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelArchive()
+      }
+    } message: { session in
+      Text(archiveConfirmationMessage(for: session))
+    }
+    // Before the batch dialog in the chain: the toggle reaches every dialog it wraps, and a
+    // question about several sessions has no "Don't ask again" unless it is #51's.
     .dialogSuppressionToggle(
       Text("Don’t ask again", bundle: .module), isSuppressed: $suppressesCloseConfirmation
     )
@@ -621,6 +651,9 @@ public struct RootView: View {
       if id != nil { suppressesCloseConfirmation = false }
     }
     .onChange(of: model.pendingBatch?.id) { _, id in
+      if id != nil { suppressesCloseConfirmation = false }
+    }
+    .onChange(of: model.pendingArchive?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
     }
     // Every other command on several sessions: one question, Cancel by default (#77).
@@ -645,34 +678,6 @@ public struct RootView: View {
       }
     } message: { confirmation in
       Text(verbatim: confirmation.message)
-    }
-    // Archiving is reversible, so the question is short and says what actually happens. Cancel
-    // is the default button: the pointer slip that opened this must not also answer it.
-    // `presenting:` hands the session to the buttons, rather than having them read it back from
-    // the model. SwiftUI dismisses the dialog before running a button's action, and the dismissal
-    // clears the pending session — read there, Archive found nothing and did nothing.
-    .confirmationDialog(
-      model.pendingArchive.map {
-        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
-      } ?? Text("Archive this session?", bundle: .module),
-      isPresented: Binding(
-        get: { model.pendingArchive != nil },
-        set: { isPresented in
-          guard !isPresented else { return }
-          model.cancelArchive()
-        }
-      ),
-      titleVisibility: .visible,
-      presenting: model.pendingArchive
-    ) { session in
-      Button(LocalizedStringResource("Archive", bundle: .module)) {
-        Task { await model.archive(session.id) }
-      }
-      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
-        model.cancelArchive()
-      }
-    } message: { session in
-      Text(archiveConfirmationMessage(for: session))
     }
   }
 
@@ -715,9 +720,12 @@ public struct RootView: View {
   }
 
   private func closeConfirmationMessage(for session: WorkSession) -> String {
+    let drawer = drawerCommandsSentence(for: session)
+    // Only side terminals at work (#115): the agent has nothing left to stop.
+    if let drawer, model.pane(for: session.id)?.status != .running { return drawer }
     let consequence = String(
       localized: "The agent will be stopped. The session can be restarted later.", bundle: .module)
-    guard let drawer = drawerCommandsSentence(for: session) else { return consequence }
+    guard let drawer else { return consequence }
     return consequence + " " + drawer
   }
 
@@ -2019,7 +2027,9 @@ struct SessionCommands {
   }
 
   func close() { Task { await model.requestClose(session.id) } }
-  func requestArchive() { model.requestArchive(session.id) }
+  func requestArchive() { Task { await model.requestArchive(session.id) } }
+  /// Whether Archive asks first (#115), which its name then says with an ellipsis.
+  var archiveAsks: Bool { model.archiveAsks(session) }
   func restore() { Task { await model.restore(session.id) } }
   func restart() { Task { await model.restart(session.id) } }
   func switchAgent() { model.beginAgentSwitch(session.id) }
@@ -2078,7 +2088,11 @@ struct SessionCommandButtons: View {
       Button(LocalizedStringResource("Close Session", bundle: .module)) { commands.close() }
     }
     if commands.canArchive {
-      Button(LocalizedStringResource("Archive…", bundle: .module)) { commands.requestArchive() }
+      Button(
+        commands.archiveAsks
+          ? LocalizedStringResource("Archive…", bundle: .module)
+          : LocalizedStringResource("Archive", bundle: .module)
+      ) { commands.requestArchive() }
     }
     if commands.canRestore {
       Button(LocalizedStringResource("Unarchive", bundle: .module)) { commands.restore() }

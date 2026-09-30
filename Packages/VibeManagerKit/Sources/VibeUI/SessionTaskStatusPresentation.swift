@@ -45,8 +45,9 @@ extension SessionTaskStatus {
       return LocalizedStringResource(
         "Move to Done", bundle: .module, comment: "Changes a session's task status.")
     case .archived:
+      // No ellipsis: archiving asks only when it stops work in progress (#115).
       return LocalizedStringResource(
-        "Archive…", bundle: .module, comment: "Changes a session's task status.")
+        "Archive", bundle: .module, comment: "A swipe button that archives a session.")
     }
   }
 
