@@ -38,6 +38,10 @@ enum Entry {
 struct VibeManagerApp: App {
   private static let troubleshooting = URL(
     string: "https://github.com/hadrienl/vibe-manager/blob/main/docs/operations.md")
+  /// Where help lives until there is documentation: the questions already asked, and a place to
+  /// ask a new one.
+  private static let issues = URL(string: "https://github.com/hadrienl/vibe-manager/issues")
+  private static let newIssue = URL(string: "https://github.com/hadrienl/vibe-manager/issues/new")
 
   @State private var environment = AppEnvironment()
   @State private var windowFocus = WindowFocus()
@@ -78,6 +82,12 @@ struct VibeManagerApp: App {
     }
     .defaultSize(width: 1_180, height: 760)
     .commands {
+      CommandGroup(replacing: .appInfo) {
+        Button("About Vibe Manager") {
+          AboutPanel.show()
+        }
+      }
+
       CommandGroup(after: .appInfo) {
         UpdateCommands(model: environment.appModel)
       }
@@ -301,12 +311,22 @@ struct VibeManagerApp: App {
 
       ConversationCopyCommands()
 
-      // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
-      CommandGroup(after: .help) {
+      // Replacing the system's item, which only said that no help was available; the search field
+      // stays.
+      CommandGroup(replacing: .help) {
+        if let issues = Self.issues {
+          Link("Vibe Manager Help", destination: issues)
+            .keyboardShortcut("?", modifiers: .command)
+        }
+        if let newIssue = Self.newIssue {
+          Link("Report an Issue…", destination: newIssue)
+        }
+        Divider()
         // Known limits, and how to recover from each thing that can go wrong.
         if let troubleshooting = Self.troubleshooting {
           Link("Troubleshooting", destination: troubleshooting)
         }
+        // Nothing leaves the Mac from here: the sheet shows the whole file, and the user saves it.
         Button("Export Diagnostics…") {
           environment.appModel.beginDiagnosticsExport()
         }
@@ -358,6 +378,44 @@ private struct TemplateCommands: View {
       model.settingsTab = .templates
       openSettings()
     }
+  }
+}
+
+/// The standard About panel, with the website and the source under the version.
+private enum AboutPanel {
+  static let website = URL(string: "https://hadrienl.github.io/vibe-manager/")
+  static let source = URL(string: "https://github.com/hadrienl/vibe-manager")
+
+  @MainActor
+  static func show() {
+    NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+    NSApp.activate()
+  }
+
+  /// One centred line per link, in the panel's small system font.
+  static var credits: NSAttributedString {
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.alignment = .center
+    let base: [NSAttributedString.Key: Any] = [
+      .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+      .foregroundColor: NSColor.labelColor,
+      .paragraphStyle: paragraph,
+    ]
+    let links: [(String, URL?)] = [
+      (String(localized: "Website"), website),
+      (String(localized: "Source code on GitHub"), source),
+    ]
+    let credits = NSMutableAttributedString()
+    for (title, url) in links {
+      guard let url else { continue }
+      if credits.length > 0 {
+        credits.append(NSAttributedString(string: "\n", attributes: base))
+      }
+      var attributes = base
+      attributes[.link] = url
+      credits.append(NSAttributedString(string: title, attributes: attributes))
+    }
+    return credits
   }
 }
 
