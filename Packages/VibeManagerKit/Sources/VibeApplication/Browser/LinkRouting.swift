@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// Where a clicked link goes, as Settings › Web View say (#69, #186).
 public enum LinkDestination: String, Codable, CaseIterable, Sendable {
@@ -36,10 +37,54 @@ public enum LinkRouting {
   /// What shows a page. A link's text and its address can differ (OSC 8), and output is anybody's:
   /// another application's address, or a file that is not a page — a `.command`, an app — is not
   /// run on a click.
+  ///
+  /// A file is judged by what it is, not by the name in the address (#245): `index.html` may be a
+  /// symbolic link or a Finder alias to `run.command`, which macOS would hand to Terminal. Links and
+  /// aliases are followed, and the file they lead to must be a page; a folder or a package never is.
+  /// A file that does not exist yet has nothing to run, and is judged by its name.
   public static func isPage(_ url: URL) -> Bool {
     let scheme = url.scheme?.lowercased() ?? ""
     if scheme == "http" || scheme == "https" { return true }
-    return url.isFileURL && ["html", "htm", "svg", "pdf"].contains(url.pathExtension.lowercased())
+    guard url.isFileURL, pageExtensions.contains(url.pathExtension.lowercased()) else {
+      return false
+    }
+    return isPageFile(url)
+  }
+
+  private static let pageExtensions: Set<String> = ["html", "htm", "svg", "pdf"]
+  private static let pageTypes: [UTType] = [.html, .svg, .pdf, .webArchive]
+
+  /// Whether the file at `url`, once its links and aliases are followed, is a page.
+  static func isPageFile(_ url: URL) -> Bool {
+    var target = url
+    // A link to a link, or an alias to a link, is followed a few steps, and refused beyond.
+    for step in 0..<8 {
+      let resolved = target.resolvingSymlinksInPath()
+      guard let values = try? resolved.resourceValues(forKeys: [.isAliasFileKey]) else {
+        // Nothing at all at the address has nothing to run. A link or an alias that leads nowhere
+        // may lead anywhere later, and is refused.
+        return step == 0
+          && (try? FileManager.default.attributesOfItem(atPath: resolved.path)) == nil
+      }
+      guard values.isAliasFile == true else { return isPageType(resolved) }
+      guard
+        let aliased = try? URL(
+          resolvingAliasFileAt: resolved, options: [.withoutUI, .withoutMounting])
+      else { return false }
+      target = aliased
+    }
+    return false
+  }
+
+  private static func isPageType(_ url: URL) -> Bool {
+    let keys: Set<URLResourceKey> = [
+      .contentTypeKey, .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .isAliasFileKey,
+    ]
+    guard let values = try? url.resourceValues(forKeys: keys),
+      values.isDirectory != true, values.isPackage != true, values.isSymbolicLink != true,
+      values.isAliasFile != true, let type = values.contentType
+    else { return false }
+    return pageTypes.contains { type.conforms(to: $0) }
   }
 
   public static func isMail(_ url: URL) -> Bool {

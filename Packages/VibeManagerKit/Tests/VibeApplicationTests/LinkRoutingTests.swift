@@ -59,13 +59,76 @@ struct LinkRoutingTests {
       URL(fileURLWithPath: "/tmp/install.pkg"),
       URL(string: "x-apple.systempreferences:com.apple")!,
       URL(string: "javascript:alert(1)")!,
+      URL(string: "vnc://host")!,
+      URL(string: "smb://host/share")!,
+      URL(string: "afp://host/share")!,
+      URL(string: "FILE:///tmp/x.command")!,
+      URL(string: "SMB://host/share")!,
     ]
     for url in refused {
       #expect(LinkRouting.externalRoute(for: url) == .refused)
       #expect(!LinkRouting.opensOutside(url))
+      #expect(ExternalOpening.plan(for: url) == nil)
     }
     #expect(LinkRouting.opensOutside(web))
     #expect(LinkRouting.opensOutside(mail))
+    #expect(LinkRouting.opensOutside(URL(string: "HTTPS://github.com")!))
+  }
+
+  @Test("A page is handed to the default browser by name, a mail address to Mail (#245)")
+  func plans() {
+    #expect(ExternalOpening.plan(for: web) == .inBrowser(web))
+    #expect(ExternalOpening.plan(for: page) == .inBrowser(page))
+    #expect(ExternalOpening.plan(for: mail) == .withMailApplication(mail))
+  }
+
+  @Test("A page file is what it is, not what its name says: links, aliases and folders (#245)")
+  func pageFilesAreLookedAt() throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("vibe-245-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let script = folder.appendingPathComponent("run.command")
+    try Data("#!/bin/sh\necho hi\n".utf8).write(to: script)
+    let real = folder.appendingPathComponent("real.html")
+    try Data("<p>hi</p>".utf8).write(to: real)
+
+    // `index.html -> run.command`, as a repository can carry it: macOS would hand it to Terminal.
+    let link = folder.appendingPathComponent("index.html")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: script)
+    // The same with a Finder alias.
+    let alias = folder.appendingPathComponent("alias.html")
+    try URL.writeBookmarkData(
+      try script.bookmarkData(options: .suitableForBookmarkFile), to: alias)
+    // A folder, and a package, named like pages.
+    let bundle = folder.appendingPathComponent("Bundle.html", isDirectory: true)
+    try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+    let app = folder.appendingPathComponent("x.app.html", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: app.appendingPathComponent("Contents", isDirectory: true),
+      withIntermediateDirectories: true)
+    // A link and an alias to a real page stay pages.
+    let pageLink = folder.appendingPathComponent("page-link.html")
+    try FileManager.default.createSymbolicLink(at: pageLink, withDestinationURL: real)
+    let pageAlias = folder.appendingPathComponent("page-alias.html")
+    try URL.writeBookmarkData(
+      try real.bookmarkData(options: .suitableForBookmarkFile), to: pageAlias)
+    // A link that leads nowhere.
+    let dangling = folder.appendingPathComponent("gone.html")
+    try FileManager.default.createSymbolicLink(
+      at: dangling, withDestinationURL: folder.appendingPathComponent("missing.command"))
+
+    for refused in [link, alias, bundle, app, dangling] {
+      #expect(!LinkRouting.isPage(refused), "\(refused.lastPathComponent)")
+      #expect(LinkRouting.externalRoute(for: refused) == .refused)
+      #expect(ExternalOpening.plan(for: refused) == nil)
+    }
+    for page in [real, pageLink, pageAlias] {
+      #expect(LinkRouting.isPage(page), "\(page.lastPathComponent)")
+      #expect(ExternalOpening.plan(for: page) == .inBrowser(page))
+    }
+    // Nothing there yet: nothing to run, judged by its name.
+    #expect(LinkRouting.isPage(folder.appendingPathComponent("later.html")))
   }
 
   @Test("A mail address goes to the mail application, whatever the gesture")

@@ -428,10 +428,10 @@ public final class NotesModel {
       return
     }
     guard let opener else {
-      // Opens outside: an http, https or mail address (`NotesLinks.isAllowed`); a file is revealed.
-      NSWorkspace.shared.open(url)
+      ExternalOpening.open(url)
       return
     }
+    // Opens outside: an http, https or mail address (`NotesLinks.isAllowed`; a file was revealed).
     Task { _ = await opener.open(url, with: .defaultApplication) }
   }
 }

@@ -190,8 +190,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     }
     webView.openExternally = { url in
       guard LinkRouting.isPage(url) else { return }
-      // Opens outside: a page, as `LinkRouting.isPage` says.
-      NSWorkspace.shared.open(url)
+      ExternalOpening.open(url)
     }
   }
 
@@ -515,7 +514,8 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       // Opens outside: another application's address, once the user allowed the agent's (#241).
       if allowed { NSWorkspace.shared.open(target) }
     } else if navigationAction.navigationType == .linkActivated {
-      // Opens outside: another application's address, from a link of the page (#241).
+      // Unsafe open, to fix in #241: a link of the page, possibly clicked by its own script, hands
+      // another application's address (`smb:`, `vnc:`…) to macOS without asking.
       NSWorkspace.shared.open(target)
     }
     return (.cancel, preferences)

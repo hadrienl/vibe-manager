@@ -134,8 +134,7 @@ public final class AppModel {
   }
   /// Hands an address to macOS, once `LinkRouting` has let it out (`openOutside`, `openLink`).
   @ObservationIgnored var openOutsideHandler: @MainActor (URL) -> Void = {
-    // Opens outside: only called with what `LinkRouting` routes to `.browser` or `.system`.
-    NSWorkspace.shared.open($0)
+    ExternalOpening.open($0)
   }
   /// The requests already accounted for: notified, or seen arriving while the application was in
   /// front. Only one arriving in the background is notified.
