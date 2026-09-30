@@ -52,8 +52,9 @@ public actor CodexLaunchObserver: AgentLaunchObserver {
     await capture.start()
   }
 
-  public func observe(output: String) async {
-    await capture?.observe(output: output)
+  public func observe(output: String) async -> AgentOutputDemand {
+    guard let capture else { return .more }
+    return await capture.observe(output: output)
   }
 
   public func finished() async {

@@ -9,11 +9,6 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private static let forcedStopTimeout = Duration.seconds(2)
   private static let statePollInterval = Duration.milliseconds(20)
   private static let exitPollAttempts = 50
-  // A subscriber that stops draining its stream must not grow the application's memory without
-  // bound. Each queued event holds at most one coalescing window of output, so this caps a stalled
-  // subscriber at a few seconds of backlog; beyond that the oldest output is dropped and the gap is
-  // reported, exactly as the bounded history does.
-  private static let subscriberBufferLimit = 512
 
   public nonisolated let id: TerminalID
 
@@ -24,7 +19,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
 
   private var historyBuffer: TerminalHistory
   private var currentState: TerminalProcessState
-  private var subscribers: [UUID: AsyncStream<TerminalEvent>.Continuation] = [:]
+  private let subscribers = TerminalSubscribers()
   private var exitSource: DispatchSourceProcess?
   private var lastSize: TerminalSize
   /// A side terminal's shell (#43) is hung up on, as a terminal window closing does, and each of
@@ -83,25 +78,22 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   }
 
   public func attach() -> TerminalAttachment {
-    let subscriberID = UUID()
-    var continuation: AsyncStream<TerminalEvent>.Continuation?
-    let stream = AsyncStream<TerminalEvent>(
-      bufferingPolicy: .bufferingNewest(Self.subscriberBufferLimit)
-    ) { continuation = $0 }
+    subscribe(.everything)
+  }
 
-    if let continuation {
-      if hasEnded {
-        continuation.finish()
-      } else {
-        subscribers[subscriberID] = continuation
-        continuation.onTermination = { [weak self] _ in
-          guard let self else { return }
-          Task { await self.removeSubscriber(subscriberID) }
-        }
-      }
-    }
+  // Declared `async`, as the requirement is: a synchronous one would lose to the relay the
+  // protocol's extension offers stand-ins, wherever the caller awaits.
+  public func attach(_ interest: TerminalEventInterest) async -> TerminalAttachment {
+    subscribe(interest)
+  }
 
-    return TerminalAttachment(state: currentState, history: historyBuffer.snapshot, events: stream)
+  private func subscribe(_ interest: TerminalEventInterest) -> TerminalAttachment {
+    subscribers.attach(
+      interest, state: currentState, history: historyBuffer.snapshot, hasEnded: hasEnded)
+  }
+
+  public func lastOutputAt() async -> ContinuousClock.Instant? {
+    subscribers.lastOutputAt
   }
 
   public func state() -> TerminalProcessState {
@@ -199,10 +191,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     switch event {
     case .bytes(let bytes):
       let dropped = historyBuffer.append(bytes)
-      broadcast(.output(bytes))
-      if dropped > 0 {
-        broadcast(.historyTruncated(droppedByteCount: dropped))
-      }
+      subscribers.output(bytes, historyDropped: dropped)
       reader.didConsume(byteCount: bytes.count)
     case .endOfFile:
       isReaderFinished = true
@@ -325,7 +314,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private func transition(to state: TerminalProcessState) {
     guard currentState != state else { return }
     currentState = state
-    broadcast(.stateChanged(state))
+    subscribers.stateChanged(state)
   }
 
   // The process group stays registered with the shutdown guard until the child's status has
@@ -359,26 +348,6 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     guard isReaderDrained, let finalState, !hasEnded else { return }
     hasEnded = true
     transition(to: finalState)
-    for continuation in subscribers.values {
-      continuation.finish()
-    }
-    subscribers.removeAll()
-  }
-
-  private func removeSubscriber(_ subscriberID: UUID) {
-    subscribers[subscriberID] = nil
-  }
-
-  private func broadcast(_ event: TerminalEvent) {
-    for continuation in subscribers.values {
-      guard case .dropped(let discarded) = continuation.yield(event) else { continue }
-      // The subscriber fell far enough behind that its oldest event was evicted. Tell it how much
-      // output it lost so it can show the gap rather than silently rendering a corrupt stream. A
-      // dropped state change needs no notice: the current state is always readable from `state()`,
-      // and the subscriber re-reads it when the stream ends.
-      if case .output(let bytes) = discarded {
-        _ = continuation.yield(.historyTruncated(droppedByteCount: bytes.count))
-      }
-    }
+    subscribers.finishAll()
   }
 }

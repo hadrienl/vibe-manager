@@ -43,6 +43,10 @@ public final class TerminalPaneModel {
   /// one of its terminals does (#43).
   public private(set) var hasKeyboardFocus = false
 
+  /// Whether the view is catching up on what its process wrote while it was put away, for longer
+  /// than a glance (#248): the pane says so rather than show a terminal fast-forwarding.
+  public internal(set) var isCatchingUp = false
+
   func setKeyboardFocus(_ focused: Bool) {
     guard hasKeyboardFocus != focused else { return }
     hasKeyboardFocus = focused
@@ -290,7 +294,8 @@ public final class TerminalPaneModel {
   /// Where a terminal's link goes when nothing else is told of it: the default browser, or the mail
   /// application, and nothing that is neither a page nor a mail address.
   public static func openOutside(_ url: URL) {
-    switch LinkRouting.route(url, gesture: .browser, preference: .defaultBrowser, hasWebView: false) {
+    switch LinkRouting.route(url, gesture: .browser, preference: .defaultBrowser, hasWebView: false)
+    {
     case .browser, .system: NSWorkspace.shared.open(url)
     case .refused: NSSound.beep()
     case .webView, .newTab: break
@@ -358,7 +363,8 @@ public final class TerminalPaneModel {
   private func observe(_ session: any TerminalSession) {
     stateTask?.cancel()
     stateTask = Task { [weak self] in
-      let attachment = await session.attach()
+      // State changes only: the status is not woken by the output (#248).
+      let attachment = await session.attach(.state)
       self?.apply(attachment.state)
       for await event in attachment.events {
         guard case .stateChanged(let state) = event else { continue }
