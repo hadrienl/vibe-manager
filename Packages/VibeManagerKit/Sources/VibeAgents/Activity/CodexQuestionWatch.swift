@@ -1,101 +1,27 @@
 import Foundation
 import VibeApplication
 
-/// Follows a file an agent appends to, line by line: only whole lines, from where the reading
-/// started, and from the beginning again when the file was replaced by a shorter one.
-struct AppendedLines: Sendable {
-  enum Start: Sendable {
-    /// What the file holds already belongs to the past.
-    case end
-    case beginning
-    /// From this offset, what was before having been read otherwise.
-    case offset(UInt64)
-  }
-
-  let file: URL
-  let start: Start
-  let pollInterval: Duration
-
-  func lines() -> AsyncStream<Data> {
-    let file = file
-    let start = start
-    let pollInterval = pollInterval
-    return AsyncStream { continuation in
-      let task = Task {
-        var offset: UInt64
-        switch start {
-        case .end: offset = Self.size(of: file)
-        case .beginning: offset = 0
-        case .offset(let value): offset = value
-        }
-        var pending = Data()
-        while !Task.isCancelled {
-          if let handle = try? FileHandle(forReadingFrom: file) {
-            defer { try? handle.close() }
-            let size = Self.size(of: file)
-            if size < offset {
-              offset = 0
-              pending = Data()
-            }
-            if size > offset, (try? handle.seek(toOffset: offset)) != nil,
-              let data = try? handle.read(upToCount: Int(size - offset))
-            {
-              offset += UInt64(data.count)
-              pending.append(data)
-              while let newline = pending.firstIndex(of: 0x0A) {
-                continuation.yield(Data(pending[pending.startIndex..<newline]))
-                pending = Data(pending[(newline + 1)...])
-              }
-            }
-          }
-          try? await Task.sleep(for: pollInterval)
-        }
-        continuation.finish()
-      }
-      continuation.onTermination = { _ in task.cancel() }
-    }
-  }
-
-  static func size(of url: URL) -> UInt64 {
-    let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-    return (attributes?[.size] as? NSNumber)?.uint64Value ?? 0
-  }
-}
-
-/// Reads the questions Codex asks with `request_user_input` from the rollout of its session (#40).
-///
-/// No hook reports them: Codex 0.157.1 sends `PreToolUse` for the tool, but only through a hook
-/// that would have to be approved again. The rollout already says it — a `function_call` named
-/// `request_user_input`, then a `function_call_output` with the same `call_id` once answered — and
-/// reading it needs nobody's approval.
-///
-/// Both are written before the question is drawn and after it is gone: nothing says when its
-/// dialog is on screen, so these questions are shown, and answered in the terminal.
-///
-/// The rollout is the one created for this working directory once the session started, the oldest
-/// of them, as `CodexRolloutSessionDiscovery` picks. Two Codex sessions started in the same folder
-/// in the same seconds could see each other's question; it would only be shown, never answered.
 public struct CodexQuestionWatch: Sendable {
   static let tool = "request_user_input"
 
   private let sessionsDirectory: URL
   private let workingDirectoryPath: String
   private let since: Date
-  private let pollInterval: Duration
+  private let discoveryInterval: Duration
   private let discoveryTimeout: Duration
 
   public init(
     sessionsDirectory: URL,
     workingDirectoryPath: String,
     since: Date,
-    pollInterval: Duration = .milliseconds(500),
+    discoveryInterval: Duration = .milliseconds(500),
     discoveryTimeout: Duration = .seconds(30)
   ) {
     self.sessionsDirectory = sessionsDirectory
     self.workingDirectoryPath = workingDirectoryPath
     // The hook writes whole seconds: the rollout may be dated a moment before.
     self.since = since.addingTimeInterval(-2)
-    self.pollInterval = pollInterval
+    self.discoveryInterval = discoveryInterval
     self.discoveryTimeout = discoveryTimeout
   }
 
@@ -112,9 +38,8 @@ public struct CodexQuestionWatch: Sendable {
         let (unanswered, waiting, offset) = Self.unanswered(in: rollout)
         var pending = unanswered
         for signal in waiting { continuation.yield(signal) }
-        let lines = AppendedLines(
-          file: rollout, start: .offset(offset), pollInterval: watch.pollInterval
-        ).lines()
+        let lines = AppendedLines(file: rollout, start: .offset(offset), needles: Self.needles)
+          .lines()
         for await line in lines {
           guard !Task.isCancelled else { break }
           for signal in Self.signals(in: line, pending: &pending) { continuation.yield(signal) }
@@ -127,27 +52,36 @@ public struct CodexQuestionWatch: Sendable {
 
   /// The questions the rollout holds that no output has answered yet, and where its whole lines
   /// end: what follows is followed as it comes.
+  /// The words a line must hold to matter here, looked for before any JSON is decoded.
+  static let needles = [Data(tool.utf8), Data("function_call_output".utf8)]
+
+  /// What the rollout already holds — read by blocks, never whole — and where its last whole line
+  /// ends, for the lines that follow.
   static func unanswered(in rollout: URL) -> (Set<String>, [AgentSignal], UInt64) {
-    guard let data = try? Data(contentsOf: rollout),
-      let last = data.lastIndex(of: 0x0A)
-    else { return ([], [], 0) }
+    guard let handle = try? FileHandle(forReadingFrom: rollout) else { return ([], [], 0) }
+    defer { try? handle.close() }
     var pending: Set<String> = []
     var asked: [String: AgentSignal] = [:]
     var order: [String] = []
-    for line in data[data.startIndex..<last].split(separator: 0x0A) {
-      for signal in signals(in: Data(line), pending: &pending) {
-        guard case .questionAsked(_, _, let notice) = signal,
-          let key = notice?.reference.subject
-        else { continue }
-        asked[key] = signal
-        order.append(key)
+    var splitter = LineSplitter()
+    var read = 0
+    while let block = try? handle.read(upToCount: AppendedLines.blockSize), !block.isEmpty {
+      read += block.count
+      splitter.append(block) { line in
+        guard LineSplitter.contains(line, anyOf: needles) else { return }
+        for signal in signals(in: line, pending: &pending) {
+          guard case .questionAsked(_, _, let notice) = signal,
+            let key = notice?.reference.subject
+          else { continue }
+          asked[key] = signal
+          order.append(key)
+        }
       }
     }
     let waiting = order.filter(pending.contains).compactMap { asked[$0] }
-    return (pending, waiting, UInt64(last - data.startIndex + 1))
+    return (pending, waiting, UInt64(read - splitter.pendingCount))
   }
 
-  /// What one line of a rollout says about questions: one asked, or one of those answered.
   static func signals(in line: Data, pending: inout Set<String>) -> [AgentSignal] {
     // Most lines are messages and tool output, some large: the words are looked for first.
     let isCall = line.range(of: Data(tool.utf8)) != nil
@@ -191,7 +125,7 @@ public struct CodexQuestionWatch: Sendable {
         return found
       }
       guard ContinuousClock.now < deadline else { return nil }
-      try? await Task.sleep(for: pollInterval)
+      try? await Task.sleep(for: discoveryInterval, tolerance: discoveryInterval / 2)
     }
     return nil
   }
