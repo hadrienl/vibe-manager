@@ -6,21 +6,30 @@ import VibeApplication
 /// Whole lines only — the CLI may be in the middle of writing the last one — resumed where the
 /// last reading stopped. A file that got shorter, or whose inode changed, was replaced: it is read
 /// again from its start, after a `.reset`. The disk wakes the reader (a `vnode` source on the
-/// file), with a slow poll underneath for what the source cannot see: a file that does not exist
-/// yet, or one replaced under its name.
+/// file), which also sees the file replaced or deleted under its name. A poll covers what it
+/// cannot see: often while the file does not exist yet, rarely once it is watched (#255).
 public struct FileTranscriptTail: TranscriptTailing {
   /// Lines handed over at once while a long transcript is first read, so that the reader can
   /// show progress rather than wait for megabytes.
   static let batchSize = 2_000
+  /// How long a watched file is left alone when the disk says nothing: only a source that went
+  /// deaf — a network volume — would need it.
+  public static let watchedSafetyInterval = Duration.seconds(30)
 
   private let pollInterval: Duration
+  private let watchedInterval: Duration
 
-  public init(pollInterval: Duration = .seconds(1)) {
+  public init(
+    pollInterval: Duration = .seconds(1),
+    watchedInterval: Duration = FileTranscriptTail.watchedSafetyInterval
+  ) {
     self.pollInterval = pollInterval
+    self.watchedInterval = watchedInterval
   }
 
   public func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
     let pollInterval = pollInterval
+    let watchedInterval = watchedInterval
     return AsyncStream { continuation in
       let task = Task.detached(priority: .utility) {
         var reader = TranscriptLineReader(file: file)
@@ -42,10 +51,16 @@ public struct FileTranscriptTail: TranscriptTailing {
             }
           }
           first = false
-          if watcher?.inode != reader.inode {
+          // A deleted file's source watches nothing any more: it goes, and the poll takes over
+          // until the file is back.
+          if reading.isMissing {
+            watcher?.cancel()
+            watcher = nil
+          } else if watcher?.inode != reader.inode {
+            watcher?.cancel()
             watcher = reader.inode.flatMap { _ in FileWatcher(path: file.path, wake: wake) }
           }
-          await wake.wait(timeout: pollInterval)
+          await wake.wait(timeout: watcher == nil ? pollInterval : watchedInterval)
         }
         watcher?.cancel()
       }
@@ -74,13 +89,18 @@ struct TranscriptLineReader {
   struct Reading {
     var lines: [Data] = []
     var wasReset = false
+    /// Nothing is at the file's path.
+    var isMissing = false
   }
 
   mutating func readAvailable() -> Reading {
     var reading = Reading()
     guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
       let size = (attributes[.size] as? NSNumber)?.uint64Value
-    else { return reading }
+    else {
+      reading.isMissing = true
+      return reading
+    }
     let identifier = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
     if let inode, inode != identifier || size < offset {
       offset = 0
