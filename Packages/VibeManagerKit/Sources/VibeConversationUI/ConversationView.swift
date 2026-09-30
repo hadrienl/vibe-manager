@@ -144,7 +144,7 @@ public struct ConversationView: View {
         model.scrollGeometryChanged(contentFrame: contentFrame, viewportHeight: height)
       }
       .defaultScrollAnchor(.bottom)
-      .modifier(ToolbarVeil(tint: theme.background.color))
+      .modifier(ToolbarVeil())
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
       }
@@ -293,59 +293,17 @@ struct BlockView: View {
   }
 }
 
-/// What scrolls under the toolbar is blurred the whole height of it, enough to be made out and not
-/// read.
+/// What scrolls under the toolbar is blurred the whole height of it.
 ///
-/// With its edge effect, macOS 26 blurs the top of the toolbar only and fades out towards its foot:
-/// a message level with the title or the pickers stayed legible under them. The materials of
-/// `NSVisualEffectView` go the other way, and blur it to a plain band. Before macOS 26 the toolbar
-/// has its own material, and this does nothing.
+/// The soft edge effect of macOS 26 blurs the top of the toolbar only and fades out towards its
+/// foot: a message level with the title or the pickers stayed legible under them. The hard one
+/// blurs it all, under a veil of the window's background. Before macOS 26 there is no edge effect.
 private struct ToolbarVeil: ViewModifier {
-  /// The theme's background, laid lightly over the blur: the title stays legible on it.
-  let tint: Color
-  @State private var height: CGFloat = 0
-
   func body(content: Content) -> some View {
     if #available(macOS 26, *) {
-      content
-        .scrollEdgeEffectHidden(true, for: .top)
-        .onGeometryChange(for: CGFloat.self) {
-          $0.safeAreaInsets.top
-        } action: {
-          height = $0
-        }
-        .overlay(alignment: .top) {
-          BackdropBlur(radius: 6)
-            .overlay(tint.opacity(0.4))
-            .frame(height: height)
-            // Drawn in the safe area it covers, from the top of the window down to the toolbar's
-            // foot.
-            .offset(y: -height)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
+      content.scrollEdgeEffectStyle(.hard, for: .top)
     } else {
       content
     }
-  }
-}
-
-/// A blur, of the given radius, of what the window draws under it.
-private struct BackdropBlur: NSViewRepresentable {
-  let radius: Double
-
-  func makeNSView(context: Context) -> NSView {
-    let view = NSView()
-    view.wantsLayer = true
-    view.layerUsesCoreImageFilters = true
-    // Without it, the whole window is blurred.
-    view.layer?.masksToBounds = true
-    return view
-  }
-
-  func updateNSView(_ view: NSView, context: Context) {
-    let blur = CIFilter(name: "CIGaussianBlur")
-    blur?.setValue(radius, forKey: kCIInputRadiusKey)
-    view.backgroundFilters = blur.map { [$0] } ?? []
   }
 }
