@@ -400,7 +400,7 @@ public struct RootView: View {
       .toolbar {
         // With the sidebar folded, its palette is reached from here (#40).
         ToolbarItem(placement: .navigation) {
-          if !model.layout.columns.isSidebarVisible, !model.pendingRequests.isEmpty {
+          if !model.layout.columns.isSidebarVisible, model.pendingRequestCount > 0 {
             RequestPaletteToolbarButton(model: model)
           }
         }

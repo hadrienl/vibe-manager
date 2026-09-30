@@ -37,6 +37,9 @@ public final class AppModel {
         if readsJournalsForQuickOpen, let journal {
           quickOpen.loadJournals(for: sessions.map(\.id), read: journal.reader)
         }
+        // A session renamed, archived or gone changes the requests listed without any activity
+        // saying so; the count the toolbar reads is stored, so it follows here (#254).
+        requestsDidChange()
       }
     }
   }
@@ -65,8 +68,15 @@ public final class AppModel {
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
-  /// What each session's agent is doing, as the tracker last said (#45).
-  public internal(set) var activities: [SessionID: AgentActivityState] = [:]
+  /// What each session's agent is doing, as the tracker last said (#45), one cell per session
+  /// (#254): a view reading one session's activity is not woken by another's.
+  @ObservationIgnored let activityCells = ObservedCells<SessionID, AgentActivityState>()
+  /// Every session's activity at once. Never from a view, which would depend on them all: a view
+  /// reads `activity(for:)`.
+  public internal(set) var activities: [SessionID: AgentActivityState] {
+    get { activityCells.snapshot }
+    set { activityCells.replace(with: newValue) }
+  }
   /// The conversation views of the sessions (#38), and the settings they share.
   public let conversations: ConversationWorkspace
   /// A CLI's hooks waiting for the user's consent before its agent starts.
@@ -118,9 +128,13 @@ public final class AppModel {
   }
   /// The requests already accounted for: notified, or seen arriving while the application was in
   /// front. Only one arriving in the background is notified.
-  var knownRequestIDs: Set<AgentRequestID> = []
-  var postedRequestIDs: Set<AgentRequestID> = []
-  var announcedRequestIDs: Set<AgentRequestID> = []
+  @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
+  @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
+  @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
+  /// How many requests wait in sessions other than the one on screen: what the toolbar and the
+  /// menu need to know. Stored rather than counted when read (#254): the count reads every
+  /// session's activity, and the window would be evaluated again at each of their transitions.
+  public internal(set) var pendingRequestCount = 0
   /// Mirrored here so the settings window changes what the notifications do at once.
   public var notifiesRequests: Bool {
     didSet {
