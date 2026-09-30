@@ -8375,6 +8375,16 @@
         }
       }
     },
+    "No preview for this option" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas d’aperçu pour cette option"
+          }
+        }
+      }
+    },
     "No prompt" : {
       "comment" : "A session was started without a prompt.",
       "localizations" : {

@@ -131,6 +131,19 @@ struct AgentRequestReadingTests {
     #expect(questions[1].allowsFreeText)
   }
 
+  @Test("One preview at a time: the option pointed at, else the one chosen, else the first")
+  func previewedOption() {
+    let layout = AgentQuestion(
+      header: nil, text: "Layout?",
+      options: [.init(label: "Grid"), .init(label: "List", preview: "≡"), .init(label: "Cards")])
+    #expect(layout.previewedOption(highlighted: nil, chosen: nil) == 1)
+    #expect(layout.previewedOption(highlighted: nil, chosen: 2) == 2)
+    #expect(layout.previewedOption(highlighted: 0, chosen: 2) == 0)
+    #expect(layout.previewedOption(highlighted: 7, chosen: nil) == 1)
+    let plain = AgentQuestion(header: nil, text: "Tea?", options: [.init(label: "Tea")])
+    #expect(plain.previewedOption(highlighted: 0, chosen: 0) == nil)
+  }
+
   @Test("A plan, an MCP call, a cut-short report")
   func others() throws {
     let plan = try #require(

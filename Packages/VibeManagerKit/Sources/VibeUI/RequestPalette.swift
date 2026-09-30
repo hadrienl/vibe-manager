@@ -207,6 +207,8 @@ struct RequestCard: View {
   let isFocused: Bool
   @State private var choices: [Int: AgentQuestionAnswer] = [:]
   @State private var writingFor: Int?
+  /// The option pointed at last, by question: its preview is the one shown.
+  @State private var highlighted: [Int: Int] = [:]
   @State private var draft = ""
   @FocusState private var isDraftFocused: Bool
 
@@ -402,6 +404,14 @@ struct RequestCard: View {
         .fixedSize(horizontal: false, vertical: true)
       ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
         optionButton(choice, option: option, of: question, at: index, in: all)
+          .onHover { if $0 { highlighted[index] = option } }
+      }
+      // One preview at a time, as Claude Code draws them: the bubble has no room for them all.
+      if let shown = question.previewedOption(
+        highlighted: highlighted[index],
+        chosen: question.options.indices.first { isChosen(option: $0, ofQuestion: index) })
+      {
+        preview(question.options[shown].preview)
       }
       if case .text(let text) = choices[index] {
         // The free answer given, chosen as an option would be.
@@ -591,6 +601,30 @@ struct RequestCard: View {
     case .option(let chosen): return chosen == option
     case .options(let chosen): return chosen.contains(option)
     case .text, nil: return false
+    }
+  }
+
+  /// An option's preview, often a mockup drawn in characters: in a fixed-width font, never
+  /// wrapped, and scrolled rather than let grow past the bubble.
+  @ViewBuilder
+  private func preview(_ text: String?) -> some View {
+    if let text {
+      ScrollView([.horizontal, .vertical]) {
+        Text(verbatim: DisplaySafeText.visible(text))
+          .font(.system(.caption, design: .monospaced))
+          .fixedSize()
+          .textSelection(.enabled)
+          .padding(6)
+      }
+      .frame(maxHeight: 160)
+      .fixedSize(horizontal: false, vertical: true)
+      .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
+      .accessibilityLabel(Text("Preview", bundle: .module))
+      .accessibilityValue(Text(verbatim: text))
+    } else {
+      Text("No preview for this option", bundle: .module)
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
   }
 

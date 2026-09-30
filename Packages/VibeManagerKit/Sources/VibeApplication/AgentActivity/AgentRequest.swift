@@ -183,6 +183,23 @@ public struct AgentQuestion: Hashable, Codable, Sendable {
   public var showsPreviews: Bool {
     !allowsMultipleChoices && options.contains { $0.preview != nil }
   }
+
+  /// The option whose preview is shown, one at a time as Claude Code does: the one pointed at,
+  /// else the one chosen, else the first that has a preview.
+  public func previewedOption(highlighted: Int?, chosen: Int?) -> Int? {
+    Self.previewedOption(
+      previews: options.map(\.preview), highlighted: highlighted, chosen: chosen)
+  }
+
+  public static func previewedOption(previews: [String?], highlighted: Int?, chosen: Int?)
+    -> Int?
+  {
+    guard previews.contains(where: { $0 != nil }) else { return nil }
+    for index in [highlighted, chosen].compactMap(\.self) where previews.indices.contains(index) {
+      return index
+    }
+    return previews.firstIndex { $0 != nil }
+  }
 }
 
 /// Which tool call a report is about, for matching a request with the tool that settles it. The
