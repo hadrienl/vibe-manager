@@ -216,8 +216,9 @@ public final class InMemoryBrowserGrantVault: BrowserGrantVault, @unchecked Send
   private var content: BrowserGrantVaultContent
   private let failure: (any Error)?
 
-  public init(content: BrowserGrantVaultContent = .sites(Data("[]".utf8)), failure: (any Error)? = nil)
-  {
+  public init(
+    content: BrowserGrantVaultContent = .sites(Data("[]".utf8)), failure: (any Error)? = nil
+  ) {
     self.content = content
     self.failure = failure
   }
