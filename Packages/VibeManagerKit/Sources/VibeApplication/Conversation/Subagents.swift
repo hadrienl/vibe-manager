@@ -64,6 +64,13 @@ public struct SubagentRun: Hashable, Sendable {
   /// Past this depth, a sub-agent shows its header and its answer, not its activity.
   public static let maximumShownDepth = 3
 
+  /// Whether a sub-agent started at `started` belongs to a process earlier than the one started at
+  /// `process`: resuming a session starts a new process, and the sub-agents its last one left
+  /// running died with it, without their end being written.
+  public static func predates(_ started: Date, process: Date) -> Bool {
+    started < process
+  }
+
   /// Its conversation, when it was read.
   public var activityEntries: [ConversationEntry]? {
     guard case .read(let entries) = activity else { return nil }

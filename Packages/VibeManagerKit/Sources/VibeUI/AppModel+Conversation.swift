@@ -94,6 +94,13 @@ extension AppModel {
         guard let status = self?.pane(for: id)?.status else { return false }
         return status == .running || status == .starting
       }
+      // As the kernel says: the same whether the application was open when it started or not.
+      model.processStartDate = { [weak self] in
+        guard let terminal = self?.pane(for: id)?.session,
+          case .running(let processIdentifier) = await terminal.state()
+        else { return nil }
+        return SystemProcessLivenessProbe().startTime(of: processIdentifier)
+      }
       model.showTerminal = { [weak self] in
         self?.setPresentation(.terminal, of: id)
       }

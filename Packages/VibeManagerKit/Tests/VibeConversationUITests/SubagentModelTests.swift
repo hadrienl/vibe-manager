@@ -73,7 +73,7 @@ struct SubagentModelTests {
     let model = ConversationModel(sessionID: SessionID())
     model.processRunning = { running }
     var told: [Bool] = []
-    model.agentRunningChanged = { told.append($0) }
+    model.agentRunningChanged = { isRunning, _ in told.append(isRunning) }
     show([subagent("a")], in: model)
     show([subagent("a")], in: model)
     running = false
@@ -87,7 +87,7 @@ struct SubagentModelTests {
     let model = ConversationModel(sessionID: SessionID())
     model.processRunning = { running }
     var told: [Bool] = []
-    model.agentRunningChanged = { told.append($0) }
+    model.agentRunningChanged = { isRunning, _ in told.append(isRunning) }
     model.activity = .idle
     show([subagent("a")], in: model)
     #expect(model.trayItems.map(\.id) == ["a"])
@@ -98,6 +98,55 @@ struct SubagentModelTests {
     #expect(told == [true, false])
     model.processStateChanged()
     #expect(told == [true, false])
+  }
+
+  @Test("Resumed, the session's sub-agents an earlier process left running are stopped")
+  func resumedSession() async throws {
+    let start = Date(timeIntervalSince1970: 2_000)
+    let model = model()
+    model.processStartDate = { start }
+    var told: [Date?] = []
+    model.agentRunningChanged = { _, since in told.append(since) }
+    func started(_ id: String, at date: Date) -> ConversationEntry {
+      var entry = subagent(id, inner: [command("\(id)-c", "ls")])
+      if case .tool(var call) = entry.content {
+        call.subagent?.startedAt = date
+        entry.content = .tool(call)
+      }
+      return entry
+    }
+    show(
+      [started("old", at: start.addingTimeInterval(-600)), started("new", at: start.addingTimeInterval(5))],
+      in: model)
+    for _ in 0..<500 where told.count < 2 {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(told == [nil, start])
+    let old = model.shownEntries[0].toolCall
+    #expect(old?.state == .interrupted)
+    #expect(old?.subagent?.activityEntries?.first?.toolCall?.state == .interrupted)
+    #expect(model.shownEntries[1].toolCall?.state == .running)
+    // Gone from the bar at once, not lingering as if it had just ended.
+    #expect(model.trayItems.map(\.id) == ["new"])
+  }
+
+  @Test("A process still starting is dated once it runs")
+  func processDatedLater() async throws {
+    let start = Date(timeIntervalSince1970: 2_000)
+    let model = model()
+    var asked = 0
+    model.processStartDate = {
+      asked += 1
+      return asked < 3 ? nil : start
+    }
+    var told: [Date?] = []
+    model.agentRunningChanged = { _, since in told.append(since) }
+    show([subagent("a")], in: model)
+    for _ in 0..<500 where told.count < 2 {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(asked == 3)
+    #expect(told == [nil, start])
   }
 
   @Test("A permission a sub-agent asks for is answered under its own call")
