@@ -47,6 +47,16 @@
         }
       }
     },
+    "About Vibe Manager" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À propos de Vibe Manager"
+          }
+        }
+      }
+    },
     "Agents are running in %lld sessions." : {
       "localizations" : {
         "en" : {
@@ -786,6 +796,16 @@
         }
       }
     },
+    "Report an Issue…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler un problème…"
+          }
+        }
+      }
+    },
     "Reset Column Layout" : {
       "localizations" : {
         "fr" : {
@@ -930,6 +950,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la vue web"
+          }
+        }
+      }
+    },
+    "Source code on GitHub" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code source sur GitHub"
           }
         }
       }
@@ -1191,12 +1221,32 @@
         }
       }
     },
+    "Vibe Manager Help" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aide Vibe Manager"
+          }
+        }
+      }
+    },
     "Web" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Web"
+          }
+        }
+      }
+    },
+    "Website" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site web"
           }
         }
       }
