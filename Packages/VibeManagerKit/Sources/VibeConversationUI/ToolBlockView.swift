@@ -337,43 +337,7 @@ struct ToolCallDetails: View {
     if let model, let request = model.request(for: call), let questions = request.questions {
       AnswerableQuestions(model: model, request: request, questions: questions, size: size)
     } else {
-      askedQuestion(size: size)
-    }
-  }
-
-  /// A question as the transcript tells it: its options, and once answered, the ones chosen —
-  /// or the user's own words.
-  private func askedQuestion(size: Double) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      ForEach(Array(AskedQuestion.all(in: call).enumerated()), id: \.offset) { _, question in
-        VStack(alignment: .leading, spacing: 6) {
-          Text(verbatim: question.text)
-            .font(theme.messageFont(size: size / 0.86).weight(.semibold))
-            .foregroundStyle(theme.text.color)
-          ForEach(Array(question.options.enumerated()), id: \.offset) { _, option in
-            let isChosen = question.chosen.contains(option)
-            Label {
-              Text(verbatim: option)
-                .foregroundStyle(isChosen ? theme.text.color : theme.secondaryText.color)
-                .fontWeight(isChosen ? .semibold : nil)
-            } icon: {
-              Image(systemName: question.symbol(chosen: isChosen))
-                .foregroundStyle(isChosen ? theme.accent.color : theme.secondaryText.color)
-            }
-            .font(theme.messageFont(size: size / 0.86))
-            .accessibilityAddTraits(isChosen ? .isSelected : [])
-          }
-          if let other = question.otherAnswer {
-            Label {
-              Text(verbatim: other).foregroundStyle(theme.text.color).fontWeight(.semibold)
-            } icon: {
-              Image(systemName: "text.bubble.fill").foregroundStyle(theme.accent.color)
-            }
-            .font(theme.messageFont(size: size / 0.86))
-            .textSelection(.enabled)
-          }
-        }
-      }
+      AskedQuestionsView(questions: AskedQuestion.all(in: call), size: size)
     }
   }
 
@@ -396,6 +360,7 @@ struct ToolCallDetails: View {
     case .multipleChoices:
       return LocalizedStringResource("Several Choices", bundle: .module)
     case .question: return LocalizedStringResource("Question", bundle: .module)
+    case .preview: return LocalizedStringResource("Preview", bundle: .module)
     case .todo: return LocalizedStringResource("Task", bundle: .module)
     }
   }
@@ -568,6 +533,107 @@ struct ProducedImageView: View {
   }
 }
 
+/// Questions as the transcript tells them: their options, and once answered, the ones chosen —
+/// or the user's own words.
+struct AskedQuestionsView: View {
+  let questions: [AskedQuestion]
+  let size: Double
+  @State private var highlighted: [Int: Int] = [:]
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
+        VStack(alignment: .leading, spacing: 6) {
+          Text(verbatim: question.text)
+            .font(theme.messageFont(size: size / 0.86).weight(.semibold))
+            .foregroundStyle(theme.text.color)
+          PreviewedOptions(
+            previews: question.options.indices.map { question.previews[$0] },
+            chosen: question.options.firstIndex { question.chosen.contains($0) },
+            highlighted: $highlighted[index], size: size
+          ) {
+            ForEach(Array(question.options.enumerated()), id: \.offset) { option, label in
+              self.option(label, of: question)
+                .onHover { if $0 { highlighted[index] = option } }
+            }
+          }
+          if let other = question.otherAnswer {
+            Label {
+              Text(verbatim: other).foregroundStyle(theme.text.color).fontWeight(.semibold)
+            } icon: {
+              Image(systemName: "text.bubble.fill").foregroundStyle(theme.accent.color)
+            }
+            .font(theme.messageFont(size: size / 0.86))
+            .textSelection(.enabled)
+          }
+        }
+      }
+    }
+  }
+
+  private func option(_ label: String, of question: AskedQuestion) -> some View {
+    let isChosen = question.chosen.contains(label)
+    return Label {
+      Text(verbatim: label)
+        .foregroundStyle(isChosen ? theme.text.color : theme.secondaryText.color)
+        .fontWeight(isChosen ? .semibold : nil)
+    } icon: {
+      Image(systemName: question.symbol(chosen: isChosen))
+        .foregroundStyle(isChosen ? theme.accent.color : theme.secondaryText.color)
+    }
+    .font(theme.messageFont(size: size / 0.86))
+    .accessibilityAddTraits(isChosen ? .isSelected : [])
+  }
+}
+
+/// A question's options, and beside them one preview at a time, as Claude Code draws them: the
+/// option pointed at, else the one chosen, else the first that has one. Without previews, the
+/// options alone.
+struct PreviewedOptions<Options: View>: View {
+  let previews: [String?]
+  let chosen: Int?
+  @Binding var highlighted: Int?
+  let size: Double
+  @ViewBuilder let options: Options
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    if let shown = AgentQuestion.previewedOption(
+      previews: previews, highlighted: highlighted, chosen: chosen)
+    {
+      HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 4) { options }
+          .frame(width: 260, alignment: .leading)
+        // Every preview laid out, one visible: the block keeps the size of the largest, and what
+        // follows it does not move as the pointer goes from one option to the next.
+        ZStack(alignment: .topLeading) {
+          ForEach(Array(previews.enumerated()), id: \.offset) { option, preview in
+            self.preview(preview)
+              .opacity(option == shown ? 1 : 0)
+              .allowsHitTesting(option == shown)
+              .accessibilityHidden(option != shown)
+          }
+        }
+      }
+    } else {
+      VStack(alignment: .leading, spacing: 4) { options }
+    }
+  }
+
+  @ViewBuilder
+  private func preview(_ text: String?) -> some View {
+    if let text {
+      OptionPreview(text: DisplaySafeText.visible(text), size: size)
+    } else {
+      Text("No preview for this option", bundle: .module)
+        .font(theme.interfaceFont(size: size * 0.95))
+        .foregroundStyle(theme.secondaryText.color)
+        .padding(8)
+    }
+  }
+}
+
 /// The questions the agent waits on, answered where they are asked: an option is a click, a free
 /// answer is the composer's (#40, #41).
 struct AnswerableQuestions: View {
@@ -575,6 +641,7 @@ struct AnswerableQuestions: View {
   let request: ConversationRequest
   let questions: [AgentQuestion]
   let size: Double
+  @State private var highlighted: [Int: Int] = [:]
   @Environment(\.conversationTheme) private var theme
 
   var body: some View {
@@ -590,11 +657,21 @@ struct AnswerableQuestions: View {
             .font(theme.messageFont(size: size / 0.86).weight(.semibold))
             .foregroundStyle(theme.text.color)
             .fixedSize(horizontal: false, vertical: true)
-          ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
-            optionButton(
-              choice, option: option, question: index,
-              isMultiple: question.allowsMultipleChoices,
-              isEnabled: request.canChoose(in: question))
+          PreviewedOptions(
+            previews: question.options.map(\.preview),
+            chosen: question.options.indices.first {
+              model.isChosen(option: $0, ofQuestion: index)
+            },
+            highlighted: $highlighted[index], size: size
+          ) {
+            ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
+              optionButton(
+                choice, option: option, question: index,
+                isMultiple: question.allowsMultipleChoices,
+                isEnabled: request.canChoose(in: question)
+              )
+              .onHover { if $0 { highlighted[index] = option } }
+            }
           }
         }
       }
@@ -645,6 +722,31 @@ struct AnswerableQuestions: View {
     .buttonStyle(OptionButtonStyle())
     .disabled(!isEnabled)
     .accessibilityAddTraits(isChosen ? .isSelected : [])
+  }
+}
+
+/// What an option would look like, as the agent drew it: often a mockup in characters, kept in a
+/// fixed-width font and never wrapped, so that its lines stay aligned.
+struct OptionPreview: View {
+  let text: String
+  let size: Double
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: true) {
+      Text(verbatim: text)
+        .font(theme.codeFont(size: size))
+        .foregroundStyle(theme.codeText.color)
+        .fixedSize()
+        .textSelection(.enabled)
+        .padding(8)
+    }
+    .fixedSize(horizontal: false, vertical: true)
+    .background(theme.codeBackground.color)
+    .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.layout.innerRadius).stroke(theme.border.color))
+    .accessibilityLabel(Text("Preview", bundle: .module))
+    .accessibilityValue(Text(verbatim: text))
   }
 }
 
@@ -777,6 +879,8 @@ struct RequestActions: View {
 struct AskedQuestion: Equatable {
   var text: String
   var options: [String] = []
+  /// Each option's preview, by its index.
+  var previews: [Int: String] = [:]
   var allowsMultipleChoices = false
   var answer: String?
 
@@ -789,6 +893,9 @@ struct AskedQuestion: Equatable {
         questions[questions.count - 1].allowsMultipleChoices = true
       case .arguments where !questions.isEmpty:
         questions[questions.count - 1].options.append(parameter.value)
+      case .preview where !questions.isEmpty && !questions[questions.count - 1].options.isEmpty:
+        let question = questions[questions.count - 1]
+        questions[questions.count - 1].previews[question.options.count - 1] = parameter.value
       case .answer where !questions.isEmpty: questions[questions.count - 1].answer = parameter.value
       default: break
       }

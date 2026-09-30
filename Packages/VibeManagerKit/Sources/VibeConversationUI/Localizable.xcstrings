@@ -1754,6 +1754,16 @@
         }
       }
     },
+    "No preview for this option" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas d’aperçu pour cette option"
+          }
+        }
+      }
+    },
     "No version is on trial any more." : {
       "localizations" : {
         "fr" : {

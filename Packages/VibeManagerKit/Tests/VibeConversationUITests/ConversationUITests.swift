@@ -421,6 +421,18 @@ struct AskedQuestionTests {
     #expect(questions.map(\.otherAnswer) == [nil, nil, "A mug", nil])
     #expect(questions[1].allowsMultipleChoices)
   }
+
+  @Test("Each preview belongs to the option before it")
+  func previews() {
+    let questions = AskedQuestion.all(
+      in: call([
+        ToolParameter(.question, "Layout?"), ToolParameter(.arguments, "Grid"),
+        ToolParameter(.preview, "▦"), ToolParameter(.arguments, "List"),
+        ToolParameter(.arguments, "Cards"), ToolParameter(.preview, "▭"),
+        ToolParameter(.question, "Later?"), ToolParameter(.arguments, "Yes"),
+      ]))
+    #expect(questions.map(\.previews) == [[0: "▦", 2: "▭"], [:]])
+  }
 }
 
 @MainActor
@@ -593,7 +605,9 @@ struct ConversationModelTests {
       id: id, receivedAt: Date(), kind: .question, content: .questions(questions),
       reference: AgentToolReference(tool: "AskUserQuestion"), isShown: true)
     let answers = Answers()
-    model.pendingRequest = { ConversationRequest(request: request, answers: kinds, isSending: false) }
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: kinds, isSending: false)
+    }
     model.answerRequest = { answer, id in
       answers.given.append((answer, id))
       return answers.sends
@@ -705,7 +719,8 @@ struct ConversationModelTests {
   @Test("A permission's buttons go under the call it names, not the last one waiting")
   func permissionUnderItsCall() {
     let (model, _) = model()
-    let first = ToolCall(callID: "t1", kind: .shell, parameters: [ToolParameter(.command, "rm -r build")])
+    let first = ToolCall(
+      callID: "t1", kind: .shell, parameters: [ToolParameter(.command, "rm -r build")])
     let last = ToolCall(callID: "t2", kind: .shell, parameters: [ToolParameter(.command, "ls")])
     model.apply(
       ConversationSnapshot(
@@ -716,7 +731,8 @@ struct ConversationModelTests {
     let request = AgentRequest(
       id: AgentRequestID(sessionID: model.sessionID, key: "p"), receivedAt: Date(),
       kind: .approval,
-      content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "rm -r build")),
+      content: .permission(
+        AgentToolPermission(tool: .shell, toolName: "Bash", subject: "rm -r build")),
       reference: AgentToolReference(tool: "Bash"), isShown: true)
     model.pendingRequest = {
       ConversationRequest(request: request, answers: [.allowOnce, .deny], isSending: false)

@@ -16,6 +16,8 @@ enum RequestPayloads {
     #"{"agent_id":"a89e4f8137e913354","tool_name":"Bash","command":"touch a.txt"}"#
   static let question =
     #"{"session_id":"s","cwd":"/Users/a/dev","hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Tea or coffee?","header":"Beverage","options":[{"label":"Tea","description":"Hot or cold tea"},{"label":"Coffee","description":"Your daily brew"}],"multiSelect":false}]},"tool_use_id":"toolu_1"}"#
+  static let previewedQuestion =
+    #"{"hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Layout?","header":"Layout","options":[{"label":"Grid","preview":"┌─┬─┐\n│ │ │\n└─┴─┘"},{"label":"List","preview":" \n "}],"multiSelect":false},{"question":"Extras?","header":"Extras","options":[{"label":"Milk","preview":"(milk)"},{"label":"Sugar"}],"multiSelect":true}]}}"#
   static let twoQuestions =
     #"{"hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Tea or coffee?","header":"Drink","options":[{"label":"Tea"},{"label":"Coffee"}],"multiSelect":false},{"question":"Sugar?","header":"Sugar","options":[{"label":"Yes"},{"label":"No"}],"multiSelect":false}]}}"#
   static let toppings =
@@ -109,6 +111,37 @@ struct AgentRequestReadingTests {
               of: "PreToolUse", with: "PermissionRequest")))))
     #expect(shown.isShown)
     #expect(shown.reference.match(announced.reference) == .same)
+  }
+
+  @Test("An option's preview is kept, a blank one is not; beside previews, no answer of one's own")
+  func previewedQuestion() throws {
+    let notice = try #require(
+      requestNotice(
+        in: claude.signal(for: event("PermissionRequest", RequestPayloads.previewedQuestion))))
+    guard case .questions(let questions) = notice.content else {
+      Issue.record("no questions")
+      return
+    }
+    #expect(questions[0].options.map(\.preview) == ["┌─┬─┐\n│ │ │\n└─┴─┘", nil])
+    #expect(questions[0].showsPreviews)
+    #expect(!questions[0].allowsFreeText)
+    // Boxes to tick are drawn as always, previews or not.
+    #expect(questions[1].options.map(\.preview) == ["(milk)", nil])
+    #expect(!questions[1].showsPreviews)
+    #expect(questions[1].allowsFreeText)
+  }
+
+  @Test("One preview at a time: the option pointed at, else the one chosen, else the first")
+  func previewedOption() {
+    let layout = AgentQuestion(
+      header: nil, text: "Layout?",
+      options: [.init(label: "Grid"), .init(label: "List", preview: "≡"), .init(label: "Cards")])
+    #expect(layout.previewedOption(highlighted: nil, chosen: nil) == 1)
+    #expect(layout.previewedOption(highlighted: nil, chosen: 2) == 2)
+    #expect(layout.previewedOption(highlighted: 0, chosen: 2) == 0)
+    #expect(layout.previewedOption(highlighted: 7, chosen: nil) == 1)
+    let plain = AgentQuestion(header: nil, text: "Tea?", options: [.init(label: "Tea")])
+    #expect(plain.previewedOption(highlighted: 0, chosen: 0) == nil)
   }
 
   @Test("A plan, an MCP call, a cut-short report")
@@ -301,13 +334,26 @@ struct AnswerKeymapTests {
       claude.keystrokes(for: .answers([.options([1, 0])]), to: .questions([toppings]))
         == [[0x31], [0x32], TerminalKeys.rightArrow, [0x31]])
     #expect(
-      claude.keystrokes(for: .answers([.option(1), .options([0])]), to: .questions([tea, toppings]))
+      claude.keystrokes(
+        for: .answers([.option(1), .options([0])]), to: .questions([tea, toppings]))
         == [[0x32], [0x31], TerminalKeys.rightArrow, [0x31]])
     #expect(
-      claude.keystrokes(for: .answers([.options([1]), .option(0)]), to: .questions([toppings, tea]))
+      claude.keystrokes(
+        for: .answers([.options([1]), .option(0)]), to: .questions([toppings, tea]))
         == [[0x32], TerminalKeys.rightArrow, [0x31], [0x31]])
     #expect(claude.keystrokes(for: .answers([.options([])]), to: .questions([toppings])) == nil)
     #expect(claude.keystrokes(for: .answers([.text("Cheese")]), to: .questions([toppings])) == nil)
+    // Beside previews, as drawn by 2.1.285, a digit only moves the highlight: Return takes it.
+    let layout = AgentQuestion(
+      header: nil, text: "Layout?",
+      options: [.init(label: "Grid", preview: "▦"), .init(label: "List")],
+      allowsFreeText: false)
+    #expect(
+      claude.keystrokes(for: .answers([.option(1)]), to: .questions([layout])) == [[0x32], [0x0D]])
+    #expect(
+      claude.keystrokes(for: .answers([.option(0), .option(1)]), to: .questions([layout, tea]))
+        == [[0x31], [0x0D], [0x32], [0x31]])
+    #expect(claude.keystrokes(for: .answers([.text("Cards")]), to: .questions([layout])) == nil)
   }
 
   @Test("Claude Code: a plan is accepted with a digit, rejected with Escape")

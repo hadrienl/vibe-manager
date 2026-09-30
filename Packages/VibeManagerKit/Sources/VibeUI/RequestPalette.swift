@@ -207,6 +207,8 @@ struct RequestCard: View {
   let isFocused: Bool
   @State private var choices: [Int: AgentQuestionAnswer] = [:]
   @State private var writingFor: Int?
+  /// The option pointed at last, by question: its preview is the one shown.
+  @State private var highlighted: [Int: Int] = [:]
   @State private var draft = ""
   @FocusState private var isDraftFocused: Bool
 
@@ -402,6 +404,24 @@ struct RequestCard: View {
         .fixedSize(horizontal: false, vertical: true)
       ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
         optionButton(choice, option: option, of: question, at: index, in: all)
+          .onHover { if $0 { highlighted[index] = option } }
+      }
+      // One preview at a time, as Claude Code draws them: the bubble has no room for them all.
+      if let shown = question.previewedOption(
+        highlighted: highlighted[index],
+        chosen: question.options.indices.first { isChosen(option: $0, ofQuestion: index) })
+      {
+        // Every preview laid out, one visible: the bubble takes the size of the largest once and
+        // for all. Growing with the one pointed at, it moved the options under the pointer, which
+        // then pointed at another.
+        ZStack(alignment: .topLeading) {
+          ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
+            preview(choice.preview)
+              .opacity(option == shown ? 1 : 0)
+              .allowsHitTesting(option == shown)
+              .accessibilityHidden(option != shown)
+          }
+        }
       }
       if case .text(let text) = choices[index] {
         // The free answer given, chosen as an option would be.
@@ -594,6 +614,30 @@ struct RequestCard: View {
     }
   }
 
+  /// An option's preview, often a mockup drawn in characters: in a fixed-width font, never
+  /// wrapped, and scrolled rather than let grow past the bubble.
+  @ViewBuilder
+  private func preview(_ text: String?) -> some View {
+    if let text {
+      ScrollView([.horizontal, .vertical]) {
+        Text(verbatim: DisplaySafeText.visible(text))
+          .font(.system(.caption, design: .monospaced))
+          .fixedSize()
+          .textSelection(.enabled)
+          .padding(6)
+      }
+      .frame(maxHeight: 160)
+      .fixedSize(horizontal: false, vertical: true)
+      .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
+      .accessibilityLabel(Text("Preview", bundle: .module))
+      .accessibilityValue(Text(verbatim: text))
+    } else {
+      Text("No preview for this option", bundle: .module)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+  }
+
   /// A choice shows itself ticked by its symbol rather than a tint: the panel by the avatar is
   /// never the key window, where a bordered button's tint does not show.
   private func optionButton(
@@ -622,12 +666,12 @@ struct RequestCard: View {
             Text(verbatim: DisplaySafeText.visible(description))
               .font(.caption)
               .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .buttonStyle(.bordered)
+    .buttonStyle(OptionButtonStyle())
     .disabled(!canChoose(in: question) || isSending)
     .accessibilityAddTraits(isChosen ? .isSelected : [])
   }
@@ -676,6 +720,25 @@ private struct AnyLabelStyle: LabelStyle {
 }
 
 /// A button style chosen at run time.
+/// An option of a question: a rounded row its label fills from the leading edge. A bordered button
+/// centred a label narrower than itself, so that the options' circles did not line up.
+private struct OptionButtonStyle: ButtonStyle {
+  @Environment(\.isEnabled) private var isEnabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 5)
+      .background(
+        RoundedRectangle(cornerRadius: 6)
+          .fill(configuration.isPressed ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.quaternary))
+      )
+      .contentShape(RoundedRectangle(cornerRadius: 6))
+      .opacity(isEnabled ? 1 : 0.55)
+  }
+}
+
 private struct AnyButtonStyle: PrimitiveButtonStyle {
   private let make: (Configuration) -> AnyView
 

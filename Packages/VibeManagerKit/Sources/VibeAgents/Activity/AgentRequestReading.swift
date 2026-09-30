@@ -180,15 +180,29 @@ enum AgentRequestReading {
       let options = (question["options"] as? [[String: Any]] ?? []).compactMap {
         option -> AgentQuestion.Option? in
         guard let label = option["label"] as? String else { return nil }
-        return AgentQuestion.Option(label: label, description: option["description"] as? String)
+        return AgentQuestion.Option(
+          label: label, description: option["description"] as? String,
+          preview: preview(of: option))
       }
+      let allowsMultipleChoices = question["multiSelect"] as? Bool ?? false
+      // Claude Code draws previews beside the options, where no answer of one's own is offered.
+      let showsPreviews = !allowsMultipleChoices && options.contains { $0.preview != nil }
       return AgentQuestion(
         header: question["header"] as? String,
         text: text,
         options: options,
-        allowsMultipleChoices: question["multiSelect"] as? Bool ?? false
+        allowsMultipleChoices: allowsMultipleChoices,
+        allowsFreeText: !showsPreviews
       )
     }
+  }
+
+  /// An option's preview, unless it is blank: Claude Code draws none for it.
+  static func preview(of option: [String: Any]) -> String? {
+    guard let preview = option["preview"] as? String,
+      !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else { return nil }
+    return preview
   }
 
   static func plan(in input: [String: Any]) -> AgentRequestContent {
