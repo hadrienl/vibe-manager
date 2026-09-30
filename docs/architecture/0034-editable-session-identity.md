@@ -78,12 +78,15 @@ the session still has the identity the change gave it; otherwise the change is d
 beeps. The sidebar's list and the inspector take `undo:` and `redo:` with `onCommand`: the hosting
 view answers them only while the keyboard is inside the view that declares them, so a ⌘Z in the
 terminal, the composer or the notes goes on to what holds it. With nothing to undo, the action is
-`nil` and ⌘Z reaches the window as before. The Edit menu says Undo, without the name of the action.
+`nil` and ⌘Z reaches the window as before. A text being edited inside those views — the name field,
+the notes — is under the view that declares the command, which takes ⌘Z before the window would hand
+it down to the text: the action gives it back to the text's own undo manager. The Edit menu says Undo, without the name of the action.
 
 ### Everything that shows the session follows
 
 The sidebar, the group's header, the window's title (#159), ⌘1…⌘9, Open Quickly (#37) and the
 palette of requests (#40) read the sessions and follow. The change is shown at once, before the
 store is written, then read back. A notification already posted for a request of the session is
-posted again under the same identifier with the new name, without a sound. The badges of Open
+posted again under the same identifier with the new name, without a sound — only after a rename,
+only while requests are notified, and only if it is still shown: one the user dismissed stays gone. The badges of Open
 Quickly, the palette and the archive now draw the project's icon too, rather than its symbol.

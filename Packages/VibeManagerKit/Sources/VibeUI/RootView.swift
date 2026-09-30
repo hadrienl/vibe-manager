@@ -504,17 +504,10 @@ public struct RootView: View {
               Divider()
               inspector(for: session)
             }
-            // ⌘Z undoes a rename or a change of icon here too (#183).
-            .onCommand(
-              Selector(("undo:")),
-              perform: model.canUndoIdentityChange
-                ? { Task { await model.undoIdentityChange() } } : nil
-            )
-            .onCommand(
-              Selector(("redo:")),
-              perform: model.canRedoIdentityChange
-                ? { Task { await model.redoIdentityChange() } } : nil
-            )
+            // ⌘Z undoes a rename or a change of icon here too (#183); the notes and the name
+            // being typed undo their own typing.
+            .onCommand(Selector(("undo:")), perform: model.identityUndoAction(redo: false))
+            .onCommand(Selector(("redo:")), perform: model.identityUndoAction(redo: true))
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
             // under it: the column stays rather than snapping shut mid-refresh.
@@ -540,6 +533,18 @@ public struct RootView: View {
     // Measured on the whole split view: which columns fit is a question about the window, and
     // the answer has to be known before either column decides whether to draw itself.
     .background(WidthReporter { model.layout.windowWidthChanged(to: $0) })
+    // A name or an icon that could not be written (#183), wherever it was edited: the inspector
+    // is where it is edited with the sidebar hidden.
+    .alert(
+      Text("The session could not be changed.", bundle: .module),
+      isPresented: Binding(
+        get: { model.identityFailure != nil },
+        set: { if !$0 { model.dismissIdentityFailure() } })
+    ) {
+      Button(LocalizedStringResource("OK", bundle: .module)) { model.dismissIdentityFailure() }
+    } message: {
+      Text(verbatim: model.identityFailure ?? "")
+    }
     // Only asked when an agent is running: the one thing closing loses is the work it is doing.
     // `presenting:` for the same reason as the archive dialog below.
     .confirmationDialog(

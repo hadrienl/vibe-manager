@@ -70,6 +70,9 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     wanted.insert(identifier)
     Task {
       guard await authorized(), wanted.contains(identifier) else { return }
+      // A notification given the session's new name (#183) replaces one still shown, and never
+      // brings back one the user has already dismissed.
+      if notification.isSilent, !(await isStillShown(identifier)) { return }
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
@@ -84,6 +87,14 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
         Self.requestKey: notification.id.key,
       ]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  private func isStillShown(_ identifier: String) async -> Bool {
+    await withCheckedContinuation { continuation in
+      center.getDeliveredNotifications { delivered in
+        continuation.resume(returning: delivered.contains { $0.request.identifier == identifier })
+      }
     }
   }
 

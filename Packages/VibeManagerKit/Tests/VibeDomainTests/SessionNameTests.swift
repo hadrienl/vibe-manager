@@ -84,6 +84,14 @@ struct SessionDraftNameLengthTests {
     #expect(draft.validate() == [.nameTooLong])
   }
 
+  @Test("A pasted line break is stored as a space, as a rename would store it")
+  func createdNameIsNormalized() {
+    let draft = SessionDraft(
+      name: " Fix\nthe\tlogin ", providerID: "claude-code", workingDirectoryPath: "/tmp")
+    #expect(draft.validate().isEmpty)
+    #expect(draft.session().name == "Fix the login")
+  }
+
   @Test("A name a template makes is cut to the limit rather than refused")
   func suggestedNameIsCut() {
     let long = String(repeating: "word ", count: 40)

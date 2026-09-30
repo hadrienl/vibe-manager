@@ -126,21 +126,7 @@ struct SessionIdentityTests {
     let workspace = try await workspace()
     let model = workspace.model
     let id = workspace.running.id
-    let notifier = IdentityNotifier()
-    model.requestNotifier = notifier
-    model.applicationWillResignActive()
-    // A request of the session, notified while the application is in the background.
-    let request = AgentRequestID(sessionID: id, key: "make")
-    var state = AgentActivityState(source: .structured)
-    state.activity = .awaitingUser(.approval)
-    state.requests.append(
-      AgentRequest(
-        id: request, receivedAt: Date(timeIntervalSince1970: 10), kind: .approval,
-        content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "make")),
-        reference: AgentToolReference(tool: "Bash", subject: "make"), isShown: true))
-    model.activities[id] = state
-    model.requestAnswering[request] = .fromPalette([.allowOnce, .deny])
-    model.requestsDidChange()
+    let (notifier, request) = notifyRequest(of: id, in: model)
     #expect(notifier.posted.count == 1)
 
     await model.commitRename(id, to: "Fix the sign-in")
@@ -162,6 +148,56 @@ struct SessionIdentityTests {
       model.quickOpen.answer?.query.text == "sign-in"
         && model.quickOpen.results.contains { $0.sessionID == id }
     }
+  }
+
+  /// A request of the session, notified while the application is in the background.
+  private func notifyRequest(of id: SessionID, in model: AppModel) -> (
+    IdentityNotifier, AgentRequestID
+  ) {
+    let notifier = IdentityNotifier()
+    model.requestNotifier = notifier
+    model.applicationWillResignActive()
+    let request = AgentRequestID(sessionID: id, key: "make")
+    var state = AgentActivityState(source: .structured)
+    state.activity = .awaitingUser(.approval)
+    state.requests.append(
+      AgentRequest(
+        id: request, receivedAt: Date(timeIntervalSince1970: 10), kind: .approval,
+        content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "make")),
+        reference: AgentToolReference(tool: "Bash", subject: "make"), isShown: true))
+    model.activities[id] = state
+    model.requestAnswering[request] = .fromPalette([.allowOnce, .deny])
+    model.requestsDidChange()
+    return (notifier, request)
+  }
+
+  @Test("A new icon, or notifications turned off, posts nothing again")
+  func notificationsLeftAlone() async throws {
+    let workspace = try await workspace()
+    let model = workspace.model
+    let id = workspace.running.id
+    let (notifier, _) = notifyRequest(of: id, in: model)
+    #expect(notifier.posted.count == 1)
+
+    model.beginAppearanceEditing(id, in: .sidebar)
+    try #require(model.appearanceEditor).pickSymbol("flask")
+    model.endAppearanceEditing()
+    await waitUntil("the icon is written") {
+      await workspace.repository.session(id: id)?.appearance.symbolName == "flask"
+    }
+    await model.reload()
+    #expect(notifier.posted.count == 1)
+
+    model.notifiesRequests = false
+    await model.commitRename(id, to: "Quiet")
+    #expect(notifier.posted.count == 1)
+  }
+
+  @Test("⌘Z in a text being typed undoes the typing, not the last rename")
+  func textKeepsItsUndo() {
+    #expect(AppModel.isEditingText(NSTextView()))
+    #expect(!AppModel.isEditingText(NSTableView()))
+    #expect(!AppModel.isEditingText(nil))
   }
 
   @Test("The icon is previewed while it is chosen, and Escape leaves the session as it was")

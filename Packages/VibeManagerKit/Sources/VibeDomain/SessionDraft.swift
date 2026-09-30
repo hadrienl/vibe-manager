@@ -64,8 +64,9 @@ public struct SessionDraft: Hashable, Sendable {
     return SessionTicket(url: url, source: .template)
   }
 
+  /// The name as it is stored: one line, without the spaces around it (#183).
   public var trimmedName: String {
-    name.trimmingCharacters(in: .whitespacesAndNewlines)
+    SessionName.normalized(name)
   }
 
   /// The prompt the agent is sent: the template's rendering, or what was typed.

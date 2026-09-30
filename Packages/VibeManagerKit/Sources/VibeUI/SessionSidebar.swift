@@ -75,17 +75,6 @@ struct SessionSidebar: View {
     return event.locationInWindow.x <= badgeTrailingEdge
   }
 
-  /// `nil` when there is nothing to undo: ⌘Z then reaches the window, as it did before.
-  private var identityUndo: (() -> Void)? {
-    guard model.canUndoIdentityChange else { return nil }
-    return { Task { await model.undoIdentityChange() } }
-  }
-
-  private var identityRedo: (() -> Void)? {
-    guard model.canRedoIdentityChange else { return nil }
-    return { Task { await model.redoIdentityChange() } }
-  }
-
   /// The list is moving its selection for a key typed in it — an arrow, Home, a letter — rather
   /// than for a click. A shortcut with ⌘, ⌥ or ⌃ goes through the menus, not the list.
   @MainActor private static var isBrowsingKeyPress: Bool {
@@ -187,9 +176,9 @@ struct SessionSidebar: View {
     .onPreferenceChange(SessionBadgeEdgeKey.self) { badgeTrailingEdge = $0 }
     .focused($isListFocused)
     // ⌘Z and ⇧⌘Z undo a rename or a change of icon while the keyboard is in the list (#183);
-    // anywhere else, they go on to what holds it. A field being edited keeps its own.
-    .onCommand(Selector(("undo:")), perform: identityUndo)
-    .onCommand(Selector(("redo:")), perform: identityRedo)
+    // anywhere else, they go on to what holds it. A name being typed undoes its own typing.
+    .onCommand(Selector(("undo:")), perform: model.identityUndoAction(redo: false))
+    .onCommand(Selector(("redo:")), perform: model.identityUndoAction(redo: true))
     .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
     // The keyboard gone elsewhere, ⇧⌘W and the Session menu act on the session on screen alone:
     // a selection nobody is looking at must not be what a shortcut typed in a terminal closes.
@@ -216,16 +205,6 @@ struct SessionSidebar: View {
     }
     .accessibilityLabel(Text("Sessions", bundle: .module))
     .accessibilityIdentifier("session-list")
-    .alert(
-      Text("The session could not be changed.", bundle: .module),
-      isPresented: Binding(
-        get: { model.identityFailure != nil },
-        set: { if !$0 { model.dismissIdentityFailure() } })
-    ) {
-      Button(LocalizedStringResource("OK", bundle: .module)) { model.dismissIdentityFailure() }
-    } message: {
-      Text(verbatim: model.identityFailure ?? "")
-    }
     .alert(
       Text("The group could not be renamed.", bundle: .module),
       isPresented: Binding(

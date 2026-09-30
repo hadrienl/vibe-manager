@@ -146,7 +146,7 @@ extension AppModel {
       } catch {
         self.identityFailure = Self.describe(error)
       }
-      await self.identityDidChange(of: id)
+      await self.identityDidChange(of: id, renamed: false)
     }
   }
 
@@ -154,6 +154,36 @@ extension AppModel {
 
   public var canUndoIdentityChange: Bool { identityHistory.canUndo }
   public var canRedoIdentityChange: Bool { identityHistory.canRedo }
+
+  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard.
+  /// `nil` with nothing to undo: it then goes on to the window, as it did before.
+  ///
+  /// A text being edited there — the name field, the notes — undoes its own typing: the command
+  /// is taken above it, by the view that declares it, before the window would have handed it
+  /// down to the text's undo manager.
+  public func identityUndoAction(redo: Bool) -> (() -> Void)? {
+    guard redo ? canRedoIdentityChange : canUndoIdentityChange else { return nil }
+    return { [weak self] in
+      let responder = (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder
+      if Self.isEditingText(responder) {
+        let manager = responder?.undoManager
+        if redo { manager?.redo() } else { manager?.undo() }
+        return
+      }
+      Task { [weak self] in
+        if redo {
+          await self?.redoIdentityChange()
+        } else {
+          await self?.undoIdentityChange()
+        }
+      }
+    }
+  }
+
+  /// Whether the keyboard is in a text being edited: a field's editor, the notes.
+  static func isEditingText(_ responder: NSResponder?) -> Bool {
+    responder is NSText
+  }
 
   /// ⌘Z in the sidebar or the inspector: the last rename or badge change, unless the session has
   /// changed since — then nothing is undone, and the Mac beeps.
@@ -185,7 +215,7 @@ extension AppModel {
       applied = nil
     }
     if applied == nil { NSSound.beep() }
-    await identityDidChange(of: change.id)
+    await identityDidChange(of: change.id, renamed: change.before.name != change.after.name)
     return applied
   }
 
@@ -197,9 +227,12 @@ extension AppModel {
 
   /// What the store now holds is shown, and the notifications already posted for the session take
   /// its new name, without a sound.
-  private func identityDidChange(of id: SessionID) async {
+  private func identityDidChange(of id: SessionID, renamed: Bool = true) async {
     await reload()
-    guard let notifier = requestNotifier else { return }
+    // Only a new name changes what they say; and only while requests are notified at all.
+    guard renamed, notifiesRequests, !(floatingPanel?.isEnabled ?? false),
+      let notifier = requestNotifier
+    else { return }
     for pending in allPendingRequests
     where pending.session.id == id && postedRequestIDs.contains(pending.id) {
       var notification = notification(for: pending)
