@@ -8,6 +8,11 @@ public struct AgentProviderID: Hashable, Codable, Sendable, CustomStringConverti
   public var description: String {
     rawValue
   }
+
+  /// Every endpoint registers as `endpoint.<uuid>` (#107).
+  public static let endpointPrefix = "endpoint."
+
+  public var isEndpoint: Bool { rawValue.hasPrefix(Self.endpointPrefix) }
 }
 
 public struct AgentVersion: Hashable, Comparable, Sendable, CustomStringConvertible {

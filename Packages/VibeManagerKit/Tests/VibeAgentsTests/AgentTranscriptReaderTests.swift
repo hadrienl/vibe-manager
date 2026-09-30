@@ -260,4 +260,33 @@ private final class ListingCounter: @unchecked Sendable {
 
   var total: Int { lock.withLock { counts.values.reduce(0, +) } }
 
+  @Test("An endpoint's conversation is read where its harness wrote it, an unknown agent is not")
+  func endpointReadsItsHarness() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identifier = "5b1f4a86-3c0e-4c43-9d8e-2f0b6f1d7a10"
+    let folder = root.appendingPathComponent("projects/-Users-a-Projects", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try append(
+      [
+        #"{"cwd":"/Users/a/Projects","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"/Users/a/Projects/n.swift"}}]}}"#
+      ], to: folder.appendingPathComponent("\(identifier).jsonl"))
+    let projects = root.appendingPathComponent("projects")
+    let reader = AgentTranscriptReader(
+      claudeProjects: projects, codexSessions: root.appendingPathComponent("sessions"))
+    let endpoint = "endpoint.7C1E6A55-0D5B-4E43-9E47-4A3C2B1D0E9F"
+
+    let driven = WorkSession(
+      name: "Endpoint",
+      agent: SessionAgentConfiguration(
+        providerID: endpoint, resumeIdentifier: identifier, harnessID: "claude-code"))
+    let activity = try #require(await reader.activity(for: driven))
+    #expect(activity.editedPaths == ["/Users/a/Projects/n.swift"])
+    #expect(await reader.transcriptDirectories(for: driven) == [projects.path])
+
+    // Without its harness recorded, nothing says which CLI wrote it.
+    let unknown = session(provider: endpoint, identifier: identifier)
+    #expect(await reader.activity(for: unknown) == nil)
+    #expect(await reader.transcriptDirectories(for: unknown).isEmpty)
+  }
 }
