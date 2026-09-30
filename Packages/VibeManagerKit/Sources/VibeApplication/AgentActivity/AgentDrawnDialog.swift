@@ -4,8 +4,10 @@ import Foundation
 /// is: Codex's notification quotes the start of a command, a file, or an MCP server.
 public struct AgentDrawnDialog: Hashable, Sendable {
   public enum Subject: Hashable, Sendable {
-    /// A command starting with this, as its report gives it.
+    /// A command starting with this, as its report gives it: the dialog quoted it cut short.
     case commandStart(String)
+    /// This command, quoted whole (#280).
+    case command(String)
     /// A patch touching this file.
     case file(String)
     /// A patch touching several files.
@@ -26,8 +28,14 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     switch (subject, permission.tool) {
     case (.commandStart(let start), .shell):
       return !start.isEmpty && permission.subject?.hasPrefix(start) == true
+    case (.command(let command), .shell):
+      return !command.isEmpty && permission.subject == command
     case (.file(let file), .patch):
-      return permission.subject?.split(separator: "\n").contains { $0.hasSuffix(file) } == true
+      // Whole path components: `Model.swift` is not `App/SubModel.swift` (#280).
+      return !file.isEmpty
+        && permission.subject?.split(separator: "\n").contains {
+          $0 == file || $0.hasSuffix("/" + file)
+        } == true
     case (.files, .patch):
       return true
     case (.server(let name), .mcp(let server, _)):

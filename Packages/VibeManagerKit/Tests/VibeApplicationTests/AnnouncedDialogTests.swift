@@ -191,26 +191,35 @@ struct AnnouncedDialogTests {
   }
 }
 
+/// Answers every request from the palette, to tell what `answering` lets through.
+private struct PaletteKeymap: AgentAnswerKeymap {
+  func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
+    [.allowOnce, .deny]
+  }
+
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    [[0x79]]
+  }
+}
+
 @Suite("A dialog whose quote fits several requests arms none (#280)")
 struct AmbiguousDrawnDialogTests {
-  /// Each request reported a minute after the last: nothing but the drawn dialog puts in doubt.
-  private func reported(_ signals: AgentSignal...) -> AgentActivityState {
-    var state = AgentActivityState(activity: .working, source: .structured)
-    for (index, signal) in signals.enumerated() {
+  /// Each signal at its own time, in seconds: requests a minute apart put nothing in doubt.
+  private func play(
+    _ steps: (TimeInterval, AgentSignal)..., to state: AgentActivityState? = nil
+  ) -> AgentActivityState {
+    var state = state ?? AgentActivityState(activity: .working, source: .structured)
+    for (seconds, signal) in steps {
       state = AgentActivityMachine.reduce(
-        state, .signal(signal), context: context("r\(index)", at: TimeInterval(index * 60)))
+        state, .signal(signal), context: context("t\(seconds)", at: seconds))
     }
     return state
   }
 
-  private func drawn(
-    _ subject: AgentDrawnDialog.Subject,
-    to state: AgentActivityState,
-    at seconds: TimeInterval = 600
-  ) -> AgentActivityState {
-    AgentActivityMachine.reduce(
-      state, .signal(.dialogDrawn(AgentDrawnDialog(subject))),
-      context: context("drawn\(seconds)", at: seconds))
+  private func drawn(_ subject: AgentDrawnDialog.Subject) -> AgentSignal {
+    .dialogDrawn(AgentDrawnDialog(subject))
   }
 
   private func patch(_ files: String) -> AgentSignal {
@@ -222,58 +231,137 @@ struct AmbiguousDrawnDialogTests {
         reference: AgentToolReference(tool: "apply_patch", subject: files), isShown: false))
   }
 
-  @Test("Two commands with the quoted start: neither is armed nor taken away, the first in doubt")
-  func commandStart() {
-    let state = reported(
-      permission(shown: false, command: "ls -la Sources/A"),
-      permission(shown: false, command: "ls -la Sources/B"))
-    #expect(!state.isFirstRequestUncertain)
-    let after = drawn(.commandStart("ls -la Sourc"), to: state)
-    #expect(after.requests.map(\.reference.subject) == ["ls -la Sources/A", "ls -la Sources/B"])
-    #expect(after.requests.allSatisfy { !$0.isShown })
-    #expect(after.isFirstRequestUncertain)
+  private func mcp(_ tool: String) -> AgentSignal {
+    let name = "mcp__github__\(tool)"
+    return .questionAsked(
+      .approval, tool: name,
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(
+            tool: .mcp(server: "github", tool: tool), toolName: name, subject: nil)),
+        reference: AgentToolReference(tool: name), isShown: false))
   }
 
-  @Test("Once the first is settled, the next dialog drawn names one request and arms it")
+  /// Whether any card of `state` would answer from the palette.
+  private func answersFromPalette(_ state: AgentActivityState) -> Bool {
+    state.requests.contains {
+      if case .fromPalette = state.answering($0, keymap: PaletteKeymap()) { return true }
+      return false
+    }
+  }
+
+  private let commandA = "npm run test -- a"
+  private let commandB = "npm run test -- b"
+
+  @Test("Two commands with the quoted start: neither is armed nor taken away, nothing answered")
+  func commandStart() {
+    let state = play(
+      (0, permission(shown: false, command: commandA)),
+      (60, permission(shown: false, command: commandB)),
+      (120, drawn(.commandStart("npm run test"))))
+    #expect(state.requests.map(\.reference.subject) == [commandA, commandB])
+    #expect(state.requests.allSatisfy { !$0.isShown })
+    #expect(state.isFirstRequestUncertain)
+    // The first card says to answer in the session, the second waits behind it.
+    let keymap = PaletteKeymap()
+    #expect(state.answering(state.requests[0], keymap: keymap) == .inTerminalOnly(.uncertain))
+    #expect(state.answering(state.requests[1], keymap: keymap) == .inTerminalOnly(.queued))
+    #expect(!answersFromPalette(state))
+  }
+
+  @Test("Codex's end of a tool settles one; the next dialog names the other alone and arms it")
   func namedOnceAlone() {
-    let state = reported(
-      permission(shown: false, command: "ls -la Sources/A"),
-      permission(shown: false, command: "ls -la Sources/B"))
-    let ambiguous = drawn(.commandStart("ls -la Sourc"), to: state)
-    let settled = AgentActivityMachine.reduce(
-      ambiguous, .signal(.toolFinished("Bash", subject: "ls -la Sources/A")),
-      context: context("done", at: 700))
-    #expect(settled.requests.map(\.reference.subject) == ["ls -la Sources/B"])
-    let armed = drawn(.commandStart("ls -la Sourc"), to: settled, at: 800)
+    let ambiguous = play(
+      (0, permission(shown: false, command: commandA)),
+      (60, permission(shown: false, command: commandB)),
+      (120, drawn(.commandStart("npm run test"))))
+    // Codex's `PostToolUse` says a tool ended, not which one.
+    let settled = play((180, .questionResolved), to: ambiguous)
+    #expect(settled.requests.map(\.reference.subject) == [commandB])
+    #expect(!answersFromPalette(settled))
+    let armed = play((240, drawn(.commandStart("npm run test"))), to: settled)
     #expect(armed.requests.map(\.isShown) == [true])
     #expect(!armed.isFirstRequestUncertain)
+    #expect(answersFromPalette(armed))
+  }
+
+  @Test("A dialog read before its report, an older look-alike waiting: the report brings doubt")
+  func reportAfterItsDialog() {
+    // A was settled by Codex's automatic review, with no dialog; it waits for its tool to end.
+    let older = play((0, permission(shown: false, command: commandA)))
+    // B's dialog is drawn, its word read before B's report: only A fits it yet, and is armed.
+    let early = play((60, drawn(.commandStart("npm run test"))), to: older)
+    #expect(early.requests.map(\.isShown) == [true])
+    // B's report, two seconds on: the dialog may be B's. Neither card answers.
+    let reported = play((62, permission(shown: false, command: commandB)), to: early)
+    #expect(reported.requests.map(\.reference.subject) == [commandA, commandB])
+    #expect(reported.requests.allSatisfy { !$0.isShown })
+    #expect(reported.isFirstRequestUncertain)
+    #expect(!answersFromPalette(reported))
+    // A report long after is not this dialog's: A stays armed.
+    let late = play((600, permission(shown: false, command: commandB)), to: early)
+    #expect(late.requests.map(\.isShown) == [true, false])
+    #expect(answersFromPalette(late))
+  }
+
+  @Test("A dialog read before any report arms the first that fits it, until a second fits it too")
+  func secondReportAfterItsDialog() {
+    let armed = play(
+      (0, drawn(.commandStart("npm run test"))), (0.5, permission(shown: false, command: commandA)))
+    #expect(armed.requests.map(\.isShown) == [true])
+    #expect(answersFromPalette(armed))
+    let both = play((2, permission(shown: false, command: commandB)), to: armed)
+    #expect(both.requests.allSatisfy { !$0.isShown })
+    #expect(!answersFromPalette(both))
+  }
+
+  @Test("A command quoted whole is that command, not every one that starts with it")
+  func wholeCommand() {
+    let state = play(
+      (0, permission(shown: false, command: "ls -la x")),
+      (60, permission(shown: false, command: "ls")))
+    let after = play((120, drawn(.command("ls"))), to: state)
+    #expect(after.requests.map(\.reference.subject) == ["ls"])
+    #expect(after.requests[0].isShown)
+    #expect(!after.isFirstRequestUncertain)
   }
 
   @Test("Two patches of a file with the quoted name: neither is armed nor taken away")
   func file() {
-    let state = reported(patch("App/A/Model.swift"), patch("App/B/Model.swift"))
-    let after = drawn(.file("Model.swift"), to: state)
+    let state = play((0, patch("App/A/Model.swift")), (60, patch("App/B/Model.swift")))
+    let after = play((120, drawn(.file("Model.swift"))), to: state)
     #expect(after.requests.count == 2)
     #expect(after.requests.allSatisfy { !$0.isShown })
-    #expect(after.isFirstRequestUncertain)
-    // A name only one of them holds arms that one; the other, reported before it and never drawn,
-    // was settled with no dialog.
-    let named = drawn(.file("B/Model.swift"), to: state)
-    #expect(named.requests.map(\.reference.subject) == ["App/B/Model.swift"])
-    #expect(named.requests[0].isShown)
+    #expect(!answersFromPalette(after))
   }
 
-  @Test("Several files quoted, two patches waiting: neither is armed nor taken away")
+  @Test("A file's name fits whole path components only")
+  func fileComponents() {
+    let state = play((0, patch("App/SubModel.swift")), (60, patch("App/B/Model.swift")))
+    let after = play((120, drawn(.file("Model.swift"))), to: state)
+    #expect(after.requests.map(\.reference.subject) == ["App/B/Model.swift"])
+    #expect(after.requests[0].isShown)
+    #expect(!after.isFirstRequestUncertain)
+  }
+
+  @Test("Several files quoted, two patches waiting: neither is armed; one alone is")
   func files() {
-    let state = reported(patch("a.swift\nb.swift"), patch("c.swift\nd.swift"))
-    let after = drawn(.files, to: state)
+    let state = play((0, patch("a.swift\nb.swift")), (60, patch("c.swift\nd.swift")))
+    let after = play((120, drawn(.files)), to: state)
     #expect(after.requests.count == 2)
     #expect(after.requests.allSatisfy { !$0.isShown })
-    #expect(after.isFirstRequestUncertain)
-    // One patch waiting: it is the one drawn.
-    let alone = drawn(.files, to: reported(patch("a.swift\nb.swift")))
+    #expect(!answersFromPalette(after))
+    let alone = play((0, patch("a.swift\nb.swift")), (120, drawn(.files)))
     #expect(alone.requests.map(\.isShown) == [true])
-    #expect(!alone.isFirstRequestUncertain)
+    #expect(answersFromPalette(alone))
+  }
+
+  @Test("Two tools of the MCP server a form names: neither is armed")
+  func server() {
+    let state = play((0, mcp("create_issue")), (60, mcp("delete_repo")))
+    let after = play((120, drawn(.server("github"))), to: state)
+    #expect(after.requests.allSatisfy { !$0.isShown })
+    #expect(!answersFromPalette(after))
   }
 }
 

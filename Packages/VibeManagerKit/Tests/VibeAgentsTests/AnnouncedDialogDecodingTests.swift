@@ -72,7 +72,11 @@ struct AnnouncedDialogDecodingTests {
     #expect(
       decoder.signal(forTerminalNotification: "Codex wants to edit 3 files")
         == .dialogDrawn(AgentDrawnDialog(.files)))
-    // A command short enough to be quoted whole, its closing quote taken off.
+    // A command short enough to be quoted whole, its closing quote taken off: that command, not
+    // every one starting with it (#280).
+    #expect(
+      decoder.signal(forTerminalNotification: "Approval requested: /bin/zsh -lc 'pwd'")
+        == .dialogDrawn(AgentDrawnDialog(.command("pwd"))))
     #expect(CodexSignalDecoder.commandStart(quoted: "/bin/zsh -lc 'pwd'") == "pwd")
     #expect(CodexSignalDecoder.commandStart(quoted: "git status") == "git status")
   }

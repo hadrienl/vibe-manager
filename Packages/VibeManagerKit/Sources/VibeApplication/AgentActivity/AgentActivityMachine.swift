@@ -52,10 +52,13 @@ public struct AgentActivityState: Hashable, Sendable {
   }
 }
 
-/// A dialog said to be drawn before any report matched it (#273).
+/// A dialog the CLI just said was drawn (#273): its report, read from another file, may come a
+/// moment after it.
 struct DrawnBeforeReport: Hashable, Sendable {
   let dialog: AgentDrawnDialog
   let at: Date
+  /// The request it armed, when one already reported fitted it alone (#280).
+  let armed: AgentRequestID?
 }
 
 /// Everything that can move an agent's state.
@@ -228,20 +231,8 @@ public enum AgentActivityMachine {
       next.pendingTool = tool
       let count = next.requests.count
       next.enqueue(notice, kind: kind, tool: tool, context: context)
-      // Its dialog was said to be drawn a moment before the report was read — unless what the
-      // screen quoted fits an older request as well (#280).
-      if let drawn = next.drawnBeforeReport, next.requests.count > count,
-        let last = next.requests.indices.last, !next.requests[last].isShown,
-        abs(context.now.timeIntervalSince(drawn.at)) <= drawnBeforeReportWindow
-      {
-        let matching = next.undrawnRequests(matching: drawn.dialog)
-        if matching == [last] {
-          next.markDrawn(at: last)
-          next.drawnBeforeReport = nil
-        } else if matching.count > 1 {
-          next.isFirstRequestUncertain = true
-          next.drawnBeforeReport = nil
-        }
+      if next.requests.count > count, let last = next.requests.indices.last {
+        next.reportFollows(drawnDialogAt: last, now: context.now)
       }
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
     case .questionResolved:
@@ -281,7 +272,7 @@ public enum AgentActivityMachine {
       // this dialog. None reported yet, its report may be read a moment later.
       let matching = next.undrawnRequests(matching: dialog)
       guard let index = matching.first else {
-        next.drawnBeforeReport = DrawnBeforeReport(dialog: dialog, at: context.now)
+        next.drawnBeforeReport = DrawnBeforeReport(dialog: dialog, at: context.now, armed: nil)
         if let otherwise { next = apply(.dialogAnnounced(otherwise), to: next, context: context) }
         break
       }
@@ -290,9 +281,19 @@ public enum AgentActivityMachine {
       // None is armed or taken away, and none is answered from outside until the screen names one.
       guard matching.count == 1 else {
         next.isFirstRequestUncertain = true
+        next.drawnBeforeReport = nil
         break
       }
+      let id = next.requests[index].id
       next.markDrawn(at: index)
+      // Alone in the queue, the request the screen names is the dialog on screen, whatever doubt
+      // came before: Codex settles its requests with no word of which (#280).
+      if next.requests.count == 1 {
+        next.isFirstRequestUncertain = false
+        next.isTrackLost = false
+      }
+      // A report read a moment later may be this dialog's own, the one armed an older look-alike.
+      next.drawnBeforeReport = DrawnBeforeReport(dialog: dialog, at: context.now, armed: id)
     case .turnEnded:
       // A sub-agent in the background can still be waiting on the user once the main turn ends —
       // on a dialog it drew. One announced by its tool and never drawn may never be: a hook of
@@ -346,6 +347,36 @@ extension AgentActivityState {
   /// The requests not drawn yet that a dialog on screen could be, oldest first.
   func undrawnRequests(matching dialog: AgentDrawnDialog) -> [Int] {
     requests.indices.filter { !requests[$0].isShown && dialog.matches(requests[$0]) }
+  }
+
+  /// A request was just reported, at `index`, a moment after the CLI said a dialog was drawn: its
+  /// report may come after its dialog (#273). The dialog arms a request only when it can be no
+  /// other one, those reported after it included (#280).
+  mutating func reportFollows(drawnDialogAt index: Int, now: Date) {
+    guard let drawn = drawnBeforeReport,
+      abs(now.timeIntervalSince(drawn.at)) <= AgentActivityMachine.drawnBeforeReportWindow,
+      !requests[index].isShown, drawn.dialog.matches(requests[index])
+    else { return }
+    if let armed = drawn.armed {
+      // The dialog armed an older request; this one fits it too, and may be the one drawn.
+      if let older = requests.firstIndex(where: { $0.id == armed }) {
+        requests[older].isShown = false
+      }
+      isFirstRequestUncertain = true
+      drawnBeforeReport = nil
+      return
+    }
+    let matching = undrawnRequests(matching: drawn.dialog)
+    if matching == [index] {
+      let id = requests[index].id
+      markDrawn(at: index)
+      // Kept: a further report that fits it too puts the one armed in doubt.
+      drawnBeforeReport = DrawnBeforeReport(dialog: drawn.dialog, at: drawn.at, armed: id)
+    } else {
+      // An older request fits it as well: which one is drawn is not known.
+      isFirstRequestUncertain = true
+      drawnBeforeReport = nil
+    }
   }
 
   /// Marks the request drawn. Reported before it and never drawn, the other permissions were
