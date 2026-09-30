@@ -238,6 +238,26 @@ public actor TrackAgentActivity {
     changed(id, from: previous)
   }
 
+  /// Whether the session's agent says anything through its terminal's notifications (#273).
+  public func readsTerminalNotifications(_ id: SessionID) -> Bool {
+    sessions[id]?.decoder?.readsTerminalNotifications ?? false
+  }
+
+  /// The agent wrote a notification to its terminal (#273).
+  public func terminalNotification(_ id: SessionID, _ message: String) {
+    // Only beside hooks that speak: settings reach the CLI where its hooks may not, and a word from
+    // the terminal alone must not stand for a channel that says when turns end.
+    guard var tracked = sessions[id], tracked.state.isStructured,
+      let signal = tracked.decoder?.signal(forTerminalNotification: message)
+    else { return }
+    let previous = tracked.state
+    tracked.state = reduce(
+      tracked.state, .signal(signal), for: id,
+      requestID: AgentRequestID(sessionID: id, key: "notification:\(UUID().uuidString)"))
+    sessions[id] = tracked
+    changed(id, from: previous)
+  }
+
   public func userInput(_ id: SessionID, _ bytes: [UInt8]) {
     guard var tracked = sessions[id] else { return }
     let previous = tracked.state
@@ -279,14 +299,23 @@ public actor TrackAgentActivity {
 
   /// The keystrokes that give `answer` to the request, if it is still the one on screen and this
   /// answer can be given to it from outside the terminal.
-  public func keystrokes(for answer: AgentAnswer, to id: AgentRequestID) -> [[UInt8]]? {
+  public func keystrokes(
+    for answer: AgentAnswer, to id: AgentRequestID, screen: AgentDialogScreen? = nil
+  ) -> [[UInt8]]? {
+    guard offers(answer, to: id), let tracked = sessions[id.sessionID],
+      let request = tracked.state.requests.first, let keymap = tracked.decoder?.answerKeymap
+    else { return nil }
+    return keymap.keystrokes(for: answer, to: request.content, screen: screen)
+  }
+
+  /// Whether `answer` may be given to the request from outside, whatever its dialog shows.
+  public func offers(_ answer: AgentAnswer, to id: AgentRequestID) -> Bool {
     guard let tracked = sessions[id.sessionID],
       let request = tracked.state.requests.first, request.id == id,
       let keymap = tracked.decoder?.answerKeymap
-    else { return nil }
+    else { return false }
     let offered = tracked.state.answering(request, keymap: keymap).answers
-    guard answer.requiredKinds.isSubset(of: offered) else { return nil }
-    return keymap.keystrokes(for: answer, to: request.content)
+    return answer.requiredKinds.isSubset(of: offered)
   }
 
   /// Whether the request is still the one the agent's terminal shows.

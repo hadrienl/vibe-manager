@@ -338,6 +338,13 @@ struct RequestCard: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+    case .inTerminal:
+      if let message = RequestPresentation.subject(of: request.content) {
+        Text(verbatim: message)
+          .font(.callout)
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
     case .elicitation, .unreadable:
       EmptyView()
     }
@@ -506,6 +513,12 @@ struct RequestCard: View {
             } label: {
               Text("Approve, Accepting Edits", bundle: .module)
             }
+            // Where Claude Code offers its auto mode, in place of accepting edits (#273).
+            Button {
+              send(.approvePlan(.autoMode))
+            } label: {
+              Text("Approve in Auto Mode", bundle: .module)
+            }
             Button {
               send(.approvePlan(.reviewEdits))
             } label: {
@@ -525,7 +538,7 @@ struct RequestCard: View {
           .help(Text(Self.stopsTheTurn))
           .accessibilityHint(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation:
+      case .questions, .elicitation, .inTerminal:
         EmptyView()
       }
       Spacer(minLength: 0)

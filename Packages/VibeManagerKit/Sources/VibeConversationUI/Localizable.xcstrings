@@ -889,6 +889,16 @@
         }
       }
     },
+    "Approve in Auto Mode" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider en mode auto"
+          }
+        }
+      }
+    },
     "Approve, Accepting Edits" : {
       "localizations" : {
         "fr" : {

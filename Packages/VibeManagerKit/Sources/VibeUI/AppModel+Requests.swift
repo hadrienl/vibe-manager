@@ -131,6 +131,12 @@ extension AppModel {
       return LocalizedStringResource(
         "\(sessionName) is no longer running: nothing was sent.", bundle: .module,
         comment: "Said when an answer from the palette found its session stopped.")
+    case .notOnScreen:
+      return LocalizedStringResource(
+        "The dialog of \(sessionName) does not offer this answer: nothing was sent. Answer it in the session.",
+        bundle: .module,
+        comment:
+          "Said when the option an answer needs is not in the dialog the session's terminal shows.")
     }
     switch answer {
     case .allowOnce, .allowAlways, .approvePlan:
