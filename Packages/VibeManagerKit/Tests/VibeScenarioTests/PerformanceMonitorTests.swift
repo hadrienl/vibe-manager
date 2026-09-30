@@ -35,6 +35,32 @@ struct PerformanceMonitorTests {
     #expect(held >= .milliseconds(300))
   }
 
+  @Test("The views' evaluations are published by view, then counted afresh; nothing, nothing said")
+  func bodyEvaluations() {
+    let log = RecordingDiagnosticLog()
+    let reporter = BodyEvaluationReporter(log: log)
+    // No await from here on: the views of the other tests evaluate on the main actor too.
+    _ = BodyCounter.drain()
+    reporter.report()
+    #expect(log.events(named: "perf.bodyEvaluations").isEmpty)
+
+    BodyCounter.tick(.rootView)
+    BodyCounter.tick(.sessionRow)
+    BodyCounter.tick(.sessionRow)
+    reporter.report()
+
+    #if DEBUG
+      let event = try? #require(log.events(named: "perf.bodyEvaluations").first)
+      #expect(event?.value(of: "total") == .count(3))
+      #expect(event?.value(of: "rootView") == .count(1))
+      #expect(event?.value(of: "sessionRow") == .count(2))
+      #expect(event?.value(of: "conversationView") == .count(0))
+      #expect(BodyCounter.count(of: .sessionRow) == 0)
+    #else
+      #expect(log.events(named: "perf.bodyEvaluations").isEmpty)
+    #endif
+  }
+
   @Test("A host that speaks stats reports its footprint; the application asks nothing of others")
   func hostFootprint() async throws {
     let location = TerminalHostLocation(

@@ -29,6 +29,7 @@ public struct RootView: View {
   }
 
   public var body: some View {
+    let _ = BodyCounter.tick(.rootView)
     Group {
       switch model.state {
       case .idle, .loading:
@@ -2128,6 +2129,7 @@ struct SessionRow: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
+    let _ = BodyCounter.tick(.sessionRow)
     HStack(spacing: 10) {
       SessionBadge(appearance: appearance, icon: icon)
         .background {

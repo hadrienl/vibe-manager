@@ -101,6 +101,8 @@ public final class AppEnvironment {
   /// second is not free, and a release build has Instruments for that.
   private let hangDetector: MainThreadHangDetector?
   private let memorySampler: MemorySampler
+  /// Development builds only: how often the window's big views are evaluated (#254).
+  private let bodyEvaluations: BodyEvaluationReporter?
   private let activityTracker: TrackAgentActivity
   /// Every session's web view, and the socket its agents reach it through (#69).
   public let browser: BrowserWorkspace
@@ -166,6 +168,12 @@ public final class AppEnvironment {
         ? MainThreadHangDetector(log: diagnostics.log) : nil
     #endif
     hangDetector?.start()
+    #if DEBUG
+      bodyEvaluations = BodyEvaluationReporter(log: diagnostics.log)
+    #else
+      bodyEvaluations = nil
+    #endif
+    bodyEvaluations?.start()
     let runtimeStore = FileSessionRuntimeStateStore(url: data.runtime)
     let recorder = SessionRuntimeRecorder(store: runtimeStore)
     let usageLedger = FileUsageLedger(directory: data.usage)
@@ -547,6 +555,7 @@ public final class AppEnvironment {
         "hosted": .count(hostedRunningCount), "inProcess": .count(inProcessRunningCount),
       ])
     memorySampler.stop()
+    bodyEvaluations?.stop()
     hangDetector?.stop()
     // The pending layout is written first: quitting is exactly when the delayed save that keeps
     // a separator drag cheap would otherwise be thrown away.

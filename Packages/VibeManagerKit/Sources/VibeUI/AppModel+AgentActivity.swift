@@ -22,12 +22,15 @@ extension AppModel {
     activityUpdates = Task { [weak self] in
       for await update in updates {
         guard let self else { return }
+        // What one transition costs the main thread, the views it wakes aside (#254).
+        let signpost = Signposts.begin("ui.activityApplied")
         self.activities[update.sessionID] = update.state
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {
           $0.key.sessionID != update.sessionID
         }.merging(update.answering) { $1 }
         self.requestsDidChange()
+        Signposts.end("ui.activityApplied", signpost)
       }
     }
     await activityTracker.load()

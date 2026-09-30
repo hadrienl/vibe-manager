@@ -35,6 +35,7 @@ struct SessionSidebar: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
+    let _ = BodyCounter.tick(.sessionSidebar)
     VStack(spacing: 0) {
       ColumnTabs(model: model)
       columns
