@@ -1,0 +1,56 @@
+<h1>Organize your sessions</h1>
+<p class="lede">The sidebar is a task list: four columns of status, groups by project, a manual order, filters, and an archive where nothing is ever deleted.</p>
+
+<vm-shot name="sidebar" class="center" alt="The sidebar: four status tabs with their counts, three sessions in progress with their agent's state, and the Pending Requests palette.">The In Progress column, and the requests waiting below.</vm-shot>
+
+<h2 id="statuses">Four statuses</h2>
+<p>Each session is <strong>To Do</strong>, <strong>In Progress</strong>, <strong>Waiting</strong> or <strong>Done</strong>, one column per status behind the four tabs at the top of the sidebar. The count shows on each tab, and an orange dot marks a column where a session waits for you.</p>
+<p>The status says where the <em>work</em> stands, not what the agent is doing: a session you close stays in its column, and only starting or restarting one brings it back to In Progress. To change it:</p>
+<ul>
+  <li>swipe a row sideways with two fingers: the statuses before and after its own appear, click one;</li>
+  <li>use the <strong>Status</strong> menu in the toolbar, <strong>Session › Status</strong>, or the row's context menu;</li>
+  <li>press <kbd>⌥⌘→</kbd> or <kbd>⌥⌘←</kbd> to move to the next or previous status.</li>
+</ul>
+<p><kbd>⌃⌘→</kbd> and <kbd>⌃⌘←</kbd> switch columns.</p>
+
+<h2 id="row">What a row tells you</h2>
+<p>Each row shows the session's badge, name and agent, and what the agent is doing right now:</p>
+<table>
+  <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Working</td><td>The agent is taking its turn.</td></tr>
+    <tr><td>Needs approval</td><td>It asks permission to run a command or edit a file.</td></tr>
+    <tr><td>Has a question</td><td>It asks you something.</td></tr>
+    <tr><td>New reply</td><td>It finished its turn since you last looked.</td></tr>
+    <tr><td>Idle</td><td>It waits for your next message.</td></tr>
+    <tr><td>Finished, Failed, Exited with code…</td><td>The agent's process ended.</td></tr>
+    <tr><td>Closed</td><td>The session is closed; everything it carries is kept.</td></tr>
+  </tbody>
+</table>
+<p>A hand on the row means the agent waits for your approval in the web view, a globe that it opened a page. The first nine sessions of the column answer <kbd>⌘1</kbd> to <kbd>⌘9</kbd>; <kbd>⌥⌘↑</kbd> and <kbd>⌥⌘↓</kbd> go to the previous and next session.</p>
+<p>The working, question and finished states come from the agent's own hooks, which you approve once per agent: see <a href="settings.html#general">Settings › General › Agent Activity</a>.</p>
+
+<h2 id="groups">Group by project</h2>
+<p><strong>View › Group Sessions by Folder</strong> (<kbd>⌃⌘G</kbd>), or the folder button at the foot of the sidebar, gives each working folder a foldable section. Its header shows how many sessions it holds and the most pressing of their states.</p>
+<vm-shot name="sidebar-grouped" class="center" alt="The sidebar grouped by folder: storefront-web, billing-api and mobile-app, each with its sessions.">Sessions grouped by working folder.</vm-shot>
+<p>Right-click a header to rename the group (or go back to the folder's name), start a <strong>New Session in This Folder</strong>, move the group, or reveal the folder in the Finder. <kbd>⌃⌥⌘←</kbd> and <kbd>⌃⌥⌘→</kbd> fold and unfold the current group.</p>
+
+<h2 id="sort-filter">Sort, filter, search</h2>
+<p>The menu at the foot of the sidebar sorts by <strong>Last Activity</strong>, <strong>Date Created</strong>, <strong>Name</strong> or <strong>Manual</strong>. In Manual, drag a row anywhere in its column (or its group), and drag a group header to move the whole group; <kbd>⌃⌘↑</kbd> and <kbd>⌃⌘↓</kbd> do the same from the keyboard. A new session arrives at the top, and a session keeps its place when it restarts or changes column.</p>
+<p>The same menu filters by agent or by folder; a filter icon shows while one is on. The search field at the top searches the sessions' names, first prompts, notes, templates and folders, ignoring case and accents.</p>
+
+<h2 id="quick-open">Open Quickly</h2>
+<p><strong>File › Open Quickly…</strong> (<kbd>⌘P</kbd>) finds a session from whatever you have at hand: a ticket number (<code>142</code>, <code>#142</code>, <code>owner/repo#142</code>, <code>!87</code>), the URL of a ticket, pull request or merge request pasted as is, a branch, a worktree, a folder, or words of its title, summary or notes. Each result says why it matches; <kbd>Return</kbd> brings the session on screen, archived ones included.</p>
+<vm-shot name="quick-open" class="center" alt="The Open Quickly panel, with a search for 142 and the matching session.">Open Quickly finds a session by ticket, URL, branch or words.</vm-shot>
+
+<h2 id="close-archive">Close, archive, restart</h2>
+<dl>
+  <dt>Close Session <kbd>⇧⌘W</kbd></dt>
+  <dd>Stops the agent and keeps everything: the conversation, the terminal output, the notes. The session stays in its column, and a bar offers to restart it. <kbd>⌘W</kbd> never closes a session: it closes the web view tab or the side terminal that has the keyboard.</dd>
+  <dt>Restart Session <kbd>⌃⌘R</kbd></dt>
+  <dd>Puts a closed session back to work. When the agent can resume its own conversation, it does, and nothing is sent. When it cannot, the app says so and offers a new process with a summary of the session, which you can read and edit before it is sent. Same agent, model, folder and worktree.</dd>
+  <dt>Archive <kbd>⌃⌘A</kbd></dt>
+  <dd>Takes the session out of the columns. Nothing is deleted: <strong>Archived</strong> at the foot of the sidebar (or <kbd>⌥⌘A</kbd>) lists the archived sessions, and <strong>Unarchive</strong> (<kbd>⇧⌃⌘A</kbd>) brings one back.</dd>
+</dl>
+<p>Closing and archiving ask first only while something runs in the session — its agent, or a command in a side terminal — so you can press <kbd>⌃⌘A</kbd> again and again to empty a column. Select several rows with <kbd>⌘</kbd>-click or <kbd>⇧</kbd>-click to close, archive, restart or move them together.</p>
+<vm-shot name="archived" class="center" alt="The archive popover, listing archived sessions with an Unarchive button.">The archive: nothing is ever deleted.</vm-shot>

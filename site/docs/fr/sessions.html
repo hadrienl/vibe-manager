@@ -1,0 +1,39 @@
+<h1>Créer une session</h1>
+<p class="lede">Une nouvelle session commence comme un brouillon dans la zone principale. Rien ne s’exécute avant que vous l’envoyiez.</p>
+
+<h2 id="new-session">Ouvrir un brouillon</h2>
+<p>Appuyez sur <kbd>⌘N</kbd>, choisissez <strong>Fichier › Nouvelle session</strong> ou cliquez sur <strong>+</strong> dans la barre d’outils. Le brouillon apparaît en haut de la barre latérale et occupe le centre de la fenêtre. Pour partir d’un dossier que vous utilisez déjà, faites un clic droit sur un en-tête de groupe dans la barre latérale groupée et choisissez <strong>Nouvelle session dans ce dossier</strong>.</p>
+<vm-shot name="new-session" alt="Un brouillon de nouvelle session : le titre, le choix du modèle de prompt, les dossiers de travail récents, les agents et le modèle, et la zone de saisie en bas.">Un brouillon : les options en haut, le premier message en bas.</vm-shot>
+
+<h2 id="options">Les options</h2>
+<dl>
+  <dt>Badge et titre</dt>
+  <dd>Le badge à gauche du titre ouvre un choix de symboles et de couleurs ; une session dans un dossier doté d’une icône d’app, d’un favicon ou d’un logo le porte par défaut. Le titre est facultatif : laissé vide, il est tiré du premier message à l’envoi.</dd>
+  <dt>Modèle de prompt</dt>
+  <dd><strong>Aucun — prompt libre</strong>, ou l’un de vos <a href="templates.html">modèles de prompt</a>. Un modèle peut proposer le dossier, le nom et le badge ; ses champs apparaissent juste en dessous.</dd>
+  <dt>Dossier de travail</dt>
+  <dd>Le dossier dans lequel l’agent travaille. Vos dossiers récents sont proposés sous forme de cartes (les trois derniers, puis <strong>Afficher … de plus</strong>) ; un clic droit sur l’un d’eux le retire de la liste ou l’affiche dans le Finder. <strong>Choisir…</strong> ouvre n’importe quel autre dossier. L’agent démarre dans ce dossier ; il peut créer des branches et des worktrees de lui-même, et l’inspecteur les signale.</dd>
+  <dt>Agent</dt>
+  <dd>Une carte par agent trouvé sur ce Mac, avec son état. Un agent absent, trop ancien ou déconnecté le signale ; corrigez-le et cliquez sur <strong>Relancer la détection</strong>.</dd>
+  <dt>Modèle</dt>
+  <dd><strong>Modèle par défaut de l’agent</strong>, ou l’un des modèles que liste la CLI de l’agent. Gardez le modèle par défaut pour utiliser celui configuré dans la CLI.</dd>
+  <dt>Plus d’options › Ticket</dt>
+  <dd>Facultatif : l’URL d’un ticket ou un numéro comme <code>#142</code>. Il désigne le ticket de la session, l’ouvre dans la <a href="terminals.html#web-view">vue web</a> et permet à <a href="organize.html#quick-open">Ouvrir rapidement</a> de retrouver la session grâce à lui. Laissé vide, il est rempli plus tard par une branche nommée d’après un ticket.</dd>
+</dl>
+
+<h2 id="first-message">Le premier message</h2>
+<p>Décrivez la tâche dans la zone de saisie en bas : c’est le premier message de l’agent. Avec un modèle, la zone de saisie montre le prompt exactement tel que l’agent le recevra ; <strong>Modifier comme texte</strong> permet de le retoucher à la main.</p>
+<ul>
+  <li><kbd>Return</kbd> ou le bouton flèche <strong>crée et lance</strong> la session (<kbd>⌘Return</kbd> fonctionne depuis n’importe où dans le brouillon).</li>
+  <li><kbd>⇧Return</kbd> ajoute une ligne.</li>
+  <li><kbd>⌥Return</kbd> ou <strong>Ajouter à À faire</strong> crée la session <em>sans</em> la démarrer : elle attend dans la colonne À faire jusqu’à ce que vous la démarriez avec <strong>Session › Démarrer la session</strong> (<kbd>⌃⌘R</kbd>).</li>
+  <li><kbd>Esc</kbd> met le brouillon de côté ; <strong>Abandonner</strong> le supprime.</li>
+</ul>
+<p>Déposez des fichiers n’importe où sur le brouillon, ou cliquez sur <strong>+</strong>, pour les joindre au premier message.</p>
+<div class="callout"><p>Sans prompt, l’agent démarre sans rien à faire : pratique pour ouvrir une CLI dans un dossier et lui écrire vous-même.</p></div>
+
+<h2 id="identity">Renommer et changer l’icône</h2>
+<p>Le nom et le badge d’une session peuvent changer à tout moment : <strong>Session › Renommer…</strong> (<kbd>⌃⌘E</kbd>) ou un double-clic sur sa ligne, et <strong>Session › Changer l’icône…</strong> (<kbd>⌃⌘I</kbd>) ou un double-clic sur son badge. <kbd>⌘Z</kbd> annule l’un comme l’autre. Les symboles et couleurs proposés se règlent dans <a href="settings.html#badges">Réglages › Badges</a>.</p>
+
+<h2 id="what-happens">Ce qui se passe à l’envoi</h2>
+<p>La session est d’abord enregistrée, puis affichée, puis son agent est lancé dans un terminal dédié. Si le lancement échoue, la session est conservée avec tout ce que vous avez saisi, et <strong>Relancer</strong> fait une nouvelle tentative. La session passe <strong>En cours</strong>, et l’activité de l’agent s’affiche désormais sur sa ligne.</p>

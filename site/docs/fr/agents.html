@@ -1,0 +1,38 @@
+<h1>Agents, relances et fermeture de l’app</h1>
+<p class="lede">Changez d’agent ou de modèle sans perdre le travail, remettez au travail une session fermée, et quittez sans interrompre un agent au milieu de son tour.</p>
+
+<h2 id="supported">Agents pris en charge</h2>
+<p>Vibe Manager fait tourner <strong>Claude Code</strong> et <strong>Codex CLI</strong>, chacun dans sa propre interface de terminal, avec votre compte et votre configuration. Il ne passe aucune option qui réduise les permissions réglées pour votre CLI, n’injecte aucune clé d’API et ne lit aucun identifiant. Ce qu’un agent a le droit de faire dans une session relève de sa propre configuration : Vibe Manager ne l’élargit ni ne la restreint.</p>
+<p>Deux ajouts sont faits au lancement, pour ce lancement seulement : les <strong>hooks</strong> de l’agent signalent son activité — il travaille, attend, a terminé — une fois que vous les avez approuvés (<a href="settings.html#general">Réglages › Général › Activité des agents</a>), et son <strong>serveur d’outils</strong> <code>vibe-browser</code> lui donne la <a href="terminals.html#agent-browser">vue web</a>.</p>
+
+<h2 id="switch">Changer d’agent ou de modèle</h2>
+<p><strong>Session › Changer d’agent…</strong> (<kbd>⌃⌘M</kbd>), ou <strong>Changer…</strong> dans la section Agent de l’inspecteur, change l’agent ou le modèle d’une session.</p>
+<vm-shot name="switch-agent" class="center" alt="La feuille Changer d’agent : l’agent actuel, la liste des agents disponibles avec un choix de modèle, et le résumé modifiable transmis au nouvel agent.">Le nouvel agent reçoit un résumé que vous pouvez lire et modifier d’abord.</vm-shot>
+<ul>
+  <li><strong>Un autre modèle du même agent</strong> reprend la même conversation et n’envoie rien.</li>
+  <li><strong>Un autre agent</strong> démarre une nouvelle conversation, avec un résumé de la session : qui y a travaillé, où en est le travail sur chaque branche et chaque worktree, ses notes et le prompt avec lequel elle a été créée. Le résumé est affiché et modifiable avant l’envoi, et n’est jamais présenté comme la conversation elle-même.</li>
+</ul>
+<p>Rien n’est arrêté avant que vous confirmiez avec <strong>Arrêter et changer</strong> (<kbd>⌘Return</kbd>). Si le nouvel agent ne démarre pas, la session revient à son agent précédent, qu’on peut reprendre comme avant. Chaque changement est conservé dans l’historique de la session, et la vue conversation continue de lire les transcripts de tous les agents qu’a eus la session.</p>
+
+<h2 id="restart">Relancer une session fermée</h2>
+<p>Une session fermée affiche une barre : « Cette session est fermée. Tout ce qu’elle contient est conservé. » <strong>Relancer</strong> — ou <strong>Session › Relancer la session</strong>, <kbd>⌃⌘R</kbd> — la remet au travail avec le même agent, le même modèle, le même dossier et le même worktree.</p>
+<vm-shot name="closed-session" alt="Une session fermée : sa conversation, et en bas la barre indiquant que la session est fermée, avec un bouton Relancer.">Une session fermée garde tout, et se relance en une commande.</vm-shot>
+<ul>
+  <li>Quand l’agent peut <strong>reprendre sa propre conversation</strong>, il le fait, et rien ne lui est envoyé.</li>
+  <li>Quand il ne le peut pas — aucun identifiant n’a jamais été conservé, ou la CLI le refuserait —, l’app le signale et propose un nouveau processus avec un résumé de la session, affiché et modifiable avant l’envoi.</li>
+</ul>
+<p>Une session créée avec <strong>Ajouter à À faire</strong> n’a jamais tourné : la même commande s’intitule alors <strong>Démarrer la session</strong>.</p>
+
+<h2 id="quit">Quitter sans arrêter les agents</h2>
+<p>Chaque terminal tourne dans un <strong>hôte des terminaux</strong>, un processus d’arrière-plan sans fenêtre ni icône dans le Dock. Aussi, quand des agents travaillent et que vous quittez, Vibe Manager demande :</p>
+<dl>
+  <dt>Laisser tourner</dt>
+  <dd>Les agents poursuivent leur tour. Au lancement suivant, chacun réapparaît à l’écran tel qu’il était, rien n’est relancé ni envoyé ; celui qui a terminé entre-temps montre sa dernière sortie. Les terminaux annexes continuent eux aussi de tourner.</dd>
+  <dt>Tout arrêter</dt>
+  <dd>Les agents sont arrêtés, avec l’intention de les reprendre : au lancement suivant, ils reviennent grâce à la reprise de leur propre CLI, sans rien demander.</dd>
+</dl>
+<p>Cochez <strong>Ne plus demander</strong>, ou faites votre choix dans <a href="settings.html#general">Réglages › Général</a>, pour toujours faire de même. Les mises à jour suivent le même choix : une mise à jour peut s’installer pendant que les agents continuent de tourner.</p>
+<div class="callout"><p>Redémarrer le Mac ou fermer la session utilisateur arrête les agents : Laisser tourner survit à l’app, pas à votre session macOS. Au lancement suivant, les sessions sont reprises nativement.</p></div>
+
+<h2 id="crash">Après un plantage</h2>
+<p>Un plantage n’est pas une intention : au lancement suivant, un bandeau propose <strong>Reprendre les sessions</strong> ou <strong>Ignorer</strong>, au lieu de les reprendre de lui-même. Les sessions reviennent une par une, avec une progression et un moyen d’annuler ; une restauration qui enverrait un texte à un agent n’est jamais automatique.</p>

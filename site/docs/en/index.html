@@ -1,0 +1,34 @@
+<h1 data-short="Overview">Vibe Manager documentation</h1>
+<p class="lede">Vibe Manager is a native macOS app that runs several Claude Code and Codex sessions side by side, and keeps track of each one: its folder, its agent, its terminal, its notes and what it changed in Git.</p>
+
+<vm-shot name="overview" alt="The Vibe Manager window: the sessions on the left, a conversation with Claude Code in the middle, the session's activity, Git changes and notes on the right.">The main window: the sessions, the session on screen, and its context.</vm-shot>
+
+<h2 id="the-idea">The idea</h2>
+<p>A <strong>session</strong> is one task given to one coding agent in one working folder: “fix the cart VAT calculation” in <code>storefront-web</code>, with Claude Code. Vibe Manager launches the agent's own command-line tool, in a real terminal, and keeps everything around it:</p>
+<ul>
+  <li>the <strong>conversation</strong>, readable like a chat, or the raw <strong>terminal</strong> — one shortcut switches between them;</li>
+  <li>a <strong>status</strong> — To Do, In Progress, Waiting, Done — so the sidebar works as a task list;</li>
+  <li>the <strong>requests</strong> of the agents, answered from a palette without leaving what you are doing;</li>
+  <li>the <strong>Git changes</strong> of the session, live, and its <strong>notes</strong>;</li>
+  <li>side <strong>terminals</strong> and a <strong>web view</strong> the agent can drive.</li>
+</ul>
+<p>Nothing is sent anywhere: there is no account, no telemetry, and the app never reads your API keys. The agents run with the permissions you gave their CLI, no more, no less.</p>
+
+<h2 id="the-window">The window</h2>
+<dl>
+  <dt>The sidebar, on the left</dt>
+  <dd>Your sessions, one column per status behind four tabs, with what each agent is doing: working, waiting for approval, a new reply. Below, the <strong>Pending Requests</strong> palette. At the foot, the archive, the sort order and the filters. See <a href="organize.html">Organize your sessions</a>.</dd>
+  <dt>The session, in the middle</dt>
+  <dd>The conversation with the agent or its terminal, the composer to write to it, and a status bar. See <a href="conversation.html">Conversation and terminal</a>.</dd>
+  <dt>The inspector, on the right</dt>
+  <dd>The context of the session: its activity and summary, its Git changes, its notes, its agent, what it used. See <a href="inspector.html">The inspector</a>.</dd>
+</dl>
+<p>The toolbar holds the session's status, the <strong>Conversation | Terminal</strong> switch, and three buttons: new session, web view, and inspector.</p>
+
+<h2 id="where-to-start">Where to start</h2>
+<div class="doc-cards">
+  <a href="install.html"><strong>Install Vibe Manager</strong><span>Requirements, first launch, Full Disk Access.</span></a>
+  <a href="sessions.html"><strong>Create a session</strong><span>Folder, agent, model and first prompt.</span></a>
+  <a href="requests.html"><strong>Answer your agents</strong><span>Approvals and questions, from anywhere.</span></a>
+  <a href="shortcuts.html"><strong>Keyboard shortcuts</strong><span>Everything is a shortcut away.</span></a>
+</div>

@@ -1,0 +1,32 @@
+<h1>Répondre à vos agents</h1>
+<p class="lede">Un agent d’une session en arrière-plan qui s’arrête sur une autorisation ou une question n’attend pas que vous ouvriez sa session : sa demande vient à vous.</p>
+
+<h2 id="kinds">Ce qu’un agent peut demander</h2>
+<ul>
+  <li><strong>Une autorisation</strong> : exécuter une commande shell, modifier un fichier, charger une adresse. Répondez <strong>Autoriser</strong>, <strong>Toujours</strong> (quand l’agent propose de s’en souvenir) ou <strong>Refuser</strong>.</li>
+  <li><strong>Une question</strong>, avec des options à choisir ou <strong>Autre réponse…</strong> pour saisir la vôtre ; <strong>Envoyer les réponses</strong> quand il y en a plusieurs.</li>
+  <li><strong>Un plan</strong> à valider (Claude Code) : <strong>Valider, modifications acceptées d’office</strong>, <strong>Valider, chaque modification à approuver</strong> ou <strong>Rejeter</strong>.</li>
+</ul>
+<p>Dans la session affichée, la demande apparaît dans la conversation, à la place de la zone de saisie. Ailleurs, elle rejoint la palette.</p>
+<div class="callout warn"><p><strong>Refuser</strong> met aussi fin au tour de l’agent : il attend alors votre prochain message. C’est ainsi que fonctionnent les CLI : refuser revient à appuyer sur Échap.</p></div>
+
+<h2 id="palette">La palette Demandes en attente</h2>
+<p>La palette se trouve en bas de la barre latérale et liste les demandes de toutes les autres sessions, de la plus ancienne à la plus récente, quelle que soit leur colonne. Chaque carte indique quelle session demande, avec quel agent et dans quel dossier, et montre la commande ou la question en entier ; <strong>Tout afficher</strong> déplie une demande longue.</p>
+<vm-shot name="requests" class="center" alt="La palette Demandes en attente : deux commandes shell en attente d’autorisation, chacune avec les boutons Autoriser et Refuser.">Deux sessions en attente d’autorisation, sans quitter la session affichée.</vm-shot>
+<ul>
+  <li>Cliquez sur <strong>Autoriser</strong> ou <strong>Refuser</strong> : la réponse est saisie dans le terminal de cette session, exactement comme vous l’auriez fait, et votre propre session garde le clavier.</li>
+  <li>Le bouton flèche, ou <kbd>⌘Return</kbd>, ouvre la session de la demande.</li>
+  <li><kbd>⌥⌘P</kbd> donne le clavier à la palette : <kbd>↑</kbd> <kbd>↓</kbd> pour passer d’une demande à l’autre, <kbd>Tab</kbd> puis <kbd>Space</kbd> sur une réponse, <kbd>Esc</kbd> pour revenir.</li>
+  <li>L’en-tête replie la palette en un simple compteur.</li>
+</ul>
+<p>Une demande dont les détails ont été tronqués, ou qu’on ne peut pas distinguer d’une autre, ne peut recevoir de réponse que dans son terminal : la carte le signale et propose <strong>Répondre dans le terminal</strong>.</p>
+
+<h2 id="background">Quand Vibe Manager est en arrière-plan</h2>
+<p>Inutile de garder Vibe Manager au premier plan pour savoir qu’un agent attend. Choisissez, dans <a href="settings.html#requests">Réglages › Demandes › Signalement</a> :</p>
+<dl>
+  <dt>Les notifications</dt>
+  <dd>Une notification système pour chaque demande, qui montre soit le type de demande, soit la commande elle-même. Une autorisation peut être accordée ou refusée directement depuis la notification. L’icône du Dock compte les demandes en attente.</dd>
+  <dt>Le panneau flottant</dt>
+  <dd>Un avatar, dans une bulle au-dessus de toutes les autres apps et sur tous les Spaces, qui présente les demandes une à une et vous permet d’y répondre là où vous êtes. Il ne prend jamais le clavier de lui-même : appuyez sur <kbd>⌃⌥⌘P</kbd> pour lui prêter le clavier (<kbd>←</kbd> <kbd>→</kbd> pour passer d’une demande à l’autre, <kbd>⌘Return</kbd> pour ouvrir la session, <kbd>Esc</kbd> pour rendre le clavier). Glissez-le où vous voulez ; sa position est retenue pour chaque écran. Tant qu’il est actif, aucune notification n’est publiée, puisque la bulle le dit déjà.</dd>
+</dl>
+<p>L’avatar peut être celui par défaut, un avatar que vous importez, ou un avatar qu’un agent dessine d’après votre description : voir <a href="personalize.html#avatars">Thèmes et avatars</a>.</p>

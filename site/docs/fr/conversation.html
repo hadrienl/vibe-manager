@@ -1,0 +1,32 @@
+<h1>Conversation et terminal</h1>
+<p class="lede">Chaque session fait tourner son agent dans un vrai terminal. La vue conversation lit ce qu’écrit l’agent et l’affiche comme un chat : les messages en entier, le reste replié sous un titre qui résume ce qu’il a fait.</p>
+
+<h2 id="two-views">Deux vues d’une même session</h2>
+<p>Le sélecteur <strong>Conversation | Terminal</strong> de la barre d’outils, ou <strong>Présentation › Afficher le terminal</strong> (<kbd>⌥⌘T</kbd>), passe de l’une à l’autre. Les deux restent actives : le passage est instantané et chacune garde sa position. Chaque session retient la vue dans laquelle vous l’avez laissée ; les nouvelles sessions s’ouvrent dans celle choisie dans <a href="settings.html#conversation">Réglages › Conversation</a>.</p>
+<vm-shot name="terminal" alt="La même session en vue Terminal : l’interface de Claude Code, sur toute la largeur, avec la barre d’état en dessous.">Le terminal fait toujours foi : la conversation est lue à partir de ce qu’écrit l’agent.</vm-shot>
+<p>Le terminal est l’interface de l’agent lui-même, intacte : tout ce que vous pouvez faire dans <code>claude</code> ou <code>codex</code> dans un terminal, vous pouvez le faire ici. La barre d’état en dessous indique si le processus tourne, avec <strong>Arrêter</strong> ou <strong>Relancer</strong>, et le bouton des <a href="terminals.html">terminaux annexes</a>.</p>
+
+<h2 id="reading">Lire une conversation</h2>
+<ul>
+  <li>Les <strong>messages</strong> — les vôtres et ceux de l’agent — s’affichent en entier, avec le Markdown, les tableaux et le code.</li>
+  <li>Les <strong>appels d’outils</strong> sont repliés sous un titre : « 2 fichiers lus », « Recherche de VAT_RATE », « Lancer la suite de tests — 13 tests réussis ». Les appels consécutifs de même nature sont regroupés ; l’état le plus grave s’affiche sur le groupe. Cliquez pour déplier : une modification de fichier montre son diff, une commande sa sortie.</li>
+  <li>Le <strong>raisonnement</strong>, quand l’agent le partage, est une ligne repliée.</li>
+  <li>Les <strong>sous-agents</strong> lancés par l’agent apparaissent sous forme de blocs avec leur mission, leur activité et leur résultat ; un bandeau liste ceux qui tournent encore.</li>
+  <li>Les images générées par l’agent s’affichent sur place.</li>
+</ul>
+<p>Quand vous remontez, une pastille <strong>nouveaux messages</strong> vous ramène à la fin. <strong>Édition › Copier en Markdown</strong> (<kbd>⌥⇧⌘C</kbd>) copie la sélection avec sa mise en forme. Ce qui est replié ou déplié se règle dans <a href="settings.html#conversation">Réglages › Conversation › Détails techniques</a>.</p>
+<div class="callout"><p>La conversation est lue dans les fichiers de transcript qu’écrivent Claude Code et Codex, et gardée en mémoire seulement. Vibe Manager ne l’écrit nulle part, ne la journalise pas et ne l’envoie jamais. Les liens se limitent à <code>http</code>, <code>https</code> et <code>mailto</code>, et aucune image distante n’est chargée.</p></div>
+
+<h2 id="composer">Écrire à l’agent</h2>
+<p>La zone de saisie en bas écrit dans le terminal de l’agent comme si vous tapiez vous-même.</p>
+<ul>
+  <li><kbd>Return</kbd> envoie, <kbd>⇧Return</kbd> ajoute une ligne.</li>
+  <li><kbd>↑</kbd> et <kbd>↓</kbd> sur la première ou la dernière ligne rappellent les messages déjà envoyés.</li>
+  <li>Un message saisi pendant que l’agent travaille est envoyé à la fin de son tour.</li>
+  <li><kbd>Esc</kbd> interrompt l’agent, comme la pastille <strong>Arrêter</strong> affichée pendant un tour.</li>
+  <li>Un message qui commence par <code>!</code> est une <strong>commande shell</strong>, exécutée par le mode shell de l’agent lui-même ; la zone de saisie prend la couleur d’avertissement. Tapez <code>\!</code> pour envoyer un message qui commence par un point d’exclamation.</li>
+</ul>
+<p>Tant que l’agent attend une réponse dans son terminal — une autorisation, une question —, la zone de saisie est fermée et la demande s’affiche à sa place : voir <a href="requests.html">Répondre à vos agents</a>.</p>
+
+<h2 id="files">Joindre des fichiers</h2>
+<p>Déposez des fichiers sur la conversation, cliquez sur <strong>+</strong> dans la zone de saisie ou choisissez <strong>Session › Joindre des fichiers…</strong> (<kbd>⌘O</kbd>) : ils deviennent des pastilles dans la zone de saisie et sont envoyés sous forme de chemins avec votre message. Déposé sur le terminal, le chemin d’un fichier est saisi, échappé comme le fait Terminal, sans appuyer sur Retour. Vous pouvez aussi déposer des fichiers sur la ligne d’une session dans la barre latérale.</p>

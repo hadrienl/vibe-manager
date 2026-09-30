@@ -1,0 +1,56 @@
+<h1>Organiser vos sessions</h1>
+<p class="lede">La barre latérale est une liste de tâches : quatre colonnes de statut, des groupes par projet, un ordre manuel, des filtres, et des archives où rien n’est jamais supprimé.</p>
+
+<vm-shot name="sidebar" class="center" alt="La barre latérale : quatre onglets de statut avec leur nombre, trois sessions en cours avec l’état de leur agent, et la palette Demandes en attente.">La colonne En cours, et les demandes en attente en dessous.</vm-shot>
+
+<h2 id="statuses">Quatre statuts</h2>
+<p>Chaque session est <strong>À faire</strong>, <strong>En cours</strong>, <strong>En attente</strong> ou <strong>Terminé</strong>, une colonne par statut derrière les quatre onglets en haut de la barre latérale. Chaque onglet affiche son nombre de sessions, et un point orange signale une colonne où une session vous attend.</p>
+<p>Le statut dit où en est le <em>travail</em>, pas ce que fait l’agent : une session que vous fermez reste dans sa colonne, et seul le fait de la démarrer ou de la relancer la ramène dans En cours. Pour le changer :</p>
+<ul>
+  <li>balayez une ligne latéralement avec deux doigts : les statuts qui précèdent et suivent le sien apparaissent, cliquez sur l’un d’eux ;</li>
+  <li>utilisez le menu <strong>Statut</strong> de la barre d’outils, <strong>Session › Statut</strong> ou le menu contextuel de la ligne ;</li>
+  <li>appuyez sur <kbd>⌥⌘→</kbd> ou <kbd>⌥⌘←</kbd> pour passer au statut suivant ou précédent.</li>
+</ul>
+<p><kbd>⌃⌘→</kbd> et <kbd>⌃⌘←</kbd> changent de colonne.</p>
+
+<h2 id="row">Ce que dit une ligne</h2>
+<p>Chaque ligne montre le badge, le nom et l’agent de la session, et ce que l’agent fait en ce moment :</p>
+<table>
+  <thead><tr><th>État</th><th>Signification</th></tr></thead>
+  <tbody>
+    <tr><td>En cours</td><td>L’agent joue son tour.</td></tr>
+    <tr><td>Autorisation requise</td><td>Il demande la permission d’exécuter une commande ou de modifier un fichier.</td></tr>
+    <tr><td>Question posée</td><td>Il vous demande quelque chose.</td></tr>
+    <tr><td>Nouvelle réponse</td><td>Il a terminé son tour depuis votre dernier passage.</td></tr>
+    <tr><td>En attente</td><td>Il attend votre prochain message.</td></tr>
+    <tr><td>Terminée, Échec, Terminé avec le code…</td><td>Le processus de l’agent s’est arrêté.</td></tr>
+    <tr><td>Fermée</td><td>La session est fermée ; tout ce qu’elle contient est conservé.</td></tr>
+  </tbody>
+</table>
+<p>Une main sur la ligne signifie que l’agent attend votre autorisation dans la vue web, un globe qu’il a ouvert une page. Les neuf premières sessions de la colonne répondent à <kbd>⌘1</kbd> à <kbd>⌘9</kbd> ; <kbd>⌥⌘↑</kbd> et <kbd>⌥⌘↓</kbd> passent à la session précédente et suivante.</p>
+<p>Les états « en cours », « question » et « terminé » viennent des hooks de l’agent lui-même, que vous approuvez une fois par agent : voir <a href="settings.html#general">Réglages › Général › Activité des agents</a>.</p>
+
+<h2 id="groups">Grouper par projet</h2>
+<p><strong>Présentation › Grouper les sessions par dossier</strong> (<kbd>⌃⌘G</kbd>), ou le bouton dossier en bas de la barre latérale, donne à chaque dossier de travail une section repliable. Son en-tête indique combien de sessions elle contient et le plus urgent de leurs états.</p>
+<vm-shot name="sidebar-grouped" class="center" alt="La barre latérale groupée par dossier : storefront-web, billing-api et mobile-app, chacun avec ses sessions.">Les sessions groupées par dossier de travail.</vm-shot>
+<p>Un clic droit sur un en-tête permet de renommer le groupe (ou de revenir au nom du dossier), de démarrer une <strong>Nouvelle session dans ce dossier</strong>, de déplacer le groupe ou d’afficher le dossier dans le Finder. <kbd>⌃⌥⌘←</kbd> et <kbd>⌃⌥⌘→</kbd> replient et déplient le groupe courant.</p>
+
+<h2 id="sort-filter">Trier, filtrer, chercher</h2>
+<p>Le menu en bas de la barre latérale trie par <strong>Dernière activité</strong>, <strong>Date de création</strong>, <strong>Nom</strong> ou <strong>Manuel</strong>. En mode Manuel, glissez une ligne n’importe où dans sa colonne (ou son groupe), et glissez un en-tête de groupe pour déplacer tout le groupe ; <kbd>⌃⌘↑</kbd> et <kbd>⌃⌘↓</kbd> font de même au clavier. Une nouvelle session arrive en haut, et une session garde sa place quand elle est relancée ou change de colonne.</p>
+<p>Le même menu filtre par agent ou par dossier ; une icône de filtre s’affiche tant qu’un filtre est actif. Le champ de recherche en haut cherche dans les noms des sessions, leurs premiers prompts, leurs notes, leurs modèles et leurs dossiers, sans tenir compte de la casse ni des accents.</p>
+
+<h2 id="quick-open">Ouvrir rapidement</h2>
+<p><strong>Fichier › Ouvrir rapidement…</strong> (<kbd>⌘P</kbd>) retrouve une session à partir de ce que vous avez sous la main : un numéro de ticket (<code>142</code>, <code>#142</code>, <code>owner/repo#142</code>, <code>!87</code>), l’URL d’un ticket, d’une pull request ou d’une merge request collée telle quelle, une branche, un worktree, un dossier, ou des mots de son titre, de son résumé ou de ses notes. Chaque résultat indique pourquoi il correspond ; <kbd>Return</kbd> affiche la session, archives comprises.</p>
+<vm-shot name="quick-open" class="center" alt="Le panneau Ouvrir rapidement, avec une recherche de 142 et la session correspondante.">Ouvrir rapidement retrouve une session par ticket, URL, branche ou mots.</vm-shot>
+
+<h2 id="close-archive">Fermer, archiver, relancer</h2>
+<dl>
+  <dt>Fermer la session <kbd>⇧⌘W</kbd></dt>
+  <dd>Arrête l’agent et conserve tout : la conversation, la sortie du terminal, les notes. La session reste dans sa colonne, et une barre propose de la relancer. <kbd>⌘W</kbd> ne ferme jamais une session : il ferme l’onglet de la vue web ou le terminal annexe qui a le clavier.</dd>
+  <dt>Relancer la session <kbd>⌃⌘R</kbd></dt>
+  <dd>Remet au travail une session fermée. Quand l’agent peut reprendre sa propre conversation, il le fait, et rien n’est envoyé. Quand il ne le peut pas, l’app le signale et propose un nouveau processus avec un résumé de la session, que vous pouvez lire et modifier avant l’envoi. Même agent, même modèle, même dossier et même worktree.</dd>
+  <dt>Archiver <kbd>⌃⌘A</kbd></dt>
+  <dd>Retire la session des colonnes. Rien n’est supprimé : <strong>Archivées</strong> en bas de la barre latérale (ou <kbd>⌥⌘A</kbd>) liste les sessions archivées, et <strong>Désarchiver</strong> (<kbd>⇧⌃⌘A</kbd>) en ramène une.</dd>
+</dl>
+<p>Fermer et archiver ne demandent confirmation que si quelque chose tourne dans la session — son agent, ou une commande dans un terminal annexe —, si bien que vous pouvez enchaîner les <kbd>⌃⌘A</kbd> pour vider une colonne. Sélectionnez plusieurs lignes avec <kbd>⌘</kbd>-clic ou <kbd>⇧</kbd>-clic pour les fermer, les archiver, les relancer ou les déplacer ensemble.</p>
+<vm-shot name="archived" class="center" alt="La fenêtre contextuelle des archives, qui liste les sessions archivées avec un bouton Désarchiver.">Les archives : rien n’est jamais supprimé.</vm-shot>

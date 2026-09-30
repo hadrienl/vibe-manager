@@ -1,0 +1,42 @@
+<h1>Prompt templates</h1>
+<p class="lede">A prompt template is a prompt with fields — <code>Review {{url}}</code> — ready to start a session from: a form, an exact preview, and a session named after what you typed.</p>
+
+<h2 id="use">Start a session from a template</h2>
+<p>Pick a template at the top of the New Session draft, or go straight to <strong>File › New Session from</strong>; <kbd>⇧⌘N</kbd> opens the first one. Each field becomes a control; a required one keeps the session from being created until it is filled. The composer previews the prompt exactly as the agent will receive it.</p>
+<vm-shot name="new-session-template" alt="A new session from the “Review a merge request” template: the merge request URL filled in, the storefront-web folder proposed by the template, and the rendered prompt in the composer.">The template proposes the folder, the name and the badge; the composer shows the exact prompt.</vm-shot>
+<p>The session keeps the rendered text, with the template's name and revision: changing the template later changes nothing already created, not even what <strong>Restart</strong> sends.</p>
+
+<h2 id="edit">Write a template</h2>
+<p>Templates are edited in <strong>Settings › Templates</strong>, also reached with <strong>File › Manage Prompt Templates…</strong>.</p>
+<vm-shot name="settings-templates" alt="Settings, Templates tab: the list of templates, the editor of “Review a merge request” with its fields, the Try it column and the preview.">The template editor, with a value to try per field.</vm-shot>
+<dl>
+  <dt>What is it for?</dt><dd>The template's name, as listed in menus.</dd>
+  <dt>Session name</dt><dd>Optional, with the same fields: <code>Review !{{url|/merge_requests\/(\d+)/}}</code>. It names the session until you type a name of your own.</dd>
+  <dt>Folder</dt><dd>Optional: the working folder proposed with the template. Written with <code>~</code>, it means the same folder on another Mac.</dd>
+  <dt>Appearance</dt><dd>Optional: the symbol and colour given to its sessions.</dd>
+  <dt>Prompt</dt><dd>The text, with its fields. The table below it sets each field's label, hint, whether it is required and whether it takes several lines.</dd>
+</dl>
+<p>The <strong>Try it</strong> column takes a value per field and shows what each pattern keeps of it; the preview below uses the same values. <strong>Save</strong> or <strong>Revert</strong> when you are done. The <strong>⋯</strong> menu duplicates, moves, deletes, imports and exports templates, and <strong>Add Examples</strong> adds a few to start from.</p>
+
+<h2 id="syntax">Syntax</h2>
+<table>
+  <thead><tr><th>Written</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>{{url}}</code></td><td>A required field named <code>url</code>. <code>{{ url }}</code> and <code>{{URL}}</code> are the same field.</td></tr>
+    <tr><td><code>{{focus?}}</code></td><td>An optional field. Left empty, it adds nothing.</td></tr>
+    <tr><td><code>{{url|/merge_requests\/(\d+)/}}</code></td><td>Only part of the value: what the regular expression finds, or its first group — <code>1315</code> out of <code>…/merge_requests/1315/diffs</code>.</td></tr>
+    <tr><td><code>\{{</code></td><td>Two literal braces: <code>\{{url}}</code> is the text <code>{{url}}</code>.</td></tr>
+  </tbody>
+</table>
+<p>A field name starts with a letter and holds letters, digits, <code>-</code> and <code>_</code>. Anything else between double braces — <code>{{payload.url}}</code>, <code>{{#each}}</code> — stays text, since prompts are full of code using the same braces; the editor underlines it. The same field used twice is asked once. A template has at most 20 fields and 16 KB of text.</p>
+<p>A pattern that finds nothing adds nothing: the form says so under the field, and the session can still be created. <code>{{url|/(?:merge_requests|pull)\/(\d+)/}}</code> gives the number of a GitLab merge request or a GitHub pull request alike.</p>
+
+<h2 id="sent">What the agent receives</h2>
+<ul>
+  <li>A value is inserted as typed, and never read again: a value holding <code>{{x}}</code> stays that text.</li>
+  <li>Nothing is quoted: the prompt reaches the agent as a single argument, with no shell in between, so <code>$</code>, quotes and backticks arrive untouched.</li>
+  <li>A one-line field loses its surrounding spaces; control characters pasted from a coloured terminal are removed.</li>
+</ul>
+
+<h2 id="share">Share templates</h2>
+<p><strong>Export…</strong> writes a JSON file; <strong>Import…</strong>, or dropping a file on the window, reads one and shows first which templates are new, identical or changed. A changed template is kept beside yours unless you choose <strong>Replace</strong>. The file format is documented in <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/prompt-templates.md">docs/prompt-templates.md</a>.</p>

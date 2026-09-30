@@ -1,0 +1,43 @@
+<h1>Install Vibe Manager</h1>
+<p class="lede">Download the disk image, drag the app to Applications, and make sure at least one agent is installed and signed in.</p>
+
+<h2 id="requirements">Requirements</h2>
+<ul>
+  <li><strong>macOS 14 Sonoma</strong> or later, on Apple silicon or Intel.</li>
+  <li>At least one coding agent, installed and signed in:
+    <table>
+      <thead><tr><th>Agent</th><th>Command</th><th>Minimum version</th><th>Sign in with</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Code</td><td><code>claude</code></td><td>2.1.0</td><td><code>claude auth login</code></td></tr>
+        <tr><td>Codex CLI</td><td><code>codex</code></td><td>0.153.0</td><td><code>codex login</code></td></tr>
+      </tbody>
+    </table>
+  </li>
+</ul>
+<p>Vibe Manager uses your agents as they are, with your own account and quota. It never asks for an API key.</p>
+
+<h2 id="download">Download and install</h2>
+<ol>
+  <li>Download the latest <code>.dmg</code> from the <a href="../">home page</a> or from <a href="https://github.com/hadrienl/vibe-manager/releases">GitHub Releases</a>.</li>
+  <li>Open it and drag <strong>Vibe Manager</strong> into <strong>Applications</strong>.</li>
+  <li>Launch it from Applications. The app is signed with a Developer ID and notarized by Apple, so macOS opens it without a warning.</li>
+</ol>
+<p>Updates are then offered by the app itself: see <a href="settings.html#updates">Settings › Updates</a>.</p>
+
+<h2 id="agents-detected">How agents are found</h2>
+<p>At launch, and whenever you click <strong>Detect again</strong>, Vibe Manager looks for <code>claude</code> and <code>codex</code> in the usual places — <code>/opt/homebrew/bin</code>, <code>/usr/local/bin</code>, <code>~/.local/bin</code>, <code>~/.bun/bin</code>, <code>~/.npm-global/bin</code>, <code>~/.volta/bin</code>, the asdf and mise shims, <code>~/.claude/local</code>, <code>~/.codex/bin</code>… — then in your <code>PATH</code>, and last in your login shell's <code>PATH</code>. A native build is preferred over one that runs under Rosetta.</p>
+<p>When an agent cannot be used, the New Session form says why: not installed, not executable, too old, or not signed in. Fix it in a terminal, then click <strong>Detect again</strong>.</p>
+
+<h2 id="full-disk-access">Full Disk Access</h2>
+<p>Agents run as children of Vibe Manager, so when one of them reads a protected folder — Documents, Desktop, Downloads, iCloud Drive — macOS asks <em>Vibe Manager</em> for permission. To avoid a string of prompts in the middle of your work, the app offers once, at the first launch, to grant <strong>Full Disk Access</strong>:</p>
+<vm-shot name="full-disk-access" class="center" alt="The “Let agents read your folders” sheet, with three steps and the Open System Settings button.">The one-time Full Disk Access step.</vm-shot>
+<ol>
+  <li>Click <strong>Open System Settings</strong>: Privacy &amp; Security › Full Disk Access opens.</li>
+  <li>Turn <strong>Vibe Manager</strong> on.</li>
+  <li>Come back to Vibe Manager.</li>
+</ol>
+<p><strong>Not Now</strong> is a perfectly good answer: repositories rarely live in protected folders, and nothing is disabled. You can grant it later from <a href="settings.html#privacy">Settings › Privacy</a>, which also shows whether the processes that run your agents already have it.</p>
+<div class="callout tip"><p>Agents keep the access they had when they started. If you grant Full Disk Access while agents are running, Settings › Privacy offers <strong>Restart When Idle</strong> or <strong>Restart Now…</strong> so they pick it up.</p></div>
+
+<h2 id="first-session">Your first session</h2>
+<p>Press <kbd>⌘N</kbd>, choose a working folder, check the agent, describe the task and press <kbd>Return</kbd>. The next page explains every option: <a href="sessions.html">Create a session</a>.</p>

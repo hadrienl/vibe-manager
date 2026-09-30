@@ -1,0 +1,43 @@
+<h1>The inspector</h1>
+<p class="lede">The column on the right holds the context of the session on screen: what it is about, what it changed, your notes, its agent and what it used.</p>
+
+<vm-shot name="inspector" class="center" alt="The inspector: the session's badge and name, the Activity section, the Git section with staged, unstaged and committed files, and the Notes.">Activity, Git and notes of a session.</vm-shot>
+
+<p>Show or hide it with the toolbar button or <strong>View › Hide Context</strong> (<kbd>⌥⌘I</kbd>). Its header shows the session's badge and name: click them to change them. Each section folds, can be dragged to another place and resized; <kbd>⌥</kbd>-click a header folds or unfolds them all, and <strong>View › Reset Column Layout</strong> puts everything back.</p>
+
+<h2 id="activity">Activity</h2>
+<dl>
+  <dt>Summary</dt>
+  <dd>A few lines on where the session stands, written by the agent itself after its turns, with its lightest model, at most once every five minutes. It is turned on or off in <a href="settings.html#activity">Settings › Activity</a>.</dd>
+  <dt>Resources</dt>
+  <dd>The tickets, pull and merge requests, branches and worktrees the session touched, found in its transcript. Right-click one to copy its address, reference or path, or reveal its repository.</dd>
+</dl>
+
+<h2 id="git">Git</h2>
+<p>Every repository the session worked in, kept live while the session is on screen — including worktrees the agent created for itself. For each one:</p>
+<ul>
+  <li>the <strong>branch</strong>, how far it is ahead of or behind its upstream (as last fetched), and a merge or rebase left in progress;</li>
+  <li>the <strong>conflicted</strong>, <strong>staged</strong>, <strong>unstaged</strong> and <strong>untracked</strong> files, in Git's order;</li>
+  <li>the files already <strong>committed</strong> on the branch since <code>origin/main</code>, so that a session whose agent committed its work still shows what it changed.</li>
+</ul>
+<p>Files are attributed to the agent that changed them: when two sessions share a folder, a file that is not in this session's transcript is flagged. <kbd>Return</kbd> or a double-click opens a file in the editor chosen in <a href="settings.html#general">Settings › General</a>; <kbd>⇧⌘R</kbd> reveals it in the Finder; its context menu copies its path.</p>
+<div class="callout"><p>Vibe Manager only reads. It never creates a branch, stages, commits or fetches: the agent does what it needs, and the inspector reports it. Nothing polls on a timer either — a change on disk triggers one <code>git status</code>, without ever taking a lock.</p></div>
+
+<h2 id="notes">Notes</h2>
+<p>Plain text, one note per session, typed right in the inspector: <strong>View › Edit Notes</strong> (<kbd>⌥⌘N</kbd>) jumps there, <kbd>Esc</kbd> goes back. Notes are saved a moment after you stop typing and whenever you leave the session; the header says when they are on disk. They survive closing, relaunching and archiving, and the sidebar search finds them.</p>
+<p>When <a href="settings.html#tickets">Settings › Tickets</a> allows it, the title of a ticket you paste is inserted next to its link.</p>
+
+<h2 id="agent-usage">Agent, usage and initial prompt</h2>
+<dl>
+  <dt>Agent</dt>
+  <dd>The agent and model of the session, the history of its switches, and <strong>Switch…</strong>: see <a href="agents.html#switch">Switch agent or model</a>.</dd>
+  <dt>Usage</dt>
+  <dd>The running time and runs of the session, and the tokens read from the agent's transcripts.</dd>
+  <dt>Initial prompt</dt>
+  <dd>The first message the session was created with, and the template and revision it came from.</dd>
+</dl>
+
+<h2 id="usage-window">The Usage window</h2>
+<p><strong>Window › Usage</strong> (<kbd>⌥⌘U</kbd>) adds it all up over a period — today, 7 or 30 days, this month, the previous one, or all time — grouped by session, agent or model, as tokens or as running time.</p>
+<vm-shot name="usage" alt="The Usage window: a chart of tokens per day, and a table of sessions with their running time and tokens.">What the agents used, by session, agent or model.</vm-shot>
+<p>Running time is measured by the app, sleep excluded. Tokens are read from the counters in the transcripts Claude Code and Codex write, and marked <code>≈</code>. No cost is shown: neither CLI reports one that holds together. Usage tracking can be turned off or cleared in <a href="settings.html#general">Settings › General</a>.</p>
