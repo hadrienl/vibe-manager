@@ -7,9 +7,11 @@ folder GitHub Pages serves; `Scripts/publish-appcast.sh` runs it, then generates
 
 ```
 site/
-  template.html   the page, with its French text; one block per page (index, changelog, contribute)
+  template.html   the page, with its French text; one block per page (index, changelog, contribute, docs)
   i18n/<lang>.json  the texts of each language, fr.json being the reference
+  docs/<lang>/    the documentation, in English and French only: docs.json and one page per file
   assets/         style, the one script, screenshots, illustrations, icons
+  assets/docs/<lang>/  the documentation's screenshots
   build.mjs       template × languages × pages → <output>/<lang>/<page>.html
 ```
 
@@ -25,6 +27,26 @@ site/
   A release triggers the workflow, so the page follows without a commit. The notes are written in
   French, and the other languages say so.
 - **It refuses a language that lacks a text,** instead of silently showing French.
+
+## The documentation
+
+`/<lang>/docs/` is the user documentation, written in English and French only; the landing page
+of every other language links to the English one. `docs/<lang>/docs.json` lists the pages in
+their order and groups, with the words around them (the menu, "On this page", previous and next);
+each page is an HTML fragment, `docs/<lang>/<slug>.html`, opening on an `<h1>` and a
+`<p class="lede">`, which give the page's title and description. The build adds the menu, the list
+of the page's `<h2 id>` on the right, and links to the previous and next pages. It stops when the two
+languages do not have the same pages.
+
+A screenshot is written `<vm-shot name="new-session" alt="…">caption</vm-shot>`, optionally with
+`class="center"` for a narrow one: it is `assets/docs/<lang>/<name>.jpg`, shown in a light system
+appearance, and `<name>-dark.jpg` in a dark one. The build reads each file's size, so the page does
+not move while images load, and stops when one is missing. The screenshots are taken from a Release
+build run as an isolated copy on a staged, fictitious data folder, in each language and each
+appearance, at 2× (shown at 1×).
+
+To add a page: write it in both languages, add its slug to both `docs.json`, and link it from its
+neighbours.
 
 ## Preview it
 

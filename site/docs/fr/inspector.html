@@ -1,0 +1,43 @@
+<h1>L’inspecteur</h1>
+<p class="lede">La colonne de droite contient le contexte de la session affichée : son objet, ce qu’elle a changé, vos notes, son agent et ce qu’elle a consommé.</p>
+
+<vm-shot name="inspector" class="center" alt="L’inspecteur : le badge et le nom de la session, la section Activité, la section Git avec les fichiers indexés, non indexés et commités, et les Notes.">L’activité, Git et les notes d’une session.</vm-shot>
+
+<p>Affichez-le ou masquez-le avec le bouton de la barre d’outils ou <strong>Présentation › Masquer le contexte</strong> (<kbd>⌥⌘I</kbd>). Son en-tête montre le badge et le nom de la session : cliquez dessus pour les changer. Chaque section se replie, se déplace par glisser-déposer et se redimensionne ; un <kbd>⌥</kbd>-clic sur un en-tête les replie ou les déplie toutes, et <strong>Présentation › Rétablir la disposition de la colonne</strong> remet tout en place.</p>
+
+<h2 id="activity">Activité</h2>
+<dl>
+  <dt>Résumé</dt>
+  <dd>Quelques lignes sur l’état d’avancement de la session, écrites par l’agent lui-même après ses tours, avec son modèle le plus léger, au plus une fois toutes les cinq minutes. Il s’active ou se désactive dans <a href="settings.html#activity">Réglages › Activité</a>.</dd>
+  <dt>Ressources</dt>
+  <dd>Les tickets, pull requests et merge requests, branches et worktrees que la session a touchés, repérés dans son transcript. Un clic droit sur l’un d’eux copie son adresse, sa référence ou son chemin, ou affiche son dépôt.</dd>
+</dl>
+
+<h2 id="git">Git</h2>
+<p>Chaque dépôt dans lequel la session a travaillé, tenu à jour en direct tant que la session est affichée — y compris les worktrees que l’agent a créés pour lui-même. Pour chacun :</p>
+<ul>
+  <li>la <strong>branche</strong>, son avance ou son retard sur l’amont (d’après le dernier fetch), et un merge ou un rebase resté en cours ;</li>
+  <li>les fichiers <strong>en conflit</strong>, <strong>indexés</strong>, <strong>non indexés</strong> et <strong>non suivis</strong>, dans l’ordre de Git ;</li>
+  <li>les fichiers déjà <strong>commités</strong> sur la branche depuis <code>origin/main</code>, pour qu’une session dont l’agent a commité son travail montre encore ce qu’elle a changé.</li>
+</ul>
+<p>Les fichiers sont attribués à l’agent qui les a modifiés : quand deux sessions partagent un dossier, un fichier absent du transcript de cette session est signalé. <kbd>Return</kbd> ou un double-clic ouvre un fichier dans l’éditeur choisi dans <a href="settings.html#general">Réglages › Général</a> ; <kbd>⇧⌘R</kbd> l’affiche dans le Finder ; son menu contextuel copie son chemin.</p>
+<div class="callout"><p>Vibe Manager ne fait que lire. Il ne crée jamais de branche, n’indexe pas, ne commite pas et ne fait pas de fetch : l’agent fait ce dont il a besoin, et l’inspecteur le rapporte. Rien n’est interrogé à intervalles réguliers non plus — une modification sur le disque déclenche un <code>git status</code>, sans jamais prendre de verrou.</p></div>
+
+<h2 id="notes">Notes</h2>
+<p>Du texte brut, une note par session, saisie directement dans l’inspecteur : <strong>Présentation › Modifier les notes</strong> (<kbd>⌥⌘N</kbd>) vous y amène, <kbd>Esc</kbd> vous ramène. Les notes sont enregistrées peu après que vous arrêtez de taper et chaque fois que vous quittez la session ; l’en-tête indique quand elles sont sur le disque. Elles survivent à la fermeture, à la relance et à l’archivage, et la recherche de la barre latérale les trouve.</p>
+<p>Quand <a href="settings.html#tickets">Réglages › Tickets</a> le permet, le titre d’un ticket que vous collez est inséré à côté de son lien.</p>
+
+<h2 id="agent-usage">Agent, utilisation et prompt initial</h2>
+<dl>
+  <dt>Agent</dt>
+  <dd>L’agent et le modèle de la session, l’historique de ses changements, et <strong>Changer…</strong> : voir <a href="agents.html#switch">Changer d’agent ou de modèle</a>.</dd>
+  <dt>Utilisation</dt>
+  <dd>Le temps d’exécution et les exécutions de la session, et les jetons lus dans les transcripts de l’agent.</dd>
+  <dt>Prompt initial</dt>
+  <dd>Le premier message avec lequel la session a été créée, et le modèle de prompt et la révision dont il vient.</dd>
+</dl>
+
+<h2 id="usage-window">La fenêtre Utilisation</h2>
+<p><strong>Fenêtre › Utilisation</strong> (<kbd>⌥⌘U</kbd>) fait le total sur une période — aujourd’hui, 7 ou 30 jours, ce mois-ci, le mois précédent, ou depuis toujours —, regroupé par session, agent ou modèle, en jetons ou en temps d’exécution.</p>
+<vm-shot name="usage" alt="La fenêtre Utilisation : un graphique des jetons par jour, et un tableau des sessions avec leur temps d’exécution et leurs jetons.">Ce que les agents ont consommé, par session, agent ou modèle.</vm-shot>
+<p>Le temps d’exécution est mesuré par l’app, hors veille. Les jetons sont lus dans les compteurs des transcripts qu’écrivent Claude Code et Codex, et marqués <code>≈</code>. Aucun coût n’est affiché : aucune des deux CLI n’en indique un qui tienne la route. Le suivi de l’utilisation peut être désactivé ou effacé dans <a href="settings.html#general">Réglages › Général</a>.</p>

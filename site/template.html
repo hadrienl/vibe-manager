@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   Template of the landing page. site/build.mjs renders it once per language and per page
-  (index, changelog, contribute) into the folder GitHub Pages serves: every element carrying
+  (index, changelog, contribute, and the documentation pages of docs/<lang>/) into the folder GitHub Pages serves: every element carrying
   data-i18n gets its text from i18n/<lang>.json, and every marker between double percent signs is filled by the build.
   The French text written here is the reference, and i18n/fr.json mirrors it.
 -->
@@ -22,12 +22,12 @@
 <meta property="og:image" content="%%SITE_URL%%assets/shots/overview-light.jpg">
 <meta property="og:locale" content="%%OG_LOCALE%%">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" type="image/png" href="../assets/icon-64.png">
-<link rel="apple-touch-icon" href="../assets/icon-256.png">
+<link rel="icon" type="image/png" href="%%ASSETS%%icon-64.png">
+<link rel="apple-touch-icon" href="%%ASSETS%%icon-256.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
-<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="%%ASSETS%%style.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -65,12 +65,13 @@
 
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="./"><svg aria-hidden="true"><use href="#appicon"/></svg>Vibe Manager</a>
+    <a class="brand" href="%%HOME%%./"><svg aria-hidden="true"><use href="#appicon"/></svg>Vibe Manager</a>
     <nav class="nav-links" data-i18n-attr="aria-label:nav.aria" aria-label="Navigation principale">
-      <a href="./#fonctionnalites" data-i18n="nav.features">Fonctionnalités</a>
-      <a href="changelog.html" data-nav="changelog" data-i18n="nav.changelog">Changelog</a>
-      <a href="contribute.html" data-nav="contribute" data-i18n="nav.contribute">Contribuer</a>
-      <a href="./#soutenir" data-i18n="nav.support">Soutenir</a>
+      <a href="%%HOME%%./#fonctionnalites" data-i18n="nav.features">Fonctionnalités</a>
+      <a href="%%DOCS_HREF%%" data-nav="docs" data-i18n="nav.docs">Documentation</a>
+      <a href="%%HOME%%changelog.html" data-nav="changelog" data-i18n="nav.changelog">Changelog</a>
+      <a href="%%HOME%%contribute.html" data-nav="contribute" data-i18n="nav.contribute">Contribuer</a>
+      <a href="%%HOME%%./#soutenir" data-i18n="nav.support">Soutenir</a>
       <a href="https://github.com/hadrienl/vibe-manager">GitHub</a>
     </nav>
     <label class="lang"><span class="sr" data-i18n="nav.language">Langue</span><svg aria-hidden="true"><use href="#i-globe"/></svg><select id="lang">%%LANG_OPTIONS%%</select></label>
@@ -95,7 +96,7 @@
         <span><svg aria-hidden="true"><use href="#i-check"/></svg><span data-i18n="hero.meta_signed">Signée et notarisée par Apple</span></span>
       </p>
       <div class="shot-stage">
-        <picture class="pic-hero"><source srcset="../assets/shots/overview.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/overview-light.jpg" data-i18n-attr="alt:hero.shot_alt" alt="Fenêtre de Vibe Manager : la liste des sessions à gauche, une conversation avec un agent au centre, l'état Git et les notes de la session à droite." width="2400" height="1735"></picture>
+        <picture class="pic-hero"><source srcset="%%ASSETS%%shots/overview.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="%%ASSETS%%shots/overview-light.jpg" data-i18n-attr="alt:hero.shot_alt" alt="Fenêtre de Vibe Manager : la liste des sessions à gauche, une conversation avec un agent au centre, l'état Git et les notes de la session à droite." width="2400" height="1735"></picture>
       </div>
     </div>
   </section>
@@ -112,7 +113,7 @@
           <li><span class="dot" style="background:var(--teal)"></span><span data-i18n="pain.s4">Revue de la MR !87</span><span class="when" data-i18n="status.done_short">terminé</span></li>
         </ul>
       </div>
-      <img src="../assets/img/hero-illu.jpg" data-i18n-attr="alt:pain.illu_alt" alt="Illustration : une fenêtre centrale reliée à quatre agents, chacun dans sa carte." loading="lazy">
+      <img src="%%ASSETS%%img/hero-illu.jpg" data-i18n-attr="alt:pain.illu_alt" alt="Illustration : une fenêtre centrale reliée à quatre agents, chacun dans sa carte." loading="lazy">
     </div>
   </section>
 
@@ -136,7 +137,7 @@
             <span class="chip"><span class="dot" style="background:var(--teal)"></span><span data-i18n="status.done">Terminé</span></span>
           </div>
         </div>
-        <picture class="pic-fade"><source srcset="../assets/shots/sidebar.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/sidebar-light.jpg" data-i18n-attr="alt:tasks.shot_alt" alt="La barre latérale de Vibe Manager, avec les sessions rangées par statut et les demandes des agents en attente de réponse." loading="lazy" width="1420" height="1500"></picture>
+        <picture class="pic-fade"><source srcset="%%ASSETS%%shots/sidebar.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="%%ASSETS%%shots/sidebar-light.jpg" data-i18n-attr="alt:tasks.shot_alt" alt="La barre latérale de Vibe Manager, avec les sessions rangées par statut et les demandes des agents en attente de réponse." loading="lazy" width="1420" height="1500"></picture>
       </div>
 
       <div class="feature-row flip">
@@ -145,7 +146,7 @@
           <h3 data-i18n="git.title">Ce que l'agent a changé, sans taper <code>git status</code></h3>
           <p data-i18n="git.text">L'inspecteur suit chaque dépôt touché par la session : fichiers modifiés, indexés, en conflit, commits d'avance sur l'amont. Les changements sont rattachés à l'agent qui les a faits, même quand deux sessions partagent le même dossier. Et vos notes de session sont juste en dessous.</p>
         </div>
-        <picture class="pic-narrow"><source srcset="../assets/shots/inspector.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/inspector-light.jpg" data-i18n-attr="alt:git.shot_alt" alt="L'inspecteur Git de Vibe Manager, avec les fichiers modifiés d'une session et ses notes." loading="lazy" width="682" height="950"></picture>
+        <picture class="pic-narrow"><source srcset="%%ASSETS%%shots/inspector.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="%%ASSETS%%shots/inspector-light.jpg" data-i18n-attr="alt:git.shot_alt" alt="L'inspecteur Git de Vibe Manager, avec les fichiers modifiés d'une session et ses notes." loading="lazy" width="682" height="950"></picture>
       </div>
 
       <div class="grid3">
@@ -202,7 +203,7 @@
           </figure>
         </div>
         <div class="avatar-stage">
-          <picture><source srcset="../assets/img/floating-dark.png" media="(prefers-color-scheme: dark)"><img class="floating" src="../assets/img/floating-light.png" width="864" height="504" data-i18n-attr="alt:avatar.shot_alt" alt="Le panneau flottant de Vibe Manager : l'avatar et sa bulle, qui montre la demande d'un agent avec les boutons Autoriser et Refuser." loading="lazy"></picture>
+          <picture><source srcset="%%ASSETS%%img/floating-dark.png" media="(prefers-color-scheme: dark)"><img class="floating" src="%%ASSETS%%img/floating-light.png" width="864" height="504" data-i18n-attr="alt:avatar.shot_alt" alt="Le panneau flottant de Vibe Manager : l'avatar et sa bulle, qui montre la demande d'un agent avec les boutons Autoriser et Refuser." loading="lazy"></picture>
           <ul class="sprites" data-i18n-attr="aria-label:avatar.sprites_aria" aria-label="Les dix expressions de l'avatar">%%AVATAR_SPRITES%%</ul>
         </div>
       </div>
@@ -224,7 +225,7 @@
             <span class="chip" data-i18n="theme.chip_contrast">Contrastes vérifiés</span>
           </div>
         </div>
-        <picture class="pic-theme"><source srcset="../assets/shots/theme.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/theme-light.jpg" width="1400" height="1098" data-i18n-attr="alt:theme.shot_alt" alt="Une conversation de Vibe Manager dans un thème personnel, avec ses couleurs, sa police et son image de fond." loading="lazy"></picture>
+        <picture class="pic-theme"><source srcset="%%ASSETS%%shots/theme.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="%%ASSETS%%shots/theme-light.jpg" width="1400" height="1098" data-i18n-attr="alt:theme.shot_alt" alt="Une conversation de Vibe Manager dans un thème personnel, avec ses couleurs, sa police et son image de fond." loading="lazy"></picture>
       </div>
     </div>
   </section>
@@ -341,7 +342,7 @@
         <h1 data-i18n="contrib.title">Vibe Manager avance au rythme de vos tickets</h1>
         <p data-i18n="contrib.lede">Un bug qui vous agace, un flux de travail qui manque, une idée à moitié formée : ouvrez un ticket. Chaque version est construite à partir de ce que les utilisateurs y écrivent.</p>
       </div>
-      <img src="../assets/img/contribute.jpg" data-i18n-attr="alt:contrib.illu_alt" alt="Illustration : des cartes de tickets posées sur un tableau, une main en ajoute une nouvelle." loading="lazy">
+      <img src="%%ASSETS%%img/contribute.jpg" data-i18n-attr="alt:contrib.illu_alt" alt="Illustration : des cartes de tickets posées sur un tableau, une main en ajoute une nouvelle." loading="lazy">
     </div>
 
     <div class="tickets">
@@ -396,20 +397,35 @@
 </main>
 <!--/PAGE:contribute-->
 
+<!-- ============ DOCUMENTATION ============ -->
+<!--PAGE:docs-->
+<main class="docs">
+  <div class="wrap docs-grid">
+    <nav class="docs-side" aria-label="%%DOCS_NAV_LABEL%%">%%DOCS_NAV%%</nav>
+    <article class="doc">
+%%DOCS_BODY%%
+      %%DOCS_PAGER%%
+    </article>
+    <aside class="docs-toc">%%DOCS_TOC%%</aside>
+  </div>
+</main>
+<!--/PAGE:docs-->
+
 <footer>
   <div class="wrap">
-    <a class="brand" href="./" style="font-size:.95rem"><svg aria-hidden="true" style="width:22px;height:22px"><use href="#appicon"/></svg>Vibe Manager</a>
+    <a class="brand" href="%%HOME%%./" style="font-size:.95rem"><svg aria-hidden="true" style="width:22px;height:22px"><use href="#appicon"/></svg>Vibe Manager</a>
     <span data-i18n="footer.tagline">Gratuit et open source.</span>
     <nav data-i18n-attr="aria-label:footer.aria" aria-label="Pied de page">
-      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
-      <a href="contribute.html" data-i18n="nav.contribute">Contribuer</a>
-      <a href="./#soutenir" data-i18n="nav.support">Soutenir</a>
+      <a href="%%DOCS_HREF%%" data-i18n="nav.docs">Documentation</a>
+      <a href="%%HOME%%changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a href="%%HOME%%contribute.html" data-i18n="nav.contribute">Contribuer</a>
+      <a href="%%HOME%%./#soutenir" data-i18n="nav.support">Soutenir</a>
       <a href="https://github.com/hadrienl/vibe-manager">GitHub</a>
       <a href="https://github.com/hadrienl/vibe-manager/releases" data-i18n="footer.all_versions">Toutes les versions</a>
     </nav>
   </div>
 </footer>
 
-<script src="../assets/app.js" defer></script>
+<script src="%%ASSETS%%app.js" defer></script>
 </body>
 </html>

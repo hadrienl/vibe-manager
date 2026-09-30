@@ -9,3 +9,10 @@
     location.href = option.dataset.href + location.hash;
   });
 })();
+
+// A screenshot opens in the appearance it is shown in.
+document.addEventListener("click", function (event) {
+  var link = event.target.closest && event.target.closest(".doc-shot a");
+  var image = link && link.querySelector("img");
+  if (image && image.currentSrc) link.href = image.currentSrc;
+});

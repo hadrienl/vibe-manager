@@ -1,0 +1,38 @@
+<h1>Agents, restarts and quitting</h1>
+<p class="lede">Change agent or model without losing the work, put a closed session back to work, and quit without interrupting an agent in the middle of its turn.</p>
+
+<h2 id="supported">Supported agents</h2>
+<p>Vibe Manager runs <strong>Claude Code</strong> and <strong>Codex CLI</strong>, each in its own terminal interface, with your account and your configuration. It passes no flag that lowers the permissions you set for your CLI, injects no API key, and reads no credential. What an agent may do inside a session is its own configuration: Vibe Manager neither widens nor narrows it.</p>
+<p>Two additions are made at launch, for that launch only: the agent's <strong>hooks</strong> report its activity — working, waiting, finished — once you have approved them (<a href="settings.html#general">Settings › General › Agent Activity</a>), and its <strong>tool server</strong> <code>vibe-browser</code> gives it the <a href="terminals.html#agent-browser">web view</a>.</p>
+
+<h2 id="switch">Switch agent or model</h2>
+<p><strong>Session › Switch Agent…</strong> (<kbd>⌃⌘M</kbd>), or <strong>Switch…</strong> in the inspector's Agent section, changes the agent or the model of a session.</p>
+<vm-shot name="switch-agent" class="center" alt="The Switch Agent sheet: the current agent, the list of agents to switch to with a model picker, and the editable summary handed to the new agent.">The new agent receives a summary you can read and edit first.</vm-shot>
+<ul>
+  <li><strong>Another model of the same agent</strong> resumes the same conversation and sends nothing.</li>
+  <li><strong>Another agent</strong> starts a new conversation, handed a summary of the session: who worked in it, where the work stands on each branch and worktree, its notes and the prompt it was created with. The summary is shown and editable before it is sent, and never presented as the conversation itself.</li>
+</ul>
+<p>Nothing is stopped until you confirm with <strong>Stop and Switch</strong> (<kbd>⌘Return</kbd>). If the new agent fails to start, the session goes back to its previous agent, resumable as before. Every switch is kept in the session's history, and the conversation view keeps reading the transcripts of every agent the session had.</p>
+
+<h2 id="restart">Restart a closed session</h2>
+<p>A closed session shows a bar: “This session is closed. Everything it carries is kept.” <strong>Restart</strong> — or <strong>Session › Restart Session</strong>, <kbd>⌃⌘R</kbd> — puts it back to work with the same agent, model, folder and worktree.</p>
+<vm-shot name="closed-session" alt="A closed session: its conversation, and at the bottom the bar saying the session is closed with a Restart button.">A closed session keeps everything, and restarts in one command.</vm-shot>
+<ul>
+  <li>When the agent can <strong>resume its own conversation</strong>, it does, and is sent nothing.</li>
+  <li>When it cannot — no identifier was ever kept, or the CLI would refuse it — the app says so and offers a new process with a summary of the session, shown and editable before it is sent.</li>
+</ul>
+<p>A session created with <strong>Add to To Do</strong> has never run: the same command reads <strong>Start Session</strong>.</p>
+
+<h2 id="quit">Quit without stopping the agents</h2>
+<p>Every terminal runs in a <strong>terminal host</strong>, a background process with no window and no Dock icon. So when agents are working and you quit, Vibe Manager asks:</p>
+<dl>
+  <dt>Keep Running</dt>
+  <dd>The agents carry on with their turn. At the next launch each one is back on screen as it was, nothing relaunched, nothing sent; one that finished meanwhile shows its last output. Side terminals keep running too.</dd>
+  <dt>Stop All</dt>
+  <dd>The agents are stopped, and left as the intention to resume them: at the next launch they come back with their CLI's own resume, without asking.</dd>
+</dl>
+<p>Tick <strong>Don't ask again</strong>, or choose in <a href="settings.html#general">Settings › General</a>, to always do the same. Updates use the same choice: an update can be installed while agents keep running.</p>
+<div class="callout"><p>Restarting or logging out of the Mac stops the agents: Keep Running outlives the app, not your macOS session. At the next launch, sessions are resumed natively.</p></div>
+
+<h2 id="crash">After a crash</h2>
+<p>A crash is not an intention: at the next launch, a banner offers <strong>Resume Sessions</strong> or <strong>Ignore</strong>, instead of resuming them on its own. Sessions come back one at a time, with progress and a way to cancel; a restoration that would send a text to an agent is never automatic.</p>

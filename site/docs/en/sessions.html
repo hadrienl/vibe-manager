@@ -1,0 +1,39 @@
+<h1>Create a session</h1>
+<p class="lede">A new session starts as a draft in the main area. Nothing runs until you send it.</p>
+
+<h2 id="new-session">Open a draft</h2>
+<p>Press <kbd>⌘N</kbd>, choose <strong>File › New Session</strong>, or click <strong>+</strong> in the toolbar. The draft appears at the top of the sidebar and fills the middle of the window. To start in a folder you already use, right-click a group header in the grouped sidebar and choose <strong>New Session in This Folder</strong>.</p>
+<vm-shot name="new-session" alt="A new session draft: the title, the prompt template picker, the recent working folders, the agents and the model, and the composer at the bottom.">A draft: options on top, the first message at the bottom.</vm-shot>
+
+<h2 id="options">The options</h2>
+<dl>
+  <dt>Badge and title</dt>
+  <dd>The badge on the left of the title opens a picker of symbols and colours; a session in a folder with an app icon, a favicon or a logo wears it by default. The title is optional: left empty, it is derived from the first message when you send.</dd>
+  <dt>Prompt template</dt>
+  <dd><strong>None — free prompt</strong>, or one of your <a href="templates.html">prompt templates</a>. A template can propose the folder, the name and the badge; its fields appear right below.</dd>
+  <dt>Working folder</dt>
+  <dd>The folder the agent works in. Your recent folders are offered as cards (the three latest, then <strong>Show More</strong>); right-click one to remove it from the list or show it in the Finder. <strong>Choose…</strong> opens any other folder. The agent is started in that folder; it may create branches and worktrees on its own, and the inspector reports them.</dd>
+  <dt>Agent</dt>
+  <dd>One card per agent found on this Mac, with its state. An agent that is missing, too old or signed out says so; fix it and click <strong>Detect again</strong>.</dd>
+  <dt>Model</dt>
+  <dd><strong>Default model of the agent</strong>, or one of the models the agent's CLI lists. Leave the default to use what you configured in the CLI.</dd>
+  <dt>More Options › Ticket</dt>
+  <dd>Optional: a ticket URL or a number such as <code>#142</code>. It names the session's ticket, opens it in the <a href="terminals.html#web-view">web view</a>, and lets <a href="organize.html#quick-open">Open Quickly</a> find the session by it. Left empty, a branch named after a ticket fills it in later.</dd>
+</dl>
+
+<h2 id="first-message">The first message</h2>
+<p>Describe the task in the composer at the bottom: it is the agent's first message. With a template, the composer shows the prompt exactly as the agent will receive it; <strong>Edit as Text</strong> lets you change it by hand.</p>
+<ul>
+  <li><kbd>Return</kbd> or the arrow button <strong>creates and launches</strong> the session (<kbd>⌘Return</kbd> works from anywhere in the draft).</li>
+  <li><kbd>⇧Return</kbd> adds a new line.</li>
+  <li><kbd>⌥Return</kbd> or <strong>Add to To Do</strong> creates the session <em>without</em> starting it: it waits in the To Do column until you start it with <strong>Session › Start Session</strong> (<kbd>⌃⌘R</kbd>).</li>
+  <li><kbd>Esc</kbd> sets the draft aside; <strong>Discard</strong> throws it away.</li>
+</ul>
+<p>Drop files anywhere on the draft, or click <strong>+</strong>, to attach them to the first message.</p>
+<div class="callout"><p>Without a prompt, the agent starts with nothing to do: useful to open a CLI in a folder and type to it yourself.</p></div>
+
+<h2 id="identity">Rename and change the icon</h2>
+<p>A session's name and badge can change at any time: <strong>Session › Rename…</strong> (<kbd>⌃⌘E</kbd>) or a double-click on its row, and <strong>Session › Change Icon…</strong> (<kbd>⌃⌘I</kbd>) or a double-click on its badge. <kbd>⌘Z</kbd> undoes either. The symbols and colours on offer are set in <a href="settings.html#badges">Settings › Badges</a>.</p>
+
+<h2 id="what-happens">What happens when you send</h2>
+<p>The session is saved first, then shown, then its agent is launched in a terminal of its own. If the launch fails, the session is kept with everything you typed, and <strong>Restart</strong> tries again. The session moves to <strong>In Progress</strong>, and the agent's activity shows on its row from then on.</p>

@@ -1,0 +1,14 @@
+{
+  "title": "Documentation de Vibe Manager",
+  "navLabel": "Documentation",
+  "onThisPage": "Sur cette page",
+  "edit": "Améliorer cette page sur GitHub",
+  "previous": "Précédent",
+  "next": "Suivant",
+  "pagerLabel": "Pages de la documentation",
+  "groups": [
+    { "title": "Premiers pas", "pages": ["index", "install"] },
+    { "title": "Au quotidien", "pages": ["sessions", "organize", "conversation", "requests", "inspector", "terminals"] },
+    { "title": "Aller plus loin", "pages": ["templates", "agents", "personalize", "settings", "shortcuts", "troubleshooting"] }
+  ]
+}

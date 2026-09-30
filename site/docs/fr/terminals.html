@@ -1,0 +1,38 @@
+<h1>Terminaux annexes et vue web</h1>
+<p class="lede">Chaque session a son propre tiroir de terminaux pour un serveur, un journal ou une commande <code>git</code>, et sa propre vue web, que vous partagez avec l’agent.</p>
+
+<h2 id="side-terminals">Terminaux annexes</h2>
+<p><strong>Présentation › Afficher les terminaux</strong> (<kbd>⌘J</kbd>), ou le bouton terminal de la barre d’état, ouvre un tiroir sous la session. <strong>Présentation › Nouveau terminal</strong> (<kbd>⌘T</kbd>) ajoute un onglet. Chaque onglet est un shell de connexion lancé dans le dossier de la session, intitulé d’après la commande qu’il exécute ou le dossier où il se trouve.</p>
+<vm-shot name="drawer" alt="Une session avec son tiroir de terminaux annexes ouvert sous la conversation, avec deux onglets.">Le tiroir des terminaux annexes, sous la session.</vm-shot>
+<ul>
+  <li><strong>Masquer le tiroir n’arrête rien.</strong> Un terminal masqué qui écrit ou se termine est signalé sur le bouton de la barre d’état.</li>
+  <li>Double-cliquez sur un onglet pour le renommer ; son menu contextuel le déplace vers la gauche ou la droite, ou le ferme (<kbd>⌘W</kbd> quand il a le clavier). <kbd>⌃⇥</kbd> et <kbd>⌃⇧⇥</kbd> passent d’un onglet à l’autre.</li>
+  <li>Un shell terminé propose de redémarrer ou de fermer.</li>
+  <li>Jusqu’à huit terminaux par session.</li>
+</ul>
+<p>Les terminaux annexes appartiennent à leur session : ils s’arrêtent quand elle se ferme, et reviennent quand elle se rouvre ou quand l’app est relancée — mêmes onglets, même ordre, même dossier, ce que chacun affichait — sous forme de nouveaux shells sous une ligne datée. Rien n’est réexécuté. Si vous quittez avec <a href="agents.html#quit">Laisser tourner</a>, ils continuent de tourner avec leur agent.</p>
+<p>Leur historique est la seule sortie de terminal écrite sur le disque ; <a href="settings.html#terminals">Réglages › Terminaux</a> permet de le désactiver et de l’effacer.</p>
+
+<h2 id="web-view">La vue web</h2>
+<p><strong>Présentation › Afficher la vue web</strong> (<kbd>⌥⌘B</kbd>), ou le globe de la barre d’outils, ouvre un navigateur à côté de la session, avec ses propres onglets. Changer de session change d’onglets ; rien n’est rechargé.</p>
+<vm-shot name="webview" alt="Une session avec sa vue web ouverte à droite, qui montre un aperçu local de la page de paiement ouvert par l’agent.">L’agent a ouvert son aperçu local dans la vue web de la session.</vm-shot>
+<ul>
+  <li>Le menu <strong>Web</strong> propose les commandes habituelles : <strong>Ouvrir l’adresse…</strong> (<kbd>⌘L</kbd>), <strong>Recharger la page</strong> (<kbd>⌘R</kbd>), <strong>Précédent</strong> et <strong>Suivant</strong> (<kbd>⌘[</kbd> <kbd>⌘]</kbd>), <strong>Ouvrir la page dans le navigateur</strong>.</li>
+  <li>Le champ d’adresse accepte aussi un ticket : tapez <code>#142</code>.</li>
+  <li>Le <strong>ticket</strong> de la session est son premier onglet, épinglé. C’est celui que vous avez donné à la session, ou celui que nomme sa branche (<code>feat/142-…</code> sur GitHub ou GitLab). Le menu <strong>Plus</strong> permet de le définir, de le changer ou de le retirer.</li>
+  <li>Un <kbd>⌘</kbd>-clic sur un lien dans un terminal l’ouvre dans la vue web ou dans votre navigateur — <a href="settings.html#web-view">Réglages › Vue web</a> en décide, et un <kbd>⌥⌘</kbd>-clic fait l’inverse.</li>
+  <li>Toutes les sessions partagent un même jeu de cookies, distinct de celui de Safari : connectez-vous une fois à GitHub ou GitLab, et tous les onglets de tickets sont connectés.</li>
+</ul>
+
+<h2 id="agent-browser">Ce que l’agent peut en faire</h2>
+<p>Chaque agent est lancé avec un serveur d’outils, <code>vibe-browser</code>, qui lui donne la vue web de la session : lister, ouvrir, recharger et fermer des onglets, lire le texte ou la structure d’une page, faire une capture d’écran, lire la console, cliquer, remplir des champs et exécuter du JavaScript. L’agent ne voit que les onglets de sa propre session. Dans les terminaux, la commande <code>vibe browser</code> fait de même depuis un script, et un <code>open https://…</code> lancé par l’agent affiche la page ici.</p>
+<table>
+  <thead><tr><th></th><th>Ce Mac (<code>localhost</code>, <code>file:</code>)</th><th>Ailleurs</th></tr></thead>
+  <tbody>
+    <tr><td>Lire : onglets, texte, console, capture d’écran</td><td>libre</td><td>libre</td></tr>
+    <tr><td>Naviguer : ouvrir, recharger, fermer</td><td>libre</td><td>libre</td></tr>
+    <tr><td>Agir : cliquer, saisir, JavaScript</td><td>libre</td><td>sur demande</td></tr>
+  </tbody>
+</table>
+<p>Quand l’agent veut agir sur un autre site, un bandeau dans la vue web vous demande : <strong>Refuser</strong>, <strong>Autoriser une fois</strong> ou <strong>Toujours autoriser pour</strong> ce site. L’agent attend deux minutes au plus ; la ligne de la session affiche une main pendant ce temps. L’onglet ouvert par l’agent porte une marque, l’élément sur lequel il clique est entouré, et le journal <strong>Actions de l’agent</strong> liste ce qu’il a fait.</p>
+<div class="callout warn"><p>La lecture est libre partout, y compris sur les pages où vous êtes connecté : un agent peut lire un ticket privé. Désactivez <strong>Donner la vue web aux agents</strong> dans <a href="settings.html#web-view">Réglages › Vue web</a> si vous ne le souhaitez pas.</p></div>

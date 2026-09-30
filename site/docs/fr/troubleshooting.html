@@ -1,0 +1,69 @@
+<h1>Dépannage et confidentialité</h1>
+<p class="lede">Où se trouvent vos données, comment vous sortir de ce qui peut mal tourner, et comment signaler un problème.</p>
+
+<h2 id="report">Signaler un problème</h2>
+<p><strong>Aide › Signaler un problème…</strong> ouvre un nouveau ticket sur GitHub. Joignez-y un fichier de diagnostics : c’est ce qui aide le plus.</p>
+<h3 id="diagnostics">Exporter les diagnostics</h3>
+<p><strong>Aide › Exporter les diagnostics…</strong> rassemble le journal local de l’app et montre le fichier en entier avant que vous l’enregistriez. Le journal se compose de types d’événements, sans place pour du texte libre : il ne contient aucun prompt, aucune note, aucun nom de session ou de dossier, aucun contenu de terminal. Il est conservé dans <code>~/Library/Logs/Vibe Manager</code> deux semaines au plus, et rien n’est jamais envoyé.</p>
+
+<h2 id="common">Problèmes courants</h2>
+<dl>
+  <dt>Un agent est introuvable</dt>
+  <dd>Le formulaire de nouvelle session et les Réglages en donnent la raison : non installé, non exécutable, trop ancien ou non connecté. Installez-le ou connectez-vous depuis un terminal (<code>claude auth login</code>, <code>codex login</code>), puis cliquez sur <strong>Relancer la détection</strong>. Voir <a href="install.html#agents-detected">Comment les agents sont trouvés</a>.</dd>
+  <dt>« Sessions indisponibles », ou le fichier des sessions est dit endommagé</dt>
+  <dd><strong>Restaurer la sauvegarde</strong> rétablit la version précédente ; le fichier endommagé est conservé à côté, jamais supprimé. Sans sauvegarde, quittez, déplacez <code>sessions.json</code> ailleurs et relancez l’app.</dd>
+  <dt>Les agents laissés en cours ne peuvent pas être rattachés</dt>
+  <dd>Une autre copie de l’app les détient, ou l’hôte des terminaux n’a pas répondu à temps : cliquez sur <strong>Réessayer</strong> dans le bandeau. En dernier recours, <code>pkill -f -- 'Vibe Manager --terminal-host'</code> arrête l’hôte et les agents qu’il gardait ; leurs conversations sont reprises au lancement suivant.</dd>
+  <dt>L’Accès complet au disque est accordé, et les agents sont toujours sollicités</dt>
+  <dd>Les agents héritent de l’accès du processus qui les a lancés. Dans <a href="settings.html#privacy">Réglages › Confidentialité</a>, choisissez <strong>Redémarrer à la fin des agents</strong> ou <strong>Redémarrer maintenant…</strong>.</dd>
+  <dt>La conversation reste vide</dt>
+  <dd>La conversation est lue dans le transcript qu’écrit l’agent ; un message apparaît dès que la CLI l’a écrit. Si un message que vous avez envoyé ne s’affiche pas dans les dix secondes, la vue le signale et propose le terminal, qui fait toujours foi.</dd>
+  <dt>L’activité de la session ne s’affiche pas (en cours, en attente…)</dt>
+  <dd>Activez l’activité de l’agent dans <a href="settings.html#general">Réglages › Général › Activité des agents</a> et approuvez ses hooks.</dd>
+  <dt>Aucune mise à jour n’est proposée</dt>
+  <dd><strong>Vibe Manager › Rechercher les mises à jour…</strong> explique pourquoi quand cette copie ne peut pas se mettre à jour elle-même. Les versions candidates ne sont proposées que sur le canal <strong>Instable</strong>. Vous pouvez toujours télécharger la dernière image disque depuis GitHub Releases et glisser l’app par-dessus l’ancienne.</dd>
+</dl>
+<p>D’autres cas sont traités dans <strong>Aide › Dépannage</strong>, qui ouvre <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/operations.md">docs/operations.md</a>.</p>
+
+<h2 id="privacy">Ce qui reste sur votre Mac</h2>
+<ul>
+  <li><strong>Pas de compte, pas de télémétrie, rien d’envoyé.</strong> Les seules requêtes réseau que l’app fait d’elle-même sont la recherche de mises à jour et les pages que vous, ou vos agents, ouvrez dans la vue web.</li>
+  <li><strong>Aucun identifiant n’est lu.</strong> Les agents utilisent leur propre connexion ; Vibe Manager ne voit jamais de clé d’API.</li>
+  <li><strong>Les conversations sont lues, pas copiées.</strong> La vue conversation lit les transcripts des agents en mémoire ; le suivi de l’utilisation ne lit que leurs compteurs.</li>
+  <li>Les résumés, les thèmes et les avatars sont générés par vos agents, avec votre compte, seulement quand vous les activez ou les demandez.</li>
+  <li>Chaque fichier de l’app n’est lisible que par vous.</li>
+</ul>
+
+<h2 id="data">Où se trouvent les choses</h2>
+<table>
+  <thead><tr><th>Quoi</th><th>Où</th></tr></thead>
+  <tbody>
+    <tr><td>Les sessions et leur sauvegarde</td><td><code>~/Library/Application Support/com.hadrienl.VibeManager/sessions.json</code></td></tr>
+    <tr><td>Les notes</td><td><code>…/com.hadrienl.VibeManager/Notes/</code></td></tr>
+    <tr><td>L’historique des terminaux annexes</td><td><code>…/com.hadrienl.VibeManager/Terminals/</code></td></tr>
+    <tr><td>Les modèles de prompt</td><td><code>…/com.hadrienl.VibeManager/templates.json</code></td></tr>
+    <tr><td>Les thèmes et les avatars</td><td><code>…/com.hadrienl.VibeManager/Themes/</code>, <code>Avatars/</code></td></tr>
+    <tr><td>Les chiffres d’utilisation</td><td><code>…/com.hadrienl.VibeManager/Usage/</code></td></tr>
+    <tr><td>Le journal de diagnostics</td><td><code>~/Library/Logs/Vibe Manager/</code></td></tr>
+    <tr><td>Les préférences</td><td><code>~/Library/Preferences/eu.hadrien.VibeManager.plist</code></td></tr>
+  </tbody>
+</table>
+<p>Les fichiers propres aux agents — <code>~/.claude</code>, <code>~/.codex</code> — leur appartiennent et ne sont jamais modifiés.</p>
+
+<h2 id="limits">Limites connues</h2>
+<ul>
+  <li>Redémarrer le Mac ou fermer la session utilisateur arrête les agents ; Laisser tourner ne survit qu’à l’app.</li>
+  <li>Chaque terminal garde ses 5 000 dernières lignes.</li>
+  <li>Après une relance, un terminal annexe revient sous forme de nouveau shell : ce qui y tournait n’est pas réexécuté.</li>
+  <li>Un fichier des sessions écrit par une version plus récente est refusé par une version plus ancienne : aucun retour en arrière n’est possible.</li>
+  <li>L’app n’est pas sandboxée : un agent doit pouvoir exécuter des outils et lire les dossiers qu’on lui confie.</li>
+</ul>
+
+<h2 id="uninstall">Désinstaller</h2>
+<p>Quittez l’app — choisissez <strong>Tout arrêter</strong> si elle le demande —, puis, dans un terminal :</p>
+<pre><code>rm -rf "/Applications/Vibe Manager.app" \
+  ~/Library/Application\ Support/com.hadrienl.VibeManager \
+  ~/Library/Logs/Vibe\ Manager \
+  "$TMPDIR/vibe-manager"
+defaults delete eu.hadrien.VibeManager
+tccutil reset All eu.hadrien.VibeManager</code></pre>

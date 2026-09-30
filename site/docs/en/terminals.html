@@ -1,0 +1,38 @@
+<h1>Side terminals and web view</h1>
+<p class="lede">Each session has its own drawer of terminals for a server, a log or a <code>git</code> command, and its own web view that you and the agent both use.</p>
+
+<h2 id="side-terminals">Side terminals</h2>
+<p><strong>View › Show Terminals</strong> (<kbd>⌘J</kbd>), or the terminal button of the status bar, opens a drawer under the session. <strong>View › New Terminal</strong> (<kbd>⌘T</kbd>) adds a tab. Each tab is a login shell started in the session's folder, titled by the command it runs or the folder it is in.</p>
+<vm-shot name="drawer" alt="A session with its drawer of side terminals open below the conversation, with two tabs.">The drawer of side terminals, under the session.</vm-shot>
+<ul>
+  <li><strong>Hiding the drawer stops nothing.</strong> A hidden terminal that writes or ends is signalled on the status bar's button.</li>
+  <li>Double-click a tab to rename it; its context menu moves it left or right, or closes it (<kbd>⌘W</kbd> with the keyboard in it). <kbd>⌃⇥</kbd> and <kbd>⌃⇧⇥</kbd> cycle the tabs.</li>
+  <li>A shell that ended offers to restart or close.</li>
+  <li>Up to eight terminals per session.</li>
+</ul>
+<p>The side terminals belong to their session: they stop when it closes, and come back when it reopens or when the app relaunches — same tabs, same order, same folder, what each showed — as new shells under a dated line. Nothing is run again. If you quit with <a href="agents.html#quit">Keep Running</a>, they keep running with their agent.</p>
+<p>Their history is the only terminal output written to disk; <a href="settings.html#terminals">Settings › Terminals</a> turns it off and erases it.</p>
+
+<h2 id="web-view">The web view</h2>
+<p><strong>View › Show Web View</strong> (<kbd>⌥⌘B</kbd>), or the globe in the toolbar, opens a browser beside the session, with its own tabs. Switching sessions switches tabs; nothing reloads.</p>
+<vm-shot name="webview" alt="A session with its web view open on the right, showing a local preview of the checkout page opened by the agent.">The agent opened its local preview in the session's web view.</vm-shot>
+<ul>
+  <li>The <strong>Web</strong> menu has the usual commands: <strong>Open Location…</strong> (<kbd>⌘L</kbd>), <strong>Reload Page</strong> (<kbd>⌘R</kbd>), <strong>Back</strong> and <strong>Forward</strong> (<kbd>⌘[</kbd> <kbd>⌘]</kbd>), <strong>Open Page in Browser</strong>.</li>
+  <li>The address field also takes a ticket: type <code>#142</code>.</li>
+  <li>The session's <strong>ticket</strong> is its first tab, pinned. It is the one you gave the session, or the one its branch names (<code>feat/142-…</code> on GitHub or GitLab). The <strong>More</strong> menu sets, changes or removes it.</li>
+  <li><kbd>⌘</kbd>-click a link in a terminal opens it in the web view, or in your browser — <a href="settings.html#web-view">Settings › Web View</a> decides, and <kbd>⌥⌘</kbd>-click does the other.</li>
+  <li>All sessions share one set of cookies, apart from Safari's: sign in to GitHub or GitLab once, and every ticket tab is signed in.</li>
+</ul>
+
+<h2 id="agent-browser">What the agent can do with it</h2>
+<p>Each agent is started with a tool server, <code>vibe-browser</code>, that gives it the session's web view: list, open, reload and close tabs, read a page's text or structure, take a screenshot, read the console, click, fill fields and run JavaScript. The agent sees its own session's tabs only. In the terminals, the <code>vibe browser</code> command does the same from a script, and an <code>open https://…</code> run by the agent shows the page here.</p>
+<table>
+  <thead><tr><th></th><th>This Mac (<code>localhost</code>, <code>file:</code>)</th><th>Anywhere else</th></tr></thead>
+  <tbody>
+    <tr><td>Read: tabs, text, console, screenshot</td><td>free</td><td>free</td></tr>
+    <tr><td>Navigate: open, reload, close</td><td>free</td><td>free</td></tr>
+    <tr><td>Act: click, type, JavaScript</td><td>free</td><td>asked</td></tr>
+  </tbody>
+</table>
+<p>When the agent wants to act on another site, a banner in the web view asks: <strong>Deny</strong>, <strong>Allow Once</strong>, or <strong>Always Allow</strong> for that site. The agent waits two minutes at most; the session's row shows a hand meanwhile. The tab the agent opened carries a mark, the element it clicks is outlined, and the <strong>Agent Actions</strong> log lists what it did.</p>
+<div class="callout warn"><p>Reading is free everywhere, pages you are signed in to included: an agent can read a private ticket. Turn off <strong>Give agents the web view</strong> in <a href="settings.html#web-view">Settings › Web View</a> if you do not want that.</p></div>

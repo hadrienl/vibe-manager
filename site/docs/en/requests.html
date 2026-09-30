@@ -1,0 +1,32 @@
+<h1>Answer your agents</h1>
+<p class="lede">An agent in a background session that stops for a permission or a question does not wait for you to open its session: its request comes to you.</p>
+
+<h2 id="kinds">What an agent can ask</h2>
+<ul>
+  <li><strong>A permission</strong>: run a shell command, edit a file, fetch an address. Answer <strong>Allow</strong>, <strong>Always</strong> (when the agent offers to remember it) or <strong>Refuse</strong>.</li>
+  <li><strong>A question</strong>, with options to pick or <strong>Another answer…</strong> to type your own; <strong>Send Answers</strong> when there are several.</li>
+  <li><strong>A plan</strong> to approve (Claude Code): <strong>Approve, Accepting Edits</strong>, <strong>Approve, Reviewing Each Edit</strong>, or <strong>Reject</strong>.</li>
+</ul>
+<p>In the session on screen, the request is shown in the conversation, in place of the composer. Elsewhere, it goes to the palette.</p>
+<div class="callout warn"><p><strong>Refuse</strong> also ends the agent's turn: it then waits for your next message. That is how the CLIs work: refusing presses Escape.</p></div>
+
+<h2 id="palette">The Pending Requests palette</h2>
+<p>The palette sits at the foot of the sidebar and lists the requests of every other session, oldest first, whatever their column. Each card says which session asks, with which agent and in which folder, and shows the command or question in full; <strong>Show All</strong> unfolds a long one.</p>
+<vm-shot name="requests" class="center" alt="The Pending Requests palette: two shell commands waiting for approval, each with Allow and Refuse buttons.">Two sessions waiting for approval, answered without leaving the session on screen.</vm-shot>
+<ul>
+  <li>Click <strong>Allow</strong> or <strong>Refuse</strong>: the answer is typed into that session's terminal, exactly as you would have, and your own session keeps the keyboard.</li>
+  <li>The arrow button, or <kbd>⌘Return</kbd>, opens the request's session.</li>
+  <li><kbd>⌥⌘P</kbd> gives the palette the keyboard: <kbd>↑</kbd> <kbd>↓</kbd> between requests, <kbd>Tab</kbd> then <kbd>Space</kbd> on an answer, <kbd>Esc</kbd> to go back.</li>
+  <li>The header folds the palette into a count.</li>
+</ul>
+<p>A request whose details were cut, or that cannot be told apart from another, can only be answered in its terminal: the card says so and offers <strong>Answer in the Terminal</strong>.</p>
+
+<h2 id="background">When Vibe Manager is in the background</h2>
+<p>You do not have to keep Vibe Manager in front to know an agent waits. Choose, in <a href="settings.html#requests">Settings › Requests › Alerts</a>:</p>
+<dl>
+  <dt>Notifications</dt>
+  <dd>A system notification for each request, showing either the kind of request or the command itself. A permission can be allowed or refused right from the notification. The Dock icon counts the pending requests.</dd>
+  <dt>The floating panel</dt>
+  <dd>An avatar, in a bubble above every other app and on every Space, that shows the requests one by one and lets you answer them where you are. It never takes the keyboard on its own: press <kbd>⌃⌥⌘P</kbd> to lend it the keyboard (<kbd>←</kbd> <kbd>→</kbd> between requests, <kbd>⌘Return</kbd> to open the session, <kbd>Esc</kbd> to give the keyboard back). Drag it anywhere; its place is remembered per screen. While it is on, no notification is posted, since the bubble already says it.</dd>
+</dl>
+<p>The avatar can be the default one, one you import, or one an agent draws from your description: see <a href="personalize.html#avatars">Themes and avatars</a>.</p>

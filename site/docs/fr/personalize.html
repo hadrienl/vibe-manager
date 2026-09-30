@@ -1,0 +1,31 @@
+<h1>Thèmes et avatars</h1>
+<p class="lede">Habillez la conversation d’un thème à vous, donnez un avatar au panneau flottant, et choisissez les badges que portent vos sessions.</p>
+
+<vm-shot name="personal-theme" alt="Une conversation affichée avec un thème personnel : une photo de forêt derrière les messages, des accents verts et l’avatar renard.">Un thème personnel, créé en le décrivant à un agent.</vm-shot>
+
+<h2 id="themes">Thèmes de conversation</h2>
+<p>Dans <strong>Réglages › Conversation</strong>, choisissez un thème pour la vue conversation : <strong>Système clair</strong>, <strong>Système sombre</strong>, <strong>Papier</strong>, <strong>Nuit</strong>, <strong>Terminal</strong>, <strong>Contraste élevé</strong>, ou l’un des vôtres. Avec <strong>Suivre le mode clair ou sombre</strong>, vous choisissez un thème pour chaque mode, et la conversation suit macOS. Tous les thèmes intégrés respectent les rapports de contraste WCAG.</p>
+<vm-shot name="settings-conversation" alt="Réglages, onglet Conversation : la grille des thèmes, les options d’affichage et un aperçu en direct.">Thèmes, affichage et détails techniques, avec un aperçu en direct.</vm-shot>
+<p>Le même onglet règle la <strong>couleur d’accent</strong>, les <strong>polices</strong> des messages et du code, la <strong>taille du texte</strong>, la <strong>densité</strong>, l’affichage de vos messages en <strong>bulles</strong> ou en <strong>lignes</strong>, et la part des détails techniques qui est dépliée. <strong>Rétablir les réglages par défaut</strong> remet tout en place.</p>
+
+<h3 id="my-theme">Créer votre propre thème</h3>
+<ol>
+  <li>Cliquez sur <strong>Créer mon thème</strong> et décrivez ce que vous voulez : « une forêt calme à l’aube, vert mousse, papier chaud pour mes messages ».</li>
+  <li>Cliquez sur <strong>Générer avec Claude Code</strong> ou <strong>Générer avec Codex</strong>. L’agent répond avec les 27 couleurs d’un thème, soumises aux mêmes contrastes que les thèmes intégrés. La version s’affiche aussitôt, sur l’aperçu et dans toutes les conversations, sans modifier vos réglages.</li>
+  <li>Demandez des changements : chacun donne une nouvelle version, et vous pouvez revenir à n’importe laquelle.</li>
+  <li>Nommez-le et cliquez sur <strong>Enregistrer et appliquer le thème</strong>.</li>
+</ol>
+<p>Un thème peut placer une image derrière la conversation : donnez l’adresse d’une image, ou décrivez-la et laissez Codex la dessiner (une à deux minutes). Le thème précise à quel point elle est voilée et floutée. Vos thèmes peuvent être exportés en <code>.zip</code> ou supprimés depuis le menu de leur carte.</p>
+<div class="callout"><p>La génération s’exécute une fois avec le compte de votre agent, hors de toute session, depuis un dossier temporaire vide, sans outils, sans serveurs MCP et sans accès au web. Seule votre description est envoyée ; la réponse est vérifiée et utilisée comme couleurs, rien d’autre.</p></div>
+
+<h2 id="avatars">Avatars</h2>
+<p>Le <a href="requests.html#background">panneau flottant</a> présente les demandes avec un avatar animé. <strong>Réglages › Demandes › Avatars</strong> contient votre bibliothèque d’avatars :</p>
+<ul>
+  <li><strong>Créer un nouvel avatar</strong> : décrivez-le, et Codex dessine ses dix expressions — neutre, parle, cligne des yeux, content, surpris, pensif, inquiet… — sur une seule planche, en une minute et demie environ. On peut redessiner une seule expression, ou toutes.</li>
+  <li><strong>Importer une archive…</strong> : un <code>.zip</code> exporté depuis Vibe Manager, ou dix images nommées d’après les expressions, dessinées à la main.</li>
+  <li><strong>Utiliser cet avatar</strong> le place sur le panneau. Les avatars peuvent être renommés, dupliqués, exportés (avec ou sans leur description) et supprimés.</li>
+</ul>
+<p>Ce que dessine un agent reste un brouillon tant que vous ne le gardez pas, et chaque image est vérifiée et réencodée par l’app avant d’être utilisée.</p>
+
+<h2 id="badges">Badges</h2>
+<p>Chaque session porte un badge : un symbole sur une couleur, ou l’icône de son projet. <strong>Réglages › Badges</strong> liste les symboles et les couleurs que propose le choix de badge : ajoutez les vôtres, réordonnez-les (<kbd>⌥←</kbd> <kbd>⌥→</kbd>), retirez-les, ou revenez à la liste par défaut. Une couleur n’est acceptée que si le symbole blanc reste lisible dessus (un contraste d’au moins 3:1).</p>

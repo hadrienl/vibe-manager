@@ -1,0 +1,34 @@
+<h1 data-short="Vue d’ensemble">Documentation de Vibe Manager</h1>
+<p class="lede">Vibe Manager est une app macOS native qui fait tourner plusieurs sessions Claude Code et Codex côte à côte, et garde la trace de chacune : son dossier, son agent, son terminal, ses notes et ce qu’elle a changé dans Git.</p>
+
+<vm-shot name="overview" alt="La fenêtre de Vibe Manager : les sessions à gauche, une conversation avec Claude Code au centre, l’activité de la session, ses modifications Git et ses notes à droite.">La fenêtre principale : les sessions, la session affichée et son contexte.</vm-shot>
+
+<h2 id="the-idea">Le principe</h2>
+<p>Une <strong>session</strong>, c’est une tâche confiée à un agent de code dans un dossier de travail : « corriger le calcul de la TVA du panier » dans <code>storefront-web</code>, avec Claude Code. Vibe Manager lance l’outil en ligne de commande de l’agent lui-même, dans un vrai terminal, et garde tout ce qui l’entoure :</p>
+<ul>
+  <li>la <strong>conversation</strong>, lisible comme un chat, ou le <strong>terminal</strong> brut — un raccourci passe de l’une à l’autre ;</li>
+  <li>un <strong>statut</strong> — À faire, En cours, En attente, Terminé — pour que la barre latérale serve de liste de tâches ;</li>
+  <li>les <strong>demandes</strong> des agents, auxquelles vous répondez depuis une palette sans quitter ce que vous faites ;</li>
+  <li>les <strong>modifications Git</strong> de la session, en direct, et ses <strong>notes</strong> ;</li>
+  <li>des <strong>terminaux</strong> annexes et une <strong>vue web</strong> que l’agent peut piloter.</li>
+</ul>
+<p>Rien n’est envoyé nulle part : pas de compte, pas de télémétrie, et l’app ne lit jamais vos clés d’API. Les agents tournent avec les permissions que vous avez données à leur CLI, ni plus ni moins.</p>
+
+<h2 id="the-window">La fenêtre</h2>
+<dl>
+  <dt>La barre latérale, à gauche</dt>
+  <dd>Vos sessions, une colonne par statut derrière quatre onglets, avec ce que fait chaque agent : il travaille, attend une autorisation, a une nouvelle réponse. En dessous, la palette <strong>Demandes en attente</strong>. En bas, les archives, l’ordre de tri et les filtres. Voir <a href="organize.html">Organiser vos sessions</a>.</dd>
+  <dt>La session, au centre</dt>
+  <dd>La conversation avec l’agent ou son terminal, la zone de saisie pour lui écrire, et une barre d’état. Voir <a href="conversation.html">Conversation et terminal</a>.</dd>
+  <dt>L’inspecteur, à droite</dt>
+  <dd>Le contexte de la session : son activité et son résumé, ses modifications Git, ses notes, son agent, ce qu’elle a consommé. Voir <a href="inspector.html">L’inspecteur</a>.</dd>
+</dl>
+<p>La barre d’outils porte le statut de la session, le sélecteur <strong>Conversation | Terminal</strong> et trois boutons : nouvelle session, vue web et inspecteur.</p>
+
+<h2 id="where-to-start">Par où commencer</h2>
+<div class="doc-cards">
+  <a href="install.html"><strong>Installer Vibe Manager</strong><span>Configuration requise, premier lancement, Accès complet au disque.</span></a>
+  <a href="sessions.html"><strong>Créer une session</strong><span>Dossier, agent, modèle et premier prompt.</span></a>
+  <a href="requests.html"><strong>Répondre à vos agents</strong><span>Autorisations et questions, où que vous soyez.</span></a>
+  <a href="shortcuts.html"><strong>Raccourcis clavier</strong><span>Tout est à un raccourci près.</span></a>
+</div>

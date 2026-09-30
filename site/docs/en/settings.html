@@ -1,0 +1,78 @@
+<h1>Settings</h1>
+<p class="lede">Every tab of <strong>Vibe Manager › Settings…</strong> (<kbd>⌘,</kbd>), and what each setting does.</p>
+
+<vm-shot name="settings-general" alt="Settings, General tab: sessions, quitting with agents running, the editor for changed files, agent activity, usage and diagnostics.">The General tab.</vm-shot>
+
+<h2 id="general">General</h2>
+<dl>
+  <dt>Ask before closing or archiving a session where work is running</dt>
+  <dd>On by default. Off, closing and archiving never ask.</dd>
+  <dt>When quitting with agents running</dt>
+  <dd><strong>Ask</strong>, <strong>Keep them running</strong> or <strong>Stop them</strong>: see <a href="agents.html#quit">Quit without stopping the agents</a>.</dd>
+  <dt>Open changed files with</dt>
+  <dd>What <kbd>Return</kbd> or a double-click does on a file of the inspector: <strong>Finder (reveal only)</strong>, <strong>Default Application</strong>, one of the editors found on this Mac, or <strong>Other…</strong>.</dd>
+  <dt>Agent Activity › Track … activity</dt>
+  <dd>One switch per agent. On, the agent's hooks report when it works, asks or finishes, which the sidebar and the requests need. The first time, a sheet shows the commands the hooks run, and you approve them once.</dd>
+  <dt>Usage › Track agent usage</dt>
+  <dd>Records running time and reads token counters for the <a href="inspector.html#usage-window">Usage window</a>. <strong>Clear Usage Data…</strong> erases what was recorded, not the agents' transcripts.</dd>
+  <dt>Diagnostics</dt>
+  <dd><strong>Export Diagnostics…</strong>: see <a href="troubleshooting.html#diagnostics">Troubleshooting</a>.</dd>
+</dl>
+
+<h2 id="privacy">Privacy</h2>
+<p>Whether Vibe Manager has <strong>Full Disk Access</strong> — Granted, Not granted, or Granted, not yet in effect — with <strong>Open System Settings</strong>. Agents inherit the access of the process that runs them, which may have started before you granted it: <strong>Restart When Idle</strong> lets it go once its last agent ends, <strong>Restart Now…</strong> stops the agents it names and resumes them. The <strong>Process by Process</strong> section appears when they disagree.</p>
+
+<h2 id="templates">Templates</h2>
+<p>The prompt template editor: see <a href="templates.html">Prompt templates</a>.</p>
+
+<h2 id="web-view">Web View</h2>
+<dl>
+  <dt>Give agents the web view</dt><dd>Starts each agent with the <code>vibe-browser</code> tool server. Takes effect at the next start of each agent.</dd>
+  <dt>Show the web view when an agent opens a page</dt><dd>Brings the web view forward when the agent opens a tab.</dd>
+  <dt>Open links</dt><dd><strong>In the web view</strong> or <strong>In the default browser</strong>, for links <kbd>⌘</kbd>-clicked in a terminal; <kbd>⌥</kbd> does the other.</dd>
+  <dt>Always allowed sites</dt><dd>The sites where you chose <strong>Always Allow</strong>; <strong>Remove</strong> takes one back.</dd>
+  <dt>Browsing data › Clear…</dt><dd>Erases the cookies and data of the web view, which signs you out of every site in every session.</dd>
+</dl>
+
+<h2 id="terminals">Terminals</h2>
+<p><strong>Keep the history of side terminals</strong>: what each side terminal showed is written to disk so it comes back after a relaunch. Turning it off erases the saved histories.</p>
+
+<h2 id="tickets">Tickets</h2>
+<p>When a new session names a ticket — in its Ticket field, its name or its prompt — its page is opened in the web view, and with <strong>Insert ticket titles in the notes</strong> its title is added at the top of the notes, in the <strong>Line format</strong> you choose (<code>{title}</code>, <code>{id}</code>, <code>{url}</code>).</p>
+<p>A <strong>resolver</strong> says which addresses are tickets: GitHub, GitLab, GitLab merge requests, Jira Cloud and Linear are shipped. Add your own for a self-hosted GitLab, a Jira Server or a Redmine: a name, an <strong>address pattern</strong> with a named capture such as <code>(?&lt;number&gt;[0-9]+)</code>, an <strong>identifier</strong> such as <code>#{number}</code>, and <strong>title cleanup</strong> patterns. <strong>Test with an address</strong> checks it. Resolvers can be imported and exported; see <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/ticket-resolvers.md">docs/ticket-resolvers.md</a>.</p>
+
+<h2 id="activity">Activity</h2>
+<p><strong>Summarize sessions automatically</strong>: after each turn, the agent writes a short summary of the session with its lightest model, at most once every five minutes, shown in the <a href="inspector.html#activity">inspector</a> and searched by Open Quickly. It uses your agent's account.</p>
+
+<h2 id="conversation">Conversation</h2>
+<dl>
+  <dt>Open sessions in</dt><dd><strong>Conversation</strong> or <strong>Terminal</strong>, for sessions you have not switched yourself.</dd>
+  <dt>Theme</dt><dd>See <a href="personalize.html#themes">Themes and avatars</a>.</dd>
+  <dt>Display</dt><dd>Accent colour, message font, code font, text size (Small to Extra Large), density (Compact or Comfortable), your messages as Bubbles or Lines.</dd>
+  <dt>Technical details</dt><dd>Group consecutive calls of the same kind; unfold a failed call; unfold file edits; show reasoning rows; wrap lines in code blocks; line numbers in diffs.</dd>
+</dl>
+
+<h2 id="requests">Requests</h2>
+<p>Two pages, <strong>Alerts</strong> and <strong>Avatars</strong>.</p>
+<dl>
+  <dt>Floating Panel</dt>
+  <dd><strong>Show requests above other applications</strong> turns on the <a href="requests.html#background">floating panel</a>. Choose its avatar (<strong>Manage Avatars…</strong>), whether it hides or keeps the avatar on screen <strong>With no pending request</strong>, and <strong>Put Back in Place</strong> if it got lost. Its shortcut is <kbd>⌃⌥⌘P</kbd>.</dd>
+  <dt>Notifications</dt>
+  <dd><strong>Notify me of requests</strong>, showing <strong>The kind of request</strong> or <strong>The command or the question</strong>. Unavailable while the floating panel is on, which already signals them.</dd>
+  <dt>Palette</dt>
+  <dd>Show the number of requests on the Dock icon; unfold the palette when a request arrives.</dd>
+  <dt>Avatars</dt>
+  <dd>Your avatar library: see <a href="personalize.html#avatars">Avatars</a>.</dd>
+</dl>
+
+<h2 id="badges">Badges</h2>
+<p>The symbols and colours offered for sessions' badges: see <a href="personalize.html#badges">Badges</a>.</p>
+
+<h2 id="updates">Updates</h2>
+<dl>
+  <dt>Check for updates automatically</dt><dd>Daily, weekly or monthly.</dd>
+  <dt>Download and install updates automatically</dt><dd>Installs in the background; otherwise you are asked.</dd>
+  <dt>Channel</dt><dd><strong>Stable</strong>, or <strong>Unstable</strong> to also receive release candidates.</dd>
+  <dt>Check Now</dt><dd>Also in <strong>Vibe Manager › Check for Updates…</strong>.</dd>
+</dl>
+<p>Updates are signed twice — with the app's Developer ID and with an EdDSA key — and verified before they are installed. When agents are running, the update asks the same question as quitting: install and keep them running, or stop them all.</p>

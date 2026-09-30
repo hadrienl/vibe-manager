@@ -29,6 +29,10 @@ const LANGS = [
   ["zh-CN", "简体中文", "zh_CN"], ["zh-TW", "繁體中文", "zh_TW"],
 ];
 
+// The documentation exists in fewer languages than the landing page: each one has its folder in
+// docs/, and the others link to the English one.
+const DOC_LANGS = ["en", "fr"];
+
 const PAGES = [
   { id: "index", file: "index.html", href: "", title: (t) => `Vibe Manager · ${strip(t("hero.title"))}`, description: "hero.lede" },
   { id: "changelog", file: "changelog.html", href: "changelog.html", title: (t) => `${strip(t("nav.changelog"))} · Vibe Manager`, description: "cl.lede" },
@@ -63,6 +67,8 @@ for (const [code, dict] of Object.entries(dicts)) {
 }
 if (broken) process.exit(1);
 
+const docs = loadDocs();
+
 const releases = (await loadReleases()).filter((r) => !r.draft);
 const latest = releases[0];
 
@@ -75,9 +81,19 @@ for (const [code, , ogLocale, dir] of LANGS) {
   for (const page of PAGES) {
     writeFileSync(join(out, code, page.file), renderPage(code, dir === "rtl" ? "rtl" : "ltr", ogLocale, page, t));
   }
+  if (!docs[code]) continue;
+  mkdirSync(join(out, code, "docs"), { recursive: true });
+  for (const doc of docs[code].pages) {
+    const page = {
+      id: "docs", file: `docs/${doc.file}`, href: doc.slug === "index" ? "docs/" : `docs/${doc.file}`, doc, depth: 1, langs: DOC_LANGS,
+      title: () => doc.slug === "index" ? docs[code].meta.title : `${strip(doc.title)} · ${docs[code].meta.title}`,
+    };
+    writeFileSync(join(out, code, "docs", doc.file), renderPage(code, "ltr", ogLocale, page, t));
+  }
 }
 writeFileSync(join(out, "index.html"), renderRoot());
-console.log(`site: ${LANGS.length} languages × ${PAGES.length} pages, ${releases.length} releases → ${out}`);
+const docPages = DOC_LANGS.reduce((n, c) => n + docs[c].pages.length, 0);
+console.log(`site: ${LANGS.length} languages × ${PAGES.length} pages, ${docPages} documentation pages, ${releases.length} releases → ${out}`);
 
 // ---------------------------------------------------------------------------------------------
 
@@ -113,20 +129,27 @@ function renderPage(code, dir, ogLocale, page, t) {
   let html = template.replace(block, (_, id, content) => (id === page.id ? content.trim() : ""));
 
   const version = latest ? latest.tag_name.replace(/^v/, "") : null;
+  const up = "../".repeat(page.depth || 0);
+  const langs = LANGS.filter(([c]) => !page.langs || page.langs.includes(c));
+  const docsLang = docs[code] ? code : DEFAULT_LANG;
   const markers = {
     LANG: code,
     DIR: dir,
     TITLE: escapeAttr(page.title(t)),
-    DESCRIPTION: escapeAttr(strip(t(page.description))),
+    DESCRIPTION: page.description ? escapeAttr(strip(t(page.description))) : "",
     CANONICAL: `${SITE_URL}${code}/${page.href}`,
     ALTERNATES: [
-      ...LANGS.map(([c]) => `<link rel="alternate" hreflang="${c}" href="${SITE_URL}${c}/${page.href}">`),
+      ...langs.map(([c]) => `<link rel="alternate" hreflang="${c}" href="${SITE_URL}${c}/${page.href}">`),
       `<link rel="alternate" hreflang="x-default" href="${SITE_URL}${DEFAULT_LANG}/${page.href}">`,
     ].join("\n"),
     OG_LOCALE: ogLocale,
     SITE_URL,
-    LANG_OPTIONS: LANGS.map(([c, name]) =>
-      `<option value="${c}" data-href="../${c}/${page.href}"${c === code ? " selected" : ""}>${name}</option>`).join(""),
+    LANG_OPTIONS: langs.map(([c, name]) =>
+      `<option value="${c}" data-href="${up}../${c}/${page.href}"${c === code ? " selected" : ""}>${name}</option>`).join(""),
+    ASSETS: `${up}../assets/`,
+    HOME: up,
+    DOCS_HREF: page.id === "docs" ? "./" : docsLang === code ? "docs/" : `../${docsLang}/docs/`,
+    ...(page.doc ? docMarkers(code, page.doc) : {}),
     DOWNLOAD_URL: latest ? downloadURL(latest) || latest.html_url : `${GH}/releases`,
     VERSION: version ? withVersion(t, "js.version", version) : "",
     VERSION_LONG: version ? withVersion(t, "js.version_long", version) : escapeHTML(strip(t("hero.meta_macos"))),
@@ -158,6 +181,99 @@ function renderPage(code, dir, ogLocale, page, t) {
   html = html.replace(new RegExp(`data-nav="${page.id}"`, "g"), `data-nav="${page.id}" aria-current="page"`);
   if (code !== SOURCE_LANG) html = html.replace(' id="cl-lang" hidden', ' id="cl-lang"');
   return html;
+}
+
+// --- Documentation ----------------------------------------------------------------------------
+//
+// docs/<lang>/docs.json names the pages in their order, grouped, and the words around them;
+// docs/<lang>/<slug>.html is the body of each page. A body may use <vm-shot name="…" alt="…">caption</vm-shot>,
+// rendered as a screenshot from assets/docs/<lang>/<name>.jpg, with <name>-dark.jpg for a dark system appearance.
+
+function loadDocs() {
+  const all = {};
+  let failed = false;
+  for (const code of DOC_LANGS) {
+    const folder = join(here, "docs", code);
+    const meta = JSON.parse(readFileSync(join(folder, "docs.json"), "utf8"));
+    const pages = meta.groups.flatMap((group) => group.pages.map((slug) => {
+      const source = readFileSync(join(folder, `${slug}.html`), "utf8");
+      const title = source.match(/<h1([^>]*)>([\s\S]*?)<\/h1>/);
+      const lede = source.match(/<p class="lede">([\s\S]*?)<\/p>/);
+      if (!title || !lede) { console.error(`docs/${code}/${slug}.html: an <h1> and a <p class="lede"> are required`); failed = true; }
+      const short = title?.[1].match(/data-short="([^"]*)"/)?.[1];
+      return { slug, file: slug === "index" ? "index.html" : `${slug}.html`, group: group.title, source, title: title?.[2] ?? slug, short: short ?? title?.[2] ?? slug, lede: lede?.[1] ?? "" };
+    }));
+    all[code] = { meta, pages };
+  }
+  const reference = all[DOC_LANGS[0]].pages.map((p) => p.slug).join(" ");
+  for (const code of DOC_LANGS) {
+    if (all[code].pages.map((p) => p.slug).join(" ") !== reference) {
+      console.error(`docs/${code}/docs.json: the pages differ from docs/${DOC_LANGS[0]}/docs.json`);
+      failed = true;
+    }
+  }
+  if (failed) process.exit(1);
+  return all;
+}
+
+function docMarkers(code, doc) {
+  const { meta, pages } = docs[code];
+  const index = pages.indexOf(doc);
+  const href = (p) => p.slug === "index" ? "./" : p.file;
+  const body = renderDocBody(code, doc);
+  const toc = [...body.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)];
+
+  const groups = meta.groups.map((group) => `<div class="docs-group"><p>${escapeHTML(group.title)}</p>${pages
+    .filter((p) => p.group === group.title)
+    .map((p) => `<a href="${href(p)}"${p === doc ? ' aria-current="page"' : ""}>${p.short}</a>`).join("")}</div>`).join("");
+  const neighbour = (p, rel, label) => p
+    ? `<a class="pager-${rel}" rel="${rel}" href="${href(p)}"><small>${escapeHTML(label)}</small><span>${p.short}</span></a>`
+    : "<span></span>";
+  const source = `https://github.com/${REPO}/blob/main/site/docs/${code}/${doc.slug}.html`;
+
+  return {
+    DESCRIPTION: escapeAttr(strip(doc.lede)),
+    DOCS_NAV_LABEL: escapeAttr(meta.navLabel),
+    DOCS_NAV: groups,
+    DOCS_BODY: body,
+    DOCS_TOC: toc.length > 1
+      ? `<p>${escapeHTML(meta.onThisPage)}</p>${toc.map(([, id, text]) => `<a href="#${id}">${strip(text)}</a>`).join("")}<a class="docs-edit" href="${source}">${escapeHTML(meta.edit)}</a>`
+      : `<a class="docs-edit" href="${source}">${escapeHTML(meta.edit)}</a>`,
+    DOCS_PAGER: `<nav class="docs-pager" aria-label="${escapeAttr(meta.pagerLabel)}">${neighbour(pages[index - 1], "prev", meta.previous)}${neighbour(pages[index + 1], "next", meta.next)}</nav>`,
+  };
+}
+
+function renderDocBody(code, doc) {
+  let first = true;
+  return doc.source.replace(/<h1 [^>]*>/, "<h1>").replace(/<vm-shot\b([^>]*)>([\s\S]*?)<\/vm-shot>/g, (_, attrs, caption) => {
+    const attr = (name) => attrs.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1];
+    const name = attr("name");
+    const light = `assets/docs/${code}/${name}.jpg`;
+    const dark = `assets/docs/${code}/${name}-dark.jpg`;
+    if (!existsSync(join(here, light))) throw new Error(`docs/${code}/${doc.slug}.html: no screenshot ${light}`);
+    const [width, height] = jpegSize(join(here, light));
+    const size = ` width="${Math.round(width / 2)}" height="${Math.round(height / 2)}"`;
+    const darkSource = existsSync(join(here, dark))
+      ? `<source srcset="../../${dark}" media="(prefers-color-scheme: dark)">` : "";
+    const classes = ["doc-shot", attr("class")].filter(Boolean).join(" ");
+    const loading = first ? "" : ' loading="lazy"';
+    first = false;
+    return `<figure class="${classes}"><a href="../../${light}"><picture>${darkSource}<img src="../../${light}" alt="${attr("alt") ?? ""}"${size}${loading} decoding="async"></picture></a>${caption.trim() ? `<figcaption>${caption.trim()}</figcaption>` : ""}</figure>`;
+  });
+}
+
+// The pixel size of a JPEG, read from its first start-of-frame segment.
+function jpegSize(path) {
+  const b = readFileSync(path);
+  for (let i = 2; i < b.length;) {
+    const marker = b[i + 1];
+    const length = b.readUInt16BE(i + 2);
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      return [b.readUInt16BE(i + 7), b.readUInt16BE(i + 5)];
+    }
+    i += 2 + length;
+  }
+  throw new Error(`${path}: not a JPEG`);
 }
 
 function renderRoot() {
