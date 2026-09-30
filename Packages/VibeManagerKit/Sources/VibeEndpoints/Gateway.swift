@@ -76,6 +76,11 @@ public protocol GatewayObserving: Sendable {
 /// Paths are `/s/<token>/v1/<operation>`. The token is a secret of the session, given to its harness
 /// alone; it must also come back in the harness's own authentication header, so a URL seen in a
 /// process list is not enough to use it.
+///
+/// Claude Code asks `messages`, Codex asks `responses`. When the endpoint speaks the same protocol,
+/// the request goes through as it came, with the endpoint's model and credentials; otherwise it is
+/// read into the canonical shape, written in the endpoint's protocol, and the answer comes back the
+/// same way.
 public final class Gateway: GatewayRequestHandling {
   private let routes: GatewayRouteTable
   private let transport: any EndpointTransport
@@ -105,24 +110,23 @@ public final class Gateway: GatewayRequestHandling {
     }
     let parts = request.path.split(separator: "/", omittingEmptySubsequences: true)
     guard parts.count >= 4, parts[0] == "s", parts[2] == "v1" else {
-      await writer.respond(status: 404, json: notFound("Unknown path."))
+      await writer.respond(status: 404, json: Self.error("not_found_error", "Unknown path."))
       return
     }
     let token = String(parts[1])
     let operation = parts[3...].joined(separator: "/")
+    let harness: HarnessProtocol = operation.hasPrefix("responses") ? .responses : .messages
     guard Self.presented(token, in: request.headers), let route = await routes.route(for: token)
     else {
-      await writer.respond(
-        status: 401,
-        json: AnthropicMessagesServer.errorBody(
-          EndpointFailure(
-            kind: .authentication,
-            message: "This session is not known to the gateway. Restart it from Vibe Manager.")))
+      let failure = EndpointFailure(
+        kind: .authentication,
+        message: "This session is not known to the gateway. Restart it from Vibe Manager.")
+      await Self.respond(failure, harness: harness, writer: writer)
       return
     }
     switch (request.method, operation) {
-    case ("POST", "messages"):
-      await messages(request, route: route, token: token, writer: writer)
+    case ("POST", "messages"), ("POST", "responses"):
+      await converse(request, harness: harness, route: route, token: token, writer: writer)
     case ("POST", "messages/count_tokens"):
       await countTokens(request, writer: writer)
     case ("GET", "models"):
@@ -134,7 +138,8 @@ public final class Gateway: GatewayRequestHandling {
           "has_more": false,
         ])
     default:
-      await writer.respond(status: 404, json: notFound("Unknown operation \(operation)."))
+      await writer.respond(
+        status: 404, json: Self.error("not_found_error", "Unknown operation \(operation)."))
     }
   }
 
@@ -147,93 +152,112 @@ public final class Gateway: GatewayRequestHandling {
     return headers["x-api-key"] == token
   }
 
-  private func notFound(_ message: String) -> JSONValue {
-    ["type": "error", "error": ["type": "not_found_error", "message": .string(message)]]
+  private static func error(_ type: String, _ message: String) -> JSONValue {
+    ["type": "error", "error": ["type": .string(type), "message": .string(message)]]
   }
 
-  private func invalid(_ message: String) -> JSONValue {
-    AnthropicMessagesServer.errorBody(EndpointFailure(kind: .invalidRequest, message: message))
+  /// A failure before any byte of an answer, in the harness's protocol.
+  static func respond(
+    _ failure: EndpointFailure, harness: HarnessProtocol, writer: any GatewayResponseWriter
+  ) async {
+    switch harness {
+    case .messages:
+      await writer.respond(
+        status: AnthropicMessagesServer.status(for: failure),
+        json: AnthropicMessagesServer.errorBody(failure))
+    case .responses:
+      await writer.respond(
+        status: ResponsesServer.status(for: failure), json: ResponsesServer.errorBody(failure))
+    }
   }
-
-  // MARK: - Claude Code
 
   private func countTokens(_ request: GatewayHTTPRequest, writer: any GatewayResponseWriter) async {
     guard let body = try? JSONValue(parsing: request.body),
       let canonical = try? AnthropicMessagesServer.decodeRequest(body)
     else {
-      await writer.respond(status: 400, json: invalid("The request is not a Messages request."))
+      await Self.respond(
+        EndpointFailure(kind: .invalidRequest, message: "The request is not a Messages request."),
+        harness: .messages, writer: writer)
       return
     }
     await writer.respond(
       status: 200,
       json: [
         "input_tokens": .number(Double(AnthropicMessagesServer.estimatedInputTokens(canonical)))
-      ]
-    )
+      ])
   }
 
-  private func messages(
-    _ request: GatewayHTTPRequest, route: GatewayRoute, token: String,
+  // MARK: - A turn
+
+  private func converse(
+    _ request: GatewayHTTPRequest, harness: HarnessProtocol, route: GatewayRoute, token: String,
     writer: any GatewayResponseWriter
   ) async {
     guard let body = try? JSONValue(parsing: request.body), case .object(var fields) = body else {
-      await writer.respond(status: 400, json: invalid("The request is not JSON."))
+      await Self.respond(
+        EndpointFailure(kind: .invalidRequest, message: "The request is not JSON."),
+        harness: harness, writer: writer)
       return
     }
-    switch route.endpoint.wireProtocol {
-    case .messages:
+    switch (harness, route.endpoint.wireProtocol) {
+    case (.messages, .messages), (.responses, .responses):
       fields["model"] = .string(route.model)
-      await passThroughMessages(
-        .object(fields), harnessHeaders: request.headers, route: route, token: token,
-        writer: writer)
-    case .chatCompletions:
-      let canonical: CanonicalRequest
-      do {
-        canonical = try AnthropicMessagesServer.decodeRequest(.object(fields))
-      } catch {
-        await writer.respond(status: 400, json: invalid("The request is not a Messages request."))
-        return
-      }
-      var translated = canonical
-      translated.model = route.model
-      await translateMessagesToChat(translated, route: route, token: token, writer: writer)
-    case .responses:
-      await writer.respond(
-        status: 501,
-        json: AnthropicMessagesServer.errorBody(
-          EndpointFailure(
-            kind: .invalidRequest,
-            message: "Claude Code cannot drive a Responses endpoint yet; choose Codex.")))
+      await passThrough(
+        .object(fields), harness: harness, harnessHeaders: request.headers, route: route,
+        token: token, writer: writer)
+      return
+    default:
+      break
     }
+    let side: HarnessSide
+    do {
+      side = try HarnessSide(harness, body: .object(fields), model: route.model)
+    } catch {
+      await Self.respond(
+        EndpointFailure(
+          kind: .invalidRequest, message: "The request does not follow the harness's protocol."),
+        harness: harness, writer: writer)
+      return
+    }
+    await translate(side, route: route, token: token, writer: writer)
   }
 
-  /// A Messages endpoint behind Claude Code: nothing to translate. The body goes out with the
-  /// endpoint's model and credentials, and the answer comes back byte for byte.
-  private func passThroughMessages(
-    _ body: JSONValue, harnessHeaders: [String: String], route: GatewayRoute, token: String,
-    writer: any GatewayResponseWriter
+  /// The same protocol on both sides: the body goes out with the endpoint's model and credentials,
+  /// and the answer comes back byte for byte.
+  private func passThrough(
+    _ body: JSONValue, harness: HarnessProtocol, harnessHeaders: [String: String],
+    route: GatewayRoute, token: String, writer: any GatewayResponseWriter
   ) async {
     var headers = route.endpoint.requestHeaders(secret: route.secret)
     headers["content-type"] = "application/json"
-    for name in ["anthropic-version", "anthropic-beta", "accept"] {
-      if let value = harnessHeaders[name] { headers[name] = value }
+    let operation: String
+    switch harness {
+    case .messages:
+      for name in ["anthropic-version", "anthropic-beta", "accept"] {
+        if let value = harnessHeaders[name] { headers[name] = value }
+      }
+      if headers["anthropic-version"] == nil { headers["anthropic-version"] = "2023-06-01" }
+      operation = route.endpoint.messagesOperation
+    case .responses:
+      for name in ["openai-beta", "accept"] {
+        if let value = harnessHeaders[name] { headers[name] = value }
+      }
+      operation = ResponsesClient.path
     }
-    if headers["anthropic-version"] == nil { headers["anthropic-version"] = "2023-06-01" }
     let request = EndpointHTTPRequest(
-      url: route.endpoint.url(for: route.endpoint.messagesOperation, secret: route.secret),
-      headers: headers,
+      url: route.endpoint.url(for: operation, secret: route.secret), headers: headers,
       body: body.data())
-    await attempt(
-      request, token: token, route: route, writer: writer, failed: messagesFailure
-    ) { response, commit in
+    await attempt(request, token: token, route: route, harness: harness, writer: writer) {
+      response, commit in
       await commit(
         response.status,
         ["content-type": response.headers["content-type"] ?? "application/json"])
       do {
         for try await chunk in response.body { await writer.write(chunk) }
       } catch {
-        // Cut after part of the answer went through: an error event in the stream, which Claude
-        // Code retries, rather than an answer that just stops.
+        // Cut after part of the answer went through. Claude Code retries on an error event; Codex
+        // retries a stream that ends without its completion, which closing now gives it.
+        guard harness == .messages else { return }
         let failure = error as? EndpointFailure ?? UnexpectedFailure.wrap(error)
         await writer.write(
           ServerSentEvent(name: "error", data: AnthropicMessagesServer.errorBody(failure).text())
@@ -242,48 +266,38 @@ public final class Gateway: GatewayRequestHandling {
     }
   }
 
-  private func translateMessagesToChat(
-    _ canonical: CanonicalRequest, route: GatewayRoute, token: String,
-    writer: any GatewayResponseWriter
+  private func translate(
+    _ side: HarnessSide, route: GatewayRoute, token: String, writer: any GatewayResponseWriter
   ) async {
-    var body = ChatCompletionsClient.encodeRequest(canonical).objectValue ?? [:]
-    for (key, value) in route.endpoint.defaultParameters where body[key] == nil {
-      body[key] = value
-    }
-    var headers = route.endpoint.requestHeaders(secret: route.secret)
-    headers["content-type"] = "application/json"
-    headers["accept"] = canonical.stream ? "text/event-stream" : "application/json"
-    let request = EndpointHTTPRequest(
-      url: route.endpoint.url(for: ChatCompletionsClient.path, secret: route.secret),
-      headers: headers, body: JSONValue.object(body).data())
-    let fallbackID = "msg_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+    let endpoint = EndpointSide(side.request, route: route)
     let observer = self.observer
     await attempt(
-      request, token: token, route: route, writer: writer, failed: messagesFailure
+      endpoint.request, token: token, route: route, harness: side.harness, writer: writer
     ) { response, commit in
-      guard canonical.stream else {
+      guard side.request.stream else {
         let data = try await response.collect()
         guard let json = try? JSONValue(parsing: data) else {
           throw EndpointFailure(kind: .malformedResponse, message: "The answer is not JSON.")
         }
-        var answer = try ChatCompletionsClient.decodeResponse(json)
-        if answer.id.isEmpty { answer.id = fallbackID }
+        var answer = try endpoint.decodeWhole(json)
+        if answer.id.isEmpty { answer.id = side.fallbackID }
         answer.model = route.model
         for step in answer.serverSteps { await observer?.serverStep(token: token, step: step) }
-        let encoded = AnthropicMessagesServer.encodeResponse(answer).data()
+        let encoded = side.whole(answer).data()
         await commit(200, ["content-type": "application/json"])
         await writer.write(encoded)
         return
       }
       var parser = ServerSentEventParser()
-      var decoder = ChatCompletionsStreamDecoder()
-      var encoder = AnthropicMessagesStreamEncoder(id: fallbackID, model: route.model)
+      var decoder = endpoint.makeDecoder()
+      var encoder = side.makeEncoder()
       var committed = false
       func forward(_ events: [CanonicalStreamEvent]) async {
         for event in events {
           var event = event
+          // The harness is told the model it asked for, under an identifier it can keep.
           if case .start(let id, _) = event {
-            event = .start(id: id.isEmpty ? fallbackID : id, model: route.model)
+            event = .start(id: id.isEmpty ? side.fallbackID : id, model: route.model)
           }
           if case .serverStep(let step) = event {
             await observer?.serverStep(token: token, step: step)
@@ -305,8 +319,8 @@ public final class Gateway: GatewayRequestHandling {
         for line in parser.strayLines { await forward(decoder.consumeStray(line)) }
         await forward(try decoder.finish())
       } catch {
-        // Once the harness has seen part of the answer, only an error in its own stream can take
-        // it back: Claude Code drops the partial answer and asks again.
+        // Once the harness has seen part of the answer, only its own stream can take it back: the
+        // harness drops the partial answer and asks again.
         guard committed else { throw error }
         let failure = error as? EndpointFailure ?? UnexpectedFailure.wrap(error)
         for sse in encoder.fail(failure) { await writer.write(sse.encoded) }
@@ -321,22 +335,14 @@ public final class Gateway: GatewayRequestHandling {
     "content-type": "text/event-stream", "cache-control": "no-cache",
   ]
 
-  private func messagesFailure(_ failure: EndpointFailure, writer: any GatewayResponseWriter) async
-  {
-    await writer.respond(
-      status: AnthropicMessagesServer.status(for: failure),
-      json: AnthropicMessagesServer.errorBody(failure))
-  }
-
   // MARK: - Attempts
 
   /// Sends `request`, and runs `answer` on a successful response. Until `answer` commits a status to
   /// the harness, a retryable failure is tried again after the policy's wait; after, the failure is
   /// `answer`'s to report in its own stream, and nothing else is written.
   private func attempt(
-    _ request: EndpointHTTPRequest, token: String, route: GatewayRoute,
+    _ request: EndpointHTTPRequest, token: String, route: GatewayRoute, harness: HarnessProtocol,
     writer: any GatewayResponseWriter,
-    failed: (EndpointFailure, any GatewayResponseWriter) async -> Void,
     answer: (
       EndpointHTTPResponse, _ commit: @escaping @Sendable (Int, [String: String]) async -> Void
     ) async throws -> Void
@@ -369,7 +375,7 @@ public final class Gateway: GatewayRequestHandling {
       }
       if committed.isSet { return }
       guard let delay = retryPolicy.delay(after: number, failure: failure, waited: waited) else {
-        await failed(failure, writer)
+        await Self.respond(failure, harness: harness, writer: writer)
         return
       }
       await observer?.retrying(
@@ -378,7 +384,7 @@ public final class Gateway: GatewayRequestHandling {
       do {
         try await sleep(delay)
       } catch {
-        await failed(failure, writer)
+        await Self.respond(failure, harness: harness, writer: writer)
         return
       }
       waited += delay
@@ -400,6 +406,115 @@ private final class CommitFlag: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     return value
+  }
+}
+
+// MARK: - The two sides
+
+protocol HarnessStreamEncoding: Sendable {
+  mutating func encode(_ event: CanonicalStreamEvent) -> [ServerSentEvent]
+  mutating func finish() -> [ServerSentEvent]
+  mutating func fail(_ failure: EndpointFailure) -> [ServerSentEvent]
+}
+
+extension AnthropicMessagesStreamEncoder: HarnessStreamEncoding {}
+extension ResponsesStreamEncoder: HarnessStreamEncoding {}
+
+protocol EndpointStreamDecoding: Sendable {
+  mutating func consume(_ event: ServerSentEvent) throws -> [CanonicalStreamEvent]
+  mutating func consumeStray(_ line: String) -> [CanonicalStreamEvent]
+  mutating func finish() throws -> [CanonicalStreamEvent]
+}
+
+extension ChatCompletionsStreamDecoder: EndpointStreamDecoding {}
+
+extension ResponsesStreamDecoder: EndpointStreamDecoding {
+  mutating func consumeStray(_ line: String) -> [CanonicalStreamEvent] { [] }
+}
+
+extension AnthropicMessagesStreamDecoder: EndpointStreamDecoding {
+  mutating func consumeStray(_ line: String) -> [CanonicalStreamEvent] { [] }
+}
+
+/// What the harness asked, and how to answer it.
+struct HarnessSide: Sendable {
+  let harness: HarnessProtocol
+  let request: CanonicalRequest
+  let fallbackID: String
+  let makeEncoder: @Sendable () -> any HarnessStreamEncoding
+  let whole: @Sendable (CanonicalResponse) -> JSONValue
+
+  init(_ harness: HarnessProtocol, body: JSONValue, model: String) throws {
+    self.harness = harness
+    let identifier = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+    switch harness {
+    case .messages:
+      var request = try AnthropicMessagesServer.decodeRequest(body)
+      request.model = model
+      self.request = request
+      let id = "msg_" + identifier
+      fallbackID = id
+      makeEncoder = { AnthropicMessagesStreamEncoder(id: id, model: model) }
+      whole = { AnthropicMessagesServer.encodeResponse($0) }
+    case .responses:
+      let decoded = try ResponsesServer.decodeRequest(body)
+      var request = decoded.request
+      request.model = model
+      self.request = request
+      let id = "resp_" + identifier
+      fallbackID = id
+      let custom = decoded.customTools
+      makeEncoder = { ResponsesStreamEncoder(id: id, model: model, customTools: custom) }
+      whole = { answer in
+        var encoder = ResponsesStreamEncoder(id: id, model: model, customTools: custom)
+        return encoder.response(answer)
+      }
+    }
+  }
+}
+
+/// The request in the endpoint's protocol, and how to read its answer.
+struct EndpointSide: Sendable {
+  let request: EndpointHTTPRequest
+  let makeDecoder: @Sendable () -> any EndpointStreamDecoding
+  let decodeWhole: @Sendable (JSONValue) throws -> CanonicalResponse
+
+  init(_ canonical: CanonicalRequest, route: GatewayRoute) {
+    let endpoint = route.endpoint
+    var body: [String: JSONValue]
+    let operation: String
+    switch endpoint.wireProtocol {
+    case .chatCompletions:
+      body = ChatCompletionsClient.encodeRequest(canonical).objectValue ?? [:]
+      operation = ChatCompletionsClient.path
+      makeDecoder = { ChatCompletionsStreamDecoder() }
+      decodeWhole = { try ChatCompletionsClient.decodeResponse($0) }
+    case .responses:
+      body = ResponsesClient.encodeRequest(canonical).objectValue ?? [:]
+      operation = ResponsesClient.path
+      makeDecoder = { ResponsesStreamDecoder() }
+      decodeWhole = { try ResponsesClient.decodeResponse($0) }
+    case .messages:
+      body =
+        AnthropicMessagesClient.encodeRequest(
+          canonical, defaultMaximumTokens: endpoint.defaultParameters["max_tokens"]?.intValue
+        ).objectValue ?? [:]
+      operation = endpoint.messagesOperation
+      makeDecoder = { AnthropicMessagesStreamDecoder() }
+      decodeWhole = { try AnthropicMessagesClient.decodeResponse($0) }
+    }
+    for (key, value) in endpoint.defaultParameters where body[key] == nil {
+      body[key] = value
+    }
+    var headers = endpoint.requestHeaders(secret: route.secret)
+    headers["content-type"] = "application/json"
+    headers["accept"] = canonical.stream ? "text/event-stream" : "application/json"
+    if endpoint.wireProtocol == .messages, headers["anthropic-version"] == nil {
+      headers["anthropic-version"] = "2023-06-01"
+    }
+    request = EndpointHTTPRequest(
+      url: endpoint.url(for: operation, secret: route.secret), headers: headers,
+      body: JSONValue.object(body).data())
   }
 }
 
