@@ -295,45 +295,15 @@ struct BlockView: View {
 
 /// What scrolls under the toolbar is blurred the whole height of it.
 ///
-/// The edge effect of macOS 26 blurs only the top of the toolbar and fades out towards its foot:
-/// a message level with the title or the pickers stayed legible under them. Before macOS 26 the
-/// toolbar has its own material, and this does nothing.
+/// With its edge effect, macOS 26 blurs the top of the toolbar only and fades out towards its foot:
+/// a message level with the title or the pickers stayed legible under them. Without it, the
+/// toolbar's own blur covers its whole height. Before macOS 26 there is no edge effect.
 private struct ToolbarVeil: ViewModifier {
-  @State private var height: CGFloat = 0
-
   func body(content: Content) -> some View {
     if #available(macOS 26, *) {
-      content
-        .scrollEdgeEffectHidden(true, for: .top)
-        .onGeometryChange(for: CGFloat.self) {
-          $0.safeAreaInsets.top
-        } action: {
-          height = $0
-        }
-        .overlay(alignment: .top) {
-          WithinWindowBlur()
-            .frame(height: height)
-            // Drawn in the safe area it covers, from the top of the window down to the toolbar's
-            // foot.
-            .offset(y: -height)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
+      content.scrollEdgeEffectHidden(true, for: .top)
     } else {
       content
     }
   }
-}
-
-/// A blur of what the window draws under it. SwiftUI's materials blur what lies behind the window.
-private struct WithinWindowBlur: NSViewRepresentable {
-  func makeNSView(context: Context) -> NSVisualEffectView {
-    let view = NSVisualEffectView()
-    view.blendingMode = .withinWindow
-    view.material = .headerView
-    view.state = .active
-    return view
-  }
-
-  func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
