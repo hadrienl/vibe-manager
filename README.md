@@ -101,8 +101,10 @@ folding thresholds of the columns and what is restored at launch are documented 
 [`docs/architecture/0008-workspace-layout.md`](docs/architecture/0008-workspace-layout.md).
 
 Nothing leaves that list on its own. Closing a session stops its agent and keeps everything else,
-terminal output included; archiving asks once, detaches the process and marks the session as no
-longer reopenable until it is unarchived. No session is ever deleted, and the list is searchable,
+terminal output included; archiving (⌃⌘A) detaches the process and marks the session as no
+longer reopenable until it is unarchived. Both ask first only while something runs in the
+session — its agent, or a command in a side terminal — so ⌃⌘A pressed again and again empties a
+column. No session is ever deleted, and the list is searchable,
 filterable and sorted in an order that survives a relaunch. The rules are documented in
 [`docs/architecture/0009-session-history-and-archive.md`](docs/architecture/0009-session-history-and-archive.md).
 
