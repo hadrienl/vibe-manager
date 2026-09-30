@@ -149,6 +149,17 @@
         }
       }
     },
+    "Updating the terminal…" : {
+      "comment" : "Over a terminal catching up on what it wrote while it was not shown.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour du terminal…"
+          }
+        }
+      }
+    },
     "terminal" : {
       "comment" : "What VoiceOver calls the element.",
       "localizations" : {
