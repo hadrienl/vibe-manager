@@ -254,6 +254,27 @@ struct AppendedLinesTests {
     #expect(await received.first(1) == ["first"])
   }
 
+  @Test("A file created empty in a watched folder, then written, hands its line out at once")
+  func createdThenWritten() async throws {
+    // `Data.write` creates the file, then writes it: the folder's event may wake the follower in
+    // between, when the file is still empty. Its line must not wait for the safety net — about one
+    // time in four it did, before the file was looked at again once its own source was armed.
+    for attempt in 0..<100 {
+      let directory = try folder()
+      let url = directory.appendingPathComponent("t.jsonl")
+      let log = WatchLog()
+      var appended = AppendedLines(file: url, start: .end)
+      appended.safetyNet = .seconds(3600)
+      appended.onWatching = { log.record($0) }
+      let received = Received(appended.lines())
+      await log.wait(for: .folder)
+      try Data("line \(attempt)\n".utf8).write(to: url)
+      let first = await received.first(1)
+      #expect(first == ["line \(attempt)"])
+      if first != ["line \(attempt)"] { return }
+    }
+  }
+
   @Test("A folder removed and made again is watched again")
   func folderMadeAgain() async throws {
     let directory = try folder().appendingPathComponent("session")

@@ -19,6 +19,9 @@ public struct AnswerAgentRequest: Sendable {
     case terminalUnavailable
     /// The request went away between two keystrokes of a longer answer: the rest was not typed.
     case interrupted
+    /// The dialog drawn in the terminal does not offer this answer, or could not be read: nothing
+    /// was typed (#273).
+    case notOnScreen
   }
 
   /// How long a terminal must stay silent before the next keystroke, and how long it is waited for
@@ -29,22 +32,26 @@ public struct AnswerAgentRequest: Sendable {
   private let tracker: TrackAgentActivity
   private let write: @Sendable (SessionID, [UInt8]) async -> Bool
   private let lastOutput: @Sendable (SessionID) async -> ContinuousClock.Instant?
+  private let screen: @Sendable (SessionID) async -> String?
   private let sleep: @Sendable (Duration) async throws -> Void
   private let diagnostics: Diagnostics
 
   /// - Parameters:
   ///   - write: types bytes into the session's running terminal; `false` when none runs.
   ///   - lastOutput: when the session's terminal last wrote something.
+  ///   - screen: what the session's terminal shows now, as text; `nil` when it cannot be told.
   public init(
     tracker: TrackAgentActivity,
     write: @escaping @Sendable (SessionID, [UInt8]) async -> Bool,
     lastOutput: @escaping @Sendable (SessionID) async -> ContinuousClock.Instant? = { _ in nil },
+    screen: @escaping @Sendable (SessionID) async -> String? = { _ in nil },
     sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
     diagnostics: Diagnostics = .disabled
   ) {
     self.tracker = tracker
     self.write = write
     self.lastOutput = lastOutput
+    self.screen = screen
     self.sleep = sleep
     self.diagnostics = diagnostics
   }
@@ -62,8 +69,15 @@ public struct AnswerAgentRequest: Sendable {
   }
 
   private func give(_ answer: AgentAnswer, to id: AgentRequestID) async -> Outcome {
-    guard let steps = await tracker.keystrokes(for: answer, to: id), !steps.isEmpty else {
+    guard await tracker.offers(answer, to: id) else {
       return await tracker.isFirstRequest(id) ? .notAnswerable : .requestGone
+    }
+    // Which key takes the answer is read off the dialog as drawn now (#273).
+    let drawn = await screen(id.sessionID).flatMap(AgentDialogScreen.init(screen:))
+    guard let steps = await tracker.keystrokes(for: answer, to: id, screen: drawn),
+      !steps.isEmpty
+    else {
+      return await tracker.isFirstRequest(id) ? .notOnScreen : .requestGone
     }
     for (index, step) in steps.enumerated() {
       if index > 0 {

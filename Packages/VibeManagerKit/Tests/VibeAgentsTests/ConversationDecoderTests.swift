@@ -497,6 +497,94 @@ struct FileTranscriptTailTests {
     #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["new"])
   }
 
+  @Test("Read by chunks, a line cut by a chunk's end is handed over whole, once (#249)")
+  func chunks() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    let lines = (0..<20).map { "line number \($0)" }
+    try append(lines.joined(separator: "\n") + "\npartial", to: file)
+    var reader = TranscriptLineReader(file: file, chunkSize: 16)
+    var read: [String] = []
+    var chunks = 0
+    var reading: TranscriptLineReader.Reading
+    repeat {
+      reading = reader.readChunk()
+      read += reading.lines.map { String(decoding: $0, as: UTF8.self) }
+      chunks += 1
+    } while reading.hasMore
+    #expect(read == lines)
+    #expect(chunks > 10)
+    // The last line has no line feed yet: not handed over, and not skipped.
+    #expect(reader.offset == UInt64(Data((lines.joined(separator: "\n") + "\n").utf8).count))
+    try append(" end\n", to: file)
+    #expect(
+      reader.readAvailable().lines.map { String(decoding: $0, as: UTF8.self) } == ["partial end"])
+  }
+
+  @Test("A line longer than a chunk is carried until its end comes")
+  func longLine() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    let long = String(repeating: "x", count: 100)
+    try append("a\n\(long)\nb\n", to: file)
+    var reader = TranscriptLineReader(file: file, chunkSize: 8)
+    #expect(
+      reader.readAvailable().lines.map { String(decoding: $0, as: UTF8.self) } == ["a", long, "b"])
+  }
+
+  @Test("Resumed at a position, only the lines written since are read")
+  func resumed() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append("one\ntwo\n", to: file)
+    var first = TranscriptLineReader(file: file)
+    _ = first.readAvailable()
+    let position = try #require(first.position)
+    try append("three\nfou", to: file)
+    var resumed = TranscriptLineReader(file: file, from: position)
+    let reading = resumed.readAvailable()
+    #expect(!reading.wasReset)
+    #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["three"])
+  }
+
+  @Test("Resumed on a file that is no longer the one it read, it reads again from the start")
+  func resumedOnAnotherFile() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append("one\ntwo\n", to: file)
+    var first = TranscriptLineReader(file: file)
+    _ = first.readAvailable()
+    let position = try #require(first.position)
+
+    // Rewritten in place: same inode, as long, other bytes.
+    let rewritten = try FileHandle(forWritingTo: file)
+    try rewritten.write(contentsOf: Data("uno\ndos\nmore\n".utf8))
+    try rewritten.close()
+    var inPlace = TranscriptLineReader(file: file, from: position)
+    var reading = inPlace.readAvailable()
+    #expect(reading.wasReset)
+    #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["uno", "dos", "more"])
+
+    // Cut short.
+    try Data("x\n".utf8).write(to: file)
+    var shorter = TranscriptLineReader(file: file, from: position)
+    reading = shorter.readAvailable()
+    #expect(reading.wasReset)
+    #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["x"])
+
+    // Replaced under its name.
+    try FileManager.default.removeItem(at: file)
+    try append("one\ntwo\nnew\n", to: file)
+    var replaced = TranscriptLineReader(file: file, from: position)
+    reading = replaced.readAvailable()
+    #expect(reading.wasReset)
+    #expect(reading.lines.count == 3)
+  }
+
   @Test("Following: what is there, what is written next, and a file that appears later")
   func follow() async throws {
     let root = try scratch()
@@ -505,23 +593,24 @@ struct FileTranscriptTailTests {
     let tail = FileTranscriptTail(pollInterval: .milliseconds(50))
     var iterator = tail.follow(file).makeAsyncIterator()
     // Nothing yet: the first reading says so, empty.
-    guard case .lines(let first) = await iterator.next() else {
+    guard case .records(let first, _, let isCaughtUp) = await iterator.next() else {
       Issue.record("no first reading")
       return
     }
     #expect(first.isEmpty)
-    try append("a\nb\n", to: file)
+    #expect(isCaughtUp)
+    try append(#"{"n":"a"}"# + "\n" + #"{"n":"b"}"# + "\nnot json\n", to: file)
     var received: [String] = []
     while received.count < 2, let chunk = await iterator.next() {
-      if case .lines(let lines) = chunk {
-        received += lines.map { String(decoding: $0, as: UTF8.self) }
+      if case .records(let records, _, _) = chunk {
+        received += records.compactMap { $0.object["n"] as? String }
       }
     }
     #expect(received == ["a", "b"])
-    try append("c\n", to: file)
+    try append(#"{"n":"c"}"# + "\n", to: file)
     while received.count < 3, let chunk = await iterator.next() {
-      if case .lines(let lines) = chunk {
-        received += lines.map { String(decoding: $0, as: UTF8.self) }
+      if case .records(let records, _, _) = chunk {
+        received += records.compactMap { $0.object["n"] as? String }
       }
     }
     #expect(received == ["a", "b", "c"])
@@ -532,39 +621,192 @@ struct FileTranscriptTailTests {
     let root = try scratch()
     defer { try? FileManager.default.removeItem(at: root) }
     let file = root.appendingPathComponent("t.jsonl")
-    try append("a\n", to: file)
+    try append(#"{"n":"a"}"# + "\n", to: file)
     let tail = FileTranscriptTail(pollInterval: .milliseconds(50), watchedInterval: .seconds(3600))
     var iterator = tail.follow(file).makeAsyncIterator()
-    guard case .lines(let first) = await iterator.next() else {
+    func names(_ records: [TranscriptRecord]) -> [String] {
+      records.compactMap { $0.object["n"] as? String }
+    }
+    guard case .records(let first, _, _) = await iterator.next() else {
       Issue.record("no first reading")
       return
     }
-    #expect(first.map { String(decoding: $0, as: UTF8.self) } == ["a"])
+    #expect(names(first) == ["a"])
     // Only the disk can wake the reader here: the poll is an hour away.
-    try append("b\n", to: file)
-    guard case .lines(let grown) = await iterator.next() else {
-      Issue.record("the growth was not read")
-      return
+    try append(#"{"n":"b"}"# + "\n", to: file)
+    var received: [String] = []
+    while !received.contains("b"), let chunk = await iterator.next() {
+      if case .records(let records, _, _) = chunk { received += names(records) }
     }
-    #expect(grown.map { String(decoding: $0, as: UTF8.self) } == ["b"])
+    #expect(received == ["b"])
     // Deleted, then written again: the reader goes back to its poll, and reads it from its start.
     try FileManager.default.removeItem(at: file)
-    try append("new\n", to: file)
-    var received: [String] = []
+    try append(#"{"n":"new"}"# + "\n", to: file)
+    received = []
     var wasReset = false
     while !received.contains("new"), let chunk = await iterator.next() {
       switch chunk {
       case .reset: wasReset = true
-      case .lines(let lines): received += lines.map { String(decoding: $0, as: UTF8.self) }
+      case .records(let records, _, _): received += names(records)
       }
     }
     #expect(wasReset)
     #expect(received == ["new"])
   }
+
+  @Test("A first reading in chunks says when it caught up with the file")
+  func catchingUp() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append((0..<50).map { #"{"n":\#($0)}"# + "\n" }.joined(), to: file)
+    let tail = FileTranscriptTail(pollInterval: .seconds(60), chunkSize: 64)
+    var iterator = tail.follow(file).makeAsyncIterator()
+    var numbers: [Int] = []
+    var chunks = 0
+    while let chunk = await iterator.next() {
+      guard case .records(let records, _, let isCaughtUp) = chunk else { continue }
+      chunks += 1
+      numbers += records.compactMap { $0.object["n"] as? Int }
+      if isCaughtUp { break }
+    }
+    #expect(numbers == Array(0..<50))
+    #expect(chunks > 1)
+  }
+
+  @Test("A line too long to keep is skipped to its end, and counted")
+  func tooLongLine() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append("a\n\(String(repeating: "x", count: 40))\nb\n", to: file)
+    var reader = TranscriptLineReader(file: file, chunkSize: 8, maximumLineLength: 16)
+    var lines: [String] = []
+    var skipped = 0
+    var reading: TranscriptLineReader.Reading
+    repeat {
+      reading = reader.readChunk()
+      lines += reading.lines.map { String(decoding: $0, as: UTF8.self) }
+      skipped += reading.skippedLines
+    } while reading.hasMore
+    #expect(lines == ["a", "b"])
+    #expect(skipped == 1)
+  }
+
+  @Test("Pulled by its consumer, a reading never runs more than a chunk ahead of it (#249)")
+  func readsOneChunkAhead() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append((0..<200).map { #"{"n":\#($0)}"# + "\n" }.joined(), to: file)
+    let tail = FileTranscriptTail(pollInterval: .seconds(60), chunkSize: 64)
+    let reading = tail.pulledReading(file, from: nil, follows: true)
+    guard case .records(_, _, let isCaughtUp) = await reading.next() else {
+      Issue.record("no first chunk")
+      return
+    }
+    #expect(!isCaughtUp)
+    // The chunk after the one handed over is read ahead…
+    while reading.chunksRead < 2 { await Task.yield() }
+    // …and none after it while the first is not decoded.
+    for _ in 0..<1_000 { await Task.yield() }
+    #expect(reading.chunksRead == 2)
+    _ = await reading.next()
+    while reading.chunksRead < 3 { await Task.yield() }
+    for _ in 0..<1_000 { await Task.yield() }
+    #expect(reading.chunksRead == 3)
+    reading.cancel()
+  }
+
+  @Test("A followed file emptied says so: reset, then an empty reading caught up (#249)")
+  func emptied() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append(#"{"n":"a"}"# + "\n", to: file)
+    let tail = FileTranscriptTail(pollInterval: .milliseconds(50))
+    var iterator = tail.follow(file).makeAsyncIterator()
+    guard case .records(let first, _, true) = await iterator.next() else {
+      Issue.record("no first reading")
+      return
+    }
+    #expect(first.count == 1)
+    try Data().write(to: file)
+    var sawReset = false
+    while let chunk = await iterator.next() {
+      switch chunk {
+      case .reset:
+        sawReset = true
+      case .records(let records, _, let isCaughtUp):
+        guard sawReset else { continue }
+        #expect(records.isEmpty)
+        #expect(isCaughtUp)
+        return
+      }
+    }
+    Issue.record("the stream ended")
+  }
+
+  @Test("Read once, the file comes a chunk at a time, and the stream ends once caught up")
+  func readInChunks() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append((0..<50).map { #"{"n":\#($0)}"# + "\n" }.joined(), to: file)
+    let tail = FileTranscriptTail(pollInterval: .seconds(60), chunkSize: 64)
+    var numbers: [Int] = []
+    var chunks = 0
+    var caughtUp = 0
+    for await chunk in tail.readChunks(file) {
+      guard case .records(let records, _, let isCaughtUp) = chunk else { continue }
+      chunks += 1
+      if isCaughtUp { caughtUp += 1 }
+      numbers += records.compactMap { $0.object["n"] as? Int }
+    }
+    #expect(numbers == Array(0..<50))
+    #expect(chunks > 1)
+    #expect(caughtUp == 1)
+    #expect(await tail.read(file).count == 50)
+    let missing = root.appendingPathComponent("missing.jsonl")
+    #expect(await tail.read(missing).isEmpty)
+  }
+
+  @Test("Lines parsed on every core come back in the order of the file, the unreadable left out")
+  func parsedInOrder() {
+    let lines = (0..<10_000).map { index in
+      Data((index % 1_000 == 999 ? "{broken" : #"{"n":\#(index)}"#).utf8)
+    }
+    let numbers = FileTranscriptTail.parse(lines).compactMap { $0.object["n"] as? Int }
+    #expect(numbers == (0..<10_000).filter { $0 % 1_000 != 999 })
+  }
+
+  @Test("A parsed record holds an immutable dictionary: it can cross tasks")
+  func immutableRecord() throws {
+    let record = try #require(TranscriptRecord(line: Data(#"{"a":{"b":[1]}}"#.utf8)))
+    let inner = record.object["a"] as AnyObject
+    #expect(!(inner is NSMutableDictionary))
+  }
 }
 
 @Suite("The mock agent's conversation")
 struct MockConversationTests {
+  /// The mock script, run with only what it needs of `inherited`. Run with all of it, a mock
+  /// started by tests in the terminal of an agent of Vibe Manager finds that session's
+  /// `VIBE_AGENT_ACTIVITY_LOG` and reports into it: its `SessionEnd` took a question the real
+  /// agent was waiting on off the queue (#271).
+  static func mockAgent(
+    _ arguments: [String],
+    inherited: [String: String] = ProcessInfo.processInfo.environment
+  ) throws -> Process {
+    let script = try #require(MockAgentProvider.defaultScriptURL())
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = [script.path] + arguments
+    process.environment = inherited.filter { ["PATH", "HOME", "TMPDIR"].contains($0.key) }
+    process.standardOutput = FileHandle.nullDevice
+    return process
+  }
+
   @Test("With a transcript folder, the mock writes its conversation as Claude Code does")
   func transcript() async throws {
     let folder = FileManager.default.temporaryDirectory
@@ -574,13 +816,9 @@ struct MockConversationTests {
     let agent = SessionAgentConfiguration(providerID: "mock", resumeIdentifier: "m1")
     let session = WorkSession(name: "Mock", agent: agent)
     #expect(provider.conversationFiles(for: agent, in: session, hint: nil).isEmpty)
-    let script = try #require(MockAgentProvider.defaultScriptURL())
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = [
-      script.path, "--session-id", "m1", "--transcript-dir", folder.path, "--prompt", "hello",
-    ]
-    process.standardOutput = FileHandle.nullDevice
+    let process = try Self.mockAgent([
+      "--session-id", "m1", "--transcript-dir", folder.path, "--prompt", "hello",
+    ])
     try process.run()
     process.waitUntilExit()
     let files = provider.conversationFiles(for: agent, in: session, hint: nil)
@@ -598,15 +836,11 @@ struct MockConversationTests {
     let folder = FileManager.default.temporaryDirectory
       .appendingPathComponent("VibeMockTranscript-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: folder) }
-    let script = try #require(MockAgentProvider.defaultScriptURL())
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = [
-      script.path, "--session-id", "m2", "--transcript-dir", folder.path, "--hold",
-    ]
+    let process = try Self.mockAgent([
+      "--session-id", "m2", "--transcript-dir", folder.path, "--hold",
+    ])
     let input = Pipe()
     process.standardInput = input
-    process.standardOutput = FileHandle.nullDevice
     try process.run()
     let lines = "!printf 'a\\nb \"c\"'\n\u{1B}[200~!pasted\u{1B}[201~\n"
     input.fileHandleForWriting.write(Data(lines.utf8))
@@ -625,5 +859,33 @@ struct MockConversationTests {
         // Pasted, a `!` is text.
         .userPrompt("!pasted", attachments: 0), .agentText("echo: !pasted"),
       ])
+  }
+
+  @Test("The activity log of the session running the tests is none of the mock's business (#271)")
+  func sessionLogUntouched() throws {
+    let log = try temporaryLog()
+    var inherited = ProcessInfo.processInfo.environment
+    inherited[AgentActivityHookCommand.environmentKey] = log.path
+    let process = try Self.mockAgent(["--prompt", "hello"], inherited: inherited)
+    try process.run()
+    process.waitUntilExit()
+    #expect(!FileManager.default.fileExists(atPath: log.path))
+  }
+}
+
+extension TranscriptLineReader {
+  /// Every complete line up to the end of the file, chunk after chunk.
+  fileprivate mutating func readAvailable() -> Reading {
+    var reading = Reading()
+    repeat {
+      let chunk = readChunk()
+      if chunk.wasReset {
+        reading.lines = []
+        reading.wasReset = true
+      }
+      reading.lines += chunk.lines
+      reading.hasMore = chunk.hasMore
+    } while reading.hasMore
+    return reading
   }
 }

@@ -15,9 +15,8 @@ private final class PromptDecoder: ConversationDecoding {
     self.file = file
   }
 
-  func consume(_ line: Data) {
-    let text = String(decoding: line, as: UTF8.self)
-    guard text.hasPrefix("user:") else { return }
+  func consume(_ record: TranscriptRecord) {
+    guard let text = record.object["line"] as? String, text.hasPrefix("user:") else { return }
     entries.append(
       ConversationEntry(
         id: "\(file)#\(entries.count)",
@@ -65,14 +64,22 @@ private struct Providers: AgentProviderResolving {
 private struct WholeFiles: TranscriptTailing {
   let contents: [URL: [String]]
 
-  func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+  func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<TranscriptChunk> {
     AsyncStream { continuation in
-      continuation.yield(.lines((contents[file] ?? []).map { Data($0.utf8) }))
+      continuation.yield(.records(records(of: file), isCaughtUp: true))
     }
   }
 
-  func read(_ file: URL) async -> [Data] {
-    (contents[file] ?? []).map { Data($0.utf8) }
+  func read(_ file: URL) async -> [TranscriptRecord] {
+    records(of: file)
+  }
+
+  /// Each line as the record `{"line": …}`.
+  private func records(of file: URL) -> [TranscriptRecord] {
+    (contents[file] ?? []).compactMap { text in
+      (try? JSONSerialization.data(withJSONObject: ["line": text])).flatMap(
+        TranscriptRecord.init(line:))
+    }
   }
 }
 

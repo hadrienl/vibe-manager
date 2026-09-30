@@ -662,6 +662,21 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     await panes[id]?.session?.lastOutputAt()
   }
 
+  /// What the terminal of a session whose agent runs shows now, as text (#273): its history
+  /// replayed at the size the pane measured — or, never shown, a size larger than any the agent
+  /// draws to, where its lines fall on the same rows. Off the main actor: a long history takes a
+  /// moment to replay.
+  public func screen(of id: SessionID) async -> String? {
+    guard let pane = panes[id], pane.status == .running, let terminal = pane.session else {
+      return nil
+    }
+    let history = await terminal.history()
+    let size = pane.viewportSize ?? TerminalSize(columns: 300, rows: 120)
+    return await Task.detached(priority: .userInitiated) {
+      TerminalText.screen(replaying: history.bytes, size: size)
+    }.value
+  }
+
   public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {
     panes[id]?.failure
   }
@@ -870,10 +885,27 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     guard let activity else { return }
     activityTasks[id]?.cancel()
     activityTasks[id] = Task.detached {
-      let attachment = await terminal.attach(.pulses(every: Self.activityPulseInterval))
-      for await event in attachment.events {
-        guard case .outputPulse = event else { continue }
-        await activity.output(id)
+      await withTaskGroup(of: Void.self) { group in
+        group.addTask {
+          let attachment = await terminal.attach(.pulses(every: Self.activityPulseInterval))
+          for await event in attachment.events {
+            guard case .outputPulse = event else { continue }
+            await activity.output(id)
+          }
+        }
+        // What the agent announces on its terminal, which no hook reports (#273): its bytes are
+        // read only for an agent that says something that way — Codex.
+        guard await activity.readsTerminalNotifications(id) else { return }
+        group.addTask {
+          let attachment = await terminal.attach()
+          var notifications = TerminalNotificationScanner()
+          for await event in attachment.events {
+            guard case .output(let bytes) = event else { continue }
+            for message in notifications.scan(bytes) {
+              await activity.terminalNotification(id, message)
+            }
+          }
+        }
       }
     }
   }

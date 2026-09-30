@@ -60,7 +60,9 @@ private struct AnyKeymap: AgentAnswerKeymap {
     [.allowOnce, .deny, .chooseOption]
   }
 
-  func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
     [[0x31]]
   }
 }

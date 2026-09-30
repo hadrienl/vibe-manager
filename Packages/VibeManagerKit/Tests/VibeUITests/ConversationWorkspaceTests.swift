@@ -37,6 +37,11 @@ struct ConversationWorkspaceTests {
     #expect(workspace.existingModel(for: listed[1].id) != nil)
   }
 
+  @Test("Readings are put aside for as many sessions as models sleep (#249)")
+  func parkedAsManyAsDormant() {
+    #expect(FollowConversation.parkedLimit == ConversationWorkspace.dormantModelCount)
+  }
+
   @Test("A request for the composer made before its model exists is handed to it (#105)")
   func pendingFocus() {
     let workspace = ConversationWorkspace()

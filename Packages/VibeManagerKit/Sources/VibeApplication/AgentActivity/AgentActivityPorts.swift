@@ -42,6 +42,12 @@ public protocol AgentSignalDecoding: Sendable {
   /// session's log, it is the one identifier two agents working in the same folder cannot mix up.
   /// `nil` for every other event, and for an agent whose identifier is known some other way.
   func conversationIdentifier(in event: AgentActivityEvent) -> String?
+  /// What a notification the agent wrote to its terminal says (#273): Codex announces through
+  /// OSC 9 the dialogs no hook reports. `nil` when it says nothing this agent's hooks do not.
+  func signal(forTerminalNotification message: String) -> AgentSignal?
+  /// Whether this agent says anything through its terminal's notifications: its output is read
+  /// for them only then.
+  var readsTerminalNotifications: Bool { get }
 }
 
 extension AgentSignalDecoding {
@@ -55,6 +61,14 @@ extension AgentSignalDecoding {
 
   public var answerKeymap: (any AgentAnswerKeymap)? {
     nil
+  }
+
+  public func signal(forTerminalNotification message: String) -> AgentSignal? {
+    nil
+  }
+
+  public var readsTerminalNotifications: Bool {
+    false
   }
 }
 
