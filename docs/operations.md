@@ -136,6 +136,11 @@ Help → Export Diagnostics…, then open an issue with the file. `defaults writ
 eu.hadrien.VibeManager DiagnosticsVerbose -bool YES` adds debug events to the log — made of the
 same types as the others: verbose is not indiscreet — and turns on the main-thread hang detector.
 
+A development build also publishes `perf.bodyEvaluations` every ten seconds: how many times the
+window, the sidebar, its rows, each session's terminal slot and the conversations had their `body`
+evaluated. An agent working in a hidden session must leave the window's count at zero (#254). The
+`ui.activityApplied` signpost times one transition of an agent's activity on the main thread.
+
 ## Rotating the update key
 
 The EdDSA key signs every update (ADR 0033). Its private half is in the maintainer's login

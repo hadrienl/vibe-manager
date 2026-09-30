@@ -33,6 +33,7 @@ public struct ConversationView: View {
   }
 
   public var body: some View {
+    let _ = BodyCounter.tick(.conversationView)
     VStack(spacing: 0) {
       switch model.snapshot.availability {
       case .loading where model.blocks.isEmpty:
