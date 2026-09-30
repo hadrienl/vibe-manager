@@ -497,6 +497,54 @@ struct FileTranscriptTailTests {
     #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["new"])
   }
 
+  @Test("Read by chunks, a line cut by a chunk's end is handed over whole, once (#249)")
+  func chunks() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    let lines = (0..<20).map { "line number \($0)" }
+    try append(lines.joined(separator: "\n") + "\npartial", to: file)
+    var reader = TranscriptLineReader(file: file, chunkSize: 16)
+    var read: [String] = []
+    var chunks = 0
+    var reading: TranscriptLineReader.Reading
+    repeat {
+      reading = reader.readChunk()
+      read += reading.lines.map { String(decoding: $0, as: UTF8.self) }
+      chunks += 1
+    } while reading.hasMore
+    #expect(read == lines)
+    #expect(chunks > 10)
+    // The last line has no line feed yet: not handed over, and not skipped.
+    #expect(reader.offset == UInt64(Data((lines.joined(separator: "\n") + "\n").utf8).count))
+    try append(" end\n", to: file)
+    #expect(
+      reader.readAvailable().lines.map { String(decoding: $0, as: UTF8.self) } == ["partial end"])
+  }
+
+  @Test("A line longer than a chunk is carried until its end comes")
+  func longLine() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    let long = String(repeating: "x", count: 100)
+    try append("a\n\(long)\nb\n", to: file)
+    var reader = TranscriptLineReader(file: file, chunkSize: 8)
+    #expect(
+      reader.readAvailable().lines.map { String(decoding: $0, as: UTF8.self) } == ["a", long, "b"])
+  }
+
+  @Test("The splitter leaves empty lines out and carries what no line feed ended")
+  func splitter() {
+    var splitter = LineSplitter()
+    #expect(splitter.lines(in: Data("one\n\ntw".utf8)) == [Data("one".utf8)])
+    #expect(splitter.carriedCount == 2)
+    #expect(splitter.lines(in: Data("o".utf8)).isEmpty)
+    #expect(splitter.lines(in: Data("\nthree\n".utf8)) == [Data("two".utf8), Data("three".utf8)])
+    #expect(splitter.carriedCount == 0)
+    #expect(splitter.lines(in: Data()).isEmpty)
+  }
+
   @Test("Following: what is there, what is written next, and a file that appears later")
   func follow() async throws {
     let root = try scratch()
