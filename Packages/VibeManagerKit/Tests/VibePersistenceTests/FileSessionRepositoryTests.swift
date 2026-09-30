@@ -671,4 +671,17 @@ func linkedBackupIsPrivate() async throws {
 
   let attributes = try FileManager.default.attributesOfItem(atPath: backupURL.path)
   #expect(attributes[.posixPermissions] as? Int == 0o600)
+@Test("The CLI that ran an endpoint's conversation is kept in the store")
+func endpointHarnessIsStored() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let session = WorkSession(
+    name: "Endpoint",
+    agent: SessionAgentConfiguration(
+      providerID: "endpoint.8CB1EF15-9CD2-46A8-87AE-1C38064F9B8A", modelID: "az-claude-opus-4-6",
+      resumeIdentifier: "01a0f2fb-d5a3-7513-93df-c2a9bfc4e6f0", harnessID: "codex"))
+  try await FileSessionRepository(storeURL: storeURL).save(session)
+  let reloaded = try await FileSessionRepository(storeURL: storeURL).sessions()
+  #expect(reloaded.first?.agent?.harnessID == "codex")
+  #expect(reloaded.first?.agent?.transcriptProviderID == "codex")
 }

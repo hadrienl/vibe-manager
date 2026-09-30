@@ -473,7 +473,13 @@ public final class AppEnvironment {
     appModel.endpoints = EndpointsSettingsModel(
       repository: endpointCatalog.repository, secrets: endpointCatalog.secrets,
       probing: EndpointProber(transport: URLSessionEndpointTransport()),
-      didSave: { await endpointCatalog.reload() })
+      didSave: { [weak appModel] in
+        await endpointCatalog.reload()
+        // The names the sidebar, the usage and the requests give agents come from the detection,
+        // and the conversation view knows the agents it reads from when it was prepared.
+        await appModel?.refreshAgents()
+        await appModel?.conversations.refreshReadableAgents()
+      })
     // The endpoints are registered before the first sheet asks for the agents, and the gateway is
     // relieved of the tokens of sessions that ended: at launch, then every five minutes.
     Task { [repository] in

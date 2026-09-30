@@ -472,18 +472,23 @@ private struct StoredAgentV2: Codable {
   let providerID: String
   let modelID: String?
   let resumeIdentifier: String?
+  /// The CLI that ran an endpoint's conversation (#107). Absent from every document written
+  /// before, and from every conversation that is not an endpoint's.
+  let harnessID: String?
 
   init(_ agent: SessionAgentConfiguration) {
     providerID = agent.providerID
     modelID = agent.modelID
     resumeIdentifier = agent.resumeIdentifier
+    harnessID = agent.harnessID
   }
 
   var domainValue: SessionAgentConfiguration {
     SessionAgentConfiguration(
       providerID: providerID,
       modelID: modelID,
-      resumeIdentifier: resumeIdentifier
+      resumeIdentifier: resumeIdentifier,
+      harnessID: harnessID
     )
   }
 }
