@@ -185,9 +185,11 @@ struct AgentTranscriptReaderTests {
     let main = folder.appendingPathComponent("\(identifier).jsonl")
     try append([#"{"cwd":"/Users/a/api","message":{"content":[]}}"#], to: main)
     let listings = ListingCounter()
+    // A still clock: a runner that stalls past `relistInterval` must not list the folders again.
+    let moment = Date()
     let reader = AgentTranscriptReader(
       claudeProjects: projects, codexSessions: root.appendingPathComponent("sessions"),
-      list: { listings.list($0) })
+      list: { listings.list($0) }, now: { moment })
     let conversation = session(provider: "claude-code", identifier: identifier)
 
     _ = await reader.activity(for: conversation)
@@ -222,9 +224,10 @@ struct AgentTranscriptReaderTests {
       [#"{"type":"session_meta","payload":{"id":"x","cwd":"/Users/a/vibe"}}"#],
       to: day.appendingPathComponent("rollout-2026-09-30T10-00-00-\(identifier).jsonl"))
     let listings = ListingCounter()
+    let moment = Date()
     let reader = AgentTranscriptReader(
       claudeProjects: root.appendingPathComponent("projects"), codexSessions: sessions,
-      list: { listings.list($0) })
+      list: { listings.list($0) }, now: { moment })
     // A session of sixty days: the first search walks every one of them.
     let conversation = WorkSession(
       name: "Session",

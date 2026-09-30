@@ -79,6 +79,12 @@ public struct GitActivityReader: RepositoryActivityReading {
     ] {
       if let found = stamp(of: file) { stamps[key] = found }
     }
+    // A reftable worktree keeps its own references, its `HEAD` among them, in its own stack.
+    if own != common,
+      let found = stamp(of: (own as NSString).appendingPathComponent("reftable/tables.list"))
+    {
+      stamps["worktree reftable"] = found
+    }
     for folder in ["logs/refs/heads", "refs/heads"] {
       let root = (common as NSString).appendingPathComponent(folder)
       guard let enumerator = FileManager.default.enumerator(atPath: root) else { continue }

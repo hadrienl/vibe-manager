@@ -66,7 +66,8 @@ went into is said by the transcript.
   of those readings find what the last one found. So each input has its own sign of change:
   - the branches — what is checked out, how it moved — are read again only when the
     fingerprint of the references changed: `stat` of `HEAD`, `logs/HEAD`, `packed-refs`, the
-    reftable and each file under `refs/heads` and `logs/refs/heads`, compared for equality. The
+    reftable — the clone's, and a worktree's own, which holds its `HEAD` — and each file under
+    `refs/heads` and `logs/refs/heads`, compared for equality. The
     fingerprint is the proof, the file system's events stay the trigger: it costs about a
     millisecond, and holds for a repository nobody watches or an event that was lost;
   - uncommitted work comes from the status the monitor of ADR 0013 already keeps for the

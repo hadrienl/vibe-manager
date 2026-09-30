@@ -72,6 +72,31 @@ struct ReferenceFingerprintTests {
     #expect(try await moves(reader, worktree) { try await commit("There", in: clone) })
   }
 
+  @Test("A reftable worktree sees its own checkout, kept in its own stack")
+  func reftableWorktree() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let clone = sandbox.path("api")
+    let worktree = sandbox.path("api-feature")
+    try FileManager.default.createDirectory(atPath: clone, withIntermediateDirectories: true)
+    // Git older than 2.45 has no reftable: nothing to check there.
+    let created = try await ProcessGitCommandRunner().run(
+      ["init", "-q", "--ref-format=reftable", "-b", "main"], in: clone)
+    guard created.succeeded else { return }
+    try await git(["config", "user.name", "Vibe Tests"], in: clone)
+    try await git(["config", "user.email", "tests@example.com"], in: clone)
+    try await git(["config", "commit.gpgsign", "false"], in: clone)
+    try await commit("Initial", in: clone)
+    try await commit("Second", in: clone)
+    try await git(["worktree", "add", "-q", "-b", "feature", worktree], in: clone)
+    let reader = GitActivityReader()
+
+    #expect(
+      try await moves(reader, worktree) {
+        try await git(["checkout", "-q", "--detach", "HEAD~1"], in: worktree)
+      })
+  }
+
   @Test("Once the repository's folders are known, no Git runs to take it")
   func noProcess() async throws {
     let sandbox = try Sandbox()
@@ -94,11 +119,10 @@ struct ReferenceFingerprintTests {
     let sandbox = try Sandbox()
     defer { sandbox.remove() }
     let path = sandbox.path("api")
-    try await makeRepository(at: path)
-    // The reflog is dated to the second: the session starts strictly after the fixture.
-    try await Task.sleep(for: .milliseconds(1_100))
-    let startedAt = Date()
-    try await Task.sleep(for: .milliseconds(1_100))
+    // The reflog is dated to the second: the fixture is dated an hour back, and the session starts
+    // two seconds back, so the commit made below falls after it without waiting for the clock.
+    try await makeRepository(at: path, dated: Date().addingTimeInterval(-3_600))
+    let startedAt = Date().addingTimeInterval(-2)
     let runner = CountingGit()
     let read = ReadSessionBranchReport(reader: GitActivityReader(git: runner))
     let session = WorkSession(
@@ -128,4 +152,34 @@ private actor CountingGit: GitCommandRunner {
     verbs[arguments.first ?? "", default: 0] += 1
     return try await git.run(arguments, in: directory)
   }
+}
+
+/// A repository with one commit on `main`, its commit and reflog dated `date`: Git takes the date
+/// from the environment, which the application's runner does not pass on.
+private func makeRepository(at path: String, dated date: Date) async throws {
+  try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+  try Data("hello\n".utf8).write(to: URL(fileURLWithPath: path).appendingPathComponent("README"))
+  let stamp = "@\(Int(date.timeIntervalSince1970)) +0000"
+  for arguments in [
+    ["init", "-q", "-b", "main"], ["add", "README"],
+    [
+      "-c", "user.name=Vibe Tests", "-c", "user.email=tests@example.com", "-c",
+      "commit.gpgsign=false", "commit", "-q", "-m", "Initial commit",
+    ],
+  ] {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = arguments
+    process.currentDirectoryURL = URL(fileURLWithPath: path)
+    var environment = ProcessInfo.processInfo.environment
+    environment["GIT_AUTHOR_DATE"] = stamp
+    environment["GIT_COMMITTER_DATE"] = stamp
+    process.environment = environment
+    try process.run()
+    process.waitUntilExit()
+    #expect(process.terminationStatus == 0, "git \(arguments.joined(separator: " "))")
+  }
+  try await git(["config", "user.name", "Vibe Tests"], in: path)
+  try await git(["config", "user.email", "tests@example.com"], in: path)
+  try await git(["config", "commit.gpgsign", "false"], in: path)
 }
