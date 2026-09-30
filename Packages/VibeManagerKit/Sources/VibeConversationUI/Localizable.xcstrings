@@ -2140,6 +2140,17 @@
         }
       }
     },
+    "Reading the skills and commands…" : {
+      "comment" : "The composer's list, while it is read from the agent the first time.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture des skills et des commandes…"
+          }
+        }
+      }
+    },
     "Reasoning" : {
       "localizations" : {
         "fr" : {

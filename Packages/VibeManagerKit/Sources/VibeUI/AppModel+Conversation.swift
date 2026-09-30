@@ -16,6 +16,8 @@ extension AppModel {
     layout.setPresentation(
       presentation, of: id, default: conversations.appearance.defaultPresentation)
     if presentation == .terminal {
+      // A panel shown in the conversation is finished in the terminal (#219).
+      conversations.existingModel(for: id)?.leaveTerminalPanel()
       pane(for: id)?.requestFocus()
     } else {
       conversations.requestComposerFocus(for: id)

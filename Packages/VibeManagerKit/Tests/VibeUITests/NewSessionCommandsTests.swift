@@ -83,7 +83,7 @@ struct NewSessionCommandsTests {
     for _ in 0..<20 { await Task.yield() }
     #expect(await log.folders.isEmpty)
     model.draft.initialPrompt = "/deb"
-    await until { model.commands.isShowing }
+    await until { model.commands.suggestions?.isEmpty == false }
     #expect(model.commands.suggestions?.map(\.command.name) == ["prisme-ai:debug-events"])
     #expect(await log.folders == ["/tmp/project"])
   }
@@ -94,7 +94,7 @@ struct NewSessionCommandsTests {
     model.draft.providerID = "claude-code"
     model.draft.workingDirectoryPath = "/tmp/project"
     model.draft.initialPrompt = "/"
-    await until { model.commands.isShowing }
+    await until { model.commands.suggestions?.isEmpty == false }
     model.insertCommand(model.commands.selectedCommand!)
     #expect(model.draft.initialPrompt == "/prisme-ai:debug-events ")
     #expect(!model.commands.isShowing)
@@ -108,7 +108,7 @@ struct NewSessionCommandsTests {
     model.draft.providerID = "claude-code"
     model.draft.initialPrompt = "/deb"
     for path in ["/t", "/tm", "/tmp", "/tmp/project"] { model.draft.workingDirectoryPath = path }
-    await until { model.commands.isShowing }
+    await until { model.commands.suggestions?.isEmpty == false }
     #expect(await log.folders == ["/tmp/project"])
   }
 

@@ -17,6 +17,7 @@ public final class ComposerCommands {
       // A reading under way was for the reader before: what it brings is dropped.
       reading?.cancel()
       reading = nil
+      isReading = false
       generation += 1
       if read == nil {
         index = AgentCommandIndex([])
@@ -34,6 +35,9 @@ public final class ComposerCommands {
   /// open to say so.
   public private(set) var suggestions: [AgentCommandMatch]?
   public private(set) var selectedIndex = 0
+  /// Whether the list is being read, the first time: it opens then, and says so, rather than
+  /// staying away for as long as the CLI takes to answer.
+  public private(set) var isReading = false
 
   @ObservationIgnored private var text = ""
   @ObservationIgnored private var isEnabled = false
@@ -64,11 +68,17 @@ public final class ComposerCommands {
   public func refresh() {
     guard reading == nil, let read else { return }
     let generation = generation
+    isReading = true
     reading = Task { [weak self] in
       let index = await read()
       guard let self, self.generation == generation else { return }
       self.reading = nil
-      if let index { self.index = index }
+      self.isReading = false
+      if let index {
+        self.index = index
+      } else {
+        self.update()
+      }
     }
   }
 
@@ -93,7 +103,8 @@ public final class ComposerCommands {
     // Opening: what was read is shown at once, and read again behind it.
     if self.query == nil { refresh() }
     guard !index.isEmpty else {
-      close()
+      // Nothing read yet: open, saying the list is on its way.
+      if isReading, suggestions != [] { suggestions = [] } else if !isReading { close() }
       return
     }
     let matches = index.matches(for: query)

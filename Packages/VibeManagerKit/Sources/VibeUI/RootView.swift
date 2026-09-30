@@ -383,6 +383,8 @@ public struct RootView: View {
               // One view per draft: another draft brought on screen starts with its own folds,
               // popover and caret, not the ones left by the previous.
               .id(draft.draftID)
+              // The list under `/` wears the conversations' colours, as in a conversation (#219).
+              .environment(\.conversationTheme, conversationTheme)
             }
           }
       }
@@ -2431,12 +2433,12 @@ private struct SessionConversationSlot: View {
           claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation,
           // The session's terminal, a second view of it, for a panel its agent opens (#219).
           liveTerminal: model.pane(for: id).map { pane in
-            {
+            { onEscape in
               AnyView(
                 TerminalSurface(
                   pane: pane, session: pane.session, isActive: isActive,
                   accessibilityTitle: terminalTitle(for: listed, pane: pane, in: model),
-                  isMirror: true))
+                  isMirror: true, onEscape: onEscape))
             }
           }
         )

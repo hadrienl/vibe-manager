@@ -22,6 +22,8 @@ public struct TerminalSurface: NSViewRepresentable {
   private let claimsKeyboardOnActivation: Bool
   /// A second view of a terminal shown elsewhere (#219): see `TerminalSurfaceCoordinator.isMirror`.
   private let isMirror: Bool
+  /// Escape, taken rather than sent to the program: see `AccessibleTerminalView.onEscape`.
+  private let onEscape: (() -> Void)?
 
   public init(
     pane: TerminalPaneModel,
@@ -30,9 +32,11 @@ public struct TerminalSurface: NSViewRepresentable {
     focusRequest: Int = 0,
     accessibilityTitle: String? = nil,
     claimsKeyboardOnActivation: Bool = true,
-    isMirror: Bool = false
+    isMirror: Bool = false,
+    onEscape: (() -> Void)? = nil
   ) {
     self.isMirror = isMirror
+    self.onEscape = onEscape
     self.pane = pane
     self.session = session
     self.isActive = isActive
@@ -61,6 +65,7 @@ public struct TerminalSurface: NSViewRepresentable {
     view.onWindowChange = { [weak coordinator, weak view] in
       guard let coordinator, let view else { return }
       coordinator.observeKeyboardFocus(of: view)
+      coordinator.joinedWindow(view)
     }
     context.coordinator.bind(to: view)
     return view
@@ -73,6 +78,7 @@ public struct TerminalSurface: NSViewRepresentable {
     if let accessibilityTitle {
       (nsView as? AccessibleTerminalView)?.accessibilityTitle = accessibilityTitle
     }
+    (nsView as? AccessibleTerminalView)?.onEscape = onEscape
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
@@ -258,7 +264,19 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// Only a *change* of activation moves the keyboard. Claiming it on every update would fight
   /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
   /// active terminal would steal the focus back from the sidebar mid-keystroke.
+  /// The activation last asked for, acted on again when a mirror joins its window.
+  private var requestedActivation: (isActive: Bool, claimingKeyboard: Bool)?
+
+  /// A mirror appears in a window that is already there: SwiftUI updated it before it had one,
+  /// and it takes the keyboard now, as a panel's block must (#219).
+  func joinedWindow(_ view: TerminalView) {
+    guard isMirror, view.window != nil, let requested = requestedActivation else { return }
+    moveKeyboard(
+      following: requested.isActive, claimingKeyboard: requested.claimingKeyboard, in: view)
+  }
+
   func followActivation(_ isActive: Bool, claimingKeyboard: Bool = true, in view: TerminalView) {
+    requestedActivation = (isActive, claimingKeyboard)
     // Every pane stays mounted, and a pane at zero opacity is still drawn: each busy agent behind
     // the visible one repainted its whole screen on the main thread at every spinner frame, and the
     // terminal being typed in waited behind them for its echo. A hidden view is not drawn at all.

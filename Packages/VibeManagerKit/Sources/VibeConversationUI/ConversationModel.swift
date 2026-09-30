@@ -1283,6 +1283,14 @@ public final class ConversationModel {
     requestComposerFocus()
   }
 
+  /// The terminal is shown in full: the panel is finished there, and the block is not shown again
+  /// — nothing says when the CLI closes a panel it writes nothing of.
+  public func leaveTerminalPanel() {
+    guard let panel = terminalPanel else { return }
+    terminalPanel = nil
+    dismissEcho(panel.echoID)
+  }
+
   /// The block goes once its command is no longer waited for.
   private func settleTerminalPanel() {
     guard let panel = terminalPanel, !echoes.contains(where: { $0.id == panel.echoID }) else {

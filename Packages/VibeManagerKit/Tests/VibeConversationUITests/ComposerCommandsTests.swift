@@ -231,6 +231,42 @@ struct ComposerCommandsTests {
     #expect(model.terminalPanel == nil)
   }
 
+  @Test(
+    "Leaving for the terminal ends the panel's block, and the command is no longer waited for",
+    .timeLimit(.minutes(1)))
+  func leavingForTheTerminal() async {
+    let (model, terminal) = await readyModel()
+    model.draft = "/mcp"
+    #expect(await model.send())
+    await until { model.terminalPanel != nil }
+    terminal.written = []
+    model.leaveTerminalPanel()
+    #expect(model.terminalPanel == nil)
+    #expect(model.echoes.isEmpty)
+    // Nothing typed: the panel is finished in the terminal.
+    #expect(terminal.written.isEmpty)
+  }
+
+  @Test(
+    "Read for the first time, the list opens at once and says it is on its way",
+    .timeLimit(.minutes(1)))
+  func firstReading() async {
+    let index = AgentCommandIndex(commands)
+    let list = ComposerCommands()
+    let gate = AsyncStream<Void>.makeStream()
+    list.read = {
+      for await _ in gate.stream { break }
+      return index
+    }
+    list.update(text: "/", isEnabled: true)
+    #expect(list.isShowing)
+    #expect(list.isReading)
+    #expect(list.suggestions == [])
+    gate.continuation.yield()
+    await until { !list.isReading }
+    #expect(list.suggestions?.count == 3)
+  }
+
   @Test("Another agent's list is not kept: a reading for the one before is dropped")
   func replaced() async {
     let (model, _) = await readyModel()

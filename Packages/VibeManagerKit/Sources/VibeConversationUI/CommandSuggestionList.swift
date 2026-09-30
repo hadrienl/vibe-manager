@@ -24,7 +24,16 @@ public struct CommandSuggestionList: View {
   public var body: some View {
     let matches = commands.suggestions ?? []
     VStack(alignment: .leading, spacing: 0) {
-      if matches.isEmpty {
+      if matches.isEmpty, commands.isReading, commands.index.isEmpty {
+        HStack(spacing: 8) {
+          ProgressView().controlSize(.small)
+          Text("Reading the skills and commands…", bundle: .module)
+        }
+        .font(theme.interfaceFont(size: 12.5))
+        .foregroundStyle(theme.secondaryText.color)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+      } else if matches.isEmpty {
         Text("No skill matches", bundle: .module)
           .font(theme.interfaceFont(size: 12.5))
           .foregroundStyle(theme.secondaryText.color)

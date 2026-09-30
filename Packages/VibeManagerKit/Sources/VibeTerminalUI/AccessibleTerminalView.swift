@@ -24,6 +24,41 @@ public final class AccessibleTerminalView: TerminalView {
 
   public override func accessibilityLabel() -> String? { accessibilityTitle }
 
+  /// Escape without a modifier, taken by the view's owner rather than sent to the program: the
+  /// block a panel opens in the conversation closes with it (#219). SwiftTerm's handling of keys
+  /// cannot be overridden: Escape is caught before it, while this view has the keyboard.
+  var onEscape: (() -> Void)? {
+    didSet {
+      guard (onEscape == nil) != (escapeMonitor == nil) else { return }
+      if onEscape == nil {
+        escapeMonitor.map(NSEvent.removeMonitor)
+        escapeMonitor = nil
+      } else {
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+          guard event.keyCode == 53,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift])
+          else { return event }
+          let window = event.window.map(ObjectIdentifier.init)
+          let taken = MainActor.assumeIsolated { () -> Bool in
+            guard let self, let onEscape = self.onEscape,
+              window == self.window.map(ObjectIdentifier.init),
+              self.window?.firstResponder === self
+            else { return false }
+            onEscape()
+            return true
+          }
+          return taken ? nil : event
+        }
+      }
+    }
+  }
+  private var escapeMonitor: Any?
+
+  public override func removeFromSuperview() {
+    onEscape = nil
+    super.removeFromSuperview()
+  }
+
   /// Told when the view joins a window, or leaves one: what follows the keyboard is installed on
   /// the window, and SwiftUI may update the view before it has one.
   var onWindowChange: (() -> Void)?
