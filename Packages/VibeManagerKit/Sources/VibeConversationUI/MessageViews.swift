@@ -8,6 +8,7 @@ struct UserPromptView: View {
   let attachments: Int
   let date: Date?
   var isEcho = false
+  @State private var selection = MessageSelection()
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -70,13 +71,14 @@ struct UserPromptView: View {
   private func content(size: Double) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       if !text.isEmpty {
-        Text(verbatim: text)
-          .font(theme.messageFont(size: size))
-          .foregroundStyle(
-            appearance.userMessageStyle == .bubbles ? theme.bubbleText.color : theme.text.color
-          )
-          .textSelection(.enabled)
-          .fixedSize(horizontal: false, vertical: true)
+        // A segment of its own: selecting in it clears the selection of an answer (#189).
+        SegmentView(
+          content: .plain(
+            text,
+            color: appearance.userMessageStyle == .bubbles ? theme.bubbleText : theme.text),
+          markdown: text, hugsText: true
+        )
+        .environment(\.messageSelection, selection)
       }
       if attachments > 0 {
         Label {
@@ -101,7 +103,7 @@ struct AgentTextView: View {
         Button {
           copy(text)
         } label: {
-          Text("Copy as Markdown", bundle: .module)
+          Text("Copy Message", bundle: .module)
         }
       }
   }

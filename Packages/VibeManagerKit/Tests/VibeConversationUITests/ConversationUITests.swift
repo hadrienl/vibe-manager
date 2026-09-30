@@ -225,7 +225,7 @@ struct MarkdownProseTests {
 
   @Test("The text view is as tall as its text at the width it is given")
   func height() {
-    let view = ProseTextView()
+    let view = SegmentTextView()
     view.show(
       MarkdownProse.attributedString(
         MarkdownDocument.blocks(from: "One.\n\nTwo.\n\nThree."), theme: .systemLight, size: 14,
@@ -243,7 +243,7 @@ struct MarkdownProseTests {
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.titled],
       backing: .buffered, defer: false)
-    let view = ProseTextView()
+    let view = SegmentTextView()
     view.frame = NSRect(x: 0, y: 0, width: 300, height: 100)
     view.markdown = "**One**"
     let other = NSTextField()

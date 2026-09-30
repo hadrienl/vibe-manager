@@ -179,34 +179,6 @@ public enum MarkdownDocument {
     return url
   }
 
-  /// The runs as one attributed string, drawn with the theme.
-  static func attributed(
-    _ runs: [InlineRun], theme: ConversationTheme, size: Double, weight: Font.Weight? = nil
-  ) -> AttributedString {
-    var result = AttributedString()
-    for run in runs {
-      var piece = AttributedString(run.text)
-      if run.isCode {
-        piece.font = theme.codeFont(size: size * 0.9)
-        piece.backgroundColor = theme.codeBackground.color
-      } else {
-        var font = theme.messageFont(size: size)
-        if let weight { font = font.weight(weight) }
-        if run.isBold { font = font.bold() }
-        if run.isItalic { font = font.italic() }
-        piece.font = font
-      }
-      if run.isStrikethrough { piece.strikethroughStyle = .single }
-      if let link = run.link {
-        piece.link = link
-        piece.foregroundColor = theme.accent.color
-        piece.underlineStyle = .single
-      }
-      result += piece
-    }
-    return result
-  }
-
   /// The runs as plain text, for copying and for VoiceOver.
   static func plainText(_ runs: [InlineRun]) -> String {
     runs.map(\.text).joined()

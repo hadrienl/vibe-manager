@@ -1,14 +1,13 @@
 import AppKit
-import Observation
 import SwiftUI
 import VibeApplication
 
-/// A run of a message's prose — headings, paragraphs, lists and quotes that follow one another —
-/// drawn as one attributed string, so that one text view holds it and a selection runs from one
-/// paragraph to the next. SwiftUI cannot select across two `Text`s on macOS 14.
+/// A message's text as attributed strings, for the text views that draw it (`SegmentTextView`).
 ///
-/// Code blocks, tables and rules are not prose: they keep their own views, their Copy button and
-/// their horizontal scrolling.
+/// A run of prose — headings, paragraphs, lists and quotes that follow one another — is one
+/// string, selectable from one paragraph to the next: SwiftUI cannot select across two `Text`s
+/// on macOS 14. Code blocks and tables are strings of their own, in views that keep their Copy
+/// button and their horizontal scrolling; the message's selection crosses them (#189).
 enum MarkdownProse {
   /// A message cut into what one text view can draw and what needs a view of its own.
   enum Segment: Hashable {
@@ -122,7 +121,7 @@ enum MarkdownProse {
       case .quote(let blocks):
         var inner = context
         inner.quotes.append(context.indent)
-        inner.indent = context.indent + ProseTextView.quoteBarWidth + 10
+        inner.indent = context.indent + SegmentTextView.quoteBarWidth + 10
         inner.color = theme.secondaryText.nsColor
         append(blocks, context: inner, spacing: 6)
       case .code, .table, .rule:
@@ -162,7 +161,7 @@ enum MarkdownProse {
       paragraphs.append(Paragraph(text: text, style: style))
     }
 
-    private func attributed(_ run: InlineRun, size: Double, bold: Bool, color: NSColor)
+    func attributed(_ run: InlineRun, size: Double, bold: Bool, color: NSColor)
       -> NSAttributedString
     {
       var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: color]
@@ -182,7 +181,7 @@ enum MarkdownProse {
       return NSAttributedString(string: run.text, attributes: attributes)
     }
 
-    private func font(size: Double) -> NSFont {
+    func font(size: Double) -> NSFont {
       theme.nsMessageFont(size: size, bold: false, italic: false)
     }
 
@@ -280,283 +279,92 @@ extension ConversationTheme {
   }
 }
 
-/// A run of prose, selectable from its first word to its last.
-struct MarkdownTextView: NSViewRepresentable {
-  let blocks: [MarkdownBlock]
-  /// The whole message, for Copy as Markdown.
-  var markdown: String?
-  var secondary = false
-  @Environment(\.conversationTheme) private var theme
-  @Environment(\.conversationAppearance) private var appearance
-  @Environment(\.openURL) private var openURL
-  @Environment(\.conversationLinks) private var links
-
-  struct Input: Equatable {
-    var blocks: [MarkdownBlock]
-    var theme: ConversationTheme
-    var size: Double
-    var spacing: Double
-    var secondary: Bool
-  }
-
-  final class Coordinator: NSObject, NSTextViewDelegate {
-    var input: Input?
-    var openURL: OpenURLAction?
-    var links: ConversationLinks?
-
-    func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
-      guard let url = link as? URL ?? (link as? String).flatMap(URL.init(string:)) else {
-        return false
-      }
-      // Only what the parser let through is a link. The session's rule when there is one (#186),
-      // else `openURL`, which is what SwiftUI's links used.
-      guard MarkdownDocument.safeLink(url.absoluteString) != nil else { return true }
-      if let links {
-        links.click(url)
-      } else {
-        openURL?(url)
-      }
-      return true
+extension MarkdownProse {
+  /// A code block's text, coloured by its words, its lines a little apart.
+  static func code(
+    _ code: String, language: String?, theme: ConversationTheme, size: Double
+  ) -> NSAttributedString {
+    let style = NSMutableParagraphStyle()
+    style.lineSpacing = 2
+    let font = theme.nsCodeFont(size: size)
+    let result = NSMutableAttributedString()
+    for segment in SyntaxHighlighter.segments(of: code, language: language) {
+      result.append(
+        NSAttributedString(
+          string: String(segment.text),
+          attributes: [
+            .font: font, .paragraphStyle: style,
+            .foregroundColor: CodeBlockView.color(for: segment.kind, theme: theme).nsColor,
+          ]))
     }
+    return result
   }
 
-  func makeCoordinator() -> Coordinator { Coordinator() }
-
-  func makeNSView(context: Context) -> ProseTextView {
-    let view = ProseTextView()
-    view.delegate = context.coordinator
-    return view
-  }
-
-  func updateNSView(_ view: ProseTextView, context: Context) {
-    context.coordinator.openURL = openURL
-    context.coordinator.links = links
-    view.links = links
-    view.markdown = markdown
-    let size = appearance.textSize.pointSize
-    let input = Input(
-      blocks: blocks, theme: theme, size: size,
-      spacing: theme.layout.at(appearance.density).paragraphSpacing, secondary: secondary)
-    // Rebuilt only when what it shows changed: rebuilding would drop the reader's selection.
-    guard context.coordinator.input != input else { return }
-    context.coordinator.input = input
-    view.quoteBarColor = theme.border.nsColor
-    view.linkTextAttributes = [
-      .foregroundColor: theme.accent.nsColor,
-      .underlineStyle: NSUnderlineStyle.single.rawValue,
-      .cursor: NSCursor.pointingHand,
-    ]
-    view.selectedTextAttributes = [.backgroundColor: NSColor.selectedTextBackgroundColor]
-    view.show(
-      MarkdownProse.attributedString(
-        blocks, theme: theme, size: size, spacing: input.spacing, secondary: secondary))
-  }
-
-  func sizeThatFits(_ proposal: ProposedViewSize, nsView view: ProseTextView, context: Context)
-    -> CGSize?
-  {
-    let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 10_000
-    let height = view.height(forWidth: width)
-    return CGSize(width: proposal.width == nil ? view.naturalWidth : width, height: height)
-  }
-}
-
-/// A text view that reads and selects, never edits, sized by SwiftUI rather than by a scroll view.
-final class ProseTextView: NSTextView {
-  nonisolated static let quoteBarWidth: CGFloat = 3
-
-  /// The message's Markdown, for Copy as Markdown.
-  var markdown: String? {
-    didSet { if FocusedMarkdown.shared.holder == ObjectIdentifier(self) { claimFocus() } }
-  }
-  var quoteBarColor = NSColor.separatorColor
-  /// The session's rule for the menu of a link (#186).
-  var links: ConversationLinks?
-
-  convenience init() {
-    // TextKit 1: the quotes' bars are drawn from its layout manager.
-    let storage = NSTextStorage()
-    let layout = NSLayoutManager()
-    storage.addLayoutManager(layout)
-    let container = NSTextContainer(
-      size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
-    container.lineFragmentPadding = 0
-    container.widthTracksTextView = false
-    layout.addTextContainer(container)
-    self.init(frame: .zero, textContainer: container)
-    isEditable = false
-    isSelectable = true
-    isRichText = true
-    drawsBackground = false
-    textContainerInset = .zero
-    isVerticallyResizable = false
-    isHorizontallyResizable = false
-    setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-    setAccessibilityRole(.staticText)
-  }
-
-  /// The sizes measured for the text shown, by width: SwiftUI asks for the same ones again.
-  private var measured: [CGFloat: CGSize] = [:]
-
-  func show(_ text: NSAttributedString) {
-    textStorage?.setAttributedString(text)
-    measured.removeAll()
-  }
-
-  func height(forWidth width: CGFloat) -> CGFloat {
-    size(forWidth: width).height
-  }
-
-  /// The width the text takes when nothing wraps it.
-  var naturalWidth: CGFloat {
-    size(forWidth: 10_000).width
-  }
-
-  /// Measured apart from the view's own layout, which a text view resizes as it pleases.
-  private func size(forWidth width: CGFloat) -> CGSize {
-    if let size = measured[width] { return size }
-    let storage = NSTextStorage(attributedString: attributedString())
-    let layout = NSLayoutManager()
-    storage.addLayoutManager(layout)
-    let container = NSTextContainer(
-      size: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
-    container.lineFragmentPadding = 0
-    layout.addTextContainer(container)
-    layout.ensureLayout(for: container)
-    let used = layout.usedRect(for: container)
-    let size = CGSize(width: ceil(used.width), height: ceil(used.height))
-    measured[width] = size
-    return size
-  }
-
-  override func setFrameSize(_ newSize: NSSize) {
-    super.setFrameSize(newSize)
-    if newSize.width > 0, let container = textContainer, container.size.width != newSize.width {
-      container.size = CGSize(width: newSize.width, height: CGFloat.greatestFiniteMagnitude)
-    }
-  }
-
-  override func draw(_ dirtyRect: NSRect) {
-    super.draw(dirtyRect)
-    guard let storage = textStorage, let layout = layoutManager, let container = textContainer
-    else { return }
-    quoteBarColor.setFill()
-    storage.enumerateAttribute(
-      .quoteBars, in: NSRange(location: 0, length: storage.length)
-    ) { value, range, _ in
-      guard let bars = value as? [CGFloat] else { return }
-      let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-      var extent = CGRect.null
-      layout.enumerateLineFragments(forGlyphRange: glyphs) { _, used, _, _, _ in
-        extent = extent.union(used)
-      }
-      let top = extent.minY
-      let bottom = min(extent.maxY, layout.usedRect(for: container).maxY)
-      guard !extent.isNull, bottom > top else { return }
-      for x in bars {
-        let bar = CGRect(
-          x: x + textContainerOrigin.x, y: top + textContainerOrigin.y,
-          width: Self.quoteBarWidth, height: bottom - top)
-        if bar.intersects(dirtyRect) {
-          NSBezierPath(roundedRect: bar, xRadius: 1.5, yRadius: 1.5).fill()
+  /// A table, as TextKit lays one out (`NSTextTable`): its header on the surface's colour, a line
+  /// under each row. Each column is as wide as its widest cell, up to 320 points, beyond which its
+  /// cells wrap — without widths, a table would take all the width it is given.
+  static func table(
+    header: [[InlineRun]], rows: [[[InlineRun]]], theme: ConversationTheme, size: Double
+  ) -> NSAttributedString {
+    let builder = Builder(theme: theme, size: size)
+    let lines = [header] + rows
+    let columns = lines.map(\.count).max() ?? 0
+    guard columns > 0 else { return NSAttributedString() }
+    let cells = lines.enumerated().map { index, line in
+      (0..<columns).map { column in
+        let text = NSMutableAttributedString()
+        for run in column < line.count ? line[column] : [] {
+          text.append(
+            builder.attributed(run, size: size, bold: index == 0, color: theme.text.nsColor))
         }
+        return text
       }
     }
-  }
-
-  override func becomeFirstResponder() -> Bool {
-    let became = super.becomeFirstResponder()
-    if became { claimFocus() }
-    return became
-  }
-
-  override func resignFirstResponder() -> Bool {
-    let resigned = super.resignFirstResponder()
-    if resigned { FocusedMarkdown.shared.release(ObjectIdentifier(self)) }
-    return resigned
-  }
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    if window == nil { FocusedMarkdown.shared.release(ObjectIdentifier(self)) }
-  }
-
-  private func claimFocus() {
-    FocusedMarkdown.shared.hold(markdown, by: ObjectIdentifier(self))
-  }
-
-  override func menu(for event: NSEvent) -> NSMenu? {
-    let menu = super.menu(for: event) ?? NSMenu()
-    if let url = link(at: convert(event.locationInWindow, from: nil)) {
-      // A link's actions, the same everywhere (#186), in place of the text view's own.
-      for item in menu.items where LinkMenuItems.isTextViewLinkItem(item) {
-        menu.removeItem(item)
+    let widths = (0..<columns).map { column in
+      min(ceil(cells.map { $0[column].size().width }.max() ?? 0) + 1, 320)
+    }
+    let table = NSTextTable()
+    table.numberOfColumns = columns
+    table.collapsesBorders = true
+    table.hidesEmptyCells = false
+    let result = NSMutableAttributedString()
+    for (row, line) in cells.enumerated() {
+      for (column, cell) in line.enumerated() {
+        let block = NSTextTableBlock(
+          table: table, startingRow: row, rowSpan: 1, startingColumn: column, columnSpan: 1)
+        block.setValue(widths[column], type: .absoluteValueType, for: .width)
+        block.setWidth(10, type: .absoluteValueType, for: .padding, edge: .minX)
+        block.setWidth(10, type: .absoluteValueType, for: .padding, edge: .maxX)
+        block.setWidth(6, type: .absoluteValueType, for: .padding, edge: .minY)
+        block.setWidth(6, type: .absoluteValueType, for: .padding, edge: .maxY)
+        if row < cells.count - 1 {
+          block.setWidth(1, type: .absoluteValueType, for: .border, edge: .maxY)
+          block.setBorderColor(theme.border.nsColor, for: .maxY)
+        }
+        if row == 0 { block.backgroundColor = theme.surface.nsColor }
+        let style = NSMutableParagraphStyle()
+        style.textBlocks = [block]
+        let text = NSMutableAttributedString(attributedString: cell)
+        text.append(
+          NSAttributedString(
+            string: "\n", attributes: [.font: builder.font(size: size)]))
+        text.addAttribute(
+          .paragraphStyle, value: style, range: NSRange(location: 0, length: text.length))
+        result.append(text)
       }
-      let items = LinkMenuItems.items(for: url, links: links)
-      for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
-      if menu.items.count > items.count { menu.insertItem(.separator(), at: items.count) }
     }
-    guard let markdown else { return menu }
-    let item = NSMenuItem(
-      title: String(localized: "Copy as Markdown", bundle: .module),
-      action: #selector(copyMarkdown(_:)), keyEquivalent: "")
-    item.target = self
-    item.representedObject = markdown
-    let copyIndex = menu.items.firstIndex { $0.action == #selector(copy(_:)) }
-    menu.insertItem(item, at: copyIndex.map { $0 + 1 } ?? 0)
-    return menu
+    return result
   }
 
-  /// The link under a point of the view, if the parser let it through.
-  func link(at point: NSPoint) -> URL? {
-    guard let layoutManager, let textContainer, let textStorage, textStorage.length > 0 else {
-      return nil
-    }
-    let inContainer = NSPoint(
-      x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
-    let glyph = layoutManager.glyphIndex(for: inContainer, in: textContainer)
-    let rect = layoutManager.boundingRect(
-      forGlyphRange: NSRange(location: glyph, length: 1), in: textContainer)
-    guard rect.contains(inContainer) else { return nil }
-    let index = layoutManager.characterIndexForGlyph(at: glyph)
-    guard index < textStorage.length else { return nil }
-    let value = textStorage.attribute(.link, at: index, effectiveRange: nil)
-    let url = value as? URL ?? (value as? String).flatMap(URL.init(string:))
-    return url.flatMap { MarkdownDocument.safeLink($0.absoluteString) }
-  }
-
-  @objc private func copyMarkdown(_ sender: NSMenuItem) {
-    guard let markdown = sender.representedObject as? String else { return }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(markdown, forType: .string)
-  }
-}
-
-/// The message whose text holds the keyboard — clicked into, or selected — for the Edit menu's
-/// Copy as Markdown: a menu command reaches no view, so the view says what it would copy.
-@MainActor
-@Observable
-public final class FocusedMarkdown {
-  public static let shared = FocusedMarkdown()
-
-  /// The Markdown of the message in focus, `nil` when no message text has the keyboard.
-  public private(set) var markdown: String?
-  @ObservationIgnored fileprivate var holder: ObjectIdentifier?
-
-  public func copy() {
-    guard let markdown else { return }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(markdown, forType: .string)
-  }
-
-  func hold(_ markdown: String?, by view: ObjectIdentifier) {
-    holder = view
-    if self.markdown != markdown { self.markdown = markdown }
-  }
-
-  func release(_ view: ObjectIdentifier) {
-    guard holder == view else { return }
-    holder = nil
-    markdown = nil
+  /// Text as it was typed, in the messages' font: what the user sent.
+  static func plain(_ text: String, theme: ConversationTheme, size: Double, color: ThemeColor)
+    -> NSAttributedString
+  {
+    NSAttributedString(
+      string: text,
+      attributes: [
+        .font: theme.nsMessageFont(size: size, bold: false, italic: false),
+        .foregroundColor: color.nsColor,
+      ])
   }
 }

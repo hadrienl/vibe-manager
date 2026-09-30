@@ -9,8 +9,8 @@ import VibeApplication
 @MainActor
 struct ConversationLinkMenuTests {
   /// "see here", "here" a link, in a window that is never shown.
-  private func makeProse() -> (ProseTextView, NSWindow) {
-    let view = ProseTextView()
+  private func makeProse() -> (SegmentTextView, NSWindow) {
+    let view = SegmentTextView()
     view.frame = NSRect(x: 0, y: 0, width: 400, height: 40)
     let text = NSMutableAttributedString(
       string: "see here", attributes: [.font: NSFont.systemFont(ofSize: 13)])
@@ -25,7 +25,7 @@ struct ConversationLinkMenuTests {
     return (view, window)
   }
 
-  private func point(ofCharacter index: Int, in view: ProseTextView) -> NSPoint {
+  private func point(ofCharacter index: Int, in view: SegmentTextView) -> NSPoint {
     let layout = view.layoutManager!
     let glyphs = layout.glyphRange(
       forCharacterRange: NSRange(location: index, length: 1), actualCharacterRange: nil)
