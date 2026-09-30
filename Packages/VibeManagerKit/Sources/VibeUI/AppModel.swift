@@ -30,6 +30,8 @@ public final class AppModel {
     // it follows the active sessions, and gives one that stopped its last pass.
     didSet {
       if case .loaded(let sessions) = state {
+        sessionIndexes = Dictionary(
+          sessions.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
         journal?.track(sessions)
         quickOpen.sessionsChanged(sessions)
         // Every journal, archived sessions' included, for Open Quickly, from the first list that
@@ -43,6 +45,9 @@ public final class AppModel {
       }
     }
   }
+  /// Where each listed session sits in the list, for `session(withID:)`. Not observed: reading
+  /// it goes through `sessions`, which is.
+  @ObservationIgnored private var sessionIndexes: [SessionID: Int] = [:]
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   /// The name of each detected agent, by provider identifier, for the places that name one.
@@ -2553,6 +2558,20 @@ public final class AppModel {
 
   public func pane(for id: SessionID) -> TerminalPaneModel? {
     launcher?.pane(for: id)
+  }
+
+  /// The sessions whose terminal is mounted in the window, in a stable order (#254).
+  public var paneSessionIDs: [SessionID] {
+    launcher?.paneSessionIDs ?? []
+  }
+
+  /// The session listed under this identifier, found without walking the list.
+  public func session(withID id: SessionID) -> WorkSession? {
+    let sessions = sessions
+    guard let index = sessionIndexes[id], sessions.indices.contains(index),
+      sessions[index].id == id
+    else { return sessions.first { $0.id == id } }
+    return sessions[index]
   }
 
   /// Whether this session's agent runs inside the application — the terminal host could not be
