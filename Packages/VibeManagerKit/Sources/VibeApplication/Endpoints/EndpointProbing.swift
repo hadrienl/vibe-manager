@@ -86,4 +86,10 @@ public enum EndpointDiscoveryError: Error, Equatable, Sendable {
 public protocol EndpointProbing: Sendable {
   func discoverModels(for endpoint: Endpoint, secret: String?) async throws -> [EndpointModel]
   func test(_ endpoint: Endpoint, secret: String?, model: String) async -> EndpointTestReport
+  /// What is wrong with the document of a custom endpoint, where: `nil` when it reads.
+  func customProtocolProblem(_ document: String) -> String?
+}
+
+extension EndpointProbing {
+  public func customProtocolProblem(_ document: String) -> String? { nil }
 }

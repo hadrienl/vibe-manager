@@ -244,6 +244,31 @@ struct GatewayTests {
     #expect(await writer.json?["error"]?["message"] == "HTTP 401: Invalid API key")
   }
 
+  @Test("A key the endpoint quotes back never reaches the session")
+  func canary() async throws {
+    let canary = "sk-VIBE-CANARY-\(UUID().uuidString)"
+    let transport = ScriptedTransport([
+      .answer(
+        status: 401, headers: [:],
+        chunks: [#"{"error":{"message":"Invalid API key: "# + canary + #""}}"#], thenFail: nil)
+    ])
+    let routes = GatewayRouteTable()
+    await routes.register(
+      GatewayRoute(
+        endpoint: EndpointConfiguration(
+          baseURL: try #require(URL(string: "https://llm.example/v1")), wireProtocol: .chatCompletions),
+        secret: canary, model: "m"),
+      token: Self.token)
+    let writer = RecordingWriter()
+    await Gateway(routes: routes, transport: transport, sleep: { _ in }).handle(
+      request(), writer: writer)
+    let body = String(decoding: await writer.body, as: UTF8.self)
+    #expect(body.contains("Invalid API key"))
+    #expect(!body.contains("VIBE-CANARY"))
+    // The key went to the endpoint, and nowhere else the harness can see.
+    #expect(transport.requests[0].headers["Authorization"] == "Bearer \(canary)")
+  }
+
   @Test("Giving up after the last attempt answers with the last failure")
   func givesUp() async throws {
     let busy = EndpointFailure(kind: .overloaded, message: "busy")

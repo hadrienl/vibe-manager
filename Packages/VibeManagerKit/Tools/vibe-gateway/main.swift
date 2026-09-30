@@ -18,6 +18,7 @@ struct Options {
   var authentication = EndpointAuthentication.bearer
   var port: UInt16 = 0
   var parameters: [String: JSONValue] = [:]
+  var customDocument: CustomProtocolDocument?
 }
 
 func fail(_ message: String) -> Never {
@@ -39,7 +40,7 @@ func parse(_ arguments: [String]) -> Options {
     case "--protocol":
       let raw = value(argument)
       guard let parsed = EndpointWireProtocol(rawValue: raw) else {
-        fail("unknown protocol \(raw); one of chatCompletions, responses, messages")
+        fail("unknown protocol \(raw); one of chatCompletions, responses, messages, custom")
       }
       options.wireProtocol = parsed
     case "--model":
@@ -53,6 +54,16 @@ func parse(_ arguments: [String]) -> Options {
     case "--port":
       guard let port = UInt16(value(argument)) else { fail("--port needs a number") }
       options.port = port
+    case "--custom-document":
+      let path = value(argument)
+      guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+        fail("cannot read \(path)")
+      }
+      do {
+        options.customDocument = try CustomProtocolDocument(parsing: text)
+      } catch {
+        fail("the custom protocol document: \(error)")
+      }
     case "--parameters":
       guard case .object(let fields)? = try? JSONValue(parsing: value(argument)) else {
         fail("--parameters needs a JSON object")
@@ -77,7 +88,8 @@ await routes.register(
   GatewayRoute(
     endpoint: EndpointConfiguration(
       baseURL: baseURL, wireProtocol: options.wireProtocol,
-      authentication: options.authentication, defaultParameters: options.parameters),
+      authentication: options.authentication, defaultParameters: options.parameters,
+      customProtocol: options.customDocument),
     secret: secret, model: model),
   token: token)
 

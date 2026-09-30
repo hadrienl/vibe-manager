@@ -119,6 +119,15 @@ extension EndpointConfiguration {
     case .chatCompletions: wire = .chatCompletions
     case .responses: wire = .responses
     case .messages: wire = .messages
+    case .custom: wire = .custom
+    }
+    var document: CustomProtocolDocument?
+    if wire == .custom {
+      // A document that does not read leaves the endpoint unusable rather than half understood.
+      guard let parsed = try? CustomProtocolDocument(parsing: endpoint.customProtocol) else {
+        return nil
+      }
+      document = parsed
     }
     let authentication: EndpointAuthentication
     switch endpoint.authentication {
@@ -143,7 +152,7 @@ extension EndpointConfiguration {
       total: .seconds(max(1, endpoint.timeouts.total)))
     self.init(
       baseURL: url, wireProtocol: wire, authentication: authentication, headers: headers,
-      defaultParameters: parameters, timeouts: timeouts)
+      defaultParameters: parameters, timeouts: timeouts, customProtocol: document)
   }
 }
 

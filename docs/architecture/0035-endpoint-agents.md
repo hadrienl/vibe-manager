@@ -85,6 +85,15 @@ Codex takes `model_context_window` and `model_auto_compact_token_limit`. Without
 assumes the window of its maker's models, and a smaller model refuses the conversation before it is
 ever compacted.
 
+### An endpoint that follows no standard is described, not programmed
+
+A custom endpoint carries a JSON document: a request template with named values of the
+conversation (`{{messages:openai}}`, `{{lastUserText}}`…), the framing of its answer (SSE, JSON
+lines or one object), and rules that match each object of the answer by a path and a comparison and
+say what it holds — text, reasoning, a tool call, a server step, usage, an error, the end. No
+scripting: a need the document cannot express adds a named value to the code, with a test. The
+document is checked as it is typed, and one that does not read cannot be saved.
+
 ### What an agent on the server does is shown, not replayed
 
 An endpoint may run tools of its own (Responses' hosted tools, Anthropic's server tools). They are
@@ -116,5 +125,4 @@ fall short.
   the sessions the host kept fail their next turn until the application returns.
 - For a model it does not know, Codex uses fallback metadata and offers no `apply_patch`: it edits
   through the shell. The benchmark says what that costs.
-- The declarative protocol for endpoints that follow no standard is not written yet.
 - An endpoint's price is kept per model but no cost is shown: ADR 0019 computes none.

@@ -288,7 +288,6 @@ public final class Gateway: GatewayRequestHandling {
         await writer.write(encoded)
         return
       }
-      var parser = ServerSentEventParser()
       var decoder = endpoint.makeDecoder()
       var encoder = side.makeEncoder()
       var committed = false
@@ -312,17 +311,14 @@ public final class Gateway: GatewayRequestHandling {
         }
       }
       do {
-        for try await chunk in response.body {
-          for event in parser.consume(chunk) { await forward(try decoder.consume(event)) }
-        }
-        if let last = parser.finish() { await forward(try decoder.consume(last)) }
-        for line in parser.strayLines { await forward(decoder.consumeStray(line)) }
-        await forward(try decoder.finish())
+        try await EndpointSide.read(
+          response, framing: endpoint.framing, decoder: &decoder, forward: forward)
       } catch {
         // Once the harness has seen part of the answer, only its own stream can take it back: the
         // harness drops the partial answer and asks again.
         guard committed else { throw error }
-        let failure = error as? EndpointFailure ?? UnexpectedFailure.wrap(error)
+        let failure = (error as? EndpointFailure ?? UnexpectedFailure.wrap(error))
+          .redacting(route.secret)
         for sse in encoder.fail(failure) { await writer.write(sse.encoded) }
         return
       }
@@ -367,7 +363,7 @@ public final class Gateway: GatewayRequestHandling {
         try await answer(response, commit)
         return
       } catch let error as EndpointFailure {
-        failure = error
+        failure = error.redacting(route.secret)
       } catch is CancellationError {
         return
       } catch {
@@ -426,6 +422,63 @@ protocol EndpointStreamDecoding: Sendable {
   mutating func finish() throws -> [CanonicalStreamEvent]
 }
 
+extension EndpointStreamDecoding {
+  /// One JSON object that is not in an SSE frame: a line of NDJSON, or a whole answer.
+  mutating func consumeObject(_ text: String) throws -> [CanonicalStreamEvent] {
+    try consume(ServerSentEvent(data: text))
+  }
+}
+
+extension CustomProtocolDecoder: EndpointStreamDecoding {}
+
+/// How an endpoint's answer is cut into the objects its decoder reads.
+enum EndpointFraming: Sendable {
+  case sse
+  /// One JSON object per line.
+  case ndjson
+  /// One JSON object, the whole answer.
+  case whole
+}
+
+extension EndpointSide {
+  /// Reads a streamed answer to its end, handing each group of events to `forward` as it comes.
+  static func read(
+    _ response: EndpointHTTPResponse, framing: EndpointFraming,
+    decoder: inout any EndpointStreamDecoding,
+    forward: ([CanonicalStreamEvent]) async -> Void
+  ) async throws {
+    switch framing {
+    case .sse:
+      var parser = ServerSentEventParser()
+      for try await chunk in response.body {
+        for event in parser.consume(chunk) { await forward(try decoder.consume(event)) }
+      }
+      if let last = parser.finish() { await forward(try decoder.consume(last)) }
+      for line in parser.strayLines { await forward(decoder.consumeStray(line)) }
+    case .ndjson:
+      var buffer = Data()
+      for try await chunk in response.body {
+        buffer.append(chunk)
+        while let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+          let line = String(decoding: buffer[buffer.startIndex..<newline], as: UTF8.self)
+          buffer.removeSubrange(buffer.startIndex...newline)
+          if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+            await forward(try decoder.consumeObject(line))
+          }
+        }
+      }
+      let rest = String(decoding: buffer, as: UTF8.self)
+      if !rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        await forward(try decoder.consumeObject(rest))
+      }
+    case .whole:
+      let data = try await response.collect()
+      await forward(try decoder.consumeObject(String(decoding: data, as: UTF8.self)))
+    }
+    await forward(try decoder.finish())
+  }
+}
+
 extension ChatCompletionsStreamDecoder: EndpointStreamDecoding {}
 
 extension ResponsesStreamDecoder: EndpointStreamDecoding {
@@ -476,6 +529,7 @@ struct HarnessSide: Sendable {
 /// The request in the endpoint's protocol, and how to read its answer.
 struct EndpointSide: Sendable {
   let request: EndpointHTTPRequest
+  let framing: EndpointFraming
   let makeDecoder: @Sendable () -> any EndpointStreamDecoding
   let decodeWhole: @Sendable (JSONValue) throws -> CanonicalResponse
 
@@ -483,7 +537,29 @@ struct EndpointSide: Sendable {
     let endpoint = route.endpoint
     var body: [String: JSONValue]
     let operation: String
+    var framing = EndpointFraming.sse
     switch endpoint.wireProtocol {
+    case .custom:
+      // `init?(_ endpoint:)` refuses a custom endpoint without a document that reads.
+      let document =
+        endpoint.customProtocol
+        ?? CustomProtocolDocument(
+          request: .init(method: "POST", path: "", body: [:]), stream: .none, rules: [],
+          models: nil)
+      body = document.body(for: canonical).objectValue ?? [:]
+      operation = document.operationPath(model: canonical.model)
+      switch document.stream {
+      case .sse: framing = .sse
+      case .ndjson: framing = .ndjson
+      case .none: framing = .whole
+      }
+      makeDecoder = { CustomProtocolDecoder(document: document) }
+      decodeWhole = { json in
+        var decoder = CustomProtocolDecoder(document: document)
+        var accumulator = CanonicalResponseAccumulator()
+        for event in try decoder.consume(json) + decoder.finish() { accumulator.consume(event) }
+        return accumulator.response
+      }
     case .chatCompletions:
       body = ChatCompletionsClient.encodeRequest(canonical).objectValue ?? [:]
       operation = ChatCompletionsClient.path
@@ -512,9 +588,11 @@ struct EndpointSide: Sendable {
     if endpoint.wireProtocol == .messages, headers["anthropic-version"] == nil {
       headers["anthropic-version"] = "2023-06-01"
     }
+    self.framing = framing
+    let method = endpoint.customProtocol?.request.method ?? "POST"
     request = EndpointHTTPRequest(
-      url: endpoint.url(for: operation, secret: route.secret), headers: headers,
-      body: JSONValue.object(body).data())
+      url: endpoint.url(for: operation, secret: route.secret), method: method, headers: headers,
+      body: method == "GET" ? nil : JSONValue.object(body).data())
   }
 }
 

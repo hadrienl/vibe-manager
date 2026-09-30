@@ -117,6 +117,31 @@ public final class EndpointsSettingsModel {
     await probing.test(endpoint, secret: secret(for: endpoint, typed: typedSecret), model: model)
   }
 
+  /// What is wrong with a custom endpoint's document, where; `nil` when it reads.
+  public func customProtocolProblem(_ document: String) -> String? {
+    probing.customProtocolProblem(document)
+  }
+
+  /// A document to start from: an API that streams its answer as JSON lines.
+  public static let customProtocolExample = """
+    {
+      "schema": 1,
+      "request": {
+        "path": "chat",
+        "body": {"model": "{{model}}", "system": "{{system}}", "messages": "{{messages:openai}}", "tools": "{{tools:openai}}", "stream": true}
+      },
+      "stream": {"format": "ndjson"},
+      "events": [
+        {"when": {"path": "type", "equals": "text"}, "text": "delta"},
+        {"when": {"path": "type", "equals": "tool_call"}, "toolCall": {"id": "id", "name": "name", "arguments": "arguments"}},
+        {"when": {"path": "type", "equals": "server_step"}, "serverStep": {"name": "tool", "input": "input", "output": "output"}},
+        {"when": {"path": "type", "equals": "done"}, "usage": {"input": "usage.input_tokens", "output": "usage.output_tokens"}, "stop": true},
+        {"when": {"path": "type", "equals": "error"}, "error": "message"}
+      ],
+      "models": {"path": "models", "list": "data", "id": "id", "name": "name"}
+    }
+    """
+
   /// Keeps the verdict of a test on the endpoint, where the list and the sheets read it.
   public func record(_ report: EndpointTestReport, for id: EndpointID) async {
     guard let index = endpoints.firstIndex(where: { $0.id == id }) else { return }

@@ -17,6 +17,9 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
   public var defaultParameters: String
   public var timeouts: EndpointTimeoutSettings
   public var harness: EndpointHarnessChoice
+  /// For `wireProtocol == .custom`: the JSON document that says how to talk to the endpoint
+  /// (#107 §3), as the user typed it.
+  public var customProtocol: String
   public var models: [EndpointModel]
   /// The last "Test", kept to show its outcome in the list and to warn before a launch.
   public var lastTest: EndpointTestOutcome?
@@ -31,6 +34,7 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
     defaultParameters: String = "",
     timeouts: EndpointTimeoutSettings = EndpointTimeoutSettings(),
     harness: EndpointHarnessChoice = .automatic,
+    customProtocol: String = "",
     models: [EndpointModel] = [],
     lastTest: EndpointTestOutcome? = nil
   ) {
@@ -43,8 +47,33 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
     self.defaultParameters = defaultParameters
     self.timeouts = timeouts
     self.harness = harness
+    self.customProtocol = customProtocol
     self.models = models
     self.lastTest = lastTest
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case id, name, baseURL, wireProtocol, authentication, headers, defaultParameters, timeouts
+    case harness, customProtocol, models, lastTest
+  }
+
+  /// Fields added after the first version of the file are read with their defaults.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(EndpointID.self, forKey: .id)
+    name = try container.decode(String.self, forKey: .name)
+    baseURL = try container.decode(String.self, forKey: .baseURL)
+    wireProtocol = try container.decode(EndpointWireKind.self, forKey: .wireProtocol)
+    authentication = try container.decode(EndpointAuthenticationKind.self, forKey: .authentication)
+    headers = try container.decodeIfPresent([EndpointHeader].self, forKey: .headers) ?? []
+    defaultParameters = try container.decodeIfPresent(String.self, forKey: .defaultParameters) ?? ""
+    timeouts =
+      try container.decodeIfPresent(EndpointTimeoutSettings.self, forKey: .timeouts)
+      ?? EndpointTimeoutSettings()
+    harness = try container.decodeIfPresent(EndpointHarnessChoice.self, forKey: .harness) ?? .automatic
+    customProtocol = try container.decodeIfPresent(String.self, forKey: .customProtocol) ?? ""
+    models = try container.decodeIfPresent([EndpointModel].self, forKey: .models) ?? []
+    lastTest = try container.decodeIfPresent(EndpointTestOutcome.self, forKey: .lastTest)
   }
 
   /// The identifier the endpoint is registered under among the agents.
@@ -79,6 +108,11 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
       let object =
         (try? JSONSerialization.jsonObject(with: Data(parameters.utf8))) as? [String: Any]
       if object == nil { issues.append(.invalidParameters) }
+    }
+    if wireProtocol == .custom,
+      customProtocol.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      issues.append(.missingCustomProtocol)
     }
     if agentModels.isEmpty { issues.append(.noToolModel) }
     return issues
@@ -140,6 +174,8 @@ public enum EndpointWireKind: String, Hashable, Codable, Sendable, CaseIterable 
   case chatCompletions
   case responses
   case messages
+  /// Described by the endpoint's own document, for an API that follows no standard.
+  case custom
 }
 
 public enum EndpointAuthenticationKind: Hashable, Codable, Sendable {
@@ -270,5 +306,6 @@ public enum EndpointValidationIssue: Hashable, Sendable {
   case insecureURL
   case missingAuthenticationName
   case invalidParameters
+  case missingCustomProtocol
   case noToolModel
 }

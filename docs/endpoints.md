@@ -34,6 +34,44 @@ what worked: reachable, authentication, streamed answer and speed, tool call, an
 tool, tokens reported. The dot beside the endpoint in the list keeps the verdict; an endpoint whose
 last test failed is not offered for new sessions until it passes.
 
+## An endpoint that follows no standard
+
+Choose the **Custom** protocol and describe the API in a JSON document — *Insert the Example* gives
+one to start from. No code: paths into the JSON the endpoint sends (`choices.0.delta.content`), a
+comparison, and named values to put in a request.
+
+```json
+{
+  "schema": 1,
+  "request": {"path": "agents/{{model}}/chat", "body": {"input": "{{lastUserText}}", "stream": true}},
+  "stream": {"format": "ndjson"},
+  "events": [
+    {"when": {"path": "type", "equals": "delta"}, "text": "content"},
+    {"when": {"path": "type", "equals": "tool"}, "toolCall": {"id": "id", "name": "name", "arguments": "args"}},
+    {"when": {"path": "type", "equals": "step"}, "serverStep": {"name": "tool", "input": "input", "output": "result"}},
+    {"when": {"path": "type", "equals": "done"}, "usage": {"input": "usage.in", "output": "usage.out"}, "stop": true},
+    {"when": {"path": "type", "equals": "error"}, "error": "message"}
+  ],
+  "models": {"path": "agents", "list": "items", "id": "slug", "name": "title"}
+}
+```
+
+- `request`: `path` under the base URL (`{{model}}` is replaced), `method` (`POST` by default), and
+  `body`, a template. A string that is exactly a named value becomes that value, of any type; inside
+  a longer string it is replaced by its text. Named values: `model`, `system`, `stream`,
+  `maxTokens`, `lastUserText`, `transcript` (the conversation as text), `messages:openai`,
+  `messages:anthropic`, `tools:openai`, `tools:anthropic`, `uuid`.
+- `stream.format`: `sse` (a JSON object per `data:`), `ndjson` (one per line) or `none` (the whole
+  answer is one object).
+- `events`: every object of the answer is matched against every rule; each rule that matches does
+  what it says — `text`, `reasoning`, `toolCall`, `serverStep`, `usage`, `error`, `stop`. A rule
+  without `when` matches everything.
+- `models`: where *Read from the Endpoint* finds the list.
+
+An endpoint that only answers — without calling the harness's tools — can read and change nothing
+on your Mac: its sessions are conversations. The document is checked as you type, and an endpoint
+whose document does not read cannot be saved.
+
 ## Using one
 
 Pick the endpoint among the agents of the new session sheet, and one of its models. The session

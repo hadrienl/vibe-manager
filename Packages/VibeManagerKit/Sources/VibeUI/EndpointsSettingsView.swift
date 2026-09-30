@@ -285,8 +285,51 @@ struct EndpointsSettingsView: View {
             .foregroundStyle(.orange)
         }
       }
+      if binding.wrappedValue.wireProtocol == .custom {
+        customProtocol(binding)
+      }
     } header: {
       Text("Connection", bundle: .module)
+    }
+  }
+
+  @ViewBuilder
+  private func customProtocol(_ binding: Binding<Endpoint>) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text("Protocol document", bundle: .module)
+        Spacer()
+        Button {
+          binding.wrappedValue.customProtocol = EndpointsSettingsModel.customProtocolExample
+        } label: {
+          Text("Insert the Example", bundle: .module)
+        }
+        .controlSize(.small)
+      }
+      TextEditor(text: binding.customProtocol)
+        .font(.body.monospaced())
+        .frame(height: 180)
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(.quaternary))
+      let text = binding.wrappedValue.customProtocol
+      if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        let problem = model.customProtocolProblem(text)
+      {
+        Text(problem)
+          .font(.caption.monospaced())
+          .foregroundStyle(.orange)
+          .textSelection(.enabled)
+      }
+      Text(
+        """
+        How to build a request from the conversation and read the answer: paths into the JSON the \
+        endpoint sends, and named values such as {{model}}, {{messages:openai}} or {{lastUserText}}. \
+        See docs/endpoints.md.
+        """,
+        bundle: .module
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
     }
   }
 
@@ -567,11 +610,16 @@ struct EndpointsSettingsView: View {
           Text("Save", bundle: .module)
         }
         .keyboardShortcut("s", modifiers: .command)
-        .disabled(!isDirty || !Self.savable(issues))
+        .disabled(!isDirty || !Self.savable(issues) || hasDocumentProblem(binding.wrappedValue))
       }
     }
     .padding(.horizontal, 20)
     .padding(.bottom, 4)
+  }
+
+  /// A custom endpoint whose document does not read would fail at its first session.
+  private func hasDocumentProblem(_ endpoint: Endpoint) -> Bool {
+    endpoint.wireProtocol == .custom && model.customProtocolProblem(endpoint.customProtocol) != nil
   }
 
   /// An endpoint without a model to run yet can still be saved: its models are read after.
@@ -778,6 +826,7 @@ struct EndpointsSettingsView: View {
     case .chatCompletions: return "OpenAI Chat Completions"
     case .responses: return "OpenAI Responses"
     case .messages: return "Anthropic Messages"
+    case .custom: return String(localized: "Custom", bundle: .module, comment: "An endpoint's protocol.")
     }
   }
 
@@ -825,6 +874,9 @@ struct EndpointsSettingsView: View {
         localized: "Name the header or the parameter that carries the key.", bundle: .module)
     case .invalidParameters:
       return String(localized: "The default parameters must be a JSON object.", bundle: .module)
+    case .missingCustomProtocol:
+      return String(
+        localized: "A custom endpoint needs its document: start from the example.", bundle: .module)
     case .noToolModel:
       return String(
         localized: "Add a model that can call tools: read them from the endpoint, or type one.",

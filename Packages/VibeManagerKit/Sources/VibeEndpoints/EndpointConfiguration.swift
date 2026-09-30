@@ -5,6 +5,8 @@ public enum EndpointWireProtocol: String, Hashable, Codable, Sendable, CaseItera
   case chatCompletions
   case responses
   case messages
+  /// Described by a `CustomProtocolDocument`.
+  case custom
 }
 
 /// How the gateway proves who it is to an endpoint. The secret itself is never part of the
@@ -20,7 +22,7 @@ public enum EndpointAuthentication: Hashable, Codable, Sendable {
 }
 
 /// Everything the gateway needs to reach an endpoint, except its secret.
-public struct EndpointConfiguration: Hashable, Codable, Sendable {
+public struct EndpointConfiguration: Hashable, Sendable {
   public var baseURL: URL
   public var wireProtocol: EndpointWireProtocol
   public var authentication: EndpointAuthentication
@@ -31,6 +33,8 @@ public struct EndpointConfiguration: Hashable, Codable, Sendable {
   /// size for a local server.
   public var defaultParameters: [String: JSONValue]
   public var timeouts: EndpointTimeouts
+  /// For `wireProtocol == .custom`.
+  public var customProtocol: CustomProtocolDocument?
 
   public init(
     baseURL: URL,
@@ -38,8 +42,10 @@ public struct EndpointConfiguration: Hashable, Codable, Sendable {
     authentication: EndpointAuthentication = .bearer,
     headers: [String: String] = [:],
     defaultParameters: [String: JSONValue] = [:],
-    timeouts: EndpointTimeouts = .standard
+    timeouts: EndpointTimeouts = .standard,
+    customProtocol: CustomProtocolDocument? = nil
   ) {
+    self.customProtocol = customProtocol
     self.baseURL = baseURL
     self.wireProtocol = wireProtocol
     self.authentication = authentication

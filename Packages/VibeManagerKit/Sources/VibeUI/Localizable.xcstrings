@@ -3895,6 +3895,16 @@
         }
       }
     },
+    "A custom endpoint needs its document: start from the example." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un endpoint personnalisé a besoin de son document : partez de l’exemple."
+          }
+        }
+      }
+    },
     "A development server often signs its own certificate. Continue only if it is yours." : {
       "localizations" : {
         "fr" : {
@@ -5999,6 +6009,17 @@
         }
       }
     },
+    "Custom" : {
+      "comment" : "An endpoint's protocol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisé"
+          }
+        }
+      }
+    },
     "Daily" : {
       "comment" : "How often to check for updates.",
       "localizations" : {
@@ -7674,6 +7695,16 @@
         }
       }
     },
+    "How to build a request from the conversation and read the answer: paths into the JSON the endpoint sends, and named values such as {{model}}, {{messages:openai}} or {{lastUserText}}. See docs/endpoints.md." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment construire une requête à partir de la conversation et lire la réponse : des chemins dans le JSON que l’endpoint envoie, et des valeurs nommées comme {{model}}, {{messages:openai}} ou {{lastUserText}}. Voir docs/endpoints.md."
+          }
+        }
+      }
+    },
     "Identical — skipped" : {
       "comment" : "An imported template the library already has as it is.",
       "localizations" : {
@@ -7870,6 +7901,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Insérer le titre du ticket"
+          }
+        }
+      }
+    },
+    "Insert the Example" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insérer l’exemple"
           }
         }
       }
@@ -10324,6 +10365,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Protocole"
+          }
+        }
+      }
+    },
+    "Protocol document" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Document du protocole"
           }
         }
       }

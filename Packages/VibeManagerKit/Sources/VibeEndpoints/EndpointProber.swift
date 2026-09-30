@@ -20,6 +20,19 @@ public struct EndpointProber: EndpointProbing {
     guard let configuration = EndpointConfiguration(endpoint) else {
       throw EndpointDiscoveryError.failed(.unreachable)
     }
+    if let document = configuration.customProtocol {
+      guard let models = document.models else { throw EndpointDiscoveryError.noList }
+      let body = try await get(
+        configuration.url(for: models.path, secret: secret), configuration: configuration,
+        secret: secret)
+      let list = models.list.components.isEmpty ? body : models.list.value(in: body)
+      let found = (list?.arrayValue ?? []).compactMap { item -> EndpointModel? in
+        guard let id = models.id.string(in: item) else { return nil }
+        return EndpointModel(id: id, displayName: models.name.flatMap { $0.string(in: item) })
+      }
+      guard !found.isEmpty else { throw EndpointDiscoveryError.noList }
+      return found
+    }
     let operation = endpoint.wireProtocol == .messages ? "v1/models" : "models"
     let url: URL
     if endpoint.wireProtocol == .messages, configuration.messagesOperation == "messages" {
@@ -51,13 +64,14 @@ public struct EndpointProber: EndpointProbing {
         timeouts: EndpointTimeouts(
           connect: .seconds(10), firstByte: .seconds(20), idle: .seconds(20), total: .seconds(30)))
     } catch let failure as EndpointFailure {
-      throw EndpointDiscoveryError.failed(Self.detail(for: failure))
+      throw EndpointDiscoveryError.failed(Self.detail(for: failure.redacting(secret)))
     }
     let data = try await response.collect(limit: 16 * 1_024 * 1_024)
     guard (200..<300).contains(response.status) else {
       throw EndpointDiscoveryError.failed(
         Self.detail(
-          for: EndpointFailure.http(status: response.status, body: data, retryAfter: nil)))
+          for: EndpointFailure.http(status: response.status, body: data, retryAfter: nil)
+            .redacting(secret)))
     }
     guard let json = try? JSONValue(parsing: data) else { throw EndpointDiscoveryError.noList }
     return json
@@ -155,6 +169,17 @@ public struct EndpointProber: EndpointProbing {
     return enriched
   }
 
+  public func customProtocolProblem(_ document: String) -> String? {
+    do {
+      _ = try CustomProtocolDocument(parsing: document)
+      return nil
+    } catch let error as CustomProtocolError {
+      return error.description
+    } catch {
+      return "document: does not read"
+    }
+  }
+
   // MARK: - Test
 
   static let echoTool = CanonicalTool(
@@ -212,13 +237,13 @@ public struct EndpointProber: EndpointProbing {
         checks.append(EndpointTestCheck(kind: .reachable, outcome: .passed))
         checks.append(
           EndpointTestCheck(
-            kind: .authentication, outcome: .failed, detail: Self.detail(for: failure)))
+            kind: .authentication, outcome: .failed, detail: Self.detail(for: failure.redacting(secret))))
         return skipRest(after: [.reachable, .authentication])
       default:
         checks.append(EndpointTestCheck(kind: .reachable, outcome: .passed))
         checks.append(EndpointTestCheck(kind: .authentication, outcome: .passed))
         checks.append(
-          EndpointTestCheck(kind: .answer, outcome: .failed, detail: Self.detail(for: failure)))
+          EndpointTestCheck(kind: .answer, outcome: .failed, detail: Self.detail(for: failure.redacting(secret))))
         return skipRest(after: [.reachable, .authentication, .answer])
       }
     } catch {
@@ -284,7 +309,7 @@ public struct EndpointProber: EndpointProbing {
           detail: answered ? nil : .noAnswerAfterTool))
     } catch let failure as EndpointFailure {
       checks.append(
-        EndpointTestCheck(kind: .toolResult, outcome: .failed, detail: Self.detail(for: failure)))
+        EndpointTestCheck(kind: .toolResult, outcome: .failed, detail: Self.detail(for: failure.redacting(secret))))
     } catch {
       checks.append(EndpointTestCheck(kind: .toolResult, outcome: .failed, detail: .unreachable))
     }
@@ -316,7 +341,6 @@ public struct EndpointProber: EndpointProbing {
       throw EndpointFailure.http(
         status: response.status, body: body, retryAfter: response.headers["retry-after"])
     }
-    var parser = ServerSentEventParser()
     var decoder = side.makeDecoder()
     var accumulator = CanonicalResponseAccumulator()
     var firstEvent: ContinuousClock.Instant?
@@ -334,12 +358,7 @@ public struct EndpointProber: EndpointProbing {
         accumulator.consume(event)
       }
     }
-    for try await chunk in response.body {
-      for event in parser.consume(chunk) { take(try decoder.consume(event)) }
-    }
-    if let last = parser.finish() { take(try decoder.consume(last)) }
-    for line in parser.strayLines { take(decoder.consumeStray(line)) }
-    take(try decoder.finish())
+    try await EndpointSide.read(response, framing: side.framing, decoder: &decoder) { take($0) }
     let end = clock.now
     let answer = accumulator.response
     return Collected(

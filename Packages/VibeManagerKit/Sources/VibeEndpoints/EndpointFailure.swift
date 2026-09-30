@@ -34,6 +34,15 @@ public struct EndpointFailure: Error, Hashable, Sendable {
     self.retryAfter = retryAfter
   }
 
+  /// The same failure with `secret` masked in its message: some endpoints quote the key they
+  /// refused, and the message reaches the session's transcript.
+  public func redacting(_ secret: String?) -> EndpointFailure {
+    guard let secret, secret.count >= 4, message.contains(secret) else { return self }
+    var copy = self
+    copy.message = message.replacingOccurrences(of: secret, with: "••••")
+    return copy
+  }
+
   /// Worth another attempt before anything reached the harness.
   public var isRetryable: Bool {
     switch kind {
