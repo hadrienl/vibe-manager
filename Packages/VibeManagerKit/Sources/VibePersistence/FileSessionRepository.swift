@@ -54,7 +54,12 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   /// is seen at once — but bytes that did not change are not decoded again: conversations and
   /// journals ask for a session every few seconds each, and decoding the whole store for every
   /// one of them kept this actor busy enough to hold a launch waiting behind them.
+  ///
+  /// A write fills it too, with what it wrote: otherwise the read after each write decoded the
+  /// whole store again, and a restoration alternates the two for every session (#253).
   private var lastRead: (data: Data, sessions: [WorkSession])?
+  /// How many times the document was decoded, for the tests that keep decoding rare.
+  private(set) var decodeCount = 0
 
   public init(
     storeURL: URL = FileSessionRepository.defaultStoreURL(),
@@ -208,7 +213,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
         .appendingPathExtension("corrupt-\(UUID().uuidString).json")
       try atomicWrite(damagedData, to: quarantineURL, invokingInterruption: false)
       let recoveredData = try codec.encode(sessions: decoded.sessions)
-      try commit(recoveredData, preservingCurrentAsBackup: false)
+      try commit(recoveredData, preservingCurrentAsBackup: false, caching: decoded.sessions)
       diagnostics.record(
         .store, .notice, "store.backupRestored", ["sessions": .count(decoded.sessions.count)])
     } catch let error as SessionStoreError {
@@ -235,7 +240,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     if let lastRead, lastRead.data == data { return lastRead.sessions }
 
     do {
-      let decoded = try codec.decode(data)
+      let decoded = try decode(data)
       // A document still to migrate is decoded again, so that its rewrite is tried again.
       lastRead = decoded.requiresRewrite ? nil : (data, decoded.sessions)
       if decoded.requiresRewrite, persistingMigration {
@@ -243,7 +248,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
         // back, for instance on a full disk or a read-only container.
         let written =
           (try? codec.encode(sessions: decoded.sessions)).map {
-            (try? commit($0, preservingCurrentAsBackup: true)) != nil
+            (try? commit($0, preservingCurrentAsBackup: true, caching: decoded.sessions)) != nil
           } ?? false
         diagnostics.record(
           .store, .notice, "store.migrated",
@@ -259,14 +264,37 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     }
   }
 
+  /// Decodes the document, noting it where it can be seen without Instruments: `store.decoded`
+  /// belongs to a launch, another writer or a migration, and to nothing else (#253).
+  private func decode(_ data: Data) throws -> SessionStoreDecodeResult {
+    decodeCount += 1
+    let start = ContinuousClock.now
+    let decoded = try Signposts.interval("store.decode") { try codec.decode(data) }
+    diagnostics.record(
+      .store, .info, "store.decoded",
+      [
+        "sessions": .count(decoded.sessions.count),
+        "duration": .duration(ContinuousClock.now - start),
+      ])
+    return decoded
+  }
+
   private func persist(_ sessions: [WorkSession]) throws {
+    let ordered = sessions.sorted(by: Self.sessionOrdering)
     try Signposts.interval("store.save") {
-      let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
-      try commit(data, preservingCurrentAsBackup: true)
+      let data = try codec.encode(sessions: ordered)
+      try commit(data, preservingCurrentAsBackup: true, caching: ordered)
     }
   }
 
-  private func commit(_ data: Data, preservingCurrentAsBackup: Bool) throws {
+  /// Writes `data`, the encoding of `sessions`, and keeps both as the last document read once
+  /// they are on disk; a write that fails leaves the cache as it was.
+  ///
+  /// The sessions kept are those encoded, not those a decoding would give back. They are the same
+  /// because a session rounds each of its dates to the store's millisecond on entry.
+  private func commit(
+    _ data: Data, preservingCurrentAsBackup: Bool, caching sessions: [WorkSession]
+  ) throws {
     try ensureStoreDirectory()
     if preservingCurrentAsBackup,
       FileManager.default.fileExists(atPath: storeURL.path)
@@ -275,6 +303,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
       try atomicWrite(currentData, to: backupURL, invokingInterruption: false)
     }
     try atomicWrite(data, to: storeURL, invokingInterruption: true)
+    lastRead = (data, sessions)
   }
 
   private func atomicWrite(_ data: Data, to destination: URL, invokingInterruption: Bool) throws {
