@@ -12,16 +12,13 @@ public struct FileTranscriptTail: TranscriptTailing {
   /// Lines handed over at once while a long transcript is first read, so that the reader can
   /// show progress rather than wait for megabytes.
   static let batchSize = 2_000
-  /// How long a watched file is left alone when the disk says nothing: only a source that went
-  /// deaf — a network volume — would need it.
-  public static let watchedSafetyInterval = Duration.seconds(30)
 
   private let pollInterval: Duration
   private let watchedInterval: Duration
 
   public init(
     pollInterval: Duration = .seconds(1),
-    watchedInterval: Duration = FileTranscriptTail.watchedSafetyInterval
+    watchedInterval: Duration = FileWatching.safetyNet
   ) {
     self.pollInterval = pollInterval
     self.watchedInterval = watchedInterval
