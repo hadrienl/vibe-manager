@@ -69,6 +69,9 @@ public struct ConversationView: View {
     // then, never for a message that arrives or a state that changes. Asked of the model rather
     // than of the composer, which is drawn again whenever the conversation changes shape.
     .onAppear { if isActive { claimKeyboardOnActivation() } }
+    // Every conversation shown lately stays mounted: only the one on screen is laid out (#250).
+    .onChange(of: isActive, initial: true) { _, isActive in model.setShown(isActive) }
+    .onDisappear { model.setShown(false) }
     .onChange(of: isActive) { _, isActive in
       if isActive {
         claimKeyboardOnActivation()
@@ -190,17 +193,17 @@ public struct ConversationView: View {
         }
       }
       .accessibilityRotor(Text("Messages", bundle: .module)) {
-        ForEach(model.blocks.filter(Self.isPrompt)) { block in
+        ForEach(model.promptBlocks) { block in
           AccessibilityRotorEntry(Text(Self.rotorLabel(block)), id: block.id)
         }
       }
       .accessibilityRotor(Text("Failures", bundle: .module)) {
-        ForEach(model.blocks.filter(Self.isFailure)) { block in
+        ForEach(model.failureBlocks) { block in
           AccessibilityRotorEntry(Text(verbatim: block.id), id: block.id)
         }
       }
       .accessibilityRotor(Text("Sub-agents", bundle: .module)) {
-        ForEach(model.blocks.filter(Self.holdsSubagents)) { block in
+        ForEach(model.subagentBlocks) { block in
           AccessibilityRotorEntry(
             Text(
               verbatim: block.calls.map(SubagentPresentation.description(of:))
@@ -280,20 +283,6 @@ public struct ConversationView: View {
       .font(theme.interfaceFont(size: 13))
       .foregroundStyle(theme.secondaryText.color)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-
-  private static func isPrompt(_ block: ConversationBlock) -> Bool {
-    if case .entry(let entry) = block { return entry.isUserPrompt }
-    return false
-  }
-
-  private static func holdsSubagents(_ block: ConversationBlock) -> Bool {
-    block.calls.contains { $0.kind == .subagent }
-  }
-
-  private static func isFailure(_ block: ConversationBlock) -> Bool {
-    if case .failed = block.toolState { return true }
-    return false
   }
 
   private static func rotorLabel(_ block: ConversationBlock) -> String {
