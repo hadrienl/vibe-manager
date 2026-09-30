@@ -600,9 +600,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     else { return false }
     exitTasks.removeValue(forKey: id)?.cancel()
     _ = nextExitGeneration(for: id)
-    outputTasks.removeValue(forKey: id)?.cancel()
-    activityTasks.removeValue(forKey: id)?.cancel()
-    if let observer = observers.removeValue(forKey: id) {
+    if let observer = forgetRuntime(of: id) {
       // Asked once the watch is over: its last look may just have stored the identifier.
       await observer.finished()
       await recorder?.awaiting(id, resumeIdentifier: observer.awaitedResumeIdentifier())
@@ -666,19 +664,29 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       task.cancel()
     }
     exitTasks.removeAll()
-    for task in outputTasks.values {
-      task.cancel()
-    }
-    outputTasks.removeAll()
-    for task in activityTasks.values {
-      task.cancel()
-    }
-    activityTasks.removeAll()
-    for observer in observers.values {
+    let observers = trackedSessionIDs.compactMap { forgetRuntime(of: $0) }
+    for observer in observers {
       await observer.finished()
     }
-    observers.removeAll()
     await supervisor.stopAll(gracePeriod: gracePeriod)
+  }
+
+  /// Lets go of what the launcher holds for a session's process — its readers, its observer, when
+  /// it last wrote — on every path its run ends by: a dictionary left out of one of them would
+  /// grow with each session run (#255). The observer is handed back, to be finished.
+  ///
+  /// `exitGenerations` is kept on purpose: counted from 1 again, a watch retired earlier and still
+  /// waiting for the main actor could take itself for the current one.
+  private func forgetRuntime(of id: SessionID) -> (any AgentLaunchObserver)? {
+    outputTasks.removeValue(forKey: id)?.cancel()
+    activityTasks.removeValue(forKey: id)?.cancel()
+    lastOutputAt[id] = nil
+    return observers.removeValue(forKey: id)
+  }
+
+  /// Every session the launcher still holds process state for.
+  var trackedSessionIDs: Set<SessionID> {
+    Set(outputTasks.keys).union(activityTasks.keys).union(lastOutputAt.keys).union(observers.keys)
   }
 
   // MARK: - SessionRuntime
@@ -714,9 +722,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // Retires the watch as well as cancelling it: one already on its way to the main actor is
     // past the point where cancellation can stop it.
     _ = nextExitGeneration(for: id)
-    outputTasks.removeValue(forKey: id)?.cancel()
-    activityTasks.removeValue(forKey: id)?.cancel()
-    if let observer = observers.removeValue(forKey: id) {
+    if let observer = forgetRuntime(of: id) {
       await observer.finished()
     }
     await activity?.processEnded(id)
@@ -827,9 +833,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // close the session under it and report its exit.
     guard exitGenerations[id] == generation else { return }
     exitTasks[id] = nil
-    outputTasks.removeValue(forKey: id)?.cancel()
-    activityTasks.removeValue(forKey: id)?.cancel()
-    if let observer = observers.removeValue(forKey: id) {
+    if let observer = forgetRuntime(of: id) {
       await observer.finished()
     }
     await activity?.processEnded(id)
@@ -855,6 +859,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       var last: ContinuousClock.Instant?
       for await event in attachment.events {
         guard case .output = event else { continue }
+        // Let go of since: what it would write now would outlive the run (#255).
+        guard !Task.isCancelled else { return }
         let now = ContinuousClock.now
         self.lastOutputAt[id] = now
         if let last, now - last < .milliseconds(250) { continue }
