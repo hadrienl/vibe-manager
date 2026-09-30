@@ -22,7 +22,8 @@ struct TranscriptLocationCacheTests {
     let url = FileManager.default.temporaryDirectory
       .appendingPathComponent("VibeLocations-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-    return url
+    // `/var` is a link to `/private/var`, where the listings say the files are.
+    return url.resolvingSymlinksInPath()
   }
 
   private func write(_ file: URL) throws {
