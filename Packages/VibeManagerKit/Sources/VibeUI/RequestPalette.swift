@@ -513,6 +513,12 @@ struct RequestCard: View {
             } label: {
               Text("Approve, Accepting Edits", bundle: .module)
             }
+            // Where Claude Code offers its auto mode, in place of accepting edits (#273).
+            Button {
+              send(.approvePlan(.autoMode))
+            } label: {
+              Text("Approve in Auto Mode", bundle: .module)
+            }
             Button {
               send(.approvePlan(.reviewEdits))
             } label: {

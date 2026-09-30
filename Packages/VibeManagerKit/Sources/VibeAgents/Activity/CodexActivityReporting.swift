@@ -116,7 +116,8 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
       // dialog ever drawn (0.159, `core/src/tools/approvals.rs`): drawn once Codex says so.
       return .questionAsked(
         .approval,
-        notice: event.requestNotice(isShown: false, alwaysAllow: CodexAnswerKeymap.alwaysAllow))
+        notice: Self.withoutAlwaysForHosts(
+          event.requestNotice(isShown: false, alwaysAllow: CodexAnswerKeymap.alwaysAllow)))
     case "PostToolUse": return .questionResolved
     case "Stop": return .turnEnded
     case "Interrupt": return .interrupted
@@ -127,6 +128,24 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
 
   public var readsTerminalNotifications: Bool {
     true
+  }
+
+  /// A network access comes as a `Bash` permission whose description is `network-access <host>`
+  /// (0.159, `core/src/tools/approvals.rs`). Its dialog allows the host for the conversation, or
+  /// for good — never commands that start the same way, which "always" says for a command: the
+  /// answer is given once, or in the terminal.
+  static func withoutAlwaysForHosts(_ notice: AgentRequestNotice) -> AgentRequestNotice {
+    guard case .permission(let permission) = notice.content,
+      permission.purpose?.hasPrefix("network-access ") == true
+    else { return notice }
+    return AgentRequestNotice(
+      content: .permission(
+        AgentToolPermission(
+          tool: permission.tool, toolName: permission.toolName, subject: permission.subject,
+          purpose: permission.purpose, details: permission.details,
+          workingDirectory: permission.workingDirectory, alwaysAllow: nil,
+          isComplete: permission.isComplete)),
+      reference: notice.reference, isShown: notice.isShown, key: notice.key)
   }
 
   /// Codex's notifications, as `tui/src/chatwidget/notifications.rs` words them in 0.159.

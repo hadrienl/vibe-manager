@@ -4455,6 +4455,16 @@
         }
       }
     },
+    "Approve in Auto Mode" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider en mode auto"
+          }
+        }
+      }
+    },
     "Approve, Accepting Edits" : {
       "localizations" : {
         "fr" : {
@@ -12886,6 +12896,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le serveur de développement est peut-être encore en train de démarrer. Nouvel essai toutes les 2 secondes — tentative %lld."
+          }
+        }
+      }
+    },
+    "The dialog of %@ does not offer this answer: nothing was sent. Answer it in the session." : {
+      "comment" : "Said when the option an answer needs is not in the dialog the session's terminal shows.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dialogue de « %@ » ne propose pas cette réponse : rien n’a été envoyé. Répondez dans la session."
           }
         }
       }

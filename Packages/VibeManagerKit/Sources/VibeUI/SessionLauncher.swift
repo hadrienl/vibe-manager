@@ -665,6 +665,21 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     await panes[id]?.session?.lastOutputAt()
   }
 
+  /// What the terminal of a session whose agent runs shows now, as text (#273): its history
+  /// replayed at the size the pane measured — or, never shown, a size larger than any the agent
+  /// draws to, where its lines fall on the same rows. Off the main actor: a long history takes a
+  /// moment to replay.
+  public func screen(of id: SessionID) async -> String? {
+    guard let pane = panes[id], pane.status == .running, let terminal = pane.session else {
+      return nil
+    }
+    let history = await terminal.history()
+    let size = pane.viewportSize ?? TerminalSize(columns: 300, rows: 120)
+    return await Task.detached(priority: .userInitiated) {
+      TerminalText.screen(replaying: history.bytes, size: size)
+    }.value
+  }
+
   public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {
     panes[id]?.failure
   }

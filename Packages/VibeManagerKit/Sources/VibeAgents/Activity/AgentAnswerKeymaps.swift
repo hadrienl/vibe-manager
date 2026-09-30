@@ -1,17 +1,21 @@
 import Foundation
 import VibeApplication
 
-/// Claude Code's dialogs, as drawn by 2.1.282 (#40).
+/// Claude Code's dialogs, as drawn by 2.1.282 (#40) and 2.1.285 (#273).
 ///
 /// - A permission: `1. Yes` / `2. Yes, and always allow…` — only when the request carries
 ///   `permission_suggestions` — / `3. No`. Escape refuses whatever the options are: a digit for
-///   "No" guessed one place off would allow instead.
+///   "No" guessed one place off would allow instead. 2.1.247 may add `Yes, and switch to auto
+///   mode`, and the options of a sandboxed command's network access are other words again: the
+///   digits are read off the screen.
 /// - Questions: a digit picks its option and moves on; the one after the options is "Type
 ///   something.", which takes pasted text and Return. A question of several choices is a list of
 ///   boxes, as drawn by 2.1.283: a digit ticks its option and stays, the right arrow moves on.
 ///   Several questions, or one of several choices, end on a review, whose `1` submits. Beside
 ///   previews, as drawn by 2.1.285, a digit only moves the highlight: Return, sent apart, takes it.
-/// - A plan: `1` accepts it with edits accepted, `2` with each edit asking first; Escape rejects.
+/// - A plan: `Yes, auto-accept edits` — or `Yes, and use auto mode` where that mode is available,
+///   in its place — then `Yes, manually approve edits`; a setting may put `clear context`
+///   options before them. The option is read off the screen; Escape rejects.
 ///
 /// Return is never pressed alone to pick an option: it takes the highlighted one, whatever that
 /// is. It follows a digit only beside previews, once the digit has moved the highlight.
@@ -38,16 +42,34 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
     }
   }
 
-  public func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
+  public func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
     switch (answer, content) {
     case (.allowOnce, .permission):
-      return [Array("1".utf8)]
+      return Self.digit(of: screen?.option { $0 == "Yes" })
     case (.allowAlways, .permission(let permission)) where permission.alwaysAllow != nil:
-      return [Array("2".utf8)]
+      // Never an option that changes the permission mode for the whole session.
+      return Self.digit(
+        of: screen?.option {
+          $0.hasPrefix("Yes, ") && !$0.localizedCaseInsensitiveContains("auto mode")
+            && !$0.localizedCaseInsensitiveContains("bypass")
+        })
     case (.deny, .permission), (.deny, .unreadable), (.rejectPlan, .plan):
       return [TerminalKeys.escape]
     case (.approvePlan(let approval), .plan):
-      return [Array((approval == .acceptEdits ? "1" : "2").utf8)]
+      let words: String
+      switch approval {
+      case .acceptEdits: words = "auto-accept edits"
+      case .autoMode: words = "auto mode"
+      case .reviewEdits: words = "manually approve edits"
+      }
+      // The options that also clear the context are never taken for these.
+      return Self.digit(
+        of: screen?.option {
+          $0.hasPrefix("Yes") && $0.localizedCaseInsensitiveContains(words)
+            && !$0.localizedCaseInsensitiveContains("clear context")
+        })
     case (.answers(let answers), .questions(let questions)):
       guard answers.count == questions.count else { return nil }
       var steps: [[UInt8]] = []
@@ -64,6 +86,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
     default:
       return nil
     }
+  }
+
+  /// The digit of an option read on screen.
+  static func digit(of option: AgentDialogScreen.Option?) -> [[UInt8]]? {
+    option.flatMap { TerminalKeys.digit(forOption: $0.number - 1) }.map { [$0] }
   }
 
   static func keystrokes(for answer: AgentQuestionAnswer, to question: AgentQuestion)
@@ -104,9 +131,12 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   }
 }
 
-/// Codex's approval dialogs, as drawn by 0.157.1 (#40): `y` runs it once, `p` stops asking for
-/// commands that start the same way, `a` for the files of a patch; Escape refuses. Its questions
-/// are reported before they are drawn, and are answered in the terminal.
+/// Codex's approval dialogs, as drawn by 0.157.1 (#40) and 0.159.2 (#273): each option shows its
+/// key — `(y)` runs it once, `(p)` stops asking for commands that start the same way, `(a)` for
+/// the rest of the session, the files of a patch or a host for the conversation; Escape refuses.
+/// The keys are taken from the screen: `p` is drawn only when Codex proposes a prefix, and in the
+/// dialog of a network access it allows the host for good. Its questions are reported before they
+/// are drawn, and are answered in the terminal.
 ///
 /// A tool of an MCP server is approved in another dialog, a form whose one field lists `Allow`
 /// first, then — only when the server allows it — `Allow for this session` and `Always allow`,
@@ -118,7 +148,8 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
   public func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
     switch content {
     case .permission(let permission):
-      return Self.alwaysKey(for: permission) == nil
+      // A host's access says nothing of commands: no "always" there, whatever the tool.
+      return Self.alwaysKey(for: permission) == nil || permission.alwaysAllow == nil
         ? [.allowOnce, .deny] : [.allowOnce, .allowAlways, .deny]
     case .unreadable:
       return [.deny]
@@ -127,18 +158,32 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
     }
   }
 
-  public func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
+  public func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
     switch (answer, content) {
     case (.allowOnce, .permission(let permission)):
-      if case .mcp = permission.tool { return [Array("1".utf8)] }
-      return [Array("y".utf8)]
+      if case .mcp = permission.tool {
+        return ClaudeCodeAnswerKeymap.digit(of: screen?.option { $0 == "Allow" })
+      }
+      return Self.shortcut("y", in: screen)
     case (.allowAlways, .permission(let permission)):
-      return Self.alwaysKey(for: permission).map { [$0] }
+      guard permission.alwaysAllow != nil, let key = Self.alwaysKey(for: permission),
+        let option = screen?.options.first(where: { $0.shortcut == String(decoding: key, as: UTF8.self) }),
+        !option.label.localizedCaseInsensitiveContains("in the future")
+      else { return nil }
+      return [key]
     case (.deny, .permission), (.deny, .unreadable):
       return [TerminalKeys.escape]
     default:
       return nil
     }
+  }
+
+  /// `key`, when an option on screen shows it.
+  static func shortcut(_ key: String, in screen: AgentDialogScreen?) -> [[UInt8]]? {
+    guard screen?.options.contains(where: { $0.shortcut == key }) == true else { return nil }
+    return [Array(key.utf8)]
   }
 
   static func alwaysKey(for permission: AgentToolPermission) -> [UInt8]? {
@@ -175,7 +220,9 @@ public struct MockAnswerKeymap: AgentAnswerKeymap {
     }
   }
 
-  public func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
+  public func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
     switch (answer, content) {
     case (.allowOnce, .permission): return [Array("y\r".utf8)]
     case (.allowAlways, .permission): return [Array("a\r".utf8)]

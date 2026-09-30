@@ -383,6 +383,7 @@ public final class AppEnvironment {
         tracker: activityTracker,
         write: { [weak launcher] id, bytes in await launcher?.writeAnswer(bytes, to: id) ?? false },
         lastOutput: { [weak launcher] id in await launcher?.lastOutput(of: id) },
+        screen: { [weak launcher] id in await launcher?.screen(of: id) },
         diagnostics: diagnostics),
       requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
       browser: browser,

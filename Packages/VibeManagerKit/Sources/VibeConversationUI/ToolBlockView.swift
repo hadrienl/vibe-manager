@@ -833,6 +833,12 @@ struct RequestActions: View {
             } label: {
               Text("Approve, Accepting Edits", bundle: .module)
             }
+            // Where Claude Code offers its auto mode, in place of accepting edits (#273).
+            Button {
+              model.answer(.approvePlan(.autoMode))
+            } label: {
+              Text("Approve in Auto Mode", bundle: .module)
+            }
             Button {
               model.answer(.approvePlan(.reviewEdits))
             } label: {

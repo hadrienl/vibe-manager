@@ -338,6 +338,9 @@ public enum AgentQuestionAnswer: Hashable, Sendable {
 public enum AgentPlanApproval: Hashable, Sendable {
   /// The agent's edits are accepted as they come.
   case acceptEdits
+  /// The agent goes on in Claude Code's auto mode, where a classifier answers its permissions:
+  /// what the dialog offers in place of accepting edits when that mode is available (#273).
+  case autoMode
   /// Each edit asks first.
   case reviewEdits
 }
@@ -383,8 +386,19 @@ public protocol AgentAnswerKeymap: Sendable {
   /// What this CLI's dialog for the request lets be answered from outside.
   func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind>
   /// The writes that give the answer, one per step: between two, the terminal settles. `nil` when
-  /// this answer cannot be given to this request.
-  func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]?
+  /// this answer cannot be given to this request. `screen` is the dialog as the terminal draws it
+  /// now (#273): where options move with the user's settings and modes, one is taken by what it
+  /// says, not by where it stands — and none when it is not on screen.
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]?
+}
+
+extension AgentAnswerKeymap {
+  /// The keystrokes with no dialog read: enough for the dialogs whose keys never move.
+  public func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
+    keystrokes(for: answer, to: content, screen: nil)
+  }
 }
 
 extension AgentActivityState {
