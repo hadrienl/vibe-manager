@@ -296,7 +296,7 @@ struct VibeManagerApp: App {
           environment.appModel.focusRequestPalette()
         }
         .keyboardShortcut("p", modifiers: [.command, .option])
-        .disabled(environment.appModel.pendingRequests.isEmpty)
+        .disabled(environment.appModel.pendingRequestCount == 0)
 
         // What the terminal said last, read by VoiceOver on demand rather than as it arrives.
         Button("Read Last Output") {

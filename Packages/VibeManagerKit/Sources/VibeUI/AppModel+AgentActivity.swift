@@ -12,7 +12,7 @@ public struct HookConsentRequest: Identifiable, Equatable, Sendable {
 
 extension AppModel {
   public func activity(for id: SessionID) -> AgentActivityState? {
-    activities[id]
+    activityCells.value(for: id)
   }
 
   /// Subscribes to the tracker, then reads back what the last launch left unread.
@@ -22,12 +22,15 @@ extension AppModel {
     activityUpdates = Task { [weak self] in
       for await update in updates {
         guard let self else { return }
-        self.activities[update.sessionID] = update.state
+        // What one transition costs the main thread, the views it wakes aside (#254).
+        let signpost = Signposts.begin("ui.activityApplied")
+        self.activityCells.set(update.state, for: update.sessionID)
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {
           $0.key.sessionID != update.sessionID
         }.merging(update.answering) { $1 }
         self.requestsDidChange()
+        Signposts.end("ui.activityApplied", signpost)
       }
     }
     await activityTracker.load()

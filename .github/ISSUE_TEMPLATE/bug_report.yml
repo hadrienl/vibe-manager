@@ -1,0 +1,55 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. A security problem is never reported here: see the [security policy](https://github.com/hadrienl/vibe-manager/security/policy).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a session with…
+        2. Click…
+        3. See…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Vibe Manager version
+      description: Vibe Manager › About Vibe Manager.
+      placeholder: 1.0.0 (42)
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.5
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent involved
+      multiple: true
+      options:
+        - Claude Code
+        - Codex
+        - Plain terminal
+        - None / not related to an agent
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots, logs or diagnostics
+      description: Anything that helps. Remove paths, tokens or conversation content you do not want to share.
