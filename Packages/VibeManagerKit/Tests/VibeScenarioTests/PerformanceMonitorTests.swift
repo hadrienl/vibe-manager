@@ -50,7 +50,8 @@ struct PerformanceMonitorTests {
     reporter.report()
 
     #if DEBUG
-      let event = try? #require(log.events(named: "perf.bodyEvaluations").first)
+      let event = log.events(named: "perf.bodyEvaluations").first
+      #expect(event != nil)
       #expect(event?.value(of: "total") == .count(3))
       #expect(event?.value(of: "rootView") == .count(1))
       #expect(event?.value(of: "sessionRow") == .count(2))
