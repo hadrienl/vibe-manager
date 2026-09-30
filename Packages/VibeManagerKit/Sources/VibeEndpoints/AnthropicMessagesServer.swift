@@ -33,7 +33,7 @@ public enum AnthropicMessagesServer {
     }
     return CanonicalRequest(
       model: model,
-      system: system(of: body["system"]),
+      system: systemPrompt(of: body["system"]),
       messages: messages,
       tools: tools,
       toolChoice: toolChoice(of: body["tool_choice"]),
@@ -42,7 +42,7 @@ public enum AnthropicMessagesServer {
       stream: body["stream"]?.boolValue ?? false)
   }
 
-  private static func system(of value: JSONValue?) -> String? {
+  private static func systemPrompt(of value: JSONValue?) -> String? {
     switch value {
     case .string(let text):
       return text.isEmpty ? nil : text
