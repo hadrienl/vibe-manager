@@ -60,7 +60,7 @@ struct EndpointsSettingsView: View {
                   "\(endpoint.agentModels.count) models", bundle: .module,
                   comment: "How many models an endpoint offers."))
                 .font(.caption)
-              .foregroundStyle(.secondary)
+                .foregroundStyle(.secondary)
             }
           }
           .tag(Optional(endpoint.id))
@@ -237,12 +237,13 @@ struct EndpointsSettingsView: View {
       case .header, .query:
         LabeledContent {
           TextField(text: authenticationName(binding), prompt: Text(verbatim: "x-api-key")) {
-            Text("Name", bundle: .module, comment: "The name of the header or parameter of the key.")
+            Text(
+              "Name", bundle: .module, comment: "The name of the header or parameter of the key.")
           }
           .labelsHidden()
           .font(.body.monospaced())
         } label: {
-            Text("Name", bundle: .module, comment: "The name of the header or parameter of the key.")
+          Text("Name", bundle: .module, comment: "The name of the header or parameter of the key.")
         }
       case .none, .bearer:
         EmptyView()
@@ -826,7 +827,8 @@ struct EndpointsSettingsView: View {
     case .chatCompletions: return "OpenAI Chat Completions"
     case .responses: return "OpenAI Responses"
     case .messages: return "Anthropic Messages"
-    case .custom: return String(localized: "Custom", bundle: .module, comment: "An endpoint's protocol.")
+    case .custom:
+      return String(localized: "Custom", bundle: .module, comment: "An endpoint's protocol.")
     }
   }
 
