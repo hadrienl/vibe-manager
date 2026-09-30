@@ -15471,6 +15471,39 @@
         }
       }
     },
+    "checked %lld s ago" : {
+      "comment" : "When the Git list was last checked against the disk: a number of seconds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vérifié il y a %lld s"
+          }
+        }
+      }
+    },
+    "checked at %@" : {
+      "comment" : "When the Git list was last checked against the disk: a time of day.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vérifié à %@"
+          }
+        }
+      }
+    },
+    "checked just now" : {
+      "comment" : "When the Git list was last checked against the disk.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vérifié à l’instant"
+          }
+        }
+      }
+    },
     "commands starting the same way" : {
       "comment" : "What always allowing grants: commands with the same beginning.",
       "localizations" : {
@@ -16160,39 +16193,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "rien pour l’instant"
-          }
-        }
-      }
-    },
-    "read %lld s ago" : {
-      "comment" : "When the Git list was read: a number of seconds.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lu il y a %lld s"
-          }
-        }
-      }
-    },
-    "read at %@" : {
-      "comment" : "When the Git list was read: a time of day.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lu à %@"
-          }
-        }
-      }
-    },
-    "read just now" : {
-      "comment" : "When the Git list was read.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lu à l’instant"
           }
         }
       }

@@ -701,6 +701,7 @@ public struct RootView: View {
       session: session,
       resolution: model.resolution(forID: session.id),
       branchReport: model.branchReport(for: session.id),
+      branchReportCheckedAt: { model.branchReportCheckedAt(for: session.id) },
       repositoryStatuses: model.repositoryStatuses,
       sessionNames: Dictionary(
         model.sessions.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
