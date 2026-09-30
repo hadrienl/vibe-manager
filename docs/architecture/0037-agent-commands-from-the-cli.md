@@ -1,4 +1,4 @@
-# 0036 — The skills and commands under `/` come from the agent's CLI
+# 0037 — The skills and commands under `/` come from the agent's CLI
 
 - Status: accepted
 - Date: 2026-09-30
