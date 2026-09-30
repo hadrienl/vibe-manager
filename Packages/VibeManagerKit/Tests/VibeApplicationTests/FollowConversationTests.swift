@@ -4,6 +4,22 @@ import VibeDomain
 
 @testable import VibeApplication
 
+extension TranscriptRecord {
+  /// A test line, carried as it is.
+  fileprivate init(text: String) {
+    self.init(["line": text])
+  }
+
+  fileprivate var text: String { object["line"] as? String ?? "" }
+}
+
+extension TranscriptChunk {
+  /// Test lines, the file caught up once they are read.
+  fileprivate static func lines(_ texts: [String]) -> TranscriptChunk {
+    .records(texts.map(TranscriptRecord.init(text:)), isCaughtUp: true)
+  }
+}
+
 /// Lines of the form `user:<text>` or `agent:<text>`, one entry each.
 private final class LineDecoder: ConversationDecoding {
   private(set) var entries: [ConversationEntry] = []
@@ -13,8 +29,8 @@ private final class LineDecoder: ConversationDecoding {
     self.file = file
   }
 
-  func consume(_ line: Data) {
-    let text = String(decoding: line, as: UTF8.self)
+  func consume(_ record: TranscriptRecord) {
+    let text = record.text
     let id = "\(file)#\(entries.count)"
     if text.hasPrefix("user:") {
       entries.append(
@@ -96,20 +112,20 @@ private actor ScriptedTail: TranscriptTailing {
 
   private func opened(_ file: URL, _ continuation: AsyncStream<TranscriptChunk>.Continuation) {
     continuations[file] = continuation
-    continuation.yield(.lines((contents[file] ?? []).map { Data($0.utf8) }))
+    continuation.yield(.lines(contents[file] ?? []))
   }
 
-  func read(_ file: URL) async -> [Data] {
-    (contents[file] ?? []).map { Data($0.utf8) }
+  func read(_ file: URL) async -> [TranscriptRecord] {
+    (contents[file] ?? []).map(TranscriptRecord.init(text:))
   }
 
   func write(_ lines: [String], to file: URL) {
-    continuations[file]?.yield(.lines(lines.map { Data($0.utf8) }))
+    continuations[file]?.yield(.lines(lines))
   }
 
   func replace(_ file: URL, with lines: [String]) {
     continuations[file]?.yield(.reset)
-    continuations[file]?.yield(.lines(lines.map { Data($0.utf8) }))
+    continuations[file]?.yield(.lines(lines))
   }
 }
 

@@ -37,9 +37,9 @@ public final class CodexConversationDecoder: ConversationDecoding {
     return [ConversationEntry(id: "codex:older-format", content: .notice(.olderFormat))] + legacy
   }
 
-  public func consume(_ line: Data) {
-    guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-      let payload = object["payload"] as? [String: Any]
+  public func consume(_ record: TranscriptRecord) {
+    let object = record.object
+    guard let payload = object["payload"] as? [String: Any]
     else { return }
     let date = (object["timestamp"] as? String).flatMap(TranscriptDates.parse)
     if isInCopiedHistory {

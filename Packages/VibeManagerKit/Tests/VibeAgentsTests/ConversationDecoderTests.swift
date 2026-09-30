@@ -553,26 +553,63 @@ struct FileTranscriptTailTests {
     let tail = FileTranscriptTail(pollInterval: .milliseconds(50))
     var iterator = tail.follow(file).makeAsyncIterator()
     // Nothing yet: the first reading says so, empty.
-    guard case .lines(let first) = await iterator.next() else {
+    guard case .records(let first, let isCaughtUp) = await iterator.next() else {
       Issue.record("no first reading")
       return
     }
     #expect(first.isEmpty)
-    try append("a\nb\n", to: file)
+    #expect(isCaughtUp)
+    try append(#"{"n":"a"}"# + "\n" + #"{"n":"b"}"# + "\nnot json\n", to: file)
     var received: [String] = []
     while received.count < 2, let chunk = await iterator.next() {
-      if case .lines(let lines) = chunk {
-        received += lines.map { String(decoding: $0, as: UTF8.self) }
+      if case .records(let records, _) = chunk {
+        received += records.compactMap { $0.object["n"] as? String }
       }
     }
     #expect(received == ["a", "b"])
-    try append("c\n", to: file)
+    try append(#"{"n":"c"}"# + "\n", to: file)
     while received.count < 3, let chunk = await iterator.next() {
-      if case .lines(let lines) = chunk {
-        received += lines.map { String(decoding: $0, as: UTF8.self) }
+      if case .records(let records, _) = chunk {
+        received += records.compactMap { $0.object["n"] as? String }
       }
     }
     #expect(received == ["a", "b", "c"])
+  }
+
+  @Test("A first reading in chunks says when it caught up with the file")
+  func catchingUp() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append((0..<50).map { #"{"n":\#($0)}"# + "\n" }.joined(), to: file)
+    let tail = FileTranscriptTail(pollInterval: .seconds(60), chunkSize: 64)
+    var iterator = tail.follow(file).makeAsyncIterator()
+    var numbers: [Int] = []
+    var chunks = 0
+    while let chunk = await iterator.next() {
+      guard case .records(let records, let isCaughtUp) = chunk else { continue }
+      chunks += 1
+      numbers += records.compactMap { $0.object["n"] as? Int }
+      if isCaughtUp { break }
+    }
+    #expect(numbers == Array(0..<50))
+    #expect(chunks > 1)
+  }
+
+  @Test("Lines parsed on every core come back in the order of the file, the unreadable left out")
+  func parsedInOrder() {
+    let lines = (0..<10_000).map { index in
+      Data((index % 1_000 == 999 ? "{broken" : #"{"n":\#(index)}"#).utf8)
+    }
+    let numbers = FileTranscriptTail.parse(lines).compactMap { $0.object["n"] as? Int }
+    #expect(numbers == (0..<10_000).filter { $0 % 1_000 != 999 })
+  }
+
+  @Test("A parsed record holds an immutable dictionary: it can cross tasks")
+  func immutableRecord() throws {
+    let record = try #require(TranscriptRecord(line: Data(#"{"a":{"b":[1]}}"#.utf8)))
+    let inner = record.object["a"] as AnyObject
+    #expect(!(inner is NSMutableDictionary))
   }
 }
 

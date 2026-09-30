@@ -32,13 +32,18 @@ public struct FileTranscriptTail: TranscriptTailing {
         let wake = WakeSignal()
         var watcher: FileWatcher?
         var first = true
+        var wasCaughtUp = false
         while !Task.isCancelled {
-          // What reading leaves to autorelease goes with each chunk, not at the end of the file.
-          let reading = autoreleasepool { reader.readChunk() }
+          let (reading, records) = Self.readChunk(with: &reader)
           if reading.wasReset { continuation.yield(.reset) }
-          // The first reading is always handed over, empty or not: it says the file was read.
-          if !reading.lines.isEmpty || first { continuation.yield(.lines(reading.lines)) }
+          // The first reading is always handed over, empty or not: it says the file was read. So is
+          // the one that reaches the end of the file, which says the reading caught up.
+          let isCaughtUp = !reading.hasMore
+          if !records.isEmpty || first || isCaughtUp != wasCaughtUp {
+            continuation.yield(.records(records, isCaughtUp: isCaughtUp))
+          }
           first = false
+          wasCaughtUp = isCaughtUp
           if reading.hasMore { continue }
           if watcher?.inode != reader.inode {
             watcher = reader.inode.flatMap { _ in FileWatcher(path: file.path, wake: wake) }
@@ -51,11 +56,49 @@ public struct FileTranscriptTail: TranscriptTailing {
     }
   }
 
-  public func read(_ file: URL) async -> [Data] {
-    await Task.detached(priority: .utility) {
-      var reader = TranscriptLineReader(file: file)
-      return reader.readAvailable().lines
+  public func read(_ file: URL) async -> [TranscriptRecord] {
+    let chunkSize = chunkSize
+    return await Task.detached(priority: .utility) {
+      var reader = TranscriptLineReader(file: file, chunkSize: chunkSize)
+      var records: [TranscriptRecord] = []
+      var reading: TranscriptLineReader.Reading
+      repeat {
+        let chunk = Self.readChunk(with: &reader)
+        reading = chunk.reading
+        records += chunk.records
+      } while reading.hasMore
+      return records
     }.value
+  }
+
+  /// The next chunk and its lines parsed. What reading and parsing leave to autorelease goes with
+  /// each chunk, not at the end of the file: `JSONSerialization` leaves a lot.
+  static func readChunk(with reader: inout TranscriptLineReader)
+    -> (reading: TranscriptLineReader.Reading, records: [TranscriptRecord])
+  {
+    autoreleasepool {
+      let reading = reader.readChunk()
+      return (reading, parse(reading.lines))
+    }
+  }
+
+  /// Lines parsed on every core, in the order they came; those that are not JSON objects are
+  /// left out. The few lines a followed transcript gains at a time are parsed right here.
+  static func parse(_ lines: [Data]) -> [TranscriptRecord] {
+    guard lines.count > 64 else { return lines.compactMap(TranscriptRecord.init(line:)) }
+    let stripes = min(lines.count, ProcessInfo.processInfo.activeProcessorCount * 4)
+    var parsed = [TranscriptRecord?](repeating: nil, count: lines.count)
+    parsed.withUnsafeMutableBufferPointer { buffer in
+      // Each stripe writes its own indices only.
+      nonisolated(unsafe) let output = buffer
+      DispatchQueue.concurrentPerform(iterations: stripes) { stripe in
+        let range = (lines.count * stripe / stripes)..<(lines.count * (stripe + 1) / stripes)
+        autoreleasepool {
+          for index in range { output[index] = TranscriptRecord(line: lines[index]) }
+        }
+      }
+    }
+    return parsed.compactMap { $0 }
   }
 }
 

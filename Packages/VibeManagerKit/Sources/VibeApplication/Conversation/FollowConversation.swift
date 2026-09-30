@@ -68,6 +68,8 @@ public actor FollowConversation {
     var agentID: String?
     /// Read again from its start: what was read stays shown until the new reading replaces it.
     var isRereading = false
+    /// The decoder of that new reading, until it caught up with the file.
+    var rereadDecoder: (any ConversationDecoding)?
 
     init(
       file: URL, agentID: String? = nil, makeDecoder: @escaping () -> any ConversationDecoding
@@ -183,8 +185,9 @@ public actor FollowConversation {
   /// Whether the session's agent runs, and since when. Its sub-agents that never said they ended
   /// are not followed while it does not, nor those started before it — by a process resumed since
   /// (#180): they will not end.
-  public func setAgentRunning(_ isRunning: Bool, since startedAt: Date? = nil, for session: SessionID)
-  {
+  public func setAgentRunning(
+    _ isRunning: Bool, since startedAt: Date? = nil, for session: SessionID
+  ) {
     // Running with no date says nothing of the date: one already known for this run is kept.
     let start =
       isRunning ? startedAt ?? (stoppedAgents.contains(session) ? nil : agentStarts[session]) : nil
@@ -364,6 +367,7 @@ public actor FollowConversation {
   private func restart(_ reading: Reading, key: UUID, follows: Bool) {
     reading.task?.cancel()
     reading.isRereading = true
+    reading.rereadDecoder = nil
     start(reading, key: key, live: follows)
   }
 
@@ -437,8 +441,9 @@ public actor FollowConversation {
           await self.received(chunk, file: file, generation: generation, key: key)
         }
       } else {
-        let lines = await tail.read(file)
-        await self?.received(.lines(lines), file: file, generation: generation, key: key)
+        let records = await tail.read(file)
+        await self?.received(
+          .records(records, isCaughtUp: true), file: file, generation: generation, key: key)
       }
     }
   }
@@ -451,16 +456,28 @@ public actor FollowConversation {
     else { return }
     switch chunk {
     case .reset:
-      if !reading.isRereading { reading.decoder = reading.makeDecoder() }
-    case .lines(let lines):
       if reading.isRereading {
-        // The whole file again, read apart before it replaces what was shown.
-        let decoder = reading.makeDecoder()
-        for line in lines { decoder.consume(line) }
-        reading.decoder = decoder
-        reading.isRereading = false
+        reading.rereadDecoder = nil
       } else {
-        for line in lines { reading.decoder.consume(line) }
+        reading.decoder = reading.makeDecoder()
+      }
+    case .records(let records, let isCaughtUp):
+      Signposts.interval("conversation.decode") {
+        if reading.isRereading {
+          // The whole file again, read apart — a chunk at a time — before it replaces what was
+          // shown.
+          let decoder = reading.rereadDecoder ?? reading.makeDecoder()
+          for record in records { decoder.consume(record) }
+          if isCaughtUp {
+            reading.decoder = decoder
+            reading.rereadDecoder = nil
+            reading.isRereading = false
+          } else {
+            reading.rereadDecoder = decoder
+          }
+        } else {
+          for record in records { reading.decoder.consume(record) }
+        }
       }
       reading.hasLoaded = true
     }

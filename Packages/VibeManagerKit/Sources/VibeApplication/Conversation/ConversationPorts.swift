@@ -51,10 +51,38 @@ extension AgentConversationReporting {
 /// Stateful — a result names the call it answers, which came lines earlier — and used by one
 /// reader at a time, so it is a class rather than a value.
 public protocol ConversationDecoding: AnyObject {
-  /// One complete line, in the order the CLI wrote it.
-  func consume(_ line: Data)
+  /// One complete line, parsed, in the order the CLI wrote it.
+  func consume(_ record: TranscriptRecord)
   /// Everything read so far, in the order it happened.
   var entries: [ConversationEntry] { get }
+}
+
+extension ConversationDecoding {
+  /// One complete line, parsed here: for one-off readers and tests. A line that is not a JSON
+  /// object is left out.
+  public func consume(_ line: Data) {
+    TranscriptRecord(line: line).map(consume)
+  }
+}
+
+/// One line of a transcript, parsed ahead of its decoder, off the actor that decodes it (#249).
+///
+/// `JSONSerialization` without `.mutableContainers` hands out immutable containers: read from any
+/// task, they are never written — hence the unchecked conformance. Keep it that way.
+public struct TranscriptRecord: @unchecked Sendable {
+  public let object: [String: Any]
+
+  public init(_ object: [String: Any]) {
+    self.object = object
+  }
+
+  /// The line parsed, or nil when it is not a JSON object.
+  public init?(line: Data) {
+    guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+      return nil
+    }
+    self.object = object
+  }
 }
 
 /// How the text of a prompt reaches the agent's input.
@@ -169,10 +197,12 @@ public protocol TranscriptTailing: Sendable {
   /// file was replaced or cut short: what was read from it is to be forgotten.
   func follow(_ file: URL) -> AsyncStream<TranscriptChunk>
   /// Reads the file once to its end, without following it.
-  func read(_ file: URL) async -> [Data]
+  func read(_ file: URL) async -> [TranscriptRecord]
 }
 
 public enum TranscriptChunk: Sendable {
-  case lines([Data])
+  /// Complete lines, parsed, in the order of the file; lines that are not JSON objects are left
+  /// out. `isCaughtUp` says the file held nothing more once they were read.
+  case records([TranscriptRecord], isCaughtUp: Bool)
   case reset
 }
