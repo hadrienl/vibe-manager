@@ -62,7 +62,9 @@ public struct ClaudeCodeTranscriptWatcher: ClaudeCodeTranscriptWatching {
       let now = ContinuousClock.now
       guard now < deadline else { return false }
       do {
-        try await Task.sleep(for: min(interval(after: now - start), deadline - now))
+        // Nothing hangs on the exact moment: the system may group this wake with others.
+        let pause = min(interval(after: now - start), deadline - now)
+        try await Task.sleep(for: pause, tolerance: pause / 2)
       } catch {
         return false
       }

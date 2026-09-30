@@ -14,6 +14,7 @@ struct SessionContextInspector: View {
   private let session: WorkSession
   private let resolution: SessionAgentResolution?
   private let branchReport: SessionBranchReport?
+  private let branchReportCheckedAt: (() -> Date?)?
   private let repositoryStatuses: [String: RepositoryStatusState]
   private let sessionNames: [SessionID: String]
   private let refreshBranches: (() -> Void)?
@@ -32,6 +33,7 @@ struct SessionContextInspector: View {
     session: WorkSession,
     resolution: SessionAgentResolution?,
     branchReport: SessionBranchReport? = nil,
+    branchReportCheckedAt: (() -> Date?)? = nil,
     repositoryStatuses: [RepositoryStatusKey: RepositoryStatusState] = [:],
     sessionNames: [SessionID: String] = [:],
     refreshBranches: (() -> Void)? = nil,
@@ -54,6 +56,7 @@ struct SessionContextInspector: View {
     self.usage = usage
     self.resolution = resolution
     self.branchReport = branchReport
+    self.branchReportCheckedAt = branchReportCheckedAt
     var byPath: [String: RepositoryStatusState] = [:]
     for (key, state) in repositoryStatuses where key.sessionID == session.id {
       byPath[key.repositoryPath] = state
@@ -124,7 +127,8 @@ extension SessionContextInspector {
           sessionNames: sessionNames, git: git)),
       accessory: AnyView(
         GitAccessory(
-          branchReport: branchReport, statuses: repositoryStatuses, refresh: refreshBranches)
+          branchReport: branchReport, checkedAt: branchReportCheckedAt,
+          statuses: repositoryStatuses, refresh: refreshBranches)
       ),
       content: AnyView(
         GitPane(
@@ -307,6 +311,8 @@ private struct GitSummary: View {
 /// Whether the Git list is live or how old it is, and the button that reads it again.
 private struct GitAccessory: View {
   let branchReport: SessionBranchReport?
+  /// Read here rather than by the inspector: it moves at every reading, the report does not.
+  let checkedAt: (() -> Date?)?
   let statuses: [String: RepositoryStatusState]
   let refresh: (() -> Void)?
 
@@ -323,7 +329,7 @@ private struct GitAccessory: View {
       } else if let branchReport {
         // The age is said, never implied: this is what was read, not a live view.
         TimelineView(.periodic(from: .now, by: 10)) { context in
-          Text(age(of: branchReport.readAt, at: context.date))
+          Text(age(of: checkedAt?() ?? branchReport.readAt, at: context.date))
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .lineLimit(1)
@@ -558,20 +564,23 @@ private struct GitPane: View {
 
 }
 
+/// A check, not a reading: the report is read again only when the disk moved, and checked at
+/// every reading.
 private func age(of date: Date, at now: Date) -> String {
   let seconds = max(0, Int(now.timeIntervalSince(date)))
   if seconds < 10 {
     return String(
-      localized: "read just now", bundle: .module, comment: "When the Git list was read.")
+      localized: "checked just now", bundle: .module,
+      comment: "When the Git list was last checked against the disk.")
   }
   if seconds < 60 {
     return String(
-      localized: "read \(seconds / 10 * 10) s ago", bundle: .module,
-      comment: "When the Git list was read: a number of seconds.")
+      localized: "checked \(seconds / 10 * 10) s ago", bundle: .module,
+      comment: "When the Git list was last checked against the disk: a number of seconds.")
   }
   return String(
-    localized: "read at \(date.formatted(date: .omitted, time: .shortened))", bundle: .module,
-    comment: "When the Git list was read: a time of day.")
+    localized: "checked at \(date.formatted(date: .omitted, time: .shortened))", bundle: .module,
+    comment: "When the Git list was last checked against the disk: a time of day.")
 }
 
 /// One repository: its header, then its lists. Equatable on what it draws, so that a selection

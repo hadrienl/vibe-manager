@@ -309,6 +309,17 @@ public actor RepositoryStatusMonitor {
     }
   }
 
+  /// The last status read of a repository of the session on screen, while it is watched and its
+  /// last reading held: the branch report takes its uncommitted work from it rather than run a
+  /// second `git status` on the same repository.
+  public func knownStatus(of session: SessionID, atPath root: String) -> WorkingTreeStatus? {
+    guard self.session?.id == session,
+      let watched = repositories[root] ?? repositories[CanonicalPath.of(root)],
+      watched.phase == .fresh
+    else { return nil }
+    return watched.lastValid
+  }
+
   /// Stops watching for good, and closes `updates`.
   public func stop() {
     isStopped = true

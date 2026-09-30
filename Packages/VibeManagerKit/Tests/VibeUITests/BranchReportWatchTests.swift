@@ -81,6 +81,28 @@ struct BranchReportWatchTests {
     await model.stopWatchingRepositories()
   }
 
+  @Test("A reading that finds nothing new runs no Git and leaves the report as it was")
+  func nothingNew() async throws {
+    let reader = CountingReader(fingerprinted: true)
+    let model = makeModel(reader: reader)
+    await model.load()
+    model.select(api.id)
+    await model.refreshBranchReport()
+    let report = try #require(model.branchReport(for: api.id))
+    let reads = await reader.reads(of: "/work/api")
+
+    // The agent writing: the transcript grows, and the report is read again each time.
+    for _ in 0..<20 { await model.readBranches(of: api.id) }
+
+    #expect(await reader.reads(of: "/work/api") == reads)
+    #expect(model.branchReport(for: api.id)?.readAt == report.readAt)
+    #expect(try #require(model.branchReportCheckedAt(for: api.id)) >= report.readAt)
+
+    // Asked for by the user: everything is read again.
+    await model.refreshBranchReport()
+    #expect(await reader.reads(of: "/work/api") == reads + 1)
+  }
+
   @Test("Without Git there is no report at all")
   func noReportWithoutGit() async {
     let model = AppModel(repository: WatchRepository(values: [api]))
@@ -153,6 +175,15 @@ struct RepositoryStatusPresentationTests {
 
 private actor CountingReader: RepositoryActivityReading {
   private var counts: [String: Int] = [:]
+  private let fingerprinted: Bool
+
+  init(fingerprinted: Bool = false) {
+    self.fingerprinted = fingerprinted
+  }
+
+  func referenceFingerprint(atPath path: String) -> ReferenceFingerprint? {
+    fingerprinted ? ReferenceFingerprint(stamps: [:]) : nil
+  }
 
   func reads(of path: String) -> Int { counts[path] ?? 0 }
 

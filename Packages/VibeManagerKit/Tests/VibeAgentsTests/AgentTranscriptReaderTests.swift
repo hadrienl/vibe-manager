@@ -172,4 +172,92 @@ struct AgentTranscriptReaderTests {
     #expect(activity.workingDirectories == ["/Users/a/Projects/api", "/Users/a/Projects/web"])
     #expect(await reader.transcriptDirectories(for: switched) == [projects.path, sessions.path])
   }
+
+  @Test("Claude Code: once found, the projects are not listed again, but new sub-agents are seen")
+  func claudeFilesRemembered() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identifier = "7d1e4b5a-0000-4000-8000-000000000001"
+    let projects = root.appendingPathComponent("projects")
+    let folder = projects.appendingPathComponent("-Users-a-api", isDirectory: true)
+    let subagents = folder.appendingPathComponent("\(identifier)/subagents", isDirectory: true)
+    try FileManager.default.createDirectory(at: subagents, withIntermediateDirectories: true)
+    let main = folder.appendingPathComponent("\(identifier).jsonl")
+    try append([#"{"cwd":"/Users/a/api","message":{"content":[]}}"#], to: main)
+    let listings = ListingCounter()
+    // A still clock: a runner that stalls past `relistInterval` must not list the folders again.
+    let moment = Date()
+    let reader = AgentTranscriptReader(
+      claudeProjects: projects, codexSessions: root.appendingPathComponent("sessions"),
+      list: { listings.list($0) }, now: { moment })
+    let conversation = session(provider: "claude-code", identifier: identifier)
+
+    _ = await reader.activity(for: conversation)
+    for _ in 0..<10 { _ = await reader.activity(for: conversation) }
+    #expect(listings.count(of: projects) == 1)
+
+    try append(
+      [#"{"cwd":"/Users/a/lib","message":{"content":[]}}"#],
+      to: subagents.appendingPathComponent("agent-2.jsonl"))
+    let activity = try #require(await reader.activity(for: conversation))
+    #expect(activity.workingDirectories.contains("/Users/a/lib"))
+    #expect(listings.count(of: projects) == 1)
+
+    // Gone: every project folder is listed again.
+    try FileManager.default.removeItem(at: main)
+    _ = await reader.activity(for: conversation)
+    #expect(listings.count(of: projects) == 2)
+  }
+
+  @Test("Codex: once a rollout is found, only the recent days are listed again")
+  func codexFilesRemembered() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identifier = "01a0cd8c-0224-7721-8fff-000000000002"
+    let sessions = root.appendingPathComponent("sessions")
+    let parts = Calendar(identifier: .gregorian).dateComponents(in: .current, from: Date())
+    let day = sessions.appendingPathComponent(
+      String(format: "%04d/%02d/%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0),
+      isDirectory: true)
+    try FileManager.default.createDirectory(at: day, withIntermediateDirectories: true)
+    try append(
+      [#"{"type":"session_meta","payload":{"id":"x","cwd":"/Users/a/vibe"}}"#],
+      to: day.appendingPathComponent("rollout-2026-09-30T10-00-00-\(identifier).jsonl"))
+    let listings = ListingCounter()
+    let moment = Date()
+    let reader = AgentTranscriptReader(
+      claudeProjects: root.appendingPathComponent("projects"), codexSessions: sessions,
+      list: { listings.list($0) }, now: { moment })
+    // A session of sixty days: the first search walks every one of them.
+    let conversation = WorkSession(
+      name: "Session",
+      agent: SessionAgentConfiguration(providerID: "codex", resumeIdentifier: identifier),
+      createdAt: Date().addingTimeInterval(-60 * 86_400))
+
+    _ = await reader.activity(for: conversation)
+    let walked = listings.total
+    #expect(walked >= 60)
+
+    for _ in 0..<10 { _ = await reader.activity(for: conversation) }
+    // Yesterday and today, each time.
+    #expect(listings.total - walked <= 10 * 2)
+  }
+}
+
+/// Lists folders for real, and counts how often each was listed.
+private final class ListingCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var counts: [String: Int] = [:]
+
+  func list(_ folder: URL) -> [URL]? {
+    lock.withLock { counts[folder.standardizedFileURL.path, default: 0] += 1 }
+    return AgentTranscriptLocator.contents(of: folder)
+  }
+
+  func count(of folder: URL) -> Int {
+    lock.withLock { counts[folder.standardizedFileURL.path] ?? 0 }
+  }
+
+  var total: Int { lock.withLock { counts.values.reduce(0, +) } }
+
 }
