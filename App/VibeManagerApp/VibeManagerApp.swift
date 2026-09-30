@@ -655,14 +655,17 @@ private struct SessionHistoryCommands: Commands {
   @ViewBuilder
   private var archiveButtons: some View {
     if let plan = batchPlan(.archive) {
-      Button(model.batchTitle(for: plan)) { request(plan) }
-        .keyboardShortcut("a", modifiers: [.command, .control])
+      Button(model.batchTitle(for: plan)) {
+        guard !Self.isKeyRepeat else { return }
+        request(plan)
+      }
+      .keyboardShortcut("a", modifiers: [.command, .control])
     } else {
       // A session where nothing runs is archived at once, and the name says so: the ellipsis only
       // when a question follows (#115).
       let asks = model.selectedSession.map(model.archiveAsks) ?? false
       Button(asks ? LocalizedStringKey("Archive…") : LocalizedStringKey("Archive")) {
-        guard let session = model.selectedSession else { return }
+        guard !Self.isKeyRepeat, let session = model.selectedSession else { return }
         Task { await model.requestArchive(session.id) }
       }
       .keyboardShortcut("a", modifiers: [.command, .control])
@@ -680,6 +683,13 @@ private struct SessionHistoryCommands: Commands {
       .keyboardShortcut("a", modifiers: [.command, .control, .shift])
       .disabled(!(model.selectedSession.map(model.canRestore) ?? false))
     }
+  }
+
+  /// Whether the command comes from a key held down rather than pressed (#115). ⌃⌘A archives
+  /// without asking: held, it would empty a whole column before the key is let go. Each press
+  /// archives one session.
+  private static var isKeyRepeat: Bool {
+    NSApp.currentEvent.map { $0.type == .keyDown && $0.isARepeat } ?? false
   }
 
   /// The selection's plan for a command, when several sessions are selected and it applies to at

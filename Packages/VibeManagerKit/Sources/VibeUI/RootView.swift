@@ -571,30 +571,6 @@ public struct RootView: View {
     } message: { session in
       Text(closeConfirmationMessage(for: session))
     }
-    // A side terminal is closed at once, unless a command runs in its foreground (#43).
-    .confirmationDialog(
-      Text("Close this terminal?", bundle: .module),
-      isPresented: Binding(
-        get: { model.pendingTerminalClose != nil },
-        set: { isPresented in
-          guard !isPresented else { return }
-          model.cancelCloseDrawerTerminal()
-        }
-      ),
-      titleVisibility: .visible,
-      presenting: model.pendingTerminalClose
-    ) { pending in
-      Button(LocalizedStringResource("Close Terminal", bundle: .module), role: .destructive) {
-        model.confirmCloseDrawerTerminal(pending)
-      }
-      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
-        model.cancelCloseDrawerTerminal()
-      }
-    } message: { pending in
-      Text(
-        "“\(pending.command)” is still running in this terminal and will be stopped.",
-        bundle: .module, comment: "The argument is the command running in a side terminal.")
-    }
     // Closing several sessions asks #51's question once, with its "Don't ask again" (#77).
     .confirmationDialog(
       Text(verbatim: model.pendingBatch?.title ?? ""),
@@ -642,8 +618,8 @@ public struct RootView: View {
     } message: { session in
       Text(archiveConfirmationMessage(for: session))
     }
-    // Before the batch dialog in the chain: the toggle reaches every dialog it wraps, and a
-    // question about several sessions has no "Don't ask again" unless it is #51's.
+    // Before the side terminal's dialog and the other batch one in the chain: the toggle reaches
+    // every dialog it wraps, and a question has a "Don't ask again" only when it is #51's.
     .dialogSuppressionToggle(
       Text("Don’t ask again", bundle: .module), isSuppressed: $suppressesCloseConfirmation
     )
@@ -655,6 +631,31 @@ public struct RootView: View {
     }
     .onChange(of: model.pendingArchive?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
+    }
+    // A side terminal is closed at once, unless a command runs in its foreground (#43). After
+    // the suppression toggle: this question has no "Don't ask again" (#115).
+    .confirmationDialog(
+      Text("Close this terminal?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingTerminalClose != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelCloseDrawerTerminal()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingTerminalClose
+    ) { pending in
+      Button(LocalizedStringResource("Close Terminal", bundle: .module), role: .destructive) {
+        model.confirmCloseDrawerTerminal(pending)
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelCloseDrawerTerminal()
+      }
+    } message: { pending in
+      Text(
+        "“\(pending.command)” is still running in this terminal and will be stopped.",
+        bundle: .module, comment: "The argument is the command running in a side terminal.")
     }
     // Every other command on several sessions: one question, Cancel by default (#77).
     .confirmationDialog(
