@@ -1,0 +1,1 @@
+The `logs/` folder holds forty days of application logs. Which component logged the most ERROR lines, and how many ERROR lines are there in total, all components together? Do not change any file. Answer with the component's name and the total.
