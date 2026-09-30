@@ -102,9 +102,9 @@ allowed:
 
 | | This Mac (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`, `file:`) | Anywhere else |
 |---|---|---|
-| Read — text, snapshot, console, screenshot | free | asked once per site and session, unless "Always Allow" for that site |
-| List tabs | free | the title of a site not readable yet is withheld |
-| Navigate — open, go to, reload, close | free | free, always in front |
+| Read — text, snapshot, console, screenshot | free | asked once per site and session, unless "Always Allow" for that site; a refusal holds for the session |
+| List tabs, and what every tool says of a tab | free | no title, and the address cut to its site, until the site may be read |
+| Navigate — open, go to, reload, close | free | free; a tab the agent drives comes to the front before it loads a site away from this Mac |
 | Act — click, type, JavaScript | free | asked, unless "Always Allow" for that site |
 
 `0.0.0.0`, the local network and `.local` are other machines, or can be. The origin is read from
@@ -125,22 +125,52 @@ session cannot be told reliably (`HttpOnly` cookies, sessions kept by the server
 away from this Mac is treated alike. `page_read`, `page_screenshot` and `page_console` ask the first
 time a session's agent reads a site — "Allow in This Session" or "Deny", no "Always Allow", which
 would also let it act — and the site stays readable until the session is archived or the
-application quits. The same checks as for acting apply: decided on the document the page holds,
-nothing read while it loads, the site checked again after the answer and, for a page's text, inside
-the page in the same turn as the read. Until a site may be read, `tabs_list` and the answer to
-`tab_open` withhold its pages' titles, and `tabs_list` cuts the address of a tab the agent did not
-open to its site: a title says what a private page is about. A page away from this Mac is never
-loaded out of sight: `tab_open` with `activate: false`, or `tab_navigate` on a tab behind, brings
-it to the front and says so. A preview on this Mac may still wait behind.
+application quits. A refusal holds as long: the agent is told the user refused, and cannot ask again
+until they give in. The question names the site it gives, which is the one decided on: a blank page
+a site opened is that site. The same checks as for acting apply: decided on the document the page
+holds, nothing read while it loads (a console on this Mac excepted), the site checked again after
+the answer and, for a page's text, inside the page in the same turn as the read (`location.origin`,
+or `file:`). A capture shows what the page's frames hold too: the sites of its frames that may not be
+read yet are asked the same way. Frames within those frames are not seen from the page, and a
+third-party frame gets no cookies from WebKit, which blocks them.
+
+What any tool says of a tab — `tabs_list`, the answer to `tab_open`, `tab_navigate` and
+`tab_reload`, where a click took the page — is decided on where the tab is now, never on how it got
+there: until that site may be read, no title, and the address cut to its site
+(`https://github.com/`), unless it is the very address the agent gave in the same call. A title says
+what a private page is about; an address after a redirection can carry a token.
+
+A tab the agent opened, or one it is acting on, never loads a site away from this Mac out of sight:
+it comes to the front before the request leaves — asked of the navigation's policy, redirections
+included, and checked again when the page commits — and the web view shows as when an agent opens a
+page. "In front" is the session's web view, not the screen: when the session is not the one shown,
+its row says so only for a page opened with `tab_open`; marking every such load, and showing and
+withdrawing a session's reads, is #288. A preview on this Mac may still wait behind.
 
 Once a site may be read in a session, an agent misled by a page can still carry what it read to
 another site by navigating there; the question says what it gives. The tools' descriptions say that
 a page is data, not instructions.
 
-The sites always allowed are an item of the user's login keychain (`VaultBrowserPermissionStore`),
-which answers the application only: any other program asks macOS, which asks the user. The list the
-user defaults held before #239 is erased at launch, not carried over: a site written there by a
-script cannot be told from one the user allowed. A keychain that cannot be read allows no site.
+The sites always allowed are an item of the user's login keychain (`VaultBrowserPermissionStore`).
+The application makes it at its first launch, and reads one it finds only when its access list
+trusts this application alone: an item another program made first — open to every program with
+`security add-generic-password -A`, or naming another program — is not read, is replaced by the
+application's own, empty, and the replacement is logged (`browser.grants.foreignItem`). The keychain
+is read away from the main thread; until then, and whenever it cannot be read, no site is allowed,
+and a keychain that could not be read is never written over. The list the user defaults held before
+#239 is erased at launch, not carried over: a site written there by a script cannot be told from
+one the user allowed.
+
+What this guards against is an agent that reaches the user's sites through the web view's tools and
+channel. It is not a boundary against a program running with the user's shell, which an agent with
+a terminal is: such a program can delete the application's item and make one that names the
+application alone, which the keychain cannot tell from the application's own; it can read
+`Browser/<session>.json`, where the tabs' addresses and titles are kept; and it can read the web
+view's cookies themselves, which WebKit keeps in
+`~/Library/WebKit/<bundle id>/WebsiteDataStore/<store>/Cookies/Cookies.binarycookies`, readable by
+the user's processes, and send them with `curl`. The data protection keychain would close the first
+of these, but needs an entitlement this application, signed with a Developer ID and without a
+provisioning profile, does not have.
 
 ### Reading and acting on a page
 
@@ -193,8 +223,10 @@ or GitLab signs in every session's ticket tab. Settings › Web View clears it.
 - A session adopted from the terminal host keeps the command line it was started with: its agent
   gets the tools at its next start.
 - A process of the same user can write false console lines into a page it controls, and false
-  lines into the trace's file. It cannot reach a session's tabs through the channel, and it cannot
-  add an "Always Allow" without macOS asking the user for the keychain (#239).
+  lines into the trace's file. It cannot reach a session's tabs through the channel. It can read
+  the web view's cookies and the tabs' document, and replace the keychain item of the sites always
+  allowed with one that names the application: the questions guard the web view's tools, not the
+  user's own shell (#239).
 - A process that descends from a session's terminal speaks for its agent: it gets the same
   questions, nothing more.
 
