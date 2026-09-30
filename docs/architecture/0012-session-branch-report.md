@@ -61,8 +61,24 @@ went into is said by the transcript.
   `GIT_OPTIONAL_LOCKS=0`: reading again and again a repository an agent commits in must never take
   its `index.lock`. A branch whose reflog file was not written since the session started is not
   read at all.
-- The report carries the time it was read, and the inspector says it ("read 20 s ago") rather than
-  pass it off as live.
+- **Git runs only when an answer may have changed** (#252). The transcript grows many times a
+  second while the agent writes, and each growth asks for the report, at most once a second; most
+  of those readings find what the last one found. So each input has its own sign of change:
+  - the branches — what is checked out, how it moved — are read again only when the
+    fingerprint of the references changed: `stat` of `HEAD`, `logs/HEAD`, `packed-refs`, the
+    reftable and each file under `refs/heads` and `logs/refs/heads`, compared for equality. The
+    fingerprint is the proof, the file system's events stay the trigger: it costs about a
+    millisecond, and holds for a repository nobody watches or an event that was lost;
+  - uncommitted work comes from the status the monitor of ADR 0013 already keeps for the
+    repositories it watches: one `git status` for both. A repository only visited, which the
+    monitor does not watch, gets a status of its own at most every 30 seconds;
+  - the transcript files, once found, are not searched for again in every project folder.
+
+  A reading asked for by a gesture — the refresh button, coming back to the application, the agent
+  stopping — trusts none of it and reads everything again.
+- The report carries the time it was last checked, and the inspector says it ("checked 20 s ago")
+  rather than pass it off as live. A reading that found nothing new moves only that time: the
+  report itself is published again only when what it says changed.
 
 ### Presentation
 
