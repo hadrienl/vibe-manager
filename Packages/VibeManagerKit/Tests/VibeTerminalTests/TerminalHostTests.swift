@@ -121,7 +121,7 @@ actor Transcript {
     switch event {
     case .output(let chunk): bytes.append(contentsOf: chunk)
     case .stateChanged(let state): self.state = state
-    case .historyTruncated: break
+    case .historyTruncated, .outputPulse: break
     }
   }
 

@@ -78,10 +78,16 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   }
 
   public func attach() -> TerminalAttachment {
-    attach(.everything)
+    subscribe(.everything)
   }
 
-  public func attach(_ interest: TerminalEventInterest) -> TerminalAttachment {
+  // Declared `async`, as the requirement is: a synchronous one would lose to the relay the
+  // protocol's extension offers stand-ins, wherever the caller awaits.
+  public func attach(_ interest: TerminalEventInterest) async -> TerminalAttachment {
+    subscribe(interest)
+  }
+
+  private func subscribe(_ interest: TerminalEventInterest) -> TerminalAttachment {
     let events = subscribers.add(interest, hasEnded: hasEnded) { [weak self] subscriberID in
       guard let self else { return }
       Task { await self.removeSubscriber(subscriberID) }
@@ -89,7 +95,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     return TerminalAttachment(state: currentState, history: historyBuffer.snapshot, events: events)
   }
 
-  public func lastOutputAt() -> ContinuousClock.Instant? {
+  public func lastOutputAt() async -> ContinuousClock.Instant? {
     subscribers.lastOutputAt
   }
 

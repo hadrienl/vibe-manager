@@ -77,7 +77,7 @@ func runToCompletion(
       outcome.bytes.append(contentsOf: chunk)
     case .stateChanged(let state):
       outcome.state = state
-    case .historyTruncated:
+    case .historyTruncated, .outputPulse:
       break
     }
   }
@@ -116,7 +116,7 @@ actor TerminalObserver {
       bytes.append(contentsOf: chunk)
     case .stateChanged(let state):
       lastState = state
-    case .historyTruncated:
+    case .historyTruncated, .outputPulse:
       break
     }
   }

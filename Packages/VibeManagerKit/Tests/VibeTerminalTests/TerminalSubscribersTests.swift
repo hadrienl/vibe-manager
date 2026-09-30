@@ -167,6 +167,8 @@ struct TerminalSessionInterestTests {
 
     #expect(events.allSatisfy { if case .stateChanged = $0 { true } else { false } })
     #expect(events.last == .stateChanged(.exited(code: 0)))
+    let historyCount = await session.history().bytes.count
+    #expect(historyCount > 0)
     #expect(await session.lastOutputAt() != nil)
     let history = await session.history()
     #expect(history.endOffset == history.bytes.count + history.startOffset)
