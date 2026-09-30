@@ -53,6 +53,25 @@ struct SessionHistoryTests {
     )
   }
 
+  /// A workspace whose sessions all have their agent running.
+  private func running(
+    _ sessions: [WorkSession],
+    preferences: InMemorySessionClosePreferences = InMemorySessionClosePreferences()
+  ) async -> (AppModel, SessionLauncher, SpySupervisor, MutableRepository) {
+    let repository = MutableRepository(sessions: sessions)
+    let supervisor = SpySupervisor()
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(
+      repository: repository, agents: EmptyRegistry(), launcher: launcher,
+      closePreferences: preferences)
+    await model.load()
+    for session in sessions {
+      await launcher.launch(session: session, plan: plan())
+    }
+    await model.reload()
+    return (model, launcher, supervisor, repository)
+  }
+
   // MARK: - The runtime
 
   @Test("Closing stops the process and keeps the pane readable")
@@ -189,13 +208,7 @@ struct SessionHistoryTests {
   @Test("Archiving a session whose agent runs is confirmed before it happens")
   func archivingARunningAgentAsksFirst() async {
     let stored = session(status: .active)
-    let repository = MutableRepository(sessions: [stored])
-    let supervisor = SpySupervisor()
-    let launcher = launcher(supervisor: supervisor, repository: repository)
-    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
-    await model.load()
-    await launcher.launch(session: stored, plan: plan())
-    await model.reload()
+    let (model, launcher, supervisor, _) = await running([stored])
 
     #expect(model.archiveAsks(stored))
     await model.requestArchive(stored.id)
@@ -213,13 +226,7 @@ struct SessionHistoryTests {
   @Test("Confirming archives the session even though the dialog has already been dismissed")
   func confirmingDoesNotDependOnThePendingSession() async {
     let stored = session(status: .active)
-    let repository = MutableRepository(sessions: [stored])
-    let supervisor = SpySupervisor()
-    let launcher = launcher(supervisor: supervisor, repository: repository)
-    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
-    await model.load()
-    await launcher.launch(session: stored, plan: plan())
-    await model.reload()
+    let (model, launcher, _, repository) = await running([stored])
 
     await model.requestArchive(stored.id)
     model.cancelArchive()
@@ -234,17 +241,8 @@ struct SessionHistoryTests {
   func archiveDontAskAgainIsShared() async {
     let first = session(name: "First", status: .active)
     let second = session(name: "Second", status: .active)
-    let repository = MutableRepository(sessions: [first, second])
-    let supervisor = SpySupervisor()
-    let launcher = launcher(supervisor: supervisor, repository: repository)
     let preferences = InMemorySessionClosePreferences()
-    let model = AppModel(
-      repository: repository, agents: EmptyRegistry(), launcher: launcher,
-      closePreferences: preferences)
-    await model.load()
-    await launcher.launch(session: first, plan: plan())
-    await launcher.launch(session: second, plan: plan())
-    await model.reload()
+    let (model, launcher, _, _) = await running([first, second], preferences: preferences)
 
     await model.requestArchive(first.id)
     await model.archive(first.id, askAgain: false)
