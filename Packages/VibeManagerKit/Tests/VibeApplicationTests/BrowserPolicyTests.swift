@@ -127,6 +127,9 @@ struct BrowserChannelAuthorizerTests {
     ]
   }
 
+  /// Kept by choice (#239, ADR 0023): `vibe browser`, `BROWSER` and a script the agent runs speak
+  /// for the session, and a script could start the signed bridge itself anyway. What guards the
+  /// user is the question before reading or acting on a signed-in site, not who asks.
   @Test("The agent's child and grandchild belong to its session")
   func descendants() {
     let bridge = [entry(101, parent: 100, at: 11), entry(100, parent: 50, at: 10)]
