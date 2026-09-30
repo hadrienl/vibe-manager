@@ -3,7 +3,7 @@ import VibeApplication
 
 // Presentation of one terminal: the surface itself plus a readable lifecycle state. The view
 // knows nothing of process identifiers or descriptors.
-public struct TerminalPaneView: View {
+public struct TerminalPaneView<Accessory: View>: View {
   /// Held, not stored in `@State`: `@State` keeps the value it was first given for as long as
   /// the view keeps its identity, so showing another session's pane in the same place went on
   /// displaying the first one. The model is an observable reference owned elsewhere.
@@ -17,7 +17,9 @@ public struct TerminalPaneView: View {
   /// False for a side terminal of the drawer (#43): its tab carries its state.
   private let showsStatusBar: Bool
   /// Shown in the status bar before its own button: the drawer's button, for the agent's terminal.
-  private let statusAccessory: AnyView?
+  /// A type of its own rather than an `AnyView`, which never compares equal to the last one: the
+  /// pane would be evaluated again each time the window is (#254).
+  private let statusAccessory: Accessory?
   /// See `TerminalSurface.claimsKeyboardOnActivation`.
   private let claimsKeyboardOnActivation: Bool
   /// See `TerminalStatusBar.restart`.
@@ -28,7 +30,7 @@ public struct TerminalPaneView: View {
   public init(
     model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
     accessibilityTitle: String? = nil, showsStatusBar: Bool = true,
-    statusAccessory: AnyView? = nil, claimsKeyboardOnActivation: Bool = true,
+    statusAccessory: Accessory?, claimsKeyboardOnActivation: Bool = true,
     restart: (() -> Void)? = nil, canRestart: Bool = true
   ) {
     self.model = model
@@ -74,6 +76,10 @@ public struct TerminalPaneView: View {
           ProgressView {
             Text("Starting terminal…", bundle: .module)
           }
+        } else if model.isCatchingUp {
+          ProgressView {
+            Text("Updating the terminal…", bundle: .module)
+          }
         }
       }
 
@@ -92,9 +98,9 @@ public struct TerminalPaneView: View {
 
 /// The foot of a session's terminal: its process's state, Stop or Restart, and what the app puts
 /// beside them. Also under the conversation view, which shows the same session in another form.
-public struct TerminalStatusBar: View {
+public struct TerminalStatusBar<Accessory: View>: View {
   private let pane: TerminalPaneModel
-  private let accessory: AnyView?
+  private let accessory: Accessory?
   /// What Restart does. Left out, the pane starts its process again exactly as it was launched.
   /// An agent's terminal must not (#138): its command line names a conversation that exists by
   /// now — `claude --session-id` then refuses it as already in use — and nothing the app watches
@@ -105,7 +111,7 @@ public struct TerminalStatusBar: View {
   private let canRestart: Bool
 
   public init(
-    pane: TerminalPaneModel, accessory: AnyView? = nil, restart: (() -> Void)? = nil,
+    pane: TerminalPaneModel, accessory: Accessory?, restart: (() -> Void)? = nil,
     canRestart: Bool = true
   ) {
     self.pane = pane
@@ -152,6 +158,29 @@ public struct TerminalStatusBar: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
+  }
+}
+
+extension TerminalPaneView where Accessory == EmptyView {
+  /// A pane with nothing beside its status bar's button: a side terminal of the drawer.
+  public init(
+    model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
+    accessibilityTitle: String? = nil, showsStatusBar: Bool = true,
+    claimsKeyboardOnActivation: Bool = true, restart: (() -> Void)? = nil, canRestart: Bool = true
+  ) {
+    self.init(
+      model: model, autoStart: autoStart, isActive: isActive,
+      accessibilityTitle: accessibilityTitle, showsStatusBar: showsStatusBar,
+      statusAccessory: nil, claimsKeyboardOnActivation: claimsKeyboardOnActivation,
+      restart: restart, canRestart: canRestart)
+  }
+}
+
+extension TerminalStatusBar where Accessory == EmptyView {
+  public init(
+    pane: TerminalPaneModel, restart: (() -> Void)? = nil, canRestart: Bool = true
+  ) {
+    self.init(pane: pane, accessory: nil, restart: restart, canRestart: canRestart)
   }
 }
 

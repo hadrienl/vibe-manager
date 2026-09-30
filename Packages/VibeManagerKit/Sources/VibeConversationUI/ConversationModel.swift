@@ -132,6 +132,64 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   }
 }
 
+/// What confirms the echoes: the prompts of the conversation and its shell commands, counted
+/// again only among the entries that changed (#250).
+struct EchoTallies {
+  private(set) var promptIndices: [Int] = []
+  private(set) var commands: [(index: Int, command: String)] = []
+
+  mutating func update(_ entries: [ConversationEntry], changedFrom from: Int) {
+    while let last = promptIndices.last, last >= from { promptIndices.removeLast() }
+    while let last = commands.last, last.index >= from { commands.removeLast() }
+    for index in entries.indices.dropFirst(from) {
+      let entry = entries[index]
+      if entry.isUserPrompt { promptIndices.append(index) }
+      if let run = entry.shellRun { commands.append((index, run.command)) }
+    }
+  }
+
+  /// The prompts of the conversation, or its shell commands: what confirms an echo of that kind.
+  func count(of kind: PromptKind) -> Int {
+    kind.isShell ? commands.count : promptIndices.count
+  }
+}
+
+/// The blocks the accessibility rotors go through, by their place among the blocks: brought up to
+/// date with them, rather than looked for among thousands at each drawing (#250).
+public struct ConversationRotor: Equatable, Sendable {
+  public private(set) var prompts: [Int] = []
+  public private(set) var failures: [Int] = []
+  public private(set) var subagents: [Int] = []
+
+  mutating func update(_ blocks: [ConversationBlock], from start: Int) {
+    for keyPath in [\Self.prompts, \Self.failures, \Self.subagents] {
+      while let last = self[keyPath: keyPath].last, last >= start {
+        self[keyPath: keyPath].removeLast()
+      }
+    }
+    for index in blocks.indices.dropFirst(start) {
+      let block = blocks[index]
+      if Self.isPrompt(block) { prompts.append(index) }
+      if Self.isFailure(block) { failures.append(index) }
+      if Self.holdsSubagents(block) { subagents.append(index) }
+    }
+  }
+
+  static func isPrompt(_ block: ConversationBlock) -> Bool {
+    if case .entry(let entry) = block { return entry.isUserPrompt }
+    return false
+  }
+
+  static func holdsSubagents(_ block: ConversationBlock) -> Bool {
+    block.calls.contains { $0.kind == .subagent }
+  }
+
+  static func isFailure(_ block: ConversationBlock) -> Bool {
+    if case .failed = block.toolState { return true }
+    return false
+  }
+}
+
 /// One session's conversation view: what it shows, and what its composer sends (#38).
 @MainActor
 @Observable
@@ -139,6 +197,11 @@ public final class ConversationModel {
   public let sessionID: SessionID
   public private(set) var snapshot = ConversationSnapshot(availability: .loading)
   public private(set) var blocks: [ConversationBlock] = []
+  /// The blocks of the accessibility rotors.
+  public private(set) var rotor = ConversationRotor()
+  public var promptBlocks: [ConversationBlock] { rotor.prompts.map { blocks[$0] } }
+  public var failureBlocks: [ConversationBlock] { rotor.failures.map { blocks[$0] } }
+  public var subagentBlocks: [ConversationBlock] { rotor.subagents.map { blocks[$0] } }
   public private(set) var scroll = ConversationScrollState()
   /// Bumped when the view should scroll to the end: a counter, so that twice in a row still moves.
   public private(set) var scrollToBottomRequest = 0
@@ -148,7 +211,7 @@ public final class ConversationModel {
   @ObservationIgnored private var repositioning = false
 
   public var activity: AgentActivity? {
-    didSet { if activity != oldValue { rebuild() } }
+    didSet { if activity != oldValue { rebuild(changedFrom: nil) } }
   }
   /// Whether the agent has said it is ready for a prompt. Until its hooks speak, a CLI may still
   /// show a screen of its own — an update offer, a folder to trust — where the Return that sends a
@@ -165,7 +228,7 @@ public final class ConversationModel {
       if appearance.groupsToolCalls != oldValue.groupsToolCalls
         || appearance.showsReasoning != oldValue.showsReasoning
       {
-        rebuild()
+        rebuild(changedFrom: 0)
       }
     }
   }
@@ -229,7 +292,9 @@ public final class ConversationModel {
   /// Reads the stream of a `FollowConversation` until it ends or the model is released.
   public func follow(_ snapshots: AsyncStream<ConversationSnapshot>) {
     followTask?.cancel()
-    isRereading = snapshot.availability != .loading
+    isRereading = latestSnapshot.availability != .loading
+    // A new stream counts its publications from the start: none says what changed since ours.
+    lastRevision = nil
     followTask = Task { [weak self] in
       for await snapshot in snapshots {
         self?.received(snapshot)
@@ -239,10 +304,57 @@ public final class ConversationModel {
 
   func received(_ snapshot: ConversationSnapshot) {
     if isRereading {
-      guard snapshot.availability != .loading else { return }
+      guard snapshot.availability != .loading else {
+        // Passed over: the next one's changes are counted from this one, never seen here.
+        lastRevision = nil
+        return
+      }
       isRereading = false
     }
     apply(snapshot)
+  }
+
+  // MARK: - On screen or not (#250)
+
+  /// Whether the conversation is on screen. Hidden, what arrives is kept and nothing is laid out:
+  /// only the echoes are confirmed, so that a prompt sent just before switching sessions is not
+  /// said lost for nobody having looked.
+  @ObservationIgnored public private(set) var isShown = true
+  /// Grows at each change of `isShown`, handed to `shownChanged` with it. Shared by every model: a
+  /// model made again for a session speaks after the one let go of.
+  @ObservationIgnored public private(set) var shownOrder = ConversationModel.nextShownOrder()
+  private static var lastShownOrder = 0
+  private static func nextShownOrder() -> Int {
+    lastShownOrder += 1
+    return lastShownOrder
+  }
+  /// Tells the reader, which publishes less often what nobody sees.
+  @ObservationIgnored public var shownChanged: ((_ isShown: Bool, _ order: Int) -> Void)?
+  /// The last snapshot received while hidden, laid out once shown.
+  @ObservationIgnored private var heldSnapshot: ConversationSnapshot?
+
+  /// The snapshot most recently received, laid out or not.
+  private var latestSnapshot: ConversationSnapshot { heldSnapshot ?? snapshot }
+
+  public func setShown(_ shown: Bool) {
+    guard shown != isShown else { return }
+    isShown = shown
+    shownOrder = Self.nextShownOrder()
+    shownChanged?(shown, shownOrder)
+    guard shown else { return }
+    if let held = heldSnapshot {
+      heldSnapshot = nil
+      snapshot = held
+    }
+    // Sub-agents that ended while nobody looked leave the bar at once, as they would have done
+    // by now on screen.
+    if let pending = pendingLayout {
+      pendingLayout = (pending.changedFrom, false)
+      layOut()
+    } else {
+      updateTray(lingers: false)
+    }
+    showNewImages()
   }
 
   /// Stops reading the transcripts, and keeps what was read: shown at once when the session comes
@@ -260,15 +372,32 @@ public final class ConversationModel {
   }
 
   public func apply(_ snapshot: ConversationSnapshot) {
-    self.snapshot = snapshot
+    // Changed from where the reader says, when this follows the last one received; otherwise
+    // from the start, which is never wrong (#250).
+    let changedFrom =
+      lastRevision.map { snapshot.revision == $0 + 1 } == true ? snapshot.unchangedPrefix : 0
+    lastRevision = snapshot.revision
+    echoTallies.update(snapshot.entries, changedFrom: changedFrom)
     confirmEchoes()
-    rebuild()
+    imagesChangedFrom = min(imagesChangedFrom ?? .max, changedFrom)
+    guard isShown else {
+      heldSnapshot = snapshot
+      rebuild(changedFrom: changedFrom)
+      Signposts.signposter.emitEvent("conversation.hiddenSnapshot")
+      return
+    }
+    self.snapshot = snapshot
+    rebuild(changedFrom: changedFrom)
     showNewImages()
   }
 
   private func showNewImages() {
-    guard snapshot.availability != .loading else { return }
-    let images = snapshot.entries.compactMap { entry -> (String, URL)? in
+    guard snapshot.availability != .loading, let changedFrom = imagesChangedFrom else { return }
+    imagesChangedFrom = nil
+    // Only those among the entries that changed: the others were looked at already.
+    let entries = snapshot.entries
+    let start = knownImages == nil ? 0 : min(changedFrom, entries.count)
+    let images = entries[start...].compactMap { entry -> (String, URL)? in
       entry.toolCall?.producedImage.map { (entry.id, $0) }
     }
     guard let known = knownImages else {
@@ -281,40 +410,182 @@ public final class ConversationModel {
     knownImages = known.union(images.map(\.0))
   }
 
-  private func rebuild(lingers: Bool = true) {
-    var entries = ConversationEntry.markingPendingPermission(
-      snapshot.entries, activity: activity,
+  // MARK: - Layout (#250)
+
+  /// What the layout of the entries depends on besides them: when one changes, everything is laid
+  /// out again.
+  struct LayoutInputs: Equatable {
+    enum Settling: Equatable {
+      case untouched
+      /// Every sub-agent still running: the agent no longer runs.
+      case all
+      /// Those an earlier process of the agent started.
+      case startedBefore(Date)
+    }
+    var settling: Settling
+    var groupsToolCalls: Bool
+    var showsReasoning: Bool
+  }
+
+  /// What was laid out for the last snapshot, to lay out the next one from where it changed.
+  struct LayoutState {
+    var inputs: LayoutInputs?
+    /// The entry marked as waiting for a permission.
+    var markedIndex: Int?
+    /// The index in `shownEntries` of each block's first entry.
+    var starts: [Int] = []
+    /// The indices in `shownEntries` of the sub-agents started by the agent itself.
+    var subagentIndices: [Int] = []
+  }
+
+  /// How much one layout did, counted rather than timed: a count does not depend on how busy the
+  /// machine is, so that tests can hold it to a bound.
+  struct LayoutWork: Equatable {
+    var entries = 0
+    var blocks = 0
+  }
+
+  /// The entries laid out again from there at the next layout, and whether sub-agents that left
+  /// the running linger in the bar; `nil` when nothing waits.
+  @ObservationIgnored private var pendingLayout: (changedFrom: Int, lingers: Bool)?
+  @ObservationIgnored private var layoutState = LayoutState()
+  /// The last publication received from the reader, `nil` when the next cannot follow it.
+  @ObservationIgnored private var lastRevision: Int?
+  /// The entries from which the images produced were not looked at yet.
+  @ObservationIgnored private var imagesChangedFrom: Int?
+  @ObservationIgnored private var echoTallies = EchoTallies()
+  @ObservationIgnored private(set) var layoutCount = 0
+  @ObservationIgnored private(set) var lastLayoutWork = LayoutWork()
+
+  /// Lays out again what changed — the entries from `changedFrom`, nothing when `nil` — now if
+  /// the conversation is on screen, once it is otherwise.
+  private func rebuild(changedFrom: Int?, lingers: Bool = true) {
+    reportProcessState()
+    let from = changedFrom ?? shownEntries.count
+    pendingLayout = (
+      min(pendingLayout?.changedFrom ?? .max, from), (pendingLayout?.lingers ?? true) && lingers
+    )
+    guard isShown else {
+      updateAnnouncedCall()
+      return
+    }
+    layOut()
+  }
+
+  /// Tells the reader whether the session's agent runs: a sub-agent whose end never came, in a
+  /// session whose agent no longer runs, will not end; nor one an earlier process of the agent
+  /// started, before the session was resumed.
+  private func reportProcessState() {
+    let isRunning = isProcessRunning
+    guard isRunning != reportedAgentRunning else { return }
+    reportedAgentRunning = isRunning
+    processStartedAt = nil
+    agentRunningChanged?(isRunning, nil)
+    if isRunning { learnProcessStart() }
+  }
+
+  private func layOut() {
+    guard let pending = pendingLayout else { return }
+    pendingLayout = nil
+    Signposts.interval("conversation.apply") { layOut(changedFrom: pending.changedFrom) }
+    updateTray(lingers: pending.lingers)
+    updateAnnouncedCall()
+  }
+
+  /// The entries as shown, then their blocks, from the first that may differ: the permission
+  /// waited on marked, sub-agents that will not end settled, tools of a family grouped.
+  private func layOut(changedFrom: Int) {
+    reportProcessState()
+    let entries = snapshot.entries
+    let inputs = LayoutInputs(
+      settling: !isProcessRunning && snapshot.availability != .loading
+        ? .all : processStartedAt.map(LayoutInputs.Settling.startedBefore) ?? .untouched,
+      groupsToolCalls: appearance.groupsToolCalls, showsReasoning: appearance.showsReasoning)
+    let mark = ConversationEntry.pendingPermissionMark(
+      entries, activity: activity,
       agentID: activity == .awaitingUser(.approval)
         ? pendingRequest()?.request.reference.agentID : nil)
-    // A sub-agent whose end never came, in a session whose agent no longer runs, will not end;
-    // nor one an earlier process of the agent started, before the session was resumed.
-    let isRunning = isProcessRunning
-    if isRunning != reportedAgentRunning {
-      reportedAgentRunning = isRunning
-      processStartedAt = nil
-      agentRunningChanged?(isRunning, nil)
-      if isRunning { learnProcessStart() }
+    var from = min(changedFrom, entries.count, shownEntries.count)
+    if inputs != layoutState.inputs { from = 0 }
+    // The entry marked, or no longer marked, is laid out again wherever it is.
+    if let marked = layoutState.markedIndex { from = min(from, marked) }
+    if let mark { from = min(from, mark.index) }
+
+    var changed = Array(entries[from...])
+    if let mark { changed[mark.index - from] = mark.entry }
+    switch inputs.settling {
+    case .untouched: break
+    case .all: changed = Self.settlingSubagents(changed)
+    case .startedBefore(let date): changed = Self.settlingSubagents(changed, startedBefore: date)
     }
-    if !isRunning, snapshot.availability != .loading {
-      entries = Self.settlingSubagents(entries)
-    } else if let processStartedAt {
-      entries = Self.settlingSubagents(entries, startedBefore: processStartedAt)
+    shownEntries.replaceSubrange(from..., with: changed)
+    layoutState.inputs = inputs
+    layoutState.markedIndex = mark?.index
+    while let last = layoutState.subagentIndices.last, last >= from {
+      layoutState.subagentIndices.removeLast()
     }
-    shownEntries = entries
-    let rebuilt = displayedBlocks(of: entries)
-    let previousIDs = Set(blocks.map(\.id))
-    let appended = rebuilt.filter { !previousIDs.contains($0.id) }.count
+    layoutState.subagentIndices += shownEntries.indices.dropFirst(from).filter {
+      shownEntries[$0].subagentCall != nil
+    }
+
+    // The blocks before the one to start from stay as they are, with their views.
+    let restart =
+      from == 0
+      ? 0
+      : ConversationGrouping.restartBlock(
+        starts: layoutState.starts, blocks: blocks, changedFrom: from)
+    var rebuilt = Array(blocks[..<restart])
+    var starts = Array(layoutState.starts[..<restart])
+    let showsReasoning = inputs.showsReasoning
+    ConversationGrouping.group(
+      shownEntries, from: restart == 0 ? 0 : layoutState.starts[restart],
+      grouping: inputs.groupsToolCalls,
+      includes: { entry in
+        if !showsReasoning, case .reasoning = entry.content { return false }
+        return true
+      },
+      into: &rebuilt, starts: &starts)
+    // New blocks can only be among those laid out again.
+    let previousIDs = Set(blocks[restart...].map(\.id))
+    let appended = rebuilt[restart...].filter { !previousIDs.contains($0.id) }.count
     let wasEmpty = blocks.isEmpty
     blocks = rebuilt
-    updateTray(lingers: lingers)
+    layoutState.starts = starts
+    rotor.update(blocks, from: restart)
+    layoutCount += 1
+    lastLayoutWork = LayoutWork(entries: changed.count, blocks: rebuilt.count - restart)
     if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }
+    #if DEBUG
+      verifyLayout()
+    #endif
   }
+
+  #if DEBUG
+    /// With `VIBE_VERIFY_CONVERSATION=1`, one layout in fifty is done again in full and compared.
+    private func verifyLayout() {
+      guard ProcessInfo.processInfo.environment["VIBE_VERIFY_CONVERSATION"] == "1",
+        layoutCount % 50 == 0
+      else { return }
+      var entries = ConversationEntry.markingPendingPermission(
+        snapshot.entries, activity: activity,
+        agentID: activity == .awaitingUser(.approval)
+          ? pendingRequest()?.request.reference.agentID : nil)
+      switch layoutState.inputs?.settling {
+      case .all: entries = Self.settlingSubagents(entries)
+      case .startedBefore(let date): entries = Self.settlingSubagents(entries, startedBefore: date)
+      case .untouched, nil: break
+      }
+      assert(entries == shownEntries, "Entries laid out from where they changed differ")
+      assert(
+        displayedBlocks(of: entries) == blocks, "Blocks laid out from where they changed differ")
+    }
+  #endif
 
   /// The session's process started or ended. Its activity may say nothing of it — an agent idle
   /// while its sub-agents work in the background stays idle when the CLI quits — so the view that
   /// observes the terminal tells: sub-agents that will not end are settled, and the reader told.
   public func processStateChanged() {
-    if isProcessRunning != reportedAgentRunning { rebuild() }
+    if isProcessRunning != reportedAgentRunning { rebuild(changedFrom: nil) }
   }
 
   /// Asks when the process started — the kernel knows, whenever the application was opened — and
@@ -337,7 +608,7 @@ public final class ConversationModel {
       self.agentRunningChanged?(true, date)
       // Gone from the bar at once: they did not just end, they ended long ago.
       self.lingering = [:]
-      self.rebuild(lingers: false)
+      self.rebuild(changedFrom: nil, lingers: false)
     }
   }
 
@@ -414,8 +685,9 @@ public final class ConversationModel {
   @ObservationIgnored private var startTask: Task<Void, Never>?
   /// How often a process that cannot be dated yet is asked again.
   static let processStartRetry = Duration.milliseconds(500)
-  @ObservationIgnored private var lingering: [String: (call: ToolCall, until: ContinuousClock.Instant)] =
-    [:]
+  @ObservationIgnored private var lingering:
+    [String: (call: ToolCall, until: ContinuousClock.Instant)] =
+      [:]
   @ObservationIgnored private var lingerTask: Task<Void, Never>?
   /// Tells the reader which sub-agents' transcripts to read besides those running.
   @ObservationIgnored public var unfoldSubagents: ((Set<String>) -> Void)?
@@ -426,12 +698,16 @@ public final class ConversationModel {
 
   /// - Parameter lingers: whether sub-agents that left the running stay a moment, dimmed.
   private func updateTray(lingers: Bool = true) {
-    let running = ConversationEntry.runningSubagents(in: shownEntries)
+    // Hidden, the bar waits for the conversation to come back, and is brought up to date then.
+    guard isShown else { return }
+    // Only the sub-agents the agent started, and theirs: not the thousands of other entries.
+    let subagents = layoutState.subagentIndices.map { shownEntries[$0] }
+    let running = ConversationEntry.runningSubagents(in: subagents)
     let runningIDs = Set(running.map(\.callID))
     let now = ContinuousClock.now
     for item in trayItems
     where lingers && !item.hasEnded && !runningIDs.contains(item.call.callID) {
-      let ended = ConversationEntry.subagentCalls([item.call.callID], in: shownEntries).first
+      let ended = ConversationEntry.subagentCalls([item.call.callID], in: subagents).first
       if let ended, ended.state.isFinished {
         lingering[ended.callID] = (ended, now + trayLinger)
       }
@@ -534,16 +810,44 @@ public final class ConversationModel {
 
   /// The sub-agent of that identifier, for the palette to say which one asks (#40, #180).
   public func subagent(agentID: String) -> ToolCall? {
-    ConversationEntry.subagent(agentID: agentID, in: snapshot.entries)
+    // Asked of a conversation in the background too: what was received, laid out or not.
+    ConversationEntry.subagent(agentID: agentID, in: latestSnapshot.entries)
   }
 
   /// The call the agent waits on, for the banner: one of a sub-agent's included — the deepest
   /// marked, the sub-agent's own call rather than the sub-agent, when one asks (#180).
   public var pendingCall: ToolCall? {
     guard case .awaitingUser = activity else { return nil }
-    return ConversationEntry.allCalls(in: shownEntries).last {
+    return Self.waitedCall(in: shownEntries)
+  }
+
+  private static func waitedCall(in entries: [ConversationEntry]) -> ToolCall? {
+    ConversationEntry.allCalls(in: entries).last {
       $0.state == .awaitingPermission || ($0.kind == .question && !$0.state.isFinished)
     }
+  }
+
+  /// The call the agent waits on, for VoiceOver to say: taken from what was received, laid out or
+  /// not, so that a conversation hidden still announces a permission or a question, as it did
+  /// before only the one on screen was laid out (#250). The same as `pendingCall` once shown.
+  public private(set) var announcedCallID: String?
+
+  private func updateAnnouncedCall() {
+    let id: String?
+    if isShown {
+      id = pendingCall?.callID
+    } else if case .awaitingUser = activity {
+      var entries = latestSnapshot.entries
+      let mark = ConversationEntry.pendingPermissionMark(
+        entries, activity: activity,
+        agentID: activity == .awaitingUser(.approval)
+          ? pendingRequest()?.request.reference.agentID : nil)
+      if let mark { entries[mark.index] = mark.entry }
+      id = Self.waitedCall(in: entries)?.callID
+    } else {
+      id = nil
+    }
+    if id != announcedCallID { announcedCallID = id }
   }
 
   /// The call still running, for the activity line. Not a sub-agent: the bar over the composer
@@ -876,7 +1180,7 @@ public final class ConversationModel {
     // A command is looked for among those written after it was sent; a prompt is confirmed by
     // the count, the prompts still on their way reaching the transcript first.
     let count =
-      Self.count(of: kind, in: snapshot.entries)
+      echoTallies.count(of: kind)
       + (kind.isShell ? 0 : echoes.filter { $0.state == .sending && !$0.kind.isShell }.count)
     let text: String
     let recallText: String
@@ -955,8 +1259,8 @@ public final class ConversationModel {
 
   private func confirmEchoes() {
     guard !echoes.isEmpty else { return }
-    let prompts = Self.count(of: .message, in: snapshot.entries)
-    let commands = snapshot.entries.compactMap(\.shellRun).map(\.command)
+    let prompts = echoTallies.count(of: .message)
+    let commands = echoTallies.commands.map(\.command)
     // Each command written confirms the oldest echo of the same command sent before it: one the
     // agent never ran — put back in its prompt by an Escape — holds back no other.
     var claimed = Set<Int>()
@@ -970,12 +1274,6 @@ public final class ConversationModel {
       claimed.insert(index)
       return true
     }
-  }
-
-  /// The prompts of the conversation, or its shell commands: what confirms an echo of that kind.
-  private static func count(of kind: PromptKind, in entries: [ConversationEntry]) -> Int {
-    kind.isShell
-      ? entries.filter { $0.shellRun != nil }.count : entries.filter(\.isUserPrompt).count
   }
 
   /// Wakes at the next echo past its wait, marks those past theirs, and waits for the next one.

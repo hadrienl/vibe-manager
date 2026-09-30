@@ -17,7 +17,9 @@ public actor ClaudeCodeLaunchObserver: AgentLaunchObserver {
     await capture.record(plan: plan)
   }
 
-  public func observe(output: String) async {}
+  public nonisolated var readsOutput: Bool { false }
+
+  public func observe(output: String) async -> AgentOutputDemand { .enough }
 
   public func finished() async {
     await capture.finish()

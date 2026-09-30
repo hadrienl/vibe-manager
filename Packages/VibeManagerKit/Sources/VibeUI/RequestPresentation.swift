@@ -62,6 +62,36 @@ public enum RequestPresentation {
       return LocalizedStringResource(
         "Permission", bundle: .module,
         comment: "The title of a request of an agent whose details could not be read.")
+    case .inTerminal(let prompt):
+      return promptTitle(prompt.kind)
+    }
+  }
+
+  /// A dialog only announced by the CLI (#273), by what it is about.
+  static func promptTitle(_ kind: AgentTerminalPrompt.Kind) -> LocalizedStringResource {
+    switch kind {
+    case .network:
+      return LocalizedStringResource(
+        "Network access", bundle: .module,
+        comment: "The title of a request of an agent: a command wants to reach the network.")
+    case .permission:
+      return LocalizedStringResource(
+        "Permission", bundle: .module,
+        comment: "The title of a request of an agent whose details could not be read.")
+    case .form:
+      return LocalizedStringResource(
+        "Form to fill in", bundle: .module,
+        comment: "The title of a request of an agent: a form an MCP server asks for.")
+    case .question:
+      return LocalizedStringResource(
+        "Question", bundle: .module, comment: "The title of a request of an agent.")
+    case .plan:
+      return LocalizedStringResource(
+        "Plan to approve", bundle: .module, comment: "The title of a request of an agent.")
+    case .other:
+      return LocalizedStringResource(
+        "Waiting in the terminal", bundle: .module,
+        comment: "The title of a request of an agent: a dialog of its terminal, of no known kind.")
     }
   }
 
@@ -112,6 +142,15 @@ public enum RequestPresentation {
     case .plan: return "list.bullet.clipboard"
     case .elicitation: return "list.bullet.rectangle"
     case .unreadable: return "hand.raised"
+    case .inTerminal(let prompt):
+      switch prompt.kind {
+      case .network: return "network"
+      case .permission: return "hand.raised"
+      case .form: return "list.bullet.rectangle"
+      case .question: return "questionmark.bubble"
+      case .plan: return "list.bullet.clipboard"
+      case .other: return "terminal"
+      }
     }
   }
 
@@ -127,6 +166,8 @@ public enum RequestPresentation {
       return questions.first.map { DisplaySafeText.visible($0.text) }
     case .plan(let excerpt, _):
       return excerpt.split(separator: "\n").first.map { DisplaySafeText.visible(String($0)) }
+    case .inTerminal(let prompt):
+      return prompt.message.map(DisplaySafeText.visible)
     case .elicitation, .unreadable:
       return nil
     }

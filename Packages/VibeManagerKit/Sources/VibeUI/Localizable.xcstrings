@@ -4455,6 +4455,16 @@
         }
       }
     },
+    "Approve in Auto Mode" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider en mode auto"
+          }
+        }
+      }
+    },
     "Approve, Accepting Edits" : {
       "localizations" : {
         "fr" : {
@@ -8202,6 +8212,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réseau"
+          }
+        }
+      }
+    },
+    "Network access" : {
+      "comment" : "The title of a request of an agent: a command wants to reach the network.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès réseau"
           }
         }
       }
@@ -12879,6 +12900,17 @@
         }
       }
     },
+    "The dialog of %@ does not offer this answer: nothing was sent. Answer it in the session." : {
+      "comment" : "Said when the option an answer needs is not in the dialog the session's terminal shows.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dialogue de « %@ » ne propose pas cette réponse : rien n’a été envoyé. Répondez dans la session."
+          }
+        }
+      }
+    },
     "The editor chosen in Settings is no longer installed. The file was revealed instead." : {
       "localizations" : {
         "fr" : {
@@ -14947,6 +14979,17 @@
         }
       }
     },
+    "Waiting in the terminal" : {
+      "comment" : "The title of a request of an agent: a dialog of its terminal, of no known kind.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente dans le terminal"
+          }
+        }
+      }
+    },
     "Web" : {
       "localizations" : {
         "fr" : {
@@ -15467,6 +15510,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "les modifications de ces fichiers"
+          }
+        }
+      }
+    },
+    "checked %lld s ago" : {
+      "comment" : "When the Git list was last checked against the disk: a number of seconds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vérifié il y a %lld s"
+          }
+        }
+      }
+    },
+    "checked at %@" : {
+      "comment" : "When the Git list was last checked against the disk: a time of day.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vérifié à %@"
+          }
+        }
+      }
+    },
+    "checked just now" : {
+      "comment" : "When the Git list was last checked against the disk.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vérifié à l’instant"
           }
         }
       }
@@ -16160,39 +16236,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "rien pour l’instant"
-          }
-        }
-      }
-    },
-    "read %lld s ago" : {
-      "comment" : "When the Git list was read: a number of seconds.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lu il y a %lld s"
-          }
-        }
-      }
-    },
-    "read at %@" : {
-      "comment" : "When the Git list was read: a time of day.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lu à %@"
-          }
-        }
-      }
-    },
-    "read just now" : {
-      "comment" : "When the Git list was read.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lu à l’instant"
           }
         }
       }

@@ -57,16 +57,24 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private let diagnostics: Diagnostics
   /// When each running process was seen starting, for the duration its exit is logged with.
   private var startedAt: [SessionID: ContinuousClock.Instant] = [:]
-  private var panes: [SessionID: TerminalPaneModel] = [:]
+  private var panes: [SessionID: TerminalPaneModel] = [:] {
+    didSet {
+      let kept = paneSessionIDs.filter { panes[$0] != nil }
+      let known = Set(kept)
+      // Assigned whole, and only when it changes: an equal list tells no view.
+      paneSessionIDs = kept + panes.keys.filter { !known.contains($0) }
+    }
+  }
+  /// The sessions that have a pane, in the order their panes were made: what the window mounts
+  /// (#254). Changes only when a pane is made or released — never with what a terminal writes —
+  /// and walks a few sessions rather than every one the store keeps, archived ones included.
+  public private(set) var paneSessionIDs: [SessionID] = []
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
   private var exitTasks: [SessionID: Task<Void, Never>] = [:]
   /// Tells the activity tracker that a terminal wrote something: the only signal an agent without
   /// hooks gives.
   private var activityTasks: [SessionID: Task<Void, Never>] = [:]
-  /// When each terminal last wrote something, for an answer typed in several keystrokes to wait
-  /// until the interface has redrawn between two (#40).
-  private var lastOutputAt: [SessionID: ContinuousClock.Instant] = [:]
   /// Which exit watch is the current one for a session.
   ///
   /// Cancelling a task only asks. A watch that has already seen its process end, and is waiting
@@ -650,8 +658,26 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     return true
   }
 
-  public func lastOutput(of id: SessionID) -> ContinuousClock.Instant? {
-    lastOutputAt[id]
+  /// When a session's terminal last wrote something, for an answer typed in several keystrokes to
+  /// wait until the interface has redrawn between two (#40). Asked of the terminal, which notes it
+  /// as the output arrives: nothing here watches the output for it (#248).
+  public func lastOutput(of id: SessionID) async -> ContinuousClock.Instant? {
+    await panes[id]?.session?.lastOutputAt()
+  }
+
+  /// What the terminal of a session whose agent runs shows now, as text (#273): its history
+  /// replayed at the size the pane measured — or, never shown, a size larger than any the agent
+  /// draws to, where its lines fall on the same rows. Off the main actor: a long history takes a
+  /// moment to replay.
+  public func screen(of id: SessionID) async -> String? {
+    guard let pane = panes[id], pane.status == .running, let terminal = pane.session else {
+      return nil
+    }
+    let history = await terminal.history()
+    let size = pane.viewportSize ?? TerminalSize(columns: 300, rows: 120)
+    return await Task.detached(priority: .userInitiated) {
+      TerminalText.screen(replaying: history.bytes, size: size)
+    }.value
   }
 
   public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {
@@ -779,7 +805,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     exitTasks[id]?.cancel()
     let generation = nextExitGeneration(for: id)
     exitTasks[id] = Task { [weak self] in
-      let attachment = await terminal.attach()
+      // State changes only: the watch is not woken by the output (#248).
+      let attachment = await terminal.attach(.state)
       var finalState = attachment.state
       if !finalState.isFinished {
         for await event in attachment.events {
@@ -847,22 +874,39 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// Tells the tracker the terminal wrote something, at most every quarter of a second: the
   /// fallback it feeds counts silences in seconds, and a flood of output must not become a flood
   /// of messages.
+  ///
+  /// The terminal spaces the pulses out itself, and the loop runs off the main actor: the tracker
+  /// is an actor of its own, and nothing here needs the main one (#248).
   private func followOutput(of id: SessionID, terminal: any TerminalSession) {
     guard let activity else { return }
     activityTasks[id]?.cancel()
-    activityTasks[id] = Task {
-      let attachment = await terminal.attach()
-      var last: ContinuousClock.Instant?
-      for await event in attachment.events {
-        guard case .output = event else { continue }
-        let now = ContinuousClock.now
-        self.lastOutputAt[id] = now
-        if let last, now - last < .milliseconds(250) { continue }
-        last = now
-        await activity.output(id)
+    activityTasks[id] = Task.detached {
+      await withTaskGroup(of: Void.self) { group in
+        group.addTask {
+          let attachment = await terminal.attach(.pulses(every: Self.activityPulseInterval))
+          for await event in attachment.events {
+            guard case .outputPulse = event else { continue }
+            await activity.output(id)
+          }
+        }
+        // What the agent announces on its terminal, which no hook reports (#273): its bytes are
+        // read only for an agent that says something that way — Codex.
+        guard await activity.readsTerminalNotifications(id) else { return }
+        group.addTask {
+          let attachment = await terminal.attach()
+          var notifications = TerminalNotificationScanner()
+          for await event in attachment.events {
+            guard case .output(let bytes) = event else { continue }
+            for message in notifications.scan(bytes) {
+              await activity.terminalNotification(id, message)
+            }
+          }
+        }
       }
     }
   }
+
+  nonisolated static let activityPulseInterval = Duration.milliseconds(250)
 
   private func startObserver(
     for session: WorkSession,
@@ -883,22 +927,51 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     await observer.launched(plan: plan, hooksApproved: hooksApproved)
 
     outputTasks[session.id]?.cancel()
-    outputTasks[session.id] = Task {
-      let attachment = await terminal.attach()
-      // One decoder for the whole stream: a read can end in the middle of a character, and the
-      // identifiers the observer looks for would be broken by a replacement character.
-      var decoder = UTF8StreamDecoder()
-      for await event in attachment.events {
-        guard case .output(let bytes) = event else { continue }
-        let text = decoder.decode(bytes)
-        guard !text.isEmpty else { continue }
-        await observer.observe(output: text)
-      }
-      let tail = decoder.flush()
-      if !tail.isEmpty {
-        await observer.observe(output: tail)
-      }
+    outputTasks[session.id] = Task.detached {
+      await Self.feed(observer, from: terminal)
       await observer.finished()
     }
+  }
+
+  /// Hands an observer the terminal's output for as long as it reads it, off the main actor, then
+  /// waits for the process to end (#248). An observer that reads nothing — Claude Code's — is never
+  /// handed a byte, and one that found what it looked for stops being handed any.
+  nonisolated static func feed(
+    _ observer: any AgentLaunchObserver, from terminal: any TerminalSession
+  ) async {
+    if observer.readsOutput {
+      // The stream is let go of as soon as the observer has enough: the terminal then stops
+      // handing this subscriber its output.
+      guard await read(terminal, into: observer) == .enough else { return }
+    }
+    await waitForEnd(of: terminal)
+  }
+
+  /// Hands `observer` the output until it has enough or the process ends.
+  nonisolated private static func read(
+    _ terminal: any TerminalSession, into observer: any AgentLaunchObserver
+  ) async -> AgentOutputDemand {
+    let attachment = await terminal.attach()
+    // One decoder for the whole stream: a read can end in the middle of a character, and the
+    // identifiers the observer looks for would be broken by a replacement character.
+    var decoder = UTF8StreamDecoder()
+    for await event in attachment.events {
+      guard case .output(let bytes) = event else { continue }
+      let text = decoder.decode(bytes)
+      guard !text.isEmpty else { continue }
+      if await observer.observe(output: text) == .enough { return .enough }
+    }
+    let tail = decoder.flush()
+    if !tail.isEmpty {
+      _ = await observer.observe(output: tail)
+    }
+    return .more
+  }
+
+  /// Returns once the process has ended, woken by nothing but its state.
+  nonisolated private static func waitForEnd(of terminal: any TerminalSession) async {
+    let attachment = await terminal.attach(.state)
+    guard !attachment.state.isFinished else { return }
+    for await _ in attachment.events {}
   }
 }

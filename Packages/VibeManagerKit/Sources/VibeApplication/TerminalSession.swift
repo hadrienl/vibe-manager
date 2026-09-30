@@ -149,16 +149,59 @@ public enum TerminalEvent: Equatable, Sendable {
   case stateChanged(TerminalProcessState)
   case output([UInt8])
   case historyTruncated(droppedByteCount: Int)
+  /// This subscriber fell behind and lost blocks of output its stream had not delivered yet
+  /// (#248). Unlike `historyTruncated`, the bytes are still in the session's history: a reader
+  /// that keeps its place in the stream counts them as passed, and can read them from there.
+  case outputDropped(byteCount: Int)
+  /// The terminal wrote something, told instead of the bytes to a subscriber that only needs to
+  /// know it did (#248): see `TerminalEventInterest.pulses`.
+  case outputPulse
+}
+
+/// What a subscriber reads of a terminal (#248).
+///
+/// Every subscriber used to be handed every block of output, and each one that runs on the main
+/// actor woke it for it: five times a block for an agent's terminal, whether its view was on screen
+/// or not. A subscriber now says what it reads, and the session serves nothing else.
+public enum TerminalEventInterest: Hashable, Sendable {
+  /// Every event: the view, and the observers that read the text.
+  case everything
+  /// State changes only: the exit watch, the pane's status.
+  case state
+  /// State changes, and `.outputPulse` in place of the bytes — at once on the first output, then
+  /// at most once per `interval`, and always once more after the last output of a burst, so that
+  /// a subscriber scheduling work on output never misses the end of it.
+  case pulses(every: Duration)
+
+  /// The event this interest is served in place of `event`, if any: for a session that has no
+  /// cadence of its own to keep, such as a stand-in, pulses are not spaced out.
+  public func translating(_ event: TerminalEvent) -> TerminalEvent? {
+    switch (self, event) {
+    case (.everything, _), (_, .stateChanged):
+      return event
+    case (.pulses, .output), (.pulses, .outputPulse):
+      return .outputPulse
+    case (.state, _), (.pulses, .historyTruncated), (.pulses, .outputDropped):
+      return nil
+    }
+  }
 }
 
 public struct TerminalHistorySnapshot: Equatable, Sendable {
   public let bytes: [UInt8]
   public let droppedByteCount: Int
+  /// Where `bytes` starts in the stream of output this session delivered (#248): how many bytes it
+  /// had delivered before them. A view that remembers how far it fed can take only what follows.
+  public let startOffset: Int
 
-  public init(bytes: [UInt8], droppedByteCount: Int) {
+  public init(bytes: [UInt8], droppedByteCount: Int, startOffset: Int = 0) {
     self.bytes = bytes
     self.droppedByteCount = droppedByteCount
+    self.startOffset = startOffset
   }
+
+  /// Where the stream goes on after `bytes`: the first byte a live event will bring.
+  public var endOffset: Int { startOffset + bytes.count }
 }
 
 public enum TerminalError: Error, Hashable, Codable, LocalizedError, Sendable {
@@ -290,6 +333,11 @@ public protocol TerminalSession: AnyObject, Sendable {
   // A view needs the backlog and the live stream as one consistent value: reading them
   // separately would lose whatever arrives between the two calls.
   func attach() async -> TerminalAttachment
+  /// The same, with only the events `interest` reads in the stream (#248).
+  func attach(_ interest: TerminalEventInterest) async -> TerminalAttachment
+  /// When the process last wrote something, noted by the session itself as the output arrives, so
+  /// that nobody has to watch every block for it (#248).
+  func lastOutputAt() async -> ContinuousClock.Instant?
   func state() async -> TerminalProcessState
   func history() async -> TerminalHistorySnapshot
   func write(_ bytes: [UInt8]) async
@@ -299,6 +347,24 @@ public protocol TerminalSession: AnyObject, Sendable {
 }
 
 extension TerminalSession {
+  /// Relays the full stream, keeping only what `interest` reads: for a session that serves one
+  /// stream to all, as the stand-ins of the tests do. The real sessions filter at the source.
+  public func attach(_ interest: TerminalEventInterest) async -> TerminalAttachment {
+    let attachment = await attach()
+    guard interest != .everything else { return attachment }
+    let (events, continuation) = AsyncStream<TerminalEvent>.makeStream()
+    let relay = Task {
+      for await event in attachment.events {
+        if let translated = interest.translating(event) { continuation.yield(translated) }
+      }
+      continuation.finish()
+    }
+    continuation.onTermination = { _ in relay.cancel() }
+    return TerminalAttachment(state: attachment.state, history: attachment.history, events: events)
+  }
+
+  public func lastOutputAt() async -> ContinuousClock.Instant? { nil }
+
   public func write(_ text: String) async {
     await write([UInt8](text.utf8))
   }

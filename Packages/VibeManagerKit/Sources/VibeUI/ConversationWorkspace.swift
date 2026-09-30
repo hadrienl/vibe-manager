@@ -116,6 +116,10 @@ public final class ConversationWorkspace {
         model.agentRunningChanged = { isRunning, startedAt in
           Task { await follow.setAgentRunning(isRunning, since: startedAt, for: id) }
         }
+        // Mounted but hidden, a conversation is still read, and published less often (#250).
+        model.shownChanged = { isShown, order in
+          Task { await follow.setShown(isShown, for: id, order: order) }
+        }
       }
       models[session.id] = model
       connect?(model, session)
@@ -145,9 +149,12 @@ public final class ConversationWorkspace {
       // earlier process of it left, are not opened, and a new model starts with everything folded
       // (#180).
       let isAgentRunning = model.isProcessRunning
+      let (isShown, shownOrder) = (model.isShown, model.shownOrder)
       Task { [weak self] in
         let startedAt = isAgentRunning ? await model.processStartDate() : nil
         await follow.setAgentRunning(isAgentRunning, since: startedAt, for: id)
+        // What the reader was told last about a model since let go of is no longer true.
+        await follow.setShown(isShown, for: id, order: shownOrder)
         if isNew { await follow.setUnfoldedSubagents([], for: id) }
         let stream = await follow.follow(session)
         guard let self, self.generations[id] == generation, self.models[id] === model else {
@@ -212,6 +219,8 @@ public final class ConversationWorkspace {
   /// A session was archived, closed for good or forgotten.
   public func release(_ id: SessionID) {
     models.removeValue(forKey: id)?.stop()
+    // What its readers kept aside to resume goes with the model.
+    if let follow { Task { await follow.forget(id) } }
     followed[id] = nil
     generations[id] = nil
     dormantSessionIDs.removeAll { $0 == id }
@@ -226,7 +235,8 @@ public final class ConversationWorkspace {
     while mountedSessionIDs.count > Self.keptModelCount {
       let id = mountedSessionIDs.removeFirst()
       models[id]?.pause()
-      // Read again from the start when shown: a follow still being set up is dropped.
+      // Followed again when shown, its readers resuming where they stopped (#249): a follow
+      // still being set up is dropped.
       followed[id] = nil
       generations[id] = (generations[id] ?? 0) + 1
       dormantSessionIDs.append(id)

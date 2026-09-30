@@ -101,6 +101,8 @@ public final class AppEnvironment {
   /// second is not free, and a release build has Instruments for that.
   private let hangDetector: MainThreadHangDetector?
   private let memorySampler: MemorySampler
+  /// Development builds only: how often the window's big views are evaluated (#254).
+  private let bodyEvaluations: BodyEvaluationReporter?
   private let activityTracker: TrackAgentActivity
   /// Every session's web view, and the socket its agents reach it through (#69).
   public let browser: BrowserWorkspace
@@ -166,6 +168,12 @@ public final class AppEnvironment {
         ? MainThreadHangDetector(log: diagnostics.log) : nil
     #endif
     hangDetector?.start()
+    #if DEBUG
+      bodyEvaluations = BodyEvaluationReporter(log: diagnostics.log)
+    #else
+      bodyEvaluations = nil
+    #endif
+    bodyEvaluations?.start()
     let runtimeStore = FileSessionRuntimeStateStore(url: data.runtime)
     let recorder = SessionRuntimeRecorder(store: runtimeStore)
     let usageLedger = FileUsageLedger(directory: data.usage)
@@ -298,6 +306,14 @@ public final class AppEnvironment {
       })
     self.terminals = terminals
     let transcripts = AgentTranscriptReader()
+    // Read only, and only when the disk says something moved: no timer reads a repository. One
+    // transcript reader for it and the branch report, so each file is read once, incrementally.
+    let repositoryStatus = RepositoryStatusMonitor(
+      reader: GitStatusReader(
+        git: ProcessGitCommandRunner(timeout: .seconds(30), diagnostics: diagnostics.log)),
+      events: FSEventsFileChangeObserver(),
+      transcripts: transcripts
+    )
     // Each session's journal (#36): read from the transcripts of every active session, summarized
     // by its own agent, kept in a file per session beside the notes.
     let journalPreferences = UserDefaultsJournalPreferences(suiteName: data.defaultsSuite)
@@ -315,7 +331,7 @@ public final class AppEnvironment {
     // The conversation view (#38): the same transcripts, read to be shown and never kept.
     let conversations = ConversationWorkspace(
       follow: FollowConversation(
-        agents: registry, tail: FileTranscriptTail(),
+        agents: registry, tail: FileTranscriptTail(diagnostics: diagnostics.log),
         hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) },
         current: { [repository] id in try? await repository.session(id: id) }),
       store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),
@@ -342,17 +358,15 @@ public final class AppEnvironment {
       terminalHost: supervisor,
       // Read only: the application reports the branches and worktrees the agent made, and never
       // makes one itself.
+      // The uncommitted work of a repository the monitor watches is taken from its status: one
+      // `git status` for both.
       branchReader: ReadSessionBranchReport(
         reader: GitActivityReader(git: ProcessGitCommandRunner(diagnostics: diagnostics.log)),
-        transcripts: transcripts),
-      // Read only as well, and only when the disk says something moved: no timer reads a
-      // repository. One transcript reader for both, so each file is read once, incrementally.
-      repositoryStatus: RepositoryStatusMonitor(
-        reader: GitStatusReader(
-          git: ProcessGitCommandRunner(timeout: .seconds(30), diagnostics: diagnostics.log)),
-        events: FSEventsFileChangeObserver(),
-        transcripts: transcripts
-      ),
+        transcripts: transcripts,
+        knownStatus: { [repositoryStatus] session, root in
+          await repositoryStatus.knownStatus(of: session, atPath: root)
+        }),
+      repositoryStatus: repositoryStatus,
       closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite),
       fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite),
       notesStore: notes,
@@ -369,6 +383,7 @@ public final class AppEnvironment {
         tracker: activityTracker,
         write: { [weak launcher] id, bytes in await launcher?.writeAnswer(bytes, to: id) ?? false },
         lastOutput: { [weak launcher] id in await launcher?.lastOutput(of: id) },
+        screen: { [weak launcher] id in await launcher?.screen(of: id) },
         diagnostics: diagnostics),
       requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
       browser: browser,
@@ -547,6 +562,7 @@ public final class AppEnvironment {
         "hosted": .count(hostedRunningCount), "inProcess": .count(inProcessRunningCount),
       ])
     memorySampler.stop()
+    bodyEvaluations?.stop()
     hangDetector?.stop()
     // The pending layout is written first: quitting is exactly when the delayed save that keeps
     // a separator drag cheap would otherwise be thrown away.

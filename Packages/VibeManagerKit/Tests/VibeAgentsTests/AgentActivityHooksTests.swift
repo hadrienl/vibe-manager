@@ -275,9 +275,10 @@ struct ClaudeCodeInterruptionWatchTests {
   func followsTheFile() async throws {
     let url = try temporaryLog().deletingLastPathComponent().appendingPathComponent("t.jsonl")
     try Data((Self.interrupted + "\n").utf8).write(to: url)
-    let watch = ClaudeCodeInterruptionWatch(transcript: url, pollInterval: .milliseconds(20))
+    let log = WatchLog()
+    let watch = ClaudeCodeInterruptionWatch(transcript: url) { log.record($0) }
     let stream = watch.signals()
-    try await Task.sleep(for: .milliseconds(60))
+    await log.wait(for: .file)
     let handle = try FileHandle(forWritingTo: url)
     try handle.seekToEnd()
     try handle.write(contentsOf: Data((Self.quoted + "\n" + Self.interruptedTool + "\n").utf8))
@@ -313,7 +314,8 @@ struct CodexActivityReportingTests {
     let count = CodexActivityHooks.hooks.count
     #expect(Array(reported.arguments.prefix(3)) == ["resume", "-C", "/Users/a/dev"])
     #expect(Array(reported.arguments.suffix(2)) == ["--", "rollout-1"])
-    #expect(reported.arguments.filter { $0 == "-c" }.count == count)
+    let notifications = CodexActivityHooks.notificationOptions.count / 2
+    #expect(reported.arguments.filter { $0 == "-c" }.count == count + notifications)
     #expect(CodexActivityHooks.hookOptions(in: reported.arguments).count == count * 2)
   }
 

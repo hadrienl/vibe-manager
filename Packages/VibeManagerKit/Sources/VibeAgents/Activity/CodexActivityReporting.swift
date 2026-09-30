@@ -34,6 +34,17 @@ public enum CodexActivityHooks {
     hooks.map { AgentActivityHookCommand.command(event: $0.event, payload: $0.payload) }
   }
 
+  /// Codex writes a notification to its terminal, as OSC 9, when it draws a dialog (#273): the
+  /// only word of the dialogs no hook reports — an MCP server's form, "Implement this plan?" — and
+  /// the one sign that a permission its hook reported is on screen, not settled by its automatic
+  /// review. Settings, not hooks: nothing for the user to approve. The end of a turn is left out,
+  /// the application tells it from `Stop`.
+  static let notificationOptions = [
+    "-c", #"tui.notifications=["approval-requested","plan-mode-prompt","async-question"]"#,
+    "-c", #"tui.notification_method="osc9""#,
+    "-c", #"tui.notification_condition="always""#,
+  ]
+
   /// The `-c` options, one per event.
   public static func options() -> [String] {
     hooks.flatMap { hook -> [String] in
@@ -101,16 +112,86 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
     case "SessionStart": return .channelConfirmed
     case "UserPromptSubmit": return .promptSubmitted(byUser: true)
     case "PermissionRequest":
-      // Codex reports the permission once its dialog is drawn: checked against 0.157.1.
+      // Codex runs the hook before its automatic review, which may settle the permission with no
+      // dialog ever drawn (0.159, `core/src/tools/approvals.rs`): drawn once Codex says so.
       return .questionAsked(
         .approval,
-        notice: event.requestNotice(isShown: true, alwaysAllow: CodexAnswerKeymap.alwaysAllow))
+        notice: Self.withoutAlwaysForHosts(
+          event.requestNotice(isShown: false, alwaysAllow: CodexAnswerKeymap.alwaysAllow)))
     case "PostToolUse": return .questionResolved
     case "Stop": return .turnEnded
     case "Interrupt": return .interrupted
     case "SessionEnd": return .agentEnded
     default: return nil
     }
+  }
+
+  public var readsTerminalNotifications: Bool {
+    true
+  }
+
+  /// A network access comes as a `Bash` permission whose description is `network-access <host>`
+  /// (0.159, `core/src/tools/approvals.rs`). Its dialog allows the host for the conversation, or
+  /// for good — never commands that start the same way, which "always" says for a command: the
+  /// answer is given once, or in the terminal.
+  static func withoutAlwaysForHosts(_ notice: AgentRequestNotice) -> AgentRequestNotice {
+    guard case .permission(let permission) = notice.content,
+      permission.purpose?.hasPrefix("network-access ") == true
+    else { return notice }
+    return AgentRequestNotice(
+      content: .permission(
+        AgentToolPermission(
+          tool: permission.tool, toolName: permission.toolName, subject: permission.subject,
+          purpose: permission.purpose, details: permission.details,
+          workingDirectory: permission.workingDirectory, alwaysAllow: nil,
+          isComplete: permission.isComplete)),
+      reference: notice.reference, isShown: notice.isShown, key: notice.key)
+  }
+
+  /// The start of a command as its report gives it, out of the notification that quotes it: the
+  /// command Codex runs — `/bin/zsh -lc 'touch a…` — cut at thirty characters.
+  static func commandStart(quoted: String) -> String {
+    var text = Substring(quoted)
+    let isCut = text.hasSuffix("...") || text.hasSuffix("…")
+    if text.hasSuffix("...") { text = text.dropLast(3) } else if text.hasSuffix("…") { text = text.dropLast() }
+    // The shell Codex wraps the model's command in, and the quote around it.
+    if let wrapper = text.range(of: #"^\S*sh -l?c ['"]?"#, options: .regularExpression) {
+      let quote = text[wrapper].last.flatMap { "'\"".contains($0) ? $0 : nil }
+      text = text[wrapper.upperBound...]
+      if !isCut, let quote, text.last == quote { text = text.dropLast() }
+    }
+    return String(text)
+  }
+
+  /// Codex's notifications, as `tui/src/chatwidget/notifications.rs` words them in 0.159.
+  public func signal(forTerminalNotification message: String) -> AgentSignal? {
+    func announced(_ kind: AgentTerminalPrompt.Kind) -> AgentSignal {
+      .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))
+    }
+    // The form of an MCP tool's permission, or a server's own request, which has no report.
+    if let server = message.trimmingPrefix("Approval requested by ") {
+      return .dialogDrawn(
+        AgentDrawnDialog(.server(server)),
+        otherwise: AgentTerminalPrompt(kind: .form, message: message))
+    }
+    if let command = message.trimmingPrefix("Approval requested: ") {
+      return .dialogDrawn(AgentDrawnDialog(.commandStart(Self.commandStart(quoted: command))))
+    }
+    if let edited = message.trimmingPrefix("Codex wants to edit ") {
+      let isSeveral = edited.hasSuffix(" files") && Int(edited.dropLast(" files".count)) != nil
+      return .dialogDrawn(AgentDrawnDialog(isSeveral ? .files : .file(edited)))
+    }
+    if let title = message.trimmingPrefix("Plan mode prompt: ") {
+      switch title {
+      case "Implement this plan?": return announced(.plan)
+      // A choice the user opened themselves, in the terminal they are looking at.
+      case "Apply reasoning change": return nil
+      // The questions of `request_user_input`, also read from the rollout.
+      default: return announced(.question)
+      }
+    }
+    if message.hasPrefix("Question: ") { return announced(.question) }
+    return nil
   }
 
   /// Codex's `request_user_input` has no hook of its own: its questions are read from the rollout
@@ -121,9 +202,17 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
   }
 }
 
+extension String {
+  /// The rest of the string after `prefix`, or `nil` when it does not start with it.
+  fileprivate func trimmingPrefix(_ prefix: String) -> String? {
+    hasPrefix(prefix) ? String(dropFirst(prefix.count)) : nil
+  }
+}
+
 extension CodexAgentProvider: AgentActivityReporting {
   public func reportingActivity(_ plan: AgentLaunchPlan, to log: URL) -> AgentLaunchPlan {
-    plan.reportingActivity(options: CodexActivityHooks.options(), to: log)
+    plan.reportingActivity(
+      options: CodexActivityHooks.options() + CodexActivityHooks.notificationOptions, to: log)
   }
 
   public func activityDecoder() -> any AgentSignalDecoding {

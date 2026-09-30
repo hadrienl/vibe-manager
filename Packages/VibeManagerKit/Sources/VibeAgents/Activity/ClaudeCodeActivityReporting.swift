@@ -75,6 +75,17 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
     ClaudeCodeAnswerKeymap()
   }
 
+  /// The notifications that say a dialog is up, checked against 2.1.285 and its documentation.
+  /// `elicitation_dialog` is left out: the `Elicitation` hook reports the same dialog, and ends it.
+  /// So is `worker_permission_prompt`: a teammate's permission, reported by its own hooks, which
+  /// may come once it is answered.
+  static let announcedKinds: [String: AgentTerminalPrompt.Kind] = [
+    "permission_prompt": .permission,
+    "elicitation_url_dialog": .form,
+    "agent_needs_input": .other,
+    "quota_auto_resume_stale": .other,
+  ]
+
   private let makeInterruptionWatch: @Sendable (URL) -> AsyncStream<AgentSignal>
 
   public init(
@@ -108,10 +119,20 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
           ? .questionAsked(.approval, tool: tool, notice: notice) : nil
       }
     case "Notification":
-      // Only the idle reminder is read. `permission_prompt` and `elicitation_dialog` repeat what
-      // `PermissionRequest` and `Elicitation` already said, and may arrive once the user has
-      // answered — putting back a question that is gone.
-      return event.string("notification_type") == "idle_prompt" ? .waitingForInput : nil
+      let type = event.string("notification_type")
+      if type == "idle_prompt" { return .waitingForInput }
+      // Most of these repeat what `PermissionRequest` said, and may come once the user answered:
+      // the machine lets them stand for a request only when no drawn one waits. Some dialogs have
+      // no other report at all — a sandboxed command's network access above all (#273).
+      guard var kind = Self.announcedKinds[type ?? ""] else { return nil }
+      let message = event.string("message")
+      if type == "permission_prompt" {
+        // "A sandboxed command needs network access": the one permission with no report. Any
+        // other repeats one, and may come once it is answered, as a request nothing ends.
+        guard message?.localizedCaseInsensitiveContains("network") == true else { return nil }
+        kind = .network
+      }
+      return .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))
     case "Elicitation":
       return .questionAsked(
         .question,
@@ -152,17 +173,25 @@ public struct ClaudeCodeInterruptionWatch: Sendable {
     "[Request interrupted by user]", "[Request interrupted by user for tool use]",
   ]
 
-  private let transcript: URL
-  private let pollInterval: Duration
+  static let needle = Data("[Request interrupted by user".utf8)
 
-  public init(transcript: URL, pollInterval: Duration = .milliseconds(500)) {
+  private let transcript: URL
+  private let onWatching: (@Sendable (AppendedLines.Watching) -> Void)?
+
+  public init(transcript: URL) {
+    self.init(transcript: transcript, onWatching: nil)
+  }
+
+  init(transcript: URL, onWatching: (@Sendable (AppendedLines.Watching) -> Void)?) {
     self.transcript = transcript
-    self.pollInterval = pollInterval
+    self.onWatching = onWatching
   }
 
   /// Interruptions written from now on; what the transcript already holds belongs to the past.
   public func signals() -> AsyncStream<AgentSignal> {
-    let lines = AppendedLines(file: transcript, start: .end, pollInterval: pollInterval).lines()
+    var appended = AppendedLines(file: transcript, start: .end, needles: [Self.needle])
+    appended.onWatching = onWatching
+    let lines = appended.lines()
     return AsyncStream { continuation in
       let task = Task {
         for await line in lines where Self.isInterruption(line) {
@@ -177,7 +206,7 @@ public struct ClaudeCodeInterruptionWatch: Sendable {
   static func isInterruption(_ line: Data) -> Bool {
     // Most lines are tool calls and their output, some of them large: the words are looked for
     // before any JSON is decoded.
-    guard line.range(of: Data("[Request interrupted by user".utf8)) != nil,
+    guard LineSplitter.contains(line, anyOf: [needle]),
       let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
       object["type"] as? String == "user",
       let message = object["message"] as? [String: Any]

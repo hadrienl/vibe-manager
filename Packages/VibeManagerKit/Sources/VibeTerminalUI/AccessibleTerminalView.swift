@@ -178,7 +178,9 @@ public final class AccessibleTerminalView: TerminalView {
     // The width SwiftTerm reserves for its scroller, unless it hides it.
     let scroller = subviews.lazy.compactMap { $0 as? NSScroller }.first
     let reserved =
-      scroller.map { $0.isHidden ? 0 : NSScroller.scrollerWidth(for: .regular, scrollerStyle: scrollerStyle) }
+      scroller.map {
+        $0.isHidden ? 0 : NSScroller.scrollerWidth(for: .regular, scrollerStyle: scrollerStyle)
+      }
       ?? 0
     let width = frame.width - reserved
     return (width / CGFloat(terminal.cols), frame.height / CGFloat(terminal.rows))
@@ -205,7 +207,8 @@ public final class AccessibleTerminalView: TerminalView {
     let pointer = LinkPointer(view: self)
     addTrackingArea(
       NSTrackingArea(
-        rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+        rect: .zero,
+        options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
         owner: pointer))
     linkPointer = pointer
     syncLinkMode()
@@ -288,14 +291,30 @@ final class LinkMenuItem: NSMenuItem {
 
 /// Text out of a terminal, for people rather than for a terminal.
 public enum TerminalText {
-  /// The screen's lines, trailing blanks and trailing empty lines removed.
-  public static func visibleScreen(of terminal: Terminal) -> String {
+  /// What a terminal of `size` shows once it has drawn `history`, as `visibleScreen` reads it but
+  /// indented as drawn: the dialog an agent draws now, read before an answer is typed into it
+  /// (#273), whose wrapped lines are told by their indent. The history is replayed into a
+  /// terminal of its own, which no view shows.
+  public static func screen(replaying history: [UInt8], size: TerminalSize) -> String {
+    let terminal = Terminal(
+      delegate: SilentTerminalDelegate(),
+      options: TerminalOptions(cols: size.columns, rows: size.rows, scrollback: 0))
+    terminal.feed(byteArray: history)
+    return visibleScreen(of: terminal, keepingIndent: true)
+  }
+
+  /// The screen's lines, trailing blanks and trailing empty lines removed — and leading blanks,
+  /// unless `keepingIndent`.
+  public static func visibleScreen(of terminal: Terminal, keepingIndent: Bool = false) -> String {
     var lines: [String] = []
     for row in 0..<terminal.rows {
       let text = terminal.getLine(row: row)?.translateToString(trimRight: true) ?? ""
       // Cells never written read as NUL, which is nothing to say.
+      let line = text.replacingOccurrences(of: "\u{0}", with: " ")
       lines.append(
-        text.replacingOccurrences(of: "\u{0}", with: " ").trimmingCharacters(in: .whitespaces))
+        keepingIndent
+          ? String(line.reversed().drop(while: \.isWhitespace).reversed())
+          : line.trimmingCharacters(in: .whitespaces))
     }
     while lines.last?.isEmpty == true { lines.removeLast() }
     return lines.joined(separator: "\n")
@@ -362,4 +381,9 @@ public enum TerminalText {
     }
     return String(output)
   }
+}
+
+/// A terminal no one reads from: what it would answer the program goes nowhere.
+private final class SilentTerminalDelegate: TerminalDelegate {
+  func send(source: Terminal, data: ArraySlice<UInt8>) {}
 }
