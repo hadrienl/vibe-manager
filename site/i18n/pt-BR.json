@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Contrastes verificados",
   "avatar.shot_alt": "O painel flutuante do Vibe Manager: o avatar e seu balão, que mostra o pedido de um agente com os botões Permitir e Recusar.",
   "avatar.sprites_aria": "As dez expressões do avatar",
-  "theme.shot_alt": "Uma conversa do Vibe Manager com um tema pessoal, com suas cores, sua fonte e sua imagem de fundo."
+  "theme.shot_alt": "Uma conversa do Vibe Manager com um tema pessoal, com suas cores, sua fonte e sua imagem de fundo.",
+  "hero.cta_docs": "Ler a documentação"
 }

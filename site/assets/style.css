@@ -73,7 +73,13 @@ p { margin: 0; }
 .btn-ghost { border-color: var(--line); background: var(--surface); color: var(--ink); }
 .btn-sm { padding: 9px 16px; font-size: .9rem; }
 .btn svg { width: 18px; height: 18px; flex: none; }
-@media (max-width: 1100px) { .nav-links { display: none; } }
+/* Écran étroit : le menu passe sous la barre, en bandeau qui défile */
+@media (max-width: 1100px) {
+  .nav .wrap { flex-wrap: wrap; height: auto; min-height: 64px; column-gap: 16px; }
+  .nav .brand, .nav .lang, .nav .btn-sm { margin-block: 12px; }
+  .nav-links { order: 3; width: 100%; margin-inline-start: 0; overflow-x: auto; gap: 20px; padding-block: 0 12px; scrollbar-width: none; }
+  .nav-links::-webkit-scrollbar { display: none; }
+}
 
 /* Hero */
 .hero { padding-block: 72px 0; text-align: center; overflow: hidden; }

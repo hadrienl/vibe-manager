@@ -152,5 +152,6 @@
   "theme.chip_contrast": "对比度已检查",
   "avatar.shot_alt": "Vibe Manager 的浮动面板：头像和它的气泡，显示智能体的请求以及“允许”和“拒绝”按钮。",
   "avatar.sprites_aria": "头像的十种表情",
-  "theme.shot_alt": "使用个人主题的 Vibe Manager 对话，有专属的颜色、字体和背景图片。"
+  "theme.shot_alt": "使用个人主题的 Vibe Manager 对话，有专属的颜色、字体和背景图片。",
+  "hero.cta_docs": "阅读文档"
 }
