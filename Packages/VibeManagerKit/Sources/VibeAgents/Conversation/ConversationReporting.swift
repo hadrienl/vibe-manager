@@ -4,19 +4,19 @@ import VibeDomain
 
 extension ClaudeCodeAgentProvider: AgentConversationReporting {
   /// The transcript named after the conversation's identifier, and the one its last
-  /// `SessionStart` named when that is another: a `/clear` starts a new file.
+  /// `SessionStart` named when that is another: a `/clear` starts a new file. Where it was found
+  /// is remembered: the folders are not looked through at every look (#255).
   public func conversationFiles(
     for conversation: SessionAgentConfiguration, in session: WorkSession,
     hint: AgentActivityEvent?
   ) -> [URL] {
-    let locator = AgentTranscriptLocator()
     var files: [URL] = []
     if let identifier = conversation.resumeIdentifier?.trimmingCharacters(in: .whitespaces),
-      !identifier.isEmpty
+      !identifier.isEmpty,
+      let found = TranscriptLocationCache.shared.claudeTranscript(
+        for: identifier, workingDirectory: RestartSession.workingDirectoryPath(of: session))
     {
-      files = locator.claudeTranscripts(for: identifier).filter {
-        $0.lastPathComponent == "\(identifier).jsonl"
-      }
+      files = [found]
     }
     if let path = hint?.string("transcript_path"), path.hasPrefix("/"),
       FileManager.default.fileExists(atPath: path)
@@ -58,7 +58,8 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
 }
 
 extension CodexAgentProvider: AgentConversationReporting {
-  /// Every rollout of the conversation: resuming it another day starts a new file.
+  /// Every rollout of the conversation: resuming it another day starts a new file. The days
+  /// already listed are not listed again (#255).
   public func conversationFiles(
     for conversation: SessionAgentConfiguration, in session: WorkSession,
     hint: AgentActivityEvent?
@@ -66,7 +67,7 @@ extension CodexAgentProvider: AgentConversationReporting {
     guard let identifier = conversation.resumeIdentifier?.trimmingCharacters(in: .whitespaces),
       !identifier.isEmpty
     else { return [] }
-    return AgentTranscriptLocator().codexRollouts(for: identifier, since: session.createdAt)
+    return TranscriptLocationCache.shared.codexRollouts(for: identifier, since: session.createdAt)
       .sorted { $0.lastPathComponent < $1.lastPathComponent }
   }
 
