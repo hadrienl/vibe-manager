@@ -73,6 +73,28 @@
         }
       }
     },
+    "Create an AGENTS.md file with instructions for Codex." : {
+      "comment" : "Codex's /init command, in the composer's list.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crée un fichier AGENTS.md avec des instructions pour Codex."
+          }
+        }
+      }
+    },
+    "Summarize the conversation to free up context." : {
+      "comment" : "Codex's /compact command, in the composer's list.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résume la conversation pour libérer du contexte."
+          }
+        }
+      }
+    },
     "The %@ check was interrupted." : {
       "comment" : "An agent's name.",
       "localizations" : {
