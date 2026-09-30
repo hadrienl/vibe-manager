@@ -13,8 +13,8 @@ private final class LineDecoder: ConversationDecoding {
     self.file = file
   }
 
-  func consume(_ line: Data) {
-    let text = String(decoding: line, as: UTF8.self)
+  func consume(_ record: TranscriptRecord) {
+    let text = record.text
     let id = "\(file)#\(entries.count)"
     if text.hasPrefix("user:") {
       entries.append(
@@ -88,7 +88,9 @@ private actor ScriptedTail: TranscriptTailing {
     self.contents = contents
   }
 
-  nonisolated func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+  nonisolated func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<
+    TranscriptChunk
+  > {
     let (stream, continuation) = AsyncStream<TranscriptChunk>.makeStream()
     Task { await self.opened(file, continuation) }
     return stream
@@ -96,20 +98,20 @@ private actor ScriptedTail: TranscriptTailing {
 
   private func opened(_ file: URL, _ continuation: AsyncStream<TranscriptChunk>.Continuation) {
     continuations[file] = continuation
-    continuation.yield(.lines((contents[file] ?? []).map { Data($0.utf8) }))
+    continuation.yield(.lines(contents[file] ?? []))
   }
 
-  func read(_ file: URL) async -> [Data] {
-    (contents[file] ?? []).map { Data($0.utf8) }
+  func read(_ file: URL) async -> [TranscriptRecord] {
+    (contents[file] ?? []).map(TranscriptRecord.init(text:))
   }
 
   func write(_ lines: [String], to file: URL) {
-    continuations[file]?.yield(.lines(lines.map { Data($0.utf8) }))
+    continuations[file]?.yield(.lines(lines))
   }
 
   func replace(_ file: URL, with lines: [String]) {
     continuations[file]?.yield(.reset)
-    continuations[file]?.yield(.lines(lines.map { Data($0.utf8) }))
+    continuations[file]?.yield(.lines(lines))
   }
 }
 
@@ -154,6 +156,22 @@ struct FollowConversationTests {
     await tail.replace(file, with: ["user:again"])
     let third = await next(&iterator) { $0.entries.count == 1 }
     #expect(third?.entries.first?.content == .userPrompt("again", attachments: 0))
+  }
+
+  @Test("A file emptied: its conversation is emptied, not left as it was (#249)")
+  func emptied() async throws {
+    let file = URL(fileURLWithPath: "/t/one.jsonl")
+    let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      refreshInterval: .milliseconds(100), publishInterval: .milliseconds(10))
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "one"))
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    _ = await next(&iterator) { $0.entries.count == 2 }
+    await tail.replace(file, with: [])
+    let emptied = await next(&iterator) { $0.entries.isEmpty }
+    #expect(emptied?.entries.isEmpty == true)
   }
 
   @Test("An identifier the agent gives after the start is read from the store, then followed")

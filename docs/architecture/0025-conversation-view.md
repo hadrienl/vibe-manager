@@ -73,18 +73,28 @@ agent did. A conversation rewound with `/rewind` therefore still shows what was 
 ### Following a file
 
 `FileTranscriptTail` hands over whole lines only, resumes at its offset, and reads a file that got
-shorter or changed inode again from the start after a `.reset`. A `vnode` source wakes it, a
-one-second poll underneath covers a file that does not exist yet or was replaced. A snapshot is
-published only when lines arrived, and the folders are looked at again every two seconds while a
-file is awaited, every ten after. Only the five sessions last shown in conversation keep a mounted
-view and a reader; a hidden conversation view is disabled, so that its composer never keeps the
-keyboard. The twenty shown before them keep their model — what was read, in memory only — without
-a reader: coming back to one shows its conversation at once, and it is read again from the start
-behind it, the partial reading never replacing what is on screen until it is complete. Past those,
-the model is let go of, and the placeholder shows while the transcript is read.
+shorter or changed inode again from the start after a `.reset`. It reads 4 MiB at most at a time,
+and parses each chunk's JSON on every core before handing it over, off the actor that decodes it
+(#249). The reading is pulled by the actor: the next chunk is read ahead while the one handed over
+is decoded, never more, so a transcript of a hundred megabytes is never in memory at once — nor
+queued, parsed, on its way to its decoder. A sub-agent that ended is read once the same way, a
+chunk at a time. A line longer than 16 MiB is skipped and noted (`transcript.lineSkipped`). A
+`vnode` source wakes it, a one-second poll underneath covers a file that does not exist yet or was
+replaced. A snapshot is
+published only when lines arrived — every 250 ms at most while a transcript is first read — and the
+folders are looked at again every two seconds while a file is awaited, every ten after. Only the
+five sessions last shown in conversation keep a mounted view and a reader; a hidden conversation
+view is disabled, so that its composer never keeps the keyboard. The twenty shown before them keep
+their model — what was read, in memory only — without a reader: coming back to one shows its
+conversation at once, and its readers resume where they stopped, their decoders and positions kept
+aside in memory for as long as the model sleeps — only what was written meanwhile is read, or the
+whole file again, apart, if it was replaced (the bytes before where the reading stopped are checked).
+Past those, the model is let go of with what was kept aside, and the placeholder shows while the
+transcript is read.
 
 Of the five mounted, only the one on screen is laid out (#250). The four others are still read, so
-that coming back to one is instant, but published once a second rather than every 50 ms, and their
+that coming back to one is instant, but published once a second rather than every 50 ms — and never less than the 250 ms of a
+first reading while one is under way — and their
 model keeps the last snapshot without laying it out: only the echoes are confirmed, so that a prompt
 sent just before switching is not said lost. Shown again, what waits is published at once and laid
 out once. The view says when it is on screen, through the `isActive` it already has; the reader is
