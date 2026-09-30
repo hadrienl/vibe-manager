@@ -372,7 +372,8 @@ struct BrowserWorkspaceToolsTests {
     }
     _ = try await answerNext(workspace, in: session, with: .allowOnce)
     #expect(text(await allowed.value).contains("3 open"))
-    let again = await workspace.run(tool: "page_read", arguments: ["mode": "text"], session: session)
+    let again = await workspace.run(
+      tool: "page_read", arguments: ["mode": "text"], session: session)
     #expect(text(again).contains("3 open"))
     #expect(workspace.pendingRequests.isEmpty)
     let relisted = try first(

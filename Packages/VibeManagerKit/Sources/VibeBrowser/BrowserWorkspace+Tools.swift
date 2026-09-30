@@ -120,7 +120,8 @@ extension BrowserWorkspace: BrowserToolRunning {
         arguments["level"]?.stringValue.flatMap(BrowserConsoleEntry.Level.init) ?? .debug
       let limit = min(max(arguments["limit"]?.intValue ?? 200, 1), 200)
       let entries = tab.console.entries.filter { $0.level >= minimum }.suffix(limit)
-      record(tool, in: browser, tab: tab, target: "\(entries.count) messages", decision: read.decision)
+      record(
+        tool, in: browser, tab: tab, target: "\(entries.count) messages", decision: read.decision)
       guard !entries.isEmpty else { return .text("The console is empty since the page loaded.") }
       let formatter = ISO8601DateFormatter()
       formatter.formatOptions = [.withTime, .withColonSeparatorInTime]
@@ -461,7 +462,8 @@ extension BrowserWorkspace: BrowserToolRunning {
       throw BrowserToolFailure(reason)
     case .ask:
       tab.isAgentActing = true
-      let outcome = await ask(.read(tool: tool.name), tab: tab, in: browser.sessionID, grantKey: nil)
+      let outcome = await ask(
+        .read(tool: tool.name), tab: tab, in: browser.sessionID, grantKey: nil)
       tab.isAgentActing = false
       switch outcome {
       case .allowed:
