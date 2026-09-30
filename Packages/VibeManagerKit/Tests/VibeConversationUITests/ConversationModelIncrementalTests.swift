@@ -87,7 +87,12 @@ struct ConversationModelIncrementalTests {
     var running = true
     let incremental = ConversationModel(sessionID: SessionID())
     let full = ConversationModel(sessionID: SessionID())
-    for model in [incremental, full] { model.processRunning = { running } }
+    for model in [incremental, full] {
+      model.processRunning = { running }
+      // Sub-agents that ended linger by the clock: a runner that stalls between the two models
+      // must not let one see them leave and not the other.
+      model.trayLinger = .seconds(3600)
+    }
     var entries: [ConversationEntry] = []
     for step in 1...120 {
       // Mostly at the end, as a transcript grows; sometimes a result further up.

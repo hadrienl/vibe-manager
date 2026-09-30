@@ -225,7 +225,25 @@ struct FollowConversationTests {
     #expect(third.unchangedPrefix == 0)
   }
 
-  @Test("Hidden, a conversation is published at its own pace; shown again, at once (#250)")
+  @Test("Hidden, a conversation is published at its own pace, not at the one on screen (#250)")
+  func hiddenPace() async throws {
+    let file = URL(fileURLWithPath: "/t/pace.jsonl")
+    let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])
+    // Only the hidden pace comes within the test: a publication is its doing.
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      refreshInterval: .milliseconds(100), publishInterval: .seconds(3600),
+      hiddenPublishInterval: .zero)
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "pace"))
+    await follow.setShown(false, for: session.id, order: 1)
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    let published = await next(&iterator) { $0.entries.count == 2 }
+    #expect(published?.entries.count == 2)
+    #expect(await follow.isHidden(session.id))
+  }
+
+  @Test("Hidden, a conversation waits; shown again, it is published at once (#250)")
   func hiddenConversation() async throws {
     let file = URL(fileURLWithPath: "/t/hidden.jsonl")
     let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])

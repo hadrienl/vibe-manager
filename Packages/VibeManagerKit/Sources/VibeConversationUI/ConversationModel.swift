@@ -465,7 +465,10 @@ public final class ConversationModel {
     pendingLayout = (
       min(pendingLayout?.changedFrom ?? .max, from), (pendingLayout?.lingers ?? true) && lingers
     )
-    guard isShown else { return }
+    guard isShown else {
+      updateAnnouncedCall()
+      return
+    }
     layOut()
   }
 
@@ -486,6 +489,7 @@ public final class ConversationModel {
     pendingLayout = nil
     Signposts.interval("conversation.apply") { layOut(changedFrom: pending.changedFrom) }
     updateTray(lingers: pending.lingers)
+    updateAnnouncedCall()
   }
 
   /// The entries as shown, then their blocks, from the first that may differ: the permission
@@ -814,9 +818,36 @@ public final class ConversationModel {
   /// marked, the sub-agent's own call rather than the sub-agent, when one asks (#180).
   public var pendingCall: ToolCall? {
     guard case .awaitingUser = activity else { return nil }
-    return ConversationEntry.allCalls(in: shownEntries).last {
+    return Self.waitedCall(in: shownEntries)
+  }
+
+  private static func waitedCall(in entries: [ConversationEntry]) -> ToolCall? {
+    ConversationEntry.allCalls(in: entries).last {
       $0.state == .awaitingPermission || ($0.kind == .question && !$0.state.isFinished)
     }
+  }
+
+  /// The call the agent waits on, for VoiceOver to say: taken from what was received, laid out or
+  /// not, so that a conversation hidden still announces a permission or a question, as it did
+  /// before only the one on screen was laid out (#250). The same as `pendingCall` once shown.
+  public private(set) var announcedCallID: String?
+
+  private func updateAnnouncedCall() {
+    let id: String?
+    if isShown {
+      id = pendingCall?.callID
+    } else if case .awaitingUser = activity {
+      var entries = latestSnapshot.entries
+      let mark = ConversationEntry.pendingPermissionMark(
+        entries, activity: activity,
+        agentID: activity == .awaitingUser(.approval)
+          ? pendingRequest()?.request.reference.agentID : nil)
+      if let mark { entries[mark.index] = mark.entry }
+      id = Self.waitedCall(in: entries)?.callID
+    } else {
+      id = nil
+    }
+    if id != announcedCallID { announcedCallID = id }
   }
 
   /// The call still running, for the activity line. Not a sub-agent: the bar over the composer

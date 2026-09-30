@@ -716,6 +716,28 @@ struct ConversationModelTests {
     #expect(model.draft == "Green")
   }
 
+  @Test("Hidden, a conversation still names the call its agent waits on, for VoiceOver (#250)")
+  func announcedWhileHidden() {
+    let (model, _) = model()
+    model.setShown(false)
+    model.activity = .awaitingUser(.approval)
+    let call = ToolCall(callID: "t1", kind: .shell, parameters: [ToolParameter(.command, "ls")])
+    model.apply(
+      ConversationSnapshot(
+        entries: [ConversationEntry(id: "e1", content: .tool(call))], availability: .available))
+    #expect(model.announcedCallID == "t1")
+    // Nothing laid out while hidden: the banner's call waits for the screen.
+    #expect(model.pendingCall == nil)
+
+    // Shown, the same call: nothing new to say.
+    model.setShown(true)
+    #expect(model.pendingCall?.callID == "t1")
+    #expect(model.announcedCallID == "t1")
+
+    model.activity = .working
+    #expect(model.announcedCallID == nil)
+  }
+
   @Test("A permission's buttons go under the call it names, not the last one waiting")
   func permissionUnderItsCall() {
     let (model, _) = model()
