@@ -37,8 +37,13 @@ public enum ClaudeCodeActivityHooks {
     Hook(
       event: "PermissionDenied", matcher: nil,
       payload: .fields(AgentRequestReading.resolutionFields)),
+    // Every call of a batch resolved, refused ones included (#273): only which agent's batch.
+    Hook(event: "PostToolBatch", matcher: nil, payload: .fields(["agent_id"])),
     Hook(event: "Stop", matcher: nil, payload: .drop),
-    Hook(event: "StopFailure", matcher: nil, payload: .drop),
+    // Which error ended the turn, and the API's words for it (#273).
+    Hook(
+      event: "StopFailure", matcher: nil,
+      payload: .fields(["error", "last_assistant_message"])),
     Hook(event: "SessionEnd", matcher: nil, payload: .drop),
   ]
 
@@ -74,6 +79,12 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
   public var answerKeymap: (any AgentAnswerKeymap)? {
     ClaudeCodeAnswerKeymap()
   }
+
+  /// The errors of `StopFailure` only the user can end: signing in again, an account to sort out.
+  static let accountErrors: Set<String> = [
+    "authentication_failed", "oauth_org_not_allowed", "account_on_hold", "billing_error",
+    "cloud_credential_error",
+  ]
 
   /// The notifications that say a dialog is up, checked against 2.1.285 and its documentation.
   /// `elicitation_dialog` is left out: the `Elicitation` hook reports the same dialog, and ends it.
@@ -144,8 +155,16 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       let reference = AgentRequestReading.reference(of: event)
       guard let tool = reference.tool else { return .questionResolved }
       return .toolFinished(tool, agentID: reference.agentID, subject: reference.subject)
-    case "Stop", "StopFailure":
+    case "PostToolBatch":
+      return .batchResolved(agentID: event.string("agent_id"))
+    case "Stop":
       return .turnEnded
+    case "StopFailure":
+      guard let error = event.string("error"), Self.accountErrors.contains(error) else {
+        return .turnEnded
+      }
+      return .turnFailed(
+        AgentTerminalPrompt(kind: .account, message: event.string("last_assistant_message")))
     case "SessionEnd":
       return .agentEnded
     default:

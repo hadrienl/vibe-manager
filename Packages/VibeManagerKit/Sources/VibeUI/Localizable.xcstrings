@@ -4013,6 +4013,17 @@
         }
       }
     },
+    "Account to check" : {
+      "comment" : "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte à vérifier"
+          }
+        }
+      }
+    },
     "Activity" : {
       "comment" : "A section of the inspector.\nA tab of the Settings window.",
       "localizations" : {
@@ -12954,6 +12965,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Démarrage…"
+          }
+        }
+      }
+    },
+    "Startup dialog" : {
+      "comment" : "The title of a request of an agent: a dialog of the CLI's start — trusting the folder, approving servers, signing in — is most likely waiting.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dialogue de démarrage"
           }
         }
       }

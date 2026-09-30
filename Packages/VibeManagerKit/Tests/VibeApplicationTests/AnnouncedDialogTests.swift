@@ -369,6 +369,76 @@ struct PartlyQuotedDialogTests {
   }
 }
 
+@Suite("Requests settled by what nothing else reports (#273, P2)")
+struct SettledRequestsTests {
+  private func request(_ command: String, agent: String? = nil) -> AgentSignal {
+    .questionAsked(
+      .approval, tool: "Bash",
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(tool: .shell, toolName: "Bash", subject: command)),
+        reference: AgentToolReference(tool: "Bash", agentID: agent, subject: command),
+        isShown: true))
+  }
+
+  @Test("A batch resolved takes its agent's requests away — a refusal with a comment is one")
+  func batchResolved() {
+    let state = feed(request("rm a"), request("ls", agent: "a1"), .batchResolved(agentID: nil))
+    #expect(state.requests.map(\.reference.agentID) == ["a1"])
+    #expect(state.activity == .awaitingUser(.approval))
+    // A sub-agent's dialog refused with Escape: its own batch is resolved.
+    let sub = feed(.batchResolved(agentID: "a1"), to: state)
+    #expect(sub.requests.isEmpty)
+    #expect(sub.activity == .working)
+  }
+
+  @Test("A sub-agent's batch leaves the main agent's requests, announced ones too")
+  func otherAgentsBatch() {
+    let state = feed(network, request("rm a"), .batchResolved(agentID: "a1"))
+    #expect(state.requests.count == 1)
+    let main = feed(network, .batchResolved(agentID: nil))
+    #expect(main.requests.isEmpty)
+  }
+
+  @Test("A turn failed on the account ends the turn and asks for the user")
+  func turnFailed() {
+    let prompt = AgentTerminalPrompt(kind: .account, message: "API Error: OAuth token has expired")
+    let state = feed(.turnFailed(prompt))
+    #expect(state.requests.map(\.content) == [.inTerminal(prompt)])
+    // Said even behind a sub-agent's dialog still up.
+    #expect(feed(request("ls", agent: "a1"), .turnFailed(prompt)).requests.count == 2)
+    #expect(state.activity == .awaitingUser(.approval))
+    #expect(feed(.promptSubmitted(byUser: true), to: state).requests.isEmpty)
+  }
+
+  @Test("Hooks silent past their delay: a startup dialog is most likely waiting, until they speak")
+  func startup() {
+    let started = AgentActivityState(
+      activity: .idle, source: .unconfirmed(since: start))
+    let late = AgentActivityMachine.reduce(
+      started, .tick,
+      context: AgentActivityContext(
+        now: start.addingTimeInterval(11), isVisible: false,
+        requestID: AgentRequestID(sessionID: session, key: "tick")))
+    #expect(late.source == .inferred)
+    guard case .inTerminal(let prompt) = late.requests.first?.content else {
+      Issue.record("no startup request")
+      return
+    }
+    #expect(prompt.kind == .startup)
+    #expect(late.activity == .awaitingUser(.approval))
+    // The dialog answered, the hooks speak: it is gone.
+    #expect(feed(.channelConfirmed, to: late).requests.isEmpty)
+    // Without hooks, nothing is waited for.
+    let bare = AgentActivityMachine.reduce(
+      AgentActivityState(activity: .idle, source: .inferred), .tick,
+      context: AgentActivityContext(
+        now: start.addingTimeInterval(11), isVisible: false,
+        requestID: AgentRequestID(sessionID: session, key: "tick")))
+    #expect(bare.requests.isEmpty)
+  }
+}
+
 @Suite("OSC 9 notifications in a terminal's output (#273)")
 struct TerminalNotificationScannerTests {
   private func bytes(_ text: String) -> [UInt8] { Array(text.utf8) }

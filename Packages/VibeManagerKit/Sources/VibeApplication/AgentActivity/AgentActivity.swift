@@ -73,8 +73,15 @@ public enum AgentSignal: Hashable, Sendable {
   /// tells which request it is; with none that matches, the dialog is `otherwise`, when that is
   /// said: Codex draws a form for an MCP tool's permission and for a server's own request alike.
   case dialogDrawn(AgentDrawnDialog, otherwise: AgentTerminalPrompt? = nil)
+  /// Every tool call of a batch the agent — `agentID`, a sub-agent, or the agent itself when `nil`
+  /// — made is resolved, refused ones too (#273): none of its requests still waits. Claude Code
+  /// reports a refusal with a comment, Escape on a sub-agent's dialog, a countdown run out, with
+  /// this alone.
+  case batchResolved(agentID: String?)
   /// The agent finished its answer.
   case turnEnded
+  /// The turn ended on an error the user must act on, which `prompt` says (#273): signing in again.
+  case turnFailed(AgentTerminalPrompt)
   /// The user stopped the turn. Nothing was answered, so nothing is left to read.
   case interrupted
   /// The agent says it has been waiting for input for a while — the net under an interruption

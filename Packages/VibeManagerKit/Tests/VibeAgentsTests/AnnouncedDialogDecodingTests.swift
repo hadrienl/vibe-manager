@@ -117,4 +117,37 @@ struct AnnouncedDialogDecodingTests {
     // The hooks, and so what Codex asked the user to approve, are the same as before.
     #expect(CodexActivityHooks.hookOptions(in: arguments) == CodexActivityHooks.options())
   }
+
+  @Test("Claude Code: a batch resolved, and a turn failed on the account (P2)")
+  func claudeP2() {
+    let decoder = ClaudeCodeSignalDecoder()
+    func event(_ name: String, _ payload: String?) -> AgentActivityEvent {
+      AgentActivityEvent(name: name, date: Date(), payload: payload.map { Data($0.utf8) })
+    }
+    #expect(decoder.signal(for: event("PostToolBatch", nil)) == .batchResolved(agentID: nil))
+    #expect(
+      decoder.signal(for: event("PostToolBatch", #"{"agent_id":"a1"}"#))
+        == .batchResolved(agentID: "a1"))
+    #expect(
+      decoder.signal(
+        for: event(
+          "StopFailure",
+          #"{"error":"authentication_failed","last_assistant_message":"API Error: 401"}"#))
+        == .turnFailed(AgentTerminalPrompt(kind: .account, message: "API Error: 401")))
+    #expect(decoder.signal(for: event("StopFailure", #"{"error":"rate_limit"}"#)) == .turnEnded)
+    #expect(decoder.signal(for: event("StopFailure", nil)) == .turnEnded)
+    #expect(ClaudeCodeActivityHooks.hooks.contains { $0.event == "PostToolBatch" })
+  }
+
+  @Test("Codex: a tool finishing says which, for which agent, on what (P2)")
+  func codexToolFinished() {
+    let event = AgentActivityEvent(
+      name: "PostToolUse", date: Date(),
+      payload: Data(#"{"agent_id":"a1","tool_name":"Bash","command":"ls"}"#.utf8))
+    #expect(
+      CodexSignalDecoder().signal(for: event) == .toolFinished("Bash", agentID: "a1", subject: "ls"))
+    #expect(
+      CodexSignalDecoder().signal(for: AgentActivityEvent(name: "PostToolUse", date: Date()))
+        == .questionResolved)
+  }
 }
