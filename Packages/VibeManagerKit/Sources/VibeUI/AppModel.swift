@@ -165,8 +165,8 @@ public final class AppModel {
   /// The last stop sent to the monitor, which the next one and every `observe` wait for.
   private var pendingStop: Task<Void, Never>?
 
-  /// The session the user asked to archive, held until they confirm. Archiving is reversible,
-  /// but it moves a session out of sight, and a slip of the pointer must not do that.
+  /// The session the user asked to archive while something was still running in it, held until
+  /// they confirm. Archiving is reversible, the work in progress it stops is not (#115).
   public private(set) var pendingArchive: WorkSession?
   /// The session the user asked to close while its agent was still working, held until they
   /// confirm. Closing can be undone with Restart, but the agent's work in progress cannot.
@@ -180,8 +180,9 @@ public final class AppModel {
   public internal(set) var pendingBatch: SessionBatchConfirmation?
   /// What a command on several sessions could not do. `nil` when everything went through.
   public internal(set) var batchReport: SessionBatchReport?
-  /// Whether closing a session whose agent runs asks first. Mirrored here so that the settings
-  /// window and the dialog's "Don't ask again" read and change the same answer.
+  /// Whether closing or archiving a session whose agent or side terminals run asks first.
+  /// Mirrored here so that the settings window and the dialogs' "Don't ask again" read and change
+  /// the same answer.
   public var confirmsStoppingRunningAgent: Bool {
     didSet { closePreferences.confirmsStoppingRunningAgent = confirmsStoppingRunningAgent }
   }
@@ -552,6 +553,14 @@ public final class AppModel {
   /// The session on screen was reached with the arrow keys in the sidebar (#105): its composer
   /// leaves the keyboard in the list, until Return or → hands it over, or another way in is used.
   public internal(set) var keepsKeyboardInSidebar = false
+  /// The session that took the place of an archived one on screen (#115): it leaves the keyboard
+  /// in the sidebar, where the next ⌃⌘A is pressed from, rather than taking it into an agent that
+  /// did not ask for it. Only that session, and only until the user goes to one themselves: a
+  /// session created or followed afterwards takes the keyboard as it always has.
+  var keyboardHeldInSidebarFor: SessionID?
+  /// Archives under way, from the command to the reload that takes the session out of its column.
+  /// Until then the row is still there, and a second ⌃⌘A would archive it a second time.
+  public private(set) var archivingSessionIDs: Set<SessionID> = []
   /// Whether the list of the archived sessions is open at the foot of the sidebar. Here rather
   /// than in the view, so that the menu can open it.
   public var isArchiveListPresented = false
@@ -1060,17 +1069,19 @@ public final class AppModel {
     return session.status == .active || launcher?.isRunning(session.id) == true
   }
 
-  /// Whether closing this session would interrupt an agent at work, and the user wants to be
-  /// asked about that. A session whose agent has already stopped loses nothing by closing.
-  public func needsCloseConfirmation(_ session: WorkSession) -> Bool {
-    confirmsStoppingRunningAgent && launcher?.isRunning(session.id) == true
+  /// Whether closing or archiving this session would interrupt work, and the user wants to be
+  /// asked about that: its agent, or a command in its side terminals (#115). A session where
+  /// nothing runs any more loses nothing by being closed or archived.
+  public func interruptsWork(_ session: WorkSession) -> Bool {
+    confirmsStoppingRunningAgent
+      && (launcher?.isRunning(session.id) == true || !runningDrawerCommands(of: session.id).isEmpty)
   }
 
-  /// What ⇧⌘W and every other Close Session run: closes at once, or asks first when an agent
-  /// would be interrupted. Does nothing for a session there is nothing left to close.
+  /// What ⇧⌘W and every other Close Session run: closes at once, or asks first when work would
+  /// be interrupted. Does nothing for a session there is nothing left to close.
   public func requestClose(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canClose(session) else { return }
-    guard !needsCloseConfirmation(session) else {
+    guard !interruptsWork(session) else {
       pendingClose = session
       return
     }
@@ -1092,7 +1103,7 @@ public final class AppModel {
   }
 
   public func canArchive(_ session: WorkSession) -> Bool {
-    session.status != .archived
+    session.status != .archived && !archivingSessionIDs.contains(session.id)
   }
 
   public func canRestore(_ session: WorkSession) -> Bool {
@@ -1226,30 +1237,59 @@ public final class AppModel {
     (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
   }
 
-  /// Opens the confirmation rather than archiving. The command is reversible, but it takes a
-  /// session out of the view it was in, and that is worth one deliberate answer.
-  public func requestArchive(_ id: SessionID) {
+  /// What ⌃⌘A and every other Archive run (#115): archives at once a session where nothing runs,
+  /// which is reversible and stops nothing, and asks first when work would be interrupted — the
+  /// rule and the setting of Close Session. One key, repeated, empties a column.
+  public func requestArchive(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canArchive(session) else { return }
-    pendingArchive = session
+    guard !interruptsWork(session) else {
+      pendingArchive = session
+      return
+    }
+    await archive(id)
+  }
+
+  /// Whether Archive will ask before archiving: the menus end its name with an ellipsis then.
+  public func archiveAsks(_ session: WorkSession) -> Bool {
+    canArchive(session) && interruptsWork(session)
   }
 
   public func cancelArchive() {
     pendingArchive = nil
   }
 
-  /// Archives the session the confirmation was opened for.
+  /// Archives a session, at once or once the confirmation is answered.
   ///
   /// It takes the identifier rather than reading `pendingArchive`, because by the time the
   /// dialog's button runs its action SwiftUI has already dismissed the dialog — and the dismissal
   /// clears `pendingArchive`. Reading it here made Archive do nothing at all.
-  public func archive(_ id: SessionID) async {
+  ///
+  /// The selected session hands the selection to its neighbour, and the keyboard to the sidebar:
+  /// the next ⌃⌘A archives that neighbour, and nothing typed in between reaches its agent.
+  public func archive(_ id: SessionID, askAgain: Bool = true) async {
     pendingArchive = nil
+    if !askAgain {
+      confirmsStoppingRunningAgent = false
+    }
+    guard archivingSessionIDs.insert(id).inserted else { return }
+    defer { archivingSessionIDs.remove(id) }
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
+    let name = sessions.first { $0.id == id }?.name
+    var archived = false
     do {
       let archival = try await archiveProcess(id)
+      archived = true
       report(archival.detachment, for: archival.session, action: .archived)
       prepareHandOff(from: id, listedBefore: visible)
+      // Set before the reload that puts the neighbour on screen: its terminal must not take the
+      // keyboard in between.
+      if wasSelected { keyboardHeldInSidebarFor = preferredSelection }
+      if let name {
+        Announcer.announce(
+          String(
+            localized: "\(name) archived.", bundle: .module, comment: "A session's name."))
+      }
     } catch {
       // An archive that failed is not a silent no-op. The dialog is already gone, so the banner
       // is the only thing left that can say the session is still where it was.
@@ -1258,6 +1298,10 @@ public final class AppModel {
     await reload()
     handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
     reconcileSelection()
+    if archived, wasSelected, selectedSessionID != id {
+      keyboardHeldInSidebarFor = selectedSessionID
+      focusSidebar()
+    }
   }
 
   private func archiveProcess(_ id: SessionID) async throws -> SessionArchival {
@@ -1319,7 +1363,7 @@ public final class AppModel {
     guard let session = sessions.first(where: { $0.id == id }), session.taskStatus != status
     else { return }
     if status == .archived {
-      requestArchive(id)
+      await requestArchive(id)
       return
     }
     if session.taskStatus == .archived {
@@ -2343,7 +2387,10 @@ public final class AppModel {
   ///   on screen (#177). A selection the application moves by itself — a session that changed
   ///   column, or went — must not take the draft away from under the user's typing.
   public func select(_ id: SessionID?, leavingDraft: Bool = true) {
-    if leavingDraft { leaveNewSessionDraft() }
+    if leavingDraft {
+      leaveNewSessionDraft()
+      keyboardHeldInSidebarFor = nil
+    }
     keepsKeyboardInSidebar = false
     creationWasLeft(for: id)
     // Going to a session is choosing it alone (#77).
@@ -2900,6 +2947,12 @@ extension AppModel {
       layout.setSidebarVisible(true)
     }
     sidebarFocusRequest += 1
+  }
+
+  /// Whether the session on screen leaves the keyboard in the sidebar: see
+  /// `keyboardHeldInSidebarFor`.
+  public var sidebarHoldsKeyboard: Bool {
+    keyboardHeldInSidebarFor != nil && keyboardHeldInSidebarFor == selectedSessionID
   }
 
   /// Show Archived Sessions, ⌥⌘A: the list at the foot of the sidebar, which is shown first if it

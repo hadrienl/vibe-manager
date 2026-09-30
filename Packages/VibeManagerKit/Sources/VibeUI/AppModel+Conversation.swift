@@ -33,6 +33,7 @@ extension AppModel {
   @discardableResult
   public func focusSession() -> Bool {
     keepsKeyboardInSidebar = false
+    keyboardHeldInSidebarFor = nil
     guard let session = selectedSession, canClaimKeyboard else { return false }
     if presentation(of: session) == .conversation {
       guard launcher?.isRunning(session.id) == true else { return false }
@@ -59,16 +60,17 @@ extension AppModel {
   /// Not while the user walks the sidebar with the arrow keys: the list would lose them at the
   /// first row. Nor while several sessions are selected: see `terminalClaimsKeyboardOnActivation`.
   public var composerClaimsKeyboardOnActivation: Bool {
-    !keepsKeyboardInSidebar && canClaimKeyboard && !hasMultipleSelection
+    !keepsKeyboardInSidebar && !sidebarHoldsKeyboard && canClaimKeyboard && !hasMultipleSelection
   }
 
   /// Whether the terminal on screen takes the keyboard when its session comes on screen. It
   /// does, as it always has — except for a session a ⌘-click or a ⇧-click just added to a
   /// selection of several (#128). The keyboard stays in the sidebar then, where the selection is
   /// made and used; it is the keyboard leaving the sidebar that brings the selection back to
-  /// the session on screen, so that ⇧⌘W never closes sessions nobody is looking at.
+  /// the session on screen, so that ⇧⌘W never closes sessions nobody is looking at. Nor for the
+  /// session that took the place of an archived one: see `sidebarHoldsKeyboard`.
   public var terminalClaimsKeyboardOnActivation: Bool {
-    !hasMultipleSelection && canClaimKeyboard
+    !hasMultipleSelection && !sidebarHoldsKeyboard && canClaimKeyboard
   }
 
   /// View › Show Conversation / Show Terminal (⌥⌘T), for the selected session.

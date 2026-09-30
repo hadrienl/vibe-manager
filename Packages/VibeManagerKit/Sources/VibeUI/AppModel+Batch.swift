@@ -178,15 +178,23 @@ extension AppModel {
           bundle: .module,
           comment: "Archived is the line at the foot of the sidebar that lists archived sessions."))
     case .close:
-      let running = eligible.filter(needsCloseConfirmation).count
-      guard running > 0 else { return nil }
+      guard eligible.contains(where: interruptsWork) else { return nil }
       title = String(localized: "Close \(count) Sessions?", bundle: .module)
       confirmTitle = batchTitle(for: plan)
-      sentences.append(
-        String(
-          localized:
-            "\(running) running agents will be stopped. The sessions can be restarted later.",
-          bundle: .module))
+      let running = eligible.filter { launcher?.isRunning($0.id) == true }.count
+      if running > 0 {
+        sentences.append(
+          String(
+            localized:
+              "\(running) running agents will be stopped. The sessions can be restarted later.",
+            bundle: .module))
+      }
+      // Only side terminals at work (#115): what they run is what closing stops.
+      if eligible.contains(where: { !runningDrawerCommands(of: $0.id).isEmpty }) {
+        sentences.append(
+          String(
+            localized: "What runs in their side terminals will be stopped.", bundle: .module))
+      }
     case .restart:
       guard count > 1 else { return nil }
       title = String(localized: "Restart \(count) Sessions?", bundle: .module)

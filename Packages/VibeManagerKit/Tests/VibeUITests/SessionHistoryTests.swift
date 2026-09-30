@@ -172,19 +172,39 @@ struct SessionHistoryTests {
 
   // MARK: - The workspace
 
-  @Test("Archiving is confirmed before it happens")
-  func archivingAsksFirst() async {
+  @Test("Archiving a session where nothing runs asks nothing (#115)")
+  func archivingAnIdleSessionIsImmediate() async {
     let stored = session()
     let repository = MutableRepository(sessions: [stored])
     let model = AppModel(repository: repository, agents: EmptyRegistry())
     await model.load()
 
-    model.requestArchive(stored.id)
+    #expect(!model.archiveAsks(stored))
+    await model.requestArchive(stored.id)
+
+    #expect(model.pendingArchive == nil)
+    #expect(await repository.session(id: stored.id)?.status == .archived)
+  }
+
+  @Test("Archiving a session whose agent runs is confirmed before it happens")
+  func archivingARunningAgentAsksFirst() async {
+    let stored = session(status: .active)
+    let repository = MutableRepository(sessions: [stored])
+    let supervisor = SpySupervisor()
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
+    await model.load()
+    await launcher.launch(session: stored, plan: plan())
+    await model.reload()
+
+    #expect(model.archiveAsks(stored))
+    await model.requestArchive(stored.id)
     #expect(model.pendingArchive?.id == stored.id)
 
     model.cancelArchive()
     #expect(model.pendingArchive == nil)
-    #expect(await repository.session(id: stored.id)?.status == .closed)
+    #expect(launcher.isRunning(stored.id))
+    #expect(await supervisor.stopped.isEmpty)
   }
 
   /// SwiftUI dismisses a confirmation dialog *before* running the button's action, and the
@@ -192,16 +212,49 @@ struct SessionHistoryTests {
   /// found nothing, and Archive silently did nothing at all.
   @Test("Confirming archives the session even though the dialog has already been dismissed")
   func confirmingDoesNotDependOnThePendingSession() async {
-    let stored = session()
+    let stored = session(status: .active)
     let repository = MutableRepository(sessions: [stored])
-    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    let supervisor = SpySupervisor()
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), launcher: launcher)
     await model.load()
+    await launcher.launch(session: stored, plan: plan())
+    await model.reload()
 
-    model.requestArchive(stored.id)
+    await model.requestArchive(stored.id)
     model.cancelArchive()
     await model.archive(stored.id)
 
     #expect(await repository.session(id: stored.id)?.status == .archived)
+    #expect(!launcher.isRunning(stored.id))
+    #expect(model.confirmsStoppingRunningAgent)
+  }
+
+  @Test("“Don't ask again” on the archive question is the close question's setting")
+  func archiveDontAskAgainIsShared() async {
+    let first = session(name: "First", status: .active)
+    let second = session(name: "Second", status: .active)
+    let repository = MutableRepository(sessions: [first, second])
+    let supervisor = SpySupervisor()
+    let launcher = launcher(supervisor: supervisor, repository: repository)
+    let preferences = InMemorySessionClosePreferences()
+    let model = AppModel(
+      repository: repository, agents: EmptyRegistry(), launcher: launcher,
+      closePreferences: preferences)
+    await model.load()
+    await launcher.launch(session: first, plan: plan())
+    await launcher.launch(session: second, plan: plan())
+    await model.reload()
+
+    await model.requestArchive(first.id)
+    await model.archive(first.id, askAgain: false)
+    #expect(!preferences.confirmsStoppingRunningAgent)
+
+    // Neither archiving nor closing asks any more.
+    await model.requestClose(second.id)
+    #expect(model.pendingClose == nil)
+    #expect(!launcher.isRunning(first.id))
+    #expect(!launcher.isRunning(second.id))
   }
 
   @Test("A confirmed archive takes the session out of the columns, and back to Done on request")
@@ -214,8 +267,7 @@ struct SessionHistoryTests {
     model.setColumn(.done)
     #expect(model.visibleSessions.count == 2)
 
-    model.requestArchive(archived.id)
-    await model.archive(archived.id)
+    await model.requestArchive(archived.id)
 
     #expect(model.archivedSessionCount == 1)
     #expect(model.visibleSessions.map(\.name) == ["Still working"])
@@ -235,8 +287,7 @@ struct SessionHistoryTests {
     let model = AppModel(repository: repository, agents: EmptyRegistry(), notesStore: notes)
     await model.load()
 
-    model.requestArchive(stored.id)
-    await model.archive(stored.id)
+    await model.requestArchive(stored.id)
 
     let archived = await repository.session(id: stored.id)
     #expect(archived?.status == .archived)
@@ -256,7 +307,7 @@ struct SessionHistoryTests {
     await model.load()
     await launcher.launch(session: stored, plan: plan())
 
-    model.requestArchive(stored.id)
+    await model.requestArchive(stored.id)
     await model.archive(stored.id)
 
     #expect(model.detachWarning?.processIdentifier == 4242)
@@ -284,7 +335,7 @@ struct SessionHistoryTests {
     #expect(model.detachWarning?.processIdentifier == 4242)
     model.dismissDetachWarning()
 
-    model.requestArchive(stored.id)
+    await model.requestArchive(stored.id)
     await model.archive(stored.id)
 
     #expect(model.detachWarning == nil)

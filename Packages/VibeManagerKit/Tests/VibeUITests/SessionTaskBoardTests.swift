@@ -125,20 +125,107 @@ struct SessionTaskBoardTests {
     #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
   }
 
-  @Test("Archive from the swipe asks first, as the command does")
-  func archivingAsks() async {
+  @Test("Archive from the swipe archives a session where nothing runs, at once (#115)")
+  func archivingAnIdleSessionAsksNothing() async {
     let subject = session("Subject", in: .done)
     let (model, _, repository) = makeWorkspace([subject])
     await model.load()
 
     await model.setTaskStatus(.archived, for: subject.id)
 
+    #expect(model.pendingArchive == nil)
+    #expect(await repository.session(id: subject.id)?.taskStatus == .archived)
+    #expect(model.archivedSessions.map(\.id) == [subject.id])
+  }
+
+  @Test("Archive from the swipe asks first when the agent runs, as the command does")
+  func archivingARunningSessionAsks() async {
+    let subject = session("Subject", in: .done, path: folder())
+    let (model, launcher, repository) = makeWorkspace([subject])
+    await model.load()
+    await model.refreshResolutions()
+    await model.restart(subject.id)
+    #expect(launcher.isRunning(subject.id))
+
+    await model.setTaskStatus(.archived, for: subject.id)
+
     #expect(model.pendingArchive?.id == subject.id)
-    #expect(await repository.session(id: subject.id)?.taskStatus == .done)
+    #expect(await repository.session(id: subject.id)?.taskStatus != .archived)
 
     await model.archive(subject.id)
     #expect(await repository.session(id: subject.id)?.taskStatus == .archived)
-    #expect(model.archivedSessions.map(\.id) == [subject.id])
+    #expect(!launcher.isRunning(subject.id))
+  }
+
+  @Test("⌃⌘A pressed again and again empties a column, in the order it is drawn (#115)")
+  func archivingInABurst() async {
+    let first = session("First", in: .done, updatedAt: 300)
+    let second = session("Second", in: .done, updatedAt: 200)
+    let third = session("Third", in: .done, updatedAt: 100)
+    let other = session("Other", in: .waiting)
+    let (model, _, repository) = makeWorkspace([first, second, third, other])
+    await model.load()
+    model.setColumn(.done)
+    model.select(first.id)
+
+    var archived: [SessionID] = []
+    for _ in 0..<3 {
+      guard let selected = model.selectedSession, model.canArchive(selected) else { break }
+      archived.append(selected.id)
+      await model.requestArchive(selected.id)
+    }
+
+    #expect(archived == [first.id, second.id, third.id])
+    #expect(model.pendingArchive == nil)
+    #expect(model.visibleSessions.isEmpty)
+    // The column is empty: the key has nothing left to archive, and never reaches another column.
+    #expect(!(model.selectedSession.map(model.canArchive) ?? false))
+    #expect(await repository.session(id: other.id)?.taskStatus == .waiting)
+  }
+
+  @Test("After archiving the session on screen, its neighbour leaves the keyboard in the sidebar")
+  func archivingKeepsTheKeyboardInTheSidebar() async {
+    let archived = session("Archived", in: .done, updatedAt: 200)
+    let next = session("Next", in: .done, updatedAt: 100)
+    let other = session("Other", in: .done, updatedAt: 50)
+    let (model, _, _) = makeWorkspace([archived, next, other])
+    await model.load()
+    model.setColumn(.done)
+    model.select(archived.id)
+    let requests = model.sidebarFocusRequest
+
+    await model.requestArchive(archived.id)
+
+    #expect(model.selectedSessionID == next.id)
+    #expect(model.sidebarFocusRequest == requests + 1)
+    #expect(!model.terminalClaimsKeyboardOnActivation)
+    #expect(!model.composerClaimsKeyboardOnActivation)
+
+    // Another session put on screen by the application — a new one, one followed — takes the
+    // keyboard as it always has: only the neighbour leaves it in the sidebar.
+    model.select(other.id, leavingDraft: false)
+    #expect(model.terminalClaimsKeyboardOnActivation)
+    model.select(next.id, leavingDraft: false)
+    #expect(!model.terminalClaimsKeyboardOnActivation)
+
+    // Going to a session by hand gives the keyboard back to the sessions shown.
+    model.select(next.id)
+    #expect(model.terminalClaimsKeyboardOnActivation)
+  }
+
+  @Test("⌃⌘A pressed twice before the first archive is done archives the session once")
+  func archivingTwiceAtOnce() async {
+    let subject = session("Subject", in: .done)
+    let (model, _, repository) = makeWorkspace([subject])
+    await model.load()
+
+    async let first: Void = model.requestArchive(subject.id)
+    async let second: Void = model.requestArchive(subject.id)
+    _ = await (first, second)
+
+    #expect(await repository.session(id: subject.id)?.taskStatus == .archived)
+    #expect(model.archivingSessionIDs.isEmpty)
+    #expect(model.refreshFailure == nil)
   }
 
   @Test("Archiving the selected session hands the selection to the next row")
