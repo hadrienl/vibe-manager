@@ -10,6 +10,7 @@
 // fetched from the API; if that fails too, the changelog links to GitHub Releases instead.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,7 +52,12 @@ if (!outArg) {
 }
 const out = resolve(outArg);
 
-const template = readFileSync(join(here, "template.html"), "utf8");
+// The style and the script are named with a digest of their content, so that a page never meets
+// the previous version of either left in a browser's cache (GitHub Pages lets them live 10 minutes).
+const assetVersion = Object.fromEntries(["style.css", "app.js"].map((name) =>
+  [name, createHash("sha256").update(readFileSync(join(here, "assets", name))).digest("hex").slice(0, 10)]));
+const template = readFileSync(join(here, "template.html"), "utf8")
+  .replace(/%%ASSETS%%(style\.css|app\.js)"/g, (_, name) => `%%ASSETS%%${name}?v=${assetVersion[name]}"`);
 const dicts = Object.fromEntries(LANGS.map(([code]) => [code, JSON.parse(readFileSync(join(here, "i18n", `${code}.json`), "utf8"))]));
 const reference = dicts[SOURCE_LANG];
 
