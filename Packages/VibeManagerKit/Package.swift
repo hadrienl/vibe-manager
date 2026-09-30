@@ -23,6 +23,8 @@ let package = Package(
     .library(name: "VibeUI", targets: ["VibeUI"]),
     .library(name: "VibeComposition", targets: ["VibeComposition"]),
     .library(name: "VibeUpdates", targets: ["VibeUpdates"]),
+    .library(name: "VibeEndpoints", targets: ["VibeEndpoints"]),
+    .executable(name: "vibe-gateway", targets: ["vibe-gateway"]),
   ],
   dependencies: [
     // Pinned exactly: the emulator parses untrusted output, so its version is a deliberate
@@ -119,6 +121,14 @@ let package = Package(
       name: "VibeUpdates",
       dependencies: ["VibeApplication", .product(name: "Sparkle", package: "Sparkle")]
     ),
+    // The gateway of #107: Claude Code or Codex on one side, any model endpoint on the other, and
+    // the translation between their protocols. Foundation and Network only: it runs in a process
+    // of its own, and depends on nothing that could bring a window or a terminal with it.
+    .target(name: "VibeEndpoints"),
+    // The gateway on the command line, for the benchmark of `Benchmarks/agent-tasks` and for
+    // trying an endpoint by hand. The application runs the same code from its own binary.
+    .executableTarget(
+      name: "vibe-gateway", dependencies: ["VibeEndpoints"], path: "Tools/vibe-gateway"),
     // The terminal host in a process of its own, for the tests that need one to outlive their
     // client or to be killed. The application runs the same code from its own binary.
     .executableTarget(
@@ -163,6 +173,7 @@ let package = Package(
       // happens between a provider and a process.
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain", "VibeTerminal"]
     ),
+    .testTarget(name: "VibeEndpointsTests", dependencies: ["VibeEndpoints"]),
     .testTarget(name: "VibeUpdatesTests", dependencies: ["VibeUpdates", "VibeApplication"]),
     .testTarget(
       name: "VibeGitTests",
