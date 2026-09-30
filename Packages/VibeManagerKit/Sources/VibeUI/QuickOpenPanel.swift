@@ -130,7 +130,9 @@ struct QuickOpenPanel: View {
         model.openQuickOpenSelection()
       } label: {
         HStack(spacing: 10) {
-          SessionBadge(appearance: session.appearance, size: 26)
+          SessionBadge(
+            appearance: session.appearance,
+            icon: model.icons.image(for: session.appearance.iconID), size: 26)
           VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
               Text(QuickOpenPresentation.highlighted(session.name, words: result.highlights))

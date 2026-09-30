@@ -50,6 +50,19 @@ public enum SessionAppearanceCatalog {
     return SessionAppearance(symbolName: symbol, colorHex: color)
   }
 
+  /// The identity a session gets when the user picks nothing (#27, #183): the project's icon when
+  /// its folder has one, over the symbol and the colour its name gives — what the badge falls back
+  /// on if the icon's file ever goes missing.
+  ///
+  /// The one rule for a creation and for Revert to Default Icon.
+  public static func defaultAppearance(forName name: String, projectIcon: SessionIconID?)
+    -> SessionAppearance
+  {
+    var appearance = derived(forName: name)
+    appearance.iconID = projectIcon
+    return appearance
+  }
+
   public static func contains(_ appearance: SessionAppearance) -> Bool {
     symbolNames.contains(appearance.symbolName)
       && colorHexValues.contains(appearance.colorHex.uppercased())

@@ -4784,6 +4784,17 @@
         }
       }
     },
+    "Bug" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bogue"
+          }
+        }
+      }
+    },
     "Cache read" : {
       "comment" : "A column of the Usage window: tokens read from the cache.",
       "localizations" : {
@@ -4811,6 +4822,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible d’atteindre %@"
+          }
+        }
+      }
+    },
+    "Change Icon" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer l’icône"
+          }
+        }
+      }
+    },
+    "Change Icon…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer l’icône…"
           }
         }
       }
@@ -5925,6 +5956,17 @@
         }
       }
     },
+    "Document" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Document"
+          }
+        }
+      }
+    },
     "Don't Restart" : {
       "localizations" : {
         "fr" : {
@@ -6521,6 +6563,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminée"
+          }
+        }
+      }
+    },
+    "Flask" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fiole"
           }
         }
       }
@@ -7490,6 +7543,17 @@
         }
       }
     },
+    "Lightning" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éclair"
+          }
+        }
+      }
+    },
     "Line format" : {
       "localizations" : {
         "fr" : {
@@ -7962,6 +8026,17 @@
         }
       }
     },
+    "Name refused: %@" : {
+      "comment" : "Said by VoiceOver when a session's new name is refused. The reason.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom refusé : %@"
+          }
+        }
+      }
+    },
     "Needs approval" : {
       "comment" : "A session's state: its agent waits for the user to allow a tool or a plan.",
       "localizations" : {
@@ -7990,6 +8065,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune des deux CLI ne fournit un coût cohérent : les totaux cumulés de Claude Code baissent autant qu’ils montent, et Codex n’en fournit aucun. Une grille de prix livrée avec l’application serait fausse en quelques semaines, et n’a aucun sens avec un abonnement."
+          }
+        }
+      }
+    },
+    "Network" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau"
           }
         }
       }
@@ -9232,6 +9318,17 @@
         }
       }
     },
+    "Package" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paquet"
+          }
+        }
+      }
+    },
     "Palette" : {
       "comment" : "A section of the Settings window.",
       "localizations" : {
@@ -9830,7 +9927,7 @@
       }
     },
     "Rename" : {
-      "comment" : "Renames a group.",
+      "comment" : "Renames a group.\nRenames a session.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -10403,6 +10500,16 @@
         }
       }
     },
+    "Revert to Default Icon" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir à l’icône par défaut"
+          }
+        }
+      }
+    },
     "Review {{url}}" : {
       "comment" : "An example of a session name pattern. Keep {{url}} as it is.",
       "localizations" : {
@@ -10699,11 +10806,23 @@
       }
     },
     "Session name" : {
+      "comment" : "The field that renames a session.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nom de la session"
+          }
+        }
+      }
+    },
+    "Session renamed: %@" : {
+      "comment" : "Said by VoiceOver once a session is renamed. Its new name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session renommée : %@"
           }
         }
       }
@@ -11777,7 +11896,7 @@
       }
     },
     "Terminal" : {
-      "comment" : "A side terminal's title.\nThe raw terminal of a session, as a view.",
+      "comment" : "A session's symbol.\nA side terminal's title.\nThe raw terminal of a session, as a view.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -12657,6 +12776,16 @@
         }
       }
     },
+    "The icon a new session with this name and this folder would get." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’icône que recevrait une nouvelle session avec ce nom et ce dossier."
+          }
+        }
+      }
+    },
     "The image of “%@” is not square." : {
       "comment" : "An avatar problem.",
       "localizations" : {
@@ -12864,6 +12993,16 @@
         }
       }
     },
+    "The project's icon could not be copied into the data folder." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’icône du projet n’a pas pu être copiée dans le dossier de données."
+          }
+        }
+      }
+    },
     "The prompt is empty." : {
       "localizations" : {
         "fr" : {
@@ -12903,6 +13042,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La demande de « %@ » n’attendait plus : rien n’a été envoyé."
+          }
+        }
+      }
+    },
+    "The session could not be changed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session n’a pas pu être modifiée."
           }
         }
       }
@@ -13408,6 +13557,16 @@
         }
       }
     },
+    "This icon cannot be stored." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette icône ne peut pas être enregistrée."
+          }
+        }
+      }
+    },
     "This is everything the file will contain. Read it, search it with ⌘F, then save it and attach it to a report yourself: nothing is sent." : {
       "localizations" : {
         "fr" : {
@@ -13517,6 +13676,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette session est fermée. Tout ce qu’elle contient est conservé."
+          }
+        }
+      }
+    },
+    "This session no longer exists." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session n’existe plus."
           }
         }
       }
@@ -13829,6 +13998,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Outil"
+          }
+        }
+      }
+    },
+    "Tools" : {
+      "comment" : "A session's symbol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outils"
           }
         }
       }

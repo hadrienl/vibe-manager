@@ -260,7 +260,9 @@ struct RequestCard: View {
 
   private var identity: some View {
     HStack(alignment: .top, spacing: 8) {
-      SessionBadge(appearance: pending.session.appearance, size: 22)
+      SessionBadge(
+        appearance: pending.session.appearance,
+        icon: model.icons.image(for: pending.session.appearance.iconID), size: 22)
       VStack(alignment: .leading, spacing: 1) {
         HStack(alignment: .firstTextBaseline) {
           Text(verbatim: pending.session.name)

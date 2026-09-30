@@ -64,8 +64,9 @@ public struct SessionDraft: Hashable, Sendable {
     return SessionTicket(url: url, source: .template)
   }
 
+  /// The name as it is stored: one line, without the spaces around it (#183).
   public var trimmedName: String {
-    name.trimmingCharacters(in: .whitespacesAndNewlines)
+    SessionName.normalized(name)
   }
 
   /// The prompt the agent is sent: the template's rendering, or what was typed.
@@ -82,17 +83,18 @@ public struct SessionDraft: Hashable, Sendable {
   /// when there is nothing to name it after.
   public var suggestedName: String {
     if let templateFill {
-      return templateFill.sessionName() ?? templateFill.template.trimmedName
+      return SessionName.shortened(
+        templateFill.sessionName() ?? templateFill.template.trimmedName)
     }
     let firstLine = PromptText.normalizingLineBreaks(initialPrompt)
       .split(separator: "\n").lazy
       .map { $0.trimmingCharacters(in: .whitespaces) }
       .first { !$0.isEmpty }
     if let firstLine {
-      return Self.shortened(firstLine)
+      return SessionName.shortened(firstLine, to: Self.suggestedNameLength)
     }
     guard let path = resolvedWorkingDirectoryPath else { return "" }
-    return (path as NSString).lastPathComponent
+    return SessionName.shortened((path as NSString).lastPathComponent)
   }
 
   /// The name the session will be created with: the one typed, else the suggested one.
@@ -103,14 +105,6 @@ public struct SessionDraft: Hashable, Sendable {
   /// How long a name taken from a prompt may be, the "…" included.
   public static let suggestedNameLength = 60
 
-  /// Cut at the last word that fits, so that a name never ends in half a word.
-  private static func shortened(_ line: String) -> String {
-    guard line.count > suggestedNameLength else { return line }
-    let head = line.prefix(suggestedNameLength - 1)
-    let cut = head.lastIndex(of: " ").map { head[..<$0] } ?? head
-    return cut.trimmingCharacters(in: .whitespaces) + "…"
-  }
-
   /// A choice the user made wins, always; then the project's icon; then what the name gives — the
   /// one typed, or the one the session will be given.
   ///
@@ -118,10 +112,8 @@ public struct SessionDraft: Hashable, Sendable {
   /// falls back on if the icon's file ever goes missing.
   public var effectiveAppearance: SessionAppearance {
     if let appearance { return appearance }
-    var derived = SessionAppearanceCatalog.derived(
-      forName: trimmedName.isEmpty ? suggestedName : name)
-    derived.iconID = projectIcon?.id
-    return derived
+    return SessionAppearanceCatalog.defaultAppearance(
+      forName: trimmedName.isEmpty ? suggestedName : name, projectIcon: projectIcon?.id)
   }
 
   /// Whether the badge shows the project's icon because nothing else was chosen.
@@ -147,6 +139,8 @@ public struct SessionDraft: Hashable, Sendable {
 
     if trimmedName.isEmpty {
       issues.append(.nameMissing)
+    } else if case .failure(let issue) = SessionName.validated(name) {
+      issues.append(issue)
     }
     if let path = resolvedWorkingDirectoryPath {
       if !path.hasPrefix("/") {

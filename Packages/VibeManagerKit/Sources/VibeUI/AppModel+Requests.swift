@@ -11,6 +11,8 @@ public struct RequestNotification: Equatable, Sendable {
   /// system asks to unlock before it acts from the lock screen.
   public let offersAllow: Bool
   public let offersDeny: Bool
+  /// Posted again over one already shown, to give it the session's new name (#183): no sound.
+  public var isSilent = false
 }
 
 /// Posts the notifications and the Dock badge of pending requests.

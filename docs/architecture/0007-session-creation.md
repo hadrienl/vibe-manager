@@ -36,7 +36,8 @@ Each `SessionDraftIssue` carries a sentence and a way out, the shape `TerminalEr
 render through one view. An agent that cannot run reuses its own `AgentDiagnostic` summary and
 its `AgentRemediation` list rather than inventing a second vocabulary for the same facts.
 
-Only a name and a usable folder are required. Everything else has a default.
+Only a name and a usable folder are required. Everything else has a default. The name follows the
+rule of ADR 0034, which a rename shares: one line, 120 characters at most.
 
 ### The launch plan is the validator
 
@@ -70,7 +71,8 @@ hold — becomes "no model" rather than a model named nothing.
 A nameless draft wears a grey placeholder: colour would claim a decision nobody made. As soon as
 there is a name, the symbol and the accent are derived from it with a hash written out in the
 source, not from `Hasher`, whose seed changes at every launch — an identity that moved between
-two runs would be worse than no identity. The first explicit pick freezes it.
+two runs would be worse than no identity. The first explicit pick freezes it. Both can be changed
+after the creation (ADR 0034), and Revert to Default Icon gives this derived identity back.
 
 ### One irreversible step, and a failure that keeps the session
 

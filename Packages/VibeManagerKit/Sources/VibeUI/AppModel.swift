@@ -594,6 +594,17 @@ public final class AppModel {
   /// A rename that could not be written, until the user has read why.
   public internal(set) var folderLabelFailure: String?
 
+  // MARK: Identity (#183)
+
+  /// The session whose name is being edited in place, and where.
+  public internal(set) var renaming: SessionIdentityEditing?
+  /// The badge being chosen in its popover, previewed until it is kept.
+  public internal(set) var appearanceEditor: SessionAppearanceEditor?
+  /// The renames and badge changes ⌘Z undoes, for this run.
+  var identityHistory = SessionIdentityHistory()
+  /// A name or a badge that could not be written, until the user has read why.
+  public internal(set) var identityFailure: String?
+
   public init(
     repository: any SessionRepository,
     recovery: (any SessionStoreRecovery)? = nil,
@@ -2619,6 +2630,17 @@ public final class AppModel {
     }
     reloadTask = task
     await task.value
+  }
+
+  /// Shows a session under a new name or badge at once, before the store is written (#183): a
+  /// field that closed on the old name for the length of a write would read as refused.
+  func showIdentity(_ identity: SessionIdentity, of id: SessionID) {
+    guard case .loaded(var current) = state,
+      let index = current.firstIndex(where: { $0.id == id })
+    else { return }
+    current[index].name = identity.name
+    current[index].appearance = identity.appearance
+    state = .loaded(current)
   }
 
   /// Writes a column or a group in its new order (#44). The rows move at once, before the store

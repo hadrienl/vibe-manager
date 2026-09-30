@@ -548,6 +548,28 @@ private struct SessionHistoryCommands: Commands {
     .keyboardShortcut("m", modifiers: [.command, .control])
     .disabled(
       model.hasMultipleSelection || !(model.selectedSession.map(model.canSwitchAgent) ?? false))
+
+    // What the session is shown as (#183): on its row when the sidebar shows it, in the
+    // inspector's header otherwise. The agent never hears of it.
+    Button("Rename…") {
+      guard let id = model.selectedSessionID else { return }
+      model.beginRename(id)
+    }
+    .keyboardShortcut("e", modifiers: [.command, .control])
+    .disabled(!canEditIdentity)
+
+    Button("Change Icon…") {
+      guard let id = model.selectedSessionID else { return }
+      model.beginAppearanceEditing(id)
+    }
+    .keyboardShortcut("i", modifiers: [.command, .control])
+    .disabled(!canEditIdentity)
+  }
+
+  /// One session on screen, in the workspace: never several at once (#77), never under a sheet.
+  private var canEditIdentity: Bool {
+    focus.front == .workspace && !model.hasMultipleSelection
+      && model.canEditIdentity(of: model.selectedSessionID)
   }
 
   @ViewBuilder

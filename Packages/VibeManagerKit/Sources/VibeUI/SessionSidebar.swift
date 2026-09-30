@@ -24,6 +24,8 @@ struct SessionSidebar: View {
   @State private var slidingSessionIDs: Set<SessionID> = []
   /// The row under the pointer, for when no row is drawn under the fingers.
   @State private var hoveredSessionID: SessionID?
+  /// Where the rows' badges end, in the window: a double-click left of it is on a badge (#183).
+  @State private var badgeTrailingEdge: CGFloat?
   /// The group whose header is being dragged, and the one it is over (#44).
   @State private var draggedGroup: SessionFolderKey?
   @State private var targetedGroup: SessionFolderKey?
@@ -58,6 +60,19 @@ struct SessionSidebar: View {
     .onChange(of: model.selectedSessionID) { _, id in
       if swipe != nil, swipe?.sessionID != id { closeSwipe(animated: true) }
     }
+  }
+
+  /// Only a click counts: Return also reaches the list's primary action.
+  static func isDoubleClick(_ event: NSEvent?) -> Bool {
+    guard let event, [.leftMouseDown, .leftMouseUp].contains(event.type) else { return false }
+    return event.clickCount == 2
+  }
+
+  /// Whether a click landed on a row's badge: left of where the badges end, in the window. Every
+  /// row draws its badge at the same place.
+  static func isOnBadge(_ event: NSEvent, badgeTrailingEdge: CGFloat?) -> Bool {
+    guard let badgeTrailingEdge else { return false }
+    return event.locationInWindow.x <= badgeTrailingEdge
   }
 
   /// The list is moving its selection for a key typed in it — an arrow, Home, a letter — rather
@@ -146,8 +161,24 @@ struct SessionSidebar: View {
     // otherwise, as in the Finder (#77). A group's header keeps its own.
     .contextMenu(forSelectionType: SessionID.self) { ids in
       SessionSelectionMenu(model: model, ids: ids)
+    } primaryAction: { ids in
+      // A double-click on a row renames it, on its badge changes its icon (#183). Return comes
+      // here too, and is left to the key handler below, which hands the keyboard to the session.
+      guard let event = NSApp.currentEvent, Self.isDoubleClick(event), ids.count == 1,
+        let id = ids.first
+      else { return }
+      if Self.isOnBadge(event, badgeTrailingEdge: badgeTrailingEdge) {
+        model.beginAppearanceEditing(id, in: .sidebar)
+      } else {
+        model.beginRename(id, in: .sidebar)
+      }
     }
+    .onPreferenceChange(SessionBadgeEdgeKey.self) { badgeTrailingEdge = $0 }
     .focused($isListFocused)
+    // ⌘Z and ⇧⌘Z undo a rename or a change of icon while the keyboard is in the list (#183);
+    // anywhere else, they go on to what holds it. A name being typed undoes its own typing.
+    .onCommand(Selector(("undo:")), perform: model.identityUndoAction(redo: false))
+    .onCommand(Selector(("redo:")), perform: model.identityUndoAction(redo: true))
     .onChange(of: model.sidebarFocusRequest) { isListFocused = true }
     // The keyboard gone elsewhere, ⇧⌘W and the Session menu act on the session on screen alone:
     // a selection nobody is looking at must not be what a shortcut typed in a terminal closes.
@@ -274,9 +305,11 @@ struct SessionSidebar: View {
     let isSwiped = swipe?.sessionID == session.id
     let rowOffset = isSwiped && !reduceMotion ? swipe?.offset ?? 0 : 0
     let commands = SessionCommands(model: model, session: session)
+    let appearance = model.displayedAppearance(of: session)
     return SessionRow(
       session: session,
-      icon: model.icons.image(for: session.appearance.iconID),
+      appearance: appearance,
+      icon: model.icons.image(for: appearance.iconID),
       status: model.statusPresentation(for: session),
       isRestoring: model.isRestoring(session.id),
       webView: model.webViewAttention(for: session.id),
@@ -698,7 +731,9 @@ private struct ArchivedSessionsList: View {
           // No gesture on the rows: it would keep the clicks the list needs to select (#96).
           List(archived, selection: $selection) { session in
             HStack(spacing: 8) {
-              SessionBadge(appearance: session.appearance)
+              SessionBadge(
+                appearance: session.appearance,
+                icon: model.icons.image(for: session.appearance.iconID))
               VStack(alignment: .leading, spacing: 1) {
                 Text(session.name)
                   .lineLimit(1)
@@ -725,6 +760,16 @@ private struct ArchivedSessionsList: View {
             if ids.count > 1, !plan.isEmpty {
               Button(model.batchTitle(for: plan)) { Task { await model.requestBatch(plan) } }
             } else if let id = ids.first {
+              // Shown in the main area, and edited in the inspector's header (#183).
+              Button(
+                LocalizedStringResource("Rename", bundle: .module, comment: "Renames a session.")
+              ) {
+                editArchived(id) { model.beginRename(id, in: .inspector) }
+              }
+              Button(LocalizedStringResource("Change Icon…", bundle: .module)) {
+                editArchived(id) { model.beginAppearanceEditing(id, in: .inspector) }
+              }
+              Divider()
               Button(LocalizedStringResource("Unarchive", bundle: .module)) {
                 Task { await model.restore(id) }
               }
@@ -751,6 +796,13 @@ private struct ArchivedSessionsList: View {
       }
     }
     .frame(width: 320, height: 300)
+  }
+
+  /// The list's popover closes first: a second popover does not open over it.
+  private func editArchived(_ id: SessionID, _ edit: @escaping () -> Void) {
+    model.showArchived(id)
+    model.isArchiveListPresented = false
+    Task { @MainActor in edit() }
   }
 
   private func ordered(_ ids: Set<SessionID>, in archived: [WorkSession]) -> [SessionID] {
