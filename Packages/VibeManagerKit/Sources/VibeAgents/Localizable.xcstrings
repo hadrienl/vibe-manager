@@ -212,6 +212,39 @@
         }
       }
     },
+    "The endpoint did not answer. Attempt %lld of %lld in %lld s." : {
+      "comment" : "A wait before another attempt: its number, how many at most, the seconds left.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint n’a pas répondu. Essai %1$lld sur %2$lld dans %3$lld s."
+          }
+        }
+      }
+    },
+    "The endpoint failed to answer. Attempt %lld of %lld in %lld s." : {
+      "comment" : "A wait before another attempt: its number, how many at most, the seconds left.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint a échoué à répondre. Essai %1$lld sur %2$lld dans %3$lld s."
+          }
+        }
+      }
+    },
+    "The endpoint limits its rate. Attempt %lld of %lld in %lld s." : {
+      "comment" : "A wait before another attempt: its number, how many at most, the seconds left.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint limite son débit. Essai %1$lld sur %2$lld dans %3$lld s."
+          }
+        }
+      }
+    },
     "The endpoint's settings are incomplete. Finish them in Settings → Endpoints." : {
       "localizations" : {
         "fr" : {

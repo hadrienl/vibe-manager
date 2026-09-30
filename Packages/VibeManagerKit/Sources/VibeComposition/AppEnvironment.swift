@@ -162,7 +162,7 @@ public final class AppEnvironment {
           launch: Self.gatewayLaunch(
             location: gatewayLocation,
             keychainService: Self.keychainService(isolated: data.defaultsSuite != nil)))),
-      providers: providers)
+      providers: providers, gatewayDirectory: gatewayLocation.directory)
     self.endpointCatalog = endpointCatalog
     // Every terminal runs in the terminal host, so its agent can be left running when the
     // application quits (ADR 0017). One host per data directory: an isolated copy has its own.

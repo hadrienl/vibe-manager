@@ -86,12 +86,14 @@ public final class EndpointCatalog {
   private let gateway: any EndpointGatewayControlling
   private let claudeCode: ClaudeCodeAgentProvider?
   private let codex: CodexAgentProvider?
+  private let gatewayDirectory: URL?
 
   init(
     repository: any EndpointRepository, secrets: any EndpointSecretStore,
     registry: AgentProviderRegistry, gateway: any EndpointGatewayControlling,
-    providers: [any AgentProvider]
+    providers: [any AgentProvider], gatewayDirectory: URL? = nil
   ) {
+    self.gatewayDirectory = gatewayDirectory
     self.repository = repository
     self.secrets = secrets
     self.registry = registry
@@ -107,7 +109,8 @@ public final class EndpointCatalog {
     let endpoints = (try? await repository.endpoints()) ?? []
     let providers = endpoints.map {
       EndpointAgentProvider.make(
-        endpoint: $0, claudeCode: claudeCode, codex: codex, gateway: gateway, secrets: secrets)
+        endpoint: $0, claudeCode: claudeCode, codex: codex, gateway: gateway, secrets: secrets,
+        gatewayDirectory: gatewayDirectory)
     }
     await registry.replaceEndpoints(providers)
   }

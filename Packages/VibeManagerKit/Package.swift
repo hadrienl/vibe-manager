@@ -174,7 +174,8 @@ let package = Package(
       // happens between a provider and a process.
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain", "VibeTerminal"]
     ),
-    .testTarget(name: "VibeEndpointsTests", dependencies: ["VibeEndpoints", "VibeDomain"]),
+    .testTarget(
+      name: "VibeEndpointsTests", dependencies: ["VibeEndpoints", "VibeApplication", "VibeDomain"]),
     .testTarget(name: "VibeUpdatesTests", dependencies: ["VibeUpdates", "VibeApplication"]),
     .testTarget(
       name: "VibeGitTests",

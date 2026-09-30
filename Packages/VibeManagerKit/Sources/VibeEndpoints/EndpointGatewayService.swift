@@ -35,7 +35,9 @@ public enum EndpointGatewayService {
       flock(lock, LOCK_UN)
       close(lock)
     }
-    let gateway = Gateway(routes: router, transport: transport, observer: observer)
+    let journal = GatewayStepJournal(
+      directory: location.directory, session: { await router.session(for: $0) })
+    let gateway = Gateway(routes: router, transport: transport, observer: observer ?? journal)
     let (server, port) = try await listen(
       preferring: GatewayState.read(location.stateURL)?.port, gateway: gateway)
     defer { server.stop() }

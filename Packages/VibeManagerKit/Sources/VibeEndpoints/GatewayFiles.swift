@@ -187,6 +187,12 @@ public actor FileGatewayRouter: GatewayRouting {
     return GatewayRoute(endpoint: configuration, secret: secret, model: route.model)
   }
 
+  /// The session a token was given to, for the journal of what the gateway saw.
+  public func session(for token: String) -> SessionID? {
+    refresh()
+    return routes.routes[token]?.session
+  }
+
   /// How many tokens lead somewhere: the gateway stops once there is none.
   public func count() -> Int {
     refresh()

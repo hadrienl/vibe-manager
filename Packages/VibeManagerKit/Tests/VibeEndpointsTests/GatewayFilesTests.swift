@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import VibeApplication
 import VibeDomain
 
 @testable import VibeEndpoints
@@ -171,5 +172,37 @@ struct ModelDiscoveryTests {
       in: try JSONValue(parsing: #"{"data":[{"id":"claude-x","display_name":"Claude X"}]}"#))
     #expect(models.first?.displayName == "Claude X")
     #expect(EndpointProber.models(in: try JSONValue(parsing: #"{"ok":true}"#)).isEmpty)
+  }
+}
+
+@Suite("The journal of what the gateway saw")
+struct GatewayStepJournalTests {
+  @Test("Steps and waits are written to the session's journal, cut short")
+  func writes() async throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeJournal-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let session = SessionID()
+    let journal = GatewayStepJournal(
+      directory: folder, session: { $0 == "tok" ? session : nil },
+      now: { Date(timeIntervalSince1970: 5) })
+    await journal.serverStep(
+      token: "tok",
+      step: CanonicalServerStep(name: "file_search", output: String(repeating: "x", count: 5_000)))
+    await journal.retrying(
+      token: "tok", attempt: 2, of: 5, after: .seconds(12),
+      failure: EndpointFailure(kind: .rateLimited, message: "slow", status: 429))
+    await journal.serverStep(token: "unknown", step: CanonicalServerStep(name: "lost"))
+
+    let url = GatewayStepRecord.file(for: session, in: folder)
+    let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n")
+    #expect(lines.count == 2)
+    let step = try GatewayStepRecord.decoder.decode(GatewayStepRecord.self, from: Data(lines[0].utf8))
+    #expect(step.kind == .step)
+    #expect((step.output?.count ?? 0) <= GatewayStepRecord.limit + 1)
+    let retry = try GatewayStepRecord.decoder.decode(GatewayStepRecord.self, from: Data(lines[1].utf8))
+    #expect(retry.kind == .retry)
+    #expect(retry.delaySeconds == 12)
+    #expect(retry.failure == "rateLimited")
   }
 }

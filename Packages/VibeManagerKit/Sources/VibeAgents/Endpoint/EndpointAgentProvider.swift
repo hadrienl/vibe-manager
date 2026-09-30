@@ -21,21 +21,26 @@ public struct EndpointAgentProvider: AgentProvider {
 
   public let endpoint: Endpoint
   let harness: Harness
+  private let journals = JournalIndex()
   private let gateway: any EndpointGatewayControlling
   private let secrets: any EndpointSecretStore
   private let makeToken: @Sendable () -> String
+  /// Where the gateway keeps what it saw of each session: see `EndpointConversationDecoder`.
+  private let gatewayDirectory: URL?
 
   public init(
     endpoint: Endpoint,
     harness: Harness,
     gateway: any EndpointGatewayControlling,
     secrets: any EndpointSecretStore,
+    gatewayDirectory: URL? = nil,
     makeToken: @escaping @Sendable () -> String = EndpointAgentProvider.randomToken
   ) {
     self.endpoint = endpoint
     self.harness = harness
     self.gateway = gateway
     self.secrets = secrets
+    self.gatewayDirectory = gatewayDirectory
     self.makeToken = makeToken
   }
 
@@ -46,16 +51,19 @@ public struct EndpointAgentProvider: AgentProvider {
     claudeCode: ClaudeCodeAgentProvider,
     codex: CodexAgentProvider,
     gateway: any EndpointGatewayControlling,
-    secrets: any EndpointSecretStore
+    secrets: any EndpointSecretStore,
+    gatewayDirectory: URL? = nil
   ) -> any AgentProvider {
     switch endpoint.harness.resolved(for: endpoint.wireProtocol) {
     case .claudeCode:
       return EndpointAgentProvider(
-        endpoint: endpoint, harness: .claudeCode(claudeCode), gateway: gateway, secrets: secrets)
+        endpoint: endpoint, harness: .claudeCode(claudeCode), gateway: gateway, secrets: secrets,
+        gatewayDirectory: gatewayDirectory)
     case .codex:
       return CodexEndpointAgentProvider(
         base: EndpointAgentProvider(
-          endpoint: endpoint, harness: .codex(codex), gateway: gateway, secrets: secrets),
+          endpoint: endpoint, harness: .codex(codex), gateway: gateway, secrets: secrets,
+          gatewayDirectory: gatewayDirectory),
         codex: codex)
     }
   }
@@ -353,11 +361,19 @@ extension EndpointAgentProvider: AgentConversationReporting {
     for conversation: SessionAgentConfiguration, in session: WorkSession,
     hint: AgentActivityEvent?
   ) -> [URL] {
-    self.conversation.conversationFiles(for: conversation, in: session, hint: hint)
+    let files = self.conversation.conversationFiles(for: conversation, in: session, hint: hint)
+    // The journal travels with the file the decoder is made for: the session is not given to it.
+    if let gatewayDirectory {
+      journals.set(
+        GatewayStepRecord.file(for: session.id, in: gatewayDirectory), for: files)
+    }
+    return files
   }
 
   public func conversationDecoder(for file: URL) -> any ConversationDecoding {
-    conversation.conversationDecoder(for: file)
+    let decoder = conversation.conversationDecoder(for: file)
+    guard let journal = journals.journal(for: file) else { return decoder }
+    return EndpointConversationDecoder(inner: decoder, journal: journal)
   }
 
   public var promptFormat: AgentPromptFormat { conversation.promptFormat }
@@ -464,5 +480,23 @@ extension CodexEndpointAgentProvider: AgentLaunchPreparing, AgentLaunchObserverP
 
   public func firstPrompt(ofSubagent file: URL) -> String? {
     base.firstPrompt(ofSubagent: file)
+  }
+}
+
+/// Which gateway journal goes with which transcript file.
+final class JournalIndex: @unchecked Sendable {
+  private let lock = NSLock()
+  private var journals: [URL: URL] = [:]
+
+  func set(_ journal: URL, for files: [URL]) {
+    lock.lock()
+    for file in files { journals[file] = journal }
+    lock.unlock()
+  }
+
+  func journal(for file: URL) -> URL? {
+    lock.lock()
+    defer { lock.unlock() }
+    return journals[file]
   }
 }
