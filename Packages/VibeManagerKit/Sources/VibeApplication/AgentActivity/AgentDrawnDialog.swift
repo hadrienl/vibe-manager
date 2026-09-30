@@ -22,7 +22,14 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     self.subject = subject
   }
 
-  /// Whether `request` is the one whose dialog this is.
+  /// Whether the dialog quotes all of what it asks: only then can it name one request for sure
+  /// (#280). The start of a command, a file's name or a server's may be another request's.
+  public var quotesWhole: Bool {
+    if case .command = subject { return true }
+    return false
+  }
+
+  /// Whether `request` is the one whose dialog this is, or may be.
   public func matches(_ request: AgentRequest) -> Bool {
     guard case .permission(let permission) = request.content else { return false }
     switch (subject, permission.tool) {
