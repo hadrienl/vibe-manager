@@ -56,6 +56,9 @@ public struct FileTranscriptTail: TranscriptTailing {
           } else if watcher?.inode != reader.inode {
             watcher?.cancel()
             watcher = reader.inode.flatMap { _ in FileWatcher(path: file.path, wake: wake) }
+            // Read once more before waiting: what was written between the reading and the watch
+            // would otherwise wait for the safety net.
+            if watcher != nil { continue }
           }
           await wake.wait(timeout: watcher == nil ? pollInterval : watchedInterval)
         }
