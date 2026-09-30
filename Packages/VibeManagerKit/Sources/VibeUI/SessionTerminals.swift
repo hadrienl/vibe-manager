@@ -678,7 +678,7 @@ public final class SessionTerminalDrawer {
             self.outputArrived(in: terminal)
           case .stateChanged(let state) where state.isFinished:
             finalState = state
-          case .stateChanged, .historyTruncated:
+          case .stateChanged, .historyTruncated, .outputDropped:
             break
           }
           if finalState.isFinished { break }

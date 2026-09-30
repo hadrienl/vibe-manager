@@ -149,6 +149,10 @@ public enum TerminalEvent: Equatable, Sendable {
   case stateChanged(TerminalProcessState)
   case output([UInt8])
   case historyTruncated(droppedByteCount: Int)
+  /// This subscriber fell behind and lost blocks of output its stream had not delivered yet
+  /// (#248). Unlike `historyTruncated`, the bytes are still in the session's history: a reader
+  /// that keeps its place in the stream counts them as passed, and can read them from there.
+  case outputDropped(byteCount: Int)
   /// The terminal wrote something, told instead of the bytes to a subscriber that only needs to
   /// know it did (#248): see `TerminalEventInterest.pulses`.
   case outputPulse
@@ -177,7 +181,7 @@ public enum TerminalEventInterest: Hashable, Sendable {
       return event
     case (.pulses, .output), (.pulses, .outputPulse):
       return .outputPulse
-    case (.state, _), (.pulses, .historyTruncated):
+    case (.state, _), (.pulses, .historyTruncated), (.pulses, .outputDropped):
       return nil
     }
   }

@@ -200,11 +200,12 @@ final class TerminalSubscribers: @unchecked Sendable {
   ) {
     guard case .dropped(let discarded) = continuation.yield(event) else { return }
     // The subscriber fell far enough behind that its oldest event was evicted. Tell it how much
-    // output it lost so it can show the gap rather than silently rendering a corrupt stream. A
+    // output it lost so it can show the gap rather than silently rendering a corrupt stream: as
+    // its own loss, not the history's, since the history still holds those bytes (#248). A
     // dropped state change needs no notice: the current state is always readable from `state()`,
     // and the subscriber re-reads it when the stream ends.
     if case .output(let lost) = discarded {
-      _ = continuation.yield(.historyTruncated(droppedByteCount: lost.count))
+      _ = continuation.yield(.outputDropped(byteCount: lost.count))
     }
   }
 }
