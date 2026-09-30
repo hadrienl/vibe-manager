@@ -1,0 +1,10 @@
+# The workflows' actions are pinned to a commit, their tag in a comment (#245): Dependabot proposes
+# each new release as a pull request that moves both.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
