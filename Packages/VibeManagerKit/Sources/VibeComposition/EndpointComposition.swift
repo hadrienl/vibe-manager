@@ -84,8 +84,7 @@ public final class EndpointCatalog {
   let secrets: any EndpointSecretStore
   private let registry: AgentProviderRegistry
   private let gateway: any EndpointGatewayControlling
-  private let claudeCode: ClaudeCodeAgentProvider?
-  private let codex: CodexAgentProvider?
+  private let providers: [any AgentProvider]
   private let gatewayDirectory: URL?
 
   init(
@@ -98,21 +97,34 @@ public final class EndpointCatalog {
     self.secrets = secrets
     self.registry = registry
     self.gateway = gateway
-    claudeCode = providers.lazy.compactMap { $0 as? ClaudeCodeAgentProvider }.first
-    codex = providers.lazy.compactMap { $0 as? CodexAgentProvider }.first
+    self.providers = providers
   }
 
   /// Reads the endpoints and registers them. An unreadable file registers none, and the settings
   /// say why.
   public func reload() async {
-    guard let claudeCode, let codex else { return }
     let endpoints = (try? await repository.endpoints()) ?? []
-    let providers = endpoints.map {
+    await registry.replaceEndpoints(
+      Self.providers(
+        for: endpoints, among: providers, gateway: gateway, secrets: secrets,
+        gatewayDirectory: gatewayDirectory))
+  }
+
+  /// The providers of `endpoints`, driven by the Claude Code and Codex of `providers`. None when
+  /// neither is there: the mock agents of the tests drive no endpoint.
+  static func providers(
+    for endpoints: [Endpoint], among providers: [any AgentProvider],
+    gateway: any EndpointGatewayControlling, secrets: any EndpointSecretStore,
+    gatewayDirectory: URL?
+  ) -> [any AgentProvider] {
+    guard let claudeCode = providers.lazy.compactMap({ $0 as? ClaudeCodeAgentProvider }).first,
+      let codex = providers.lazy.compactMap({ $0 as? CodexAgentProvider }).first
+    else { return [] }
+    return endpoints.map {
       EndpointAgentProvider.make(
         endpoint: $0, claudeCode: claudeCode, codex: codex, gateway: gateway, secrets: secrets,
         gatewayDirectory: gatewayDirectory)
     }
-    await registry.replaceEndpoints(providers)
   }
 
   /// Forgets the tokens of the sessions no longer running, so the gateway can stop once none is,

@@ -183,8 +183,15 @@ public struct EndpointAgentProvider: AgentProvider {
     guard endpoint.agentModels.contains(where: { $0.id == model }) else {
       throw AgentLaunchError.unsupportedModel(model)
     }
+    // A conversation is resumed by the CLI that wrote it: an endpoint whose harness changed since
+    // starts a new one, handed a summary like a switch of agent.
+    if case .identifier = request.resume, let recorded = request.harnessID,
+      recorded != harnessKind.providerID
+    {
+      throw AgentLaunchError.resumeUnsupported
+    }
     var harnessRequest = request
-    harnessRequest.modelID = model
+    harnessRequest.modelID = Self.harnessModelName(model)
     let plan = try await harnessProvider.launchPlan(for: harnessRequest)
     return AgentLaunchPlan(
       providerID: descriptor.id, executablePath: plan.executablePath, arguments: plan.arguments,
@@ -192,11 +199,19 @@ public struct EndpointAgentProvider: AgentProvider {
       promptDelivery: plan.promptDelivery, version: plan.version)
   }
 
-  /// The model a plan runs: what the harness was told on its command line.
-  static func model(in plan: AgentLaunchPlan) -> String? {
+  /// The name the harness is given for a model. The CLIs refuse a `/` in a model's name, and
+  /// OpenRouter's all have one (`qwen/qwen3-coder`): the harness is told a name without it, and
+  /// the gateway asks the endpoint for the real one, which only the session's route holds.
+  static func harnessModelName(_ id: String) -> String {
+    id.replacingOccurrences(of: "/", with: "_")
+  }
+
+  /// The endpoint's model a plan runs, from the name its harness was told on its command line.
+  func model(in plan: AgentLaunchPlan) -> String? {
     for flag in ["--model", "-m"] {
       if let index = plan.arguments.firstIndex(of: flag), index + 1 < plan.arguments.count {
-        return plan.arguments[index + 1]
+        let name = plan.arguments[index + 1]
+        return endpoint.models.first { Self.harnessModelName($0.id) == name }?.id ?? name
       }
     }
     return nil
@@ -210,7 +225,8 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
   public func preparingLaunch(_ plan: AgentLaunchPlan, session: SessionID) async throws
     -> AgentLaunchPlan
   {
-    guard let model = Self.model(in: plan) ?? endpoint.agentModels.first?.id else { return plan }
+    guard let model = model(in: plan) ?? endpoint.agentModels.first?.id else { return plan }
+    let harnessName = Self.harnessModelName(model)
     let base = try await gateway.ensureRunning()
     let token = makeToken()
     try await gateway.register(token: token, endpoint: endpoint.id, model: model, session: session)
@@ -220,13 +236,13 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
       var environment: [String: String] = [
         "ANTHROPIC_BASE_URL": root.absoluteString,
         "ANTHROPIC_AUTH_TOKEN": token,
-        "ANTHROPIC_MODEL": model,
+        "ANTHROPIC_MODEL": harnessName,
         // Claude Code runs its side tasks — titles, summaries — on a smaller model: the same one,
         // so that nothing of the session goes elsewhere.
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": model,
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": model,
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": model,
-        "ANTHROPIC_SMALL_FAST_MODEL": model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": harnessName,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": harnessName,
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": harnessName,
+        "ANTHROPIC_SMALL_FAST_MODEL": harnessName,
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
       ]
       if let window = endpoint.models.first(where: { $0.id == model })?.contextWindow {

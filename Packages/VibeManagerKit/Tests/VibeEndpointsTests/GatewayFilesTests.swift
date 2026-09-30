@@ -64,14 +64,30 @@ struct GatewayFilesTests {
       token: "t2", endpoint: endpoint.id, model: "qwen", session: session)
     #expect(await router.route(for: "t1") == nil)
     #expect(await router.route(for: "t2") != nil)
+    // Kept a minute rather than asked of the keychain on every request.
     secret.value = "sk-2"
-    #expect(await router.route(for: "t2")?.secret == "sk-2")
+    #expect(await router.route(for: "t2")?.secret == "sk-1")
 
     // Ended sessions let go of their tokens, and the gateway is left with none.
     try await controller.retain(sessions: [])
     #expect(await router.count() == 0)
     let attributes = try FileManager.default.attributesOfItem(atPath: location.routesURL.path)
     #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+  }
+
+  @Test("A gateway runs while its lock is held, whatever process number its state names")
+  func liveness() throws {
+    let location = try location()
+    defer { try? FileManager.default.removeItem(at: location.directory.deletingLastPathComponent()) }
+    try location.prepare()
+    #expect(!EndpointGatewayController.isRunning(at: location))
+    // A state left by a gateway that crashed, naming a process that is alive: not running.
+    try GatewayState(processIdentifier: getpid(), port: 1).write(to: location.stateURL)
+    #expect(!EndpointGatewayController.isRunning(at: location))
+    let lock = open(location.lockURL.path, O_CREAT | O_RDWR, 0o600)
+    defer { close(lock) }
+    #expect(flock(lock, LOCK_EX | LOCK_NB) == 0)
+    #expect(EndpointGatewayController.isRunning(at: location))
   }
 
   @Test("Tokens are 256 random bits")

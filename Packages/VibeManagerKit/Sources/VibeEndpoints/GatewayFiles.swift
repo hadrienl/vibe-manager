@@ -165,9 +165,8 @@ extension GatewayRouteTable: GatewayRouting {}
 
 /// The routes read from their files, again whenever one of them changed.
 ///
-/// The secret is read from the keychain on each request rather than kept: replacing a key in the
-/// settings takes effect on the next turn of every session, and nothing secret stays in memory
-/// longer than a request.
+/// The secret is read from the keychain at most once a minute: replacing a key in the settings
+/// takes effect within that minute for every session.
 public actor FileGatewayRouter: GatewayRouting {
   private let location: GatewayLocation
   private let readEndpoints: @Sendable (URL) throws -> [Endpoint]
@@ -176,6 +175,9 @@ public actor FileGatewayRouter: GatewayRouting {
   private var endpoints: [EndpointID: Endpoint] = [:]
   private var routesDate: Date?
   private var endpointsDate: Date?
+  /// A minute at most: a key replaced in the settings takes effect within it, and the keychain is
+  /// not asked on every request — on a build signed ad hoc, each read may ask the user.
+  private var secrets: [EndpointID: (value: String?, until: ContinuousClock.Instant)] = [:]
 
   public init(
     location: GatewayLocation,
@@ -192,8 +194,16 @@ public actor FileGatewayRouter: GatewayRouting {
     guard let route = routes.routes[token], let endpoint = endpoints[route.endpoint],
       let configuration = EndpointConfiguration(endpoint)
     else { return nil }
-    let secret = endpoint.authentication.needsSecret ? self.secret(endpoint.id) : nil
+    let secret = endpoint.authentication.needsSecret ? cachedSecret(endpoint.id) : nil
     return GatewayRoute(endpoint: configuration, secret: secret, model: route.model)
+  }
+
+  private func cachedSecret(_ id: EndpointID) -> String? {
+    let now = ContinuousClock.now
+    if let cached = secrets[id], cached.until > now { return cached.value }
+    let value = secret(id)
+    secrets[id] = (value, now + .seconds(60))
+    return value
   }
 
   /// The session a token was given to, for the journal of what the gateway saw.

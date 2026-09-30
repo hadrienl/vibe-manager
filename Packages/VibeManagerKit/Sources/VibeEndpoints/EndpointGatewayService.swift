@@ -77,7 +77,6 @@ public actor EndpointGatewayController {
   private let location: GatewayLocation
   private let launch: @Sendable () throws -> Void
   private let now: @Sendable () -> Date
-  private let isAlive: @Sendable (Int32) -> Bool
   private let startupLimit: Duration
 
   /// - Parameter launch: starts `Vibe Manager --endpoint-gateway <directory>`, detached.
@@ -85,14 +84,23 @@ public actor EndpointGatewayController {
     location: GatewayLocation,
     launch: @escaping @Sendable () throws -> Void,
     now: @escaping @Sendable () -> Date = Date.init,
-    isAlive: @escaping @Sendable (Int32) -> Bool = { kill($0, 0) == 0 },
     startupLimit: Duration = .seconds(5)
   ) {
     self.location = location
     self.launch = launch
     self.now = now
-    self.isAlive = isAlive
     self.startupLimit = startupLimit
+  }
+
+  /// Whether a gateway runs for this folder: its lock is held. Not its process number, which a
+  /// gateway that crashed leaves behind in `gateway.json` for another process to be given.
+  public static func isRunning(at location: GatewayLocation) -> Bool {
+    let lock = open(location.lockURL.path, O_RDWR | O_CLOEXEC)
+    guard lock >= 0 else { return false }
+    defer { close(lock) }
+    guard flock(lock, LOCK_EX | LOCK_NB) == 0 else { return errno == EWOULDBLOCK }
+    flock(lock, LOCK_UN)
+    return false
   }
 
   public enum ControlError: Error, Equatable {
@@ -101,7 +109,7 @@ public actor EndpointGatewayController {
 
   /// The running gateway's base URL, after starting it when needed.
   public func ensureRunning() async throws -> URL {
-    if let state = GatewayState.read(location.stateURL), isAlive(state.processIdentifier) {
+    if Self.isRunning(at: location), let state = GatewayState.read(location.stateURL) {
       return state.baseURL
     }
     try location.prepare()
@@ -110,7 +118,7 @@ public actor EndpointGatewayController {
     let deadline = clock.now + startupLimit
     while clock.now < deadline {
       try await Task.sleep(for: .milliseconds(50))
-      if let state = GatewayState.read(location.stateURL), isAlive(state.processIdentifier) {
+      if Self.isRunning(at: location), let state = GatewayState.read(location.stateURL) {
         return state.baseURL
       }
     }

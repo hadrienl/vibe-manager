@@ -231,6 +231,41 @@ struct EndpointAgentProviderTests {
     #expect(!(provider(Self.endpoint()) is any AgentHookTrusting))
   }
 
+  @Test("A model whose name holds a slash starts, under a name the CLI accepts")
+  func slashedModel() async throws {
+    let gateway = RecordingGateway()
+    let endpoint = Self.endpoint(
+      authentication: .none, models: [EndpointModel(id: "qwen/qwen3-coder", contextWindow: 262_144)])
+    let provider = EndpointAgentProvider(
+      endpoint: endpoint, harness: .claudeCode(Self.claude()), gateway: gateway,
+      secrets: InMemoryEndpointSecretStore(), makeToken: { "t" })
+    let plan = try await provider.launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: "/tmp", modelID: "qwen/qwen3-coder"))
+    #expect(plan.arguments.contains("qwen_qwen3-coder"))
+    let prepared = try await provider.preparingLaunch(plan, session: SessionID())
+    #expect(prepared.environment["ANTHROPIC_MODEL"] == "qwen_qwen3-coder")
+    // The endpoint is asked for the real one.
+    #expect(await gateway.registered.first?.model == "qwen/qwen3-coder")
+  }
+
+  @Test("A conversation another harness wrote is not resumed")
+  func harnessChanged() async throws {
+    let provider = EndpointAgentProvider(
+      endpoint: Self.endpoint(authentication: .none), harness: .claudeCode(Self.claude()),
+      gateway: RecordingGateway(), secrets: InMemoryEndpointSecretStore())
+    await #expect(throws: AgentLaunchError.resumeUnsupported) {
+      try await provider.launchPlan(
+        for: AgentLaunchRequest(
+          workingDirectoryPath: "/tmp", modelID: "qwen3-coder:30b",
+          resume: .identifier("019e-codex"), harnessID: "codex"))
+    }
+    let resumed = try await provider.launchPlan(
+      for: AgentLaunchRequest(
+        workingDirectoryPath: "/tmp", modelID: "qwen3-coder:30b",
+        resume: .identifier("5b1f4a86-3c0e-4c43-9d8e-2f0b6f1d7a10"), harnessID: "claude-code"))
+    #expect(resumed.arguments.contains("--resume"))
+  }
+
   @Test("TOML strings are escaped as Codex reads them")
   func toml() {
     #expect(EndpointAgentProvider.toml(#"My "LLM" \ gw"#) == #""My \"LLM\" \\ gw""#)

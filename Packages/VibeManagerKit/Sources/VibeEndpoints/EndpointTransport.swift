@@ -130,6 +130,9 @@ public final class URLSessionEndpointTransport: NSObject, EndpointTransport, @un
     let state = TaskState(timeouts: timeouts)
     let (stream, continuation) = AsyncThrowingStream<Data, any Error>.makeStream(
       bufferingPolicy: .unbounded)
+    // Nobody reads the body any more — an answer too large, a decoder that gave up, a cancelled
+    // turn: the request stops, rather than keep downloading into a buffer.
+    continuation.onTermination = { _ in task.cancel() }
     state.body = continuation
     state.bodyStream = stream
     return try await withTaskCancellationHandler {

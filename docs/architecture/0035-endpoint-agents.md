@@ -60,13 +60,15 @@ on an endpoint is about to start — never when a form merely builds a launch pl
 
 There is no protocol between the application and the gateway. The application writes which session
 token leads to which endpoint and model (`Gateway/routes.json`, mode 0600); the gateway reads it and
-`endpoints.json` again when they change, reads the endpoint's key from the keychain on each
-request, and writes the port it listens on (`gateway.json`), which it reuses after a restart. It
+`endpoints.json` again when they change, reads the endpoint's key from the keychain at most once
+a minute, and writes the port it listens on (`gateway.json`), which it reuses after a crash. It is
+known to run by the lock it holds, not by a process number a crash leaves behind. It
 outlives the application while tokens remain, so sessions the host kept still reach their model,
 and stops by itself once none is left: the application removes the tokens of sessions that ended.
 
 A session's harness is given the gateway's URL and a random 256-bit token of its own, never the
-endpoint's key. The token must come back in the harness's own credential header, not only in the
+endpoint's key, and a name for the model without `/`, which both CLIs refuse: only the session's
+route holds the endpoint's own name for it. A harness that goes away cancels the request it made. The token must come back in the harness's own credential header, not only in the
 path.
 
 ### Failures are retried where the harness cannot see them

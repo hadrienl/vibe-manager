@@ -143,6 +143,7 @@ private final class GatewayConnection: @unchecked Sendable {
   private let queue: DispatchQueue
   // Only touched from `queue`.
   private var buffer = Data()
+  private var handling: Task<Void, Never>?
 
   init(connection: NWConnection, handler: any GatewayRequestHandling, queue: DispatchQueue) {
     self.connection = connection
@@ -151,6 +152,14 @@ private final class GatewayConnection: @unchecked Sendable {
   }
 
   func run() {
+    // A harness that goes away — Escape in Claude Code, its own timeout — cancels the turn it
+    // asked for: the gateway stops reading the endpoint, and stops paying for its tokens.
+    connection.stateUpdateHandler = { [self] state in
+      switch state {
+      case .failed, .cancelled: handling?.cancel()
+      default: break
+      }
+    }
     connection.start(queue: queue)
     receive()
   }
@@ -163,7 +172,7 @@ private final class GatewayConnection: @unchecked Sendable {
       case .complete(let request):
         let writer = ConnectionWriter(connection: connection)
         let handler = self.handler
-        Task {
+        handling = Task {
           await handler.handle(request, writer: writer)
           await writer.finish()
         }

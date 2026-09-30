@@ -231,6 +231,18 @@ struct GatewayTests {
     #expect(events.last?.data.contains("overloaded_error") == true)
   }
 
+  @Test("A wait longer than the budget goes back to the harness with the endpoint's Retry-After")
+  func retryAfterPassedOn() async throws {
+    let transport = ScriptedTransport([
+      .answer(status: 429, headers: ["retry-after": "900"], chunks: [], thenFail: nil)
+    ])
+    let writer = RecordingWriter()
+    try await gateway(transport).handle(request(), writer: writer)
+    #expect(transport.requestCount == 1)
+    #expect(await writer.status == 429)
+    #expect(await writer.headers["retry-after"] == "900")
+  }
+
   @Test("A refused key is not retried, and says what to do")
   func authenticationIsFinal() async throws {
     let transport = ScriptedTransport([

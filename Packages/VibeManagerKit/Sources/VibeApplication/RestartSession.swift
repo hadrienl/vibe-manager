@@ -304,7 +304,8 @@ public struct RestartSession: Sendable {
             workingDirectoryPath: path,
             modelID: configuration.modelID,
             initialPrompt: nil,
-            resume: .identifier(identifier)
+            resume: .identifier(identifier),
+            harnessID: configuration.harnessID
           )
         )
         return SessionRestart(

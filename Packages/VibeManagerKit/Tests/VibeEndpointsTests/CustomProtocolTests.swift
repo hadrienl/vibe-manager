@@ -131,6 +131,75 @@ struct CustomProtocolTests {
     #expect(try transport.sentBody(0)["input"] == "Hi")
   }
 
+  private func customGateway(_ transport: ScriptedTransport, format: String = "ndjson") async throws
+    -> Gateway
+  {
+    let routes = GatewayRouteTable()
+    let document = Self.document.replacingOccurrences(
+      of: #""format": "ndjson""#, with: "\"format\": \"\(format)\"")
+    await routes.register(
+      GatewayRoute(
+        endpoint: EndpointConfiguration(
+          baseURL: try #require(URL(string: "https://agents.example/api")), wireProtocol: .custom,
+          customProtocol: try CustomProtocolDocument(parsing: document)),
+        secret: nil, model: "support"),
+      token: "tok")
+    return Gateway(routes: routes, transport: transport, sleep: { _ in })
+  }
+
+  private func turn(stream: Bool) -> GatewayHTTPRequest {
+    GatewayHTTPRequest(
+      method: "POST", path: "/s/tok/v1/messages", headers: ["authorization": "Bearer tok"],
+      body: Data(
+        #"{"model":"x","max_tokens":10,"stream":\#(stream),"messages":[{"role":"user","content":"Hi"}]}"#
+          .utf8))
+  }
+
+  @Test("The end is where the document says, not where the stream closes")
+  func stopRule() async throws {
+    // Heartbeats after the end are never read: the answer is complete at "done".
+    let after = ScriptedTransport([
+      .answer(
+        status: 200, headers: [:],
+        chunks: [
+          #"{"type":"delta","content":"Hi"}"# + "\n" + #"{"type":"done"}"# + "\n",
+          "not json at all\n",
+        ], thenFail: nil)
+    ])
+    let complete = RecordingWriter()
+    try await customGateway(after).handle(turn(stream: true), writer: complete)
+    #expect(await complete.events.last?.name == "message_stop")
+
+    // A stream closed before "done" was cut short, and is tried again.
+    let cut = ScriptedTransport([
+      .answer(status: 200, headers: [:], chunks: [#"{"type":"delta","content":"H"}"# + "\n"], thenFail: nil),
+      .answer(
+        status: 200, headers: [:],
+        chunks: [#"{"type":"delta","content":"Hi"}"# + "\n" + #"{"type":"done"}"# + "\n"],
+        thenFail: nil),
+    ])
+    let retried = RecordingWriter()
+    try await customGateway(cut).handle(turn(stream: true), writer: retried)
+    let events = await retried.events
+    // The first answer had gone out before it was found cut: an error the harness retries.
+    #expect(events.contains { $0.name == "error" })
+  }
+
+  @Test("A turn that does not stream, from a custom endpoint that streams, is answered whole")
+  func wholeFromStream() async throws {
+    let transport = ScriptedTransport([
+      .answer(
+        status: 200, headers: [:],
+        chunks: [#"{"type":"delta","content":"Hello"}"# + "\n" + #"{"type":"done","usage":{"in":3,"out":1}}"# + "\n"],
+        thenFail: nil)
+    ])
+    let writer = RecordingWriter()
+    try await customGateway(transport).handle(turn(stream: false), writer: writer)
+    let json = try #require(await writer.json)
+    #expect(json["content"] == [["type": "text", "text": "Hello"]])
+    #expect(json["usage"]?["input_tokens"] == 3)
+  }
+
   @Test("A custom endpoint without a document that reads is not usable")
   func endpointMapping() {
     var endpoint = Endpoint(

@@ -156,19 +156,28 @@ public final class Gateway: GatewayRequestHandling {
     ["type": "error", "error": ["type": .string(type), "message": .string(message)]]
   }
 
-  /// A failure before any byte of an answer, in the harness's protocol.
+  /// A failure before any byte of an answer, in the harness's protocol. The endpoint's
+  /// `Retry-After` goes with it, so that the harness waits as long as the endpoint asked.
   static func respond(
     _ failure: EndpointFailure, harness: HarnessProtocol, writer: any GatewayResponseWriter
   ) async {
+    let status: Int
+    let body: Data
     switch harness {
     case .messages:
-      await writer.respond(
-        status: AnthropicMessagesServer.status(for: failure),
-        json: AnthropicMessagesServer.errorBody(failure))
+      status = AnthropicMessagesServer.status(for: failure)
+      body = AnthropicMessagesServer.errorBody(failure).data()
     case .responses:
-      await writer.respond(
-        status: ResponsesServer.status(for: failure), json: ResponsesServer.errorBody(failure))
+      status = ResponsesServer.status(for: failure)
+      body = ResponsesServer.errorBody(failure).data()
     }
+    var headers = ["content-type": "application/json", "content-length": String(body.count)]
+    if let wait = failure.retryAfter {
+      headers["retry-after"] = String(max(1, Int(wait.components.seconds)))
+    }
+    await writer.start(status: status, headers: headers)
+    await writer.write(body)
+    await writer.finish()
   }
 
   private func countTokens(_ request: GatewayHTTPRequest, writer: any GatewayResponseWriter) async {
@@ -274,6 +283,23 @@ public final class Gateway: GatewayRequestHandling {
     await attempt(
       endpoint.request, token: token, route: route, harness: side.harness, writer: writer
     ) { response, commit in
+      // A turn that does not stream, from an endpoint that streams all the same: a custom one
+      // whose document asks for a stream. Read as a stream, answered whole.
+      if !side.request.stream, endpoint.framing != .whole, route.endpoint.wireProtocol == .custom {
+        var decoder = endpoint.makeDecoder()
+        var accumulator = CanonicalResponseAccumulator()
+        try await EndpointSide.read(response, framing: endpoint.framing, decoder: &decoder) {
+          for event in $0 { accumulator.consume(event) }
+        }
+        var answer = accumulator.response
+        if answer.id.isEmpty { answer.id = side.fallbackID }
+        answer.model = route.model
+        for step in answer.serverSteps { await observer?.serverStep(token: token, step: step) }
+        let encoded = side.whole(answer).data()
+        await commit(200, ["content-type": "application/json"])
+        await writer.write(encoded)
+        return
+      }
       guard side.request.stream else {
         let data = try await response.collect()
         guard let json = try? JSONValue(parsing: data) else {
@@ -348,7 +374,10 @@ public final class Gateway: GatewayRequestHandling {
       committed.set()
       await writer.start(status: status, headers: headers)
     }
-    var waited: Duration = .zero
+    // The budget is the time the turn has taken, attempts included: five attempts that each wait
+    // their whole first-byte timeout must not add up to ten minutes.
+    let clock = ContinuousClock()
+    let started = clock.now
     var number = 0
     while true {
       number += 1
@@ -370,7 +399,10 @@ public final class Gateway: GatewayRequestHandling {
         failure = UnexpectedFailure.wrap(error)
       }
       if committed.isSet { return }
-      guard let delay = retryPolicy.delay(after: number, failure: failure, waited: waited) else {
+      guard
+        let delay = retryPolicy.delay(
+          after: number, failure: failure, waited: clock.now - started)
+      else {
         await Self.respond(failure, harness: harness, writer: writer)
         return
       }
@@ -383,7 +415,6 @@ public final class Gateway: GatewayRequestHandling {
         await Self.respond(failure, harness: harness, writer: writer)
         return
       }
-      waited += delay
     }
   }
 }
@@ -420,6 +451,8 @@ protocol EndpointStreamDecoding: Sendable {
   mutating func consume(_ event: ServerSentEvent) throws -> [CanonicalStreamEvent]
   mutating func consumeStray(_ line: String) -> [CanonicalStreamEvent]
   mutating func finish() throws -> [CanonicalStreamEvent]
+  /// Whether the answer said it is over, before its stream closed.
+  var hasEnded: Bool { get }
 }
 
 extension EndpointStreamDecoding {
@@ -427,6 +460,8 @@ extension EndpointStreamDecoding {
   mutating func consumeObject(_ text: String) throws -> [CanonicalStreamEvent] {
     try consume(ServerSentEvent(data: text))
   }
+
+  var hasEnded: Bool { false }
 }
 
 extension CustomProtocolDecoder: EndpointStreamDecoding {}
@@ -450,20 +485,28 @@ extension EndpointSide {
     switch framing {
     case .sse:
       var parser = ServerSentEventParser()
-      for try await chunk in response.body {
-        for event in parser.consume(chunk) { await forward(try decoder.consume(event)) }
+      reading: for try await chunk in response.body {
+        for event in parser.consume(chunk) {
+          await forward(try decoder.consume(event))
+          // An endpoint may keep its stream open after the end, with heartbeats.
+          if decoder.hasEnded { break reading }
+        }
       }
       if let last = parser.finish() { await forward(try decoder.consume(last)) }
       for line in parser.strayLines { await forward(decoder.consumeStray(line)) }
     case .ndjson:
       var buffer = Data()
-      for try await chunk in response.body {
+      reading: for try await chunk in response.body {
         buffer.append(chunk)
         while let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
           let line = String(decoding: buffer[buffer.startIndex..<newline], as: UTF8.self)
           buffer.removeSubrange(buffer.startIndex...newline)
           if !line.trimmingCharacters(in: .whitespaces).isEmpty {
             await forward(try decoder.consumeObject(line))
+            if decoder.hasEnded {
+              buffer.removeAll()
+              break reading
+            }
           }
         }
       }

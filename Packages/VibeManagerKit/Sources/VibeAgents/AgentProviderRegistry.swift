@@ -13,9 +13,12 @@ public actor AgentProviderRegistry: AgentProviderResolving {
   private var ordered: [any AgentProvider]
   private var index: [AgentProviderID: any AgentProvider]
 
-  public init(providers: [any AgentProvider] = []) {
+  /// - Parameter endpoints: the endpoints' providers known at launch, registered with the others
+  ///   so that no session is adopted before its agent is known.
+  public init(providers: [any AgentProvider] = [], endpoints: [any AgentProvider] = []) {
     fixed = providers
-    (ordered, index) = Self.indexed(providers)
+    self.endpoints = endpoints
+    (ordered, index) = Self.indexed(providers + endpoints)
   }
 
   private static func indexed(_ providers: [any AgentProvider]) -> (

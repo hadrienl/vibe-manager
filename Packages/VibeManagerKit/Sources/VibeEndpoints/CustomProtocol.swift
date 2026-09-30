@@ -420,9 +420,17 @@ public struct CustomProtocolDecoder: Sendable {
     return out
   }
 
+  /// Whether a `stop` rule matched: the answer is over, whatever the stream does next.
+  public var hasEnded: Bool { stopped }
+
   public mutating func finish() throws -> [CanonicalStreamEvent] {
     guard started else {
       throw EndpointFailure(kind: .malformedResponse, message: "The endpoint sent no answer.")
+    }
+    // A document that says how an answer ends, and a stream closed before it: cut short.
+    if !stopped, document.rules.contains(where: { $0.actions.contains(.stop) }) {
+      throw EndpointFailure(
+        kind: .network, message: "The endpoint's answer ended before it was complete.")
     }
     var out: [CanonicalStreamEvent] = []
     if let open { out.append(.blockStop(index: open.index)) }

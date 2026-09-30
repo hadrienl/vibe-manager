@@ -145,23 +145,29 @@ public final class AppEnvironment {
     let providers =
       configuration.providers?(diagnostics.log)
       ?? Self.providers(environment: configuration.environment, diagnostics: diagnostics.log)
-    let registry = AgentProviderRegistry(providers: providers)
-    // The endpoints (#107): registered beside the command line agents, their secrets in the
-    // keychain, their sessions reaching them through the gateway.
+    // The endpoints (#107): registered beside the command line agents from the start — a session
+    // the terminal host kept is adopted as soon as the workspace loads, and must find its agent —
+    // their secrets in the keychain, their sessions reaching them through the gateway.
     let endpointSecrets = KeychainEndpointSecretStore(
       service: Self.keychainService(isolated: data.defaultsSuite != nil))
     let gatewayLocation = Self.gatewayLocation(
       dataFolder: data.store.deletingLastPathComponent(), endpoints: data.endpoints)
+    let gateway = EndpointGatewayAdapter(
+      controller: EndpointGatewayController(
+        location: gatewayLocation,
+        launch: Self.gatewayLaunch(
+          location: gatewayLocation,
+          keychainService: Self.keychainService(isolated: data.defaultsSuite != nil))))
+    let registry = AgentProviderRegistry(
+      providers: providers,
+      endpoints: EndpointCatalog.providers(
+        for: (try? FileEndpointRepository.read(data.endpoints)) ?? [], among: providers,
+        gateway: gateway, secrets: endpointSecrets, gatewayDirectory: gatewayLocation.directory))
     let endpointCatalog = EndpointCatalog(
       repository: FileEndpointRepository(storeURL: data.endpoints),
       secrets: endpointSecrets,
       registry: registry,
-      gateway: EndpointGatewayAdapter(
-        controller: EndpointGatewayController(
-          location: gatewayLocation,
-          launch: Self.gatewayLaunch(
-            location: gatewayLocation,
-            keychainService: Self.keychainService(isolated: data.defaultsSuite != nil)))),
+      gateway: gateway,
       providers: providers, gatewayDirectory: gatewayLocation.directory)
     self.endpointCatalog = endpointCatalog
     // Every terminal runs in the terminal host, so its agent can be left running when the
@@ -471,7 +477,6 @@ public final class AppEnvironment {
     // The endpoints are registered before the first sheet asks for the agents, and the gateway is
     // relieved of the tokens of sessions that ended: at launch, then every five minutes.
     Task { [repository] in
-      await endpointCatalog.reload()
       while !Task.isCancelled {
         if let sessions = try? await repository.sessions() {
           await endpointCatalog.retainActive(in: sessions)

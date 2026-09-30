@@ -384,7 +384,8 @@ public struct PlanAgentSwitch: Sendable {
             workingDirectoryPath: path,
             modelID: target.modelID,
             initialPrompt: nil,
-            resume: .identifier(identifier)
+            resume: .identifier(identifier),
+            harnessID: current.harnessID
           )
         )
         return planned(launch, .resumeWithModel(identifier: identifier))
