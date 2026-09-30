@@ -1,17 +1,28 @@
 import VibeDomain
 
+/// Whether an observer still reads the terminal after a piece of its output (#248).
+public enum AgentOutputDemand: Sendable {
+  case more
+  /// It found what it was reading for: the launcher stops handing it the output.
+  case enough
+}
+
 /// What watches one launch long enough to keep what makes it resumable.
 ///
 /// The two CLIs reveal their session identifier in ways that have nothing in common — one is
 /// told which identifier to use, the other has to be discovered — so the knowledge stays inside
 /// each provider and only this shape crosses into the application.
 public protocol AgentLaunchObserver: Sendable {
+  /// Whether this observer reads the terminal at all. One that does not is never handed the
+  /// output, which spares a decode of every block the agent writes (#248).
+  var readsOutput: Bool { get }
   func launched(plan: AgentLaunchPlan) async
   /// The same, knowing whether the CLI will really run the hooks the plan carries: approved, or
   /// not needing an approval (#144). A plan whose hooks may still be refused in the terminal is
   /// launched with `false`.
   func launched(plan: AgentLaunchPlan, hooksApproved: Bool) async
-  func observe(output: String) async
+  /// Reads a piece of the terminal's output, decoded, and says whether it wants the rest.
+  func observe(output: String) async -> AgentOutputDemand
   func finished() async
   /// The identifier this launch gave its conversation and has not yet seen written down, if any:
   /// asked when the application lets go of a process the terminal host keeps, so that the next
@@ -28,6 +39,9 @@ public protocol AgentLaunchObserver: Sendable {
 }
 
 extension AgentLaunchObserver {
+  /// Observers read the terminal unless they say otherwise.
+  public var readsOutput: Bool { true }
+
   public func launched(plan: AgentLaunchPlan, hooksApproved: Bool) async {
     await launched(plan: plan)
   }

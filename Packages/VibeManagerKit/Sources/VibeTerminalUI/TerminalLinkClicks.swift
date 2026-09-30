@@ -24,14 +24,16 @@ final class TerminalLinkClicks {
   private let sleep: @Sendable (Duration) async throws -> Void
   private var pending: Task<Void, Never>?
 
-  init(sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) })
-  {
+  init(
+    sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+  ) {
     self.sleep = sleep
   }
 
   var isWaiting: Bool { pending != nil }
 
-  func linkClicked(clickCount: Int, command: Bool, open: @escaping @MainActor @Sendable () -> Void) {
+  func linkClicked(clickCount: Int, command: Bool, open: @escaping @MainActor @Sendable () -> Void)
+  {
     cancel()
     switch Self.decide(clickCount: clickCount, command: command) {
     case .open:

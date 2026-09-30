@@ -222,8 +222,9 @@ struct WorkspaceSlowObserver: AgentLaunchObserver {
     for _ in 0..<yields { await Task.yield() }
   }
 
-  func observe(output _: String) async {
+  func observe(output _: String) async -> AgentOutputDemand {
     // The identifier this launch would reveal is not what these tests are about.
+    .more
   }
 
   func finished() async {

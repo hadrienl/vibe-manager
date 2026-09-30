@@ -32,4 +32,9 @@ public enum Signposts {
   public static func end(_ name: StaticString, _ state: OSSignpostIntervalState) {
     signposter.endInterval(name, state)
   }
+
+  /// A moment rather than an interval, for Instruments.
+  public static func event(_ name: StaticString) {
+    signposter.emitEvent(name)
+  }
 }

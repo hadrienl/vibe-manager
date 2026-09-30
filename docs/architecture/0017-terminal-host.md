@@ -2,7 +2,8 @@
 
 - Status: accepted; amended by [0030](0030-side-terminals.md): terminals are keyed by `TerminalID`
   (the agent's keeps its session's UUID, so the protocol is unchanged), and side terminals run in the
-  same host
+  same host; amended by [0036](0036-hidden-terminals.md): each subscriber of a session is served only
+  what it reads, and a view put away is suspended then caught up from the history
 - Date: 2026-09-24
 - Issue: [#58](https://github.com/hadrienl/vibe-manager/issues/58)
 - Supersedes: ADR 0011's "An agent does not outlive the application that spawned it", and ADR

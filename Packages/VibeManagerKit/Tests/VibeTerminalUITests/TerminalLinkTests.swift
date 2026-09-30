@@ -113,12 +113,15 @@ struct TerminalLinkViewTests {
   @Test("The link under the pointer is found in the cell it is written in, far right too")
   func findsTheLinkUnderThePointer() {
     let padding = String(repeating: " ", count: 50)
-    let (view, window) = makeTerminal(text: "see https://example.com/a here\r\n\(padding)https://far.example")
+    let (view, window) = makeTerminal(
+      text: "see https://example.com/a here\r\n\(padding)https://far.example")
     defer { window.close() }
     #expect(view.link(atScreen: Position(col: 8, row: 0)) == "https://example.com/a")
     #expect(view.link(atScreen: Position(col: 1, row: 0)) == nil)
     let cols = view.getTerminal().cols
-    for cell in [Position(col: 8, row: 0), Position(col: cols - 1, row: 1), Position(col: 55, row: 1)] {
+    for cell in [
+      Position(col: 8, row: 0), Position(col: cols - 1, row: 1), Position(col: 55, row: 1),
+    ] {
       let local = view.convert(point(of: cell, in: view), from: nil)
       #expect(view.cell(at: local) == cell)
     }

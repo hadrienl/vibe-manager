@@ -666,17 +666,19 @@ public final class SessionTerminalDrawer {
   private func follow(_ terminal: DrawerTerminal, session: any TerminalSession) {
     terminal.watch?.cancel()
     terminal.watch = Task { [weak self, weak terminal] in
-      let attachment = await session.attach()
+      // Told that the shell wrote, at most every quarter of a second and once more after its last
+      // output, rather than woken for every block (#248): what follows only schedules work.
+      let attachment = await session.attach(.pulses(every: Self.outputPulseInterval))
       var finalState = attachment.state
       if !finalState.isFinished {
         for await event in attachment.events {
           guard !Task.isCancelled, let self, let terminal else { return }
           switch event {
-          case .output:
+          case .output, .outputPulse:
             self.outputArrived(in: terminal)
           case .stateChanged(let state) where state.isFinished:
             finalState = state
-          case .stateChanged, .historyTruncated:
+          case .stateChanged, .historyTruncated, .outputDropped:
             break
           }
           if finalState.isFinished { break }
@@ -687,6 +689,8 @@ public final class SessionTerminalDrawer {
       await self.shellEnded(in: terminal, state: finalState)
     }
   }
+
+  static let outputPulseInterval = Duration.milliseconds(250)
 
   private func outputArrived(in terminal: DrawerTerminal) {
     if !isSeen(terminal) { terminal.hasUnseenOutput = true }
