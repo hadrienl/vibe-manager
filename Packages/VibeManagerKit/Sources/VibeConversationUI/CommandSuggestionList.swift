@@ -60,6 +60,9 @@ public struct CommandSuggestionList: View {
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("\(matches.count) skills and commands", bundle: .module))
     .onAppear { announceCount(matches.count) }
+    // Filtering says what is left and which entry is selected: the selection goes back to the
+    // first, often without `selectedIndex` changing.
+    .onChange(of: matches.map(\.id)) { _, _ in announceFiltered(matches) }
   }
 
   private func rows(_ matches: [AgentCommandMatch]) -> some View {
@@ -100,6 +103,17 @@ public struct CommandSuggestionList: View {
     guard matches.indices.contains(index) else { return }
     AccessibilityNotification.Announcement(
       CommandSuggestionRow.spokenLabel(matches[index].command)
+    ).post()
+  }
+
+  private func announceFiltered(_ matches: [AgentCommandMatch]) {
+    let count = String(localized: "\(matches.count) skills and commands", bundle: .module)
+    let selected =
+      matches.indices.contains(commands.selectedIndex)
+      ? CommandSuggestionRow.spokenLabel(matches[commands.selectedIndex].command) : nil
+    AccessibilityNotification.Announcement(
+      [count, selected].compactMap(\.self).joined(
+        separator: ", ")
     ).post()
   }
 
