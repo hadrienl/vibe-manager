@@ -1284,7 +1284,11 @@ public final class AppModel {
       prepareHandOff(from: id, listedBefore: visible)
       // Set before the reload that puts the neighbour on screen: its terminal must not take the
       // keyboard in between.
-      if wasSelected { keyboardHeldInSidebarFor = preferredSelection }
+      // Only into a sidebar on screen: archiving never shows a sidebar the user hid, and the
+      // neighbour then takes the keyboard as it always has.
+      if wasSelected, layout.columns.isSidebarVisible {
+        keyboardHeldInSidebarFor = preferredSelection
+      }
       if let name {
         Announcer.announce(
           String(
@@ -1298,7 +1302,7 @@ public final class AppModel {
     await reload()
     handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
     reconcileSelection()
-    if archived, wasSelected, selectedSessionID != id {
+    if archived, wasSelected, selectedSessionID != id, layout.columns.isSidebarVisible {
       keyboardHeldInSidebarFor = selectedSessionID
       focusSidebar()
     }

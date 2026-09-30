@@ -723,7 +723,8 @@ public struct RootView: View {
   private func closeConfirmationMessage(for session: WorkSession) -> String {
     let drawer = drawerCommandsSentence(for: session)
     // Only side terminals at work (#115): the agent has nothing left to stop.
-    if let drawer, model.pane(for: session.id)?.status != .running { return drawer }
+    // An agent still starting is at work too: the launcher counts it, as the question's rule does.
+    if let drawer, model.launcher?.isRunning(session.id) != true { return drawer }
     let consequence = String(
       localized: "The agent will be stopped. The session can be restarted later.", bundle: .module)
     guard let drawer else { return consequence }

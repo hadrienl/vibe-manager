@@ -213,6 +213,25 @@ struct SessionTaskBoardTests {
     #expect(model.terminalClaimsKeyboardOnActivation)
   }
 
+  @Test("With the sidebar hidden, archiving leaves it hidden and the neighbour takes the keyboard")
+  func archivingWithTheSidebarHidden() async {
+    let archived = session("Archived", in: .done, updatedAt: 200)
+    let next = session("Next", in: .done, updatedAt: 100)
+    let (model, _, _) = makeWorkspace([archived, next])
+    await model.load()
+    model.setColumn(.done)
+    model.select(archived.id)
+    model.layout.setSidebarVisible(false)
+    let requests = model.sidebarFocusRequest
+
+    await model.requestArchive(archived.id)
+
+    #expect(model.selectedSessionID == next.id)
+    #expect(!model.layout.columns.isSidebarVisible)
+    #expect(model.sidebarFocusRequest == requests)
+    #expect(model.terminalClaimsKeyboardOnActivation)
+  }
+
   @Test("⌃⌘A pressed twice before the first archive is done archives the session once")
   func archivingTwiceAtOnce() async {
     let subject = session("Subject", in: .done)
