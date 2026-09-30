@@ -10,24 +10,28 @@ import VibeProcess
 /// repository an agent is committing in never collides with it.
 ///
 /// A repository is only ever read, and it may be one the user merely opened: its local
-/// configuration is not trusted to run anything. `hardeningOptions` switch off the two settings
-/// through which a plain `git status` executes a command of the repository's choosing.
+/// configuration is not trusted to run anything. `hardeningOptions` switch off its monitor and its
+/// folder of hooks; before a `status`, `FilterConfiguration` switches off its filter drivers, the
+/// aliases and Git LFS extensions a filter could reach, and the hooks it declares by name; and no
+/// command fetches a missing object from a remote of its choosing (`GIT_NO_LAZY_FETCH`).
 public struct ProcessGitCommandRunner: GitCommandRunner {
   private let executable: GitExecutable
   private let timeout: Duration
   private let diagnostics: any DiagnosticLog
-  private let filters: RepositoryFilterGuard
+  private let inherited: [String: String]
 
+  /// `inherited` is the environment the allowlist is taken from: the application's, or a test's
+  /// with a `HOME` of its own.
   public init(
     candidates: [String] = ProcessGitCommandRunner.defaultCandidates,
     timeout: Duration = .seconds(120),
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
-    filters: RepositoryFilterGuard = .shared
+    inheriting inherited: [String: String] = ProcessInfo.processInfo.environment
   ) {
     executable = GitExecutable(candidates: candidates)
     self.timeout = timeout
     self.diagnostics = diagnostics
-    self.filters = filters
+    self.inherited = inherited
   }
 
   public static let defaultCandidates = [
@@ -37,7 +41,9 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
   /// Passed before every command. `core.fsmonitor` names a program Git runs to learn what changed,
   /// and `core.hooksPath` a folder of programs it runs around some commands: both are read from a
   /// repository's own `.git/config`, which is how a hostile repository runs code in whoever
-  /// inspects it. The user's global configuration is still read for everything else.
+  /// inspects it. Hooks declared by name (`hook.<name>.command`) are not in that folder: no command
+  /// run here fires one — reads take no optional lock — and a `status` disables them all the same.
+  /// The user's global configuration is still read for everything else.
   public static let hardeningOptions = [
     "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null",
   ]
@@ -60,9 +66,11 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
   public func run(_ arguments: [String], in directory: String) async throws -> GitCommandResult {
     let path = try await executable.resolve()
     var arguments = arguments
-    var environment = Self.environment()
+    var environment = Self.environment(inheriting: inherited)
     if let status = Self.statusIndex(in: arguments) {
-      guard let drivers = await driversToNeutralize(in: directory, git: path) else {
+      // Listed again before every `status`, never remembered: a checkout can change what an
+      // included file says without any file the application could watch moving.
+      guard let configuration = await repositoryConfiguration(in: directory, git: path) else {
         diagnostics.record(
           .git, .error, "git.filtersUnknown", ["repository": .path(RedactedPath(directory))])
         return GitCommandResult(
@@ -70,11 +78,12 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
           errorOutput: String(
             localized: "git could not read this repository's configuration.", bundle: .module))
       }
-      if !drivers.isEmpty {
-        environment.merge(FilterConfiguration.environment(neutralizing: drivers)) { $1 }
+      let neutralizations = configuration.neutralizations
+      if !neutralizations.isEmpty {
+        environment.merge(FilterConfiguration.environment(for: neutralizations)) { $1 }
         diagnostics.record(
           .git, .info, "git.filtersNeutralized",
-          ["count": .count(drivers.count), "repository": .path(RedactedPath(directory))])
+          ["count": .count(neutralizations.count), "repository": .path(RedactedPath(directory))])
       }
       // An option, not `diff.ignoreSubmodules`: a repository's `submodule.<name>.ignore` would
       // override the configuration, and the Git run in a submodule reads that submodule's filters.
@@ -122,34 +131,37 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
     )
   }
 
-  /// The verb alone: every other argument may be a path, a branch name or a revision.
-  /// The filter drivers the repository at `directory` defines for itself, or `nil` when Git could
-  /// not list them. Listing runs nothing of the repository's: `git config` starts no filter, hook or
-  /// monitor.
-  private func driversToNeutralize(in directory: String, git path: String) async -> [String]? {
-    let timeout = timeout
-    return await filters.drivers(in: directory) {
-      guard
-        let result = try? await BoundedProcess.run(
-          BoundedProcessRequest(
-            executablePath: path,
-            arguments: Self.hardeningOptions + FilterConfiguration.arguments,
-            environment: Self.environment(),
-            workingDirectoryPath: directory,
-            timeout: timeout,
-            outputByteLimit: Self.outputByteLimit
-          )
-        ), !result.didTimeOut, !result.outputTruncated
-      else { return nil }
-      // `--get-regexp` answers 1 when nothing matched: outside a repository, nothing to switch off.
-      switch result.exitCode {
-      case 0: return result.standardOutput
-      case 1 where result.standardOutput.isEmpty: return Data()
-      default: return nil
-      }
+  /// What the repository at `directory` configures that a `status` could run, or `nil` when Git
+  /// could not list it. Listing runs nothing of the repository's: `git config` starts no filter,
+  /// hook or monitor. It is given at most 10 s, so that a `status` never waits twice its own delay.
+  private func repositoryConfiguration(in directory: String, git path: String) async
+    -> FilterConfiguration?
+  {
+    let arguments = FilterConfiguration.arguments
+    let startedAt = ContinuousClock.now
+    guard
+      let result = try? await BoundedProcess.run(
+        BoundedProcessRequest(
+          executablePath: path,
+          arguments: Self.hardeningOptions + arguments,
+          environment: Self.environment(inheriting: inherited),
+          workingDirectoryPath: directory,
+          timeout: min(timeout, .seconds(10)),
+          outputByteLimit: Self.outputByteLimit
+        )
+      )
+    else { return nil }
+    note(result, arguments: arguments, directory: directory, duration: .now - startedAt)
+    guard !result.didTimeOut, !result.outputTruncated else { return nil }
+    // `--get-regexp` answers 1 when nothing matched: outside a repository, nothing to switch off.
+    switch result.exitCode {
+    case 0: return FilterConfiguration.parse(result.standardOutput)
+    case 1 where result.standardOutput.isEmpty: return FilterConfiguration(entries: [])
+    default: return nil
     }
   }
 
+  /// The verb alone: every other argument may be a path, a branch name or a revision.
   static func verb(of arguments: [String]) -> DiagnosticToken {
     switch arguments.first {
     case "status": return DiagnosticToken("status")
@@ -199,6 +211,11 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
     environment["GIT_TERMINAL_PROMPT"] = "0"
     environment["GIT_OPTIONAL_LOCKS"] = "0"
     environment["GIT_PAGER"] = "cat"
+    // A partial clone fetches a missing object from its promisor remote, through the
+    // `remote.<name>.uploadpack` or `core.sshCommand` of the repository's choosing: a `status`
+    // detecting a rename, a `diff` between two commits, would run it. Without the object, Git
+    // fails instead. A Git older than 2.45 ignores the variable.
+    environment["GIT_NO_LAZY_FETCH"] = "1"
     return environment
   }
 }

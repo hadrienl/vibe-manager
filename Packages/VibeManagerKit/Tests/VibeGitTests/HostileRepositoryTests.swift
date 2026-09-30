@@ -94,13 +94,160 @@ struct HostileRepositoryTests {
   func ownFilters() async throws {
     let sandbox = try Sandbox()
     defer { sandbox.remove() }
-    for variable in ["clean", "process", "smudge"] {
+    for variable in ["clean", "process"] {
       let repository = sandbox.path("filtered-\(variable)")
       let (payload, marker) = try await makeFilteredRepository(at: repository, in: sandbox)
       try await git(["config", "filter.evil.\(variable)", payload], in: repository)
       try await readEverything(repository)
       #expect(!FileManager.default.fileExists(atPath: marker), "filter.evil.\(variable) ran")
     }
+  }
+
+  @Test("A driver with an empty name, which `filter=` names, never runs")
+  func emptyName() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("empty")
+    let (payload, marker) = try await makeFilteredRepository(
+      at: repository, driver: "", in: sandbox)
+    try append("[filter \"\"]\n\tclean = \(payload)\n", toConfigurationOf: repository)
+    try await readEverything(repository)
+    #expect(!FileManager.default.fileExists(atPath: marker))
+  }
+
+  @Test("A filter its per-worktree configuration defines never runs")
+  func worktreeConfiguration() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("worktree")
+    let (payload, marker) = try await makeFilteredRepository(at: repository, in: sandbox)
+    try await git(["config", "extensions.worktreeConfig", "true"], in: repository)
+    try await git(["config", "--worktree", "filter.evil.clean", payload], in: repository)
+    try await readEverything(repository)
+    #expect(!FileManager.default.fileExists(atPath: marker))
+  }
+
+  /// A runner whose Git reads a global configuration of the test's own, for the filters a user
+  /// installs globally.
+  private func runner(withGlobalConfiguration configuration: String, in sandbox: Sandbox) throws
+    -> ProcessGitCommandRunner
+  {
+    let home = sandbox.path("home-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(atPath: home, withIntermediateDirectories: true)
+    try Data(configuration.utf8)
+      .write(to: URL(fileURLWithPath: home).appendingPathComponent(".gitconfig"))
+    var environment = ProcessInfo.processInfo.environment
+    environment["HOME"] = home
+    return ProcessGitCommandRunner(inheriting: environment)
+  }
+
+  @Test("A global filter that falls back on an alias never runs the repository's alias")
+  func aliasBehindGlobalFilter() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("alias")
+    let (payload, marker) = try await makeFilteredRepository(
+      at: repository, driver: "vibemedia", in: sandbox)
+    // `git vibemedia` is no command: Git falls back on the alias, which the repository defines.
+    let runner = try runner(
+      withGlobalConfiguration: "[filter \"vibemedia\"]\n\tclean = git vibemedia clean %f\n",
+      in: sandbox)
+    try await git(["config", "alias.vibemedia", "!\(payload)"], in: repository)
+
+    for _ in 0..<2 {
+      try touchFiltered(in: repository)
+      _ = try await runner.run(GitStatusReader.arguments, in: repository)
+    }
+
+    #expect(!FileManager.default.fileExists(atPath: marker))
+  }
+
+  @Test("A global Git LFS filter never runs an extension the repository configures")
+  func lfsExtensionBehindGlobalFilter() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("lfs")
+    let (payload, marker) = try await makeFilteredRepository(
+      at: repository, driver: "vibelfs", in: sandbox)
+    // Stands for `git-lfs`, which runs `lfs.extension.<name>.clean` on every file it cleans.
+    let lfs = sandbox.path("git-lfs")
+    try Data(
+      """
+      #!/bin/sh
+      command=$(git config --get lfs.extension.evil.clean)
+      [ -n "$command" ] && sh -c "$command"
+      cat
+
+      """.utf8
+    ).write(to: URL(fileURLWithPath: lfs))
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: lfs)
+    let runner = try runner(
+      withGlobalConfiguration: "[filter \"vibelfs\"]\n\tclean = \(lfs) clean %f\n", in: sandbox)
+    try await git(["config", "lfs.extension.evil.clean", payload], in: repository)
+
+    for _ in 0..<2 {
+      try touchFiltered(in: repository)
+      _ = try await runner.run(GitStatusReader.arguments, in: repository)
+    }
+
+    #expect(!FileManager.default.fileExists(atPath: marker))
+  }
+
+  @Test("A partial clone never fetches a missing object through the remote it names")
+  func noLazyFetch() async throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let repository = sandbox.path("partial")
+    try await makeRepository(at: repository)
+    let lines = (1...200).map(String.init).joined(separator: "\n") + "\n"
+    let folder = URL(fileURLWithPath: repository)
+    try Data(lines.utf8).write(to: folder.appendingPathComponent("f.txt"))
+    try await git(["add", "f.txt"], in: repository)
+    try await git(["commit", "-q", "-m", "One file"], in: repository)
+    let first = try await git(["rev-parse", "HEAD:f.txt"], in: repository)
+    try await git(["mv", "f.txt", "g.txt"], in: repository)
+    try Data((lines + "moved\n").utf8).write(to: folder.appendingPathComponent("g.txt"))
+    try await git(["add", "g.txt"], in: repository)
+    try await git(["commit", "-q", "-m", "Moved"], in: repository)
+    let second = try await git(["rev-parse", "HEAD:g.txt"], in: repository)
+    try await git(["mv", "g.txt", "h.txt"], in: repository)
+    try Data((lines + "moved again\n").utf8).write(to: folder.appendingPathComponent("h.txt"))
+    try await git(["add", "h.txt"], in: repository)
+
+    let marker = sandbox.path("fetched")
+    let payload = sandbox.path("upload-pack.sh")
+    try Data("#!/bin/sh\ntouch '\(marker)'\nexit 1\n".utf8)
+      .write(to: URL(fileURLWithPath: payload))
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: payload)
+    for (key, value) in [
+      ("core.repositoryformatversion", "1"), ("extensions.partialClone", "origin"),
+      ("remote.origin.url", sandbox.path("nowhere")), ("remote.origin.promisor", "true"),
+      ("remote.origin.uploadpack", payload),
+    ] {
+      try await git(["config", key, value], in: repository)
+    }
+    for object in [first, second] {
+      let loose = folder.appendingPathComponent(
+        ".git/objects/\(object.prefix(2))/\(object.dropFirst(2))")
+      try FileManager.default.removeItem(at: loose)
+    }
+
+    _ = await GitStatusReader().status(atPath: repository, limit: 100)
+    _ = try await ProcessGitCommandRunner().run(
+      [
+        "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--name-status", "-z",
+        "--find-renames", "HEAD~1", "HEAD",
+      ], in: repository)
+
+    #expect(!FileManager.default.fileExists(atPath: marker))
+  }
+
+  private func append(_ text: String, toConfigurationOf repository: String) throws {
+    let configuration = (repository as NSString).appendingPathComponent(".git/config")
+    let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: configuration))
+    handle.seekToEndOfFile()
+    handle.write(Data(text.utf8))
+    try handle.close()
   }
 
   @Test("A filter the repository marks as required is switched off all the same, and read")
@@ -149,11 +296,7 @@ struct HostileRepositoryTests {
       let repository = sandbox.path("odd-\(UUID().uuidString)")
       let (payload, marker) = try await makeFilteredRepository(
         at: repository, driver: driver, in: sandbox)
-      let configuration = (repository as NSString).appendingPathComponent(".git/config")
-      let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: configuration))
-      handle.seekToEndOfFile()
-      handle.write(Data("[filter \"\(driver)\"]\n\tclean = \(payload)\n".utf8))
-      try handle.close()
+      try append("[filter \"\(driver)\"]\n\tclean = \(payload)\n", toConfigurationOf: repository)
       try await readEverything(repository)
       #expect(!FileManager.default.fileExists(atPath: marker), "\(driver) ran")
     }

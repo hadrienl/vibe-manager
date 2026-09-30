@@ -39,15 +39,20 @@ git --no-optional-locks status --porcelain=v2 -z --branch --untracked-files=norm
   does not confirm.
 - The user's configuration is read and never written: a repository with `core.fsmonitor` benefits
   from it; the application enables nothing.
-- Nothing the repository defines for itself runs (#243). Before each `status`, the runner lists —
-  with `git config`, which runs nothing — the filter drivers of the `local` and `worktree` scopes,
-  includes followed, and gives each an empty `clean`, `smudge` and `process` and `required=false`
-  through `GIT_CONFIG_*`: Git then hashes the file as it is. The user's global and system filters
-  (Git LFS) keep working, and so does a local definition identical to theirs (`git lfs install
-  --local`). `--ignore-submodules=dirty` keeps Git out of submodules, whose filters are theirs: a
-  submodule at another commit is still shown, one only edited is not. When the list cannot be
-  read, `status` is not run. The list is remembered per folder while its configuration files and
-  those they include keep the same identity, size and date.
+- Nothing the repository defines for itself runs (#243). Before each `status` — every time, since
+  a checkout can change what an included file says without anything the application could watch
+  moving — the runner lists with `git config`, which runs nothing, what the `local` and `worktree`
+  scopes define, includes followed, and switches it off through `GIT_CONFIG_*`: each filter driver
+  (the empty name `filter=` gives included) gets an empty `clean`, `smudge` and `process` and
+  `required=false`, so Git hashes the file as it is; the repository's aliases and Git LFS
+  extensions, which a global filter would reach (`git media` falls back on `alias.media`,
+  `git-lfs` runs `lfs.extension.*`), are emptied; its hooks declared by name are disabled. The
+  user's global and system filters (Git LFS) keep working, and so does a local definition
+  identical to theirs (`git lfs install --local`). `--ignore-submodules=dirty` keeps Git out of
+  submodules, whose filters are theirs: a submodule at another commit is still shown, one only
+  edited is not. When the list cannot be read, `status` is not run. Every command runs with
+  `GIT_NO_LAZY_FETCH=1`: a partial clone's missing object is an error, never a fetch through a
+  remote the repository names.
 - An operation left half done — rebase, merge, cherry-pick, revert, bisect — is read from the
   files Git leaves in its `git-dir`, since `status --porcelain` does not say it.
 - 30 seconds at most per reading, through a runner of its own.
