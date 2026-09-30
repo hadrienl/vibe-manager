@@ -61,8 +61,7 @@ final class WindowTitleRoom {
 struct WindowTitleHeader: View {
   let title: WindowTitle
   let room: WindowTitleRoom
-  /// The most the toolbar can give, as measured from inside it; `nil` until then, or when it
-  /// cannot be (#256).
+  /// The most the toolbar can give, as measured from inside it; `nil` until then (#256).
   @State private var measuredRoom: CGFloat?
   @State private var applicationWidth: CGFloat = 0
   @State private var nameWidth: CGFloat = 0
@@ -117,7 +116,6 @@ struct WindowTitleHeader: View {
     }
     .background(
       ToolbarRoomReader(detailLeading: self.room.detailLeading) { measured in
-        guard let measured else { return measuredRoom = nil }
         if measuredRoom.map({ abs($0 - measured) >= 1 }) ?? true { measuredRoom = measured }
       }
     )
@@ -208,7 +206,7 @@ struct ToolbarTitleLayout {
 /// when the window is resized, when an item comes or goes, and when one moves or changes width.
 private struct ToolbarRoomReader: NSViewRepresentable {
   let detailLeading: CGFloat
-  let measured: (CGFloat?) -> Void
+  let measured: (CGFloat) -> Void
 
   func makeNSView(context: Context) -> ToolbarRoomView {
     ToolbarRoomView()
@@ -223,8 +221,7 @@ private struct ToolbarRoomReader: NSViewRepresentable {
 
 final class ToolbarRoomView: NSView {
   var detailLeading: CGFloat = 0
-  /// The room, or `nil` when where the title stands says nothing of it.
-  var measured: ((CGFloat?) -> Void)?
+  var measured: ((CGFloat) -> Void)?
   private var observers = NotificationObservers()
   private var observedItemViews: Set<ObjectIdentifier> = []
   /// The window last drawn in. Sent to the overflow menu, the title leaves the window, and must
@@ -278,9 +275,9 @@ final class ToolbarRoomView: NSView {
     let visible = Set((toolbar.visibleItems ?? []).map(\.itemIdentifier))
     let own = toolbar.items[ownIndex]
     guard let ownView = own.view, visible.contains(own.itemIdentifier) else {
-      // In the » menu itself, where it stands says nothing: the room assumed without a
-      // measurement brings it back to the bar, where it is measured.
-      measured?(nil)
+      // In the » menu itself, where it stands says nothing: made small, it comes back to the bar
+      // and is measured there. The room assumed without a measurement may still not fit.
+      measured?(ToolbarTitleLayout.minimumNameWidth)
       return
     }
     let ownFrame = ownView.convert(ownView.bounds, to: nil)

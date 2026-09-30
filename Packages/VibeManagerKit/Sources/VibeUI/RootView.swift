@@ -64,7 +64,8 @@ public struct RootView: View {
       }
     }
     // The window's title (#159), in every state: the Window menu, Mission Control and ⌘` read it.
-    // The toolbar draws it itself, in two styles, where the system allows it.
+    // From macOS 26 the toolbar draws it itself, the application's name and the session's in two
+    // styles (#256).
     .navigationTitle(model.windowTitle.full)
     .removingSystemDrawnTitle()
     // Open Quickly, over the whole window (#37).
