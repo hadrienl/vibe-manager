@@ -237,6 +237,8 @@ struct SubagentFollowTests {
     let follow = follow(tail)
     let session = session()
     await follow.setAgentRunning(true, since: Date(timeIntervalSince1970: 2_000), for: session.id)
+    // The model's first word, before it could date the process, does not drop the date.
+    await follow.setAgentRunning(true, for: session.id)
     var iterator = await follow.follow(session).makeAsyncIterator()
     let snapshot = await next(&iterator) { run("s2", in: $0)?.activityEntries?.count == 1 }
     #expect(run("s1", in: snapshot)?.activity == .unread)

@@ -185,7 +185,9 @@ public actor FollowConversation {
   /// (#180): they will not end.
   public func setAgentRunning(_ isRunning: Bool, since startedAt: Date? = nil, for session: SessionID)
   {
-    let start = isRunning ? startedAt : nil
+    // Running with no date says nothing of the date: one already known for this run is kept.
+    let start =
+      isRunning ? startedAt ?? (stoppedAgents.contains(session) ? nil : agentStarts[session]) : nil
     guard stoppedAgents.contains(session) == isRunning || agentStarts[session] != start else {
       return
     }

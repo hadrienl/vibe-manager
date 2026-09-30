@@ -322,8 +322,17 @@ public final class ConversationModel {
   private func learnProcessStart() {
     startTask?.cancel()
     startTask = Task { [weak self] in
-      guard let self, let date = await self.processStartDate() else { return }
-      guard !Task.isCancelled, self.reportedAgentRunning == true else { return }
+      // A terminal still starting has no process to date yet: asked again until it has, for as long
+      // as the agent is said to run.
+      var date: Date?
+      while !Task.isCancelled, self?.reportedAgentRunning == true {
+        date = await self?.processStartDate()
+        if date != nil { break }
+        try? await Task.sleep(for: Self.processStartRetry)
+      }
+      guard let self, let date, !Task.isCancelled, self.reportedAgentRunning == true else {
+        return
+      }
       self.processStartedAt = date
       self.agentRunningChanged?(true, date)
       // Gone from the bar at once: they did not just end, they ended long ago.
@@ -403,6 +412,8 @@ public final class ConversationModel {
   @ObservationIgnored public var processStartDate: () async -> Date? = { nil }
   @ObservationIgnored private var processStartedAt: Date?
   @ObservationIgnored private var startTask: Task<Void, Never>?
+  /// How often a process that cannot be dated yet is asked again.
+  static let processStartRetry = Duration.milliseconds(500)
   @ObservationIgnored private var lingering: [String: (call: ToolCall, until: ContinuousClock.Instant)] =
     [:]
   @ObservationIgnored private var lingerTask: Task<Void, Never>?

@@ -130,6 +130,25 @@ struct SubagentModelTests {
     #expect(model.trayItems.map(\.id) == ["new"])
   }
 
+  @Test("A process still starting is dated once it runs")
+  func processDatedLater() async throws {
+    let start = Date(timeIntervalSince1970: 2_000)
+    let model = model()
+    var asked = 0
+    model.processStartDate = {
+      asked += 1
+      return asked < 3 ? nil : start
+    }
+    var told: [Date?] = []
+    model.agentRunningChanged = { _, since in told.append(since) }
+    show([subagent("a")], in: model)
+    for _ in 0..<500 where told.count < 2 {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(asked == 3)
+    #expect(told == [nil, start])
+  }
+
   @Test("A permission a sub-agent asks for is answered under its own call")
   func permissionInsideASubagent() {
     let model = model()
