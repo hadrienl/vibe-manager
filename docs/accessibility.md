@@ -250,6 +250,11 @@ after the draft left there (#105). Walking the sidebar with ↑ / ↓ keeps the 
 Return or → on the row then hands it to the composer. Text follows the size chosen in
 Settings › Conversation, and unfolding does not animate with Reduce Motion on.
 
+A `/` typed first in the composer opens the agent's skills and commands (#219). The list is announced
+with its count ("12 skills and commands"). The keyboard stays in the composer: ↑ / ↓ move the
+selection, and each entry reached is announced as "name, description, origin". Tab or Return inserts
+the entry, Escape closes the list. Each entry is also a button, for a click or a VoiceOver action.
+
 ### Dropping files
 
 A drop on a session (#42) is announced once it is done: "Dropped into the terminal of *name*",

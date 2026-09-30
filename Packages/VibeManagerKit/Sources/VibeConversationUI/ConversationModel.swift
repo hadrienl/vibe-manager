@@ -132,6 +132,14 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   }
 }
 
+extension ConversationEntry {
+  /// A command of the CLI the user ran — `/mcp`, a skill — as the transcript writes it.
+  fileprivate var isCommand: Bool {
+    if case .notice(.command) = content { return true }
+    return false
+  }
+}
+
 /// What confirms the echoes: the prompts of the conversation and its shell commands, counted
 /// again only among the entries that changed (#250).
 struct EchoTallies {
@@ -143,7 +151,9 @@ struct EchoTallies {
     while let last = commands.last, last.index >= from { commands.removeLast() }
     for index in entries.indices.dropFirst(from) {
       let entry = entries[index]
-      if entry.isUserPrompt { promptIndices.append(index) }
+      // A skill or a command sent with `/` is written as a command, not a prompt (#219): it
+      // confirms a message as well.
+      if entry.isUserPrompt || entry.isCommand { promptIndices.append(index) }
       if let run = entry.shellRun { commands.append((index, run.command)) }
     }
   }
@@ -235,7 +245,9 @@ public final class ConversationModel {
 
   // MARK: Composer
 
-  public var draft = ""
+  public var draft = "" {
+    didSet { if draft != oldValue { updateCommandSuggestions() } }
+  }
   public private(set) var attachments: [URL] = []
   public private(set) var echoes: [PendingEcho] = []
   /// A prompt pasted whose Return is not written yet: another pasted now would join it.
@@ -1024,8 +1036,9 @@ public final class ConversationModel {
   public func editAgain(_ run: ShellRun) {
     guard composerState == .ready else { return }
     // As if recalled with ↑: the draft put aside comes back with ↓ or Escape.
-    draft = historyNavigation.recall(
-      PromptHistory.recalled(command: run.command), in: promptHistory, draft: draft)
+    showRecalled(
+      historyNavigation.recall(
+        PromptHistory.recalled(command: run.command), in: promptHistory, draft: draft))
     requestComposerFocus()
   }
 
@@ -1218,6 +1231,148 @@ public final class ConversationModel {
     return true
   }
 
+  // MARK: - Skills and commands
+
+  /// Reads the skills and commands of the session's agent (#219): the list kept, read again when
+  /// it is stale. `nil` for an agent that cannot list them — `/` is then text.
+  @ObservationIgnored public var readCommands: (() async -> AgentCommandIndex?)? {
+    didSet {
+      // A reading under way was for the reader before: what it brings is dropped.
+      commandReading?.cancel()
+      commandReading = nil
+      commandGeneration += 1
+      if readCommands == nil { commandIndex = AgentCommandIndex([]) }
+    }
+  }
+  /// What the agent accepts, as last read.
+  public private(set) var commandIndex = AgentCommandIndex([]) {
+    didSet { updateCommandSuggestions() }
+  }
+  /// The list under the `/` being typed, in the order shown; `nil` while it is closed. Empty when
+  /// nothing matches: it stays open to say so.
+  public private(set) var commandSuggestions: [AgentCommandMatch]?
+  public private(set) var selectedCommandIndex = 0
+  /// The command being typed when the list was last worked out: the selection goes back to the
+  /// first entry when it changes.
+  @ObservationIgnored private var commandQuery: AgentCommandQuery?
+  /// The draft Escape closed the list on: it stays closed while that command is typed, and opens
+  /// again once erased back to its `/`, or at the next one.
+  @ObservationIgnored private var dismissedCommandDraft: String?
+  /// The command last inserted, with its arguments' hint, while the draft still opens on it.
+  @ObservationIgnored private var insertedCommand: AgentCommand?
+  @ObservationIgnored private var commandReading: Task<Void, Never>?
+  @ObservationIgnored private var commandGeneration = 0
+
+  /// Reads the list again, in the background: when it opens, and when the conversation is shown.
+  public func refreshCommands() {
+    guard commandReading == nil, let readCommands else { return }
+    let generation = commandGeneration
+    commandReading = Task { [weak self] in
+      let index = await readCommands()
+      guard let self, self.commandGeneration == generation else { return }
+      self.commandReading = nil
+      if let index { self.commandIndex = index }
+    }
+  }
+
+  private func updateCommandSuggestions() {
+    let query = AgentCommandQuery(draft: draft, triggers: commandIndex.triggers)
+    defer { commandQuery = query }
+    if let inserted = insertedCommand, !draftOpens(on: inserted) { insertedCommand = nil }
+    if let dismissed = dismissedCommandDraft {
+      let erasedToTrigger =
+        query?.text.isEmpty == true
+        && AgentCommandQuery(draft: dismissed, triggers: commandIndex.triggers)?.text.isEmpty
+          == false
+      guard query == nil || erasedToTrigger else {
+        if commandSuggestions != nil { commandSuggestions = nil }
+        return
+      }
+      dismissedCommandDraft = nil
+    }
+    // Only while a message can be written: an answer to a question lists nothing.
+    guard let query, readCommands != nil, composerState == .ready else {
+      if commandSuggestions != nil { commandSuggestions = nil }
+      return
+    }
+    // Opening: what was read is shown at once, and read again behind it.
+    if commandQuery == nil { refreshCommands() }
+    guard !commandIndex.isEmpty else {
+      if commandSuggestions != nil { commandSuggestions = nil }
+      return
+    }
+    let matches = commandIndex.matches(for: query)
+    if query != commandQuery || commandSuggestions == nil {
+      selectedCommandIndex = 0
+    } else {
+      selectedCommandIndex = min(selectedCommandIndex, max(matches.count - 1, 0))
+    }
+    commandSuggestions = matches
+  }
+
+  /// Whether the list is on screen: while a message can be written.
+  public var showsCommandSuggestions: Bool {
+    commandSuggestions != nil && composerState == .ready
+  }
+
+  /// ↑ or ↓ while the list is open. Returns whether the key was used.
+  public func moveCommandSelection(by offset: Int) -> Bool {
+    guard showsCommandSuggestions, let matches = commandSuggestions else { return false }
+    guard !matches.isEmpty else { return true }
+    selectedCommandIndex = min(max(selectedCommandIndex + offset, 0), matches.count - 1)
+    return true
+  }
+
+  /// ⇥ or ↩ while the list is open: the entry selected replaces what was typed. Returns whether
+  /// one was inserted — with nothing matching, ↩ sends the text as it is.
+  public func insertSelectedCommand() -> Bool {
+    guard showsCommandSuggestions, let matches = commandSuggestions,
+      matches.indices.contains(selectedCommandIndex)
+    else { return false }
+    insertCommand(matches[selectedCommandIndex].command)
+    return true
+  }
+
+  public func insertCommand(_ command: AgentCommand) {
+    guard composerState == .ready else { return }
+    insertedCommand = command
+    draft = AgentCommandQuery.draft(inserting: command, into: draft)
+  }
+
+  /// Escape while the list is open: it closes, the draft left as it is.
+  public func dismissCommandSuggestions() -> Bool {
+    guard showsCommandSuggestions else { return false }
+    dismissedCommandDraft = draft
+    commandSuggestions = nil
+    return true
+  }
+
+  /// The command the draft opens on, as inserted from the list: shown as a token.
+  public var insertedInvocation: String? {
+    insertedCommand.flatMap { draftOpens(on: $0) ? $0.invocation : nil }
+  }
+
+  /// What the command inserted expects, dimmed after it until something is typed.
+  public var pendingArgumentHint: String? {
+    guard let command = insertedCommand,
+      draft == AgentCommandQuery.draft(inserting: command, into: draft)
+    else { return nil }
+    return command.argumentHint
+  }
+
+  private func draftOpens(on command: AgentCommand) -> Bool {
+    let text = draft.drop { $0 == " " || $0 == "\t" }
+    return text.hasPrefix(command.invocation + " ")
+  }
+
+  /// A message recalled from the history is shown without its list: ↑ and ↓ keep walking the
+  /// history.
+  private func showRecalled(_ text: String) {
+    dismissedCommandDraft = AgentCommandQuery(draft: text, triggers: commandIndex.triggers)
+      .map { _ in text }
+    draft = text
+  }
+
   // MARK: - History
 
   /// The messages sent in this session: those of its transcript, then those on their way to it.
@@ -1233,7 +1388,7 @@ public final class ConversationModel {
     guard composerState == .ready,
       let text = historyNavigation.older(in: promptHistory, draft: draft)
     else { return false }
-    draft = text
+    showRecalled(text)
     return true
   }
 
@@ -1242,7 +1397,7 @@ public final class ConversationModel {
     guard composerState == .ready,
       let text = historyNavigation.newer(in: promptHistory, draft: draft)
     else { return false }
-    draft = text
+    showRecalled(text)
     return true
   }
 
@@ -1251,7 +1406,7 @@ public final class ConversationModel {
     guard composerState == .ready,
       let text = historyNavigation.cancel(in: promptHistory, draft: draft)
     else { return false }
-    draft = text
+    showRecalled(text)
     return true
   }
 

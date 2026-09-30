@@ -23,11 +23,17 @@ public final class ConversationWorkspace {
   public struct Agent: Sendable {
     public let name: String
     public let format: AgentPromptFormat
+    /// Lists what a prompt may invoke; `nil` for an agent that cannot (#219).
+    public var commands: (any AgentCommandListing)? = nil
   }
 
   @ObservationIgnored private let follow: FollowConversation?
   @ObservationIgnored private let store: any ConversationAppearanceStore
   @ObservationIgnored private let agents: (any AgentProviderResolving)?
+  /// The skills and commands read from the agents, shared by the sessions of a folder (#219).
+  @ObservationIgnored private let commands: AgentCommandCatalog
+  /// Which list each model reads: another agent or folder starts from an empty one.
+  @ObservationIgnored private var commandKeys: [SessionID: AgentCommandCatalog.Key] = [:]
   /// The user's own themes, and the one on trial (#118).
   public let themes: ConversationThemesModel
 
@@ -71,11 +77,13 @@ public final class ConversationWorkspace {
     follow: FollowConversation? = nil,
     store: any ConversationAppearanceStore = InMemoryConversationAppearanceStore(),
     agents: (any AgentProviderResolving)? = nil,
-    themes: ConversationThemesModel = ConversationThemesModel()
+    themes: ConversationThemesModel = ConversationThemesModel(),
+    commands: AgentCommandCatalog = AgentCommandCatalog()
   ) {
     self.follow = follow
     self.store = store
     self.agents = agents
+    self.commands = commands
     self.themes = themes
     appearance = store.appearance
   }
@@ -92,7 +100,8 @@ public final class ConversationWorkspace {
         let reporting = provider as? any AgentConversationReporting
       else { continue }
       readable[descriptor.id.rawValue] = Agent(
-        name: descriptor.displayName, format: reporting.promptFormat)
+        name: descriptor.displayName, format: reporting.promptFormat,
+        commands: provider as? any AgentCommandListing)
     }
     readableAgents = readable
   }
@@ -137,9 +146,11 @@ public final class ConversationWorkspace {
       apply(state, to: model)
     }
     dormantSessionIDs.removeAll { $0 == session.id }
-    let agent = session.conversationAgents.last.flatMap { readableAgents[$0.providerID] }
+    let conversation = session.conversationAgents.last
+    let agent = conversation.flatMap { readableAgents[$0.providerID] }
     model.agentName = agent?.name ?? ""
     model.promptFormat = agent?.format ?? AgentPromptFormat()
+    connectCommands(of: model, agent: agent, providerID: conversation?.providerID, in: session)
     // Where the agent runs: the worktree of a session that has one.
     model.workingDirectoryName =
       RestartSession.workingDirectoryPath(of: session).map {
@@ -184,6 +195,29 @@ public final class ConversationWorkspace {
     mountedSessionIDs.append(session.id)
     evict()
     return model
+  }
+
+  /// Hands the model what its agent accepts under `/`, read where the agent runs (#219): read
+  /// once the conversation is first shown, then each time the list opens.
+  private func connectCommands(
+    of model: ConversationModel, agent: Agent?, providerID: String?, in session: WorkSession
+  ) {
+    guard let listing = agent?.commands, let providerID,
+      let directory = RestartSession.workingDirectoryPath(of: session)
+    else {
+      commandKeys[session.id] = nil
+      model.readCommands = nil
+      return
+    }
+    let key = AgentCommandCatalog.Key(
+      providerID: AgentProviderID(providerID), workingDirectoryPath: directory)
+    guard commandKeys[session.id] != key || model.readCommands == nil else { return }
+    commandKeys[session.id] = key
+    let catalog = commands
+    // Emptied first: the list of the agent before is not this one's.
+    model.readCommands = nil
+    model.readCommands = { await catalog.refreshed(key, from: listing) }
+    model.refreshCommands()
   }
 
   /// Asks for the session's composer to take the keyboard, now or as soon as its model exists.
@@ -273,6 +307,7 @@ public final class ConversationWorkspace {
     changedSessions[id] = nil
     generations[id] = nil
     activities[id] = nil
+    commandKeys[id] = nil
     dormantSessionIDs.removeAll { $0 == id }
     dormantActivities[id] = nil
     if pendingComposerFocus == id { pendingComposerFocus = nil }

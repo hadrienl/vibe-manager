@@ -616,6 +616,47 @@
         }
       }
     },
+    "%lld skills and commands" : {
+      "comment" : "The composer's list of skills and commands, as VoiceOver reads it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skill or command"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skills and commands"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skill ou commande"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skills et commandes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sub-agents" : {
       "localizations" : {
         "en" : {
@@ -1015,6 +1056,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commande"
+          }
+        }
+      }
+    },
+    "Commands" : {
+      "comment" : "A section of the composer's list: the agent's commands.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commandes"
           }
         }
       }
@@ -1774,6 +1826,17 @@
         }
       }
     },
+    "No skill matches" : {
+      "comment" : "The composer's list of skills and commands, when nothing matches what is typed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune skill ne correspond"
+          }
+        }
+      }
+    },
     "No version is on trial any more." : {
       "localizations" : {
         "fr" : {
@@ -2402,6 +2465,17 @@
         }
       }
     },
+    "Skills" : {
+      "comment" : "A section of the composer's list: the agent's skills.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skills"
+          }
+        }
+      }
+    },
     "Small" : {
       "localizations" : {
         "fr" : {
@@ -2974,6 +3048,17 @@
         }
       }
     },
+    "built-in" : {
+      "comment" : "Where a command comes from: the agent's own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "intégrée"
+          }
+        }
+      }
+    },
     "collapsed" : {
       "localizations" : {
         "fr" : {
@@ -3084,6 +3169,17 @@
         }
       }
     },
+    "project" : {
+      "comment" : "Where a skill comes from: the session's folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "projet"
+          }
+        }
+      }
+    },
     "running" : {
       "localizations" : {
         "fr" : {
@@ -3130,6 +3226,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "réussi"
+          }
+        }
+      }
+    },
+    "system" : {
+      "comment" : "Where a skill comes from: shipped with the agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "système"
           }
         }
       }
@@ -3181,6 +3288,17 @@
         }
       }
     },
+    "user" : {
+      "comment" : "Where a skill comes from: the user's own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "utilisateur"
+          }
+        }
+      }
+    },
     "waiting for your permission" : {
       "localizations" : {
         "fr" : {
@@ -3227,6 +3345,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » est inconnu"
+          }
+        }
+      }
+    },
+    "↑↓ navigate · ⇥ or ↩ insert · Esc close" : {
+      "comment" : "The keys of the composer's list of skills and commands.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↑↓ naviguer · ⇥ ou ↩ insérer · Échap fermer"
           }
         }
       }

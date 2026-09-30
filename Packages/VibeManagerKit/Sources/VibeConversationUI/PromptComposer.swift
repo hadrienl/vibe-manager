@@ -32,6 +32,7 @@ struct PromptComposer: View {
         }
       }
       ZStack(alignment: .topLeading) {
+        commandUnderlay(size)
         if model.draft.isEmpty {
           placeholder(state)
             .font(theme.messageFont(size: size))
@@ -60,8 +61,17 @@ struct PromptComposer: View {
             guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option),
               !Self.isComposingText
             else { return .ignored }
+            // The list open, Return inserts its entry and sends nothing; with nothing matching,
+            // the text goes as it is (#219).
+            if insertCommand() { return .handled }
             Task { await model.send() }
             return .handled
+          }
+          .onKeyPress(.tab, phases: .down) { press in
+            guard press.modifiers.isDisjoint(with: [.shift, .command, .option, .control]),
+              !Self.isComposingText
+            else { return .ignored }
+            return insertCommand() ? .handled : .ignored
           }
           // ↑ and ↓ recall the messages sent, from the first and the last line only: elsewhere,
           // with a modifier, over a selection or while an input method composes, they move the
@@ -70,9 +80,14 @@ struct PromptComposer: View {
             // An arrow comes flagged as a function key of the numeric pad: only the modifiers the
             // user holds count.
             guard press.modifiers.isDisjoint(with: [.shift, .command, .option, .control]),
-              !Self.isComposingText,
-              let caret = ComposerCaret.current(showing: model.draft)
+              !Self.isComposingText
             else { return .ignored }
+            // The list open, the arrows are its own.
+            if model.showsCommandSuggestions {
+              return model.moveCommandSelection(by: press.key == .upArrow ? -1 : 1)
+                ? .handled : .ignored
+            }
+            guard let caret = ComposerCaret.current(showing: model.draft) else { return .ignored }
             let recalled =
               press.key == .upArrow
               ? caret.isOnFirstLine && model.recallOlderPrompt()
@@ -82,6 +97,8 @@ struct PromptComposer: View {
             return .handled
           }
           .onKeyPress(.escape) {
+            // The list of commands closes first (#219).
+            if !Self.isComposingText, model.dismissCommandSuggestions() { return .handled }
             // A message recalled is put back first: the draft, then the shell mode, then the agent.
             if !Self.isComposingText, model.cancelPromptRecall() {
               Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
@@ -140,6 +157,16 @@ struct PromptComposer: View {
         .stroke(isShell ? theme.warning.color : theme.border.color, lineWidth: isShell ? 1.5 : 1)
     )
     .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
+    // Above the composer, as wide, over the end of the conversation (#219).
+    .overlay(alignment: .top) {
+      if model.showsCommandSuggestions {
+        CommandSuggestionList(model: model) {
+          isFocused = true
+          Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+        }
+        .alignmentGuide(.top) { $0[.bottom] + 8 }
+      }
+    }
     // A request waits for the composer to be on screen, and is spent once: made before the view
     // existed, it is honoured when it appears (#105).
     .onAppear { takePendingFocusRequest() }
@@ -181,6 +208,42 @@ struct PromptComposer: View {
   /// tests, whose window is never on screen and so never the key window.
   @MainActor static var focusedTextView: () -> NSTextView? = {
     NSApp.keyWindow?.firstResponder as? NSTextView
+  }
+
+  /// Inserts the entry selected in the list, if it is open. The cursor goes after it.
+  private func insertCommand() -> Bool {
+    guard model.insertSelectedCommand() else { return false }
+    Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+    return true
+  }
+
+  /// Behind the text, drawn as it is laid out: the command inserted as a token, and what it
+  /// expects, dimmed, until something is typed after it (#219). The draft itself stays plain text.
+  @ViewBuilder
+  private func commandUnderlay(_ size: Double) -> some View {
+    if let invocation = model.insertedInvocation, !model.draft.contains("\n") {
+      let draft = model.draft
+      let blanks = draft.prefix { $0 == " " || $0 == "\t" }
+      let rest = draft.dropFirst(blanks.count + invocation.count)
+      Text(underlay(blanks: String(blanks), invocation: invocation, rest: String(rest)))
+        .font(theme.messageFont(size: size))
+        .padding(.leading, 5)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+  }
+
+  private func underlay(blanks: String, invocation: String, rest: String) -> AttributedString {
+    var token = AttributedString(invocation)
+    token.backgroundColor = theme.accent.color.opacity(theme.isDark ? 0.28 : 0.16)
+    var text = AttributedString(blanks) + token + AttributedString(rest)
+    text.foregroundColor = .clear
+    if let hint = model.pendingArgumentHint {
+      var dimmed = AttributedString(hint)
+      dimmed.foregroundColor = theme.secondaryText.color.opacity(0.8)
+      text += dimmed
+    }
+    return text
   }
 
   private func attachMenu(_ state: ConversationModel.ComposerState) -> some View {
