@@ -198,7 +198,11 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       append(ConversationEntry(id: uuid, date: date, content: .notice(.interrupted)))
       return
     }
-    if trimmed.hasPrefix("<command-name>") {
+    // A skill invoked opens on `<command-message>` (2.1.285), a command on `<command-name>`:
+    // both are the command the user typed (#219).
+    if trimmed.hasPrefix("<command-name>")
+      || (trimmed.hasPrefix("<command-message>") && trimmed.contains("<command-name>"))
+    {
       let name = Self.tag("command-name", in: trimmed) ?? ""
       let arguments = Self.tag("command-args", in: trimmed) ?? ""
       let command = [name, arguments].filter { !$0.isEmpty }.joined(separator: " ")

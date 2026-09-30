@@ -168,6 +168,17 @@ struct ClaudeCodeConversationDecoderTests {
       ])
   }
 
+  @Test("A skill invoked with / is a command, and the skill's text the CLI adds is not shown")
+  func skillInvocation() {
+    // As 2.1.285 writes `/prisme-ai:app-mcp-implement seedext` (#219).
+    let entries = decode([
+      #"{"type":"user","uuid":"c","message":{"content":"<command-message>prisme-ai:app-mcp-implement</command-message>\n<command-name>/prisme-ai:app-mcp-implement</command-name>\n<command-args>seedext</command-args>"}}"#,
+      #"{"type":"user","uuid":"m","isMeta":true,"message":{"content":[{"type":"text","text":"Base directory for this skill: /p\n\n# Builder"}]}}"#,
+      #"{"type":"user","uuid":"l","message":{"content":"<command-message>alone</command-message>"}}"#,
+    ])
+    #expect(entries.map(\.content) == [.notice(.command("/prisme-ai:app-mcp-implement seedext"))])
+  }
+
   @Test("A sub-agent in front answers in its result, a to-do list counts what is done")
   func subagentAndTodos() {
     let entries = decode([
