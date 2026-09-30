@@ -49,6 +49,9 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   private let backupURL: URL
   private let codec = SessionStoreCodec()
   private let beforeReplace: (@Sendable () throws -> Void)?
+  /// Whether the previous document is kept as the backup by a hard link; tests turn it off to
+  /// exercise the copy that volumes without hard links fall back to.
+  private let backsUpByLink: Bool
   private let diagnostics: any DiagnosticLog
   /// The last document read, and what it held. Every read still reads the file — another writer
   /// is seen at once — but bytes that did not change are not decoded again: conversations and
@@ -68,13 +71,19 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     self.storeURL = storeURL
     backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
     beforeReplace = nil
+    backsUpByLink = true
     self.diagnostics = diagnostics
   }
 
-  init(storeURL: URL, beforeReplace: @escaping @Sendable () throws -> Void) {
+  init(
+    storeURL: URL,
+    backsUpByLink: Bool = true,
+    beforeReplace: (@Sendable () throws -> Void)? = nil
+  ) {
     self.storeURL = storeURL
     backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
     self.beforeReplace = beforeReplace
+    self.backsUpByLink = backsUpByLink
     diagnostics = NullDiagnosticLog()
   }
 
@@ -299,11 +308,40 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     if preservingCurrentAsBackup,
       FileManager.default.fileExists(atPath: storeURL.path)
     {
-      let currentData = try Data(contentsOf: storeURL)
-      try atomicWrite(currentData, to: backupURL, invokingInterruption: false)
+      try preserveCurrentAsBackup()
     }
     try atomicWrite(data, to: storeURL, invokingInterruption: true)
     lastRead = (data, sessions)
+  }
+
+  /// Keeps the current document as the backup, by giving its file a second name: it was written
+  /// and synchronized when it became the store, so reading it back and writing it again would
+  /// only cost a read, a write and a second `fsync` per change (#253). The store's replacement
+  /// then gives the store a new file, and the backup keeps the old one.
+  ///
+  /// A volume without hard links gets a copy instead. The store is never renamed to the backup:
+  /// until its replacement arrived, there would be no store on disk.
+  private func preserveCurrentAsBackup() throws {
+    try Signposts.interval("store.backup") {
+      if backsUpByLink, linkCurrentAsBackup() { return }
+      let currentData = try Data(contentsOf: storeURL)
+      try atomicWrite(currentData, to: backupURL, invokingInterruption: false)
+    }
+  }
+
+  private func linkCurrentAsBackup() -> Bool {
+    let temporaryURL = backupURL.deletingLastPathComponent()
+      .appendingPathComponent(".\(backupURL.lastPathComponent).\(UUID().uuidString).tmp")
+    guard link(storeURL.path, temporaryURL.path) == 0 else { return false }
+    guard rename(temporaryURL.path, backupURL.path) == 0 else {
+      unlink(temporaryURL.path)
+      return false
+    }
+    // The backup shares the store's file, and so its mode: a store someone else wrote more
+    // openly is kept owner only, as a copy would have been.
+    try? FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+    return true
   }
 
   private func atomicWrite(_ data: Data, to destination: URL, invokingInterruption: Bool) throws {

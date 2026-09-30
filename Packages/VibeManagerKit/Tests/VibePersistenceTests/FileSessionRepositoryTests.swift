@@ -580,3 +580,50 @@ func failedWriteKeepsTheCache() async throws {
   #expect(try await repository.sessions() == [original])
   #expect(await repository.decodeCount == 0)
 }
+
+private func inode(of url: URL) throws -> Int {
+  try #require(FileManager.default.attributesOfItem(atPath: url.path)[.systemFileNumber] as? Int)
+}
+
+@Test(
+  "The backup holds the document before the last change, linked or copied",
+  arguments: [true, false])
+func backupHoldsThePreviousDocument(backsUpByLink: Bool) async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
+  let repository = FileSessionRepository(storeURL: storeURL, backsUpByLink: backsUpByLink)
+  let session = makeCompleteSession(name: "First")
+  try await repository.save(session)
+
+  _ = try await repository.mutate(id: session.id) { $0.name = "Second" }
+  _ = try await repository.mutate(id: session.id) { $0.name = "Third" }
+
+  let backup = try await FileSessionRepository(storeURL: backupURL).sessions()
+  #expect(backup.map(\.name) == ["Second"])
+  #expect(try await FileSessionRepository(storeURL: storeURL).sessions().map(\.name) == ["Third"])
+  #expect(try inode(of: storeURL) != inode(of: backupURL))
+  let attributes = try FileManager.default.attributesOfItem(atPath: backupURL.path)
+  #expect(attributes[.posixPermissions] as? Int == 0o600)
+  let leftovers = try FileManager.default.contentsOfDirectory(
+    atPath: storeURL.deletingLastPathComponent().path
+  ).filter { $0.hasSuffix(".tmp") }
+  #expect(leftovers.isEmpty)
+}
+
+@Test("A store written openly by someone else is backed up owner only")
+func linkedBackupIsPrivate() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
+  let session = makeCompleteSession()
+  try SessionStoreCodec().encode(sessions: [session]).write(to: storeURL)
+  try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: storeURL.path)
+
+  _ = try await FileSessionRepository(storeURL: storeURL).mutate(id: session.id) {
+    $0.name = "Changed"
+  }
+
+  let attributes = try FileManager.default.attributesOfItem(atPath: backupURL.path)
+  #expect(attributes[.posixPermissions] as? Int == 0o600)
+}
