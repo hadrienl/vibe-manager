@@ -298,6 +298,14 @@ public final class AppEnvironment {
       })
     self.terminals = terminals
     let transcripts = AgentTranscriptReader()
+    // Read only, and only when the disk says something moved: no timer reads a repository. One
+    // transcript reader for it and the branch report, so each file is read once, incrementally.
+    let repositoryStatus = RepositoryStatusMonitor(
+      reader: GitStatusReader(
+        git: ProcessGitCommandRunner(timeout: .seconds(30), diagnostics: diagnostics.log)),
+      events: FSEventsFileChangeObserver(),
+      transcripts: transcripts
+    )
     // Each session's journal (#36): read from the transcripts of every active session, summarized
     // by its own agent, kept in a file per session beside the notes.
     let journalPreferences = UserDefaultsJournalPreferences(suiteName: data.defaultsSuite)
@@ -342,17 +350,15 @@ public final class AppEnvironment {
       terminalHost: supervisor,
       // Read only: the application reports the branches and worktrees the agent made, and never
       // makes one itself.
+      // The uncommitted work of a repository the monitor watches is taken from its status: one
+      // `git status` for both.
       branchReader: ReadSessionBranchReport(
         reader: GitActivityReader(git: ProcessGitCommandRunner(diagnostics: diagnostics.log)),
-        transcripts: transcripts),
-      // Read only as well, and only when the disk says something moved: no timer reads a
-      // repository. One transcript reader for both, so each file is read once, incrementally.
-      repositoryStatus: RepositoryStatusMonitor(
-        reader: GitStatusReader(
-          git: ProcessGitCommandRunner(timeout: .seconds(30), diagnostics: diagnostics.log)),
-        events: FSEventsFileChangeObserver(),
-        transcripts: transcripts
-      ),
+        transcripts: transcripts,
+        knownStatus: { [repositoryStatus] session, root in
+          await repositoryStatus.knownStatus(of: session, atPath: root)
+        }),
+      repositoryStatus: repositoryStatus,
       closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite),
       fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite),
       notesStore: notes,
