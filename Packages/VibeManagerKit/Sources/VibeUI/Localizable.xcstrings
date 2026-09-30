@@ -12906,7 +12906,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le dialogue de « %@ » ne propose pas cette réponse : rien n’a été envoyé. Répondez dans la session."
+            "value" : "Le dialogue de « %@ » ne propose pas cette réponse : rien n’a été envoyé. Répondez dans la session."
           }
         }
       }
