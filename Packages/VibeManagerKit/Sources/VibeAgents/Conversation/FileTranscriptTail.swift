@@ -159,7 +159,7 @@ struct TranscriptLineReader {
     else { return reading }
     let identifier = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
     if let inode,
-      inode != identifier || size < offset + UInt64(splitter.carriedCount)
+      inode != identifier || size < offset + UInt64(splitter.pendingCount)
         || (isUnchecked && !endsWithFingerprint())
     {
       offset = 0
@@ -170,7 +170,7 @@ struct TranscriptLineReader {
     isUnchecked = false
     inode = identifier
     // A line cut by the end of the last chunk is carried: reading goes on after it.
-    let readFrom = offset + UInt64(splitter.carriedCount)
+    let readFrom = offset + UInt64(splitter.pendingCount)
     guard size > readFrom, let handle = try? FileHandle(forReadingFrom: file) else {
       return reading
     }
@@ -178,9 +178,11 @@ struct TranscriptLineReader {
     guard (try? handle.seek(toOffset: readFrom)) != nil,
       let data = try? handle.read(upToCount: chunkSize), !data.isEmpty
     else { return reading }
-    reading.lines = splitter.lines(in: data)
-    let completeCount = data.count - splitter.carriedCount
-    offset = readFrom + UInt64(data.count) - UInt64(splitter.carriedCount)
+    var lines: [Data] = []
+    splitter.append(data) { lines.append($0) }
+    reading.lines = lines
+    let completeCount = data.count - splitter.pendingCount
+    offset = readFrom + UInt64(data.count) - UInt64(splitter.pendingCount)
     if completeCount >= Self.fingerprintSize {
       fingerprint = Data(
         data.dropFirst(completeCount - Self.fingerprintSize).prefix(Self.fingerprintSize))

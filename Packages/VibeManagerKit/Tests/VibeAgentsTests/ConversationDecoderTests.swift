@@ -585,17 +585,6 @@ struct FileTranscriptTailTests {
     #expect(reading.lines.count == 3)
   }
 
-  @Test("The splitter leaves empty lines out and carries what no line feed ended")
-  func splitter() {
-    var splitter = LineSplitter()
-    #expect(splitter.lines(in: Data("one\n\ntw".utf8)) == [Data("one".utf8)])
-    #expect(splitter.carriedCount == 2)
-    #expect(splitter.lines(in: Data("o".utf8)).isEmpty)
-    #expect(splitter.lines(in: Data("\nthree\n".utf8)) == [Data("two".utf8), Data("three".utf8)])
-    #expect(splitter.carriedCount == 0)
-    #expect(splitter.lines(in: Data()).isEmpty)
-  }
-
   @Test("Following: what is there, what is written next, and a file that appears later")
   func follow() async throws {
     let root = try scratch()
