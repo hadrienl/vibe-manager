@@ -110,9 +110,9 @@ let package = Package(
     .target(
       name: "VibeComposition",
       dependencies: [
-        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeDomain", "VibeGit",
-        "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI", "VibeConversationUI",
-        "VibeUI",
+        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeDomain", "VibeEndpoints",
+        "VibeGit", "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI",
+        "VibeConversationUI", "VibeUI",
       ]
     ),
     // The application's updater (#92): Sparkle, behind the `SoftwareUpdating` port. Linked by the
@@ -123,8 +123,9 @@ let package = Package(
     ),
     // The gateway of #107: Claude Code or Codex on one side, any model endpoint on the other, and
     // the translation between their protocols. Foundation and Network only: it runs in a process
-    // of its own, and depends on nothing that could bring a window or a terminal with it.
-    .target(name: "VibeEndpoints"),
+    // of its own, and depends on nothing that could bring a window or a terminal with it: the
+    // domain alone, for the endpoints it reads from their file.
+    .target(name: "VibeEndpoints", dependencies: ["VibeDomain", "VibeApplication"]),
     // The gateway on the command line, for the benchmark of `Benchmarks/agent-tasks` and for
     // trying an endpoint by hand. The application runs the same code from its own binary.
     .executableTarget(
@@ -173,7 +174,7 @@ let package = Package(
       // happens between a provider and a process.
       dependencies: ["VibeAgents", "VibeApplication", "VibeDomain", "VibeTerminal"]
     ),
-    .testTarget(name: "VibeEndpointsTests", dependencies: ["VibeEndpoints"]),
+    .testTarget(name: "VibeEndpointsTests", dependencies: ["VibeEndpoints", "VibeDomain"]),
     .testTarget(name: "VibeUpdatesTests", dependencies: ["VibeUpdates", "VibeApplication"]),
     .testTarget(
       name: "VibeGitTests",

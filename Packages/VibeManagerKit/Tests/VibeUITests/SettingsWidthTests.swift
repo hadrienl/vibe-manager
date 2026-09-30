@@ -1,8 +1,10 @@
 import AppKit
 import SwiftUI
 import Testing
+import VibeApplication
 import VibeBrowser
 import VibeConversationUI
+import VibeDomain
 import VibeLocalizationTesting
 
 @testable import VibeUI
@@ -62,7 +64,7 @@ struct SettingsWidthTests {
   /// `frame(minWidth:)` it stayed at 780 points, and these pages overflowed it on both sides.
   @Test(
     "A wide tab is whole in the least window the settings accept",
-    arguments: [SettingsTab.templates, .tickets, .conversation], ["en", "fr"])
+    arguments: [SettingsTab.templates, .tickets, .conversation, .endpoints], ["en", "fr"])
   func wideTabIsWhole(tab: SettingsTab, language: String) async throws {
     _ = NSApplication.shared
     let model = AppModel(
@@ -75,6 +77,9 @@ struct SettingsWidthTests {
       await model.templates.addExamples()
       model.templates.requestSelect(model.templates.library.templates.first?.id)
     }
+    if tab == .endpoints {
+      model.endpoints = Self.endpoints()
+    }
     let locale = Locale(identifier: language)
     let host = NSHostingController(
       rootView: SettingsView(model: model).environment(\.locale, locale))
@@ -84,6 +89,8 @@ struct SettingsWidthTests {
       switch tab {
       case .templates: AnyView(PromptTemplatesView(model: model.templates))
       case .tickets: AnyView(TicketSettingsView(model: model.ticketTitles))
+      case .endpoints:
+        AnyView(EndpointsSettingsView(model: model.endpoints ?? Self.endpoints()))
       default:
         AnyView(
           ConversationSettingsView(
@@ -137,6 +144,9 @@ struct SettingsWidthTests {
         && views.contains { ($0 as? NSTextField)?.stringValue.contains("github") == true }
     case .templates:
       return model.templates.editing != nil && views.contains { $0 is NSTableView }
+    case .endpoints:
+      return model.endpoints?.isLoaded == true
+        && views.contains { ($0 as? NSTextField)?.stringValue.contains("openrouter") == true }
     default:
       return views.contains { $0 is NSScrollView }
     }
@@ -184,5 +194,33 @@ struct SettingsWidthTests {
     window.setContentSize(NSSize(width: width, height: 200))
     window.layoutIfNeeded()
     return window.toolbar?.visibleItems?.count ?? 0
+  }
+
+  /// The tab as a user who declared one endpoint sees it.
+  static func endpoints() -> EndpointsSettingsModel {
+    EndpointsSettingsModel(
+      repository: InMemoryEndpointRepository(endpoints: [
+        Endpoint(
+          name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1",
+          wireProtocol: .chatCompletions,
+          models: [
+            EndpointModel(id: "qwen/qwen3-coder", contextWindow: 262_144),
+            EndpointModel(id: "moonshotai/kimi-k2", contextWindow: 131_072),
+            EndpointModel(id: "tiny", contextWindow: 8_192, supportsTools: false),
+          ],
+          lastTest: EndpointTestOutcome(verdict: .passedWithWarnings, date: Date()))
+      ]),
+      secrets: InMemoryEndpointSecretStore(),
+      probing: NoProbing())
+  }
+}
+
+private struct NoProbing: EndpointProbing {
+  func discoverModels(for endpoint: Endpoint, secret: String?) async throws -> [EndpointModel] {
+    []
+  }
+
+  func test(_ endpoint: Endpoint, secret: String?, model: String) async -> EndpointTestReport {
+    EndpointTestReport(model: model, date: Date(), checks: [])
   }
 }

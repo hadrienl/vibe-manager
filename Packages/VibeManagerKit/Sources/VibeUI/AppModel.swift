@@ -121,6 +121,8 @@ public final class AppModel {
   }
   /// The library of avatars: the one in use, and those being made (#41, #154).
   public var avatars: AvatarLibraryModel?
+  /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
+  public var endpoints: EndpointsSettingsModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?

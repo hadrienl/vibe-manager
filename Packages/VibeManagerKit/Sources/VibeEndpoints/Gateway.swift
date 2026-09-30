@@ -82,14 +82,14 @@ public protocol GatewayObserving: Sendable {
 /// read into the canonical shape, written in the endpoint's protocol, and the answer comes back the
 /// same way.
 public final class Gateway: GatewayRequestHandling {
-  private let routes: GatewayRouteTable
+  private let routes: any GatewayRouting
   private let transport: any EndpointTransport
   private let retryPolicy: GatewayRetryPolicy
   private let sleep: @Sendable (Duration) async throws -> Void
   private let observer: (any GatewayObserving)?
 
   public init(
-    routes: GatewayRouteTable,
+    routes: any GatewayRouting,
     transport: any EndpointTransport,
     retryPolicy: GatewayRetryPolicy = .standard,
     observer: (any GatewayObserving)? = nil,

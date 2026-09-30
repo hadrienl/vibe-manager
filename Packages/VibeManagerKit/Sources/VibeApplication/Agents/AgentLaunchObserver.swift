@@ -66,3 +66,40 @@ public protocol AgentLaunchObserverProviding: Sendable {
     repository: any SessionRepository
   ) -> any AgentLaunchObserver
 }
+
+/// Under which agent a launch's conversation is recorded: its own, or — for an endpoint (#107) —
+/// the endpoint's, with the command line agent that ran it.
+public struct AgentResumeRecording: Hashable, Sendable {
+  public var providerID: String
+  public var harnessID: String?
+
+  public init(providerID: String, harnessID: String? = nil) {
+    self.providerID = providerID
+    self.harnessID = harnessID
+  }
+}
+
+/// Implemented by the providers that must do something just before their process starts, and not
+/// before: an endpoint starts its gateway and gives the session its token (#107). A plan is also
+/// built to validate a form, many times; a launch is prepared once, when it happens.
+public protocol AgentLaunchPreparing: Sendable {
+  /// The plan as it will run, or an error the session shows instead of starting.
+  func preparingLaunch(_ plan: AgentLaunchPlan, session: SessionID) async throws -> AgentLaunchPlan
+}
+
+/// Prepares a launch with its provider, when the provider has something to prepare.
+public struct PrepareAgentLaunch: Sendable {
+  private let agents: any AgentProviderResolving
+
+  public init(agents: any AgentProviderResolving) {
+    self.agents = agents
+  }
+
+  public func callAsFunction(_ plan: AgentLaunchPlan, session: SessionID) async throws
+    -> AgentLaunchPlan
+  {
+    guard let preparing = await agents.provider(id: plan.providerID) as? any AgentLaunchPreparing
+    else { return plan }
+    return try await preparing.preparingLaunch(plan, session: session)
+  }
+}

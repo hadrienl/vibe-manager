@@ -39,8 +39,19 @@ extension ClaudeCodeAgentProvider: AgentLaunchObserverProviding {
     for sessionID: SessionID,
     repository: any SessionRepository
   ) -> any AgentLaunchObserver {
+    launchObserver(
+      for: sessionID, repository: repository,
+      recording: AgentResumeRecording(providerID: Self.id.rawValue))
+  }
+
+  /// The same, for a conversation recorded under another agent: an endpoint Claude Code drives.
+  public func launchObserver(
+    for sessionID: SessionID,
+    repository: any SessionRepository,
+    recording: AgentResumeRecording
+  ) -> any AgentLaunchObserver {
     ClaudeCodeLaunchObserver(
-      capture: identifierCapture(for: sessionID, repository: repository)
+      capture: identifierCapture(for: sessionID, repository: repository, recording: recording)
     )
   }
 }

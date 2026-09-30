@@ -6,18 +6,35 @@ import VibeApplication
 /// Registering a provider is the only step needed to add an agent: no view, use case or
 /// persisted model has to change.
 public actor AgentProviderRegistry: AgentProviderResolving {
-  private let ordered: [any AgentProvider]
-  private let index: [AgentProviderID: any AgentProvider]
+  private let fixed: [any AgentProvider]
+  /// The endpoints (#107): replaced as a whole each time their settings are saved, after the
+  /// command line agents, in the user's order.
+  private var endpoints: [any AgentProvider] = []
+  private var ordered: [any AgentProvider]
+  private var index: [AgentProviderID: any AgentProvider]
 
   public init(providers: [any AgentProvider] = []) {
+    fixed = providers
+    (ordered, index) = Self.indexed(providers)
+  }
+
+  private static func indexed(_ providers: [any AgentProvider]) -> (
+    [any AgentProvider], [AgentProviderID: any AgentProvider]
+  ) {
     var ordered: [any AgentProvider] = []
     var index: [AgentProviderID: any AgentProvider] = [:]
     for provider in providers where index[provider.descriptor.id] == nil {
       index[provider.descriptor.id] = provider
       ordered.append(provider)
     }
-    self.ordered = ordered
-    self.index = index
+    return (ordered, index)
+  }
+
+  /// Registers the endpoints' providers in place of the previous ones. A session whose endpoint
+  /// was deleted then resolves to no provider, and loads unresumable, like any unknown agent.
+  public func replaceEndpoints(_ providers: [any AgentProvider]) {
+    endpoints = providers
+    (ordered, index) = Self.indexed(fixed + providers)
   }
 
   public func providers() -> [any AgentProvider] {

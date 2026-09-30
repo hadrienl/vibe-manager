@@ -40,6 +40,17 @@
         }
       }
     },
+    "%@ drives this endpoint: %@" : {
+      "comment" : "The harness's name, then why it cannot run.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ pilote cet endpoint : %2$@"
+          }
+        }
+      }
+    },
     "%@ is installed but not signed in." : {
       "comment" : "An agent's name.",
       "localizations" : {
@@ -73,24 +84,108 @@
         }
       }
     },
+<<<<<<< HEAD
     "Create an AGENTS.md file with instructions for Codex." : {
       "comment" : "Codex's /init command, in the composer's list.",
+=======
+    "%lld models" : {
+      "comment" : "How many models an endpoint offers.",
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld model"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld models"
+                }
+              }
+            }
+          }
+        },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crée un fichier AGENTS.md avec des instructions pour Codex."
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèles"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèle"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèles"
+                }
+              }
+            }
           }
         }
       }
     },
-    "Summarize the conversation to free up context." : {
-      "comment" : "Codex's /compact command, in the composer's list.",
+    "Endpoint via %@" : {
+      "comment" : "The coding agent that drives an endpoint.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
+            "value" : "Endpoint via %@"
+          }
+        }
+      }
+    },
+    "Its key is not in the keychain. Add it in Settings → Endpoints." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sa clé n’est pas dans le trousseau. Ajoutez-la dans Réglages → Endpoints."
+          }
+        }
+      }
+    },
+    "Its last test failed. Test it again in Settings → Endpoints." : {
+>>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+<<<<<<< HEAD
+            "value" : "Crée un fichier AGENTS.md avec des instructions pour Codex."
+=======
+            "value" : "Son dernier test a échoué. Testez-le à nouveau dans Réglages → Endpoints."
+>>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
+          }
+        }
+      }
+    },
+<<<<<<< HEAD
+    "Summarize the conversation to free up context." : {
+      "comment" : "Codex's /compact command, in the composer's list.",
+=======
+    "No model of this endpoint can call tools. Add one in Settings → Endpoints." : {
+>>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+<<<<<<< HEAD
             "value" : "Résume la conversation pour libérer du contexte."
+=======
+            "value" : "Aucun modèle de cet endpoint ne sait appeler d’outils. Ajoutez-en un dans Réglages → Endpoints."
+>>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
           }
         }
       }
@@ -113,6 +208,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La commande %@ existe, mais ne peut pas être exécutée."
+          }
+        }
+      }
+    },
+    "The endpoint's settings are incomplete. Finish them in Settings → Endpoints." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les réglages de l’endpoint sont incomplets. Complétez-les dans Réglages → Endpoints."
           }
         }
       }
