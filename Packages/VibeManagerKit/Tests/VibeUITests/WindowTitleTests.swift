@@ -128,8 +128,8 @@ struct WindowTitleTests {
   }
 }
 
-/// The toolbar gives an item the width it asks for, never less, and nothing holds the buttons
-/// against the right edge once the system's title is gone: the title takes exactly what is left.
+/// The toolbar gives an item the width it asks for, never less: the title asks for no more than
+/// what the other items leave it.
 @Suite("The window's title leaves the toolbar's buttons their room")
 struct ToolbarTitleLayoutTests {
   /// The four buttons of a session's toolbar, measured side by side.
@@ -182,5 +182,41 @@ struct ToolbarTitleLayoutTests {
   func estimatedExtent() {
     #expect(ToolbarTitleLayout.estimatedExtent(of: []) == 0)
     #expect(ToolbarTitleLayout.estimatedExtent(of: [36, 35, 41]) == 128)
+  }
+
+  @Test("Unmeasured, a wide window still gives the title the room for the application's name")
+  func unmeasuredWideWindow() {
+    // Waiting for the measurement at a fixed 80 pt hid the application's name and cut every
+    // session's name short (#256).
+    let room = ToolbarTitleLayout.fallbackRoom(detailWidth: 1040)
+    #expect(room == 402)
+    #expect(
+      ToolbarTitleLayout.showsApplicationName(
+        room: room, applicationWidth: 118, nameWidth: 180))
+  }
+
+  @Test("Unmeasured, a narrow window leaves the title enough of the session's name to read")
+  func unmeasuredNarrowWindow() {
+    #expect(
+      ToolbarTitleLayout.fallbackRoom(detailWidth: 300) == ToolbarTitleLayout.minimumNameWidth)
+    #expect(ToolbarTitleLayout.fallbackRoom(detailWidth: 0) == ToolbarTitleLayout.minimumNameWidth)
+  }
+
+  @Test("The application's name is shown when it fits with the whole name")
+  func applicationNameWithWholeName() {
+    #expect(
+      ToolbarTitleLayout.showsApplicationName(room: 160, applicationWidth: 118, nameWidth: 40))
+    #expect(
+      !ToolbarTitleLayout.showsApplicationName(room: 157, applicationWidth: 118, nameWidth: 40))
+  }
+
+  @Test("A long name keeps the application's name while enough of the name can be read")
+  func applicationNameWithLongName() {
+    #expect(
+      ToolbarTitleLayout.showsApplicationName(room: 198, applicationWidth: 118, nameWidth: 600))
+    #expect(
+      !ToolbarTitleLayout.showsApplicationName(room: 197, applicationWidth: 118, nameWidth: 600))
+    #expect(
+      !ToolbarTitleLayout.showsApplicationName(room: 0, applicationWidth: 118, nameWidth: 600))
   }
 }

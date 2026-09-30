@@ -17,7 +17,7 @@ public struct RootView: View {
   /// The window this view is drawn in: the only one whose visibility says whether its sessions
   /// are in front of the user.
   @State private var hostWindow = HostWindow()
-  /// Where the detail column starts: the room of the window's title depends on it (#159).
+  /// Where the detail column lies: the room of the window's title depends on it (#159).
   @State private var titleRoom = WindowTitleRoom()
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
@@ -384,10 +384,11 @@ public struct RootView: View {
             }
           }
       }
-      .onGeometryChange(for: CGFloat.self) {
-        $0.frame(in: .global).minX
-      } action: { leading in
-        titleRoom.detailLeading = leading
+      .onGeometryChange(for: CGRect.self) {
+        $0.frame(in: .global)
+      } action: { frame in
+        titleRoom.detailLeading = frame.minX
+        titleRoom.detailWidth = frame.width
       }
       .restartNowConfirmation(
         permissions: model.permissions, origin: .workspace, sessionName: model.sessionName(for:)

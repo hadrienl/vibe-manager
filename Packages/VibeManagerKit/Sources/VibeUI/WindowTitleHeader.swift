@@ -6,31 +6,32 @@ import SwiftUI
 ///
 /// It stands in for the title the system draws, which says it all in one style: the window keeps
 /// that title — the Window menu, Mission Control and ⌘` read it — and only its drawing is removed.
-/// Before macOS 15 it cannot be removed, and the system's title is the header.
+/// Before macOS 26 the system's title is the header: without it, nothing held the buttons against
+/// the window's right edge (#256).
 struct WindowTitleToolbarItem: ToolbarContent {
   let title: WindowTitle
   let room: WindowTitleRoom
 
   /// Whether the header is drawn here rather than by the system.
   static var isDrawn: Bool {
-    if #available(macOS 15, *) { return true }
+    if #available(macOS 26, *) { return true }
     return false
   }
 
   var body: some ToolbarContent {
-    // Where the system draws its own title: at the leading edge, not over the pickers in the
-    // middle of the toolbar.
     if #available(macOS 26, *) {
-      // Text, not a button: no capsule of glass around it.
-      item.sharedBackgroundVisibility(.hidden)
-    } else {
-      item
-    }
-  }
-
-  private var item: some ToolbarContent {
-    ToolbarItem(placement: .navigation) {
-      WindowTitleHeader(title: title, room: room)
+      // Where the system draws its own title: at the leading edge, not over the pickers in the
+      // middle of the toolbar. Text, not a button: no capsule of glass around it.
+      ToolbarItem(placement: .navigation) {
+        WindowTitleHeader(title: title, room: room)
+      }
+      .sharedBackgroundVisibility(.hidden)
+      // The system's title stretched to hold the buttons against the window's right edge; drawn
+      // here, it is as wide as its text, and the buttons followed it wherever a view had no
+      // picker centred to push them (#256). The space takes what the title leaves, whatever its
+      // width, and gives it back first when the window narrows. Declared before every other
+      // primary action, it comes before them.
+      ToolbarSpacer(.flexible, placement: .primaryAction)
     }
   }
 }
@@ -40,7 +41,7 @@ extension View {
   /// The window's title stays: the Window menu, Mission Control and ⌘` still read it.
   @ViewBuilder
   func removingSystemDrawnTitle() -> some View {
-    if #available(macOS 15, *) {
+    if #available(macOS 26, *) {
       toolbar(removing: .title)
     } else {
       self
@@ -48,31 +49,33 @@ extension View {
   }
 }
 
-/// Where the detail column starts in the window. The toolbar centres its principal items — the
+/// Where the detail column lies in the window. The toolbar centres its principal items — the
 /// pickers of #69 and #38 — over what lies right of the sidebar, so the room left of them depends
 /// on it. Only the header reads it: the whole window is not redrawn at each step of a drag.
 @MainActor @Observable
 final class WindowTitleRoom {
   var detailLeading: CGFloat = 0
+  var detailWidth: CGFloat = 0
 }
 
 struct WindowTitleHeader: View {
   let title: WindowTitle
   let room: WindowTitleRoom
-  /// All the width the toolbar can give, once measured: taken whole, it holds the buttons after it
-  /// against the window's edge, as the system's title did.
-  @State private var width: CGFloat?
+  /// The most the toolbar can give, as measured from inside it; `nil` until then, or when it
+  /// cannot be (#256).
+  @State private var measuredRoom: CGFloat?
   @State private var applicationWidth: CGFloat = 0
-
-  /// Below this much room for the session's name, the application's name gives way to it.
-  private static let minimumNameWidth: CGFloat = 80
+  @State private var nameWidth: CGFloat = 0
 
   var body: some View {
-    let width = width ?? ToolbarTitleLayout.unmeasuredWidth
+    let room =
+      measuredRoom ?? ToolbarTitleLayout.fallbackRoom(detailWidth: self.room.detailWidth)
     Group {
       if let sessionName = title.sessionName {
         HStack(spacing: 0) {
-          if width >= applicationWidth + Self.minimumNameWidth {
+          if ToolbarTitleLayout.showsApplicationName(
+            room: room, applicationWidth: applicationWidth, nameWidth: nameWidth)
+          {
             applicationAndSeparator
           }
           Text(verbatim: sessionName)
@@ -82,12 +85,15 @@ struct WindowTitleHeader: View {
       } else {
         Text(verbatim: title.applicationName)
           .foregroundStyle(.primary)
+          .truncationMode(.tail)
       }
     }
     .font(.headline)
     .lineLimit(1)
-    .frame(width: width, alignment: .leading)
-    // Measured apart, whether shown or not: whether it is shown depends on it.
+    // As wide as its text, and never wider than the room: a long name is truncated rather than
+    // sending the buttons into the » menu. The flexible space after it holds them to the right.
+    .frame(maxWidth: room, alignment: .leading)
+    // Measured apart, whether shown or not: whether they are shown depends on them.
     .background {
       applicationAndSeparator
         .hidden()
@@ -97,9 +103,22 @@ struct WindowTitleHeader: View {
           applicationWidth = $0
         }
     }
+    .background {
+      Text(verbatim: title.sessionName ?? "")
+        .font(.headline)
+        .lineLimit(1)
+        .fixedSize()
+        .hidden()
+        .onGeometryChange(for: CGFloat.self) {
+          $0.size.width
+        } action: {
+          nameWidth = $0
+        }
+    }
     .background(
-      ToolbarRoomReader(detailLeading: room.detailLeading) { measured in
-        if self.width.map({ abs($0 - measured) >= 1 }) ?? true { self.width = measured }
+      ToolbarRoomReader(detailLeading: self.room.detailLeading) { measured in
+        guard let measured else { return measuredRoom = nil }
+        if measuredRoom.map({ abs($0 - measured) >= 1 }) ?? true { measuredRoom = measured }
       }
     )
     // The whole name, truncated or not: knowing whether it is would take a measurement for
@@ -109,6 +128,7 @@ struct WindowTitleHeader: View {
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title.spoken)
     .accessibilityAddTraits(.isHeader)
+    .accessibilityIdentifier("window-title")
   }
 
   private var applicationAndSeparator: some View {
@@ -126,17 +146,37 @@ struct WindowTitleHeader: View {
 /// The room the toolbar leaves the title.
 ///
 /// `NSToolbar` gives an item the width it asks for, never less: a title as wide as its text pushed
-/// the buttons into the » menu instead of being truncated, and so did the system's own title. And
-/// with the system's title removed, nothing held the buttons against the window's right edge any
-/// more: they followed the title. So the header takes exactly what is left once the other items
-/// have theirs — no more, and no less.
+/// the buttons into the » menu instead of being truncated, and so did the system's own title. So
+/// the header is never wider than what is left once the other items have theirs.
+///
+/// It is only a bound. The header once took exactly that room to hold the buttons against the
+/// window's edge, and waited for it at a placeholder width: in the application's window it stayed
+/// there, without the application's name, and the buttons followed it (#256).
 struct ToolbarTitleLayout {
   /// Between two items, as `NSToolbar` spaces them.
   static let spacing: CGFloat = 8
   /// Between the last item and the window's edge.
   static let trailingInset: CGFloat = 8
-  /// Before the first measurement, or sent to the » menu: little enough to find a place on the bar.
-  static let unmeasuredWidth: CGFloat = 80
+  /// Below this much room for the session's name, the application's name gives way to it.
+  static let minimumNameWidth: CGFloat = 80
+  /// What a window's detail column gives the title when the toolbar cannot be measured: its left
+  /// half, less where a centred picker may start.
+  static let fallbackCentredHalfWidth: CGFloat = 110
+
+  /// The room assumed until the toolbar is measured, or when it cannot be: a share of the detail
+  /// column, left of where a picker centred over it would start — never a fixed placeholder, which
+  /// hid the application's name in any window (#256).
+  static func fallbackRoom(detailWidth: CGFloat) -> CGFloat {
+    max(minimumNameWidth, (detailWidth / 2 - fallbackCentredHalfWidth - spacing).rounded(.down))
+  }
+
+  /// Whether "Vibe Manager ›" is shown before the session's name: when it fits with the whole name,
+  /// or with enough of it to read — below that, the application's name gives way.
+  static func showsApplicationName(
+    room: CGFloat, applicationWidth: CGFloat, nameWidth: CGFloat
+  ) -> Bool {
+    applicationWidth + min(nameWidth, minimumNameWidth) <= room
+  }
 
   /// - Parameters:
   ///   - titleLeading: where the title starts, after the traffic lights and the items before it.
@@ -168,7 +208,7 @@ struct ToolbarTitleLayout {
 /// when the window is resized, when an item comes or goes, and when one moves or changes width.
 private struct ToolbarRoomReader: NSViewRepresentable {
   let detailLeading: CGFloat
-  let measured: (CGFloat) -> Void
+  let measured: (CGFloat?) -> Void
 
   func makeNSView(context: Context) -> ToolbarRoomView {
     ToolbarRoomView()
@@ -183,7 +223,8 @@ private struct ToolbarRoomReader: NSViewRepresentable {
 
 final class ToolbarRoomView: NSView {
   var detailLeading: CGFloat = 0
-  var measured: ((CGFloat) -> Void)?
+  /// The room, or `nil` when where the title stands says nothing of it.
+  var measured: ((CGFloat?) -> Void)?
   private var observers = NotificationObservers()
   private var observedItemViews: Set<ObjectIdentifier> = []
   /// The window last drawn in. Sent to the overflow menu, the title leaves the window, and must
@@ -237,9 +278,9 @@ final class ToolbarRoomView: NSView {
     let visible = Set((toolbar.visibleItems ?? []).map(\.itemIdentifier))
     let own = toolbar.items[ownIndex]
     guard let ownView = own.view, visible.contains(own.itemIdentifier) else {
-      // In the » menu itself, where it stands says nothing: made small, it comes back to the bar
-      // and is measured there.
-      measured?(ToolbarTitleLayout.unmeasuredWidth)
+      // In the » menu itself, where it stands says nothing: the room assumed without a
+      // measurement brings it back to the bar, where it is measured.
+      measured?(nil)
       return
     }
     let ownFrame = ownView.convert(ownView.bounds, to: nil)
