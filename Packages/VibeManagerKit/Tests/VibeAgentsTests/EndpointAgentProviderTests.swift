@@ -266,6 +266,33 @@ struct EndpointAgentProviderTests {
     #expect(resumed.arguments.contains("--resume"))
   }
 
+  @Test("The gateway's address also goes in Claude Code's settings, merged with the hooks'")
+  func settingsEnvironment() async throws {
+    let provider = EndpointAgentProvider(
+      endpoint: Self.endpoint(authentication: .none), harness: .claudeCode(Self.claude()),
+      gateway: RecordingGateway(), secrets: InMemoryEndpointSecretStore(), makeToken: { "tok" })
+    var plan = try await provider.launchPlan(
+      for: AgentLaunchRequest(workingDirectoryPath: "/tmp", initialPrompt: "Go"))
+    plan = plan.adding(options: ["--settings", #"{"hooks":{"Stop":[]}}"#])
+    let prepared = try await provider.preparingLaunch(plan, session: SessionID())
+    let flags = prepared.arguments.enumerated().filter { $0.element == "--settings" }
+    #expect(flags.count == 1)
+    let index = try #require(flags.first?.offset)
+    let settings = try #require(
+      try JSONSerialization.jsonObject(with: Data(prepared.arguments[index + 1].utf8))
+        as? [String: Any])
+    #expect(settings["hooks"] != nil)
+    let env = try #require(settings["env"] as? [String: String])
+    #expect(env["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:61234/s/tok")
+    #expect(env["CLAUDE_CODE_USE_BEDROCK"] == "0")
+    #expect(index < (prepared.arguments.firstIndex(of: "--") ?? prepared.arguments.endIndex))
+
+    let alone = try await provider.preparingLaunch(
+      try await provider.launchPlan(for: AgentLaunchRequest(workingDirectoryPath: "/tmp")),
+      session: SessionID())
+    #expect(alone.arguments.contains("--settings"))
+  }
+
   @Test("TOML strings are escaped as Codex reads them")
   func toml() {
     #expect(EndpointAgentProvider.toml(#"My "LLM" \ gw"#) == #""My \"LLM\" \\ gw""#)

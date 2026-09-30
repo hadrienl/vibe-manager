@@ -252,10 +252,16 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
         environment["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = String(window)
         environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(window)
       }
+      // Another provider the user set for Claude Code would take the session elsewhere.
+      environment["CLAUDE_CODE_USE_BEDROCK"] = "0"
+      environment["CLAUDE_CODE_USE_VERTEX"] = "0"
       var prepared = plan.adding(options: [], environment: environment)
       // A key of the user's own would win over the token.
       prepared = prepared.removingEnvironment(["ANTHROPIC_API_KEY"])
-      return prepared
+      // Claude Code applies the `env` of its settings over its process's environment, the
+      // settings given on its command line last: an `ANTHROPIC_BASE_URL` in the user's own would
+      // send the session past the gateway. The same variables go there too.
+      return Self.addingSettingsEnvironment(environment, to: prepared)
     case .codex:
       let provider = "vibe-endpoint"
       var options = [
@@ -277,6 +283,34 @@ extension EndpointAgentProvider: AgentLaunchPreparing {
   }
 
   static let tokenVariable = "VIBE_ENDPOINT_TOKEN"
+
+  /// `environment` in the `env` of the plan's `--settings`, merged with what the hooks put there
+  /// (#45), or in a `--settings` of its own.
+  static func addingSettingsEnvironment(_ environment: [String: String], to plan: AgentLaunchPlan)
+    -> AgentLaunchPlan
+  {
+    var arguments = plan.arguments
+    let separator = arguments.firstIndex(of: "--") ?? arguments.endIndex
+    if let flag = arguments[..<separator].firstIndex(of: "--settings"), flag + 1 < separator,
+      var settings = (try? JSONSerialization.jsonObject(with: Data(arguments[flag + 1].utf8)))
+        as? [String: Any]
+    {
+      var env = settings["env"] as? [String: Any] ?? [:]
+      for (key, value) in environment { env[key] = value }
+      settings["env"] = env
+      if let data = try? JSONSerialization.data(withJSONObject: settings, options: [.sortedKeys]) {
+        arguments[flag + 1] = String(decoding: data, as: UTF8.self)
+      }
+    } else if let data = try? JSONSerialization.data(
+      withJSONObject: ["env": environment], options: [.sortedKeys])
+    {
+      arguments.insert(contentsOf: ["--settings", String(decoding: data, as: UTF8.self)], at: separator)
+    }
+    return AgentLaunchPlan(
+      providerID: plan.providerID, executablePath: plan.executablePath, arguments: arguments,
+      environment: plan.environment, workingDirectoryPath: plan.workingDirectoryPath,
+      promptDelivery: plan.promptDelivery, version: plan.version)
+  }
 
   /// A TOML basic string.
   static func toml(_ value: String) -> String {
