@@ -56,8 +56,8 @@ stays in the preference.
 
 The shipped colours have localized names (Indigo, Blue, Teal…), kept out of the stored lists so they
 follow the application's language. A colour added may be given a name (40 characters at most); one
-without is said by its hex. The shipped symbols have names since #183; one added is said by its SF
-name, read as words.
+without is said by its hex. The shipped symbols have names since #183; one added is said as macOS
+describes it ("send" for `paperplane.circle`), else by its SF name read as words.
 
 ## Consequences
 
