@@ -530,6 +530,23 @@ struct FileTranscriptTailTests {
 
 @Suite("The mock agent's conversation")
 struct MockConversationTests {
+  /// The mock script, run with only what it needs of `inherited`. Run with all of it, a mock
+  /// started by tests in the terminal of an agent of Vibe Manager finds that session's
+  /// `VIBE_AGENT_ACTIVITY_LOG` and reports into it: its `SessionEnd` took a question the real
+  /// agent was waiting on off the queue (#271).
+  static func mockAgent(
+    _ arguments: [String],
+    inherited: [String: String] = ProcessInfo.processInfo.environment
+  ) throws -> Process {
+    let script = try #require(MockAgentProvider.defaultScriptURL())
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = [script.path] + arguments
+    process.environment = inherited.filter { ["PATH", "HOME", "TMPDIR"].contains($0.key) }
+    process.standardOutput = FileHandle.nullDevice
+    return process
+  }
+
   @Test("With a transcript folder, the mock writes its conversation as Claude Code does")
   func transcript() async throws {
     let folder = FileManager.default.temporaryDirectory
@@ -539,13 +556,9 @@ struct MockConversationTests {
     let agent = SessionAgentConfiguration(providerID: "mock", resumeIdentifier: "m1")
     let session = WorkSession(name: "Mock", agent: agent)
     #expect(provider.conversationFiles(for: agent, in: session, hint: nil).isEmpty)
-    let script = try #require(MockAgentProvider.defaultScriptURL())
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = [
-      script.path, "--session-id", "m1", "--transcript-dir", folder.path, "--prompt", "hello",
-    ]
-    process.standardOutput = FileHandle.nullDevice
+    let process = try Self.mockAgent([
+      "--session-id", "m1", "--transcript-dir", folder.path, "--prompt", "hello",
+    ])
     try process.run()
     process.waitUntilExit()
     let files = provider.conversationFiles(for: agent, in: session, hint: nil)
@@ -563,15 +576,11 @@ struct MockConversationTests {
     let folder = FileManager.default.temporaryDirectory
       .appendingPathComponent("VibeMockTranscript-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: folder) }
-    let script = try #require(MockAgentProvider.defaultScriptURL())
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = [
-      script.path, "--session-id", "m2", "--transcript-dir", folder.path, "--hold",
-    ]
+    let process = try Self.mockAgent([
+      "--session-id", "m2", "--transcript-dir", folder.path, "--hold",
+    ])
     let input = Pipe()
     process.standardInput = input
-    process.standardOutput = FileHandle.nullDevice
     try process.run()
     let lines = "!printf 'a\\nb \"c\"'\n\u{1B}[200~!pasted\u{1B}[201~\n"
     input.fileHandleForWriting.write(Data(lines.utf8))
@@ -590,5 +599,16 @@ struct MockConversationTests {
         // Pasted, a `!` is text.
         .userPrompt("!pasted", attachments: 0), .agentText("echo: !pasted"),
       ])
+  }
+
+  @Test("The activity log of the session running the tests is none of the mock's business (#271)")
+  func sessionLogUntouched() throws {
+    let log = try temporaryLog()
+    var inherited = ProcessInfo.processInfo.environment
+    inherited[AgentActivityHookCommand.environmentKey] = log.path
+    let process = try Self.mockAgent(["--prompt", "hello"], inherited: inherited)
+    try process.run()
+    process.waitUntilExit()
+    #expect(!FileManager.default.fileExists(atPath: log.path))
   }
 }
