@@ -144,6 +144,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   private var retiredFeed: Task<Void, Never>?
   /// How many times the sentinel woke a suspended view, for the tests.
   private(set) var sentinelWakeCount = 0
+  /// A process replaced before the view was fed all its output — suspended, or its live feed
+  /// cancelled mid-stream — and how far it had been fed: the rest is shown before the next one.
+  private var unfinished: (session: any TerminalSession, fedThrough: Int)?
+  /// The screen is missing output — the history let go of it, or the live feed dropped it — and is
+  /// drawn again from the history before anything else is fed.
+  private var needsRepaint = false
+  /// A question the view was fed only the start of ends after the place it stopped: the sentinel
+  /// starts reading a little before, so the question is not taken for text.
+  static let sentinelLookBehind = 32
 
   init(pane: TerminalPaneModel, suspensionDelay: Duration = defaultSuspensionDelay) {
     self.pane = pane
@@ -216,9 +225,11 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     connectLinkMenu()
     eventTask?.cancel()
     eventTask = nil
+    rememberUnfinished()
     attachedSession = nil
     session = nil
     fedThrough = nil
+    needsRepaint = false
     stopSuspension()
   }
 
@@ -307,12 +318,21 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     let identity = ObjectIdentifier(session)
     guard attachedSession != identity else { return }
     attachedSession = identity
+    rememberUnfinished()
     self.session = session
     fedThrough = nil
+    needsRepaint = false
     // A new process is fed from its start, suspended or not: a hidden view is suspended again
     // once it has been put away for long enough.
     stopSuspension()
     startFeeding(session)
+  }
+
+  /// A relaunch replaces the process while its view was suspended, or still being fed: what the
+  /// old one wrote after that point — its last answer, its error — is shown before the new one.
+  private func rememberUnfinished() {
+    guard let session, let fedThrough else { return }
+    unfinished = (session, fedThrough)
   }
 
   func unbind() {
@@ -321,6 +341,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     attachedSession = nil
     session = nil
     fedThrough = nil
+    unfinished = nil
+    needsRepaint = false
     stopSuspension()
     focusObservation = nil
     observedWindow = nil
@@ -337,19 +359,46 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     eventTask?.cancel()
     let retired = retiredFeed
     retiredFeed = nil
+    let unfinished = self.unfinished
+    self.unfinished = nil
     eventTask = Task { [session] in
       await retired?.value
       await previous?.value
+      if let unfinished {
+        let history = await unfinished.session.history()
+        guard !Task.isCancelled else { return }
+        await finishShowing(history, after: unfinished.fedThrough)
+      }
       let attachment = await session.attach()
       guard !Task.isCancelled else { return }
       await bringUpToDate(session, with: attachment.history)
+      // Hidden when it came back from a suspension, until it showed what it had missed.
+      view?.alphaValue = 1
       for await event in attachment.events {
         guard !Task.isCancelled else { return }
-        if case .output(let bytes) = event {
+        switch event {
+        case .output(let bytes):
           feedOutput(bytes)
+        case .outputDropped(let byteCount):
+          // The view fell behind and lost those bytes: past them in the stream, but missing from
+          // the screen, which is drawn again from the history that still holds them.
+          fedThrough = (fedThrough ?? 0) + byteCount
+          needsRepaint = true
+          startFeeding(session)
+          return
+        case .stateChanged, .historyTruncated, .outputPulse:
+          continue
         }
       }
     }
+  }
+
+  /// Shows the end of a process the view had not been fed all of, above the process replacing it.
+  /// Nothing it asked is answered: the process that would read the answer is gone.
+  private func finishShowing(_ history: TerminalHistorySnapshot, after offset: Int) async {
+    if offset < history.startOffset { restartScreen(above: nil) }
+    let skipped = min(max(0, offset - history.startOffset), history.bytes.count)
+    await feedInSlices(history.bytes[skipped...], replaying: true)
   }
 
   /// Feeds what the view has not seen of `history`: all of it, above its prelude, the first time;
@@ -375,44 +424,95 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       self.fedThrough = history.endOffset
       return
     }
+    // The history let go of output the view never saw: going on from the stale screen would show
+    // the rest out of place, from the middle of a frame or a sequence. It starts over instead.
+    if needsRepaint || fedThrough < history.startOffset {
+      needsRepaint = true
+      await repaint(session, from: history, knownThrough: fedThrough)
+      return
+    }
     await catchUp(on: history, after: fedThrough)
   }
 
-  /// Feeds the part of `history` that follows `offset`, in slices.
+  /// Feeds the part of `history` that follows `offset`.
   ///
   /// Every byte fed here is new to the view, so it answers what they ask, as it would have live.
-  /// Output the history had already let go of is lost to the view, as it is to one opened now.
   private func catchUp(on history: TerminalHistorySnapshot, after offset: Int) async {
     let skipped = min(max(0, offset - history.startOffset), history.bytes.count)
-    var remaining = history.bytes[skipped...]
     fedThrough = history.startOffset + skipped
-    guard !remaining.isEmpty else { return }
+    await feedInSlices(history.bytes[skipped...], replaying: false)
+  }
+
+  /// Draws the screen again from what the history holds (#248).
+  ///
+  /// The output up to `offset` already went past the view — answered, or dropped on its way — so
+  /// it is replayed without answers. What follows is new, and answered as it would have been live.
+  /// Output the history had let go of is lost to the view, as it is to one opened now.
+  private func repaint(
+    _ session: any TerminalSession, from history: TerminalHistorySnapshot, knownThrough offset: Int
+  ) async {
+    restartScreen(above: session)
+    let known = min(max(0, offset - history.startOffset), history.bytes.count)
+    await feedInSlices(history.bytes[..<known], replaying: true)
+    guard !Task.isCancelled else { return }
+    fedThrough = history.startOffset + known
+    await feedInSlices(history.bytes[known...], replaying: false)
+    guard !Task.isCancelled else { return }
+    needsRepaint = false
+  }
+
+  /// An empty screen, under the prelude `session` is shown with, if any.
+  private func restartScreen(above session: (any TerminalSession)?) {
+    view?.getTerminal().resetToInitialState()
+    view?.getTerminal().clearScrollback()
+    guard let session else { return }
+    replay.isOn = true
+    feed(pane.prelude(above: session))
+    replay.isOn = false
+  }
+
+  /// Feeds `bytes` in slices, so the keyboard and the other views are served between two.
+  ///
+  /// A long feed is not shown fast-forwarding: the view is drawn once it is done, and the pane
+  /// says what is happening if it takes more than a glance — when it is on screen. Replayed bytes
+  /// answer nothing and do not move the view's place in the stream.
+  private func feedInSlices(_ bytes: ArraySlice<UInt8>, replaying: Bool) async {
+    guard !bytes.isEmpty else { return }
     let interval = Signposts.begin("terminal.catchUp")
     defer { Signposts.end("terminal.catchUp", interval) }
-    guard remaining.count > Self.catchUpSliceSize else {
-      feedOutput(Array(remaining))
+    guard bytes.count > Self.catchUpSliceSize else {
+      feed(bytes, replaying: replaying)
       return
     }
-    // A long catch-up is not shown fast-forwarding: the view is drawn once it is done, and the
-    // pane says what is happening if it takes more than a glance.
     view?.alphaValue = 0
-    let notice = Task { [pane] in
+    let notice = Task { [weak self] in
       try? await Task.sleep(for: Self.catchUpNoticeDelay)
-      guard !Task.isCancelled else { return }
-      pane.isCatchingUp = true
+      guard !Task.isCancelled, let self, self.view?.isHidden == false else { return }
+      self.pane.isCatchingUp = true
     }
     defer {
       notice.cancel()
       pane.isCatchingUp = false
       view?.alphaValue = 1
     }
+    var remaining = bytes
     while !remaining.isEmpty {
       let slice = remaining.prefix(Self.catchUpSliceSize)
-      feedOutput(Array(slice))
+      feed(slice, replaying: replaying)
       remaining = remaining.dropFirst(slice.count)
       guard !remaining.isEmpty else { break }
       await Task.yield()
       guard !Task.isCancelled else { return }
+    }
+  }
+
+  private func feed(_ bytes: ArraySlice<UInt8>, replaying: Bool) {
+    if replaying {
+      replay.isOn = true
+      feed(Array(bytes))
+      replay.isOn = false
+    } else {
+      feedOutput(Array(bytes))
     }
   }
 
@@ -448,6 +548,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     wake?.cancel()
     wake = nil
     wakesAgain = false
+    // Not drawn until it has caught up: the stale screen would flash before the new one.
+    view?.alphaValue = 0
     startFeeding(session, after: finishing)
   }
 
@@ -466,11 +568,12 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// Reads the output of a suspended view off the main actor, for the questions it has to answer
   /// and the folder a shell reports, starting where the view stopped.
   private func watchWhileSuspended(_ session: any TerminalSession, from offset: Int) {
+    let from = offset - Self.sentinelLookBehind
     sentinel = Task.detached { [weak self] in
       let attachment = await session.attach()
       var scanner = TerminalQuerySentinel()
       let history = attachment.history
-      let skipped = min(max(0, offset - history.startOffset), history.bytes.count)
+      let skipped = min(max(0, from - history.startOffset), history.bytes.count)
       if let query = scanner.scan(history.bytes[skipped...]) {
         await self?.sentinelSaw(query)
       }
