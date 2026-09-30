@@ -21,6 +21,22 @@ private func notifies(reading read: () -> Void, when write: () -> Void) -> Bool 
   return flag.isRaised
 }
 
+private struct NoTranscripts: SessionJournalReading {
+  func read(_ session: WorkSession, from cursors: [String: TranscriptCursor]) -> TranscriptReading {
+    TranscriptReading(events: [], cursors: cursors, foundTranscript: false)
+  }
+
+  func transcriptDirectories(for session: WorkSession) -> [String] { [] }
+}
+
+private struct NoSummaries: SessionSummarizerResolving {
+  func summarizer(for providerID: String) async -> (any SessionSummarizing)? { nil }
+}
+
+private struct NoRepositories: RepositoryIdentityResolving {
+  func identity(ofDirectory path: String) async -> RepositoryIdentity? { nil }
+}
+
 /// #254: what one session does wakes the views of that session, and no other.
 @MainActor
 @Suite("Observation by session")
@@ -128,5 +144,30 @@ struct ObservationGranularityTests {
     // On screen, the session answers its own requests: none waits elsewhere.
     model.select(second.id)
     #expect(model.pendingRequestCount == 0)
+  }
+
+  @Test("Another session's journal wakes neither this session's journal nor its summary's state")
+  func journalOfAnother() {
+    let journal = SessionJournalModel(
+      monitor: SessionJournalMonitor(
+        store: InMemorySessionJournalStore(), reader: NoTranscripts(),
+        repositories: NoRepositories(), summarizers: NoSummaries()),
+      preferences: InMemoryJournalPreferences(), opener: FakeOpener())
+    let first = SessionID()
+    let second = SessionID()
+
+    #expect(
+      !notifies(reading: { _ = journal.journal(for: first) }) {
+        journal.summarizing.set(true, for: second)
+      })
+    #expect(
+      !notifies(reading: { _ = journal.isSummarizing(first) }) {
+        journal.summarizing.set(true, for: second)
+      })
+    #expect(
+      notifies(reading: { _ = journal.isSummarizing(first) }) {
+        journal.summarizing.set(true, for: first)
+      })
+    #expect(journal.isSummarizing(first))
   }
 }

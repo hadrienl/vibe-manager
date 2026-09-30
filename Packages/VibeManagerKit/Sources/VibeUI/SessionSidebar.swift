@@ -311,9 +311,6 @@ struct SessionSidebar: View {
       session: session,
       appearance: appearance,
       icon: model.icons.image(for: appearance.iconID),
-      status: model.statusPresentation(for: session),
-      isRestoring: model.isRestoring(session.id),
-      webView: model.webViewAttention(for: session.id),
       shortcutPosition: position,
       commands: commands
     )

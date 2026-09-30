@@ -2055,12 +2055,6 @@ struct SessionRow: View {
   /// The badge drawn: the session's, or the one previewed in its Change Icon popover (#183).
   let appearance: SessionAppearance
   let icon: NSImage?
-  let status: SessionStatusPresentation
-  /// The one row the restoration is working on. Said on the row rather than only in the banner,
-  /// because the banner names a session the sidebar may have scrolled away from.
-  let isRestoring: Bool
-  /// Its web view has something unseen: a page its agent opened, or a question (#69).
-  let webView: WebViewAttention?
   let shortcutPosition: Int?
   let commands: SessionCommands
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -2194,6 +2188,23 @@ struct SessionRow: View {
         }
       }
     }
+  }
+
+  // Read by the row itself rather than handed to it by the list (#254): what an agent does wakes
+  // its own row, not the whole list.
+  private var status: SessionStatusPresentation {
+    commands.model.statusPresentation(for: session)
+  }
+
+  /// The one row the restoration is working on. Said on the row rather than only in the banner,
+  /// because the banner names a session the sidebar may have scrolled away from.
+  private var isRestoring: Bool {
+    commands.model.isRestoring(session.id)
+  }
+
+  /// Its web view has something unseen: a page its agent opened, or a question (#69).
+  private var webView: WebViewAttention? {
+    commands.model.webViewAttention(for: session.id)
   }
 
   private var accessibilityValue: Text {
