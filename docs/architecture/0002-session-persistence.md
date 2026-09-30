@@ -42,7 +42,14 @@ from closing or archiving a session.
 
 Writes are serialized by the repository actor. Data is written and synchronized to a unique
 temporary file in the destination directory, then atomically moved or replaced. Before replacing
-an existing primary file, its bytes are atomically copied to `sessions.backup.json`. Files use
+an existing primary file, that file is atomically kept as `sessions.backup.json`: a hard link to it
+is renamed over the backup, and the replacement then gives the store a new file while the backup
+keeps the old one. A volume without hard links gets a copy of its bytes instead (#253). After a
+write that failed between the two, the store and the backup are two names of one file: the next
+write leaves the backup as it is instead of linking it again, since `rename` between two names of
+one file does nothing. The first write also removes the temporary files, older than a minute, that
+a crash left beside the store. The store
+is never renamed to the backup, which would leave no store on disk until its replacement. Files use
 mode `0600`, and a store directory created by the application uses `0700`. A directory that
 already exists keeps its own permissions: the store location is caller-provided and may sit inside
 a directory the application does not own.
@@ -50,6 +57,13 @@ a directory the application does not own.
 Reading a legacy document migrates it in memory and writes it back on a best-effort basis, so a
 read never fails because of the rewrite. A mutation loads without rewriting and commits once,
 which leaves the pre-migration document as the backup rather than an already migrated copy of it.
+
+Every read reads the file, so another writer is seen at once, but only bytes that differ from the
+last document read or written are decoded. A write keeps what it wrote once the replacement
+succeeded, which the rounding of every date makes identical to what a decoding would give back
+(#253). The dates the store writes, `yyyy-MM-ddTHH:mm:ss.SSSZ` in UTC, are read by arithmetic, to
+the same bit as `ISO8601DateFormatter`, which takes up to a millisecond per date on macOS 27; any
+other shape is left to the formatters.
 
 A malformed or invalid primary document produces a typed error. If the backup decodes and
 validates, recovery is reported as available but is never automatic. Explicit restoration re-checks

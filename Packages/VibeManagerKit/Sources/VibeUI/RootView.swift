@@ -29,6 +29,7 @@ public struct RootView: View {
   }
 
   public var body: some View {
+    let _ = BodyCounter.tick(.rootView)
     Group {
       switch model.state {
       case .idle, .loading:
@@ -399,7 +400,7 @@ public struct RootView: View {
       .toolbar {
         // With the sidebar folded, its palette is reached from here (#40).
         ToolbarItem(placement: .navigation) {
-          if !model.layout.columns.isSidebarVisible, !model.pendingRequests.isEmpty {
+          if !model.layout.columns.isSidebarVisible, model.pendingRequestCount > 0 {
             RequestPaletteToolbarButton(model: model)
           }
         }
@@ -921,38 +922,12 @@ public struct RootView: View {
     }
   }
 
-  /// "Terminal — <session> — <what its agent is doing>".
-  private func terminalTitle(for session: WorkSession, pane: TerminalPaneModel) -> String {
-    let status = SessionStatusPresentation.make(
-      session: session,
-      paneStatus: pane.status,
-      resolution: model.resolution(forID: session.id),
-      wasStoppedOnPurpose: pane.wasStoppedOnPurpose,
-      activity: model.activity(for: session.id)
-    )
-    return String(
-      localized: "Terminal — \(session.name) — \(String(localized: status.label))",
-      bundle: .module,
-      comment: "What VoiceOver calls a terminal: the session's name, then its state.")
-  }
-
   /// The theme of the conversation views, for the system's appearance of the moment — or the one
   /// on trial in the settings (#118).
   private var conversationTheme: ConversationTheme {
     model.conversations.themes.displayed(
       ConversationFonts.installedOnly(model.conversations.appearance),
       isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
-  }
-
-  /// The drawer's button, beside the state of the session's terminal (#43).
-  private func statusAccessory(for session: WorkSession) -> AnyView? {
-    model.terminals == nil ? nil : AnyView(DrawerStatusButton(model: model, session: session))
-  }
-
-  /// Restart, at the foot of a session's terminal: the session's own, which resumes its
-  /// conversation — never the pane's process run again as it was launched (#138).
-  private func sessionRestart(for id: SessionID) -> () -> Void {
-    { Task { await model.restart(id) } }
   }
 
   @ViewBuilder
@@ -962,56 +937,19 @@ public struct RootView: View {
     // keeps the keyboard: typed into, the session left would take what was meant for the new one.
     let isCovered = model.shownCreation != nil || model.isPresentingNewSession
     ZStack {
-      ForEach(model.sessions) { listed in
-        if let pane = model.pane(for: listed.id) {
-          let isActive =
-            !isCovered && listed.id == session.id && model.presentation(of: listed) == .terminal
-          // Started by the launcher, so switching sessions never restarts an agent.
-          TerminalPaneView(
-            model: pane, autoStart: false, isActive: isActive,
-            accessibilityTitle: terminalTitle(for: listed, pane: pane),
-            statusAccessory: statusAccessory(for: listed),
-            claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
-            restart: sessionRestart(for: listed.id), canRestart: model.canRestart(listed)
-          )
-          .id(listed.id)
-          .opacity(isActive ? 1 : 0)
-          .allowsHitTesting(isActive)
-          .accessibilityHidden(!isActive)
-        }
+      // Each session's slot reads what changes while its agent works — its terminal's state, its
+      // activity — in its own `body`: a transition in one session evaluates that slot again, not
+      // the window (#254). Only the sessions with a pane are walked, never the archived ones.
+      ForEach(model.paneSessionIDs, id: \.self) { id in
+        SessionTerminalSlot(model: model, id: id, shownID: session.id, isCovered: isCovered)
       }
 
       // Mounted like the terminals, so that going back and forth keeps each one's place. Only
       // the few sessions last shown in conversation keep one.
+      let theme = conversationTheme
       ForEach(model.conversations.mountedSessionIDs, id: \.self) { id in
-        if let conversation = model.conversations.existingModel(for: id),
-          let listed = model.sessions.first(where: { $0.id == id })
-        {
-          let isActive =
-            !isCovered && id == session.id && model.presentation(of: listed) == .conversation
-          VStack(spacing: 0) {
-            ConversationView(
-              model: conversation, theme: conversationTheme,
-              appearance: model.conversations.appearance, isActive: isActive,
-              claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation
-            )
-            .conversationLinks(of: id, in: model)
-            // The terminal's bar, and its button of the drawer, whichever form the session is
-            // shown in.
-            if let pane = model.pane(for: id) {
-              Divider()
-              TerminalStatusBar(
-                pane: pane, accessory: statusAccessory(for: listed),
-                restart: sessionRestart(for: id), canRestart: model.canRestart(listed))
-            }
-          }
-          .opacity(isActive ? 1 : 0)
-          .allowsHitTesting(isActive)
-          .accessibilityHidden(!isActive)
-          // A hidden composer must lose the keyboard: typed into, it would send to a session
-          // nobody is looking at.
-          .disabled(!isActive)
-        }
+        SessionConversationSlot(
+          model: model, id: id, shownID: session.id, isCovered: isCovered, theme: theme)
       }
 
       // An archived session has no pane by construction — archiving released it — so its own
@@ -2118,17 +2056,12 @@ struct SessionRow: View {
   /// The badge drawn: the session's, or the one previewed in its Change Icon popover (#183).
   let appearance: SessionAppearance
   let icon: NSImage?
-  let status: SessionStatusPresentation
-  /// The one row the restoration is working on. Said on the row rather than only in the banner,
-  /// because the banner names a session the sidebar may have scrolled away from.
-  let isRestoring: Bool
-  /// Its web view has something unseen: a page its agent opened, or a question (#69).
-  let webView: WebViewAttention?
   let shortcutPosition: Int?
   let commands: SessionCommands
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
+    let _ = BodyCounter.tick(.sessionRow)
     HStack(spacing: 10) {
       SessionBadge(appearance: appearance, icon: icon)
         .background {
@@ -2256,6 +2189,23 @@ struct SessionRow: View {
         }
       }
     }
+  }
+
+  // Read by the row itself rather than handed to it by the list (#254): what an agent does wakes
+  // its own row, not the whole list.
+  private var status: SessionStatusPresentation {
+    commands.model.statusPresentation(for: session)
+  }
+
+  /// The one row the restoration is working on. Said on the row rather than only in the banner,
+  /// because the banner names a session the sidebar may have scrolled away from.
+  private var isRestoring: Bool {
+    commands.model.isRestoring(session.id)
+  }
+
+  /// Its web view has something unseen: a page its agent opened, or a question (#69).
+  private var webView: WebViewAttention? {
+    commands.model.webViewAttention(for: session.id)
   }
 
   private var accessibilityValue: Text {
@@ -2398,5 +2348,106 @@ extension View {
           links.click(url)
           return .handled
         })
+  }
+}
+
+/// "Terminal — <session> — <what its agent is doing>".
+@MainActor
+private func terminalTitle(
+  for session: WorkSession, pane: TerminalPaneModel, in model: AppModel
+) -> String {
+  let status = SessionStatusPresentation.make(
+    session: session,
+    paneStatus: pane.status,
+    resolution: model.resolution(forID: session.id),
+    wasStoppedOnPurpose: pane.wasStoppedOnPurpose,
+    activity: model.activity(for: session.id)
+  )
+  return String(
+    localized: "Terminal — \(session.name) — \(String(localized: status.label))",
+    bundle: .module,
+    comment: "What VoiceOver calls a terminal: the session's name, then its state.")
+}
+
+/// Restart, at the foot of a session's terminal: the session's own, which resumes its
+/// conversation — never the pane's process run again as it was launched (#138).
+@MainActor
+private func sessionRestart(for id: SessionID, in model: AppModel) -> () -> Void {
+  { Task { await model.restart(id) } }
+}
+
+/// One session's terminal in the window's stack, shown or kept behind the one shown (#254).
+///
+/// A view of its own so that what changes while an agent works — the terminal's state, the
+/// agent's activity in its accessibility title — is read here, and wakes this slot alone.
+private struct SessionTerminalSlot: View {
+  let model: AppModel
+  let id: SessionID
+  /// The session the column shows.
+  let shownID: SessionID
+  /// Under the placeholder of a session being made, or a new session's draft (#177).
+  let isCovered: Bool
+
+  var body: some View {
+    let _ = BodyCounter.tick(.sessionTerminalSlot)
+    if let pane = model.pane(for: id), let session = model.session(withID: id) {
+      let isActive =
+        !isCovered && id == shownID && model.presentation(of: session) == .terminal
+      // Started by the launcher, so switching sessions never restarts an agent.
+      TerminalPaneView(
+        model: pane, autoStart: false, isActive: isActive,
+        accessibilityTitle: terminalTitle(for: session, pane: pane, in: model),
+        statusAccessory: model.terminals == nil
+          ? nil : DrawerStatusButton(model: model, session: session),
+        claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
+        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session)
+      )
+      .id(id)
+      .opacity(isActive ? 1 : 0)
+      .allowsHitTesting(isActive)
+      .accessibilityHidden(!isActive)
+    }
+  }
+}
+
+/// One session's conversation in the window's stack, shown or kept behind the one shown.
+private struct SessionConversationSlot: View {
+  let model: AppModel
+  let id: SessionID
+  let shownID: SessionID
+  let isCovered: Bool
+  let theme: ConversationTheme
+
+  var body: some View {
+    if let conversation = model.conversations.existingModel(for: id),
+      let listed = model.session(withID: id)
+    {
+      let isActive =
+        !isCovered && id == shownID && model.presentation(of: listed) == .conversation
+      VStack(spacing: 0) {
+        ConversationView(
+          model: conversation, theme: theme,
+          appearance: model.conversations.appearance, isActive: isActive,
+          claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation
+        )
+        .conversationLinks(of: id, in: model)
+        // The terminal's bar, and its button of the drawer, whichever form the session is
+        // shown in.
+        if let pane = model.pane(for: id) {
+          Divider()
+          TerminalStatusBar(
+            pane: pane,
+            accessory: model.terminals == nil
+              ? nil : DrawerStatusButton(model: model, session: listed),
+            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed))
+        }
+      }
+      .opacity(isActive ? 1 : 0)
+      .allowsHitTesting(isActive)
+      .accessibilityHidden(!isActive)
+      // A hidden composer must lose the keyboard: typed into, it would send to a session
+      // nobody is looking at.
+      .disabled(!isActive)
+    }
   }
 }

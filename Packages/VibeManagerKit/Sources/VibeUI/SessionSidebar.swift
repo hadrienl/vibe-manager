@@ -35,6 +35,7 @@ struct SessionSidebar: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
+    let _ = BodyCounter.tick(.sessionSidebar)
     VStack(spacing: 0) {
       ColumnTabs(model: model)
       columns
@@ -310,9 +311,6 @@ struct SessionSidebar: View {
       session: session,
       appearance: appearance,
       icon: model.icons.image(for: appearance.iconID),
-      status: model.statusPresentation(for: session),
-      isRestoring: model.isRestoring(session.id),
-      webView: model.webViewAttention(for: session.id),
       shortcutPosition: position,
       commands: commands
     )
