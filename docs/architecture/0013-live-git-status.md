@@ -84,6 +84,12 @@ names the same repository, the state says so, because the unattributed files may
   `max(1 s, 2 × the last reading)`: an agent streaming its transcript asks many times a second.
   The 30 second timer of ADR 0012 is gone, and so is every other way to read a report: the refresh
   button goes through the same queue, so an older report can never land after a newer one.
+- The report does not run a second `git status` on a repository watched here: it asks for the last
+  valid status (`knownStatus`) and applies its own rule — a listed file written since the session
+  started — to its entries. A list cut short that does not answer is not taken for clean: the
+  report then reads the repository itself. And the report is handed back to this monitor only when
+  the repositories, the transcript or the conversations it names changed: otherwise it would read
+  the transcript and its folders again at every reading (#252).
 - A transcript folder holds the transcripts of every session opened in the same place: only the
   files named after this session's identifier count.
 - The whole transcript folder of the agent is watched — `~/.claude/projects`, or Codex's

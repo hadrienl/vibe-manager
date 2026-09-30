@@ -293,7 +293,9 @@ public struct CodexRolloutSessionDiscovery: CodexSessionDiscovering {
       let now = ContinuousClock.now
       guard now < deadline else { return nil }
       do {
-        try await Task.sleep(for: min(interval(after: now - start), deadline - now))
+        // Nothing hangs on the exact moment: the system may group this wake with others.
+        let pause = min(interval(after: now - start), deadline - now)
+        try await Task.sleep(for: pause, tolerance: pause / 2)
       } catch {
         return nil
       }

@@ -9,6 +9,7 @@ import VibeDomain
 public struct GitActivityReader: RepositoryActivityReading {
   private let git: any GitCommandRunner
   private let roots = RepositoryRootCache()
+  private let directories = GitDirectoryCache()
 
   public init(git: any GitCommandRunner = ProcessGitCommandRunner()) {
     self.git = git
@@ -39,15 +40,81 @@ public struct GitActivityReader: RepositoryActivityReading {
     }
   }
 
-  public func reflog(atPath path: String, since date: Date) async -> [ReflogEntry] {
+  /// Where the repository keeps its state, asked of Git once per repository: a worktree's own
+  /// `HEAD` and the clone's shared references are in two different folders.
+  func layout(atPath path: String) async -> GitDirectories? {
+    if let known = await directories.known(path) { return known }
     guard
-      let location = try? await git.run(
-        ["rev-parse", "--path-format=absolute", "--git-common-dir"], in: path),
-      location.succeeded
-    else { return [] }
+      let result = try? await git.run(
+        ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"], in: path),
+      result.succeeded
+    else { return nil }
+    let lines = result.text.split(separator: "\n").map(String.init)
+    guard lines.count == 2 else { return nil }
+    let found = GitDirectories(gitDirectory: lines[0], commonDirectory: lines[1])
+    await directories.remember(found, for: path)
+    return found
+  }
+
+  public func referenceFingerprint(atPath path: String) async -> ReferenceFingerprint? {
+    guard FileManager.default.fileExists(atPath: path), let layout = await layout(atPath: path)
+    else { return nil }
+    return Self.fingerprint(of: layout)
+  }
+
+  /// `stat` only, whatever the repository: nothing here runs Git or reads a file's content.
+  static func fingerprint(of layout: GitDirectories) -> ReferenceFingerprint? {
+    let own = layout.gitDirectory
+    let common = layout.commonDirectory
+    // Without its `HEAD`, the folder is no longer a repository: the branches are read again, and
+    // say so.
+    guard let head = stamp(of: (own as NSString).appendingPathComponent("HEAD")) else {
+      return nil
+    }
+    var stamps = ["HEAD": head]
+    for (key, file) in [
+      ("logs/HEAD", (own as NSString).appendingPathComponent("logs/HEAD")),
+      ("packed-refs", (common as NSString).appendingPathComponent("packed-refs")),
+      ("reftable", (common as NSString).appendingPathComponent("reftable/tables.list")),
+    ] {
+      if let found = stamp(of: file) { stamps[key] = found }
+    }
+    // A reftable worktree keeps its own references, its `HEAD` among them, in its own stack.
+    if own != common,
+      let found = stamp(of: (own as NSString).appendingPathComponent("reftable/tables.list"))
+    {
+      stamps["worktree reftable"] = found
+    }
+    for folder in ["logs/refs/heads", "refs/heads"] {
+      let root = (common as NSString).appendingPathComponent(folder)
+      guard let enumerator = FileManager.default.enumerator(atPath: root) else { continue }
+      while let relative = enumerator.nextObject() as? String {
+        let file = (root as NSString).appendingPathComponent(relative)
+        if let found = stamp(of: file, regularOnly: true) {
+          stamps["\(folder)/\(relative)"] = found
+        }
+      }
+    }
+    return ReferenceFingerprint(stamps: stamps)
+  }
+
+  private static func stamp(of file: String, regularOnly: Bool = false)
+    -> ReferenceFingerprint.Stamp?
+  {
+    var info = stat()
+    guard lstat(file, &info) == 0 else { return nil }
+    if regularOnly, info.st_mode & S_IFMT != S_IFREG { return nil }
+    return ReferenceFingerprint.Stamp(
+      inode: UInt64(info.st_ino), size: Int64(info.st_size),
+      modified: Int64(info.st_mtimespec.tv_sec) * 1_000_000_000
+        + Int64(info.st_mtimespec.tv_nsec))
+  }
+
+  public func reflog(atPath path: String, since date: Date) async -> [ReflogEntry] {
+    guard let layout = await layout(atPath: path) else { return [] }
     // A branch whose reflog file was not written since the date has nothing to say: reading the
     // file dates first keeps a repository of three hundred branches to a handful of commands.
-    let logs = (location.text as NSString).appendingPathComponent("logs/refs/heads")
+    let logs = (layout.commonDirectory as NSString).appendingPathComponent("logs/refs/heads")
     var branches: [String] = []
     if let enumerator = FileManager.default.enumerator(atPath: logs) {
       while let relative = enumerator.nextObject() as? String {

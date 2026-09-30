@@ -116,6 +116,10 @@ public final class ConversationWorkspace {
         model.agentRunningChanged = { isRunning, startedAt in
           Task { await follow.setAgentRunning(isRunning, since: startedAt, for: id) }
         }
+        // Mounted but hidden, a conversation is still read, and published less often (#250).
+        model.shownChanged = { isShown, order in
+          Task { await follow.setShown(isShown, for: id, order: order) }
+        }
       }
       models[session.id] = model
       connect?(model, session)
@@ -145,9 +149,12 @@ public final class ConversationWorkspace {
       // earlier process of it left, are not opened, and a new model starts with everything folded
       // (#180).
       let isAgentRunning = model.isProcessRunning
+      let (isShown, shownOrder) = (model.isShown, model.shownOrder)
       Task { [weak self] in
         let startedAt = isAgentRunning ? await model.processStartDate() : nil
         await follow.setAgentRunning(isAgentRunning, since: startedAt, for: id)
+        // What the reader was told last about a model since let go of is no longer true.
+        await follow.setShown(isShown, for: id, order: shownOrder)
         if isNew { await follow.setUnfoldedSubagents([], for: id) }
         let stream = await follow.follow(session)
         guard let self, self.generations[id] == generation, self.models[id] === model else {

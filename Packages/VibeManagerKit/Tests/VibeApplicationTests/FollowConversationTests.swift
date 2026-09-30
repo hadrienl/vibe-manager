@@ -222,6 +222,93 @@ struct FollowConversationTests {
     #expect(name == "Beta")
   }
 
+  @Test("Each publication says how many entries, from the first, are the same as before (#250)")
+  func unchangedPrefix() async throws {
+    let file = URL(fileURLWithPath: "/t/prefix.jsonl")
+    let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      refreshInterval: .milliseconds(100), publishInterval: .milliseconds(10))
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "prefix"))
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    let first = try #require(await next(&iterator) { $0.availability == .available })
+    await tail.write(["agent:more"], to: file)
+    let second = try #require(await next(&iterator) { $0.entries.count == 3 })
+    #expect(second.revision > first.revision)
+    // Published one after the other, or with one in between that held the same two entries.
+    #expect(second.unchangedPrefix == 2)
+    await tail.replace(file, with: ["user:again"])
+    let third = try #require(await next(&iterator) { $0.entries.count == 1 })
+    #expect(third.unchangedPrefix == 0)
+  }
+
+  @Test("Hidden, a conversation is published at its own pace, not at the one on screen (#250)")
+  func hiddenPace() async throws {
+    let file = URL(fileURLWithPath: "/t/pace.jsonl")
+    let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])
+    // Only the hidden pace comes within the test: a publication is its doing.
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      refreshInterval: .milliseconds(100), publishInterval: .seconds(3600),
+      hiddenPublishInterval: .zero)
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "pace"))
+    await follow.setShown(false, for: session.id, order: 1)
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    let published = await next(&iterator) { $0.entries.count == 2 }
+    #expect(published?.entries.count == 2)
+    #expect(await follow.isHidden(session.id))
+  }
+
+  @Test("Hidden, a conversation waits; shown again, it is published at once (#250)")
+  func hiddenConversation() async throws {
+    let file = URL(fileURLWithPath: "/t/hidden.jsonl")
+    let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])
+    // Neither pace comes within the test: only coming on screen publishes.
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      refreshInterval: .milliseconds(100), publishInterval: .seconds(3600),
+      hiddenPublishInterval: .seconds(3600))
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "hidden"))
+    await follow.setShown(false, for: session.id, order: 1)
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    #expect(await eventually { await follow.hasPendingPublication(for: session.id) })
+    await follow.setShown(true, for: session.id, order: 2)
+    let shown = await next(&iterator) { $0.availability == .available }
+    #expect(shown?.entries.count == 2)
+    #expect(await !follow.hasPendingPublication(for: session.id))
+  }
+
+  @Test("A word on the conversation older than the last one heard changes nothing (#250)")
+  func shownOrder() async {
+    let follow = FollowConversation(
+      agents: Registry(providers: []), tail: ScriptedTail([:]))
+    let id = SessionID()
+    await follow.setShown(false, for: id, order: 5)
+    await follow.setShown(true, for: id, order: 4)
+    #expect(await follow.isHidden(id))
+    await follow.setShown(true, for: id, order: 6)
+    #expect(await !follow.isHidden(id))
+  }
+
+  @Test("The entry waiting for a permission is marked, and said where (#250)")
+  func pendingPermissionMark() {
+    let entries = [
+      ConversationEntry(id: "a", content: .tool(ToolCall(callID: "a", kind: .read))),
+      ConversationEntry(id: "b", content: .tool(ToolCall(callID: "b", kind: .shell))),
+      ConversationEntry(id: "c", content: .agentText("…")),
+    ]
+    let mark = ConversationEntry.pendingPermissionMark(entries, activity: .awaitingUser(.approval))
+    #expect(mark?.index == 1)
+    #expect(mark?.entry.toolCall?.state == .awaitingPermission)
+    #expect(
+      ConversationEntry.markingPendingPermission(entries, activity: .awaitingUser(.approval))[1]
+        == mark?.entry)
+    #expect(ConversationEntry.pendingPermissionMark(entries, activity: .working) == nil)
+  }
+
   @Test("An agent that writes nothing readable, and one that has not written yet")
   func availability() async throws {
     let follow = FollowConversation(

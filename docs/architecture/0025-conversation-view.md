@@ -92,6 +92,26 @@ whole file again, apart, if it was replaced (the bytes before where the reading 
 Past those, the model is let go of with what was kept aside, and the placeholder shows while the
 transcript is read.
 
+Of the five mounted, only the one on screen is laid out (#250). The four others are still read, so
+that coming back to one is instant, but published once a second rather than every 50 ms — the longer of that pause and the 250 ms
+of a first reading when both apply — and their
+model keeps the last snapshot without laying it out: only the echoes are confirmed, so that a prompt
+sent just before switching is not said lost. Shown again, what waits is published at once and laid
+out once. The view says when it is on screen, through the `isActive` it already has; the reader is
+told in order, a word older than the last heard being dropped.
+
+A snapshot says what did not change: its `revision` grows at each publication, and
+`unchangedPrefix` counts the entries, from the first, that are the same as in the one before —
+compared from the start and only as far as they are the same, off the main actor. The model lays
+out again only from there: the permission marked, sub-agents settled, then the blocks from the one
+`ConversationGrouping.restartBlock` names — the one before the change, and back past reasoning,
+which a group that goes on swallows. The prompts and commands that confirm echoes, the images
+produced, the sub-agents of the bar and the lists of the accessibility rotors are brought up to
+date the same way. A publication missed, a stream started again or a setting changed lays out
+everything again, which is never wrong. Tests hold the incremental layout to the full one on
+conversations drawn at random, and count its work rather than time it; with
+`VIBE_VERIFY_CONVERSATION=1`, a debug build checks one layout in fifty against a full one.
+
 ### Titles, groups, and the state that shows folded
 
 `ToolCallSummary` writes the titles — "Read Session.swift", "swift test — 42 tests passed" — and

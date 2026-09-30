@@ -49,12 +49,21 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   private let backupURL: URL
   private let codec = SessionStoreCodec()
   private let beforeReplace: (@Sendable () throws -> Void)?
+  /// Whether the previous document is kept as the backup by a hard link; tests turn it off to
+  /// exercise the copy that volumes without hard links fall back to.
+  private let backsUpByLink: Bool
   private let diagnostics: any DiagnosticLog
   /// The last document read, and what it held. Every read still reads the file — another writer
   /// is seen at once — but bytes that did not change are not decoded again: conversations and
   /// journals ask for a session every few seconds each, and decoding the whole store for every
   /// one of them kept this actor busy enough to hold a launch waiting behind them.
+  ///
+  /// A write fills it too, with what it wrote: otherwise the read after each write decoded the
+  /// whole store again, and a restoration alternates the two for every session (#253).
   private var lastRead: (data: Data, sessions: [WorkSession])?
+  /// How many times the document was decoded, for the tests that keep decoding rare.
+  private(set) var decodeCount = 0
+  private var removedOrphans = false
 
   public init(
     storeURL: URL = FileSessionRepository.defaultStoreURL(),
@@ -63,13 +72,19 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     self.storeURL = storeURL
     backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
     beforeReplace = nil
+    backsUpByLink = true
     self.diagnostics = diagnostics
   }
 
-  init(storeURL: URL, beforeReplace: @escaping @Sendable () throws -> Void) {
+  init(
+    storeURL: URL,
+    backsUpByLink: Bool = true,
+    beforeReplace: (@Sendable () throws -> Void)? = nil
+  ) {
     self.storeURL = storeURL
     backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
     self.beforeReplace = beforeReplace
+    self.backsUpByLink = backsUpByLink
     diagnostics = NullDiagnosticLog()
   }
 
@@ -208,7 +223,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
         .appendingPathExtension("corrupt-\(UUID().uuidString).json")
       try atomicWrite(damagedData, to: quarantineURL, invokingInterruption: false)
       let recoveredData = try codec.encode(sessions: decoded.sessions)
-      try commit(recoveredData, preservingCurrentAsBackup: false)
+      try commit(recoveredData, preservingCurrentAsBackup: false, caching: decoded.sessions)
       diagnostics.record(
         .store, .notice, "store.backupRestored", ["sessions": .count(decoded.sessions.count)])
     } catch let error as SessionStoreError {
@@ -235,7 +250,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     if let lastRead, lastRead.data == data { return lastRead.sessions }
 
     do {
-      let decoded = try codec.decode(data)
+      let decoded = try decode(data)
       // A document still to migrate is decoded again, so that its rewrite is tried again.
       lastRead = decoded.requiresRewrite ? nil : (data, decoded.sessions)
       if decoded.requiresRewrite, persistingMigration {
@@ -243,7 +258,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
         // back, for instance on a full disk or a read-only container.
         let written =
           (try? codec.encode(sessions: decoded.sessions)).map {
-            (try? commit($0, preservingCurrentAsBackup: true)) != nil
+            (try? commit($0, preservingCurrentAsBackup: true, caching: decoded.sessions)) != nil
           } ?? false
         diagnostics.record(
           .store, .notice, "store.migrated",
@@ -259,22 +274,103 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     }
   }
 
+  /// Decodes the document, noting it where it can be seen without Instruments: `store.decoded`
+  /// belongs to a launch, another writer or a migration, and to nothing else (#253).
+  private func decode(_ data: Data) throws -> SessionStoreDecodeResult {
+    decodeCount += 1
+    let start = ContinuousClock.now
+    let decoded = try Signposts.interval("store.decode") { try codec.decode(data) }
+    diagnostics.record(
+      .store, .info, "store.decoded",
+      [
+        "sessions": .count(decoded.sessions.count),
+        "duration": .duration(ContinuousClock.now - start),
+      ])
+    return decoded
+  }
+
   private func persist(_ sessions: [WorkSession]) throws {
+    let ordered = sessions.sorted(by: Self.sessionOrdering)
     try Signposts.interval("store.save") {
-      let data = try codec.encode(sessions: sessions.sorted(by: Self.sessionOrdering))
-      try commit(data, preservingCurrentAsBackup: true)
+      let data = try codec.encode(sessions: ordered)
+      try commit(data, preservingCurrentAsBackup: true, caching: ordered)
     }
   }
 
-  private func commit(_ data: Data, preservingCurrentAsBackup: Bool) throws {
+  /// Writes `data`, the encoding of `sessions`, and keeps both as the last document read once
+  /// they are on disk; a write that fails leaves the cache as it was.
+  ///
+  /// The sessions kept are those encoded, not those a decoding would give back. They are the same
+  /// because a session rounds each of its dates to the store's millisecond on entry.
+  private func commit(
+    _ data: Data, preservingCurrentAsBackup: Bool, caching sessions: [WorkSession]
+  ) throws {
     try ensureStoreDirectory()
+    removeOrphanedTemporaryFiles()
     if preservingCurrentAsBackup,
       FileManager.default.fileExists(atPath: storeURL.path)
     {
+      try preserveCurrentAsBackup()
+    }
+    try atomicWrite(data, to: storeURL, invokingInterruption: true)
+    lastRead = (data, sessions)
+  }
+
+  /// Keeps the current document as the backup, by giving its file a second name: it was written
+  /// and synchronized when it became the store, so reading it back and writing it again would
+  /// only cost a read, a write and a second `fsync` per change (#253). The store's replacement
+  /// then gives the store a new file, and the backup keeps the old one.
+  ///
+  /// A volume without hard links gets a copy instead. The store is never renamed to the backup:
+  /// until its replacement arrived, there would be no store on disk.
+  private func preserveCurrentAsBackup() throws {
+    try Signposts.interval("store.backup") {
+      if backsUpByLink, linkCurrentAsBackup() { return }
       let currentData = try Data(contentsOf: storeURL)
       try atomicWrite(currentData, to: backupURL, invokingInterruption: false)
     }
-    try atomicWrite(data, to: storeURL, invokingInterruption: true)
+  }
+
+  private func linkCurrentAsBackup() -> Bool {
+    // A write that failed after the backup was linked leaves both names on the store's file: the
+    // backup already holds the current document, and linking it again would ask `rename` to move
+    // a name onto another name of the same file, which does nothing and leaves the link behind.
+    if let store = fileIdentity(storeURL), store == fileIdentity(backupURL) { return true }
+    let temporaryURL = backupURL.deletingLastPathComponent()
+      .appendingPathComponent(".\(backupURL.lastPathComponent).\(UUID().uuidString).tmp")
+    guard link(storeURL.path, temporaryURL.path) == 0 else { return false }
+    // Removed whatever `rename` did: gone when it moved it, still there when it had nothing to do.
+    defer { unlink(temporaryURL.path) }
+    guard rename(temporaryURL.path, backupURL.path) == 0 else { return false }
+    // The backup shares the store's file, and so its mode: a store someone else wrote more
+    // openly is kept owner only, as a copy would have been.
+    try? FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+    return true
+  }
+
+  private func fileIdentity(_ url: URL) -> [Int]? {
+    var status = stat()
+    guard stat(url.path, &status) == 0 else { return nil }
+    return [Int(status.st_dev), Int(status.st_ino)]
+  }
+
+  /// Removes the temporary files a crash left beside the store, between a write and its rename:
+  /// once, at the first write, and only those old enough not to belong to a write in progress.
+  private func removeOrphanedTemporaryFiles() {
+    guard !removedOrphans else { return }
+    removedOrphans = true
+    let manager = FileManager.default
+    let directory = storeURL.deletingLastPathComponent()
+    let prefixes = [storeURL, backupURL].map { ".\($0.lastPathComponent)." }
+    let limit = Date(timeIntervalSinceNow: -60)
+    guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else { return }
+    for name in names
+    where name.hasSuffix(".tmp") && prefixes.contains(where: { name.hasPrefix($0) }) {
+      let url = directory.appendingPathComponent(name)
+      let modified = (try? manager.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+      if let modified, modified < limit { try? manager.removeItem(at: url) }
+    }
   }
 
   private func atomicWrite(_ data: Data, to destination: URL, invokingInterruption: Bool) throws {

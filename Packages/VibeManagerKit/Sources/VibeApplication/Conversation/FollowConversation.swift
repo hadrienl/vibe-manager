@@ -17,10 +17,25 @@ public struct ConversationSnapshot: Hashable, Sendable {
 
   public var entries: [ConversationEntry]
   public var availability: Availability
+  /// Grows at each publication of one follow: a reader that missed one knows it (#250).
+  public var revision = 0
+  /// How many entries, from the first, are the same as in the publication `revision - 1`: a
+  /// reader lays out again only what follows them. 0 promises nothing.
+  public var unchangedPrefix = 0
 
   public init(entries: [ConversationEntry] = [], availability: Availability) {
     self.entries = entries
     self.availability = availability
+  }
+
+  /// What the view shows: how the snapshot came is left out.
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.availability == rhs.availability && lhs.entries == rhs.entries
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(availability)
+    hasher.combine(entries)
   }
 
   public var isReadable: Bool {
@@ -47,6 +62,9 @@ public actor FollowConversation {
   private let current: @Sendable (SessionID) async -> WorkSession?
   private let refreshInterval: Duration
   private let publishInterval: Duration
+  /// How often a conversation nobody sees is published: still read, so that it is up to date when
+  /// it comes back, but laid out by nobody meanwhile (#250).
+  private let hiddenPublishInterval: Duration
 
   private final class Reading {
     let file: URL
@@ -104,6 +122,7 @@ public actor FollowConversation {
     var chapters: [Chapter] = []
     var isDirty = true
     var lastPublished: ConversationSnapshot?
+    var revision = 0
     var publishTask: Task<Void, Never>?
     var tasks: [Task<Void, Never>] = []
     /// When the sub-agents of a transcript were last looked for: a sub-agent whose transcript
@@ -132,6 +151,10 @@ public actor FollowConversation {
   /// When the process of each session's agent started, when known: a sub-agent started before it
   /// belonged to an earlier process, which ended without it saying so.
   private var agentStarts: [SessionID: Date] = [:]
+  /// Sessions whose conversation is not on screen, and the order of the last word on it: a word
+  /// older than the last one heard, arriving late, is dropped.
+  private var hidden: Set<SessionID> = []
+  private var shownOrders: [SessionID: Int] = [:]
   /// How often, at most, the sub-agents of one transcript are looked for.
   static let subagentLookInterval = Duration.seconds(1)
 
@@ -161,7 +184,8 @@ public actor FollowConversation {
     hint: @escaping @Sendable (SessionID) async -> AgentActivityEvent? = { _ in nil },
     current: @escaping @Sendable (SessionID) async -> WorkSession? = { _ in nil },
     refreshInterval: Duration = .seconds(2),
-    publishInterval: Duration = .milliseconds(50)
+    publishInterval: Duration = .milliseconds(50),
+    hiddenPublishInterval: Duration = .seconds(1)
   ) {
     self.agents = agents
     self.tail = tail
@@ -169,6 +193,7 @@ public actor FollowConversation {
     self.current = current
     self.refreshInterval = refreshInterval
     self.publishInterval = publishInterval
+    self.hiddenPublishInterval = hiddenPublishInterval
   }
 
   /// The session's conversation, then every change to it while the stream is kept — or only
@@ -262,6 +287,33 @@ public actor FollowConversation {
     }
   }
 
+  /// Whether the session's conversation is on screen (#250). Hidden, it is still read, but
+  /// published only every `hiddenPublishInterval`; shown again, what waits is published at once.
+  ///
+  /// - Parameter order: grows with each word from the view, so that one arriving after a later
+  ///   one changes nothing.
+  public func setShown(_ shown: Bool, for session: SessionID, order: Int) {
+    if let last = shownOrders[session], order <= last { return }
+    shownOrders[session] = order
+    let changed = shown ? hidden.remove(session) != nil : hidden.insert(session).inserted
+    guard changed, shown else { return }
+    for (key, following) in followings
+    where following.session.id == session && following.live && following.publishTask != nil {
+      following.publishTask?.cancel()
+      publishNow(key)
+    }
+  }
+
+  func isHidden(_ session: SessionID) -> Bool { hidden.contains(session) }
+
+  /// Whether what was read waits to be published, every file read, for the tests.
+  func hasPendingPublication(for session: SessionID) -> Bool {
+    followings.values.contains {
+      $0.session.id == session && $0.publishTask != nil && !$0.allReadings.isEmpty
+        && isLoaded($0)
+    }
+  }
+
   /// Whether the session's agent runs, and since when. Its sub-agents that never said they ended
   /// are not followed while it does not, nor those started before it — by a process resumed since
   /// (#180): they will not end.
@@ -328,15 +380,17 @@ public actor FollowConversation {
     }
   }
 
-  /// One publication per pause, whatever the number of chunks that arrived in it — a longer pause
-  /// while transcripts are first read.
+  /// One publication per pause, whatever the number of chunks that arrived in it: a longer pause
+  /// while transcripts are first read, and longer still for a conversation nobody sees.
   private func schedulePublish(_ following: Following, key: UUID) {
     guard following.publishTask == nil else { return }
-    let interval =
-      isCatchingUp(following)
-      ? max(publishInterval, Self.catchingUpPublishInterval) : publishInterval
+    var interval = publishInterval
+    if isCatchingUp(following) { interval = max(interval, Self.catchingUpPublishInterval) }
+    if hidden.contains(following.session.id) { interval = max(interval, hiddenPublishInterval) }
     following.publishTask = Task { [weak self] in
-      do { try await Task.sleep(for: interval) } catch { return }
+      try? await Task.sleep(for: interval)
+      // Cut short by the conversation coming on screen, which published already.
+      guard !Task.isCancelled else { return }
       await self?.publishNow(key)
     }
   }
@@ -609,10 +663,29 @@ public actor FollowConversation {
   private func publishIfNeeded(_ following: Following) {
     guard following.isDirty else { return }
     following.isDirty = false
-    let snapshot = compose(following)
-    guard snapshot != following.lastPublished else { return }
+    var snapshot = Signposts.interval("conversation.compose") { compose(following) }
+    // Compared from the start, and only as far as it is the same: what follows is what the
+    // reader lays out again (#250).
+    let previous = following.lastPublished
+    let unchanged = previous.map { Self.commonPrefix($0.entries, snapshot.entries) } ?? 0
+    if let previous, previous.availability == snapshot.availability,
+      unchanged == previous.entries.count, unchanged == snapshot.entries.count
+    {
+      return
+    }
+    following.revision += 1
+    snapshot.revision = following.revision
+    snapshot.unchangedPrefix = unchanged
     following.lastPublished = snapshot
     following.continuation.yield(snapshot)
+  }
+
+  /// How many entries, from the first, two lists share.
+  static func commonPrefix(_ old: [ConversationEntry], _ new: [ConversationEntry]) -> Int {
+    var index = 0
+    let end = min(old.count, new.count)
+    while index < end, old[index] == new[index] { index += 1 }
+    return index
   }
 
   private func compose(_ following: Following) -> ConversationSnapshot {
@@ -708,28 +781,41 @@ extension ConversationEntry {
   public static func markingPendingPermission(
     _ entries: [ConversationEntry], activity: AgentActivity?, agentID: String? = nil
   ) -> [ConversationEntry] {
-    guard activity == .awaitingUser(.approval) else { return entries }
+    guard let mark = pendingPermissionMark(entries, activity: activity, agentID: agentID) else {
+      return entries
+    }
+    var marked = entries
+    marked[mark.index] = mark.entry
+    return marked
+  }
+
+  /// The one entry `markingPendingPermission` changes, and where: a view that laid the others out
+  /// already lays out again only from there (#250).
+  public static func pendingPermissionMark(
+    _ entries: [ConversationEntry], activity: AgentActivity?, agentID: String? = nil
+  ) -> (index: Int, entry: ConversationEntry)? {
+    guard activity == .awaitingUser(.approval) else { return nil }
     if let agentID, let marked = marking(agentID: agentID, in: entries) { return marked }
     guard
       let index = entries.lastIndex(where: {
         $0.toolCall?.state == .running && $0.toolCall?.kind != .subagent
       }),
       case .tool(var call) = entries[index].content
-    else { return entries }
-    var marked = entries
+    else { return nil }
+    var marked = entries[index]
     call.state = .awaitingPermission
-    marked[index].content = .tool(call)
-    return marked
+    marked.content = .tool(call)
+    return (index, marked)
   }
 
   private static func marking(agentID: String, in entries: [ConversationEntry])
-    -> [ConversationEntry]?
+    -> (index: Int, entry: ConversationEntry)?
   {
     for index in entries.indices {
       guard case .tool(var call) = entries[index].content, call.kind == .subagent,
         var run = call.subagent
       else { continue }
-      var marked = entries
+      var marked = entries[index]
       if run.agentID == agentID {
         if let inner = run.activityEntries,
           inner.contains(where: { $0.toolCall?.state == .running })
@@ -738,15 +824,17 @@ extension ConversationEntry {
           call.subagent = run
         }
         call.state = .awaitingPermission
-        marked[index].content = .tool(call)
-        return marked
+        marked.content = .tool(call)
+        return (index, marked)
       }
       if let inner = run.activityEntries, let found = marking(agentID: agentID, in: inner) {
-        run.activity = .read(found)
+        var innerMarked = inner
+        innerMarked[found.index] = found.entry
+        run.activity = .read(innerMarked)
         call.subagent = run
         call.state = .awaitingPermission
-        marked[index].content = .tool(call)
-        return marked
+        marked.content = .tool(call)
+        return (index, marked)
       }
     }
     return nil
