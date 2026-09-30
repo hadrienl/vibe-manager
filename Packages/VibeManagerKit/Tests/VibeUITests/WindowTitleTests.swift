@@ -219,4 +219,12 @@ struct ToolbarTitleLayoutTests {
     #expect(
       !ToolbarTitleLayout.showsApplicationName(room: 0, applicationWidth: 118, nameWidth: 600))
   }
+
+  @Test("No room left, the title still asks for enough of a name to read")
+  func neverNothing() {
+    // Given no width in a narrowed window, the title was never measured again once widened (#256).
+    #expect(ToolbarTitleLayout.titleRoom(measured: 0, detailWidth: 1040) == 80)
+    #expect(ToolbarTitleLayout.titleRoom(measured: 500, detailWidth: 1040) == 500)
+    #expect(ToolbarTitleLayout.titleRoom(measured: nil, detailWidth: 1040) == 402)
+  }
 }

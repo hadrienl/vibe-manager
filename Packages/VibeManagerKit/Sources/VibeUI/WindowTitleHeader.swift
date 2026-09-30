@@ -67,8 +67,8 @@ struct WindowTitleHeader: View {
   @State private var nameWidth: CGFloat = 0
 
   var body: some View {
-    let room =
-      measuredRoom ?? ToolbarTitleLayout.fallbackRoom(detailWidth: self.room.detailWidth)
+    let room = ToolbarTitleLayout.titleRoom(
+      measured: measuredRoom, detailWidth: self.room.detailWidth)
     Group {
       if let sessionName = title.sessionName {
         HStack(spacing: 0) {
@@ -166,6 +166,14 @@ struct ToolbarTitleLayout {
   /// hid the application's name in any window (#256).
   static func fallbackRoom(detailWidth: CGFloat) -> CGFloat {
     max(minimumNameWidth, (detailWidth / 2 - fallbackCentredHalfWidth - spacing).rounded(.down))
+  }
+
+  /// The most the title asks for: the room measured, or else the one assumed — never less than
+  /// enough of a name to read. Given nothing, it drew nothing, and a title of no width was never
+  /// measured again, even in a window made wide again (#256): too wide for the bar, it goes to the
+  /// » menu, and comes back from it.
+  static func titleRoom(measured: CGFloat?, detailWidth: CGFloat) -> CGFloat {
+    measured.map { max($0, minimumNameWidth) } ?? fallbackRoom(detailWidth: detailWidth)
   }
 
   /// Whether "Vibe Manager ›" is shown before the session's name: when it fits with the whole name,
