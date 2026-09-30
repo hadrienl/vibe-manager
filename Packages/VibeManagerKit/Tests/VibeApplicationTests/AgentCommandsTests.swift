@@ -119,7 +119,34 @@ struct AgentCommandsTests {
     #expect(blank.argumentHint == nil)
   }
 
-  @Test("Typing stays quick with hundreds of entries")
+  @Test("↩ completes a name, a part after `:` or an alias begun; never a name typed in full")
+  func returnCompletes() {
+    let compact = Self.command("compact", "Free up context.", aliases: ["squash"])
+    let debug = Self.skill("prisme-ai:debug-events")
+    let index = AgentCommandIndex([compact, debug])
+    #expect(index.completes(Self.query("/comp")!, with: compact))
+    #expect(index.completes(Self.query("/squ")!, with: compact))
+    #expect(index.completes(Self.query("/debug")!, with: debug))
+    #expect(index.completes(Self.query("/")!, with: compact))
+    #expect(!index.completes(Self.query("/compact")!, with: compact))
+    #expect(!index.completes(Self.query("/squash")!, with: compact))
+  }
+
+  @Test("↩ does not complete an entry found by its description only: `/context` is sent")
+  func returnSendsDescriptionMatch() {
+    let compact = Self.command("compact", "Free up context.")
+    let docs = Self.skill("writer", "Write the api docs.")
+    let index = AgentCommandIndex([compact, docs])
+    #expect(index.matches(for: Self.query("/context")!).map(\.command) == [compact])
+    #expect(!index.completes(Self.query("/context")!, with: compact))
+    #expect(!index.completes(Self.query("/api")!, with: docs))
+    #expect(!index.completes(Self.query("/pact")!, with: compact))
+  }
+
+  // Timed, so out of the default run: a runner that stalls would fail it with nothing wrong.
+  @Test(
+    "Typing stays quick with hundreds of entries",
+    .enabled(if: ProcessInfo.processInfo.environment["VIBE_PERF_TESTS"] == "1"))
   func speed() {
     let commands = (0..<600).map {
       Self.skill("plugin-\($0 % 7):skill-number-\($0)", "Does thing \($0) for the user, well.")

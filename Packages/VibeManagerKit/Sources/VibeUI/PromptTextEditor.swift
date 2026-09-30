@@ -289,8 +289,9 @@ private struct GrowingTextView: NSViewRepresentable {
       return true
     }
 
-    /// While the list under `/` is open, ↑ and ↓ move in it, ⇥ and ↩ insert the entry selected —
-    /// sending nothing — and Escape closes it. With nothing matching, ↩ submits as ever.
+    /// While the list under `/` is open, ↑ and ↓ move in it, ⇥ inserts the entry selected, ↩ too
+    /// when it completes a name begun — sending nothing — and Escape closes it. Otherwise ↩ submits
+    /// as ever: nothing matching, a match by its description only, a name typed in full.
     private func handleCommandList(_ textView: NSTextView, _ selector: Selector) -> Bool {
       guard let commands = parent?.commands, commands.isShowing, !textView.hasMarkedText()
       else { return false }
@@ -301,6 +302,9 @@ private struct GrowingTextView: NSViewRepresentable {
         return commands.moveSelection(by: 1)
       case #selector(NSResponder.insertTab(_:)), #selector(NSResponder.insertNewline(_:)):
         guard let command = commands.selectedCommand else { return false }
+        if selector == #selector(NSResponder.insertNewline(_:)), !commands.returnInserts {
+          return false
+        }
         let modifiers = NSApp.currentEvent?.modifierFlags ?? []
         guard modifiers.isDisjoint(with: [.shift, .option]) else { return false }
         // Typed in, as the user would: ⌘Z takes it back.

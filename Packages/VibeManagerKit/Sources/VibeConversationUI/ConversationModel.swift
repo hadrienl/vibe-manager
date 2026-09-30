@@ -1324,9 +1324,11 @@ public final class ConversationModel {
   }
 
   /// ⇥ or ↩ while the list is open: the entry selected replaces what was typed. Returns whether
-  /// one was inserted — with nothing matching, ↩ sends the text as it is.
-  public func insertSelectedCommand() -> Bool {
+  /// one was inserted. ↩ inserts only to complete a name begun: with nothing matching, a match
+  /// found by its description only, or a name typed in full, it sends the text as it is.
+  public func insertSelectedCommand(onReturn: Bool = false) -> Bool {
     guard showsCommandSuggestions, let command = commands.selectedCommand else { return false }
+    guard !onReturn || commands.returnInserts else { return false }
     insertCommand(command)
     return true
   }

@@ -53,15 +53,21 @@ time the list opens, without FSEvents. A reading that fails keeps the list read 
 
 `ComposerCommands` holds the list's state for a text: the composer of a conversation and the initial
 prompt of a new session each own one. The new session reads the list for the agent and folder chosen
-in the draft, only once `/` is typed: typing a folder starts no CLI. Claude Code runs a command given
+in the draft, only once `/` is typed, and only once the folder field has settled: typing a folder,
+even under a prompt that already opens on `/`, starts no CLI at each letter. Claude Code runs a command given
 as its initial prompt (measured with `/context`).
 
 ### The state is read from the draft
 
 As with the shell mode (#188), the list is open when the whole draft (blanks aside) is a trigger
 followed by a name without a blank. Escape closes it for the command being typed. A message recalled
-from the history does not open it. While the list is open, ↑, ↓, ⇥, ↩ and Escape are its own. ↩
-inserts the selected entry and sends nothing. With nothing matching, ↩ sends the text as it is.
+from the history does not open it. While the list is open, ↑, ↓, ⇥, ↩ and Escape are its own. ⇥
+always inserts the selected entry. ↩ inserts it, sending nothing, only to complete a name begun —
+the text typed starts the entry's name, a part of it after `:`, or an alias, without being a name or
+an alias already. Otherwise ↩ sends the text as it is: with nothing matching, with a name typed in
+full (`/compact` runs at once, as in the agent's own interface), or with an entry found by its
+description only — `/context`, which the list leaves out, must not become `/compact` because that
+one speaks of context.
 
 Search and order are pure (`AgentCommandIndex`), and the entries are folded once when the list is
 read. The order within each group (skills first, then commands) is:

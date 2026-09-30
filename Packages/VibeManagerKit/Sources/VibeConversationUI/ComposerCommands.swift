@@ -124,6 +124,13 @@ public final class ComposerCommands {
   }
 
   /// The text once `command` replaces what was typed: its invocation and a space.
+  /// Whether ↩ inserts the entry selected: only to complete a name begun. Found by its description
+  /// only, or with a name typed in full, ↩ sends the text as typed; ⇥ always inserts.
+  public var returnInserts: Bool {
+    guard let command = selectedCommand, let query else { return false }
+    return index.completes(query, with: command)
+  }
+
   public func inserting(_ command: AgentCommand) -> String {
     inserted = command
     return AgentCommandQuery.draft(inserting: command, into: text)

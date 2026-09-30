@@ -234,10 +234,63 @@ struct ComposerCommandsTests {
   @Test("Another agent's list is not kept: a reading for the one before is dropped")
   func replaced() async {
     let (model, _) = await readyModel()
+    model.draft = "/"
+    let before = Gate()
+    model.readCommands = {
+      await before.wait()
+      return AgentCommandIndex([
+        AgentCommand(
+          name: "stale", invocation: "/stale", description: "", kind: .skill, origin: .user)
+      ])
+    }
+    while !(await before.isWaiting) { await Task.yield() }
+    let fresh = AgentCommand(
+      name: "fresh", invocation: "/fresh", description: "", kind: .skill, origin: .user)
+    model.readCommands = { AgentCommandIndex([fresh]) }
+    while model.commandIndex.commands != [fresh] { await Task.yield() }
+    await before.open()
+    while !(await before.hasReturned) { await Task.yield() }
+    for _ in 0..<20 { await Task.yield() }
+    #expect(model.commandIndex.commands == [fresh])
+
     model.readCommands = nil
     #expect(model.commandIndex.isEmpty)
-    model.draft = "/"
     #expect(!model.showsCommandSuggestions)
+  }
+
+  @Test("↩ completes a name begun; found by its description only, or typed in full, it does not")
+  func returnCompletesOnly() async {
+    let (model, _) = await readyModel()
+    model.draft = "/comp"
+    #expect(model.insertSelectedCommand(onReturn: true))
+    #expect(model.draft == "/compact ")
+    model.draft = "/context"
+    #expect(model.commandSuggestions?.map(\.command.name) == ["compact"])
+    #expect(!model.insertSelectedCommand(onReturn: true))
+    #expect(model.draft == "/context")
+    model.draft = "/compact"
+    #expect(!model.insertSelectedCommand(onReturn: true))
+    model.draft = "/context"
+    #expect(model.insertSelectedCommand())
+    #expect(model.draft == "/compact ")
+  }
+}
+
+/// Holds a reading back until the test lets it go.
+private actor Gate {
+  private var waiter: CheckedContinuation<Void, Never>?
+  private(set) var isWaiting = false
+  private(set) var hasReturned = false
+
+  func wait() async {
+    isWaiting = true
+    await withCheckedContinuation { waiter = $0 }
+    hasReturned = true
+  }
+
+  func open() {
+    waiter?.resume()
+    waiter = nil
   }
 }
 
@@ -250,8 +303,8 @@ struct ComposerCommandsTests {
   let window: NSWindow
   let textView: NSTextView
 
-  init() async throws {
-    let (model, terminal) = await readyModel()
+  init(entries: [ConversationEntry] = []) async throws {
+    let (model, terminal) = await readyModel(entries: entries)
     self.model = model
     self.terminal = terminal
     window = NSWindow(
@@ -377,7 +430,9 @@ extension ComposerHistoryKeysTests {
 
   @Test("Escape closes the list and leaves the draft; ↑ then walks the history")
   func escapeCloses() async throws {
-    let composer = try await CommandComposer()
+    let composer = try await CommandComposer(entries: [
+      ConversationEntry(id: "1", content: .userPrompt("hello", attachments: 0))
+    ])
     defer { composer.close() }
     await composer.type("/deb")
     await composer.up()
@@ -385,5 +440,29 @@ extension ComposerHistoryKeysTests {
     await composer.escape()
     await composer.until { !composer.model.showsCommandSuggestions }
     #expect(composer.model.draft == "/deb")
+    await composer.up()
+    await composer.until { composer.model.draft == "hello" }
+  }
+
+  @Test("↩ on `/context`, found only in `/compact`'s description, sends `/context`")
+  func returnSendsDescriptionMatch() async throws {
+    let composer = try await CommandComposer()
+    defer { composer.close() }
+    await composer.type("/context")
+    #expect(composer.model.commandSuggestions?.map(\.command.name) == ["compact"])
+    await composer.enter()
+    await composer.until { !composer.terminal.written.isEmpty }
+    #expect(composer.terminal.written.first == Array("/context".utf8))
+  }
+
+  @Test("↩ on a command typed in full sends it at once")
+  func returnSendsFullName() async throws {
+    let composer = try await CommandComposer()
+    defer { composer.close() }
+    await composer.type("/compact")
+    #expect(composer.model.showsCommandSuggestions)
+    await composer.enter()
+    await composer.until { !composer.terminal.written.isEmpty }
+    #expect(composer.terminal.written.first == Array("/compact".utf8))
   }
 }

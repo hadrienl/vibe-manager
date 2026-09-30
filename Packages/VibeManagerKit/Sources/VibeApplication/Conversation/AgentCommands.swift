@@ -210,6 +210,24 @@ public struct AgentCommandIndex: Sendable {
     }.map(\.match)
   }
 
+  /// Whether ↩ completes the text typed into `command` rather than sending it: only when what is
+  /// typed begins its name, a part of it after `:`, or an alias, without being one already. An
+  /// entry found by its description, or a name typed in full, leaves ↩ to send the text as typed —
+  /// `/context` stays `/context` when `/compact` speaks of context (#219).
+  public func completes(_ query: AgentCommandQuery, with command: AgentCommand) -> Bool {
+    let text = Self.fold(query.text)
+    guard !text.isEmpty else { return true }
+    let candidates = entries.filter { query.trigger == "/" || $0.command.trigger == query.trigger }
+    if candidates.contains(where: { $0.name == text || $0.aliases.contains(text) }) {
+      return false
+    }
+    guard let entry = candidates.first(where: { $0.command == command }) else { return false }
+    if entry.name.hasPrefix(text) { return true }
+    let segments = entry.name.split(separator: ":", omittingEmptySubsequences: false).dropFirst()
+    if segments.contains(where: { $0.hasPrefix(text) }) { return true }
+    return entry.aliases.contains { $0.hasPrefix(text) }
+  }
+
   private static func match(_ entry: Entry, _ text: String) -> (Int, AgentCommandMatch)? {
     func found(_ rank: Int, name: [Range<Int>] = [], description: [Range<Int>] = [])
       -> (Int, AgentCommandMatch)

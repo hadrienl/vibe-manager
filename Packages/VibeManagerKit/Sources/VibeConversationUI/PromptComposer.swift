@@ -61,9 +61,9 @@ struct PromptComposer: View {
             guard !press.modifiers.contains(.shift), !press.modifiers.contains(.option),
               !Self.isComposingText
             else { return .ignored }
-            // The list open, Return inserts its entry and sends nothing; with nothing matching,
-            // the text goes as it is (#219).
-            if insertCommand() { return .handled }
+            // The list open, Return completes a name begun and sends nothing; otherwise — nothing
+            // matching, a description only, a name typed in full — the text goes as it is (#219).
+            if insertCommand(onReturn: true) { return .handled }
             Task { await model.send() }
             return .handled
           }
@@ -217,9 +217,10 @@ struct PromptComposer: View {
     NSApp.keyWindow?.firstResponder as? NSTextView
   }
 
-  /// Inserts the entry selected in the list, if it is open. The cursor goes after it.
-  private func insertCommand() -> Bool {
-    guard model.insertSelectedCommand() else { return false }
+  /// Inserts the entry selected in the list, if it is open — for ↩, only to complete a name
+  /// begun. The cursor goes after it.
+  private func insertCommand(onReturn: Bool = false) -> Bool {
+    guard model.insertSelectedCommand(onReturn: onReturn) else { return false }
     Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
     return true
   }
