@@ -566,7 +566,7 @@ struct MockConversationTests {
     try input.fileHandleForWriting.close()
     process.waitUntilExit()
     let file = folder.appendingPathComponent("m2.jsonl")
-    let decoder = ClaudeCodeConversationDecoder(file: file)
+    let decoder = ClaudeCodeConversationDecoder()
     for line in await FileTranscriptTail().read(file) { decoder.consume(line) }
     #expect(
       decoder.entries.map(\.content) == [
