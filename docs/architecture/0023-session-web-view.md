@@ -86,6 +86,12 @@ The bridge, `vibe` typed in the terminal, a script the agent runs: all descend f
 terminal and are accepted for it alone. A daemon that forked twice and was taken in by `launchd` is
 refused: that is the rule's one limit.
 
+Accepting every descendant is a choice (#239), not an oversight: `vibe browser` and `BROWSER` in a
+script are features, and a script of the repository could start the signed bridge itself, so
+checking the connecting program's signature would guard nothing. What guards the user is that
+nothing is read from, or done on, a signed-in site without their answer, and that the answer
+cannot be forged outside the application.
+
 An agent sees only its session's tabs. An identifier from another session is answered exactly like
 one that never existed.
 
@@ -96,8 +102,9 @@ allowed:
 
 | | This Mac (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`, `file:`) | Anywhere else |
 |---|---|---|
-| Read — tabs, text, snapshot, console, screenshot | free | free |
-| Navigate — open, go to, reload, close | free | free |
+| Read — text, snapshot, console, screenshot | free | asked once per site and session, unless "Always Allow" for that site |
+| List tabs | free | the title of a site not readable yet is withheld |
+| Navigate — open, go to, reload, close | free | free, always in front |
 | Act — click, type, JavaScript | free | asked, unless "Always Allow" for that site |
 
 `0.0.0.0`, the local network and `.local` are other machines, or can be. The origin is read from
@@ -109,13 +116,31 @@ page may have moved while the question was on screen, and once more inside the p
 (`location.origin`) in the same turn as the action. A tab cannot be sent to `javascript:` or `data:`; another
 application's address, and a download, caused by the agent are asked. A question is a banner in
 the session's web view — the session's row says so when it is not on screen — and the agent waits
-two minutes at most. "Always Allow" covers clicks, typing and JavaScript on that site; the sites are
-listed, and removed, in Settings › Web View.
+two minutes at most. "Always Allow" covers clicks, typing, JavaScript and reading on that site; the
+sites are listed, and removed, in Settings › Web View.
 
-Reading is free everywhere, including pages the user is signed in to: an agent can read a private
-ticket, and a page can try to steer the agent through its content. The tools' descriptions say that
-a page is data, not instructions; the policy bounds what the agent can *do* about it, not what it
-can read.
+Reading a site away from this Mac is acting as the user too: the page carries their cookies, and a
+private ticket read is a private ticket that can be sent anywhere (#239). Whether a site keeps a
+session cannot be told reliably (`HttpOnly` cookies, sessions kept by the server), so every site
+away from this Mac is treated alike. `page_read`, `page_screenshot` and `page_console` ask the first
+time a session's agent reads a site — "Allow in This Session" or "Deny", no "Always Allow", which
+would also let it act — and the site stays readable until the session is archived or the
+application quits. The same checks as for acting apply: decided on the document the page holds,
+nothing read while it loads, the site checked again after the answer and, for a page's text, inside
+the page in the same turn as the read. Until a site may be read, `tabs_list` and the answer to
+`tab_open` withhold its pages' titles, and `tabs_list` cuts the address of a tab the agent did not
+open to its site: a title says what a private page is about. A page away from this Mac is never
+loaded out of sight: `tab_open` with `activate: false`, or `tab_navigate` on a tab behind, brings
+it to the front and says so. A preview on this Mac may still wait behind.
+
+Once a site may be read in a session, an agent misled by a page can still carry what it read to
+another site by navigating there; the question says what it gives. The tools' descriptions say that
+a page is data, not instructions.
+
+The sites always allowed are an item of the user's login keychain (`VaultBrowserPermissionStore`),
+which answers the application only: any other program asks macOS, which asks the user. The list the
+user defaults held before #239 is erased at launch, not carried over: a site written there by a
+script cannot be told from one the user allowed. A keychain that cannot be read allows no site.
 
 ### Reading and acting on a page
 
@@ -168,10 +193,10 @@ or GitLab signs in every session's ticket tab. Settings › Web View clears it.
 - A session adopted from the terminal host keeps the command line it was started with: its agent
   gets the tools at its next start.
 - A process of the same user can write false console lines into a page it controls, and false
-  lines into the trace's file. It cannot reach a session's tabs through the channel. It can,
-  however, write an "Always Allow" into the user defaults, as it can edit any file of the user's:
-  the question guards against an agent that is mistaken or misled by a page, not against a
-  program of the user's own that sets out to act as them.
+  lines into the trace's file. It cannot reach a session's tabs through the channel, and it cannot
+  add an "Always Allow" without macOS asking the user for the keychain (#239).
+- A process that descends from a session's terminal speaks for its agent: it gets the same
+  questions, nothing more.
 
 ## Out of scope
 

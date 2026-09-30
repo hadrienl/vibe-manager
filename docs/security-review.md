@@ -78,6 +78,7 @@ pid, so a `git` that started a helper or a login shell whose profile started one
 | A12 | Claude Code is started with `--allowedTools mcp__vibe-browser` | Claude no longer asks before a web view tool | **Accepted**: Vibe Manager asks before anything is done as the user, and a second question on the same call adds nothing. The user's other tools keep their own rules. |
 | A14 | The application replaces itself with what a feed on the Internet offers (#92) | A compromised feed, Pages site or GitHub account delivering a malicious build to every copy | **Decided in ADR 0033**: an archive is installed only if its EdDSA signature verifies with the key the application carries **and** the application inside is signed with the same Developer ID — checked before anything is extracted. The private key is a secret of the protected `release` environment and a copy offline, never in the repository nor in the feed's workflow, which holds no secret. Feed and archives over HTTPS only. `release.sh` checks each archive against the application's own key, and the designated requirement against `Configuration/DesignatedRequirement.txt`. Copies built from source, or isolated, never update themselves. Rotation of a lost key is in [operations](operations.md#rotating-the-update-key). |
 | A13 | A new session's ticket addresses are loaded in its web view, where the user is signed in, to read their titles (#89) | A crafted address loading a page on the user's behalf; another page's title passed off as the ticket's | **Decided in ADR 0031**: only an address an enabled resolver's pattern recognises is loaded, the way a click would load it; nothing is ever handed to a shell or a command. A title is read only once the page's own address is recognised again by the same resolver as the same ticket, with a 2xx answer: a sign-in page or a redirection to another ticket gives none. No token is stored: the session is the web view's. `TicketPageReadingTests` prove the redirections, and `TicketTitlesTests` that nothing is read when the feature is off. |
+| A15 | An agent — misled by a page it read, or a script in its terminal — could read any site the user is signed in to in the web view, open it out of sight, and carry it elsewhere by navigating; a script could add an "Always Allow" with `defaults write` (#239) | A private ticket, repository or mailbox read and sent to another site without the user ever being asked | **Fixed, ADR 0023**: reading a site away from this Mac is asked once per site and session, titles are withheld until then, such a page never loads in the background, and the sites always allowed are an item of the login keychain, the former list in the user defaults erased. Every descendant of the agent is still accepted on the channel, by choice. `BrowserPolicyTests`, `BrowserWorkspaceToolsTests` (a question per session, refused then allowed) and `BrowserGrantStoreTests` (a site written with `defaults write` is not allowed) prove it. |
 
 ## Residual risks
 
@@ -90,13 +91,14 @@ pid, so a `git` that started a helper or a login shell whose profile started one
   it cannot already reach. The application does not defend against its own user.
 - **Agents' own permissions.** What Claude Code or Codex are allowed to do inside a session is their
   configuration, not the application's.
-- **What an agent reads in the web view.** Reading is free on every site, including those the user
-  is signed in to: an agent can read a private ticket, and a page can try to steer the agent
-  through its content. The tools say a page is data; the policy bounds what the agent can do about
-  it, not what it reads (ADR 0023).
-- **"Always Allow" is a preference.** It lives in the user defaults, which an agent's shell can
-  write like any file of the user's: the question stops a mistaken or misled agent, not a program
-  bent on acting as the user.
+- **What an agent reads in the web view, once allowed.** Since #239, reading a site away from this
+  Mac is asked once per site and session, and titles are withheld until then. Once the user allows
+  a site, the session's agent — or a script in its terminal, which speaks for it — can read it for
+  the rest of the session and, misled by a page, carry what it read to another site by navigating
+  there. The question says so; outgoing navigations are not filtered (ADR 0023).
+- **"Always Allow" in the keychain.** Since #239 the sites are an item of the login keychain that
+  only the application reads without asking; the former list in the user defaults is erased and
+  ignored. A program of the user's can still ask macOS for the item, and the user can say yes.
 - **The history of side terminals is on disk** (#43, ADR 0030). What a side terminal showed —
   possibly a token a command printed — is written to `Terminals/<session>/*.scrollback`, `0600` in
   `0700` folders excluded from backups, bounded to 4 MiB per terminal, never read by the
