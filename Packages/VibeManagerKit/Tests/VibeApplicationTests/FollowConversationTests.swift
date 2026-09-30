@@ -104,7 +104,9 @@ private actor ScriptedTail: TranscriptTailing {
     self.contents = contents
   }
 
-  nonisolated func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+  nonisolated func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<
+    TranscriptChunk
+  > {
     let (stream, continuation) = AsyncStream<TranscriptChunk>.makeStream()
     Task { await self.opened(file, continuation) }
     return stream

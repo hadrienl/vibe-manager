@@ -4,8 +4,9 @@ import VibeApplication
 /// Follows a transcript as its CLI appends to it (#38).
 ///
 /// Whole lines only — the CLI may be in the middle of writing the last one — resumed where the
-/// last reading stopped. A file that got shorter, or whose inode changed, was replaced: it is read
-/// again from its start, after a `.reset`. The disk wakes the reader (a `vnode` source on the
+/// last reading stopped, or where a reading put aside stopped (#249). A file that got shorter,
+/// whose inode changed, or whose bytes before that point changed, was replaced: it is read again
+/// from its start, after a `.reset`. The disk wakes the reader (a `vnode` source on the
 /// file), with a slow poll underneath for what the source cannot see: a file that does not exist
 /// yet, or one replaced under its name.
 public struct FileTranscriptTail: TranscriptTailing {
@@ -23,24 +24,29 @@ public struct FileTranscriptTail: TranscriptTailing {
     self.chunkSize = chunkSize
   }
 
-  public func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+  public func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<
+    TranscriptChunk
+  > {
     let pollInterval = pollInterval
     let chunkSize = chunkSize
     return AsyncStream { continuation in
       let task = Task.detached(priority: .utility) {
-        var reader = TranscriptLineReader(file: file, chunkSize: chunkSize)
+        var reader = TranscriptLineReader(file: file, from: position, chunkSize: chunkSize)
         let wake = WakeSignal()
         var watcher: FileWatcher?
         var first = true
         var wasCaughtUp = false
         while !Task.isCancelled {
-          let (reading, records) = Self.readChunk(with: &reader)
+          let (reading, records) = Signposts.interval("transcript.chunk") {
+            Self.readChunk(with: &reader)
+          }
           if reading.wasReset { continuation.yield(.reset) }
           // The first reading is always handed over, empty or not: it says the file was read. So is
           // the one that reaches the end of the file, which says the reading caught up.
           let isCaughtUp = !reading.hasMore
           if !records.isEmpty || first || isCaughtUp != wasCaughtUp {
-            continuation.yield(.records(records, isCaughtUp: isCaughtUp))
+            continuation.yield(
+              .records(records, through: reader.position, isCaughtUp: isCaughtUp))
           }
           first = false
           wasCaughtUp = isCaughtUp
@@ -107,16 +113,35 @@ public struct FileTranscriptTail: TranscriptTailing {
 struct TranscriptLineReader {
   static let chunkSize = 4 << 20
 
+  static let fingerprintSize = 64
+
   let file: URL
   private let chunkSize: Int
   /// Where the complete lines handed out end.
   private(set) var offset: UInt64 = 0
   private(set) var inode: UInt64?
   private var splitter = LineSplitter()
+  /// The last bytes before `offset`.
+  private var fingerprint = Data()
+  /// Resumed at a position not checked against the file yet.
+  private var isUnchecked = false
 
-  init(file: URL, chunkSize: Int = Self.chunkSize) {
+  /// - Parameter position: where an earlier reading of the file stopped, to go on from there —
+  ///   from the start if the file is no longer the one it was in.
+  init(file: URL, from position: TranscriptPosition? = nil, chunkSize: Int = Self.chunkSize) {
     self.file = file
     self.chunkSize = chunkSize
+    if let position {
+      inode = position.inode
+      offset = position.offset
+      fingerprint = position.fingerprint
+      isUnchecked = true
+    }
+  }
+
+  /// Where this reading stands, to resume it: nil before the file was found.
+  var position: TranscriptPosition? {
+    inode.map { TranscriptPosition(inode: $0, offset: offset, fingerprint: fingerprint) }
   }
 
   struct Reading {
@@ -133,11 +158,16 @@ struct TranscriptLineReader {
       let size = (attributes[.size] as? NSNumber)?.uint64Value
     else { return reading }
     let identifier = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
-    if let inode, inode != identifier || size < offset + UInt64(splitter.carriedCount) {
+    if let inode,
+      inode != identifier || size < offset + UInt64(splitter.carriedCount)
+        || (isUnchecked && !endsWithFingerprint())
+    {
       offset = 0
+      fingerprint = Data()
       splitter.reset()
       reading.wasReset = true
     }
+    isUnchecked = false
     inode = identifier
     // A line cut by the end of the last chunk is carried: reading goes on after it.
     let readFrom = offset + UInt64(splitter.carriedCount)
@@ -149,9 +179,31 @@ struct TranscriptLineReader {
       let data = try? handle.read(upToCount: chunkSize), !data.isEmpty
     else { return reading }
     reading.lines = splitter.lines(in: data)
+    let completeCount = data.count - splitter.carriedCount
     offset = readFrom + UInt64(data.count) - UInt64(splitter.carriedCount)
+    if completeCount >= Self.fingerprintSize {
+      fingerprint = Data(
+        data.dropFirst(completeCount - Self.fingerprintSize).prefix(Self.fingerprintSize))
+    } else if completeCount > 0 {
+      fingerprint = bytes(before: offset, in: handle)
+    }
     reading.hasMore = size > readFrom + UInt64(data.count)
     return reading
+  }
+
+  /// Whether the bytes before `offset` are still those the reading last saw there.
+  private func endsWithFingerprint() -> Bool {
+    guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
+    defer { try? handle.close() }
+    return bytes(before: offset, in: handle) == fingerprint
+  }
+
+  private func bytes(before end: UInt64, in handle: FileHandle) -> Data {
+    let start = end - min(end, UInt64(Self.fingerprintSize))
+    guard (try? handle.seek(toOffset: start)) != nil,
+      let bytes = try? handle.read(upToCount: Int(end - start))
+    else { return Data() }
+    return bytes
   }
 
   /// Every complete line up to the end of the file, chunk after chunk.

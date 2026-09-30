@@ -193,16 +193,41 @@ public struct AgentPromptFormat: Hashable, Sendable {
 
 /// Follows a transcript file as the CLI appends to it.
 public protocol TranscriptTailing: Sendable {
-  /// Complete lines from the start of the file, then as they are written. `.reset` means the
-  /// file was replaced or cut short: what was read from it is to be forgotten.
-  func follow(_ file: URL) -> AsyncStream<TranscriptChunk>
+  /// Complete lines from `position` — the start of the file when nil — then as they are written.
+  /// `.reset` means the file was replaced or cut short, or is no longer the one `position` was
+  /// in: what was read from it is to be forgotten, and it is read again from its start.
+  func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<TranscriptChunk>
   /// Reads the file once to its end, without following it.
   func read(_ file: URL) async -> [TranscriptRecord]
 }
 
+extension TranscriptTailing {
+  /// Complete lines from the start of the file, then as they are written.
+  public func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+    follow(file, from: nil)
+  }
+}
+
 public enum TranscriptChunk: Sendable {
   /// Complete lines, parsed, in the order of the file; lines that are not JSON objects are left
-  /// out. `isCaughtUp` says the file held nothing more once they were read.
-  case records([TranscriptRecord], isCaughtUp: Bool)
+  /// out. `through` is where the reading stands after them, to resume it there; `isCaughtUp` says
+  /// the file held nothing more once they were read.
+  case records([TranscriptRecord], through: TranscriptPosition? = nil, isCaughtUp: Bool)
   case reset
+}
+
+/// Where a reading of a transcript stands (#249): resumable while the file is the same one.
+public struct TranscriptPosition: Hashable, Sendable {
+  public var inode: UInt64
+  /// Where the complete lines read end.
+  public var offset: UInt64
+  /// The last bytes before `offset`, 64 at most: a file rewritten in place — same inode, as long
+  /// or longer — no longer has them there, and is read again from its start.
+  public var fingerprint: Data
+
+  public init(inode: UInt64, offset: UInt64, fingerprint: Data) {
+    self.inode = inode
+    self.offset = offset
+    self.fingerprint = fingerprint
+  }
 }

@@ -212,6 +212,8 @@ public final class ConversationWorkspace {
   /// A session was archived, closed for good or forgotten.
   public func release(_ id: SessionID) {
     models.removeValue(forKey: id)?.stop()
+    // What its readers kept aside to resume goes with the model.
+    if let follow { Task { await follow.forget(id) } }
     followed[id] = nil
     generations[id] = nil
     dormantSessionIDs.removeAll { $0 == id }
@@ -226,7 +228,8 @@ public final class ConversationWorkspace {
     while mountedSessionIDs.count > Self.keptModelCount {
       let id = mountedSessionIDs.removeFirst()
       models[id]?.pause()
-      // Read again from the start when shown: a follow still being set up is dropped.
+      // Followed again when shown, its readers resuming where they stopped (#249): a follow
+      // still being set up is dropped.
       followed[id] = nil
       generations[id] = (generations[id] ?? 0) + 1
       dormantSessionIDs.append(id)

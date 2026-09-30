@@ -534,6 +534,57 @@ struct FileTranscriptTailTests {
       reader.readAvailable().lines.map { String(decoding: $0, as: UTF8.self) } == ["a", long, "b"])
   }
 
+  @Test("Resumed at a position, only the lines written since are read")
+  func resumed() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append("one\ntwo\n", to: file)
+    var first = TranscriptLineReader(file: file)
+    _ = first.readAvailable()
+    let position = try #require(first.position)
+    try append("three\nfou", to: file)
+    var resumed = TranscriptLineReader(file: file, from: position)
+    let reading = resumed.readAvailable()
+    #expect(!reading.wasReset)
+    #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["three"])
+  }
+
+  @Test("Resumed on a file that is no longer the one it read, it reads again from the start")
+  func resumedOnAnotherFile() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append("one\ntwo\n", to: file)
+    var first = TranscriptLineReader(file: file)
+    _ = first.readAvailable()
+    let position = try #require(first.position)
+
+    // Rewritten in place: same inode, as long, other bytes.
+    let rewritten = try FileHandle(forWritingTo: file)
+    try rewritten.write(contentsOf: Data("uno\ndos\nmore\n".utf8))
+    try rewritten.close()
+    var inPlace = TranscriptLineReader(file: file, from: position)
+    var reading = inPlace.readAvailable()
+    #expect(reading.wasReset)
+    #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["uno", "dos", "more"])
+
+    // Cut short.
+    try Data("x\n".utf8).write(to: file)
+    var shorter = TranscriptLineReader(file: file, from: position)
+    reading = shorter.readAvailable()
+    #expect(reading.wasReset)
+    #expect(reading.lines.map { String(decoding: $0, as: UTF8.self) } == ["x"])
+
+    // Replaced under its name.
+    try FileManager.default.removeItem(at: file)
+    try append("one\ntwo\nnew\n", to: file)
+    var replaced = TranscriptLineReader(file: file, from: position)
+    reading = replaced.readAvailable()
+    #expect(reading.wasReset)
+    #expect(reading.lines.count == 3)
+  }
+
   @Test("The splitter leaves empty lines out and carries what no line feed ended")
   func splitter() {
     var splitter = LineSplitter()
@@ -553,7 +604,7 @@ struct FileTranscriptTailTests {
     let tail = FileTranscriptTail(pollInterval: .milliseconds(50))
     var iterator = tail.follow(file).makeAsyncIterator()
     // Nothing yet: the first reading says so, empty.
-    guard case .records(let first, let isCaughtUp) = await iterator.next() else {
+    guard case .records(let first, _, let isCaughtUp) = await iterator.next() else {
       Issue.record("no first reading")
       return
     }
@@ -562,14 +613,14 @@ struct FileTranscriptTailTests {
     try append(#"{"n":"a"}"# + "\n" + #"{"n":"b"}"# + "\nnot json\n", to: file)
     var received: [String] = []
     while received.count < 2, let chunk = await iterator.next() {
-      if case .records(let records, _) = chunk {
+      if case .records(let records, _, _) = chunk {
         received += records.compactMap { $0.object["n"] as? String }
       }
     }
     #expect(received == ["a", "b"])
     try append(#"{"n":"c"}"# + "\n", to: file)
     while received.count < 3, let chunk = await iterator.next() {
-      if case .records(let records, _) = chunk {
+      if case .records(let records, _, _) = chunk {
         received += records.compactMap { $0.object["n"] as? String }
       }
     }
@@ -587,7 +638,7 @@ struct FileTranscriptTailTests {
     var numbers: [Int] = []
     var chunks = 0
     while let chunk = await iterator.next() {
-      guard case .records(let records, let isCaughtUp) = chunk else { continue }
+      guard case .records(let records, _, let isCaughtUp) = chunk else { continue }
       chunks += 1
       numbers += records.compactMap { $0.object["n"] as? Int }
       if isCaughtUp { break }

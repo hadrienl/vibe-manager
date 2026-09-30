@@ -70,6 +70,11 @@ public actor FollowConversation {
     var isRereading = false
     /// The decoder of that new reading, until it caught up with the file.
     var rereadDecoder: (any ConversationDecoding)?
+    /// Where what `decoder` holds was read to: a follow resumed goes on from there (#249).
+    var position: TranscriptPosition?
+    /// Reading what the file already held, not yet what is written next: publications are
+    /// spaced out meanwhile (#249).
+    var isCatchingUp = true
 
     init(
       file: URL, agentID: String? = nil, makeDecoder: @escaping () -> any ConversationDecoding
@@ -130,6 +135,26 @@ public actor FollowConversation {
   /// How often, at most, the sub-agents of one transcript are looked for.
   static let subagentLookInterval = Duration.seconds(1)
 
+  private struct Parked {
+    let agents: [SessionAgentConfiguration]
+    let chapters: [Chapter]
+  }
+
+  /// The readings of sessions whose follow ended, kept with their decoders and positions (#249):
+  /// followed again, they resume where they stopped instead of reading from the start. In memory
+  /// only, as long as a model of the session sleeps (ADR 0025).
+  private var parked: [SessionID: Parked] = [:]
+  /// Sessions put aside, the oldest first.
+  private var parkedOrder: [SessionID] = []
+  /// Sessions whose model was let go of while their follow was ending: what it puts aside is
+  /// dropped.
+  private var forgotten: Set<SessionID> = []
+  /// Sessions put aside at most: as many as the conversation models kept asleep.
+  public static let parkedLimit = 20
+  /// How often, at most, a conversation is published while its transcripts are first read: each
+  /// publication composes it whole.
+  static let catchingUpPublishInterval = Duration.milliseconds(250)
+
   public init(
     agents: any AgentProviderResolving,
     tail: any TranscriptTailing,
@@ -155,6 +180,7 @@ public actor FollowConversation {
     let key = UUID()
     let following = Following(session: session, live: live, continuation: continuation)
     followings[key] = following
+    forgotten.remove(session.id)
     continuation.onTermination = { [weak self] _ in
       Task { await self?.stop(key) }
     }
@@ -167,6 +193,56 @@ public actor FollowConversation {
     following.tasks.forEach { $0.cancel() }
     following.publishTask?.cancel()
     following.allReadings.forEach { $0.task?.cancel() }
+    if following.live, !forgotten.contains(following.session.id) { park(following) }
+  }
+
+  /// The sessions put aside, the oldest first: for tests.
+  var parkedSessionIDs: [SessionID] { parkedOrder }
+
+  /// How many follows are under way: for tests.
+  var followCount: Int { followings.count }
+
+  /// Forgets what was put aside for the session: its model was let go of.
+  public func forget(_ session: SessionID) {
+    parked[session] = nil
+    parkedOrder.removeAll { $0 == session }
+    // A follow still ending would put its readings aside after this.
+    if followings.values.contains(where: { $0.session.id == session }) {
+      forgotten.insert(session)
+    }
+  }
+
+  private func park(_ following: Following) {
+    let id = following.session.id
+    for reading in following.allReadings where reading.isRereading {
+      // Its new reading was under way: done again, from the start, when resumed.
+      reading.rereadDecoder = nil
+      reading.position = nil
+    }
+    parked[id] = Parked(agents: following.session.conversationAgents, chapters: following.chapters)
+    parkedOrder.removeAll { $0 == id }
+    parkedOrder.append(id)
+    while parkedOrder.count > Self.parkedLimit {
+      parked[parkedOrder.removeFirst()] = nil
+    }
+  }
+
+  /// Takes back what the session's last follow put aside: its conversation is there at once, and
+  /// its readings go on where they stopped — only what was written meanwhile is read.
+  private func resume(_ following: Following, key: UUID) {
+    let id = following.session.id
+    guard let kept = parked.removeValue(forKey: id) else { return }
+    parkedOrder.removeAll { $0 == id }
+    for reading in reuse(kept.chapters, of: kept.agents, in: following).flatMap(\.all) {
+      // A sub-agent read once to its end, done, stays as it is.
+      guard reading.isFollowed || !reading.hasLoaded || reading.isRereading else { continue }
+      if reading.isFollowed, reading.hasLoaded, reading.position == nil {
+        // Where it stopped is not known: read again, what it showed staying until then.
+        reading.isRereading = true
+      }
+      start(reading, key: key, live: reading.isFollowed, from: reading.position)
+    }
+    following.isDirty = true
   }
 
   /// The sub-agents whose activity the user unfolded in the session (#180): their transcripts are
@@ -224,6 +300,7 @@ public actor FollowConversation {
       following.continuation.finish()
       return
     }
+    if following.live { resume(following, key: key) }
     while !Task.isCancelled, followings[key] != nil {
       await refreshFiles(following, key: key)
       guard following.live else {
@@ -247,14 +324,21 @@ public actor FollowConversation {
     }
   }
 
-  /// One publication per pause, whatever the number of chunks that arrived in it.
+  /// One publication per pause, whatever the number of chunks that arrived in it — a longer pause
+  /// while transcripts are first read.
   private func schedulePublish(_ following: Following, key: UUID) {
     guard following.publishTask == nil else { return }
-    let interval = publishInterval
+    let interval =
+      isCatchingUp(following)
+      ? max(publishInterval, Self.catchingUpPublishInterval) : publishInterval
     following.publishTask = Task { [weak self] in
-      try? await Task.sleep(for: interval)
+      do { try await Task.sleep(for: interval) } catch { return }
       await self?.publishNow(key)
     }
+  }
+
+  private func isCatchingUp(_ following: Following) -> Bool {
+    following.allReadings.contains(where: \.isCatchingUp)
   }
 
   private func publishNow(_ key: UUID) {
@@ -378,17 +462,27 @@ public actor FollowConversation {
     let previousAgents = following.session.conversationAgents
     following.session = latest
     await prepareChapters(following)
-    for (index, agent) in latest.conversationAgents.enumerated() {
-      guard let kept = previousAgents.firstIndex(of: agent), kept < previous.count,
-        index < following.chapters.count
-      else { continue }
-      following.chapters[index].readings = previous[kept].readings
-    }
-    let reused = Set(following.chapters.flatMap(\.readings).map(ObjectIdentifier.init))
+    let reused = Set(reuse(previous, of: previousAgents, in: following).map(ObjectIdentifier.init))
     for reading in previous.flatMap(\.readings) where !reused.contains(ObjectIdentifier(reading)) {
       reading.all.forEach { $0.task?.cancel() }
     }
     following.isDirty = true
+  }
+
+  /// Gives the chapters of `following` the readings of `previous` — chapters of the conversations
+  /// `previousAgents` — whose conversation is still there. The readings given.
+  private func reuse(
+    _ previous: [Chapter], of previousAgents: [SessionAgentConfiguration], in following: Following
+  ) -> [Reading] {
+    var reused: [Reading] = []
+    for (index, agent) in following.session.conversationAgents.enumerated() {
+      guard let kept = previousAgents.firstIndex(of: agent), kept < previous.count,
+        index < following.chapters.count
+      else { continue }
+      following.chapters[index].readings = previous[kept].readings
+      reused += previous[kept].readings
+    }
+    return reused
   }
 
   private func prepareChapters(_ following: Following) async {
@@ -428,15 +522,19 @@ public actor FollowConversation {
     }
   }
 
-  private func start(_ reading: Reading, key: UUID, live: Bool) {
+  /// - Parameter position: where a reading put aside stopped, to go on from there (#249).
+  private func start(
+    _ reading: Reading, key: UUID, live: Bool, from position: TranscriptPosition? = nil
+  ) {
     let tail = tail
     let file = reading.file
     reading.generation += 1
     reading.isFollowed = live
+    reading.isCatchingUp = position == nil
     let generation = reading.generation
     reading.task = Task { [weak self] in
       if live {
-        for await chunk in tail.follow(file) {
+        for await chunk in tail.follow(file, from: position) {
           guard let self else { return }
           await self.received(chunk, file: file, generation: generation, key: key)
         }
@@ -454,14 +552,20 @@ public actor FollowConversation {
       // What a reading started before it was restarted says is forgotten with it.
       reading.generation == generation
     else { return }
+    let wasCatchingUp = isCatchingUp(following)
     switch chunk {
     case .reset:
-      if reading.isRereading {
+      reading.position = nil
+      if reading.hasLoaded {
+        // Read again from its start, what it showed staying until the new reading caught up.
+        reading.isRereading = true
         reading.rereadDecoder = nil
       } else {
         reading.decoder = reading.makeDecoder()
       }
-    case .records(let records, let isCaughtUp):
+    case .records(let records, let through, let isCaughtUp):
+      if let through { reading.position = through }
+      reading.isCatchingUp = !isCaughtUp
       Signposts.interval("conversation.decode") {
         if reading.isRereading {
           // The whole file again, read apart — a chunk at a time — before it replaces what was
@@ -482,7 +586,13 @@ public actor FollowConversation {
       reading.hasLoaded = true
     }
     following.isDirty = true
-    if following.live { schedulePublish(following, key: key) }
+    guard following.live else { return }
+    if wasCatchingUp, !isCatchingUp(following), let pending = following.publishTask {
+      // Every transcript caught up: what waited for the longer pause is shown now.
+      pending.cancel()
+      following.publishTask = nil
+    }
+    schedulePublish(following, key: key)
   }
 
   private func isLoaded(_ following: Following) -> Bool {
