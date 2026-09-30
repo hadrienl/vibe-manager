@@ -124,8 +124,9 @@ struct SessionAppearanceSettingsView: View {
 
       Section {
         HStack(spacing: 12) {
-          BadgePreview(palette: palette, scheme: .light)
-          BadgePreview(palette: palette, scheme: .dark)
+          // What sessions are really given: the lists less what this Mac cannot draw.
+          BadgePreview(palette: model.offered, scheme: .light)
+          BadgePreview(palette: model.offered, scheme: .dark)
         }
       } header: {
         Text("Preview", bundle: .module, comment: "A section of the Badges settings.")
@@ -236,12 +237,7 @@ private struct SymbolChip: View {
 
   @MainActor
   static func label(_ symbol: String) -> Text {
-    guard SymbolCatalog.isDrawable(symbol) else {
-      return Text(
-        "\(symbol), not drawn by this version of macOS", bundle: .module,
-        comment: "Help and VoiceOver: a symbol of the list this Mac cannot draw. Its SF name.")
-    }
-    return Text(SessionSymbolName.label(for: symbol))
+    SessionSymbolName.text(for: symbol)
   }
 }
 

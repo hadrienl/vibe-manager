@@ -67,9 +67,13 @@ struct SessionAppearanceChoices<LeadingSymbols: View, TrailingColors: View>: Vie
     VStack(alignment: .leading, spacing: 8) {
       AppearanceChoiceGrid {
         leadingSymbols
-        // A symbol this Mac cannot draw — added on a later macOS — would be an empty square.
+        // A symbol of the lists this Mac cannot draw — added on a later macOS — is not offered.
+        // The one a session or a template keeps is still shown, marked, so that it can be seen
+        // and replaced: an unknown name in a template's file would otherwise go unnoticed.
         ForEach(
-          palette.symbolChoices(keeping: current?.symbolName).filter(SymbolCatalog.isDrawable),
+          palette.symbolChoices(keeping: current?.symbolName).filter {
+            SymbolCatalog.isDrawable($0) || $0 == current?.symbolName
+          },
           id: \.self
         ) { symbol in
           SymbolChoice(
@@ -172,6 +176,18 @@ extension View {
 /// What the symbols of the catalogue are called, for VoiceOver and their help tags: an SF Symbol's
 /// own name says nothing to a person.
 enum SessionSymbolName {
+  /// Its name, or that this Mac cannot draw it — a symbol of a later macOS, or a name that is
+  /// none, written in a template's file.
+  @MainActor
+  static func text(for symbol: String) -> Text {
+    guard SymbolCatalog.isDrawable(symbol) else {
+      return Text(
+        "\(symbol), not drawn by this version of macOS", bundle: .module,
+        comment: "Help and VoiceOver: a symbol of the list this Mac cannot draw. Its SF name.")
+    }
+    return Text(label(for: symbol))
+  }
+
   @MainActor
   static func label(for symbol: String) -> LocalizedStringResource {
     switch symbol {

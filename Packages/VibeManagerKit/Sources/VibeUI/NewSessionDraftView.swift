@@ -1053,7 +1053,8 @@ struct SymbolChoice: View {
 
   var body: some View {
     Button(action: select) {
-      Image(systemName: symbol)
+      Image(systemName: SymbolCatalog.isDrawable(symbol) ? symbol : "questionmark.square.dashed")
+        .foregroundStyle(SymbolCatalog.isDrawable(symbol) ? .primary : .tertiary)
         .frame(width: 26, height: 26)
         .overlay(
           RoundedRectangle(cornerRadius: 7)
@@ -1065,8 +1066,8 @@ struct SymbolChoice: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .help(isOffered ? Text(SessionSymbolName.label(for: symbol)) : AppearanceChoiceText.offList)
-    .accessibilityLabel(Text(SessionSymbolName.label(for: symbol)))
+    .help(isOffered ? SessionSymbolName.text(for: symbol) : AppearanceChoiceText.offList)
+    .accessibilityLabel(SessionSymbolName.text(for: symbol))
     .accessibilityValue(isOffered ? Text(verbatim: "") : AppearanceChoiceText.offList)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
   }
