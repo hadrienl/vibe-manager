@@ -358,7 +358,8 @@ public final class TerminalPaneModel {
   private func observe(_ session: any TerminalSession) {
     stateTask?.cancel()
     stateTask = Task { [weak self] in
-      let attachment = await session.attach()
+      // State changes only: the status is not woken by the output (#248).
+      let attachment = await session.attach(.state)
       self?.apply(attachment.state)
       for await event in attachment.events {
         guard case .stateChanged(let state) = event else { continue }

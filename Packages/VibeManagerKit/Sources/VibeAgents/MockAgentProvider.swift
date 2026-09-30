@@ -215,17 +215,18 @@ public actor MockLaunchObserver: AgentLaunchObserver {
   /// The identifier is printed first: past this much output, nothing is looked for any more.
   static let observedLimit = 64 * 1024
 
-  public func observe(output: String) async {
-    guard !isRecorded, observed < Self.observedLimit else { return }
+  public func observe(output: String) async -> AgentOutputDemand {
+    guard !isRecorded, observed < Self.observedLimit else { return .enough }
     observed += output.utf8.count
     pending += output
     // Only whole lines: an identifier cut by a read would be recorded cut. A terminal ends its
     // lines with `\r\n`, one `Character`, which `isNewline` recognises and `"\n"` does not.
-    guard let end = pending.lastIndex(where: \.isNewline) else { return }
+    guard let end = pending.lastIndex(where: \.isNewline) else { return .more }
     let complete = String(pending[..<end])
     pending = String(pending[pending.index(after: end)...])
-    guard let identifier = extractor.resumeIdentifier(in: complete) else { return }
+    guard let identifier = extractor.resumeIdentifier(in: complete) else { return .more }
     await keep(identifier)
+    return isRecorded ? .enough : .more
   }
 
   public func finished() async {}
