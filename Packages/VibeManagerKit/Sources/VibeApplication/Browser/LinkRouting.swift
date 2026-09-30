@@ -63,6 +63,18 @@ public enum LinkRouting {
     }
     return hasWebView || wanted == .browser ? wanted : .browser
   }
+
+  /// Where an address goes when it is asked to leave the application — « Open in Browser » (#245):
+  /// the default browser for a page, the mail application for an address, and nowhere otherwise, so
+  /// that a tab showing `file:///…/x.command` never runs it.
+  public static func externalRoute(for url: URL) -> LinkRoute {
+    route(url, gesture: .browser, preference: .defaultBrowser, hasWebView: false)
+  }
+
+  /// Whether `externalRoute(for:)` opens the address somewhere: a button that would not is greyed.
+  public static func opensOutside(_ url: URL) -> Bool {
+    externalRoute(for: url) != .refused
+  }
 }
 
 /// What a link's context menu offers, wherever the link is: the terminal, the conversation, the

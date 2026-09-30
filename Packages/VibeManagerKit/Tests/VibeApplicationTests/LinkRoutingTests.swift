@@ -47,6 +47,27 @@ struct LinkRoutingTests {
     }
   }
 
+  @Test("« Open in Browser » lets out a page or a mail address, and runs nothing else (#245)")
+  func outside() {
+    #expect(LinkRouting.externalRoute(for: web) == .browser)
+    #expect(LinkRouting.externalRoute(for: page) == .browser)
+    #expect(LinkRouting.externalRoute(for: URL(fileURLWithPath: "/tmp/a.pdf")) == .browser)
+    #expect(LinkRouting.externalRoute(for: mail) == .system)
+    let refused = [
+      URL(fileURLWithPath: "/tmp/x.command"),
+      URL(fileURLWithPath: "/Applications/Calculator.app"),
+      URL(fileURLWithPath: "/tmp/install.pkg"),
+      URL(string: "x-apple.systempreferences:com.apple")!,
+      URL(string: "javascript:alert(1)")!,
+    ]
+    for url in refused {
+      #expect(LinkRouting.externalRoute(for: url) == .refused)
+      #expect(!LinkRouting.opensOutside(url))
+    }
+    #expect(LinkRouting.opensOutside(web))
+    #expect(LinkRouting.opensOutside(mail))
+  }
+
   @Test("A mail address goes to the mail application, whatever the gesture")
   func mailGoesToTheSystem() {
     #expect(route(mail, .click(alternate: false)) == .system)
