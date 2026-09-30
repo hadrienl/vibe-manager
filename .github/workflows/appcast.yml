@@ -1,9 +1,10 @@
 name: Appcast
 
-# Publishes the site on GitHub Pages: the `site/` folder, and the Sparkle feed `appcast.xml`
-# generated beside it (ADR 0033). The feed is recomputed in full from the published releases on
-# every run, never edited: unpublishing or deleting a release takes it out, and a draft never
-# enters it, since its assets are not even read.
+# Publishes the site on GitHub Pages: the landing page rendered from `site/` (site/build.mjs), and
+# the Sparkle feed `appcast.xml` generated beside it (ADR 0033). A release changes both: the feed,
+# and the download links and changelog of the page. The feed is recomputed in full from the
+# published releases on every run, never edited: unpublishing or deleting a release takes it out,
+# and a draft never enters it, since its assets are not even read.
 #
 # No secret here: the EdDSA signature of each archive is already in its `.appcast.json` asset,
 # written by Scripts/release.sh in the protected `release` environment. This workflow can only
@@ -57,6 +58,12 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select --switch /Applications/Xcode_27.app
+
+      # The landing page is rendered by site/build.mjs, which needs nothing but Node.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
 
       - name: Generate the site and its feed
         env:

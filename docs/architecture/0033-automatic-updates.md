@@ -38,8 +38,8 @@ where Sparkle puts them, unused, and sealed by the signature like the rest.
 
 `https://hadrienl.github.io/vibe-manager/appcast.xml` is the feed. The workflow `Appcast`
 recomputes it **whole** from the list of releases whenever one is published, unpublished, edited
-or deleted, and deploys it with the `site/` folder, where a landing page will come. GitHub
-Releases stays the one source of truth: nothing is edited by hand, nothing is kept between runs,
+or deleted, and deploys it with the landing page that `site/build.mjs` renders from `site/`
+(see [`site/README.md`](../../site/README.md)). GitHub Releases stays the one source of truth: nothing is edited by hand, nothing is kept between runs,
 and a release unpublished is gone from the feed at the next run.
 
 - **A draft is never offered.** The generator skips `draft` releases before reading anything of
