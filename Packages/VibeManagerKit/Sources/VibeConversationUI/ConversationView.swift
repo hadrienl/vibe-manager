@@ -59,7 +59,9 @@ public struct ConversationView: View {
       if showsComposer { footer }
     }
     // The theme's picture, when it has one, stays where it is while the messages scroll (#118).
-    .background(ThemeBackdropView(theme: theme))
+    // Under the toolbar too, where the messages scroll: a view, unlike the colour it replaced,
+    // stops at the safe area, and the window's grey showed there instead of the theme.
+    .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.colorScheme, theme.colorScheme)
@@ -153,6 +155,7 @@ public struct ConversationView: View {
         model.scrollGeometryChanged(contentFrame: contentFrame, viewportHeight: height)
       }
       .defaultScrollAnchor(.bottom)
+      .modifier(ToolbarVeil())
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
       }
@@ -327,6 +330,21 @@ struct BlockView: View {
       case .notice(let notice):
         NoticeRow(notice: notice)
       }
+    }
+  }
+}
+
+/// What scrolls under the toolbar is blurred the whole height of it.
+///
+/// The soft edge effect of macOS 26 blurs the top of the toolbar only and fades out towards its
+/// foot: a message level with the title or the pickers stayed legible under them. The hard one
+/// blurs it all, under a veil of the window's background. Before macOS 26 there is no edge effect.
+private struct ToolbarVeil: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content.scrollEdgeEffectStyle(.hard, for: .top)
+    } else {
+      content
     }
   }
 }
