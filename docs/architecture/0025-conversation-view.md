@@ -104,12 +104,31 @@ Claude Code 2.1.283 records any paste in its transcript as `<pasted_content>`, a
 takes the prompt for text the user did not write — it refused to act on a plain "yes". For Claude
 Code the text is therefore typed, 256 bytes every 20 ms: a line feed stays a line break, while 4 kB
 arriving at once is still taken for a paste. A tab typed is a key, so it becomes four spaces. The
-joined paths stay pasted, since an image is attached only from a pasted path; so does a prompt
+joined paths stay pasted, since an image is attached only from a pasted path; so does a message
 opening on `!`, which typed would switch the TUI to its shell.
 The composer is closed while the agent waits for an answer in its terminal, where a prompt would
 be read as the answer. Files joined to a prompt are written as paths escaped the way Terminal.app
 drops them. The sent prompt shows as an echo until the transcript has it; after ten seconds without
 it, the view says so and offers the terminal.
+
+### Shell commands with `!`
+
+A draft opening on `!` is a command for the agent's shell mode (#188), the composer shows it in the
+theme's warning colour, and `\!` sends a message that opens on `!`. The mode is read from the
+draft, never kept apart, so that erasing the `!`, pasting or recalling a command sets it alone.
+Measured against Claude Code 2.1.285 and Codex 0.159.0 in a real pseudo terminal: `!` typed alone
+switches an empty prompt to its shell, a command typed 20 ms later — line feeds included — runs on
+Return, and the agent reads it with its output. The trigger is typed, a pause, then the command,
+typed too. Claude Code writes `<bash-input>` when the command starts and its output when it ends,
+without an exit code, the error stream most often folded into the first; a command sent during a
+turn is queued and run when the turn ends. Codex writes a `CommandExecution` of source
+`user_shell`, streams apart and exit code included, once the command ended, and hands its model a
+copy, `<user_shell_command>`, which is not shown. Codex also runs a *pasted* text opening on `!`,
+spaces before it trimmed — a message opening on `!` ran as a command before #188 — so such a
+message is sent after a zero-width space, which its model reads past and the view leaves out. A command is shown on the user's side, running
+from the moment it is sent, then as the transcript completes it; its output folds past twelve lines.
+A failure is shown only when an exit code says so. Codex's behaviour during a turn was not
+measured: the composer holds the command until the turn ends.
 
 ### Conversation by default, switched per session
 

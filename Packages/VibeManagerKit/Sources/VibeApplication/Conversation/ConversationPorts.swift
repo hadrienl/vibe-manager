@@ -44,6 +44,51 @@ public enum PromptTextEntry: Hashable, Sendable {
   case typed(chunkSize: Int, chunkDelay: Duration)
 }
 
+/// How a command reaches an agent's shell mode: `!` typed first in its prompt runs the rest as a
+/// shell command, whose output the agent reads with the conversation (#188).
+///
+/// Measured against Claude Code 2.1.285 and Codex 0.159.0 in a real terminal: `!` typed alone on
+/// an empty prompt switches it to a shell prompt, and a command then typed — line feeds
+/// included — runs as one on Return. The command is typed, never pasted: pasted, a text opening on
+/// `!` may stay text.
+public struct ShellEntry: Hashable, Sendable {
+  /// Typed alone, on an empty prompt: what turns it into a shell prompt.
+  public var trigger: [UInt8]
+  /// Between the trigger and the command, for the prompt to be redrawn as a shell one. 20 ms was
+  /// enough for Claude Code.
+  public var switchDelay: Duration
+  public var chunkSize: Int
+  public var chunkDelay: Duration
+  /// Whether a command sent while the agent works waits for the turn to end. Claude Code queues
+  /// it, then runs it as a command; Codex was not measured, and nothing is written to it then.
+  public var queuesWhileWorking: Bool
+  /// Whether the command is written to the transcript as it starts — Claude Code — or once it
+  /// ended — Codex: then it may take long before the transcript says anything of it.
+  public var isRecordedAtStart: Bool
+  /// Put before a message opening on `!` for it to stay text. Claude Code takes a pasted `!` for
+  /// text; Codex runs it — spaces before it included, which it trims — but not after a zero-width
+  /// space, its model reading the message as written.
+  public var messageGuard: String
+
+  public init(
+    trigger: [UInt8] = Array("!".utf8),
+    switchDelay: Duration = .milliseconds(80),
+    chunkSize: Int = 256,
+    chunkDelay: Duration = .milliseconds(20),
+    queuesWhileWorking: Bool = false,
+    isRecordedAtStart: Bool = true,
+    messageGuard: String = ""
+  ) {
+    self.messageGuard = messageGuard
+    self.trigger = trigger
+    self.switchDelay = switchDelay
+    self.chunkSize = chunkSize
+    self.chunkDelay = chunkDelay
+    self.queuesWhileWorking = queuesWhileWorking
+    self.isRecordedAtStart = isRecordedAtStart
+  }
+}
+
 /// How a prompt typed in the conversation view is written into an agent's terminal.
 ///
 /// Measured against Claude Code 2.1.282 and Codex 0.157.0 in a real terminal (ADR 0025): both take
@@ -67,6 +112,8 @@ public struct AgentPromptFormat: Hashable, Sendable {
   /// was pasted before it takes the next key: with two screenshots, a Return 80 ms after the
   /// paste was lost and the prompt stayed in its input (#99).
   public var attachmentDelay: Duration
+  /// `nil` for an agent without a shell mode: a `!` typed first is then text (#188).
+  public var shellEntry: ShellEntry?
 
   public init(
     textEntry: PromptTextEntry = .bracketedPaste,
@@ -74,8 +121,10 @@ public struct AgentPromptFormat: Hashable, Sendable {
     queueKey: [UInt8] = [0x0D],
     interruptKey: [UInt8] = [0x1B],
     submitDelay: Duration = .milliseconds(80),
-    attachmentDelay: Duration = .milliseconds(500)
+    attachmentDelay: Duration = .milliseconds(500),
+    shellEntry: ShellEntry? = nil
   ) {
+    self.shellEntry = shellEntry
     self.textEntry = textEntry
     self.submitKey = submitKey
     self.queueKey = queueKey

@@ -128,7 +128,8 @@ fi
 # One line of a Claude Code transcript: `user` or `assistant`, and its text.
 converse() {
   if [ -z "$transcript" ]; then return; fi
-  text="$(printf '%s' "$2" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  # Kept a valid JSON string: tabs escaped, every other control character but the line break dropped.
+  text="$(printf '%s' "$2" | tr -d '\000-\010\013-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e "s/$(printf '\t')/\\\\t/g" | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }')"
   stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   line_id="$(date +%s)-$$-$3"
   if [ "$1" = "user" ]; then
@@ -171,9 +172,21 @@ if [ "$hold" -eq 1 ]; then
   echo "Holding."
   count=0
   while IFS= read -r line; do
+    # A `!` typed first, not pasted, runs a shell command, as Claude Code's does (#188).
+    typed="$line"
     # A prompt pasted by the conversation view arrives between the brackets of a paste.
     line="$(printf '%s' "$line" | sed -e "s/$(printf '\033')\[20[01]~//g")"
     count=$((count + 1))
+    case "$typed" in
+      '!'*)
+        command="${typed#!}"
+        converse user "<bash-input>$command</bash-input>" "$count"
+        output="$(/bin/sh -c "$command" 2>&1)" || true
+        printf '%s\n' "$output"
+        converse user "<bash-stdout>$output</bash-stdout><bash-stderr></bash-stderr>" "$count-out"
+        continue
+        ;;
+    esac
     case "$line" in
       event:*)
         event="${line#event:}"

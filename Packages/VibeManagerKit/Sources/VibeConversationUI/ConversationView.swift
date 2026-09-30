@@ -113,9 +113,18 @@ public struct ConversationView: View {
           }
           ForEach(model.echoes) { echo in
             VStack(alignment: .trailing, spacing: 4) {
-              UserPromptView(
-                text: echo.text, attachments: echo.attachmentCount, date: echo.sentAt, isEcho: true)
-              echoStatus(echo)
+              if echo.kind.isShell {
+                // Running from the moment it is sent: the transcript completes it.
+                ShellRunView(
+                  id: echo.id.uuidString, run: ShellRun(command: echo.text), model: model,
+                  isEcho: true, dismiss: { model.dismissEcho(echo.id) })
+                if echo.state == .unconfirmed { echoStatus(echo) }
+              } else {
+                UserPromptView(
+                  text: echo.text, attachments: echo.attachmentCount, date: echo.sentAt,
+                  isEcho: true)
+                echoStatus(echo)
+              }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
           }
@@ -283,6 +292,8 @@ struct BlockView: View {
         ReasoningRow(id: entry.id, text: text, model: model)
       case .tool:
         ToolBlockView(block: block, model: model)
+      case .notice(.shell(let run)):
+        ShellRunView(id: entry.id, run: run, model: model)
       case .notice(let notice):
         NoticeRow(notice: notice)
       }

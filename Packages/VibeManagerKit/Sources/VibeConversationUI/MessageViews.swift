@@ -192,18 +192,9 @@ struct NoticeRow: View {
           symbol: "clock.arrow.circlepath")
       case .command(let command):
         leading(Text(verbatim: command), symbol: "command", monospaced: true)
-      case .shell(let command, let output):
-        VStack(alignment: .leading, spacing: 4) {
-          leading(Text(verbatim: "! " + command), symbol: "terminal", monospaced: true)
-          if let output, !output.isEmpty {
-            Text(verbatim: output)
-              .font(theme.codeFont(size: size))
-              .foregroundStyle(theme.secondaryText.color)
-              .lineLimit(12)
-              .textSelection(.enabled)
-              .padding(.leading, 24)
-          }
-        }
+      case .shell(let run):
+        // Shown by the conversation as a block of its own.
+        leading(Text(verbatim: "! " + run.command), symbol: "terminal", monospaced: true)
       case .error(let text):
         leading(Text(verbatim: text), symbol: "exclamationmark.triangle.fill", color: theme.failure)
       case .information(let text):

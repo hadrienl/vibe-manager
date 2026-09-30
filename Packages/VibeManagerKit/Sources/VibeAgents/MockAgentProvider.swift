@@ -274,8 +274,11 @@ extension MockAgentProvider: AgentConversationReporting {
     ClaudeCodeConversationDecoder(file: file)
   }
 
-  /// The mock reads a line at a time: a paste without brackets, then Return.
+  /// The mock reads a line at a time: a paste without brackets, then Return. A line typed
+  /// opening on `!` is a shell command, written to its transcript as Claude Code writes one.
   public var promptFormat: AgentPromptFormat {
-    AgentPromptFormat(textEntry: transcriptDirectory != nil ? .bracketedPaste : .plain)
+    AgentPromptFormat(
+      textEntry: transcriptDirectory != nil ? .bracketedPaste : .plain,
+      shellEntry: ShellEntry(switchDelay: .milliseconds(20)))
   }
 }
