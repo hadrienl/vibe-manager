@@ -127,7 +127,10 @@ public struct KeychainBrowserGrantVault: BrowserGrantVault, @unchecked Sendable 
       kSecAttrLabel as String: "Vibe Manager — sites always allowed in the web view",
     ]
     if let keychain { item[kSecUseKeychain as String] = keychain }
-    let added = SecItemAdd(item as CFDictionary, nil)
+    // No user presence asked at each read: the item holds site names, not a credential, and is read
+    // once per launch; what guards it is its access list, which trusts this application alone.
+    let added = SecItemAdd(item as CFDictionary, nil)  // NOSONAR: swift:S6288, ADR 0023
+
     guard added == errSecSuccess else { throw KeychainError(status: added) }
   }
 }

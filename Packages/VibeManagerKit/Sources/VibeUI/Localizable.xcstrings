@@ -9139,7 +9139,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien n’est lu sans votre accord ; la demande expire %@."
+            "value" : "Rien n’est lu sans votre accord ; la demande expire %@."
           }
         }
       }
