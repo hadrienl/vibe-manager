@@ -666,12 +666,12 @@ struct RequestCard: View {
             Text(verbatim: DisplaySafeText.visible(description))
               .font(.caption)
               .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .buttonStyle(.bordered)
+    .buttonStyle(OptionButtonStyle())
     .disabled(!canChoose(in: question) || isSending)
     .accessibilityAddTraits(isChosen ? .isSelected : [])
   }
@@ -720,6 +720,25 @@ private struct AnyLabelStyle: LabelStyle {
 }
 
 /// A button style chosen at run time.
+/// An option of a question: a rounded row its label fills from the leading edge. A bordered button
+/// centred a label narrower than itself, so that the options' circles did not line up.
+private struct OptionButtonStyle: ButtonStyle {
+  @Environment(\.isEnabled) private var isEnabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 5)
+      .background(
+        RoundedRectangle(cornerRadius: 6)
+          .fill(configuration.isPressed ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.quaternary))
+      )
+      .contentShape(RoundedRectangle(cornerRadius: 6))
+      .opacity(isEnabled ? 1 : 0.55)
+  }
+}
+
 private struct AnyButtonStyle: PrimitiveButtonStyle {
   private let make: (Configuration) -> AnyView
 
