@@ -382,14 +382,13 @@ struct SwatchEditor: View {
 
       suggestions(selected: normalized)
 
-      Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
-        GridRow {
-          Text("Hue", bundle: .module, comment: "A slider: the hue of the colour being added.")
-            .foregroundStyle(.secondary)
-          Slider(value: slider(.hue), in: 0...1)
-            .accessibilityLabel(Text("Hue", bundle: .module))
-        }
-        GridRow {
+      HStack(spacing: 14) {
+        ColorWheel(
+          hue: $hue, saturation: $saturation, brightness: brightness,
+          changed: { hex = currentHex }
+        )
+        .frame(width: 132, height: 132)
+        VStack(alignment: .leading, spacing: 4) {
           Text(
             "Brightness", bundle: .module,
             comment: "A slider: the brightness of the colour being added."
@@ -398,8 +397,8 @@ struct SwatchEditor: View {
           Slider(value: slider(.brightness), in: 0...1)
             .accessibilityLabel(Text("Brightness", bundle: .module))
         }
+        .controlSize(.small)
       }
-      .controlSize(.small)
 
       HStack(spacing: 10) {
         TextField(text: $hex) {
@@ -536,6 +535,10 @@ struct SwatchEditor: View {
 
   private enum Channel { case hue, brightness }
 
+  private var currentHex: String {
+    SessionAppearancePalette.hex(hue: hue, saturation: saturation, brightness: brightness)
+  }
+
   /// A slider moves its channel and writes the colour; the others stay as they were.
   private func slider(_ channel: Channel) -> Binding<Double> {
     Binding(
@@ -557,5 +560,71 @@ struct SwatchEditor: View {
     if newSaturation > 0, newBrightness > 0 { hue = newHue }
     if newBrightness > 0 { saturation = newSaturation }
     brightness = newBrightness
+  }
+}
+
+/// Hue around, saturation from the centre out, at the brightness of the slider beside it: drawn
+/// here rather than borrowed from the system's colour panel, a window whose clicks would close the
+/// popover it serves.
+struct ColorWheel: View {
+  @Binding var hue: Double
+  @Binding var saturation: Double
+  let brightness: Double
+  /// Told after every move, so that the colour is written from the three channels.
+  let changed: () -> Void
+
+  var body: some View {
+    GeometryReader { proxy in
+      let radius = min(proxy.size.width, proxy.size.height) / 2
+      let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+      ZStack {
+        Circle()
+          .fill(
+            AngularGradient(
+              colors: (0...36).map { step in
+                Color(hue: Double(step) / 36, saturation: 1, brightness: 1)
+              },
+              center: .center))
+        Circle()
+          .fill(
+            RadialGradient(
+              colors: [.white, .white.opacity(0)], center: .center,
+              startRadius: 0, endRadius: radius))
+        Circle()
+          .fill(.black.opacity(1 - brightness))
+        Circle()
+          .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+        Circle()
+          .fill(Color(hue: hue, saturation: saturation, brightness: brightness))
+          .frame(width: 14, height: 14)
+          .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+          .shadow(color: .black.opacity(0.4), radius: 1.5)
+          .position(
+            x: center.x + cos(hue * 2 * .pi) * saturation * radius,
+            y: center.y + sin(hue * 2 * .pi) * saturation * radius)
+      }
+      .contentShape(Circle())
+      .gesture(
+        DragGesture(minimumDistance: 0).onChanged { drag in
+          let dx = drag.location.x - center.x
+          let dy = drag.location.y - center.y
+          var angle = atan2(dy, dx) / (2 * .pi)
+          if angle < 0 { angle += 1 }
+          hue = angle
+          saturation = min(hypot(dx, dy) / radius, 1)
+          changed()
+        })
+    }
+    .accessibilityElement()
+    .accessibilityLabel(Text("Colour wheel", bundle: .module, comment: "VoiceOver: picks a hue."))
+    .accessibilityValue(
+      Text(verbatim: "\(Int((hue * 360).rounded()))°, \(Int((saturation * 100).rounded())) %")
+    )
+    .accessibilityAdjustableAction { direction in
+      // VoiceOver turns the hue by steps of a twenty-fourth of the wheel.
+      let step = direction == .increment ? 1.0 / 24 : -1.0 / 24
+      hue = (hue + step + 1).truncatingRemainder(dividingBy: 1)
+      changed()
+    }
   }
 }

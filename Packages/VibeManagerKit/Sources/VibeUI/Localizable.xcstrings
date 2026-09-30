@@ -5428,6 +5428,17 @@
         }
       }
     },
+    "Colour wheel" : {
+      "comment" : "VoiceOver: picks a hue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roue des couleurs"
+          }
+        }
+      }
+    },
     "Colours" : {
       "comment" : "A section of the Badges settings.",
       "localizations" : {
@@ -7225,17 +7236,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Heures"
-          }
-        }
-      }
-    },
-    "Hue" : {
-      "comment" : "A slider: the hue of the colour being added.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Teinte"
           }
         }
       }
