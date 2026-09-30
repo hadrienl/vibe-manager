@@ -128,7 +128,7 @@ struct AnnouncedDialogTests {
     #expect(sent.requests.isEmpty)
   }
 
-  @Test("Codex's form for an MCP tool arms the permission it reported, adding nothing")
+  @Test("Codex's form for an MCP tool puts the permission it reported in doubt, adding nothing")
   func codexMCPTool() {
     let form = AgentSignal.dialogDrawn(
       AgentDrawnDialog(.server("prisme-ai-builder")),
@@ -144,8 +144,9 @@ struct AnnouncedDialogTests {
         reference: AgentToolReference(tool: "mcp__prisme_ai_builder__call_api"), isShown: false))
     let state = feed(tool, form)
     #expect(state.requests.count == 1)
-    #expect(state.requests[0].isShown)
-    #expect(!state.isFirstRequestUncertain)
+    // A server's name may be another of its tools' (#280): answered in the session.
+    #expect(!state.requests[0].isShown)
+    #expect(state.isFirstRequestUncertain)
     // A server's own form, no permission of it waiting: a request answered in the terminal.
     let own = feed(form)
     #expect(own.requests.first?.content.isAnnouncedOnly == true)
@@ -155,12 +156,12 @@ struct AnnouncedDialogTests {
   func stale() {
     // `ls` was settled by Codex's automatic review, with no dialog and no report of it.
     let stale = feed(permission(shown: false, command: "ls"))
-    let drawnB = AgentSignal.dialogDrawn(AgentDrawnDialog(.commandStart("rm x")))
+    let drawnB = AgentSignal.dialogDrawn(AgentDrawnDialog(.command("rm x")))
     // B's dialog read before B's report: `ls` is not armed in its place.
     let early = feed(drawnB, to: stale)
     #expect(!early.requests[0].isShown)
     let reported = AgentActivityMachine.reduce(
-      early, .signal(permission(shown: false, command: "rm x")), context: context("b", at: 1))
+      early, .signal(permission(shown: false, command: "rm x")), context: context("b", at: 60))
     #expect(reported.requests.map(\.reference.subject) == ["rm x"])
     #expect(reported.requests[0].isShown)
     #expect(!reported.isFirstRequestUncertain)
@@ -170,24 +171,201 @@ struct AnnouncedDialogTests {
     #expect(later.requests[0].isShown)
   }
 
-  @Test("A dialog said drawn long before a report arms nothing")
-  func drawnLongBefore() {
-    let drawn = feed(.dialogDrawn(AgentDrawnDialog(.commandStart("ls"))))
+  @Test("A dialog said drawn is forgotten once something says it was answered")
+  func drawnThenAnswered() {
+    let drawn = feed(.dialogDrawn(AgentDrawnDialog(.command("ls"))))
+    for gone in [AgentSignal.questionResolved, .turnEnded, .promptSubmitted(byUser: true)] {
+      let answered = AgentActivityMachine.reduce(drawn, .signal(gone), context: context("gone"))
+      let reported = AgentActivityMachine.reduce(
+        answered, .signal(permission(shown: false)), context: context("late", at: 60))
+      #expect(!reported.requests[0].isShown)
+    }
+    let typed = AgentActivityMachine.reduce(drawn, .userInput([0x31]), context: context("key"))
     let reported = AgentActivityMachine.reduce(
-      drawn, .signal(permission(shown: false)), context: context("late", at: 60))
+      typed, .signal(permission(shown: false)), context: context("late", at: 60))
     #expect(!reported.requests[0].isShown)
   }
 
-  @Test("Codex's word that its dialog is drawn arms the permission it reported")
+  @Test("Codex's word that a command quoted whole is drawn arms the permission it reported")
   func drawn() {
     let reported = feed(permission(shown: false))
     #expect(!reported.requests[0].isShown)
-    let drawn = feed(.dialogDrawn(AgentDrawnDialog(.commandStart("l"))), to: reported)
+    let drawn = feed(.dialogDrawn(AgentDrawnDialog(.command("ls"))), to: reported)
     #expect(drawn.requests[0].isShown)
     // Another command's dialog does not arm it.
-    #expect(!feed(.dialogDrawn(AgentDrawnDialog(.commandStart("rm"))), to: reported).requests[0].isShown)
+    #expect(!feed(.dialogDrawn(AgentDrawnDialog(.command("rm"))), to: reported).requests[0].isShown)
+    // Quoted cut short, it may be another's: in doubt, not armed (#280).
+    let cut = feed(.dialogDrawn(AgentDrawnDialog(.commandStart("l"))), to: reported)
+    #expect(!cut.requests[0].isShown)
+    #expect(cut.isFirstRequestUncertain)
     // Never drawn — its automatic review settled it — it is gone with the turn.
     #expect(feed(.turnEnded, to: reported).requests.isEmpty)
+  }
+}
+
+/// Answers every request from the palette, to tell what `answering` lets through.
+private struct PaletteKeymap: AgentAnswerKeymap {
+  func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
+    [.allowOnce, .deny]
+  }
+
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    [[0x79]]
+  }
+}
+
+@Suite("Only a command quoted whole arms a Codex permission (#280)")
+struct PartlyQuotedDialogTests {
+  /// Each signal at its own time, in seconds: requests a minute apart put nothing in doubt.
+  private func play(
+    _ steps: (TimeInterval, AgentSignal)..., to state: AgentActivityState? = nil
+  ) -> AgentActivityState {
+    var state = state ?? AgentActivityState(activity: .working, source: .structured)
+    for (seconds, signal) in steps {
+      state = AgentActivityMachine.reduce(
+        state, .signal(signal), context: context("t\(seconds)", at: seconds))
+    }
+    return state
+  }
+
+  private func drawn(_ subject: AgentDrawnDialog.Subject) -> AgentSignal {
+    .dialogDrawn(AgentDrawnDialog(subject))
+  }
+
+  private func patch(_ files: String) -> AgentSignal {
+    .questionAsked(
+      .approval, tool: "apply_patch",
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(tool: .patch, toolName: "apply_patch", subject: files)),
+        reference: AgentToolReference(tool: "apply_patch", subject: files), isShown: false))
+  }
+
+  private func mcp(_ tool: String) -> AgentSignal {
+    let name = "mcp__github__\(tool)"
+    return .questionAsked(
+      .approval, tool: name,
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(
+            tool: .mcp(server: "github", tool: tool), toolName: name, subject: nil)),
+        reference: AgentToolReference(tool: name), isShown: false))
+  }
+
+  /// Whether any card of `state` would answer from the palette.
+  private func answersFromPalette(_ state: AgentActivityState) -> Bool {
+    state.requests.contains {
+      if case .fromPalette = state.answering($0, keymap: PaletteKeymap()) { return true }
+      return false
+    }
+  }
+
+  private let commandA = "npm run test -- a"
+  private let commandB = "npm run test -- b"
+
+  @Test(
+    "A dialog quoted in part arms nothing, even alone: its card says to answer in the session",
+    arguments: [
+      (AgentDrawnDialog.Subject.commandStart("npm run test"), "command"),
+      (.file("Model.swift"), "file"), (.files, "files"), (.server("github"), "server"),
+    ])
+  func partlyQuoted(subject: AgentDrawnDialog.Subject, kind: String) {
+    let request: AgentSignal =
+      switch kind {
+      case "command": permission(shown: false, command: commandA)
+      case "server": mcp("create_issue")
+      default: patch("App/Model.swift\nApp/Other.swift")
+      }
+    let state = play((0, request), (60, drawn(subject)))
+    #expect(state.requests.count == 1)
+    #expect(!state.requests[0].isShown)
+    #expect(
+      state.answering(state.requests[0], keymap: PaletteKeymap()) == .inTerminalOnly(.uncertain))
+    #expect(!answersFromPalette(state))
+  }
+
+  @Test("Two commands with the quoted start: neither is armed nor taken away, nothing answered")
+  func commandStart() {
+    let state = play(
+      (0, permission(shown: false, command: commandA)),
+      (60, permission(shown: false, command: commandB)),
+      (120, drawn(.commandStart("npm run test"))))
+    #expect(state.requests.map(\.reference.subject) == [commandA, commandB])
+    #expect(state.requests.allSatisfy { !$0.isShown })
+    let keymap = PaletteKeymap()
+    #expect(state.answering(state.requests[0], keymap: keymap) == .inTerminalOnly(.uncertain))
+    #expect(state.answering(state.requests[1], keymap: keymap) == .inTerminalOnly(.queued))
+    #expect(!answersFromPalette(state))
+  }
+
+  @Test("A click before the other request is reported sends nothing: its dialog was quoted in part")
+  func clickBeforeTheOtherReport() {
+    // A was settled by Codex's automatic review, with no dialog; it waits for its tool to end.
+    // B's dialog is drawn, its word read before B's report: only A fits it yet.
+    let early = play(
+      (0, permission(shown: false, command: commandA)), (60, drawn(.commandStart("npm run test"))))
+    #expect(!early.requests[0].isShown)
+    #expect(!answersFromPalette(early))
+    // B's report, however soon or late, changes nothing.
+    for seconds in [62.0, 600] {
+      let reported = play((seconds, permission(shown: false, command: commandB)), to: early)
+      #expect(reported.requests.map(\.reference.subject) == [commandA, commandB])
+      #expect(reported.requests.allSatisfy { !$0.isShown })
+      #expect(!answersFromPalette(reported))
+    }
+  }
+
+  @Test("A command quoted whole, read before its report, arms it once reported, however late")
+  func wholeBeforeItsReport() {
+    let state = play(
+      (0, permission(shown: false, command: commandA)), (60, drawn(.command(commandB))),
+      (600, permission(shown: false, command: commandB)))
+    // A, reported before it and never drawn, was settled with no dialog.
+    #expect(state.requests.map(\.reference.subject) == [commandB])
+    #expect(state.requests[0].isShown)
+    #expect(answersFromPalette(state))
+  }
+
+  @Test("A command quoted whole is that command, not every one that starts with it")
+  func wholeCommand() {
+    let state = play(
+      (0, permission(shown: false, command: "ls -la x")),
+      (60, permission(shown: false, command: "ls")))
+    let after = play((120, drawn(.command("ls"))), to: state)
+    #expect(after.requests.map(\.reference.subject) == ["ls"])
+    #expect(after.requests[0].isShown)
+    #expect(!after.isFirstRequestUncertain)
+    #expect(answersFromPalette(after))
+  }
+
+  @Test("After Codex settles one on a guess, a command quoted whole clears the doubt; in part not")
+  func afterAGuess() {
+    let both = play(
+      (0, permission(shown: false, command: commandA)),
+      (60, permission(shown: false, command: commandB)))
+    // Codex's `PostToolUse` says a tool ended, not which one.
+    let settled = play((120, .questionResolved), to: both)
+    #expect(settled.requests.map(\.reference.subject) == [commandB])
+    #expect(settled.isTrackLost)
+    #expect(!answersFromPalette(settled))
+    let cut = play((180, drawn(.commandStart("npm run test"))), to: settled)
+    #expect(cut.isTrackLost)
+    #expect(!answersFromPalette(cut))
+    let whole = play((180, drawn(.command(commandB))), to: settled)
+    #expect(whole.requests.map(\.isShown) == [true])
+    #expect(!whole.isTrackLost)
+    #expect(answersFromPalette(whole))
+  }
+
+  @Test("A file's name fits whole path components only")
+  func fileComponents() {
+    let sub = play((0, patch("App/SubModel.swift")), (60, drawn(.file("Model.swift"))))
+    // Nothing fits: the dialog is some other request's, not this one's.
+    #expect(!sub.isFirstRequestUncertain)
+    let named = play((0, patch("App/B/Model.swift")), (60, drawn(.file("Model.swift"))))
+    #expect(named.isFirstRequestUncertain)
   }
 }
 

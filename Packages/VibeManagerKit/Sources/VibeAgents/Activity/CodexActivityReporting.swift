@@ -151,6 +151,12 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
   /// The start of a command as its report gives it, out of the notification that quotes it: the
   /// command Codex runs — `/bin/zsh -lc 'touch a…` — cut at thirty characters.
   static func commandStart(quoted: String) -> String {
+    quotedCommand(quoted).text
+  }
+
+  /// The command out of the notification that quotes it, and whether it was cut short: a command
+  /// quoted whole names one request, not every one that starts the same way (#280).
+  static func quotedCommand(_ quoted: String) -> (text: String, isCut: Bool) {
     var text = Substring(quoted)
     let isCut = text.hasSuffix("...") || text.hasSuffix("…")
     if text.hasSuffix("...") { text = text.dropLast(3) } else if text.hasSuffix("…") { text = text.dropLast() }
@@ -160,7 +166,7 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
       text = text[wrapper.upperBound...]
       if !isCut, let quote, text.last == quote { text = text.dropLast() }
     }
-    return String(text)
+    return (String(text), isCut)
   }
 
   /// Codex's notifications, as `tui/src/chatwidget/notifications.rs` words them in 0.159.
@@ -175,7 +181,9 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
         otherwise: AgentTerminalPrompt(kind: .form, message: message))
     }
     if let command = message.trimmingPrefix("Approval requested: ") {
-      return .dialogDrawn(AgentDrawnDialog(.commandStart(Self.commandStart(quoted: command))))
+      let quoted = Self.quotedCommand(command)
+      return .dialogDrawn(
+        AgentDrawnDialog(quoted.isCut ? .commandStart(quoted.text) : .command(quoted.text)))
     }
     if let edited = message.trimmingPrefix("Codex wants to edit ") {
       let isSeveral = edited.hasSuffix(" files") && Int(edited.dropLast(" files".count)) != nil

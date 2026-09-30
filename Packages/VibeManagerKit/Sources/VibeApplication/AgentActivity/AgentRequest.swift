@@ -410,8 +410,10 @@ extension AgentActivityState {
   ) -> AgentRequestAnswering {
     guard let keymap else { return .inTerminalOnly(.notSupported) }
     guard requests.first?.id == request.id else { return .inTerminalOnly(.queued) }
-    guard request.isShown else { return .inTerminalOnly(.notYetShown) }
+    // In doubt, a dialog may well be on screen — only not known to be this one's (#280): the
+    // answer is given in the session, not waited for.
     guard !isFirstRequestUncertain else { return .inTerminalOnly(.uncertain) }
+    guard request.isShown else { return .inTerminalOnly(.notYetShown) }
     var kinds = keymap.answers(for: request.content)
     if case .permission(let permission) = request.content, !permission.isComplete {
       // What would be allowed is not all on screen: it may only be refused (#40, decision 2).
