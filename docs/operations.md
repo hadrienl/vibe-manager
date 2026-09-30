@@ -68,6 +68,20 @@ put a team in `Configuration/Local.xcconfig` (see the README). To start over fro
 tccutil reset SystemPolicyAllFiles eu.hadrien.VibeManager
 ```
 
+### Settings say "Not granted", and the switch is on
+
+The application learns the access by opening a file only it unlocks: TCC's system database. By hand,
+from a terminal of Vibe Manager, whose agents answer as the application does:
+
+```sh
+head -c 15 "/Library/Application Support/com.apple.TCC/TCC.db"   # "SQLite format 3" when granted
+```
+
+Refused while the switch is on: the switch belongs to another signature of Vibe Manager. Remove the
+entry with **−**, add `/Applications/Vibe Manager.app` with **+**, and let the background process
+restart (below). Before #225, the application read the user's database, which macOS 27 no longer
+shows at all, and said "Not granted" to everyone.
+
 ### Full Disk Access is granted, and agents are still asked
 
 Each process keeps the access it had when it started, and the agents inherit theirs from the
@@ -121,6 +135,11 @@ Releases and dragged over the application.
 Help → Export Diagnostics…, then open an issue with the file. `defaults write
 eu.hadrien.VibeManager DiagnosticsVerbose -bool YES` adds debug events to the log — made of the
 same types as the others: verbose is not indiscreet — and turns on the main-thread hang detector.
+
+A development build also publishes `perf.bodyEvaluations` every ten seconds: how many times the
+window, the sidebar, its rows, each session's terminal slot and the conversations had their `body`
+evaluated. An agent working in a hidden session must leave the window's count at zero (#254). The
+`ui.activityApplied` signpost times one transition of an agent's activity on the main thread.
 
 ## Rotating the update key
 

@@ -79,6 +79,55 @@ public final class MainThreadHangDetector: @unchecked Sendable {
   }
 }
 
+/// Publishes, every ten seconds, how many times the views that hold the window together had their
+/// `body` evaluated (#254): `perf.bodyEvaluations`. Development builds only count them — see
+/// `BodyCounter` — so a release build publishes nothing. Quiet when nothing was evaluated.
+@MainActor
+public final class BodyEvaluationReporter {
+  public static let period: Duration = .seconds(10)
+
+  private let log: any DiagnosticLog
+  private let period: Duration
+  private var task: Task<Void, Never>?
+
+  public init(log: any DiagnosticLog, period: Duration = BodyEvaluationReporter.period) {
+    self.log = log
+    self.period = period
+  }
+
+  public func start() {
+    guard task == nil else { return }
+    task = Task { [weak self] in
+      while !Task.isCancelled {
+        guard let period = self?.period else { return }
+        try? await Task.sleep(for: period)
+        self?.report()
+      }
+    }
+  }
+
+  public func stop() {
+    task?.cancel()
+    task = nil
+  }
+
+  /// Publishes what was counted since the last report, if anything was.
+  public func report() {
+    let counts = BodyCounter.drain()
+    let total = counts.values.reduce(0, +)
+    guard total > 0 else { return }
+    let fields: [(name: StaticString, value: DiagnosticValue)] = [
+      ("total", .count(total)),
+      ("rootView", .count(counts[.rootView] ?? 0)),
+      ("sessionSidebar", .count(counts[.sessionSidebar] ?? 0)),
+      ("sessionRow", .count(counts[.sessionRow] ?? 0)),
+      ("sessionTerminalSlot", .count(counts[.sessionTerminalSlot] ?? 0)),
+      ("conversationView", .count(counts[.conversationView] ?? 0)),
+    ]
+    log.record(DiagnosticEvent(.perf, .info, "perf.bodyEvaluations", fields: fields))
+  }
+}
+
 /// Notes what the application and its terminal host weigh: when the number of running sessions
 /// changes, and every ten minutes while one runs. Rare enough to cost nothing, often enough for a
 /// leak to show in an export.

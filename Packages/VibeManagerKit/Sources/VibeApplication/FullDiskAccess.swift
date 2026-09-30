@@ -15,7 +15,7 @@ public enum FullDiskAccessStatus: Hashable, Sendable {
 ///
 /// There is no system call for the question, so the answer is empirical: read something only that
 /// access opens. The probe must never be the thing that raises an alert — see
-/// `TCCFullDiskAccessProbe` for the witness that was chosen and why it stays silent.
+/// `TCCFullDiskAccessProbe` for the witnesses that were chosen and why they stay silent.
 ///
 /// The answer is the one this process was given **when it started**, and it never changes while
 /// it runs (ADR 0010, measured for #76): TCC settles Full Disk Access once for the process

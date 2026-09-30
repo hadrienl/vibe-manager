@@ -17,15 +17,58 @@ struct TCCFullDiskAccessProbeTests {
     #expect(await probe.status() == .granted)
   }
 
-  @Test("A witness it cannot open means the access is missing")
-  func hiddenWitnessMeansNotGranted() async {
-    // This is exactly what the real refusal looks like from inside the process: without Full
-    // Disk Access the path is hidden rather than denied, and nothing is shown to the user.
+  @Test("No witness there to answer means the access is not proven")
+  func missingWitnessMeansNotGranted() async {
     let probe = TCCFullDiskAccessProbe(
       witnessPath: "/nonexistent-\(UUID().uuidString)/TCC.db"
     )
 
     #expect(await probe.status() == .notGranted)
+  }
+
+  @Test("A witness that refuses to open means the access is missing")
+  func refusingWitnessMeansNotGranted() async throws {
+    // What the system's database does without Full Disk Access: `EPERM`, and no alert.
+    let witness = try makeWitness()
+    defer { removeWitness(witness) }
+    try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: witness.path)
+    let readable = try makeWitness()
+    defer { removeWitness(readable) }
+
+    let probe = TCCFullDiskAccessProbe(witnessPaths: [witness.path, readable.path])
+
+    #expect(await probe.status() == .notGranted)
+  }
+
+  @Test("A missing witness gives way to the next one (#225)")
+  func missingWitnessGivesWay() async throws {
+    // macOS 27 no longer shows the user's database, with the access or without it.
+    let readable = try makeWitness()
+    defer { removeWitness(readable) }
+
+    let probe = TCCFullDiskAccessProbe(
+      witnessPaths: ["/nonexistent-\(UUID().uuidString)/TCC.db", readable.path])
+
+    #expect(await probe.status() == .granted)
+  }
+
+  @Test("The system's database is asked first")
+  func systemDatabaseFirst() {
+    #expect(
+      TCCFullDiskAccessProbe.defaultWitnessPaths.first
+        == "/Library/Application Support/com.apple.TCC/TCC.db")
+  }
+
+  private func makeWitness() throws -> URL {
+    let witness = FileManager.default.temporaryDirectory
+      .appendingPathComponent("witness-\(UUID().uuidString).db")
+    try Data("x".utf8).write(to: witness)
+    return witness
+  }
+
+  private func removeWitness(_ witness: URL) {
+    try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: witness.path)
+    try? FileManager.default.removeItem(at: witness)
   }
 }
 
