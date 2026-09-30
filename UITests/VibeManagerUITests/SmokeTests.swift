@@ -288,6 +288,40 @@ final class SmokeTests: XCTestCase {
     app.terminate()
   }
 
+  /// The toolbar's buttons against the window's right edge, in a view with a picker centred and in
+  /// one without, and the title as wide as its text rather than a placeholder (#256): the title
+  /// drawn in the toolbar once left them wherever its width put them.
+  func testTheToolbarKeepsItsButtonsAgainstTheRightEdge() throws {
+    let app = launch()
+    createSession(named: "Toolbar layout check", isFirst: true, in: app)
+    expectSessionRows(1, in: app)
+    let window = app.windows.firstMatch
+    let title = app.descendants(matching: .any).matching(identifier: "window-title").firstMatch
+    let inspector = app.toolbars.buttons.matching(
+      NSPredicate(format: "label == 'Show Context' OR label == 'Hide Context'")
+    ).firstMatch
+
+    // A session shown as a conversation: its picker is centred in the toolbar.
+    XCTAssertTrue(app.radioButtons["Terminal"].waitForExistence(timeout: 10))
+    XCTAssertTrue(title.waitForExistence(timeout: 5))
+    XCTAssertEqual(title.label, "Vibe Manager, Toolbar layout check")
+    XCTAssertTrue(inspector.waitForExistence(timeout: 5))
+    let withPicker = inspector.frame.maxX
+    XCTAssertLessThan(window.frame.maxX - withPicker, 24, "The buttons are away from the edge")
+    XCTAssertGreaterThan(title.frame.width, 100, "The title is held to a placeholder width")
+
+    // A new session's draft: nothing centred.
+    app.typeKey("n", modifierFlags: .command)
+    XCTAssertTrue(app.textFields["new-session-name"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.radioButtons["Terminal"].waitForNonExistence(timeout: 5))
+    let settled = NSPredicate { _, _ in abs(inspector.frame.maxX - withPicker) < 1 }
+    let stays = expectation(for: settled, evaluatedWith: nil)
+    wait(for: [stays], timeout: 5)
+    XCTAssertGreaterThan(title.frame.width, 80, "The title is held to a placeholder width")
+    app.typeKey(.escape, modifierFlags: [])
+    app.terminate()
+  }
+
   func testTheInterfaceSpeaksFrench() throws {
     let app = launch(language: "fr", locale: "fr_FR")
     XCTAssertTrue(app.buttons["Nouvelle session"].waitForExistence(timeout: 10))
