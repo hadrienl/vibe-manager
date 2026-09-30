@@ -154,7 +154,7 @@ public enum AgentActivityMachine {
       // whose letters answer nothing: only Return or Escape ends it.
       if case .inTerminal(let prompt) = next.requests.first?.content {
         let ends =
-          [.form, .question, .plan].contains(prompt.kind)
+          [.form, .question, .plan, .account, .startup].contains(prompt.kind)
           ? bytes == [0x0D] : context.approvalAnswerKeys.contains(bytes)
         if ends || interruptKeys.contains(bytes) {
           next.settleFirstRequest(isKnownAnswered: true)
@@ -185,6 +185,16 @@ public enum AgentActivityMachine {
         context.now.timeIntervalSince(since) >= confirmationTimeout.seconds
       {
         next.source = .inferred
+        // Hooks that stay silent are held back by a dialog of the CLI's start, most likely: the
+        // user is told there is one to answer (#273). The first word of the hooks takes it away.
+        if next.requests.isEmpty {
+          next.enqueue(
+            AgentRequestNotice(
+              content: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil)),
+              reference: AgentToolReference(tool: nil), isShown: true, key: "startup"),
+            kind: .approval, tool: nil, context: context)
+          if !next.requests.isEmpty { next.activity = .awaitingUser(.approval) }
+        }
       }
       if !next.isStructured, next.activity == .working,
         let last = next.lastOutputAt ?? next.lastUserInputAt,
@@ -203,8 +213,9 @@ public enum AgentActivityMachine {
   ) -> AgentActivityState {
     var next = state
     // Anything the hooks say proves they are wired, even when their `SessionStart` came late —
-    // after the fallback already took over.
+    // after the fallback already took over. Whatever start held them back is behind the agent.
     next.source = .structured
+    next.dropAnnouncedRequests { $0.kind == .startup }
     next.lastOutputAt = nil
     switch signal {
     case .channelConfirmed:
@@ -281,6 +292,30 @@ public enum AgentActivityMachine {
         break
       }
       next.markDrawn(at: index)
+    case .batchResolved(let agentID):
+      // What this agent asked is answered, one way or another. Another agent's request waits on.
+      let isOthers = { (request: AgentRequest) in
+        request.content.isAnnouncedOnly ? agentID != nil : request.reference.agentID != agentID
+      }
+      guard next.requests.contains(where: { !isOthers($0) }) else { break }
+      let wasFirst = next.requests.first.map { !isOthers($0) } == true
+      next.requests.removeAll { !isOthers($0) }
+      if next.requests.isEmpty {
+        next.clearRequests()
+        next.activity = .working
+      } else if wasFirst {
+        // Which of the others is on screen is not known from this.
+        next.isFirstRequestUncertain = next.requests.count > 1 || next.isTrackLost
+        next.activity = .awaitingUser(next.requests[0].kind)
+      }
+    case .turnFailed(let prompt):
+      next = apply(.turnEnded, to: next, context: context)
+      // Said whatever else waits: nothing goes on until the account is sorted out.
+      next.enqueue(
+        AgentRequestNotice(
+          content: .inTerminal(prompt), reference: AgentToolReference(tool: nil), isShown: true),
+        kind: .approval, tool: nil, context: context)
+      next.activity = .awaitingUser(next.requests.first?.kind ?? .approval)
     case .turnEnded:
       // A sub-agent in the background can still be waiting on the user once the main turn ends —
       // on a dialog it drew. One announced by its tool and never drawn may never be: a hook of

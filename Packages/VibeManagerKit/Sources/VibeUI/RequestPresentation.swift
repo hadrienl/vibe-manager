@@ -88,6 +88,16 @@ public enum RequestPresentation {
     case .plan:
       return LocalizedStringResource(
         "Plan to approve", bundle: .module, comment: "The title of a request of an agent.")
+    case .account:
+      return LocalizedStringResource(
+        "Account to check", bundle: .module,
+        comment:
+          "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped.")
+    case .startup:
+      return LocalizedStringResource(
+        "Startup dialog", bundle: .module,
+        comment:
+          "The title of a request of an agent: a dialog of the CLI's start — trusting the folder, approving servers, signing in — is most likely waiting.")
     case .other:
       return LocalizedStringResource(
         "Waiting in the terminal", bundle: .module,
@@ -149,6 +159,8 @@ public enum RequestPresentation {
       case .form: return "list.bullet.rectangle"
       case .question: return "questionmark.bubble"
       case .plan: return "list.bullet.clipboard"
+      case .account: return "person.crop.circle.badge.exclamationmark"
+      case .startup: return "power"
       case .other: return "terminal"
       }
     }

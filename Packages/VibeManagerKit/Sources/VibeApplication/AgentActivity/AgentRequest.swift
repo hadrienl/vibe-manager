@@ -87,6 +87,11 @@ public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
     case question
     /// A plan to accept.
     case plan
+    /// The CLI's account needs the user: signed out, refused, unpaid (#273).
+    case account
+    /// The CLI started, and its hooks have not spoken: a dialog of its own start holds them back —
+    /// trusting the folder, approving servers or hooks, signing in (#273).
+    case startup
     /// Anything else the agent stopped for.
     case other
   }

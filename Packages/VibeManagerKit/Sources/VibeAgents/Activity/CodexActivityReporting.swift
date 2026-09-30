@@ -23,7 +23,8 @@ public enum CodexActivityHooks {
     Hook(event: "SessionStart", payload: .fields(["session_id"])),
     Hook(event: "UserPromptSubmit", payload: .drop),
     Hook(event: "PermissionRequest", payload: .keep),
-    Hook(event: "PostToolUse", payload: .drop),
+    // Which agent ran which tool on what (#273): the request it settles, among several waiting.
+    Hook(event: "PostToolUse", payload: .fields(AgentRequestReading.resolutionFields)),
     Hook(event: "Stop", payload: .drop),
     Hook(event: "Interrupt", payload: .drop),
     Hook(event: "SessionEnd", payload: .drop),
@@ -118,7 +119,10 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
         .approval,
         notice: Self.withoutAlwaysForHosts(
           event.requestNotice(isShown: false, alwaysAllow: CodexAnswerKeymap.alwaysAllow)))
-    case "PostToolUse": return .questionResolved
+    case "PostToolUse":
+      let reference = AgentRequestReading.reference(of: event)
+      guard let tool = reference.tool else { return .questionResolved }
+      return .toolFinished(tool, agentID: reference.agentID, subject: reference.subject)
     case "Stop": return .turnEnded
     case "Interrupt": return .interrupted
     case "SessionEnd": return .agentEnded
