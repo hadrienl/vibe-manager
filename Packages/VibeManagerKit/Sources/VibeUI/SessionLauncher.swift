@@ -607,7 +607,6 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     }
     // The run goes on without the application: the next launch says how it ended.
     await usage?.detached(id)
-    startedAt[id] = nil
     await sideTerminals?.handOff(id)
     diagnostics.record(.session, .info, "session.handedOff", ["session": diagnostics.pseudonym(id)])
     return true
@@ -672,8 +671,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   }
 
   /// Lets go of what the launcher holds for a session's process — its readers, its observer, when
-  /// it last wrote — on every path its run ends by: a dictionary left out of one of them would
-  /// grow with each session run (#255). The observer is handed back, to be finished.
+  /// it started and last wrote — on every path its run ends by: a dictionary left out of one of
+  /// them would grow with each session run (#255). The observer is handed back, to be finished.
   ///
   /// `exitGenerations` is kept on purpose: counted from 1 again, a watch retired earlier and still
   /// waiting for the main actor could take itself for the current one.
@@ -681,12 +680,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     outputTasks.removeValue(forKey: id)?.cancel()
     activityTasks.removeValue(forKey: id)?.cancel()
     lastOutputAt[id] = nil
+    startedAt[id] = nil
     return observers.removeValue(forKey: id)
   }
 
   /// Every session the launcher still holds process state for.
   var trackedSessionIDs: Set<SessionID> {
     Set(outputTasks.keys).union(activityTasks.keys).union(lastOutputAt.keys).union(observers.keys)
+      .union(startedAt.keys).union(exitTasks.keys)
   }
 
   // MARK: - SessionRuntime
