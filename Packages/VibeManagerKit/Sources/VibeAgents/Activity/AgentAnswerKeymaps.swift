@@ -9,10 +9,12 @@ import VibeApplication
 /// - Questions: a digit picks its option and moves on; the one after the options is "Type
 ///   something.", which takes pasted text and Return. A question of several choices is a list of
 ///   boxes, as drawn by 2.1.283: a digit ticks its option and stays, the right arrow moves on.
-///   Several questions, or one of several choices, end on a review, whose `1` submits.
+///   Several questions, or one of several choices, end on a review, whose `1` submits. Beside
+///   previews, as drawn by 2.1.285, a digit only moves the highlight: Return, sent apart, takes it.
 /// - A plan: `1` accepts it with edits accepted, `2` with each edit asking first; Escape rejects.
 ///
-/// Return is never pressed to pick an option: it takes the highlighted one, whatever that is.
+/// Return is never pressed alone to pick an option: it takes the highlighted one, whatever that
+/// is. It follows a digit only beside previews, once the digit has moved the highlight.
 public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
