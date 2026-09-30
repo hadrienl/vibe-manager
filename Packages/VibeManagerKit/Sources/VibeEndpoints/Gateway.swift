@@ -579,8 +579,13 @@ struct EndpointSide: Sendable {
       makeDecoder = { AnthropicMessagesStreamDecoder() }
       decodeWhole = { try AnthropicMessagesClient.decodeResponse($0) }
     }
-    for (key, value) in endpoint.defaultParameters where body[key] == nil {
-      body[key] = value
+    for (key, value) in endpoint.defaultParameters {
+      // `null` takes a field out: for an endpoint that refuses one the gateway sends.
+      if value.isNull {
+        body[key] = nil
+      } else if body[key] == nil {
+        body[key] = value
+      }
     }
     var headers = endpoint.requestHeaders(secret: route.secret)
     headers["content-type"] = "application/json"

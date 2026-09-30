@@ -103,9 +103,9 @@ public enum ChatCompletionsClient {
         continue
       }
     }
-    var message: [String: JSONValue] = [
-      "role": "assistant", "content": text.isEmpty && !calls.isEmpty ? .null : .string(text),
-    ]
+    // An empty string rather than `null` beside tool calls: OpenAI takes either, and stricter
+    // validators — the Prisme.ai LLM Gateway's — only a string or an array.
+    var message: [String: JSONValue] = ["role": "assistant", "content": .string(text)]
     if !calls.isEmpty { message["tool_calls"] = .array(calls) }
     return [.object(message)]
   }

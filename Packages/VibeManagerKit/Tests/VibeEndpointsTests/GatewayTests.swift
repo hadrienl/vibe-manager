@@ -138,7 +138,8 @@ struct GatewayTests {
       .answer(status: 200, headers: [:], chunks: Self.chunks, thenFail: nil)
     ])
     let writer = RecordingWriter()
-    try await gateway(transport, parameters: ["provider": ["sort": "throughput"]])
+    try await gateway(
+      transport, parameters: ["provider": ["sort": "throughput"], "stream_options": nil])
       .handle(request(), writer: writer)
 
     #expect(await writer.status == 200)
@@ -157,6 +158,7 @@ struct GatewayTests {
     let body = try transport.sentBody(0)
     #expect(body["model"] == "qwen/qwen3-coder")
     #expect(body["provider"] == ["sort": "throughput"])
+    #expect(body["stream_options"] == nil)
   }
 
   @Test("A request that does not stream gets a whole Messages answer")

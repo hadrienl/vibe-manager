@@ -159,10 +159,12 @@ public final class EndpointsSettingsModel {
     public var baseURL: String
     public var wireProtocol: EndpointWireKind
     public var authentication: EndpointAuthenticationKind
+    public var defaultParameters = ""
 
     public var endpoint: Endpoint {
       Endpoint(
-        name: name, baseURL: baseURL, wireProtocol: wireProtocol, authentication: authentication)
+        name: name, baseURL: baseURL, wireProtocol: wireProtocol, authentication: authentication,
+        defaultParameters: defaultParameters)
     }
   }
 
@@ -180,7 +182,9 @@ public final class EndpointsSettingsModel {
     Preset(
       id: "prisme", name: "Prisme.ai LLM Gateway",
       baseURL: "https://api.studio.prisme.ai/v2/workspaces/slug:llm-gateway/webhooks/v1",
-      wireProtocol: .chatCompletions, authentication: .header(name: "x-prismeai-api-key")),
+      wireProtocol: .chatCompletions, authentication: .header(name: "x-prismeai-api-key"),
+      // Not in the fields it documents, and not needed: it gives the usage after `[DONE]`.
+      defaultParameters: #"{"stream_options": null}"#),
     Preset(
       id: "openai", name: "OpenAI-compatible", baseURL: "https://", wireProtocol: .chatCompletions,
       authentication: .bearer),

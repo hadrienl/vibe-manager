@@ -87,6 +87,14 @@ struct AnthropicRequestTests {
     #expect(
       messages.map { $0["role"]?.stringValue } == ["system", "user", "assistant", "tool", "user"])
     #expect(messages[2]["content"] == "Reading it.")
+    // Beside tool calls alone, an empty string rather than null.
+    let callsOnly = ChatCompletionsClient.encodeRequest(
+      CanonicalRequest(
+        model: "m",
+        messages: [
+          CanonicalMessage(role: .assistant, content: [.toolCall(id: "c", name: "ls", arguments: "{}")])
+        ]))
+    #expect(callsOnly["messages"]?.arrayValue?.first?["content"] == "")
     #expect(
       messages[2]["tool_calls"]
         == [

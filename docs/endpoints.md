@@ -27,7 +27,8 @@ Settings → Endpoints → **+**, then a starting point:
 - **Driven by**: *Automatic* picks Claude Code for a Messages endpoint and Codex for a Responses
   one (no translation at all), Claude Code for the rest.
 - **Advanced**: extra headers, a JSON object merged into every request (`{"provider": {"sort":
-  "throughput"}}` for OpenRouter), timeouts.
+  "throughput"}}` for OpenRouter; a `null` value takes a field out, as the Prisme.ai starting
+  point does with `stream_options`), timeouts.
 
 **Test** sends a short request asking the model to call a tool, then gives it the result, and says
 what worked: reachable, authentication, streamed answer and speed, tool call, answer after the

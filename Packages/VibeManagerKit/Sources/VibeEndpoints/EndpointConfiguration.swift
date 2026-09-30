@@ -29,8 +29,8 @@ public struct EndpointConfiguration: Hashable, Sendable {
   /// Sent with every request, after the gateway's own headers.
   public var headers: [String: String]
   /// Merged into every request body, the request's own fields winning. For what an endpoint needs
-  /// and the harness does not know: `stream_options`, a provider routing preference, a context
-  /// size for a local server.
+  /// and the harness does not know: a provider routing preference, a context size for a local
+  /// server. A `null` value takes the field out of the request instead.
   public var defaultParameters: [String: JSONValue]
   public var timeouts: EndpointTimeouts
   /// For `wireProtocol == .custom`.
