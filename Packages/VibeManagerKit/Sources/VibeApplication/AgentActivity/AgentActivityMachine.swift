@@ -228,14 +228,20 @@ public enum AgentActivityMachine {
       next.pendingTool = tool
       let count = next.requests.count
       next.enqueue(notice, kind: kind, tool: tool, context: context)
-      // Its dialog was said to be drawn a moment before the report was read.
+      // Its dialog was said to be drawn a moment before the report was read — unless what the
+      // screen quoted fits an older request as well (#280).
       if let drawn = next.drawnBeforeReport, next.requests.count > count,
         let last = next.requests.indices.last, !next.requests[last].isShown,
-        drawn.dialog.matches(next.requests[last]),
         abs(context.now.timeIntervalSince(drawn.at)) <= drawnBeforeReportWindow
       {
-        next.markDrawn(at: last)
-        next.drawnBeforeReport = nil
+        let matching = next.undrawnRequests(matching: drawn.dialog)
+        if matching == [last] {
+          next.markDrawn(at: last)
+          next.drawnBeforeReport = nil
+        } else if matching.count > 1 {
+          next.isFirstRequestUncertain = true
+          next.drawnBeforeReport = nil
+        }
       }
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
     case .questionResolved:
@@ -273,11 +279,17 @@ public enum AgentActivityMachine {
     case .dialogDrawn(let dialog, let otherwise):
       // Only the request the dialog names is armed: a key typed for another's card would answer
       // this dialog. None reported yet, its report may be read a moment later.
-      guard
-        let index = next.requests.lastIndex(where: { !$0.isShown && dialog.matches($0) })
-      else {
+      let matching = next.undrawnRequests(matching: dialog)
+      guard let index = matching.first else {
         next.drawnBeforeReport = DrawnBeforeReport(dialog: dialog, at: context.now)
         if let otherwise { next = apply(.dialogAnnounced(otherwise), to: next, context: context) }
+        break
+      }
+      // What the screen quotes — the first characters of a command, a file's name — fits more
+      // than one request: whichever is armed, the other's card would answer this dialog (#280).
+      // None is armed or taken away, and none is answered from outside until the screen names one.
+      guard matching.count == 1 else {
+        next.isFirstRequestUncertain = true
         break
       }
       next.markDrawn(at: index)
@@ -330,6 +342,11 @@ extension AgentActivityState {
   }
 
   // MARK: - Requests (#40)
+
+  /// The requests not drawn yet that a dialog on screen could be, oldest first.
+  func undrawnRequests(matching dialog: AgentDrawnDialog) -> [Int] {
+    requests.indices.filter { !requests[$0].isShown && dialog.matches(requests[$0]) }
+  }
 
   /// Marks the request drawn. Reported before it and never drawn, the other permissions were
   /// settled with no dialog — the CLI draws its dialogs in the order it reported them — and

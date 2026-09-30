@@ -191,6 +191,90 @@ struct AnnouncedDialogTests {
   }
 }
 
+@Suite("A dialog whose quote fits several requests arms none (#280)")
+struct AmbiguousDrawnDialogTests {
+  /// Each request reported a minute after the last: nothing but the drawn dialog puts in doubt.
+  private func reported(_ signals: AgentSignal...) -> AgentActivityState {
+    var state = AgentActivityState(activity: .working, source: .structured)
+    for (index, signal) in signals.enumerated() {
+      state = AgentActivityMachine.reduce(
+        state, .signal(signal), context: context("r\(index)", at: TimeInterval(index * 60)))
+    }
+    return state
+  }
+
+  private func drawn(
+    _ subject: AgentDrawnDialog.Subject, to state: AgentActivityState, at seconds: TimeInterval = 600
+  ) -> AgentActivityState {
+    AgentActivityMachine.reduce(
+      state, .signal(.dialogDrawn(AgentDrawnDialog(subject))),
+      context: context("drawn\(seconds)", at: seconds))
+  }
+
+  private func patch(_ files: String) -> AgentSignal {
+    .questionAsked(
+      .approval, tool: "apply_patch",
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(tool: .patch, toolName: "apply_patch", subject: files)),
+        reference: AgentToolReference(tool: "apply_patch", subject: files), isShown: false))
+  }
+
+  @Test("Two commands with the quoted start: neither is armed nor taken away, the first in doubt")
+  func commandStart() {
+    let state = reported(
+      permission(shown: false, command: "ls -la Sources/A"),
+      permission(shown: false, command: "ls -la Sources/B"))
+    #expect(!state.isFirstRequestUncertain)
+    let after = drawn(.commandStart("ls -la Sourc"), to: state)
+    #expect(after.requests.map(\.reference.subject) == ["ls -la Sources/A", "ls -la Sources/B"])
+    #expect(after.requests.allSatisfy { !$0.isShown })
+    #expect(after.isFirstRequestUncertain)
+  }
+
+  @Test("Once the first is settled, the next dialog drawn names one request and arms it")
+  func namedOnceAlone() {
+    let state = reported(
+      permission(shown: false, command: "ls -la Sources/A"),
+      permission(shown: false, command: "ls -la Sources/B"))
+    let ambiguous = drawn(.commandStart("ls -la Sourc"), to: state)
+    let settled = AgentActivityMachine.reduce(
+      ambiguous, .signal(.toolFinished("Bash", subject: "ls -la Sources/A")),
+      context: context("done", at: 700))
+    #expect(settled.requests.map(\.reference.subject) == ["ls -la Sources/B"])
+    let armed = drawn(.commandStart("ls -la Sourc"), to: settled, at: 800)
+    #expect(armed.requests.map(\.isShown) == [true])
+    #expect(!armed.isFirstRequestUncertain)
+  }
+
+  @Test("Two patches of a file with the quoted name: neither is armed nor taken away")
+  func file() {
+    let state = reported(patch("App/A/Model.swift"), patch("App/B/Model.swift"))
+    let after = drawn(.file("Model.swift"), to: state)
+    #expect(after.requests.count == 2)
+    #expect(after.requests.allSatisfy { !$0.isShown })
+    #expect(after.isFirstRequestUncertain)
+    // A name only one of them holds arms that one; the other, reported before it and never drawn,
+    // was settled with no dialog.
+    let named = drawn(.file("B/Model.swift"), to: state)
+    #expect(named.requests.map(\.reference.subject) == ["App/B/Model.swift"])
+    #expect(named.requests[0].isShown)
+  }
+
+  @Test("Several files quoted, two patches waiting: neither is armed nor taken away")
+  func files() {
+    let state = reported(patch("a.swift\nb.swift"), patch("c.swift\nd.swift"))
+    let after = drawn(.files, to: state)
+    #expect(after.requests.count == 2)
+    #expect(after.requests.allSatisfy { !$0.isShown })
+    #expect(after.isFirstRequestUncertain)
+    // One patch waiting: it is the one drawn.
+    let alone = drawn(.files, to: reported(patch("a.swift\nb.swift")))
+    #expect(alone.requests.map(\.isShown) == [true])
+    #expect(!alone.isFirstRequestUncertain)
+  }
+}
+
 @Suite("OSC 9 notifications in a terminal's output (#273)")
 struct TerminalNotificationScannerTests {
   private func bytes(_ text: String) -> [UInt8] { Array(text.utf8) }
