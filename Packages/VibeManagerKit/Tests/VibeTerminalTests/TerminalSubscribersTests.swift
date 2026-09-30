@@ -9,6 +9,7 @@ import VibeDomain
 /// and the pane's status read the state, the activity tracker reads pulses.
 @Suite("What each subscriber of a terminal is served")
 struct TerminalSubscribersTests {
+  private static let empty = TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
   private let start = ContinuousClock.now
 
   private func at(_ milliseconds: Int) -> ContinuousClock.Instant {
@@ -56,12 +57,15 @@ struct TerminalSubscribersTests {
 
   @Test("A subscriber of the state is never handed output")
   func stateSubscriberReadsNoOutput() async {
-    var subscribers = TerminalSubscribers()
-    let state = subscribers.add(.state, hasEnded: false) { _ in }
-    let everything = subscribers.add(.everything, hasEnded: false) { _ in }
+    let subscribers = TerminalSubscribers(schedule: { _, _ in })
+    let state = subscribers.attach(.state, state: .starting, history: Self.empty, hasEnded: false)
+      .events
+    let everything = subscribers.attach(
+      .everything, state: .starting, history: Self.empty, hasEnded: false
+    ).events
 
     for _ in 0..<1_000 {
-      _ = subscribers.output([UInt8]("x".utf8), historyDropped: 1)
+      subscribers.output([UInt8]("x".utf8), historyDropped: 1)
     }
     subscribers.stateChanged(.exited(code: 0))
     subscribers.finishAll()
@@ -79,8 +83,10 @@ struct TerminalSubscribersTests {
 
   @Test("A subscriber of pulses is told of output without its bytes")
   func pulseSubscriberReadsPulses() async {
-    var subscribers = TerminalSubscribers()
-    let pulses = subscribers.add(.pulses(every: .milliseconds(250)), hasEnded: false) { _ in }
+    let subscribers = TerminalSubscribers(schedule: { _, _ in })
+    let pulses = subscribers.attach(
+      .pulses(every: .milliseconds(250)), state: .starting, history: Self.empty, hasEnded: false
+    ).events
 
     #expect(subscribers.output([1, 2, 3], historyDropped: 0, at: at(0)).isEmpty)
     let planned = subscribers.output([4], historyDropped: 0, at: at(10))
@@ -97,9 +103,9 @@ struct TerminalSubscribersTests {
 
   @Test("The last output is noted as it arrives")
   func notesTheLastOutput() {
-    var subscribers = TerminalSubscribers()
+    let subscribers = TerminalSubscribers(schedule: { _, _ in })
     #expect(subscribers.lastOutputAt == nil)
-    _ = subscribers.output([1], historyDropped: 0, at: at(40))
+    subscribers.output([1], historyDropped: 0, at: at(40))
     #expect(subscribers.lastOutputAt == at(40))
   }
 

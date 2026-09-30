@@ -19,7 +19,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
 
   private var historyBuffer: TerminalHistory
   private var currentState: TerminalProcessState
-  private var subscribers = TerminalSubscribers()
+  private let subscribers = TerminalSubscribers()
   private var exitSource: DispatchSourceProcess?
   private var lastSize: TerminalSize
   /// A side terminal's shell (#43) is hung up on, as a terminal window closing does, and each of
@@ -88,20 +88,12 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   }
 
   private func subscribe(_ interest: TerminalEventInterest) -> TerminalAttachment {
-    let events = subscribers.add(interest, hasEnded: hasEnded) { [weak self] subscriberID in
-      guard let self else { return }
-      Task { await self.removeSubscriber(subscriberID) }
-    }
-    return TerminalAttachment(state: currentState, history: historyBuffer.snapshot, events: events)
+    subscribers.attach(
+      interest, state: currentState, history: historyBuffer.snapshot, hasEnded: hasEnded)
   }
 
   public func lastOutputAt() async -> ContinuousClock.Instant? {
     subscribers.lastOutputAt
-  }
-
-  /// What each subscriber reads, for the tests.
-  var subscriberInterests: [TerminalEventInterest] {
-    subscribers.interests
   }
 
   public func state() -> TerminalProcessState {
@@ -199,7 +191,7 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     switch event {
     case .bytes(let bytes):
       let dropped = historyBuffer.append(bytes)
-      deliver(output: bytes, historyDropped: dropped)
+      subscribers.output(bytes, historyDropped: dropped)
       reader.didConsume(byteCount: bytes.count)
     case .endOfFile:
       isReaderFinished = true
@@ -358,23 +350,4 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
     transition(to: finalState)
     subscribers.finishAll()
   }
-
-  private func removeSubscriber(_ subscriberID: UUID) {
-    subscribers.remove(subscriberID)
-  }
-
-  /// Hands a block of output to whoever reads it, and waits for the pulses it planned.
-  private func deliver(output bytes: [UInt8], historyDropped dropped: Int) {
-    for pulse in subscribers.output(bytes, historyDropped: dropped) {
-      Task { [weak self] in
-        try? await Task.sleep(until: pulse.deadline, clock: .continuous)
-        await self?.deliverPulse(to: pulse.subscriberID)
-      }
-    }
-  }
-
-  private func deliverPulse(to subscriberID: UUID) {
-    subscribers.deliverPulse(to: subscriberID)
-  }
-
 }

@@ -42,17 +42,18 @@ struct PulseGate {
 /// The subscribers of one terminal and what each of them reads (#248), shared by the two sessions
 /// that serve them: the one whose process runs here and the one the terminal host runs.
 ///
-/// Held inside the session's actor. The pulses it plans are handed back to the actor, which alone
-/// can wait for them.
-struct TerminalSubscribers {
+/// Called by the session's actor, in order, and by the pulses it plans for later, from wherever they
+/// fall due: its state is behind a lock, never held while a stream is written to — ending a stream
+/// calls back into it.
+final class TerminalSubscribers: @unchecked Sendable {
   private struct Subscriber {
     let continuation: AsyncStream<TerminalEvent>.Continuation
     let interest: TerminalEventInterest
     var gate: PulseGate?
   }
 
-  /// A pulse a subscriber is owed at `deadline`, for the actor to deliver.
-  struct PlannedPulse {
+  /// A pulse a subscriber is owed at `deadline`.
+  struct PlannedPulse: Sendable {
     let subscriberID: UUID
     let deadline: ContinuousClock.Instant
   }
@@ -63,103 +64,138 @@ struct TerminalSubscribers {
   // reported, exactly as the bounded history does.
   private static let bufferLimit = 512
 
+  private let lock = NSLock()
   private var subscribers: [UUID: Subscriber] = [:]
-  /// When the process last wrote something.
-  private(set) var lastOutputAt: ContinuousClock.Instant?
+  private var lastOutput: ContinuousClock.Instant?
+  /// What delivers a planned pulse when it falls due: a task that waits for it, unless a test
+  /// delivers them itself.
+  private let schedule: @Sendable (PlannedPulse, TerminalSubscribers) -> Void
 
-  var count: Int { subscribers.count }
-
-  /// What each subscriber reads, for the tests that check nobody reads more than it needs.
-  var interests: [TerminalEventInterest] { subscribers.values.map(\.interest) }
-
-  /// A new stream for `interest`, already finished when the session has ended. The subscriber is
-  /// removed through `onRemove` when its reader lets go of the stream.
-  mutating func add(
-    _ interest: TerminalEventInterest,
-    hasEnded: Bool,
-    onRemove: @escaping @Sendable (UUID) -> Void
-  ) -> AsyncStream<TerminalEvent> {
-    let (stream, continuation) = AsyncStream<TerminalEvent>.makeStream(
-      bufferingPolicy: .bufferingNewest(Self.bufferLimit))
-    guard !hasEnded else {
-      continuation.finish()
-      return stream
+  init(
+    schedule: @escaping @Sendable (PlannedPulse, TerminalSubscribers) -> Void = { pulse, owner in
+      Task { [weak owner] in
+        try? await Task.sleep(until: pulse.deadline, clock: .continuous)
+        owner?.deliverPulse(to: pulse.subscriberID)
+      }
     }
-    let id = UUID()
-    var gate: PulseGate?
-    if case .pulses(let interval) = interest { gate = PulseGate(interval: interval) }
-    subscribers[id] = Subscriber(continuation: continuation, interest: interest, gate: gate)
-    continuation.onTermination = { _ in onRemove(id) }
-    return stream
+  ) {
+    self.schedule = schedule
   }
 
-  mutating func remove(_ id: UUID) {
-    subscribers[id] = nil
+  /// When the process last wrote something.
+  var lastOutputAt: ContinuousClock.Instant? {
+    lock.withLock { lastOutput }
+  }
+
+  /// What each subscriber reads, for the tests that check nobody reads more than it needs.
+  var interests: [TerminalEventInterest] {
+    lock.withLock { subscribers.values.map(\.interest) }
+  }
+
+  /// The attachment of a new subscriber reading `interest`: its stream is already finished when the
+  /// session has ended, and it is let go of when its reader drops the stream.
+  func attach(
+    _ interest: TerminalEventInterest,
+    state: TerminalProcessState,
+    history: TerminalHistorySnapshot,
+    hasEnded: Bool
+  ) -> TerminalAttachment {
+    let (stream, continuation) = AsyncStream<TerminalEvent>.makeStream(
+      bufferingPolicy: .bufferingNewest(Self.bufferLimit))
+    if hasEnded {
+      continuation.finish()
+    } else {
+      let id = UUID()
+      var gate: PulseGate?
+      if case .pulses(let interval) = interest { gate = PulseGate(interval: interval) }
+      lock.withLock {
+        subscribers[id] = Subscriber(continuation: continuation, interest: interest, gate: gate)
+      }
+      continuation.onTermination = { [weak self] _ in
+        _ = self?.lock.withLock { self?.subscribers.removeValue(forKey: id) }
+      }
+    }
+    return TerminalAttachment(state: state, history: history, events: stream)
   }
 
   /// Hands a block of output, and the bytes the history dropped for it, to whoever reads them.
-  /// Returns the pulses planned for later, for the actor to deliver.
-  mutating func output(
+  /// Returns the pulses planned for later, which are already scheduled.
+  @discardableResult
+  func output(
     _ bytes: [UInt8],
     historyDropped dropped: Int,
     at now: ContinuousClock.Instant = .now
   ) -> [PlannedPulse] {
-    lastOutputAt = now
+    var readers: [AsyncStream<TerminalEvent>.Continuation] = []
+    var pulsed: [AsyncStream<TerminalEvent>.Continuation] = []
     var planned: [PlannedPulse] = []
-    for (id, subscriber) in subscribers {
-      switch subscriber.interest {
-      case .everything:
-        yield(.output(bytes), to: subscriber.continuation)
-        if dropped > 0 {
-          yield(.historyTruncated(droppedByteCount: dropped), to: subscriber.continuation)
+    lock.withLock {
+      lastOutput = now
+      for (id, subscriber) in subscribers {
+        switch subscriber.interest {
+        case .everything:
+          readers.append(subscriber.continuation)
+        case .state:
+          continue
+        case .pulses:
+          guard var gate = subscriber.gate else { continue }
+          switch gate.output(at: now) {
+          case .emit: pulsed.append(subscriber.continuation)
+          case .schedule(let deadline):
+            planned.append(PlannedPulse(subscriberID: id, deadline: deadline))
+          case .covered: break
+          }
+          subscribers[id]?.gate = gate
         }
-      case .state:
-        continue
-      case .pulses:
-        guard var gate = subscriber.gate else { continue }
-        switch gate.output(at: now) {
-        case .emit:
-          subscriber.continuation.yield(.outputPulse)
-        case .schedule(let deadline):
-          planned.append(PlannedPulse(subscriberID: id, deadline: deadline))
-        case .covered:
-          break
-        }
-        subscribers[id]?.gate = gate
       }
     }
+    for continuation in readers {
+      Self.yield(.output(bytes), to: continuation)
+      if dropped > 0 { Self.yield(.historyTruncated(droppedByteCount: dropped), to: continuation) }
+    }
+    for continuation in pulsed { continuation.yield(.outputPulse) }
+    for pulse in planned { schedule(pulse, self) }
     return planned
   }
 
   /// A planned pulse is due.
-  mutating func deliverPulse(to id: UUID, at now: ContinuousClock.Instant = .now) {
-    guard let subscriber = subscribers[id] else { return }
-    subscribers[id]?.gate?.scheduledPulseFired(at: now)
-    subscriber.continuation.yield(.outputPulse)
+  func deliverPulse(to id: UUID, at now: ContinuousClock.Instant = .now) {
+    let continuation: AsyncStream<TerminalEvent>.Continuation? = lock.withLock {
+      subscribers[id]?.gate?.scheduledPulseFired(at: now)
+      return subscribers[id]?.continuation
+    }
+    continuation?.yield(.outputPulse)
   }
 
   /// Bytes lost before they reached the history — trimmed from another buffer on their way here.
   func truncated(_ byteCount: Int) {
-    for subscriber in subscribers.values where subscriber.interest == .everything {
-      yield(.historyTruncated(droppedByteCount: byteCount), to: subscriber.continuation)
+    for continuation in continuations(where: { $0 == .everything }) {
+      Self.yield(.historyTruncated(droppedByteCount: byteCount), to: continuation)
     }
   }
 
   func stateChanged(_ state: TerminalProcessState) {
-    for subscriber in subscribers.values {
-      yield(.stateChanged(state), to: subscriber.continuation)
+    for continuation in continuations(where: { _ in true }) {
+      Self.yield(.stateChanged(state), to: continuation)
     }
   }
 
   /// The session ended: every stream ends with it.
-  mutating func finishAll() {
-    for subscriber in subscribers.values {
-      subscriber.continuation.finish()
+  func finishAll() {
+    let all = lock.withLock {
+      defer { subscribers.removeAll() }
+      return subscribers.values.map(\.continuation)
     }
-    subscribers.removeAll()
+    for continuation in all { continuation.finish() }
   }
 
-  private func yield(
+  private func continuations(
+    where reads: (TerminalEventInterest) -> Bool
+  ) -> [AsyncStream<TerminalEvent>.Continuation] {
+    lock.withLock { subscribers.values.filter { reads($0.interest) }.map(\.continuation) }
+  }
+
+  private static func yield(
     _ event: TerminalEvent, to continuation: AsyncStream<TerminalEvent>.Continuation
   ) {
     guard case .dropped(let discarded) = continuation.yield(event) else { return }

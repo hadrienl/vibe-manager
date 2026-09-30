@@ -54,7 +54,8 @@ struct TerminalHistory {
     }
     // The budget counts bytes, not the storage behind them: a block kept with a buffer sized for a
     // much larger read would let the history weigh many times its limit.
-    let stored = bytes.capacity > 2 * bytes.count ? bytes.withUnsafeBufferPointer(Array.init) : bytes
+    let stored =
+      bytes.capacity > 2 * bytes.count ? bytes.withUnsafeBufferPointer(Array.init) : bytes
     blocks.append(Block(bytes: stored, newlineCount: newlines))
     byteCount += bytes.count
     newlineCount += newlines

@@ -14,7 +14,7 @@ public actor HostedTerminalSession: HostedTerminal {
 
   private var historyBuffer: TerminalHistory
   private var currentState: TerminalProcessState
-  private var subscribers = TerminalSubscribers()
+  private let subscribers = TerminalSubscribers()
   private var hasEnded = false
   /// Set on a session taken back after a relaunch: the first size the view reports is followed by
   /// a redraw, so a full-screen program draws itself for the window it is now in.
@@ -45,20 +45,12 @@ public actor HostedTerminalSession: HostedTerminal {
   }
 
   private func subscribe(_ interest: TerminalEventInterest) -> TerminalAttachment {
-    let events = subscribers.add(interest, hasEnded: hasEnded) { [weak self] subscriberID in
-      guard let self else { return }
-      Task { await self.removeSubscriber(subscriberID) }
-    }
-    return TerminalAttachment(state: currentState, history: historyBuffer.snapshot, events: events)
+    subscribers.attach(
+      interest, state: currentState, history: historyBuffer.snapshot, hasEnded: hasEnded)
   }
 
   public func lastOutputAt() async -> ContinuousClock.Instant? {
     subscribers.lastOutputAt
-  }
-
-  /// What each subscriber reads, for the tests.
-  var subscriberInterests: [TerminalEventInterest] {
-    subscribers.interests
   }
 
   public func state() -> TerminalProcessState {
@@ -102,7 +94,7 @@ public actor HostedTerminalSession: HostedTerminal {
 
   func receive(output bytes: [UInt8]) {
     let dropped = historyBuffer.append(bytes)
-    deliver(output: bytes, historyDropped: dropped)
+    subscribers.output(bytes, historyDropped: dropped)
   }
 
   func receive(truncated byteCount: Int) {
@@ -154,23 +146,4 @@ public actor HostedTerminalSession: HostedTerminal {
     hasEnded = true
     subscribers.finishAll()
   }
-
-  private func removeSubscriber(_ subscriberID: UUID) {
-    subscribers.remove(subscriberID)
-  }
-
-  /// Hands a block of output to whoever reads it, and waits for the pulses it planned.
-  private func deliver(output bytes: [UInt8], historyDropped dropped: Int) {
-    for pulse in subscribers.output(bytes, historyDropped: dropped) {
-      Task { [weak self] in
-        try? await Task.sleep(until: pulse.deadline, clock: .continuous)
-        await self?.deliverPulse(to: pulse.subscriberID)
-      }
-    }
-  }
-
-  private func deliverPulse(to subscriberID: UUID) {
-    subscribers.deliverPulse(to: subscriberID)
-  }
-
 }
