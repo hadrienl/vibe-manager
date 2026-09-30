@@ -79,7 +79,7 @@ struct SessionDraftTests {
     let second = SessionAppearanceCatalog.derived(forName: "  refactor the WEBHOOK ")
 
     #expect(first == second)
-    #expect(SessionAppearanceCatalog.contains(first))
+    #expect(SessionAppearancePalette.default.contains(first))
     #expect(first != SessionAppearanceCatalog.derived(forName: "Write the release notes"))
   }
 

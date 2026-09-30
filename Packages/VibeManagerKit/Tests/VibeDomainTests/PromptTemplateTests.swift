@@ -391,14 +391,25 @@ struct PromptTemplateFolderTests {
 
 @Suite("The symbol and colour a template gives")
 struct PromptTemplateAppearanceTests {
-  @Test("Only the symbols and colours the sheet offers are accepted")
-  func offeredOnly() {
+  @Test("A symbol and colour the pickers no longer offer stay valid; only a malformed one is not")
+  func offListStaysValid() {
     let offered = PromptTemplate(
       name: "T", body: "x", appearance: SessionAppearance(symbolName: "bolt", colorHex: "#0B63E5"))
-    let other = PromptTemplate(
+    // Offered once, then removed from the Settings (#199): the template must not break for it.
+    let offList = PromptTemplate(
       name: "T", body: "x", appearance: SessionAppearance(symbolName: "star", colorHex: "#123456"))
+    let malformed = PromptTemplate(
+      name: "T", body: "x", appearance: SessionAppearance(symbolName: "star", colorHex: "blue"))
+    let nameless = PromptTemplate(
+      name: "T", body: "x", appearance: SessionAppearance(symbolName: " ", colorHex: "#123456"))
     #expect(offered.problems(among: []).isEmpty)
-    #expect(other.problems(among: []) == [.appearanceNotOffered])
+    #expect(offList.problems(among: []).isEmpty)
+    #expect(malformed.problems(among: []) == [.appearanceMalformed])
+    #expect(nameless.problems(among: []) == [.appearanceMalformed])
+    // Found valid, a template's appearance must give a session that can be created.
+    let hashless = PromptTemplate(
+      name: "T", body: "x", appearance: SessionAppearance(symbolName: "star", colorHex: "5E5CE6"))
+    #expect(hashless.problems(among: []) == [.appearanceMalformed])
     #expect(!offered.hasSameContent(as: PromptTemplate(name: "T", body: "x")))
   }
 

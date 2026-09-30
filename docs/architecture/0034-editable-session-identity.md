@@ -38,7 +38,8 @@ earlier version or by hand, still loads and still takes its other changes.
 
 `SessionAppearanceCatalog.defaultAppearance(forName:projectIcon:)` is what a creation gives when the
 user picks nothing, and what Revert to Default Icon gives: the project's icon when the folder has
-one, over the symbol and colour the name gives. The folder is looked at again when the popover opens,
+one, over the symbol and colour the name gives — among the lists the Settings offer now (#199,
+ADR 0035). The folder is looked at again when the popover opens,
 with the same `ProjectIconFinding` as the New Session draft. As at creation, an icon is copied into
 the data folder before the session names it; if it cannot be, nothing changes and the user is told
 — they chose that icon.

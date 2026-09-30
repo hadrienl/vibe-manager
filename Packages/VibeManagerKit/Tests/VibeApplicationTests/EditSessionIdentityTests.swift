@@ -218,6 +218,18 @@ struct EditSessionIdentityTests {
     #expect(await edit.defaultAppearance(for: original).appearance == appearance)
   }
 
+  @Test("The default badge is picked among the lists the Settings offer now (#199)")
+  func defaultAppearanceFollowsThePalette() async {
+    let original = session()
+    let edit = EditSessionIdentity(
+      repository: IdentityRepository([original]), projectIcons: FolderIcons(icons: [:]))
+    let palette = SessionAppearancePalette(symbols: ["star"], swatches: [.init(hex: "#0B63E5")])
+
+    let (appearance, _) = await edit.defaultAppearance(for: original, palette: palette)
+
+    #expect(appearance == SessionAppearance(symbolName: "star", colorHex: "#0B63E5"))
+  }
+
   @Test("Undoing puts the identity back, unless it was changed since")
   func applyChecksTheCurrentIdentity() async throws {
     let original = session()

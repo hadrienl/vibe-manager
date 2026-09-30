@@ -794,6 +794,17 @@
         }
       }
     },
+    "%@, not drawn by this version of macOS" : {
+      "comment" : "Help and VoiceOver: a symbol of the list this Mac cannot draw. Its SF name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, non dessiné par cette version de macOS"
+          }
+        }
+      }
+    },
     "%@, opened by the agent" : {
       "localizations" : {
         "fr" : {
@@ -3960,6 +3971,16 @@
         }
       }
     },
+    "Add" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter"
+          }
+        }
+      }
+    },
     "Add Examples" : {
       "localizations" : {
         "fr" : {
@@ -3970,12 +3991,32 @@
         }
       }
     },
+    "Add a Colour" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une couleur"
+          }
+        }
+      }
+    },
     "Add a Rule" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajouter une règle"
+          }
+        }
+      }
+    },
+    "Add a Symbol" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un symbole"
           }
         }
       }
@@ -4742,6 +4783,17 @@
         }
       }
     },
+    "Badges" : {
+      "comment" : "A tab of the Settings window: the symbols and colours sessions may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badges"
+          }
+        }
+      }
+    },
     "Bisect in progress" : {
       "localizations" : {
         "fr" : {
@@ -4770,6 +4822,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Branches"
+          }
+        }
+      }
+    },
+    "Brightness" : {
+      "comment" : "A slider: the brightness of the colour being added.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luminosité"
           }
         }
       }
@@ -5303,6 +5366,16 @@
         }
       }
     },
+    "Closest that can be read: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La plus proche qui reste lisible : %@"
+          }
+        }
+      }
+    },
     "Collapse" : {
       "comment" : "Folds a group of the sidebar.\nHides a section of the inspector.",
       "localizations" : {
@@ -5341,6 +5414,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replié"
+          }
+        }
+      }
+    },
+    "Colour" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur"
+          }
+        }
+      }
+    },
+    "Colour wheel" : {
+      "comment" : "VoiceOver: picks a hue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roue des couleurs"
+          }
+        }
+      }
+    },
+    "Colours" : {
+      "comment" : "A section of the Badges settings.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleurs"
           }
         }
       }
@@ -5656,7 +5761,7 @@
       }
     },
     "Default" : {
-      "comment" : "The model an agent uses when none is chosen.\nThe model an agent uses when none was chosen.",
+      "comment" : "Restores the shipped list of the section.\nThe model an agent uses when none is chosen.\nThe model an agent uses when none was chosen.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -8026,6 +8131,16 @@
         }
       }
     },
+    "Name (optional)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom (facultatif)"
+          }
+        }
+      }
+    },
     "Name refused: %@" : {
       "comment" : "Said by VoiceOver when a session's new name is refused. The reason.",
       "localizations" : {
@@ -8490,6 +8605,16 @@
         }
       }
     },
+    "No symbol of that name." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun symbole de ce nom."
+          }
+        }
+      }
+    },
     "No templates yet — Manage… to write one, or add the examples." : {
       "comment" : "Manage… is the button next to the template picker.",
       "localizations" : {
@@ -8665,6 +8790,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non accordé"
+          }
+        }
+      }
+    },
+    "Not in the list of the Settings" : {
+      "comment" : "Help and VoiceOver: a symbol or colour kept by a session, no longer offered.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Absent de la liste des Réglages"
           }
         }
       }
@@ -9112,6 +9248,16 @@
         }
       }
     },
+    "Offered when a session or a template is given its appearance. Drag to reorder." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proposés pour l’apparence d’une session ou d’un modèle. Faites glisser pour réordonner."
+          }
+        }
+      }
+    },
     "Only the first %lld changes are listed; the counts are exact." : {
       "localizations" : {
         "fr" : {
@@ -9405,6 +9551,16 @@
         }
       }
     },
+    "Pick a symbol, or type the exact name of one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un symbole, ou tapez son nom exact."
+          }
+        }
+      }
+    },
     "Plan to approve" : {
       "comment" : "The title of a request of an agent.",
       "localizations" : {
@@ -9438,6 +9594,7 @@
       }
     },
     "Preview" : {
+      "comment" : "A section of the Badges settings.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -10314,12 +10471,42 @@
         }
       }
     },
+    "Restore Defaults" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir les valeurs par défaut"
+          }
+        }
+      }
+    },
     "Restore the Shipped Version" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rétablir la version livrée"
+          }
+        }
+      }
+    },
+    "Restore the shipped colours?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir les couleurs d’origine ?"
+          }
+        }
+      }
+    },
+    "Restore the shipped symbols?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir les symboles d’origine ?"
           }
         }
       }
@@ -10733,6 +10920,16 @@
         }
       }
     },
+    "Search symbols" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher un symbole"
+          }
+        }
+      }
+    },
     "Secure connection" : {
       "localizations" : {
         "fr" : {
@@ -10845,6 +11042,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sessions"
+          }
+        }
+      }
+    },
+    "Sessions already made keep their symbol and colour, even one no longer in these lists." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions existantes gardent leur symbole et leur couleur, même s’ils ne figurent plus dans ces listes."
           }
         }
       }
@@ -11880,6 +12087,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changer…"
+          }
+        }
+      }
+    },
+    "Symbols" : {
+      "comment" : "A section of the Badges settings.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Symboles"
           }
         }
       }
@@ -13178,6 +13396,16 @@
         }
       }
     },
+    "The symbol is drawn in white: a colour is only accepted if it can be read on it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le symbole est dessiné en blanc : une couleur n’est acceptée que s’il reste lisible dessus."
+          }
+        }
+      }
+    },
     "The terminal has shown nothing yet." : {
       "localizations" : {
         "fr" : {
@@ -13310,6 +13538,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le titre de %1$@ n’a pas été lu : le certificat de %2$@ n’est pas fiable."
+          }
+        }
+      }
+    },
+    "The white symbol can be read: %@:1." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le symbole blanc est lisible : %@ :1."
+          }
+        }
+      }
+    },
+    "The white symbol cannot be read: %@:1, under 3:1." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le symbole blanc n’est pas lisible : %@ :1, sous 3 :1."
           }
         }
       }
@@ -13492,6 +13740,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce build n’a pas de clé pour vérifier les mises à jour : il n’en recherche donc aucune."
+          }
+        }
+      }
+    },
+    "This colour is already in the list." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette couleur est déjà dans la liste."
           }
         }
       }
@@ -14128,6 +14386,16 @@
         }
       }
     },
+    "Type a colour as #RRGGBB." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez une couleur au format #RRGGBB."
+          }
+        }
+      }
+    },
     "Type a ticket (#36, owner/repo#36), a pull or merge request URL, a branch, a folder or a title." : {
       "comment" : "The help of Open Quickly. Keep the examples as they are.",
       "localizations" : {
@@ -14444,6 +14712,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le suivi de l’utilisation est désactivé."
+          }
+        }
+      }
+    },
+    "Use" : {
+      "comment" : "Takes the suggested colour.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser"
           }
         }
       }
@@ -14973,6 +15252,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous serez déconnecté de tous les sites dans la vue web de chaque session."
+          }
+        }
+      }
+    },
+    "Your additions and your order are lost." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos ajouts et votre ordre seront perdus."
           }
         }
       }

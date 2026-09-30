@@ -89,7 +89,9 @@ public final class NewSessionModel {
     recentFolders: [RecentFolder] = [],
     folderProbe: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
     recentFolderProbeBudget: Duration = .milliseconds(300),
-    forgetRecentFolder: (@MainActor (RecentFolder) -> Void)? = nil
+    forgetRecentFolder: (@MainActor (RecentFolder) -> Void)? = nil,
+    /// The symbols and colours the Settings offer (#199), and what a name is given among them.
+    palette: SessionAppearancePalette = .default
   ) {
     self.projectIcons = projectIcons
     self.icons = icons
@@ -102,6 +104,7 @@ public final class NewSessionModel {
     self.registry = registry
     self.revalidationDelay = revalidationDelay
     self.fullDiskAccess = fullDiskAccess
+    draft.palette = palette
   }
 
   /// What the sheet says under a working folder macOS guards — a remark, never a problem.

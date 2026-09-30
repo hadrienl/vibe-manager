@@ -413,6 +413,7 @@ public struct NewSessionDraftView: View {
   private var appearancePicker: some View {
     SessionAppearancePicker(
       appearance: model.draft.effectiveAppearance,
+      palette: model.draft.palette,
       // Offered only when the folder has one, to come back to it after picking something else.
       projectIcon: model.draft.projectIcon.map { .init(image: model.icons?.image(for: $0.id)) },
       usesProjectIcon: model.usesProjectIcon,
@@ -1046,25 +1047,53 @@ struct RecentFolderCard: View {
 struct SymbolChoice: View {
   let symbol: String
   let isSelected: Bool
+  /// False for the symbol a session or a template keeps, which the Settings no longer offer.
+  var isOffered = true
   let select: () -> Void
 
   var body: some View {
     Button(action: select) {
-      Image(systemName: symbol)
+      Image(systemName: SymbolCatalog.isDrawable(symbol) ? symbol : "questionmark.square.dashed")
+        .foregroundStyle(SymbolCatalog.isDrawable(symbol) ? .primary : .tertiary)
         .frame(width: 26, height: 26)
         .overlay(
           RoundedRectangle(cornerRadius: 7)
             .strokeBorder(
               isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
-              lineWidth: isSelected ? 2 : 1
+              style: StrokeStyle(lineWidth: isSelected ? 2 : 1, dash: isOffered ? [] : [3, 2])
             )
         )
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .help(Text(SessionSymbolName.label(for: symbol)))
-    .accessibilityLabel(Text(SessionSymbolName.label(for: symbol)))
+    .help(isOffered ? SessionSymbolName.text(for: symbol) : AppearanceChoiceText.offList)
+    .accessibilityLabel(SessionSymbolName.text(for: symbol))
+    .accessibilityValue(isOffered ? Text(verbatim: "") : AppearanceChoiceText.offList)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+  }
+}
+
+/// A row of symbols or colours that wraps, eight to a line: the Settings may offer forty-eight.
+struct AppearanceChoiceGrid<Content: View>: View {
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    LazyVGrid(
+      columns: Array(repeating: GridItem(.fixed(26), spacing: 6), count: 8),
+      alignment: .leading, spacing: 6
+    ) {
+      content
+    }
+    .fixedSize()
+  }
+}
+
+enum AppearanceChoiceText {
+  /// Said of the symbol or colour a session keeps, which the Settings no longer offer.
+  static var offList: Text {
+    Text(
+      "Not in the list of the Settings", bundle: .module,
+      comment: "Help and VoiceOver: a symbol or colour kept by a session, no longer offered.")
   }
 }
 
@@ -1106,26 +1135,35 @@ struct ProjectIconChoice: View {
 }
 
 struct ColorChoice: View {
-  let hex: String
+  let swatch: SessionAppearancePalette.Swatch
   let isSelected: Bool
+  var isOffered = true
   let select: () -> Void
 
   var body: some View {
     Button(action: select) {
       RoundedRectangle(cornerRadius: 7)
-        .fill(Color(sessionHex: hex))
+        .fill(Color(sessionHex: swatch.hex))
         .frame(width: 26, height: 26)
         .overlay(
           RoundedRectangle(cornerRadius: 7)
-            .strokeBorder(isSelected ? Color.primary : Color.black.opacity(0.15), lineWidth: 2)
+            .strokeBorder(
+              isSelected ? Color.primary : Color.black.opacity(0.15),
+              style: StrokeStyle(lineWidth: 2, dash: isOffered ? [] : [3, 2]))
         )
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(
-      Text("Accent \(hex)", bundle: .module, comment: "VoiceOver: a colour, by its hex code.")
-    )
+    .help(isOffered ? swatchLabel : AppearanceChoiceText.offList)
+    .accessibilityLabel(swatchLabel)
+    .accessibilityValue(isOffered ? Text(verbatim: "") : AppearanceChoiceText.offList)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+  }
+
+  private var swatchLabel: Text {
+    if let name = swatch.displayName { return Text(verbatim: name) }
+    return Text(
+      "Accent \(swatch.hex)", bundle: .module, comment: "VoiceOver: a colour, by its hex code.")
   }
 }
 

@@ -89,6 +89,17 @@
         }
       }
     },
+    "Amber" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ambre"
+          }
+        }
+      }
+    },
     "Another template is already called “%@”." : {
       "comment" : "The name of the other prompt template.",
       "localizations" : {
@@ -96,6 +107,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un autre modèle s’appelle déjà « %@ »."
+          }
+        }
+      }
+    },
+    "Blue" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu"
           }
         }
       }
@@ -211,6 +233,28 @@
         }
       }
     },
+    "Green" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vert"
+          }
+        }
+      }
+    },
+    "Indigo" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indigo"
+          }
+        }
+      }
+    },
     "It appears twice in the file." : {
       "comment" : "Why a prompt template of an imported file is skipped.",
       "localizations" : {
@@ -294,6 +338,17 @@
         }
       }
     },
+    "Petrol Blue" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu pétrole"
+          }
+        }
+      }
+    },
     "Pick a name that tells them apart." : {
       "localizations" : {
         "fr" : {
@@ -351,6 +406,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prompt"
+          }
+        }
+      }
+    },
+    "Purple" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Violet"
+          }
+        }
+      }
+    },
+    "Red" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rouge"
           }
         }
       }
@@ -414,6 +491,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raccourcissez-le : il s’affiche en entier dans la barre latérale et le titre de la fenêtre."
+          }
+        }
+      }
+    },
+    "Teal" : {
+      "comment" : "A colour a session may be given.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sarcelle"
           }
         }
       }
@@ -537,12 +625,13 @@
         }
       }
     },
-    "This symbol or colour is not one Vibe Manager offers." : {
+    "This symbol or colour cannot be read." : {
+      "comment" : "A template's appearance, as written in its file, is not a symbol and a colour.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager ne propose pas ce symbole ou cette couleur."
+            "value" : "Ce symbole ou cette couleur est illisible."
           }
         }
       }

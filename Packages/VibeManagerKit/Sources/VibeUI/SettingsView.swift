@@ -64,11 +64,14 @@ public struct SettingsView: View {
         .settingsPage(.conversation)
         RequestsSettingsView(model: model)
           .settingsPage(.requests)
+        SessionAppearanceSettingsView(model: model.appearancePalette)
+          .settingsPage(.sessionAppearance)
         if let updates = model.updates {
           UpdatesSettingsView(updates: updates)
             .settingsPage(.updates)
         }
       }
+      .environment(\.sessionAppearancePalette, model.appearancePalette.offered)
     } else {
       general
     }
@@ -176,6 +179,8 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
   /// How the requests of background sessions are signalled (#40), the floating panel (#41), and
   /// its avatars (#154), in two pages.
   case requests
+  /// The symbols and colours a session may be given (#199).
+  case sessionAppearance
   /// Whether and how the application updates itself, and on which channel (#92).
   case updates
 
@@ -206,6 +211,10 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .requests:
       LocalizedStringResource(
         "Requests", bundle: .module, comment: "A tab of the Settings window.")
+    case .sessionAppearance:
+      LocalizedStringResource(
+        "Badges", bundle: .module,
+        comment: "A tab of the Settings window: the symbols and colours sessions may be given.")
     case .updates:
       LocalizedStringResource("Updates", bundle: .module, comment: "A tab of the Settings window.")
     }
@@ -224,6 +233,7 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .conversation: "bubble.left.and.text.bubble.right"
     // Not Privacy's hand: a person speaking in a bubble, as the avatar of the panel does.
     case .requests: "person.bubble"
+    case .sessionAppearance: "paintpalette"
     case .updates: "arrow.down.circle"
     }
   }

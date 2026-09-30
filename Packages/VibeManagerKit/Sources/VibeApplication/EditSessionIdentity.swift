@@ -119,7 +119,10 @@ public struct EditSessionIdentity: Sendable {
 
   /// What the session would be given if it were created now with its name and its folder: the
   /// project's icon when the folder has one, and the icon found, which `setAppearance` then keeps.
-  public func defaultAppearance(for session: WorkSession) async -> (
+  /// Its symbol and colour are picked among `palette`, the lists the Settings offer now (#199).
+  public func defaultAppearance(
+    for session: WorkSession, palette: SessionAppearancePalette = .default
+  ) async -> (
     appearance: SessionAppearance, icon: ProjectIcon?
   ) {
     let icon: ProjectIcon? =
@@ -129,7 +132,7 @@ public struct EditSessionIdentity: Sendable {
         nil
       }
     return (
-      SessionAppearanceCatalog.defaultAppearance(forName: session.name, projectIcon: icon?.id),
+      palette.defaultAppearance(forName: session.name, projectIcon: icon?.id),
       icon
     )
   }
