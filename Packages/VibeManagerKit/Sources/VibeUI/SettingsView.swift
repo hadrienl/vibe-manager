@@ -21,9 +21,9 @@ public struct SettingsView: View {
   ///
   /// The window takes each tab's size, and its toolbar holds the tabs. Too narrow, the last ones
   /// fall into an overflow menu where SwiftUI greys them out: at 500 points, Conversation,
-  /// Requests and Avatar could not be reached. At this width the nine tabs of #154 leave room
-  /// for a longer translation, or one more tab.
-  nonisolated static let formWidth: CGFloat = 780
+  /// Requests and Avatar could not be reached. 780 points held the nine tabs of #154 and one more;
+  /// with Badges (#199) and Endpoints (#107), the twelve need 820 in French.
+  nonisolated static let formWidth: CGFloat = 820
 
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
     self.permissions = permissions

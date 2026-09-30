@@ -242,23 +242,6 @@ struct AgentTranscriptReaderTests {
     // Yesterday and today, each time.
     #expect(listings.total - walked <= 10 * 2)
   }
-}
-
-/// Lists folders for real, and counts how often each was listed.
-private final class ListingCounter: @unchecked Sendable {
-  private let lock = NSLock()
-  private var counts: [String: Int] = [:]
-
-  func list(_ folder: URL) -> [URL]? {
-    lock.withLock { counts[folder.standardizedFileURL.path, default: 0] += 1 }
-    return AgentTranscriptLocator.contents(of: folder)
-  }
-
-  func count(of folder: URL) -> Int {
-    lock.withLock { counts[folder.standardizedFileURL.path] ?? 0 }
-  }
-
-  var total: Int { lock.withLock { counts.values.reduce(0, +) } }
 
   @Test("An endpoint's conversation is read where its harness wrote it, an unknown agent is not")
   func endpointReadsItsHarness() async throws {
@@ -289,4 +272,22 @@ private final class ListingCounter: @unchecked Sendable {
     #expect(await reader.activity(for: unknown) == nil)
     #expect(await reader.transcriptDirectories(for: unknown).isEmpty)
   }
+}
+
+/// Lists folders for real, and counts how often each was listed.
+private final class ListingCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var counts: [String: Int] = [:]
+
+  func list(_ folder: URL) -> [URL]? {
+    lock.withLock { counts[folder.standardizedFileURL.path, default: 0] += 1 }
+    return AgentTranscriptLocator.contents(of: folder)
+  }
+
+  func count(of folder: URL) -> Int {
+    lock.withLock { counts[folder.standardizedFileURL.path] ?? 0 }
+  }
+
+  var total: Int { lock.withLock { counts.values.reduce(0, +) } }
+
 }

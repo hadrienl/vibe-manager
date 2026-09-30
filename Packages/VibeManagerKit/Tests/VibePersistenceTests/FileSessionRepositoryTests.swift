@@ -671,6 +671,8 @@ func linkedBackupIsPrivate() async throws {
 
   let attributes = try FileManager.default.attributesOfItem(atPath: backupURL.path)
   #expect(attributes[.posixPermissions] as? Int == 0o600)
+}
+
 @Test("The CLI that ran an endpoint's conversation is kept in the store")
 func endpointHarnessIsStored() async throws {
   let storeURL = try makeStoreURL()
