@@ -57,7 +57,18 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private let diagnostics: Diagnostics
   /// When each running process was seen starting, for the duration its exit is logged with.
   private var startedAt: [SessionID: ContinuousClock.Instant] = [:]
-  private var panes: [SessionID: TerminalPaneModel] = [:]
+  private var panes: [SessionID: TerminalPaneModel] = [:] {
+    didSet {
+      let kept = paneSessionIDs.filter { panes[$0] != nil }
+      let known = Set(kept)
+      // Assigned whole, and only when it changes: an equal list tells no view.
+      paneSessionIDs = kept + panes.keys.filter { !known.contains($0) }
+    }
+  }
+  /// The sessions that have a pane, in the order their panes were made: what the window mounts
+  /// (#254). Changes only when a pane is made or released — never with what a terminal writes —
+  /// and walks a few sessions rather than every one the store keeps, archived ones included.
+  public private(set) var paneSessionIDs: [SessionID] = []
   private var observers: [SessionID: any AgentLaunchObserver] = [:]
   private var outputTasks: [SessionID: Task<Void, Never>] = [:]
   private var exitTasks: [SessionID: Task<Void, Never>] = [:]

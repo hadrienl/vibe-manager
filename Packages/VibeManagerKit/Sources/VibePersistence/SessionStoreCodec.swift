@@ -157,7 +157,11 @@ struct SessionStoreCodec {
 /// quarter of a second per read of a store of two hundred sessions — and the store is read every
 /// few seconds by each conversation followed, which kept its actor busy enough to hold a launch
 /// waiting on it for twenty seconds.
-private enum StoreDates {
+///
+/// Even made once, a formatter still takes 0.2 to 0.7 ms per date on macOS 27: nearly a second
+/// for a store of two hundred sessions (#253). The one shape the store writes is therefore read
+/// by arithmetic, and the formatters only read the others: older documents, or edited by hand.
+enum StoreDates {
   nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -171,7 +175,58 @@ private enum StoreDates {
   private static let lock = NSLock()
 
   static func parse(_ text: String) -> Date? {
-    lock.withLock { fractional.date(from: text) ?? whole.date(from: text) }
+    utcMilliseconds(text)
+      ?? lock.withLock { fractional.date(from: text) ?? whole.date(from: text) }
+  }
+
+  /// `yyyy-MM-ddTHH:mm:ss.SSSZ`, the shape `format` writes, or nil for anything else.
+  ///
+  /// `Double(seconds) + Double(milliseconds) / 1000` since 1970 gives the very value the
+  /// formatter gives, bit for bit; counting from 2001 or multiplying by 0.001 does not.
+  static func utcMilliseconds(_ text: String) -> Date? {
+    var text = text
+    return text.withUTF8 { bytes -> Date? in
+      guard bytes.count == 24, bytes[4] == 0x2D, bytes[7] == 0x2D, bytes[10] == 0x54,
+        bytes[13] == 0x3A, bytes[16] == 0x3A, bytes[19] == 0x2E, bytes[23] == 0x5A
+      else { return nil }
+      func number(_ start: Int, _ count: Int) -> Int? {
+        var value = 0
+        for index in start..<(start + count) {
+          let digit = Int(bytes[index]) - 0x30
+          guard (0...9).contains(digit) else { return nil }
+          value = value * 10 + digit
+        }
+        return value
+      }
+      guard let year = number(0, 4), let month = number(5, 2), let day = number(8, 2),
+        let hour = number(11, 2), let minute = number(14, 2), let second = number(17, 2),
+        let millisecond = number(20, 3),
+        year >= 1970, (1...12).contains(month), (1...daysIn(month, of: year)).contains(day),
+        hour < 24, minute < 60, second < 60
+      else { return nil }
+      let seconds =
+        daysFromCivil(year: year, month: month, day: day) * 86_400
+        + hour * 3_600 + minute * 60 + second
+      return Date(timeIntervalSince1970: Double(seconds) + Double(millisecond) / 1_000)
+    }
+  }
+
+  /// Days since 1970-01-01 in the proleptic Gregorian calendar (Howard Hinnant's algorithm).
+  private static func daysFromCivil(year: Int, month: Int, day: Int) -> Int {
+    let year = month <= 2 ? year - 1 : year
+    let era = (year >= 0 ? year : year - 399) / 400
+    let yearOfEra = year - era * 400
+    let dayOfYear = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1
+    let dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+    return era * 146_097 + dayOfEra - 719_468
+  }
+
+  private static func daysIn(_ month: Int, of year: Int) -> Int {
+    switch month {
+    case 2: return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) ? 29 : 28
+    case 4, 6, 9, 11: return 30
+    default: return 31
+    }
   }
 
   static func format(_ date: Date) -> String {

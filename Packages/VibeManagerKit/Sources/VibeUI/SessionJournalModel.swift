@@ -19,10 +19,12 @@ public final class SessionJournalModel {
   /// How many of the latest entries are shown before "Show Earlier".
   static let pageSize = 30
 
-  private(set) var journals: [SessionID: SessionJournal] = [:]
-  private(set) var summarizing: Set<SessionID> = []
-  /// Sessions whose journal was asked of the store, found or not.
-  private(set) var looked: Set<SessionID> = []
+  /// One cell per session (#254): the Activity pane of one session is not evaluated again when
+  /// another's journal moves.
+  @ObservationIgnored let journals = ObservedCells<SessionID, SessionJournal>()
+  @ObservationIgnored let summarizing = ObservedCells<SessionID, Bool>()
+  /// Sessions whose journal was asked of the store, found or not. No view reads it.
+  @ObservationIgnored private var looked: Set<SessionID> = []
   private(set) var focusRequest = 0
   private var selections: [SessionID: ActivityRowID] = [:]
   private var shownEntries: [SessionID: Int] = [:]
@@ -86,14 +88,12 @@ public final class SessionJournalModel {
     updates = Task { [weak self] in
       for await update in stream {
         guard let self else { return }
-        self.journals[update.sessionID] = update.journal
-        self.journalDidChange?(update.sessionID, update.journal)
-        self.looked.insert(update.sessionID)
-        if update.isSummarizing {
-          self.summarizing.insert(update.sessionID)
-        } else {
-          self.summarizing.remove(update.sessionID)
+        // Open Quickly indexes a journal again only when it changed.
+        if self.journals.set(update.journal, for: update.sessionID) {
+          self.journalDidChange?(update.sessionID, update.journal)
         }
+        self.looked.insert(update.sessionID)
+        self.summarizing.set(update.isSummarizing ? true : nil, for: update.sessionID)
       }
     }
     await monitor.setSummariesEnabled(summariesEnabled)
@@ -125,8 +125,8 @@ public final class SessionJournalModel {
     looked.insert(id)
     Task { [weak self, monitor] in
       let journal = await monitor.journal(for: id)
-      guard let self, let journal, self.journals[id] == nil else { return }
-      self.journals[id] = journal
+      guard let self, let journal, self.journals.value(for: id) == nil else { return }
+      self.journals.set(journal, for: id)
     }
   }
 
@@ -135,11 +135,11 @@ public final class SessionJournalModel {
   }
 
   func journal(for id: SessionID) -> SessionJournal? {
-    journals[id]
+    journals.value(for: id)
   }
 
   func isSummarizing(_ id: SessionID) -> Bool {
-    summarizing.contains(id)
+    summarizing.value(for: id) == true
   }
 
   // MARK: - Screen state
@@ -180,10 +180,12 @@ public final class SessionJournalModel {
     notice = nil
     switch row {
     case .resource(let key):
-      guard let resource = journals[id]?.resources.first(where: { $0.key == key }) else { return }
+      guard let resource = journals.value(for: id)?.resources.first(where: { $0.key == key }) else {
+        return
+      }
       open(resource, from: id)
     case .entry(let entryID):
-      guard let entry = journals[id]?.entries.first(where: { $0.id == entryID }),
+      guard let entry = journals.value(for: id)?.entries.first(where: { $0.id == entryID }),
         let url = ActivityPresentation.links(in: entry.text).first
       else { return }
       openLink(url, from: id)
@@ -280,10 +282,14 @@ public final class SessionJournalModel {
   func copy(_ row: ActivityRowID, in id: SessionID) {
     switch row {
     case .resource(let key):
-      guard let resource = journals[id]?.resources.first(where: { $0.key == key }) else { return }
+      guard let resource = journals.value(for: id)?.resources.first(where: { $0.key == key }) else {
+        return
+      }
       copy(ActivityPresentation.copyText(resource))
     case .entry(let entryID):
-      guard let entry = journals[id]?.entries.first(where: { $0.id == entryID }) else { return }
+      guard let entry = journals.value(for: id)?.entries.first(where: { $0.id == entryID }) else {
+        return
+      }
       copy(entry.text)
     }
   }
