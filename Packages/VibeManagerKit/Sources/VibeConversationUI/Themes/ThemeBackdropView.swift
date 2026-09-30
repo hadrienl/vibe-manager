@@ -9,21 +9,22 @@ struct ThemeBackdropView: View {
   let theme: ConversationTheme
 
   var body: some View {
-    ZStack {
-      theme.background.color
-      if let url = theme.backdrop.localImage,
-        let image = ThemeBackdropImages.image(at: url, blur: theme.backdrop.blur)
-      {
-        Image(nsImage: image)
-          .resizable()
-          .scaledToFill()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .overlay(theme.background.color.opacity(theme.backdrop.veil))
+    // The colour takes the place it is offered; the picture only covers it. A picture filling
+    // that place is larger than it, and must not make the backdrop grow past its bounds (#224).
+    theme.background.color
+      .overlay {
+        if let url = theme.backdrop.localImage,
+          let image = ThemeBackdropImages.image(at: url, blur: theme.backdrop.blur)
+        {
+          Image(nsImage: image)
+            .resizable()
+            .scaledToFill()
+            .overlay(theme.background.color.opacity(theme.backdrop.veil))
+        }
       }
-    }
-    .clipped()
-    .allowsHitTesting(false)
-    .accessibilityHidden(true)
+      .clipped()
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
   }
 }
 
