@@ -72,7 +72,8 @@ extension ConversationDecoding {
 public struct TranscriptRecord: @unchecked Sendable {
   public let object: [String: Any]
 
-  public init(_ object: [String: Any]) {
+  /// For tests only: an object from anywhere else might hold mutable containers.
+  init(_ object: [String: Any]) {
     self.object = object
   }
 
@@ -199,12 +200,26 @@ public protocol TranscriptTailing: Sendable {
   func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<TranscriptChunk>
   /// Reads the file once to its end, without following it.
   func read(_ file: URL) async -> [TranscriptRecord]
+  /// Reads the file once to its end, without following it, a chunk at a time: the last chunk is
+  /// the one caught up, then the stream finishes.
+  func readChunks(_ file: URL) -> AsyncStream<TranscriptChunk>
 }
 
 extension TranscriptTailing {
   /// Complete lines from the start of the file, then as they are written.
   public func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
     follow(file, from: nil)
+  }
+
+  /// The whole file in one chunk: for readers of small files, and tests.
+  public func readChunks(_ file: URL) -> AsyncStream<TranscriptChunk> {
+    AsyncStream { continuation in
+      let task = Task {
+        continuation.yield(.records(await read(file), isCaughtUp: true))
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
   }
 }
 

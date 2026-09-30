@@ -9,72 +9,67 @@ import VibeApplication
 /// from its start, after a `.reset`. The disk wakes the reader (a `vnode` source on the
 /// file), with a slow poll underneath for what the source cannot see: a file that does not exist
 /// yet, or one replaced under its name.
+///
+/// The reading is pulled by whoever decodes it: the next chunk is read, and parsed, while the one
+/// handed over is decoded — never more. A long transcript is thus never read far ahead of its
+/// decoder, nor held whole in memory on its way to it.
 public struct FileTranscriptTail: TranscriptTailing {
   private let pollInterval: Duration
   private let chunkSize: Int
+  private let diagnostics: any DiagnosticLog
 
-  public init(pollInterval: Duration = .seconds(1)) {
-    self.init(pollInterval: pollInterval, chunkSize: TranscriptLineReader.chunkSize)
+  public init(
+    pollInterval: Duration = .seconds(1), diagnostics: any DiagnosticLog = NullDiagnosticLog()
+  ) {
+    self.init(
+      pollInterval: pollInterval, chunkSize: TranscriptLineReader.chunkSize,
+      diagnostics: diagnostics)
   }
 
   /// - Parameter chunkSize: the bytes read at once — and handed over at once — while a long
   ///   transcript is first read, so that the reader shows progress rather than wait for megabytes.
-  init(pollInterval: Duration, chunkSize: Int) {
+  init(
+    pollInterval: Duration, chunkSize: Int,
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
+  ) {
     self.pollInterval = pollInterval
     self.chunkSize = chunkSize
+    self.diagnostics = diagnostics
   }
 
   public func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<
     TranscriptChunk
   > {
-    let pollInterval = pollInterval
-    let chunkSize = chunkSize
-    return AsyncStream { continuation in
-      let task = Task.detached(priority: .utility) {
-        var reader = TranscriptLineReader(file: file, from: position, chunkSize: chunkSize)
-        let wake = WakeSignal()
-        var watcher: FileWatcher?
-        var first = true
-        var wasCaughtUp = false
-        while !Task.isCancelled {
-          let (reading, records) = Signposts.interval("transcript.chunk") {
-            Self.readChunk(with: &reader)
-          }
-          if reading.wasReset { continuation.yield(.reset) }
-          // The first reading is always handed over, empty or not: it says the file was read. So is
-          // the one that reaches the end of the file, which says the reading caught up.
-          let isCaughtUp = !reading.hasMore
-          if !records.isEmpty || first || isCaughtUp != wasCaughtUp {
-            continuation.yield(
-              .records(records, through: reader.position, isCaughtUp: isCaughtUp))
-          }
-          first = false
-          wasCaughtUp = isCaughtUp
-          if reading.hasMore { continue }
-          if watcher?.inode != reader.inode {
-            watcher = reader.inode.flatMap { _ in FileWatcher(path: file.path, wake: wake) }
-          }
-          await wake.wait(timeout: pollInterval)
-        }
-        watcher?.cancel()
-      }
-      continuation.onTermination = { _ in task.cancel() }
-    }
+    stream(of: pulledReading(file, from: position, follows: true))
   }
 
+  public func readChunks(_ file: URL) -> AsyncStream<TranscriptChunk> {
+    stream(of: pulledReading(file, from: nil, follows: false))
+  }
+
+  /// The whole file at once: for small files and tests — a long transcript is read with
+  /// `readChunks`.
   public func read(_ file: URL) async -> [TranscriptRecord] {
-    let chunkSize = chunkSize
-    return await Task.detached(priority: .utility) {
-      var reader = TranscriptLineReader(file: file, chunkSize: chunkSize)
-      var records: [TranscriptRecord] = []
-      var reading: TranscriptLineReader.Reading
-      repeat {
-        let chunk = Self.readChunk(with: &reader)
-        reading = chunk.reading
-        records += chunk.records
-      } while reading.hasMore
-      return records
-    }.value
+    var records: [TranscriptRecord] = []
+    for await chunk in readChunks(file) {
+      switch chunk {
+      case .reset: records = []
+      case .records(let chunkRecords, _, _): records += chunkRecords
+      }
+    }
+    return records
+  }
+
+  func pulledReading(_ file: URL, from position: TranscriptPosition?, follows: Bool)
+    -> PulledTranscriptReading
+  {
+    PulledTranscriptReading(
+      reader: TranscriptLineReader(file: file, from: position, chunkSize: chunkSize),
+      follows: follows, pollInterval: pollInterval, diagnostics: diagnostics)
+  }
+
+  private func stream(of reading: PulledTranscriptReading) -> AsyncStream<TranscriptChunk> {
+    AsyncStream(unfolding: { await reading.next() }, onCancel: { reading.cancel() })
   }
 
   /// The next chunk and its lines parsed. What reading and parsing leave to autorelease goes with
@@ -108,6 +103,134 @@ public struct FileTranscriptTail: TranscriptTailing {
   }
 }
 
+/// One reading of a transcript, a chunk handed over each time its consumer asks for one (#249).
+///
+/// The chunk after the one handed over is read ahead, off the consumer, while it decodes: one
+/// chunk at most waits for it. Each step runs after the one before it — `next()` awaits the read
+/// under way before it starts another — so the reader is never touched by two at once; only the
+/// read ahead and the cancellation, which `cancel()` touches from anywhere, are under the lock.
+final class PulledTranscriptReading: @unchecked Sendable {
+  private struct Step {
+    var reading: TranscriptLineReader.Reading
+    var records: [TranscriptRecord]
+    var position: TranscriptPosition?
+  }
+
+  private var reader: TranscriptLineReader
+  private let follows: Bool
+  private let pollInterval: Duration
+  private let diagnostics: any DiagnosticLog
+  private let wake = WakeSignal()
+  private var watcher: FileWatcher?
+  private var pending: [TranscriptChunk] = []
+  private var first = true
+  private var wasCaughtUp = false
+  /// Caught up with the file: the next step waits for it to change.
+  private var waitsForChange = false
+  private var isFinished = false
+
+  private let lock = NSLock()
+  private var ahead: Task<Step, Never>?
+  private var isCancelled = false
+  private var readCount = 0
+
+  init(
+    reader: TranscriptLineReader, follows: Bool, pollInterval: Duration,
+    diagnostics: any DiagnosticLog
+  ) {
+    self.reader = reader
+    self.follows = follows
+    self.pollInterval = pollInterval
+    self.diagnostics = diagnostics
+  }
+
+  deinit {
+    watcher?.cancel()
+  }
+
+  /// The chunks read from the file so far, the one read ahead included: for tests.
+  var chunksRead: Int { lock.withLock { readCount } }
+
+  func next() async -> TranscriptChunk? {
+    while true {
+      if !pending.isEmpty { return pending.removeFirst() }
+      if isFinished || Task.isCancelled || lock.withLock({ isCancelled }) {
+        watcher?.cancel()
+        watcher = nil
+        return nil
+      }
+      if waitsForChange {
+        waitsForChange = false
+        if watcher?.inode != reader.inode {
+          watcher = reader.inode.flatMap { _ in FileWatcher(path: reader.file.path, wake: wake) }
+        }
+        await wake.wait(timeout: pollInterval)
+        continue
+      }
+      take(await nextStep())
+    }
+  }
+
+  func cancel() {
+    lock.withLock {
+      isCancelled = true
+      ahead?.cancel()
+      ahead = nil
+    }
+    wake.fire()
+  }
+
+  /// The chunk read ahead, or read now; the one after it is read ahead when the file holds more.
+  private func nextStep() async -> Step {
+    let task = lock.withLock {
+      let task = ahead ?? readTask()
+      ahead = nil
+      return task
+    }
+    let step = await task.value
+    if step.reading.hasMore {
+      lock.withLock {
+        if !isCancelled { ahead = readTask() }
+      }
+    }
+    return step
+  }
+
+  /// Called under the lock.
+  private func readTask() -> Task<Step, Never> {
+    readCount += 1
+    return Task.detached(priority: .utility) { self.read() }
+  }
+
+  private func read() -> Step {
+    Signposts.interval("transcript.chunk") {
+      let (reading, records) = FileTranscriptTail.readChunk(with: &reader)
+      return Step(reading: reading, records: records, position: reader.position)
+    }
+  }
+
+  private func take(_ step: Step) {
+    if step.reading.skippedLines > 0 {
+      // A line longer than the splitter keeps: whatever it held — a huge tool result — is not
+      // shown.
+      diagnostics.record(
+        .session, .notice, "transcript.lineSkipped", ["lines": .count(step.reading.skippedLines)])
+    }
+    if step.reading.wasReset { pending.append(.reset) }
+    // The first reading is always handed over, empty or not: it says the file was read. So is
+    // the one that reaches the end of the file, which says the reading caught up, and the one
+    // after a reset, which ends the reading again even when the file holds no line yet.
+    let isCaughtUp = !step.reading.hasMore
+    if !step.records.isEmpty || first || step.reading.wasReset || isCaughtUp != wasCaughtUp {
+      pending.append(.records(step.records, through: step.position, isCaughtUp: isCaughtUp))
+    }
+    first = false
+    wasCaughtUp = isCaughtUp
+    guard isCaughtUp else { return }
+    if follows { waitsForChange = true } else { isFinished = true }
+  }
+}
+
 /// Reads the complete lines a file gained since the last reading, a bounded chunk at a time (#249):
 /// a transcript of a hundred megabytes is never in memory at once.
 struct TranscriptLineReader {
@@ -120,7 +243,9 @@ struct TranscriptLineReader {
   /// Where the complete lines handed out end.
   private(set) var offset: UInt64 = 0
   private(set) var inode: UInt64?
-  private var splitter = LineSplitter()
+  private var splitter: LineSplitter
+  /// In a line too long to keep, skipped to its end.
+  private var isSkipping = false
   /// The last bytes before `offset`.
   private var fingerprint = Data()
   /// Resumed at a position not checked against the file yet.
@@ -128,9 +253,14 @@ struct TranscriptLineReader {
 
   /// - Parameter position: where an earlier reading of the file stopped, to go on from there —
   ///   from the start if the file is no longer the one it was in.
-  init(file: URL, from position: TranscriptPosition? = nil, chunkSize: Int = Self.chunkSize) {
+  /// - Parameter maximumLineLength: a longer line is skipped, and counted in `skippedLines`.
+  init(
+    file: URL, from position: TranscriptPosition? = nil, chunkSize: Int = Self.chunkSize,
+    maximumLineLength: Int = LineSplitter.defaultMaximumLineLength
+  ) {
     self.file = file
     self.chunkSize = chunkSize
+    splitter = LineSplitter(maximumLineLength: maximumLineLength)
     if let position {
       inode = position.inode
       offset = position.offset
@@ -149,6 +279,8 @@ struct TranscriptLineReader {
     var wasReset = false
     /// The file already holds more than this chunk: read on without waiting.
     var hasMore = false
+    /// Lines found too long to keep in this chunk: left out.
+    var skippedLines = 0
   }
 
   /// The complete lines of the next chunk: `chunkSize` bytes read at most.
@@ -165,6 +297,7 @@ struct TranscriptLineReader {
       offset = 0
       fingerprint = Data()
       splitter.reset()
+      isSkipping = false
       reading.wasReset = true
     }
     isUnchecked = false
@@ -181,6 +314,10 @@ struct TranscriptLineReader {
     var lines: [Data] = []
     splitter.append(data) { lines.append($0) }
     reading.lines = lines
+    // Nothing carried after a chunk that does not end a line: the splitter gave the line up.
+    let skips = data.last != 0x0A && splitter.pendingCount == 0
+    if skips, !isSkipping { reading.skippedLines += 1 }
+    isSkipping = skips
     let completeCount = data.count - splitter.pendingCount
     offset = readFrom + UInt64(data.count) - UInt64(splitter.pendingCount)
     if completeCount >= Self.fingerprintSize {
@@ -206,21 +343,6 @@ struct TranscriptLineReader {
       let bytes = try? handle.read(upToCount: Int(end - start))
     else { return Data() }
     return bytes
-  }
-
-  /// Every complete line up to the end of the file, chunk after chunk.
-  mutating func readAvailable() -> Reading {
-    var reading = Reading()
-    repeat {
-      let chunk = readChunk()
-      if chunk.wasReset {
-        reading.lines = []
-        reading.wasReset = true
-      }
-      reading.lines += chunk.lines
-      reading.hasMore = chunk.hasMore
-    } while reading.hasMore
-    return reading
   }
 }
 

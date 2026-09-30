@@ -4,22 +4,6 @@ import VibeDomain
 
 @testable import VibeApplication
 
-extension TranscriptRecord {
-  /// A test line, carried as it is.
-  fileprivate init(text: String) {
-    self.init(["line": text])
-  }
-
-  fileprivate var text: String { object["line"] as? String ?? "" }
-}
-
-extension TranscriptChunk {
-  /// Test lines, the file caught up once they are read.
-  fileprivate static func lines(_ texts: [String]) -> TranscriptChunk {
-    .records(texts.map(TranscriptRecord.init(text:)), isCaughtUp: true)
-  }
-}
-
 /// Lines of the form `user:<text>` or `agent:<text>`, one entry each.
 private final class LineDecoder: ConversationDecoding {
   private(set) var entries: [ConversationEntry] = []
@@ -172,6 +156,22 @@ struct FollowConversationTests {
     await tail.replace(file, with: ["user:again"])
     let third = await next(&iterator) { $0.entries.count == 1 }
     #expect(third?.entries.first?.content == .userPrompt("again", attachments: 0))
+  }
+
+  @Test("A file emptied: its conversation is emptied, not left as it was (#249)")
+  func emptied() async throws {
+    let file = URL(fileURLWithPath: "/t/one.jsonl")
+    let tail = ScriptedTail([file: ["user:hi", "agent:hello"]])
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file])]), tail: tail,
+      refreshInterval: .milliseconds(100), publishInterval: .milliseconds(10))
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "one"))
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    _ = await next(&iterator) { $0.entries.count == 2 }
+    await tail.replace(file, with: [])
+    let emptied = await next(&iterator) { $0.entries.isEmpty }
+    #expect(emptied?.entries.isEmpty == true)
   }
 
   @Test("An identifier the agent gives after the start is read from the store, then followed")

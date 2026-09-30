@@ -193,7 +193,11 @@ public actor FollowConversation {
     following.tasks.forEach { $0.cancel() }
     following.publishTask?.cancel()
     following.allReadings.forEach { $0.task?.cancel() }
-    if following.live, !forgotten.contains(following.session.id) { park(following) }
+    let id = following.session.id
+    if following.live, !forgotten.contains(id) { park(following) }
+    // Forgotten for the follows that were ending when its model was let go of: once none is left,
+    // there is nothing more to forget.
+    if !followings.values.contains(where: { $0.session.id == id }) { forgotten.remove(id) }
   }
 
   /// The sessions put aside, the oldest first: for tests.
@@ -539,9 +543,12 @@ public actor FollowConversation {
           await self.received(chunk, file: file, generation: generation, key: key)
         }
       } else {
-        let records = await tail.read(file)
-        await self?.received(
-          .records(records, isCaughtUp: true), file: file, generation: generation, key: key)
+        // Decoded a chunk at a time too: a long transcript of a sub-agent that ended is never
+        // held whole on its way to its decoder.
+        for await chunk in tail.readChunks(file) {
+          guard let self else { return }
+          await self.received(chunk, file: file, generation: generation, key: key)
+        }
       }
     }
   }

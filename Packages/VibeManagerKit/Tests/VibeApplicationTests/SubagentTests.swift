@@ -4,22 +4,6 @@ import VibeDomain
 
 @testable import VibeApplication
 
-extension TranscriptRecord {
-  /// A test line, carried as it is.
-  fileprivate init(text: String) {
-    self.init(["line": text])
-  }
-
-  fileprivate var text: String { object["line"] as? String ?? "" }
-}
-
-extension TranscriptChunk {
-  /// Test lines, the file caught up once they are read.
-  fileprivate static func lines(_ texts: [String]) -> TranscriptChunk {
-    .records(texts.map(TranscriptRecord.init(text:)), isCaughtUp: true)
-  }
-}
-
 /// Lines `agent:<text>`, `tool:<name>`, and `sub:<call id>:running|done[:<seconds since 1970>]`:
 /// a sub-agent call, started then when a time is given, the same call again to change its state.
 private final class ScriptDecoder: ConversationDecoding {

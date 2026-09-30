@@ -636,6 +636,103 @@ struct FileTranscriptTailTests {
     #expect(chunks > 1)
   }
 
+  @Test("A line too long to keep is skipped to its end, and counted")
+  func tooLongLine() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append("a\n\(String(repeating: "x", count: 40))\nb\n", to: file)
+    var reader = TranscriptLineReader(file: file, chunkSize: 8, maximumLineLength: 16)
+    var lines: [String] = []
+    var skipped = 0
+    var reading: TranscriptLineReader.Reading
+    repeat {
+      reading = reader.readChunk()
+      lines += reading.lines.map { String(decoding: $0, as: UTF8.self) }
+      skipped += reading.skippedLines
+    } while reading.hasMore
+    #expect(lines == ["a", "b"])
+    #expect(skipped == 1)
+  }
+
+  @Test("Pulled by its consumer, a reading never runs more than a chunk ahead of it (#249)")
+  func readsOneChunkAhead() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append((0..<200).map { #"{"n":\#($0)}"# + "\n" }.joined(), to: file)
+    let tail = FileTranscriptTail(pollInterval: .seconds(60), chunkSize: 64)
+    let reading = tail.pulledReading(file, from: nil, follows: true)
+    guard case .records(_, _, let isCaughtUp) = await reading.next() else {
+      Issue.record("no first chunk")
+      return
+    }
+    #expect(!isCaughtUp)
+    // The chunk after the one handed over is read ahead…
+    while reading.chunksRead < 2 { await Task.yield() }
+    // …and none after it while the first is not decoded.
+    for _ in 0..<1_000 { await Task.yield() }
+    #expect(reading.chunksRead == 2)
+    _ = await reading.next()
+    while reading.chunksRead < 3 { await Task.yield() }
+    for _ in 0..<1_000 { await Task.yield() }
+    #expect(reading.chunksRead == 3)
+    reading.cancel()
+  }
+
+  @Test("A followed file emptied says so: reset, then an empty reading caught up (#249)")
+  func emptied() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append(#"{"n":"a"}"# + "\n", to: file)
+    let tail = FileTranscriptTail(pollInterval: .milliseconds(50))
+    var iterator = tail.follow(file).makeAsyncIterator()
+    guard case .records(let first, _, true) = await iterator.next() else {
+      Issue.record("no first reading")
+      return
+    }
+    #expect(first.count == 1)
+    try Data().write(to: file)
+    var sawReset = false
+    while let chunk = await iterator.next() {
+      switch chunk {
+      case .reset:
+        sawReset = true
+      case .records(let records, _, let isCaughtUp):
+        guard sawReset else { continue }
+        #expect(records.isEmpty)
+        #expect(isCaughtUp)
+        return
+      }
+    }
+    Issue.record("the stream ended")
+  }
+
+  @Test("Read once, the file comes a chunk at a time, and the stream ends once caught up")
+  func readInChunks() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append((0..<50).map { #"{"n":\#($0)}"# + "\n" }.joined(), to: file)
+    let tail = FileTranscriptTail(pollInterval: .seconds(60), chunkSize: 64)
+    var numbers: [Int] = []
+    var chunks = 0
+    var caughtUp = 0
+    for await chunk in tail.readChunks(file) {
+      guard case .records(let records, _, let isCaughtUp) = chunk else { continue }
+      chunks += 1
+      if isCaughtUp { caughtUp += 1 }
+      numbers += records.compactMap { $0.object["n"] as? Int }
+    }
+    #expect(numbers == Array(0..<50))
+    #expect(chunks > 1)
+    #expect(caughtUp == 1)
+    #expect(await tail.read(file).count == 50)
+    let missing = root.appendingPathComponent("missing.jsonl")
+    #expect(await tail.read(missing).isEmpty)
+  }
+
   @Test("Lines parsed on every core come back in the order of the file, the unreadable left out")
   func parsedInOrder() {
     let lines = (0..<10_000).map { index in
@@ -715,5 +812,22 @@ struct MockConversationTests {
         // Pasted, a `!` is text.
         .userPrompt("!pasted", attachments: 0), .agentText("echo: !pasted"),
       ])
+  }
+}
+
+extension TranscriptLineReader {
+  /// Every complete line up to the end of the file, chunk after chunk.
+  fileprivate mutating func readAvailable() -> Reading {
+    var reading = Reading()
+    repeat {
+      let chunk = readChunk()
+      if chunk.wasReset {
+        reading.lines = []
+        reading.wasReset = true
+      }
+      reading.lines += chunk.lines
+      reading.hasMore = chunk.hasMore
+    } while reading.hasMore
+    return reading
   }
 }
