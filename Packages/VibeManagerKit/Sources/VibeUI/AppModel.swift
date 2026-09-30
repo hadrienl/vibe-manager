@@ -32,6 +32,7 @@ public final class AppModel {
       if case .loaded(let sessions) = state {
         journal?.track(sessions)
         quickOpen.sessionsChanged(sessions)
+        conversations.sessionsChanged(sessions)
         // Every journal, archived sessions' included, for Open Quickly, from the first list that
         // holds sessions: a first load that failed or came back empty leaves it to the next one.
         if readsJournalsForQuickOpen, let journal {

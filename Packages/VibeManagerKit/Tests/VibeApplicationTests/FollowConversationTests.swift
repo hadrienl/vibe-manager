@@ -25,9 +25,19 @@ private final class LineDecoder: ConversationDecoding {
   }
 }
 
+/// Counts what the test wants counted: looks through the folders, files opened.
+private final class Counter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var counts: [String: Int] = [:]
+
+  func add(_ key: String) { lock.withLock { counts[key, default: 0] += 1 } }
+  func count(_ key: String) -> Int { lock.withLock { counts[key] ?? 0 } }
+}
+
 private struct LineProvider: AgentProvider, AgentConversationReporting {
   let descriptor: AgentDescriptor
   let files: [URL]
+  var looks: Counter?
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
     AgentDiagnosticFactoryStub.available(descriptor)
@@ -40,7 +50,8 @@ private struct LineProvider: AgentProvider, AgentConversationReporting {
     for conversation: SessionAgentConfiguration, in session: WorkSession,
     hint: AgentActivityEvent?
   ) -> [URL] {
-    files.filter { $0.lastPathComponent.hasPrefix(conversation.resumeIdentifier ?? "-") }
+    looks?.add("look")
+    return files.filter { $0.lastPathComponent.hasPrefix(conversation.resumeIdentifier ?? "-") }
   }
   func conversationDecoder(for file: URL) -> any ConversationDecoding {
     LineDecoder(file: file.lastPathComponent)
@@ -83,12 +94,14 @@ private struct Registry: AgentProviderResolving {
 private actor ScriptedTail: TranscriptTailing {
   private var contents: [URL: [String]] = [:]
   private var continuations: [URL: AsyncStream<TranscriptChunk>.Continuation] = [:]
+  nonisolated let opened = Counter()
 
   init(_ contents: [URL: [String]]) {
     self.contents = contents
   }
 
   nonisolated func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+    opened.add(file.lastPathComponent)
     let (stream, continuation) = AsyncStream<TranscriptChunk>.makeStream()
     Task { await self.opened(file, continuation) }
     return stream
@@ -223,5 +236,54 @@ struct FollowConversationTests {
       live: false
     ).makeAsyncIterator()
     #expect(await empty.next()?.availability == .notYetWritten(providerName: "Alpha"))
+  }
+
+  @Test("Every file found, the folders are looked at again only when something says to (#255)")
+  func looksOnlyWhenWoken() async throws {
+    let file = URL(fileURLWithPath: "/t/one.jsonl")
+    let tail = ScriptedTail([file: ["user:hi"]])
+    let looks = Counter()
+    let follow = FollowConversation(
+      agents: Registry(providers: [LineProvider(descriptor: alpha, files: [file], looks: looks)]),
+      tail: tail, refreshInterval: .milliseconds(20), safetyInterval: .seconds(3600),
+      publishInterval: .milliseconds(10))
+    let session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "one"))
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    _ = await next(&iterator) { $0.availability == .available }
+    let found = looks.count("look")
+    // Lines arrive and are published: nothing looks through the folders for them.
+    await tail.write(["agent:more"], to: file)
+    _ = await next(&iterator) { $0.entries.count == 2 }
+    #expect(looks.count("look") == found)
+    await follow.lookAgain(for: session.id)
+    #expect(await eventually { looks.count("look") == found + 1 })
+    // A process that starts may resume the conversation in a new file.
+    await follow.setAgentRunning(true, since: Date(), for: session.id)
+    #expect(await eventually { looks.count("look") == found + 2 })
+  }
+
+  @Test("A session changed is adopted, and what was read is not read again (#255)")
+  func sessionChangedKeepsReadings() async throws {
+    let one = URL(fileURLWithPath: "/t/one.jsonl")
+    let two = URL(fileURLWithPath: "/t/two.jsonl")
+    let tail = ScriptedTail([one: ["user:first"], two: ["user:second"]])
+    let follow = FollowConversation(
+      agents: Registry(providers: [
+        LineProvider(descriptor: alpha, files: [one]), LineProvider(descriptor: beta, files: [two]),
+      ]), tail: tail, refreshInterval: .milliseconds(20), safetyInterval: .seconds(3600),
+      publishInterval: .milliseconds(10))
+    var session = WorkSession(
+      name: "S", agent: SessionAgentConfiguration(providerID: "alpha", resumeIdentifier: "one"))
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    _ = await next(&iterator) { $0.availability == .available }
+    _ = try session.switchAgent(
+      to: SessionAgentConfiguration(providerID: "beta", resumeIdentifier: "two"),
+      handover: .initialPrompt, at: Date())
+    await follow.sessionChanged(session)
+    let both = await next(&iterator) { $0.entries.count == 3 }
+    #expect(both?.entries.last?.content == .userPrompt("second", attachments: 0))
+    #expect(tail.opened.count("one.jsonl") == 1)
+    #expect(tail.opened.count("two.jsonl") == 1)
   }
 }

@@ -50,6 +50,8 @@ public final class ConversationWorkspace {
   /// than rebuilding a conversation nobody sees at every change.
   @ObservationIgnored private var dormantActivities: [SessionID: AgentActivityState?] = [:]
   @ObservationIgnored private var followed: [SessionID: [SessionAgentConfiguration]] = [:]
+  /// The last activity of each followed session, to tell a turn that starts from one that goes on.
+  @ObservationIgnored private var activities: [SessionID: AgentActivityState?] = [:]
   /// Which follow is the current one for a session: a stream that arrives after its model was
   /// let go of, or after a newer one was asked for, is dropped — and stops its reader with it.
   @ObservationIgnored private var generations: [SessionID: Int] = [:]
@@ -136,7 +138,12 @@ public final class ConversationWorkspace {
       RestartSession.workingDirectoryPath(of: session).map {
         URL(fileURLWithPath: $0).lastPathComponent
       } ?? ""
-    if followed[session.id] != session.conversationAgents, let follow {
+    if let known = followed[session.id], known != session.conversationAgents, let follow {
+      // Already followed: the follow adopts the session as it is now, and keeps what it read
+      // rather than reading every transcript again from its start (#255).
+      followed[session.id] = session.conversationAgents
+      Task { await follow.sessionChanged(session) }
+    } else if followed[session.id] == nil, let follow {
       followed[session.id] = session.conversationAgents
       let generation = (generations[session.id] ?? 0) + 1
       generations[session.id] = generation
@@ -186,13 +193,43 @@ public final class ConversationWorkspace {
     models[id]
   }
 
+  /// The sessions as the application now holds them: a follow whose session gained or changed a
+  /// conversation — a switch of agent, an identifier learned — adopts it, whether it is on screen
+  /// or not (#255).
+  public func sessionsChanged(_ sessions: [WorkSession]) {
+    guard let follow, !followed.isEmpty else { return }
+    for session in sessions {
+      guard let known = followed[session.id], known != session.conversationAgents else {
+        continue
+      }
+      followed[session.id] = session.conversationAgents
+      Task { await follow.sessionChanged(session) }
+    }
+  }
+
   public func activityChanged(_ id: SessionID, to state: AgentActivityState?) {
+    // A turn that starts, or hooks that speak for the first time, may come with a new transcript:
+    // after a `/clear`, the next prompt writes a new file (#255).
+    if followed[id] != nil, let follow {
+      let previous = activities.updateValue(state, forKey: id) ?? nil
+      if Self.mayStartTranscript(from: previous, to: state) {
+        Task { await follow.lookAgain(for: id) }
+      }
+    }
     guard let model = models[id] else { return }
     if dormantSessionIDs.contains(id) {
       dormantActivities[id] = .some(state)
     } else {
       apply(state, to: model)
     }
+  }
+
+  static func mayStartTranscript(from previous: AgentActivityState?, to state: AgentActivityState?)
+    -> Bool
+  {
+    guard let state else { return false }
+    return (state.activity == .working && previous?.activity != .working)
+      || state.source != previous?.source
   }
 
   private func apply(_ state: AgentActivityState?, to model: ConversationModel) {
@@ -214,6 +251,7 @@ public final class ConversationWorkspace {
     models.removeValue(forKey: id)?.stop()
     followed[id] = nil
     generations[id] = nil
+    activities[id] = nil
     dormantSessionIDs.removeAll { $0 == id }
     dormantActivities[id] = nil
     if pendingComposerFocus == id { pendingComposerFocus = nil }
@@ -228,6 +266,7 @@ public final class ConversationWorkspace {
       models[id]?.pause()
       // Read again from the start when shown: a follow still being set up is dropped.
       followed[id] = nil
+      activities[id] = nil
       generations[id] = (generations[id] ?? 0) + 1
       dormantSessionIDs.append(id)
     }

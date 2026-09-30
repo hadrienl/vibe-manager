@@ -73,10 +73,17 @@ agent did. A conversation rewound with `/rewind` therefore still shows what was 
 ### Following a file
 
 `FileTranscriptTail` hands over whole lines only, resumes at its offset, and reads a file that got
-shorter or changed inode again from the start after a `.reset`. A `vnode` source wakes it, a
-one-second poll underneath covers a file that does not exist yet or was replaced. A snapshot is
-published only when lines arrived, and the folders are looked at again every two seconds while a
-file is awaited, every ten after. Only the five sessions last shown in conversation keep a mounted
+shorter or changed inode again from the start after a `.reset`. A `vnode` source wakes it, and
+sees the file replaced or deleted too: a one-second poll covers a file that does not exist yet, a
+thirty-second one a watched file whose source would have gone deaf. A snapshot is published only
+when lines arrived. The folders are looked at again every two seconds while a file is awaited —
+the store read again then, for an identifier Codex stored without the application hearing of it.
+Once every file is found, they are looked at on events only: the session changed (a switch of
+agent, pushed by the application), its agent (re)started, a turn started or the hooks spoke; and
+every sixty seconds as a safety net (#255). Where each transcript was found is remembered
+(`TranscriptLocationCache`): a Claude Code transcript is checked by one `stat`, and only the last
+day listed and today are listed again for a Codex rollout. A clock in a hidden conversation stops.
+Only the five sessions last shown in conversation keep a mounted
 view and a reader; a hidden conversation view is disabled, so that its composer never keeps the
 keyboard. The twenty shown before them keep their model — what was read, in memory only — without
 a reader: coming back to one shows its conversation at once, and it is read again from the start
