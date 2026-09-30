@@ -417,6 +417,10 @@ public actor TerminalHostServer {
           for frame in TerminalHostFrame.terminalChunks(.output, session: id, bytes: bytes) {
             await connection.sendAndWait(frame)
           }
+        case .outputPulse:
+          // Not asked for: the host forwards everything, and the application's own session
+          // serves each of its subscribers what it reads.
+          continue
         case .historyTruncated(let count):
           await connection.sendAndWait(
             .control(
