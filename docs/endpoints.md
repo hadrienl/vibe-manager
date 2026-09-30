@@ -1,7 +1,7 @@
 # Endpoints
 
 An endpoint is a model server reachable over HTTP — on this Mac (Ollama, LM Studio) or in the cloud
-(OpenRouter, a corporate gateway such as the Prisme.ai LLM Gateway). Its models appear beside Claude
+(OpenRouter, a corporate gateway). Its models appear beside Claude
 Code and Codex when you create a session, and the session runs Claude Code or Codex against them:
 same terminal, same conversation view, same requests in the palette, same resume after a relaunch.
 The design is in [ADR 0035](architecture/0035-endpoint-agents.md).
@@ -15,7 +15,6 @@ Settings → Endpoints → **+**, then a starting point:
 | Ollama | `http://localhost:11434` | Anthropic Messages | none |
 | LM Studio | `http://localhost:1234/v1` | OpenAI Chat Completions | none |
 | OpenRouter | `https://openrouter.ai/api/v1` | OpenAI Chat Completions | bearer token |
-| Prisme.ai LLM Gateway | `https://<host>/v2/workspaces/slug:llm-gateway/webhooks/v1` | OpenAI Chat Completions | `x-prismeai-api-key` header |
 | OpenAI-compatible, Anthropic-compatible | yours | as named | as the server wants |
 
 - **Key**: typed once, written to the login keychain (service `com.hadrienl.VibeManager.endpoint`,
@@ -27,8 +26,8 @@ Settings → Endpoints → **+**, then a starting point:
 - **Driven by**: *Automatic* picks Claude Code for a Messages endpoint and Codex for a Responses
   one (no translation at all), Claude Code for the rest.
 - **Advanced**: extra headers, a JSON object merged into every request (`{"provider": {"sort":
-  "throughput"}}` for OpenRouter; a `null` value takes a field out, as the Prisme.ai starting
-  point does with `stream_options`), timeouts.
+  "throughput"}}` for OpenRouter; a `null` value takes a field out of the request, such as
+  `{"stream_options": null}` for a server that refuses it), timeouts.
 
 **Test** sends a short request asking the model to call a tool, then gives it the result, and says
 what worked: reachable, authentication, streamed answer and speed, tool call, answer after the

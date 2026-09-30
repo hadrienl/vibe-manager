@@ -849,7 +849,7 @@ struct EndpointsSettingsView: View {
     switch preset.id {
     case "ollama", "lmstudio":
       return String(localized: "On this Mac, no key", bundle: .module)
-    case "openrouter", "prisme":
+    case "openrouter":
       return String(localized: "Cloud, an API key", bundle: .module)
     default:
       return protocolName(preset.wireProtocol)
