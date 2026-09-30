@@ -608,16 +608,13 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     else { return false }
     exitTasks.removeValue(forKey: id)?.cancel()
     _ = nextExitGeneration(for: id)
-    outputTasks.removeValue(forKey: id)?.cancel()
-    activityTasks.removeValue(forKey: id)?.cancel()
-    if let observer = observers.removeValue(forKey: id) {
+    if let observer = forgetRuntime(of: id) {
       // Asked once the watch is over: its last look may just have stored the identifier.
       await observer.finished()
       await recorder?.awaiting(id, resumeIdentifier: observer.awaitedResumeIdentifier())
     }
     // The run goes on without the application: the next launch says how it ended.
     await usage?.detached(id)
-    startedAt[id] = nil
     await sideTerminals?.handOff(id)
     diagnostics.record(.session, .info, "session.handedOff", ["session": diagnostics.pseudonym(id)])
     return true
@@ -692,19 +689,30 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       task.cancel()
     }
     exitTasks.removeAll()
-    for task in outputTasks.values {
-      task.cancel()
-    }
-    outputTasks.removeAll()
-    for task in activityTasks.values {
-      task.cancel()
-    }
-    activityTasks.removeAll()
-    for observer in observers.values {
+    let observers = trackedSessionIDs.compactMap { forgetRuntime(of: $0) }
+    for observer in observers {
       await observer.finished()
     }
-    observers.removeAll()
     await supervisor.stopAll(gracePeriod: gracePeriod)
+  }
+
+  /// Lets go of what the launcher holds for a session's process — its readers, its observer, when
+  /// it started — on every path its run ends by: a dictionary left out of one of them would grow
+  /// with each session run (#255). The observer is handed back, to be finished.
+  ///
+  /// `exitGenerations` is kept on purpose: counted from 1 again, a watch retired earlier and still
+  /// waiting for the main actor could take itself for the current one.
+  private func forgetRuntime(of id: SessionID) -> (any AgentLaunchObserver)? {
+    outputTasks.removeValue(forKey: id)?.cancel()
+    activityTasks.removeValue(forKey: id)?.cancel()
+    startedAt[id] = nil
+    return observers.removeValue(forKey: id)
+  }
+
+  /// Every session the launcher still holds process state for.
+  var trackedSessionIDs: Set<SessionID> {
+    Set(outputTasks.keys).union(activityTasks.keys).union(observers.keys).union(startedAt.keys)
+      .union(exitTasks.keys)
   }
 
   // MARK: - SessionRuntime
@@ -740,9 +748,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // Retires the watch as well as cancelling it: one already on its way to the main actor is
     // past the point where cancellation can stop it.
     _ = nextExitGeneration(for: id)
-    outputTasks.removeValue(forKey: id)?.cancel()
-    activityTasks.removeValue(forKey: id)?.cancel()
-    if let observer = observers.removeValue(forKey: id) {
+    if let observer = forgetRuntime(of: id) {
       await observer.finished()
     }
     await activity?.processEnded(id)
@@ -854,9 +860,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // close the session under it and report its exit.
     guard exitGenerations[id] == generation else { return }
     exitTasks[id] = nil
-    outputTasks.removeValue(forKey: id)?.cancel()
-    activityTasks.removeValue(forKey: id)?.cancel()
-    if let observer = observers.removeValue(forKey: id) {
+    if let observer = forgetRuntime(of: id) {
       await observer.finished()
     }
     await activity?.processEnded(id)

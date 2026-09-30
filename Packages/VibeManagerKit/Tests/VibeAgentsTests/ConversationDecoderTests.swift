@@ -616,6 +616,44 @@ struct FileTranscriptTailTests {
     #expect(received == ["a", "b", "c"])
   }
 
+  @Test("A watched file waits for the disk, not the poll; a deleted one is looked for again (#255)")
+  func watchedThenDeleted() async throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("t.jsonl")
+    try append(#"{"n":"a"}"# + "\n", to: file)
+    let tail = FileTranscriptTail(pollInterval: .milliseconds(50), watchedInterval: .seconds(3600))
+    var iterator = tail.follow(file).makeAsyncIterator()
+    func names(_ records: [TranscriptRecord]) -> [String] {
+      records.compactMap { $0.object["n"] as? String }
+    }
+    guard case .records(let first, _, _) = await iterator.next() else {
+      Issue.record("no first reading")
+      return
+    }
+    #expect(names(first) == ["a"])
+    // Only the disk can wake the reader here: the poll is an hour away.
+    try append(#"{"n":"b"}"# + "\n", to: file)
+    var received: [String] = []
+    while !received.contains("b"), let chunk = await iterator.next() {
+      if case .records(let records, _, _) = chunk { received += names(records) }
+    }
+    #expect(received == ["b"])
+    // Deleted, then written again: the reader goes back to its poll, and reads it from its start.
+    try FileManager.default.removeItem(at: file)
+    try append(#"{"n":"new"}"# + "\n", to: file)
+    received = []
+    var wasReset = false
+    while !received.contains("new"), let chunk = await iterator.next() {
+      switch chunk {
+      case .reset: wasReset = true
+      case .records(let records, _, _): received += names(records)
+      }
+    }
+    #expect(wasReset)
+    #expect(received == ["new"])
+  }
+
   @Test("A first reading in chunks says when it caught up with the file")
   func catchingUp() async throws {
     let root = try scratch()

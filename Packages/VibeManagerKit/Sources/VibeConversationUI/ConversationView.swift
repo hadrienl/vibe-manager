@@ -65,6 +65,7 @@ public struct ConversationView: View {
     .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
+    .environment(\.conversationIsLive, isActive)
     .environment(\.colorScheme, theme.colorScheme)
     // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
     // then, never for a message that arrives or a state that changes. Asked of the model rather

@@ -57,10 +57,14 @@ public actor FollowConversation {
   private let tail: any TranscriptTailing
   private let hint: @Sendable (SessionID) async -> AgentActivityEvent?
   /// The session as the store has it now. Codex tells its conversation's identifier only once it
-  /// has started, and a switch of agent adds a conversation: what was followed at first goes
-  /// stale, and is read again.
+  /// has started, and stores it without the application hearing of it: while a file is still
+  /// awaited, the store is asked again at each look. Once every file is found, nothing is read
+  /// from it: a switch of agent comes through `sessionChanged`.
   private let current: @Sendable (SessionID) async -> WorkSession?
   private let refreshInterval: Duration
+  /// How long the folders are left alone once every file is found, unless something says a new
+  /// one may have appeared (#255).
+  private let safetyInterval: Duration
   private let publishInterval: Duration
   /// How often a conversation nobody sees is published: still read, so that it is up to date when
   /// it comes back, but laid out by nobody meanwhile (#250).
@@ -128,6 +132,18 @@ public actor FollowConversation {
     /// When the sub-agents of a transcript were last looked for: a sub-agent whose transcript
     /// cannot be found yet is looked for again, not at every line.
     var lastSubagentLook: [URL: ContinuousClock.Instant] = [:]
+    /// A file was still awaited at the last look: the store may hold what it needs.
+    var awaitsFile = false
+    /// The session as the application last told it, when its conversations changed: adopted by
+    /// the next look, the only place chapters change — a reading added meanwhile is not lost.
+    var pendingSession: WorkSession?
+    /// Looks still made at the short interval after something said a file may appear: the file
+    /// may come a moment after the event that announced it — a turn's first prompt (#255).
+    var eagerLooks = 0
+    /// The pause between two looks, when one is under way, and whether it was cut short before.
+    var pause: CheckedContinuation<Void, Never>?
+    var pauseGeneration = 0
+    var isWoken = false
 
     var allReadings: [Reading] { chapters.flatMap(\.readings).flatMap(\.all) }
 
@@ -157,6 +173,8 @@ public actor FollowConversation {
   private var shownOrders: [SessionID: Int] = [:]
   /// How often, at most, the sub-agents of one transcript are looked for.
   static let subagentLookInterval = Duration.seconds(1)
+  /// How many looks follow at the short interval once something said a file may appear.
+  static let eagerLookCount = 3
 
   private struct Parked {
     let agents: [SessionAgentConfiguration]
@@ -184,6 +202,7 @@ public actor FollowConversation {
     hint: @escaping @Sendable (SessionID) async -> AgentActivityEvent? = { _ in nil },
     current: @escaping @Sendable (SessionID) async -> WorkSession? = { _ in nil },
     refreshInterval: Duration = .seconds(2),
+    safetyInterval: Duration = .seconds(60),
     publishInterval: Duration = .milliseconds(50),
     hiddenPublishInterval: Duration = .seconds(1)
   ) {
@@ -192,6 +211,7 @@ public actor FollowConversation {
     self.hint = hint
     self.current = current
     self.refreshInterval = refreshInterval
+    self.safetyInterval = safetyInterval
     self.publishInterval = publishInterval
     self.hiddenPublishInterval = hiddenPublishInterval
   }
@@ -216,6 +236,7 @@ public actor FollowConversation {
   private func stop(_ key: UUID) {
     guard let following = followings.removeValue(forKey: key) else { return }
     following.tasks.forEach { $0.cancel() }
+    wake(following)
     following.publishTask?.cancel()
     following.allReadings.forEach { $0.task?.cancel() }
     let id = following.session.id
@@ -287,6 +308,30 @@ public actor FollowConversation {
     }
   }
 
+  /// The session as the application has it now: its conversations may have changed — a switch of
+  /// agent, an identifier learned. Adopted by every follow of it at its next look, what they read
+  /// kept (#255): only the look changes chapters, so nothing it adds meanwhile is lost.
+  public func sessionChanged(_ session: WorkSession) {
+    for following in followings.values where following.session.id == session.id {
+      if following.pendingSession != nil
+        || session.conversationAgents != following.session.conversationAgents
+      {
+        following.pendingSession = session
+      } else {
+        following.session = session
+      }
+      lookSoon(following)
+    }
+  }
+
+  /// Something may have made a new transcript appear — a `SessionStart`, a turn after a
+  /// `/clear`: the folders are looked at now rather than at the next safety pass (#255).
+  public func lookAgain(for session: SessionID) {
+    for following in followings.values where following.session.id == session {
+      lookSoon(following)
+    }
+  }
+
   /// Whether the session's conversation is on screen (#250). Hidden, it is still read, but
   /// published only every `hiddenPublishInterval`; shown again, what waits is published at once.
   ///
@@ -332,6 +377,8 @@ public actor FollowConversation {
       refreshSubagents(following, key: key)
       following.isDirty = true
       if following.live { schedulePublish(following, key: key) }
+      // A process that starts may resume the conversation in a new file: the next day's rollout.
+      if isRunning { lookSoon(following) }
     }
   }
 
@@ -372,11 +419,61 @@ public actor FollowConversation {
       refreshSubagents(following, key: key)
       if following.isDirty { schedulePublish(following, key: key) }
       // Nothing wakes the reader but the disk: lines are published as they arrive. The folders
-      // are looked at again for new files, often while one is still awaited, rarely after.
-      let everyFileFound =
-        following.chapters.allSatisfy { $0.reporter == nil || !$0.readings.isEmpty }
-        && !hasUnreadRunningSubagent(following)
-      try? await Task.sleep(for: everyFileFound ? refreshInterval * 5 : refreshInterval)
+      // are looked at again for new files often while one is still awaited by a running agent,
+      // and for a few looks after something said one may appear. After, only when something
+      // says so again, or at the safety pass (#255).
+      let agentRuns = !stoppedAgents.contains(following.session.id)
+      let isEager = following.eagerLooks > 0
+      if isEager { following.eagerLooks -= 1 }
+      let looksOften =
+        (agentRuns && (following.awaitsFile || isEager)) || hasUnreadRunningSubagent(following)
+      await pause(key, for: looksOften ? refreshInterval : safetyInterval)
+    }
+  }
+
+  /// Waits `duration`, or less if the follow is woken meanwhile. A wake that came during a look
+  /// is not lost: the next pause ends at once.
+  private func pause(_ key: UUID, for duration: Duration) async {
+    guard let following = followings[key] else { return }
+    guard !following.isWoken else {
+      following.isWoken = false
+      return
+    }
+    following.pauseGeneration += 1
+    let generation = following.pauseGeneration
+    let timer = Task { [weak self] in
+      try? await Task.sleep(for: duration)
+      guard !Task.isCancelled else { return }
+      await self?.endPause(key, generation: generation)
+    }
+    await withCheckedContinuation { continuation in
+      guard let following = self.followings[key] else { return continuation.resume() }
+      following.pause = continuation
+    }
+    timer.cancel()
+    followings[key]?.isWoken = false
+  }
+
+  private func endPause(_ key: UUID, generation: Int) {
+    guard let following = followings[key], following.pauseGeneration == generation,
+      let pause = following.pause
+    else { return }
+    following.pause = nil
+    pause.resume()
+  }
+
+  /// Looks now, then a few more times at the short interval.
+  private func lookSoon(_ following: Following) {
+    following.eagerLooks = Self.eagerLookCount
+    wake(following)
+  }
+
+  private func wake(_ following: Following) {
+    if let pause = following.pause {
+      following.pause = nil
+      pause.resume()
+    } else {
+      following.isWoken = true
     }
   }
 
@@ -558,7 +655,17 @@ public actor FollowConversation {
   /// Looks for files the CLIs started since the last look: a first exchange, a `/clear`, a resume
   /// the next day.
   private func refreshFiles(_ following: Following, key: UUID) async {
-    if let latest = await current(following.session.id),
+    let signpost = Signposts.begin("conversation.lookForFiles")
+    defer { Signposts.end("conversation.lookForFiles", signpost) }
+    if let pending = following.pendingSession {
+      following.pendingSession = nil
+      if pending.conversationAgents != following.session.conversationAgents {
+        await adopt(pending, in: following)
+      } else {
+        following.session = pending
+      }
+    }
+    if following.awaitsFile, let latest = await current(following.session.id),
       latest.conversationAgents != following.session.conversationAgents
     {
       await adopt(latest, in: following)
@@ -578,6 +685,12 @@ public actor FollowConversation {
         start(reading, key: key, live: following.live)
       }
     }
+    // A conversation not written yet, or a file its hooks named and its CLI has yet to write —
+    // the new transcript of a `/clear`.
+    let lastReporter = following.chapters.last?.reporter
+    following.awaitsFile =
+      following.chapters.contains { $0.reporter != nil && $0.readings.isEmpty }
+      || lastReporter?.awaitsFile(named: lastHint) == true
   }
 
   /// - Parameter position: where a reading put aside stopped, to go on from there (#249).

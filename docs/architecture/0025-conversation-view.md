@@ -79,18 +79,27 @@ and parses each chunk's JSON on every core before handing it over, off the actor
 is decoded, never more, so a transcript of a hundred megabytes is never in memory at once — nor
 queued, parsed, on its way to its decoder. A sub-agent that ended is read once the same way, a
 chunk at a time. A line longer than 16 MiB is skipped and noted (`transcript.lineSkipped`). A
-`vnode` source wakes it, a one-second poll underneath covers a file that does not exist yet or was
-replaced. A snapshot is
-published only when lines arrived — every 250 ms at most while a transcript is first read — and the
-folders are looked at again every two seconds while a file is awaited, every ten after. Only the
-five sessions last shown in conversation keep a mounted view and a reader; a hidden conversation
-view is disabled, so that its composer never keeps the keyboard. The twenty shown before them keep
-their model — what was read, in memory only — without a reader: coming back to one shows its
-conversation at once, and its readers resume where they stopped, their decoders and positions kept
-aside in memory for as long as the model sleeps — only what was written meanwhile is read, or the
-whole file again, apart, if it was replaced (the bytes before where the reading stopped are checked).
-Past those, the model is let go of with what was kept aside, and the placeholder shows while the
-transcript is read.
+`vnode` source wakes it, and sees the file replaced or deleted too: a one-second poll covers a file
+that does not exist yet, a thirty-second one a watched file whose source would have gone deaf. A
+snapshot is published only when lines arrived — every 250 ms at most while a transcript is first
+read. The folders are looked at again every two seconds while a file is awaited by an agent that
+runs — a conversation not written yet, or the transcript a `/clear` named and the CLI writes at the
+next exchange — the store read again then, for an identifier Codex stored without the application
+hearing of it. Once every file is found, they are looked at on events only: the session changed (a
+switch of agent, pushed by the application), its agent (re)started, a turn started or the hooks
+spoke — then three more times two seconds apart, for a file written a moment after the event; and
+every sixty seconds as a safety net (#255). Only the look changes what is followed: a session
+changed is kept until the next one adopts it, so that nothing a look adds meanwhile is lost. Where
+each transcript was found is remembered (`TranscriptLocationCache`): a Claude Code transcript is
+checked by one `stat`, and only the last day listed and today are listed again for a Codex
+rollout. A clock in a hidden conversation stops. Only the five sessions last shown in conversation
+keep a mounted view and a reader; a hidden conversation view is disabled, so that its composer
+never keeps the keyboard. The twenty shown before them keep their model — what was read, in memory
+only — without a reader: coming back to one shows its conversation at once, and its readers resume
+where they stopped, their decoders and positions kept aside in memory for as long as the model
+sleeps — only what was written meanwhile is read, or the whole file again, apart, if it was
+replaced (the bytes before where the reading stopped are checked). Past those, the model is let go
+of with what was kept aside, and the placeholder shows while the transcript is read.
 
 Of the five mounted, only the one on screen is laid out (#250). The four others are still read, so
 that coming back to one is instant, but published once a second rather than every 50 ms — and never less than the 250 ms of a

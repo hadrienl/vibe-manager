@@ -6,33 +6,39 @@ import VibeApplication
 /// Whole lines only — the CLI may be in the middle of writing the last one — resumed where the
 /// last reading stopped, or where a reading put aside stopped (#249). A file that got shorter,
 /// whose inode changed, or whose bytes before that point changed, was replaced: it is read again
-/// from its start, after a `.reset`. The disk wakes the reader (a `vnode` source on the
-/// file), with a slow poll underneath for what the source cannot see: a file that does not exist
-/// yet, or one replaced under its name.
+/// from its start, after a `.reset`. The disk wakes the reader (a `vnode` source on the file),
+/// which also sees the file replaced or deleted under its name. A poll covers what it cannot see:
+/// often while the file does not exist yet, rarely once it is watched (#255).
 ///
 /// The reading is pulled by whoever decodes it: the next chunk is read, and parsed, while the one
 /// handed over is decoded — never more. A long transcript is thus never read far ahead of its
 /// decoder, nor held whole in memory on its way to it.
 public struct FileTranscriptTail: TranscriptTailing {
   private let pollInterval: Duration
+  private let watchedInterval: Duration
   private let chunkSize: Int
   private let diagnostics: any DiagnosticLog
 
+  /// - Parameter pollInterval: how often a file not watched — not there yet, or deleted — is
+  ///   looked at again.
+  /// - Parameter watchedInterval: the safety net under a file already watched (#255).
   public init(
-    pollInterval: Duration = .seconds(1), diagnostics: any DiagnosticLog = NullDiagnosticLog()
+    pollInterval: Duration = .seconds(1), watchedInterval: Duration = FileWatching.safetyNet,
+    diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) {
     self.init(
-      pollInterval: pollInterval, chunkSize: TranscriptLineReader.chunkSize,
-      diagnostics: diagnostics)
+      pollInterval: pollInterval, watchedInterval: watchedInterval,
+      chunkSize: TranscriptLineReader.chunkSize, diagnostics: diagnostics)
   }
 
   /// - Parameter chunkSize: the bytes read at once — and handed over at once — while a long
   ///   transcript is first read, so that the reader shows progress rather than wait for megabytes.
   init(
-    pollInterval: Duration, chunkSize: Int,
+    pollInterval: Duration, watchedInterval: Duration = FileWatching.safetyNet, chunkSize: Int,
     diagnostics: any DiagnosticLog = NullDiagnosticLog()
   ) {
     self.pollInterval = pollInterval
+    self.watchedInterval = watchedInterval
     self.chunkSize = chunkSize
     self.diagnostics = diagnostics
   }
@@ -65,7 +71,8 @@ public struct FileTranscriptTail: TranscriptTailing {
   {
     PulledTranscriptReading(
       reader: TranscriptLineReader(file: file, from: position, chunkSize: chunkSize),
-      follows: follows, pollInterval: pollInterval, diagnostics: diagnostics)
+      follows: follows, pollInterval: pollInterval, watchedInterval: watchedInterval,
+      diagnostics: diagnostics)
   }
 
   private func stream(of reading: PulledTranscriptReading) -> AsyncStream<TranscriptChunk> {
@@ -119,12 +126,15 @@ final class PulledTranscriptReading: @unchecked Sendable {
   private var reader: TranscriptLineReader
   private let follows: Bool
   private let pollInterval: Duration
+  private let watchedInterval: Duration
   private let diagnostics: any DiagnosticLog
   private let wake = WakeSignal()
   private var watcher: FileWatcher?
   private var pending: [TranscriptChunk] = []
   private var first = true
   private var wasCaughtUp = false
+  /// Nothing was at the file's path at the last reading: its source, if any, watches nothing.
+  private var isMissing = false
   /// Caught up with the file: the next step waits for it to change.
   private var waitsForChange = false
   private var isFinished = false
@@ -136,11 +146,12 @@ final class PulledTranscriptReading: @unchecked Sendable {
 
   init(
     reader: TranscriptLineReader, follows: Bool, pollInterval: Duration,
-    diagnostics: any DiagnosticLog
+    watchedInterval: Duration = FileWatching.safetyNet, diagnostics: any DiagnosticLog
   ) {
     self.reader = reader
     self.follows = follows
     self.pollInterval = pollInterval
+    self.watchedInterval = watchedInterval
     self.diagnostics = diagnostics
   }
 
@@ -161,10 +172,19 @@ final class PulledTranscriptReading: @unchecked Sendable {
       }
       if waitsForChange {
         waitsForChange = false
-        if watcher?.inode != reader.inode {
+        // A deleted file's source watches nothing any more: it goes, and the poll takes over
+        // until the file is back (#255).
+        if isMissing {
+          watcher?.cancel()
+          watcher = nil
+        } else if watcher?.inode != reader.inode {
+          watcher?.cancel()
           watcher = reader.inode.flatMap { _ in FileWatcher(path: reader.file.path, wake: wake) }
+          // Read once more before waiting: what was written between the reading and the watch
+          // would otherwise wait for the safety net.
+          if watcher != nil { continue }
         }
-        await wake.wait(timeout: pollInterval)
+        await wake.wait(timeout: watcher == nil ? pollInterval : watchedInterval)
         continue
       }
       take(await nextStep())
@@ -216,6 +236,7 @@ final class PulledTranscriptReading: @unchecked Sendable {
       diagnostics.record(
         .session, .notice, "transcript.lineSkipped", ["lines": .count(step.reading.skippedLines)])
     }
+    isMissing = step.reading.isMissing
     if step.reading.wasReset { pending.append(.reset) }
     // The first reading is always handed over, empty or not: it says the file was read. So is
     // the one that reaches the end of the file, which says the reading caught up, and the one
@@ -277,6 +298,8 @@ struct TranscriptLineReader {
   struct Reading {
     var lines: [Data] = []
     var wasReset = false
+    /// Nothing is at the file's path.
+    var isMissing = false
     /// The file already holds more than this chunk: read on without waiting.
     var hasMore = false
     /// Lines found too long to keep in this chunk: left out.
@@ -288,7 +311,10 @@ struct TranscriptLineReader {
     var reading = Reading()
     guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
       let size = (attributes[.size] as? NSNumber)?.uint64Value
-    else { return reading }
+    else {
+      reading.isMissing = true
+      return reading
+    }
     let identifier = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
     if let inode,
       inode != identifier || size < offset + UInt64(splitter.pendingCount)
