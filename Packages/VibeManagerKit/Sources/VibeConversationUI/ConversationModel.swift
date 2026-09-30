@@ -256,6 +256,7 @@ public final class ConversationModel {
     followTask?.cancel()
     followTask = nil
     echoTimer?.cancel()
+    startTask?.cancel()
   }
 
   public func apply(_ snapshot: ConversationSnapshot) {
@@ -280,19 +281,24 @@ public final class ConversationModel {
     knownImages = known.union(images.map(\.0))
   }
 
-  private func rebuild() {
+  private func rebuild(lingers: Bool = true) {
     var entries = ConversationEntry.markingPendingPermission(
       snapshot.entries, activity: activity,
       agentID: activity == .awaitingUser(.approval)
         ? pendingRequest()?.request.reference.agentID : nil)
-    // A sub-agent whose end never came, in a session whose agent no longer runs, will not end.
+    // A sub-agent whose end never came, in a session whose agent no longer runs, will not end;
+    // nor one an earlier process of the agent started, before the session was resumed.
     let isRunning = isProcessRunning
     if isRunning != reportedAgentRunning {
       reportedAgentRunning = isRunning
-      agentRunningChanged?(isRunning)
+      processStartedAt = nil
+      agentRunningChanged?(isRunning, nil)
+      if isRunning { learnProcessStart() }
     }
     if !isRunning, snapshot.availability != .loading {
       entries = Self.settlingSubagents(entries)
+    } else if let processStartedAt {
+      entries = Self.settlingSubagents(entries, startedBefore: processStartedAt)
     }
     shownEntries = entries
     let rebuilt = displayedBlocks(of: entries)
@@ -300,7 +306,7 @@ public final class ConversationModel {
     let appended = rebuilt.filter { !previousIDs.contains($0.id) }.count
     let wasEmpty = blocks.isEmpty
     blocks = rebuilt
-    updateTray()
+    updateTray(lingers: lingers)
     if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }
   }
 
@@ -309,6 +315,21 @@ public final class ConversationModel {
   /// observes the terminal tells: sub-agents that will not end are settled, and the reader told.
   public func processStateChanged() {
     if isProcessRunning != reportedAgentRunning { rebuild() }
+  }
+
+  /// Asks when the process started — the kernel knows, whenever the application was opened — and
+  /// settles, once it is known, the sub-agents an earlier process left behind.
+  private func learnProcessStart() {
+    startTask?.cancel()
+    startTask = Task { [weak self] in
+      guard let self, let date = await self.processStartDate() else { return }
+      guard !Task.isCancelled, self.reportedAgentRunning == true else { return }
+      self.processStartedAt = date
+      self.agentRunningChanged?(true, date)
+      // Gone from the bar at once: they did not just end, they ended long ago.
+      self.lingering = [:]
+      self.rebuild(lingers: false)
+    }
   }
 
   /// Entries laid out as blocks, with the settings of the view: the conversation's, and a
@@ -329,13 +350,34 @@ public final class ConversationModel {
   static func settlingSubagents(_ entries: [ConversationEntry], inside: Bool = false)
     -> [ConversationEntry]
   {
+    settling(entries, inside: inside, startedBefore: nil)
+  }
+
+  /// Sub-agents still running, at any depth, that started before `date`, settled as above.
+  static func settlingSubagents(_ entries: [ConversationEntry], startedBefore date: Date)
+    -> [ConversationEntry]
+  {
+    settling(entries, inside: false, startedBefore: date)
+  }
+
+  private static func settling(
+    _ entries: [ConversationEntry], inside: Bool, startedBefore date: Date?
+  ) -> [ConversationEntry] {
     entries.map { entry in
       guard case .tool(var call) = entry.content, inside || call.kind == .subagent else {
         return entry
       }
-      if !call.state.isFinished { call.state = .interrupted }
+      // Only those an earlier process started, when a date is given; the others are looked into.
+      let settles =
+        inside
+        || date.map { date in
+          !call.state.isFinished
+            && call.subagent?.startedAt.map { SubagentRun.predates($0, process: date) } == true
+        } ?? true
+      if settles, !call.state.isFinished { call.state = .interrupted }
       if var run = call.subagent, let inner = run.activityEntries {
-        run.activity = .read(settlingSubagents(inner, inside: true))
+        run.activity = .read(
+          settling(inner, inside: settles, startedBefore: settles ? nil : date))
         call.subagent = run
       }
       var settled = entry
@@ -354,8 +396,13 @@ public final class ConversationModel {
   @ObservationIgnored public var trayLinger = Duration.seconds(4)
   /// Tells the reader whether the session's agent runs: a sub-agent whose end never came is not
   /// followed once it does not.
-  @ObservationIgnored public var agentRunningChanged: ((Bool) -> Void)?
+  /// With the instant its process started, once known.
+  @ObservationIgnored public var agentRunningChanged: ((Bool, Date?) -> Void)?
   @ObservationIgnored private var reportedAgentRunning: Bool?
+  /// When the session's process started, as the kernel says.
+  @ObservationIgnored public var processStartDate: () async -> Date? = { nil }
+  @ObservationIgnored private var processStartedAt: Date?
+  @ObservationIgnored private var startTask: Task<Void, Never>?
   @ObservationIgnored private var lingering: [String: (call: ToolCall, until: ContinuousClock.Instant)] =
     [:]
   @ObservationIgnored private var lingerTask: Task<Void, Never>?
@@ -366,11 +413,13 @@ public final class ConversationModel {
   public private(set) var revealedBlockID: String?
   public private(set) var revealRequest = 0
 
-  private func updateTray() {
+  /// - Parameter lingers: whether sub-agents that left the running stay a moment, dimmed.
+  private func updateTray(lingers: Bool = true) {
     let running = ConversationEntry.runningSubagents(in: shownEntries)
     let runningIDs = Set(running.map(\.callID))
     let now = ContinuousClock.now
-    for item in trayItems where !item.hasEnded && !runningIDs.contains(item.call.callID) {
+    for item in trayItems
+    where lingers && !item.hasEnded && !runningIDs.contains(item.call.callID) {
       let ended = ConversationEntry.subagentCalls([item.call.callID], in: shownEntries).first
       if let ended, ended.state.isFinished {
         lingering[ended.callID] = (ended, now + trayLinger)

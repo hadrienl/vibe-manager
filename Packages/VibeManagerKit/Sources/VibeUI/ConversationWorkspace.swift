@@ -113,8 +113,8 @@ public final class ConversationWorkspace {
         model.unfoldSubagents = { callIDs in
           Task { await follow.setUnfoldedSubagents(callIDs, for: id) }
         }
-        model.agentRunningChanged = { isRunning in
-          Task { await follow.setAgentRunning(isRunning, for: id) }
+        model.agentRunningChanged = { isRunning, startedAt in
+          Task { await follow.setAgentRunning(isRunning, since: startedAt, for: id) }
         }
       }
       models[session.id] = model
@@ -141,11 +141,13 @@ public final class ConversationWorkspace {
       let generation = (generations[session.id] ?? 0) + 1
       generations[session.id] = generation
       let id = session.id
-      // Told before the first reading: the sub-agents of a session whose agent stopped are not
-      // opened, and a new model starts with everything folded (#180).
+      // Told before the first reading: the sub-agents of a session whose agent stopped, or that an
+      // earlier process of it left, are not opened, and a new model starts with everything folded
+      // (#180).
       let isAgentRunning = model.isProcessRunning
       Task { [weak self] in
-        await follow.setAgentRunning(isAgentRunning, for: id)
+        let startedAt = isAgentRunning ? await model.processStartDate() : nil
+        await follow.setAgentRunning(isAgentRunning, since: startedAt, for: id)
         if isNew { await follow.setUnfoldedSubagents([], for: id) }
         let stream = await follow.follow(session)
         guard let self, self.generations[id] == generation, self.models[id] === model else {

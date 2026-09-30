@@ -64,7 +64,9 @@ On 683 Claude Code sub-agents (2.1.284–2.1.285) and 23 Codex activities (0.157
    runs long after its block has scrolled up. A pill brings its block into view and unfolds it;
    a sub-agent that ends stays four seconds, dimmed. The activity line stays: it carries Stop.
 7. **Nothing is made up.** A sub-agent whose end never came, in a session whose agent no longer
-   runs, is shown stopped without an answer. A Codex mission that cannot be read says so. The
+   runs, is shown stopped without an answer — and so is one started before the agent's current
+   process, as the kernel dates it: resuming a session starts a new process, and the sub-agents
+   the last one left running died with it. A Codex mission that cannot be read says so. The
    answer of a Codex sub-agent, written in its rollout only, is read when its block is unfolded.
 8. **A permission a sub-agent asks for is attributed to it**: the hook's `agent_id` marks the
    call waiting in that sub-agent's activity, or the sub-agent itself while its activity is not

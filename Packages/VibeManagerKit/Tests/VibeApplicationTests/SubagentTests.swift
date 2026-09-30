@@ -4,8 +4,8 @@ import VibeDomain
 
 @testable import VibeApplication
 
-/// Lines `agent:<text>`, `tool:<name>`, and `sub:<call id>:running|done`: a sub-agent call, the
-/// same call again to change its state.
+/// Lines `agent:<text>`, `tool:<name>`, and `sub:<call id>:running|done[:<seconds since 1970>]`:
+/// a sub-agent call, started then when a time is given, the same call again to change its state.
 private final class ScriptDecoder: ConversationDecoding {
   private(set) var entries: [ConversationEntry] = []
   private let file: String
@@ -31,7 +31,10 @@ private final class ScriptDecoder: ConversationDecoding {
       let call = ToolCall(
         callID: callID, kind: .subagent, state: state,
         parameters: [ToolParameter(.description, callID)],
-        subagent: SubagentRun(agentID: "agent-\(callID)", mode: .background))
+        subagent: SubagentRun(
+          agentID: "agent-\(callID)", mode: .background,
+          startedAt: parts.count > 3
+            ? Double(parts[3]).map { Date(timeIntervalSince1970: $0) } : nil))
       if let index = entries.firstIndex(where: { $0.id == callID }) {
         entries[index].content = .tool(call)
       } else {
@@ -223,6 +226,22 @@ struct SubagentFollowTests {
     #expect(running.isEmpty)
     try await Task.sleep(for: .milliseconds(150))
     #expect(await tail.opened.contains(ScriptProvider.transcript("s2")) == false)
+  }
+
+  @Test("A sub-agent an earlier process of the agent started is not followed once resumed")
+  func earlierProcess() async throws {
+    let tail = RecordingTail([
+      root: ["sub:s1:running:1000", "sub:s2:running:3000"],
+      ScriptProvider.transcript("s1"): ["tool:Read"], ScriptProvider.transcript("s2"): ["tool:Read"],
+    ])
+    let follow = follow(tail)
+    let session = session()
+    await follow.setAgentRunning(true, since: Date(timeIntervalSince1970: 2_000), for: session.id)
+    var iterator = await follow.follow(session).makeAsyncIterator()
+    let snapshot = await next(&iterator) { run("s2", in: $0)?.activityEntries?.count == 1 }
+    #expect(run("s1", in: snapshot)?.activity == .unread)
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await tail.opened.contains(ScriptProvider.transcript("s1")) == false)
   }
 
   @Test("In a session whose agent stopped, a sub-agent that never ended is not opened")

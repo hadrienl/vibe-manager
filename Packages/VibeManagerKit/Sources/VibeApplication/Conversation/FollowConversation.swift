@@ -122,6 +122,9 @@ public actor FollowConversation {
   /// Sessions whose agent does not run: a sub-agent that never said it ended there will not, and
   /// is not followed.
   private var stoppedAgents: Set<SessionID> = []
+  /// When the process of each session's agent started, when known: a sub-agent started before it
+  /// belonged to an earlier process, which ended without it saying so.
+  private var agentStarts: [SessionID: Date] = [:]
   /// How often, at most, the sub-agents of one transcript are looked for.
   static let subagentLookInterval = Duration.seconds(1)
 
@@ -177,11 +180,17 @@ public actor FollowConversation {
     }
   }
 
-  /// Whether the session's agent runs. Its sub-agents that never said they ended are not followed
-  /// while it does not: they will not end (#180).
-  public func setAgentRunning(_ isRunning: Bool, for session: SessionID) {
-    guard stoppedAgents.contains(session) == isRunning else { return }
+  /// Whether the session's agent runs, and since when. Its sub-agents that never said they ended
+  /// are not followed while it does not, nor those started before it — by a process resumed since
+  /// (#180): they will not end.
+  public func setAgentRunning(_ isRunning: Bool, since startedAt: Date? = nil, for session: SessionID)
+  {
+    let start = isRunning ? startedAt : nil
+    guard stoppedAgents.contains(session) == isRunning || agentStarts[session] != start else {
+      return
+    }
     if isRunning { stoppedAgents.remove(session) } else { stoppedAgents.insert(session) }
+    agentStarts[session] = start
     for (key, following) in followings where following.session.id == session {
       refreshSubagents(following, key: key)
       following.isDirty = true
@@ -190,10 +199,14 @@ public actor FollowConversation {
   }
 
   /// A sub-agent at work, as far as reading it goes: not done, under no sub-agent that ended —
-  /// its own calls end with it, results or not — in a session followed live whose agent runs.
+  /// its own calls end with it, results or not — in a session followed live whose agent runs, and
+  /// started by that agent's process rather than an earlier one.
   private func isRunning(_ call: ToolCall, in following: Following, underEnded: Bool) -> Bool {
-    !underEnded && !call.state.isFinished && following.live
-      && !stoppedAgents.contains(following.session.id)
+    let id = following.session.id
+    guard !underEnded, !call.state.isFinished, following.live, !stoppedAgents.contains(id)
+    else { return false }
+    guard let start = agentStarts[id], let started = call.subagent?.startedAt else { return true }
+    return !SubagentRun.predates(started, process: start)
   }
 
   private func run(_ key: UUID) async {
