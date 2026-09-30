@@ -355,6 +355,63 @@ public struct SessionAppearancePalette: Hashable, Codable, Sendable {
     (glyphContrast(on: hex) ?? 0) >= minimumGlyphContrast
   }
 
+  // MARK: - Hue, saturation, brightness
+
+  /// A colour from its hue (0…1, red at both ends), saturation and brightness (0…1), `#RRGGBB`.
+  public static func hex(hue: Double, saturation: Double, brightness: Double) -> String {
+    let hue = (hue - hue.rounded(.down)) * 6
+    let saturation = min(max(saturation, 0), 1)
+    let brightness = min(max(brightness, 0), 1)
+    let chroma = brightness * saturation
+    let second = chroma * (1 - abs(hue.truncatingRemainder(dividingBy: 2) - 1))
+    let (red, green, blue): (Double, Double, Double) =
+      switch Int(hue) {
+      case 0: (chroma, second, 0)
+      case 1: (second, chroma, 0)
+      case 2: (0, chroma, second)
+      case 3: (0, second, chroma)
+      case 4: (second, 0, chroma)
+      default: (chroma, 0, second)
+      }
+    let lift = brightness - chroma
+    return Self.hex(red + lift, green + lift, blue + lift)
+  }
+
+  /// The hue, saturation and brightness of a colour, each 0…1. `nil` for a malformed colour.
+  public static func hsb(of hex: String) -> (hue: Double, saturation: Double, brightness: Double)? {
+    guard let (red, green, blue) = components(hex) else { return nil }
+    let high = max(red, green, blue)
+    let spread = high - min(red, green, blue)
+    var hue = 0.0
+    if spread > 0 {
+      if high == red {
+        hue = ((green - blue) / spread).truncatingRemainder(dividingBy: 6)
+      } else if high == green {
+        hue = (blue - red) / spread + 2
+      } else {
+        hue = (red - green) / spread + 4
+      }
+      hue /= 6
+      if hue < 0 { hue += 1 }
+    }
+    return (hue, high == 0 ? 0 : spread / high, high)
+  }
+
+  /// Colours ready to add, every one of them legible: ten hues around the wheel, each at the
+  /// lightest shade the white symbol can be read on, then two deeper ones. Rows of ten.
+  public static let suggestedColors: [[String]] = {
+    let hues = (0..<10).map { Double($0) / 10 }
+    let lightest = hues.map { hue in
+      legibleVariant(of: hex(hue: hue, saturation: 0.78, brightness: 1)) ?? "#000000"
+    }
+    return [1.0, 0.8, 0.62].map { depth in
+      lightest.map { color in
+        guard let (hue, saturation, brightness) = hsb(of: color) else { return color }
+        return hex(hue: hue, saturation: saturation, brightness: brightness * depth)
+      }
+    }
+  }()
+
   /// The same hue, darkened just enough for the glyph to be read on it; the colour itself when it
   /// already is. `nil` for a malformed colour.
   public static func legibleVariant(of hex: String) -> String? {

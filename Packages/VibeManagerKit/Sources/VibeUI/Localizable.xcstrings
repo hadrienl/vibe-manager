@@ -4826,6 +4826,17 @@
         }
       }
     },
+    "Brightness" : {
+      "comment" : "A slider: the brightness of the colour being added.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luminosité"
+          }
+        }
+      }
+    },
     "Browsing data" : {
       "localizations" : {
         "fr" : {
@@ -7214,6 +7225,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Heures"
+          }
+        }
+      }
+    },
+    "Hue" : {
+      "comment" : "A slider: the hue of the colour being added.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teinte"
           }
         }
       }

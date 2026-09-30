@@ -99,9 +99,9 @@ struct SessionAppearanceSettingsView: View {
                 })
           }
           AddChip(isEnabled: palette.canAddSwatch) { isAddingSwatch = true }
-            // A sheet, not a popover: the colour panel is a window of its own, and a click in it
-            // would close a popover and lose what was typed.
-            .sheet(isPresented: $isAddingSwatch) {
+            // Like the symbols': the popover has its own shades and sliders, and never opens the
+            // system's colour panel, whose clicks would close it.
+            .popover(isPresented: $isAddingSwatch, arrowEdge: .bottom) {
               SwatchEditor(palette: palette) { swatch in
                 model.update { $0.addSwatch(swatch) }
                 isAddingSwatch = false

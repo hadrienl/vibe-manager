@@ -230,4 +230,39 @@ struct SessionAppearancePaletteTests {
       hex: "#BB8D14", name: String(repeating: "a", count: 60))
     #expect(long.name?.count == SessionAppearancePalette.Swatch.maximumNameLength)
   }
+
+  @Test("Hue, saturation and brightness go to a colour and back")
+  func hsbRoundTrip() throws {
+    for color in ["#0B63E5", "#B42318", "#1E7F4D", "#7A3DB8", "#000000", "#FFFFFF"] {
+      let (hue, saturation, brightness) = try #require(SessionAppearancePalette.hsb(of: color))
+      let back = SessionAppearancePalette.hex(
+        hue: hue, saturation: saturation, brightness: brightness)
+      let (red, green, blue) = (
+        Int(back.dropFirst().prefix(2), radix: 16)!, Int(back.dropFirst(3).prefix(2), radix: 16)!,
+        Int(back.dropFirst(5).prefix(2), radix: 16)!
+      )
+      let (red0, green0, blue0) = (
+        Int(color.dropFirst().prefix(2), radix: 16)!,
+        Int(color.dropFirst(3).prefix(2), radix: 16)!, Int(color.dropFirst(5).prefix(2), radix: 16)!
+      )
+      // Rounded down on the way back: one step at most.
+      #expect(
+        abs(red - red0) <= 1 && abs(green - green0) <= 1 && abs(blue - blue0) <= 1, "\(color)")
+    }
+    #expect(SessionAppearancePalette.hex(hue: 0, saturation: 1, brightness: 1) == "#FF0000")
+    #expect(SessionAppearancePalette.hex(hue: 1, saturation: 1, brightness: 1) == "#FF0000")
+  }
+
+  @Test("The shades offered to add are three rows of ten, all different, all legible")
+  func suggestedColors() {
+    let rows = SessionAppearancePalette.suggestedColors
+    #expect(rows.count == 3)
+    #expect(rows.allSatisfy { $0.count == 10 })
+    let all = rows.flatMap { $0 }
+    #expect(Set(all).count == all.count)
+    for color in all {
+      #expect(SessionAppearancePalette.isLegible(color), "\(color)")
+      #expect(SessionAppearancePalette.normalizedHex(color) == color)
+    }
+  }
 }

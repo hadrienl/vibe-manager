@@ -336,15 +336,40 @@ struct SystemSymbols: Sendable {
 
 // MARK: - Adding a colour
 
-/// Picks a colour, names it, and says whether the white symbol can be read on it — offering the
-/// closest colour that can when it cannot.
+/// Picks a colour among shades ready to use, or by hue and brightness, or by its hex; names it, and
+/// says whether the white symbol can be read on it — offering the closest colour that can when it
+/// cannot. Everything is in the popover: the system's colour panel is a window of its own, and a
+/// click in it would close the popover and lose what was chosen.
 struct SwatchEditor: View {
   let palette: SessionAppearancePalette
   let add: (SessionAppearancePalette.Swatch) -> Void
   let cancel: () -> Void
 
-  @State private var hex = "#D4A017"
+  @State private var hex: String
   @State private var name = ""
+  /// Kept apart from `hex`: at no saturation or no brightness a colour has no hue, and the sliders
+  /// must not jump back to red.
+  @State private var hue: Double
+  @State private var saturation: Double
+  @State private var brightness: Double
+
+  init(
+    palette: SessionAppearancePalette,
+    add: @escaping (SessionAppearancePalette.Swatch) -> Void,
+    cancel: @escaping () -> Void
+  ) {
+    self.palette = palette
+    self.add = add
+    self.cancel = cancel
+    let first =
+      SessionAppearancePalette.suggestedColors.joined().first { !palette.containsColor($0) }
+      ?? "#0B63E5"
+    let (hue, saturation, brightness) = SessionAppearancePalette.hsb(of: first) ?? (0.6, 0.8, 0.8)
+    _hex = State(initialValue: first)
+    _hue = State(initialValue: hue)
+    _saturation = State(initialValue: saturation)
+    _brightness = State(initialValue: brightness)
+  }
 
   var body: some View {
     let normalized = SessionAppearancePalette.normalizedHex(hex)
@@ -354,21 +379,46 @@ struct SwatchEditor: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Add a Colour", bundle: .module)
         .font(.headline)
-      HStack(spacing: 10) {
-        ColorPicker(selection: colorBinding, supportsOpacity: false) {
-          Text("Colour", bundle: .module)
+
+      suggestions(selected: normalized)
+
+      Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+        GridRow {
+          Text("Hue", bundle: .module, comment: "A slider: the hue of the colour being added.")
+            .foregroundStyle(.secondary)
+          Slider(value: slider(.hue), in: 0...1)
+            .accessibilityLabel(Text("Hue", bundle: .module))
         }
-        .labelsHidden()
+        GridRow {
+          Text(
+            "Brightness", bundle: .module,
+            comment: "A slider: the brightness of the colour being added."
+          )
+          .foregroundStyle(.secondary)
+          Slider(value: slider(.brightness), in: 0...1)
+            .accessibilityLabel(Text("Brightness", bundle: .module))
+        }
+      }
+      .controlSize(.small)
+
+      HStack(spacing: 10) {
         TextField(text: $hex) {
           Text(verbatim: "#RRGGBB")
         }
         .textFieldStyle(.roundedBorder)
         .font(.body.monospaced())
         .frame(width: 100)
+        .onChange(of: hex) { follow(hex) }
         SessionBadge(
           appearance: SessionAppearance(symbolName: "terminal", colorHex: normalized ?? "#8E8E96"),
-          size: 30)
+          size: 26)
+        if let contrast, !isTaken {
+          Text(verbatim: "\(Self.ratio(contrast)):1")
+            .monospacedDigit()
+            .foregroundStyle(isLegible ? Color.secondary : Color.orange)
+        }
       }
+
       TextField(text: $name) {
         Text("Name (optional)", bundle: .module)
       }
@@ -378,42 +428,7 @@ struct SwatchEditor: View {
         if name.count > limit { name = String(name.prefix(limit)) }
       }
 
-      Group {
-        if normalized == nil {
-          Label {
-            Text("Type a colour as #RRGGBB.", bundle: .module)
-          } icon: {
-            Image(systemName: "exclamationmark.triangle")
-          }
-        } else if isTaken {
-          Label {
-            Text("This colour is already in the list.", bundle: .module)
-          } icon: {
-            Image(systemName: "exclamationmark.triangle")
-          }
-        } else if let contrast {
-          contrastLine(contrast, isLegible: isLegible)
-        }
-      }
-      .font(.callout)
-      .foregroundStyle(isLegible && !isTaken ? Color.secondary : Color.orange)
-
-      if let normalized, !isLegible,
-        let suggestion = SessionAppearancePalette.legibleVariant(of: normalized)
-      {
-        HStack(spacing: 8) {
-          SessionBadge(
-            appearance: SessionAppearance(symbolName: "terminal", colorHex: suggestion), size: 22)
-          Text("Closest that can be read: \(suggestion)", bundle: .module)
-            .font(.callout)
-          Button {
-            hex = suggestion
-          } label: {
-            Text("Use", bundle: .module, comment: "Takes the suggested colour.")
-          }
-          .controlSize(.small)
-        }
-      }
+      verdict(normalized: normalized, contrast: contrast, isLegible: isLegible, isTaken: isTaken)
 
       HStack {
         Spacer()
@@ -431,13 +446,83 @@ struct SwatchEditor: View {
       }
     }
     .padding(16)
-    .frame(width: 340)
+    .frame(width: 300)
+  }
+
+  /// Shades ready to add, all legible; those already in the list are shown, faded, not offered.
+  private func suggestions(selected: String?) -> some View {
+    LazyVGrid(
+      columns: Array(repeating: GridItem(.fixed(22), spacing: 5), count: 10), spacing: 5
+    ) {
+      ForEach(SessionAppearancePalette.suggestedColors.joined().map { $0 }, id: \.self) { color in
+        let isTaken = palette.containsColor(color)
+        Button {
+          hex = color
+        } label: {
+          RoundedRectangle(cornerRadius: 5)
+            .fill(Color(sessionHex: color))
+            .frame(width: 22, height: 22)
+            .overlay(
+              RoundedRectangle(cornerRadius: 5)
+                .strokeBorder(selected == color ? Color.primary : .clear, lineWidth: 2)
+            )
+            .opacity(isTaken ? 0.3 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(isTaken)
+        .help(Text(verbatim: color))
+        .accessibilityLabel(Text(verbatim: color))
+        .accessibilityAddTraits(selected == color ? [.isSelected] : [])
+      }
+    }
+    .fixedSize()
+  }
+
+  @ViewBuilder
+  private func verdict(normalized: String?, contrast: Double?, isLegible: Bool, isTaken: Bool)
+    -> some View
+  {
+    Group {
+      if normalized == nil {
+        Label {
+          Text("Type a colour as #RRGGBB.", bundle: .module)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle")
+        }
+      } else if isTaken {
+        Label {
+          Text("This colour is already in the list.", bundle: .module)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle")
+        }
+      } else if let contrast {
+        contrastLine(contrast, isLegible: isLegible)
+      }
+    }
+    .font(.callout)
+    .foregroundStyle(isLegible && !isTaken ? Color.secondary : Color.orange)
+    .fixedSize(horizontal: false, vertical: true)
+
+    if let normalized, !isLegible, !isTaken,
+      let suggestion = SessionAppearancePalette.legibleVariant(of: normalized)
+    {
+      HStack(spacing: 8) {
+        SessionBadge(
+          appearance: SessionAppearance(symbolName: "terminal", colorHex: suggestion), size: 22)
+        Text("Closest that can be read: \(suggestion)", bundle: .module)
+          .font(.callout)
+        Button {
+          hex = suggestion
+        } label: {
+          Text("Use", bundle: .module, comment: "Takes the suggested colour.")
+        }
+        .controlSize(.small)
+      }
+    }
   }
 
   private func contrastLine(_ contrast: Double, isLegible: Bool) -> some View {
-    // Rounded down: 2.96 said "3.0:1, under 3:1" would contradict itself.
-    let ratio = ((contrast * 10).rounded(.down) / 10).formatted(
-      .number.precision(.fractionLength(1)))
+    let ratio = Self.ratio(contrast)
     return Label {
       if isLegible {
         Text("The white symbol can be read: \(ratio):1.", bundle: .module)
@@ -449,15 +534,33 @@ struct SwatchEditor: View {
     }
   }
 
-  private var colorBinding: Binding<Color> {
+  /// Rounded down: 2.96 said "3.0:1, under 3:1" would contradict itself.
+  private static func ratio(_ contrast: Double) -> String {
+    ((contrast * 10).rounded(.down) / 10).formatted(.number.precision(.fractionLength(1)))
+  }
+
+  private enum Channel { case hue, brightness }
+
+  /// A slider moves its channel and writes the colour; the others stay as they were.
+  private func slider(_ channel: Channel) -> Binding<Double> {
     Binding(
-      get: { Color(sessionHex: SessionAppearancePalette.normalizedHex(hex) ?? "#8E8E96") },
-      set: { color in
-        guard let srgb = NSColor(color).usingColorSpace(.sRGB) else { return }
-        func byte(_ value: CGFloat) -> Int { Int((min(max(value, 0), 1) * 255).rounded()) }
-        hex = String(
-          format: "#%02X%02X%02X", byte(srgb.redComponent), byte(srgb.greenComponent),
-          byte(srgb.blueComponent))
+      get: { channel == .hue ? hue : brightness },
+      set: { value in
+        if channel == .hue { hue = value } else { brightness = value }
+        hex = SessionAppearancePalette.hex(
+          hue: hue, saturation: saturation, brightness: brightness)
       })
+  }
+
+  /// A colour chosen or typed moves the sliders — but only what it says: a grey keeps the hue.
+  private func follow(_ text: String) {
+    guard let normalized = SessionAppearancePalette.normalizedHex(text),
+      normalized
+        != SessionAppearancePalette.hex(hue: hue, saturation: saturation, brightness: brightness),
+      let (newHue, newSaturation, newBrightness) = SessionAppearancePalette.hsb(of: normalized)
+    else { return }
+    if newSaturation > 0, newBrightness > 0 { hue = newHue }
+    if newBrightness > 0 { saturation = newSaturation }
+    brightness = newBrightness
   }
 }
