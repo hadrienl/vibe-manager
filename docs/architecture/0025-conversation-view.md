@@ -76,11 +76,15 @@ agent did. A conversation rewound with `/rewind` therefore still shows what was 
 shorter or changed inode again from the start after a `.reset`. A `vnode` source wakes it, and
 sees the file replaced or deleted too: a one-second poll covers a file that does not exist yet, a
 thirty-second one a watched file whose source would have gone deaf. A snapshot is published only
-when lines arrived. The folders are looked at again every two seconds while a file is awaited —
-the store read again then, for an identifier Codex stored without the application hearing of it.
-Once every file is found, they are looked at on events only: the session changed (a switch of
-agent, pushed by the application), its agent (re)started, a turn started or the hooks spoke; and
-every sixty seconds as a safety net (#255). Where each transcript was found is remembered
+when lines arrived. The folders are looked at again every two seconds while a file is awaited by
+an agent that runs — a conversation not written yet, or the transcript a `/clear` named and the
+CLI writes at the next exchange — the store read again then, for an identifier Codex stored
+without the application hearing of it. Once every file is found, they are looked at on events
+only: the session changed (a switch of agent, pushed by the application), its agent (re)started,
+a turn started or the hooks spoke — then three more times two seconds apart, for a file written
+a moment after the event; and every sixty seconds as a safety net (#255). Only the look changes
+what is followed: a session changed is kept until the next one adopts it, so that nothing a look
+adds meanwhile is lost. Where each transcript was found is remembered
 (`TranscriptLocationCache`): a Claude Code transcript is checked by one `stat`, and only the last
 day listed and today are listed again for a Codex rollout. A clock in a hidden conversation stops.
 Only the five sessions last shown in conversation keep a mounted

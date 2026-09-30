@@ -50,6 +50,9 @@ public final class ConversationWorkspace {
   /// than rebuilding a conversation nobody sees at every change.
   @ObservationIgnored private var dormantActivities: [SessionID: AgentActivityState?] = [:]
   @ObservationIgnored private var followed: [SessionID: [SessionAgentConfiguration]] = [:]
+  /// The session as last told to its follow when its conversations changed: a change heard while
+  /// the follow was still being set up had no follow to reach, and is told again once it exists.
+  @ObservationIgnored private var changedSessions: [SessionID: WorkSession] = [:]
   /// The last activity of each followed session, to tell a turn that starts from one that goes on.
   @ObservationIgnored private var activities: [SessionID: AgentActivityState?] = [:]
   /// Which follow is the current one for a session: a stream that arrives after its model was
@@ -142,9 +145,11 @@ public final class ConversationWorkspace {
       // Already followed: the follow adopts the session as it is now, and keeps what it read
       // rather than reading every transcript again from its start (#255).
       followed[session.id] = session.conversationAgents
+      changedSessions[session.id] = session
       Task { await follow.sessionChanged(session) }
     } else if followed[session.id] == nil, let follow {
       followed[session.id] = session.conversationAgents
+      changedSessions[session.id] = nil
       let generation = (generations[session.id] ?? 0) + 1
       generations[session.id] = generation
       let id = session.id
@@ -159,6 +164,11 @@ public final class ConversationWorkspace {
         let stream = await follow.follow(session)
         guard let self, self.generations[id] == generation, self.models[id] === model else {
           return
+        }
+        if let changed = self.changedSessions[id],
+          changed.conversationAgents != session.conversationAgents
+        {
+          await follow.sessionChanged(changed)
         }
         model.follow(stream)
       }
@@ -203,6 +213,7 @@ public final class ConversationWorkspace {
         continue
       }
       followed[session.id] = session.conversationAgents
+      changedSessions[session.id] = session
       Task { await follow.sessionChanged(session) }
     }
   }
@@ -250,6 +261,7 @@ public final class ConversationWorkspace {
   public func release(_ id: SessionID) {
     models.removeValue(forKey: id)?.stop()
     followed[id] = nil
+    changedSessions[id] = nil
     generations[id] = nil
     activities[id] = nil
     dormantSessionIDs.removeAll { $0 == id }
@@ -266,6 +278,7 @@ public final class ConversationWorkspace {
       models[id]?.pause()
       // Read again from the start when shown: a follow still being set up is dropped.
       followed[id] = nil
+      changedSessions[id] = nil
       activities[id] = nil
       generations[id] = (generations[id] ?? 0) + 1
       dormantSessionIDs.append(id)

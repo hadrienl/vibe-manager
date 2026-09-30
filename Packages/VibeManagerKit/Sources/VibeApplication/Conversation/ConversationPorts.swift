@@ -15,6 +15,10 @@ public protocol AgentConversationReporting: Sendable {
     hint: AgentActivityEvent?
   ) -> [URL]
 
+  /// Whether `hint` names a transcript the CLI has not written yet — the new file a `/clear`
+  /// announces, written at the next exchange: it is looked for often until it appears (#255).
+  func awaitsFile(named hint: AgentActivityEvent?) -> Bool
+
   /// A decoder for one file of this provider, fresh: it keeps what it read so far.
   func conversationDecoder(for file: URL) -> any ConversationDecoding
 
@@ -35,6 +39,8 @@ public protocol AgentConversationReporting: Sendable {
 }
 
 extension AgentConversationReporting {
+  public func awaitsFile(named hint: AgentActivityEvent?) -> Bool { false }
+
   public func subagentTranscripts(beside root: URL, agentIDs: Set<String>)
     -> [SubagentTranscriptInfo]
   { [] }

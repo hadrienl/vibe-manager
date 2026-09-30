@@ -108,6 +108,12 @@ public actor FollowConversation {
     var lastSubagentLook: [URL: ContinuousClock.Instant] = [:]
     /// A file was still awaited at the last look: the store may hold what it needs.
     var awaitsFile = false
+    /// The session as the application last told it, when its conversations changed: adopted by
+    /// the next look, the only place chapters change — a reading added meanwhile is not lost.
+    var pendingSession: WorkSession?
+    /// Looks still made at the short interval after something said a file may appear: the file
+    /// may come a moment after the event that announced it — a turn's first prompt (#255).
+    var eagerLooks = 0
     /// The pause between two looks, when one is under way, and whether it was cut short before.
     var pause: CheckedContinuation<Void, Never>?
     var pauseGeneration = 0
@@ -137,6 +143,8 @@ public actor FollowConversation {
   private var agentStarts: [SessionID: Date] = [:]
   /// How often, at most, the sub-agents of one transcript are looked for.
   static let subagentLookInterval = Duration.seconds(1)
+  /// How many looks follow at the short interval once something said a file may appear.
+  static let eagerLookCount = 3
 
   public init(
     agents: any AgentProviderResolving,
@@ -194,15 +202,18 @@ public actor FollowConversation {
   }
 
   /// The session as the application has it now: its conversations may have changed — a switch of
-  /// agent, an identifier learned. Adopted by every follow of it, what they read kept (#255).
-  public func sessionChanged(_ session: WorkSession) async {
+  /// agent, an identifier learned. Adopted by every follow of it at its next look, what they read
+  /// kept (#255): only the look changes chapters, so nothing it adds meanwhile is lost.
+  public func sessionChanged(_ session: WorkSession) {
     for following in followings.values where following.session.id == session.id {
-      if session.conversationAgents != following.session.conversationAgents {
-        await adopt(session, in: following)
+      if following.pendingSession != nil
+        || session.conversationAgents != following.session.conversationAgents
+      {
+        following.pendingSession = session
       } else {
         following.session = session
       }
-      wake(following)
+      lookSoon(following)
     }
   }
 
@@ -210,7 +221,7 @@ public actor FollowConversation {
   /// `/clear`: the folders are looked at now rather than at the next safety pass (#255).
   public func lookAgain(for session: SessionID) {
     for following in followings.values where following.session.id == session {
-      wake(following)
+      lookSoon(following)
     }
   }
 
@@ -233,7 +244,7 @@ public actor FollowConversation {
       following.isDirty = true
       if following.live { schedulePublish(following, key: key) }
       // A process that starts may resume the conversation in a new file: the next day's rollout.
-      if isRunning { wake(following) }
+      if isRunning { lookSoon(following) }
     }
   }
 
@@ -273,12 +284,15 @@ public actor FollowConversation {
       refreshSubagents(following, key: key)
       if following.isDirty { schedulePublish(following, key: key) }
       // Nothing wakes the reader but the disk: lines are published as they arrive. The folders
-      // are looked at again for new files often while one is still awaited. After, only when
-      // something says one may have appeared, or at the safety pass (#255).
-      following.awaitsFile =
-        following.chapters.contains { $0.reporter != nil && $0.readings.isEmpty }
-      let everyFileFound = !following.awaitsFile && !hasUnreadRunningSubagent(following)
-      await pause(key, for: everyFileFound ? safetyInterval : refreshInterval)
+      // are looked at again for new files often while one is still awaited by a running agent,
+      // and for a few looks after something said one may appear. After, only when something
+      // says so again, or at the safety pass (#255).
+      let agentRuns = !stoppedAgents.contains(following.session.id)
+      let isEager = following.eagerLooks > 0
+      if isEager { following.eagerLooks -= 1 }
+      let looksOften =
+        (agentRuns && (following.awaitsFile || isEager)) || hasUnreadRunningSubagent(following)
+      await pause(key, for: looksOften ? refreshInterval : safetyInterval)
     }
   }
 
@@ -311,6 +325,12 @@ public actor FollowConversation {
     else { return }
     following.pause = nil
     pause.resume()
+  }
+
+  /// Looks now, then a few more times at the short interval.
+  private func lookSoon(_ following: Following) {
+    following.eagerLooks = Self.eagerLookCount
+    wake(following)
   }
 
   private func wake(_ following: Following) {
@@ -482,6 +502,14 @@ public actor FollowConversation {
   private func refreshFiles(_ following: Following, key: UUID) async {
     let signpost = Signposts.begin("conversation.lookForFiles")
     defer { Signposts.end("conversation.lookForFiles", signpost) }
+    if let pending = following.pendingSession {
+      following.pendingSession = nil
+      if pending.conversationAgents != following.session.conversationAgents {
+        await adopt(pending, in: following)
+      } else {
+        following.session = pending
+      }
+    }
     if following.awaitsFile, let latest = await current(following.session.id),
       latest.conversationAgents != following.session.conversationAgents
     {
@@ -502,6 +530,12 @@ public actor FollowConversation {
         start(reading, key: key, live: following.live)
       }
     }
+    // A conversation not written yet, or a file its hooks named and its CLI has yet to write —
+    // the new transcript of a `/clear`.
+    let lastReporter = following.chapters.last?.reporter
+    following.awaitsFile =
+      following.chapters.contains { $0.reporter != nil && $0.readings.isEmpty }
+      || lastReporter?.awaitsFile(named: lastHint) == true
   }
 
   private func start(_ reading: Reading, key: UUID, live: Bool) {

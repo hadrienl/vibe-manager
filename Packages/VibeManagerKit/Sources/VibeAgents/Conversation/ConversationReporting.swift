@@ -27,6 +27,13 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
     return files
   }
 
+  /// The transcript a `SessionStart` named — after a `/clear` — and Claude Code has not written
+  /// yet: it writes it at the next exchange.
+  public func awaitsFile(named hint: AgentActivityEvent?) -> Bool {
+    guard let path = hint?.string("transcript_path"), path.hasPrefix("/") else { return false }
+    return !FileManager.default.fileExists(atPath: path)
+  }
+
   public func conversationDecoder(for file: URL) -> any ConversationDecoding {
     ClaudeCodeConversationDecoder()
   }
