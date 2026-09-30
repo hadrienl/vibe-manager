@@ -67,12 +67,13 @@ struct SymbolSearch: View {
                 .frame(width: 30, height: 30)
                 .background(
                   chosen == symbol ? Color.accentColor.opacity(0.25) : Color.clear,
-                  in: RoundedRectangle(cornerRadius: 6))
+                  in: RoundedRectangle(cornerRadius: 6)
+                )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help(Text(verbatim: symbol))
-            .accessibilityLabel(Text(verbatim: symbol))
+            .accessibilityLabel(Text(SessionSymbolName.label(for: symbol)))
             .accessibilityAddTraits(chosen == symbol ? [.isSelected] : [])
           }
         }
@@ -135,7 +136,8 @@ enum SymbolCatalog {
     "magnifyingglass", "scope", "binoculars", "lightbulb", "graduationcap", "puzzlepiece",
     "shippingbox", "cube", "cube.transparent", "square.stack.3d.up", "square.grid.2x2",
     "rectangle.3.group", "chart.bar", "chart.line.uptrend.xyaxis", "chart.pie", "gauge",
-    "speedometer", "timer", "clock", "calendar", "hourglass", "point.3.connected.trianglepath.dotted",
+    "speedometer", "timer", "clock", "calendar", "hourglass",
+    "point.3.connected.trianglepath.dotted",
     "arrow.triangle.branch", "arrow.triangle.merge", "arrow.triangle.pull",
     "arrow.triangle.2.circlepath", "arrow.clockwise", "arrow.up.arrow.down", "shuffle", "repeat",
     "link", "paperclip", "lock", "lock.open", "key", "shield", "checkmark.shield", "person",
@@ -154,13 +156,89 @@ enum SymbolCatalog {
     "hammer.circle", "wrench.adjustable", "bandage.fill", "stethoscope.circle",
   ]
 
+  /// Words a kind of work is looked for by, when the symbol's name does not hold them. In English,
+  /// as the names are.
+  static let keywords: [String: [String]] = [
+    "terminal": ["shell", "console", "cli", "command"],
+    "apple.terminal": ["shell", "console", "cli"],
+    "chevron.left.forwardslash.chevron.right": ["code", "html", "dev", "web"],
+    "curlybraces": ["code", "json", "dev"],
+    "function": ["code", "math", "lambda"],
+    "wrench.and.screwdriver": ["tools", "fix", "repair", "maintenance"],
+    "hammer": ["build", "tools", "fix"],
+    "gearshape": ["settings", "config", "preferences"],
+    "gearshape.2": ["settings", "config", "automation"],
+    "doc.text": ["document", "docs", "spec", "readme"],
+    "book": ["docs", "documentation", "guide", "manual"],
+    "checklist": ["todo", "tasks", "review", "test"],
+    "list.bullet.clipboard": ["todo", "tasks", "plan"],
+    "server.rack": ["backend", "infra", "ops", "database"],
+    "cylinder": ["database", "db", "storage", "sql"],
+    "cylinder.split.1x2": ["database", "db", "migration"],
+    "externaldrive": ["storage", "backup", "disk"],
+    "cpu": ["performance", "hardware", "chip"],
+    "globe": ["web", "internet", "i18n", "translation", "world"],
+    "network": ["api", "graph", "connections"],
+    "cloud": ["deploy", "infra", "aws", "server"],
+    "bolt": ["fast", "performance", "power", "quick"],
+    "flame": ["hotfix", "urgent", "fire", "performance"],
+    "sparkles": ["ai", "magic", "new", "clean"],
+    "wand.and.stars": ["ai", "magic", "refactor"],
+    "exclamationmark.triangle": ["warning", "incident", "error", "alert"],
+    "xmark.octagon": ["error", "stop", "failure"],
+    "ladybug": ["bug", "debug", "fix", "issue"],
+    "ant": ["bug", "debug", "insect"],
+    "flask": ["test", "experiment", "lab", "spike"],
+    "testtube.2": ["test", "experiment", "lab"],
+    "brain": ["ai", "ml", "idea", "think"],
+    "magnifyingglass": ["search", "find", "investigate", "review"],
+    "lightbulb": ["idea", "spike", "prototype"],
+    "shippingbox": ["package", "release", "deploy", "ship", "dependency"],
+    "cube": ["model", "3d", "package", "module"],
+    "chart.bar": ["stats", "analytics", "metrics", "data"],
+    "chart.line.uptrend.xyaxis": ["growth", "analytics", "metrics"],
+    "gauge": ["performance", "metrics", "monitoring"],
+    "speedometer": ["performance", "speed", "benchmark"],
+    "timer": ["cron", "schedule", "time"],
+    "calendar": ["schedule", "planning", "date"],
+    "arrow.triangle.branch": ["git", "branch", "fork"],
+    "arrow.triangle.merge": ["git", "merge", "pull request"],
+    "arrow.triangle.pull": ["git", "pull request", "review"],
+    "arrow.triangle.2.circlepath": ["sync", "refresh", "ci", "loop"],
+    "lock": ["security", "auth", "private"],
+    "key": ["auth", "secret", "password", "security"],
+    "shield": ["security", "protection"],
+    "checkmark.shield": ["security", "audit", "compliance"],
+    "person": ["user", "account", "profile"],
+    "person.2": ["team", "users", "pair"],
+    "paintbrush": ["design", "ui", "style", "css"],
+    "paintpalette": ["design", "ui", "colour", "color", "theme"],
+    "photo": ["image", "picture", "media"],
+    "rocket": ["launch", "deploy", "release", "ship"],
+    "airplane.departure": ["deploy", "launch", "release"],
+    "paperplane": ["send", "deploy", "message", "email"],
+    "envelope": ["email", "mail", "message"],
+    "bubble.left.and.bubble.right": ["chat", "conversation", "discussion"],
+    "megaphone": ["announcement", "marketing", "release notes"],
+    "bell": ["notification", "alert"],
+    "cart": ["shop", "ecommerce", "checkout"],
+    "creditcard": ["payment", "billing", "stripe"],
+    "house": ["home", "landing", "main"],
+    "target": ["goal", "focus", "objective"],
+    "trophy": ["win", "goal", "achievement"],
+    "tablecells": ["spreadsheet", "table", "data", "csv"],
+  ]
+
   /// The symbols of the list this Mac draws, less those already offered, matching every word of
   /// `query`. An exact name typed that the list does not hold comes first.
   static func search(_ query: String, excluding palette: SessionAppearancePalette) -> [String] {
     let typed = query.trimmingCharacters(in: .whitespaces).lowercased()
     let words = typed.split(whereSeparator: { $0 == " " || $0 == "." }).map(String.init)
     var results = available.filter { name in
-      !palette.containsSymbol(name) && words.allSatisfy { name.contains($0) }
+      !palette.containsSymbol(name)
+        && words.allSatisfy { word in
+          name.contains(word) || keywords[name, default: []].contains { $0.hasPrefix(word) }
+        }
     }
     if !typed.isEmpty, !results.contains(typed), exists(typed), !palette.containsSymbol(typed) {
       results.insert(typed, at: 0)
@@ -173,6 +251,20 @@ enum SymbolCatalog {
   }
 
   @MainActor private static var drawable: [String: Bool] = [:]
+  @MainActor private static var descriptions: [String: String] = [:]
+
+  /// What macOS says of a symbol — "send" for `paperplane.circle` — asked once per name; its SF
+  /// name read as words when it says nothing, or does not know it.
+  @MainActor
+  static func systemDescription(of name: String) -> String {
+    if let known = descriptions[name] { return known }
+    let said = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+      .accessibilityDescription
+    let answer =
+      said.flatMap { $0.isEmpty ? nil : $0 } ?? name.replacingOccurrences(of: ".", with: " ")
+    descriptions[name] = answer
+    return answer
+  }
 
   /// Whether this Mac draws `name`, asked once per name: the pickers ask at every redraw.
   @MainActor
@@ -229,6 +321,10 @@ struct SwatchEditor: View {
         Text("Name (optional)", bundle: .module)
       }
       .textFieldStyle(.roundedBorder)
+      .onChange(of: name) {
+        let limit = SessionAppearancePalette.Swatch.maximumNameLength
+        if name.count > limit { name = String(name.prefix(limit)) }
+      }
 
       Group {
         if normalized == nil {
@@ -287,7 +383,9 @@ struct SwatchEditor: View {
   }
 
   private func contrastLine(_ contrast: Double, isLegible: Bool) -> some View {
-    let ratio = contrast.formatted(.number.precision(.fractionLength(1)))
+    // Rounded down: 2.96 said "3.0:1, under 3:1" would contradict itself.
+    let ratio = ((contrast * 10).rounded(.down) / 10).formatted(
+      .number.precision(.fractionLength(1)))
     return Label {
       if isLegible {
         Text("The white symbol can be read: \(ratio):1.", bundle: .module)

@@ -1160,8 +1160,9 @@ struct ColorChoice: View {
   }
 
   private var swatchLabel: Text {
-    if let name = swatch.name { return Text(verbatim: name) }
-    return Text("Accent \(swatch.hex)", bundle: .module, comment: "VoiceOver: a colour, by its hex code.")
+    if let name = swatch.displayName { return Text(verbatim: name) }
+    return Text(
+      "Accent \(swatch.hex)", bundle: .module, comment: "VoiceOver: a colour, by its hex code.")
   }
 }
 

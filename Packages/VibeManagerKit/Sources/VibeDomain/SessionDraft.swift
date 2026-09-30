@@ -194,10 +194,6 @@ public struct SessionDraft: Hashable, Sendable {
   }
 
   private var isStorableAppearance: Bool {
-    let appearance = effectiveAppearance
-    guard !appearance.symbolName.isEmpty else { return false }
-    let color = appearance.colorHex
-    guard color.count == 7 || color.count == 9, color.first == "#" else { return false }
-    return color.dropFirst().allSatisfy(\.isHexDigit)
+    SessionAppearanceCatalog.isWellFormed(effectiveAppearance)
   }
 }

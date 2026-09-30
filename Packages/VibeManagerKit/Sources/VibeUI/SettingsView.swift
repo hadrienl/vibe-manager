@@ -71,7 +71,7 @@ public struct SettingsView: View {
             .settingsPage(.updates)
         }
       }
-      .environment(\.sessionAppearancePalette, model.appearancePalette.palette)
+      .environment(\.sessionAppearancePalette, model.appearancePalette.offered)
     } else {
       general
     }

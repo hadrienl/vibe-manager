@@ -794,6 +794,17 @@
         }
       }
     },
+    "%@, not drawn by this version of macOS" : {
+      "comment" : "Help and VoiceOver: a symbol of the list this Mac cannot draw. Its SF name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, non dessiné par cette version de macOS"
+          }
+        }
+      }
+    },
     "%@, opened by the agent" : {
       "localizations" : {
         "fr" : {
@@ -8114,7 +8125,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nom refusé : %@"
+            "value" : "Nom refusé : %@"
           }
         }
       }

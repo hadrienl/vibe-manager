@@ -177,4 +177,57 @@ struct SessionAppearancePaletteTests {
       !SessionAppearanceCatalog.isWellFormed(SessionAppearance(symbolName: "star", colorHex: "red"))
     )
   }
+
+  @Test("With the shipped lists, a name looks exactly as it did before the lists could change")
+  func shippedIdentityIsPinned() {
+    #expect(
+      SessionAppearancePalette.default.derived(forName: "Refactor the webhook")
+        == SessionAppearance(symbolName: "wrench.and.screwdriver", colorHex: "#0A6E8A"))
+    #expect(
+      SessionAppearancePalette.default.derived(forName: "Write the release notes")
+        == SessionAppearance(
+          symbolName: "point.3.connected.trianglepath.dotted", colorHex: "#B42318"))
+    #expect(
+      SessionAppearancePalette.default.derived(forName: "Fix the login")
+        == SessionAppearance(symbolName: "shippingbox", colorHex: "#1E7F4D"))
+  }
+
+  @Test("The default appearance puts the project's icon over what the lists give the name")
+  func defaultAppearanceFollowsThePalette() throws {
+    let palette = SessionAppearancePalette(
+      symbols: ["star"], swatches: [.init(hex: "#0B63E5")])
+    let icon = try #require(SessionIconID(sha256: String(repeating: "a", count: 64)))
+    let appearance = palette.defaultAppearance(forName: "Fix the login", projectIcon: icon)
+    #expect(appearance.symbolName == "star")
+    #expect(appearance.colorHex == "#0B63E5")
+    #expect(appearance.iconID == icon)
+  }
+
+  @Test("A list left as shipped is written as nothing, and read back as the shipped one")
+  func eachListIsStoredOnItsOwn() throws {
+    var palette = SessionAppearancePalette.default
+    palette.addSymbol("star")
+    let data = try JSONEncoder().encode(palette)
+    let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(object["symbols"] != nil)
+    #expect(object["swatches"] == nil)
+    #expect(try JSONDecoder().decode(SessionAppearancePalette.self, from: data) == palette)
+
+    let empty = try JSONDecoder().decode(SessionAppearancePalette.self, from: Data("{}".utf8))
+    #expect(empty == .default)
+  }
+
+  @Test("The shipped colours have names; one added keeps the name it was given, cut to 40")
+  func colourNames() {
+    for hex in SessionAppearanceCatalog.colorHexValues {
+      #expect(SessionAppearanceCatalog.colorName(of: hex) != nil, "\(hex)")
+    }
+    #expect(SessionAppearancePalette.Swatch(hex: "#5e5ce6").displayName != nil)
+    #expect(SessionAppearancePalette.Swatch(hex: "#BB8D14").displayName == nil)
+    #expect(
+      SessionAppearancePalette.Swatch(hex: "#BB8D14", name: " Mustard ").displayName == "Mustard")
+    let long = SessionAppearancePalette.Swatch(
+      hex: "#BB8D14", name: String(repeating: "a", count: 60))
+    #expect(long.name?.count == SessionAppearancePalette.Swatch.maximumNameLength)
+  }
 }

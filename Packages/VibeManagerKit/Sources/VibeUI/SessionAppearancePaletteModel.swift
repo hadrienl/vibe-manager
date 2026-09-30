@@ -21,6 +21,13 @@ public final class SessionAppearancePaletteModel {
     palette = store.palette ?? .default
   }
 
+  /// What the pickers offer and what a name is given from: the lists, less the symbols this Mac
+  /// cannot draw — added on a later macOS, they would be an empty badge (ADR 0035). They stay in
+  /// the lists, and the Settings still show them.
+  public var offered: SessionAppearancePalette {
+    palette.keepingSymbols(where: SymbolCatalog.isDrawable)
+  }
+
   /// Applies `change` to the palette and keeps it.
   public func update(_ change: (inout SessionAppearancePalette) -> Void) {
     var edited = palette
@@ -28,14 +35,14 @@ public final class SessionAppearancePaletteModel {
     guard edited != palette else { return }
     palette = edited
     store.palette = edited
-    changed?(edited)
+    changed?(offered)
   }
 
   /// Back to the shipped lists.
   public func restoreDefaults() {
     palette = .default
     store.palette = nil
-    changed?(.default)
+    changed?(offered)
   }
 }
 

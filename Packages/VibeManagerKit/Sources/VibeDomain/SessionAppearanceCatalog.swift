@@ -28,6 +28,32 @@ public enum SessionAppearanceCatalog {
     "#0A6E8A",
   ]
 
+  /// The words for the shipped colours. Kept out of the stored lists, so that they follow the
+  /// language of the application rather than the one they were saved in.
+  public static func colorName(of hex: String) -> String? {
+    switch SessionAppearancePalette.normalizedHex(hex) {
+    case "#5E5CE6":
+      String(localized: "Indigo", bundle: .module, comment: "A colour a session may be given.")
+    case "#0B63E5":
+      String(localized: "Blue", bundle: .module, comment: "A colour a session may be given.")
+    case "#0F7B76":
+      String(localized: "Teal", bundle: .module, comment: "A colour a session may be given.")
+    case "#1E7F4D":
+      String(localized: "Green", bundle: .module, comment: "A colour a session may be given.")
+    case "#A65B00":
+      String(localized: "Amber", bundle: .module, comment: "A colour a session may be given.")
+    case "#B42318":
+      String(localized: "Red", bundle: .module, comment: "A colour a session may be given.")
+    case "#7A3DB8":
+      String(localized: "Purple", bundle: .module, comment: "A colour a session may be given.")
+    case "#0A6E8A":
+      String(
+        localized: "Petrol Blue", bundle: .module, comment: "A colour a session may be given.")
+    default:
+      nil
+    }
+  }
+
   /// Worn while the session has no name yet: grey says "not decided" where a colour would claim
   /// a choice the user has not made.
   public static let placeholder = SessionAppearance(symbolName: "terminal", colorHex: "#8E8E96")
@@ -44,11 +70,18 @@ public enum SessionAppearanceCatalog {
     SessionAppearancePalette.default.defaultAppearance(forName: name, projectIcon: projectIcon)
   }
 
-  /// Whether a symbol and a colour are well formed enough to be stored and drawn: a symbol name,
-  /// and `#RRGGBB` (or `#RRGGBBAA`). Whether the symbol exists on this Mac is for the interface.
+  /// Whether a symbol and a colour can be stored as they are and drawn: a symbol name, and
+  /// `#RRGGBB` (or `#RRGGBBAA`) written with its `#`. The one rule for a session and a template, so
+  /// that a template found valid never gives a session that cannot be created. Whether the symbol
+  /// exists on this Mac is for the interface.
   public static func isWellFormed(_ appearance: SessionAppearance) -> Bool {
-    !appearance.symbolName.trimmingCharacters(in: .whitespaces).isEmpty
-      && SessionAppearancePalette.normalizedHex(appearance.colorHex) != nil
+    let symbol = appearance.symbolName
+    guard !symbol.isEmpty, symbol == symbol.trimmingCharacters(in: .whitespacesAndNewlines) else {
+      return false
+    }
+    let color = appearance.colorHex
+    guard color.count == 7 || color.count == 9, color.first == "#" else { return false }
+    return color.dropFirst().allSatisfy(\.isHexDigit)
   }
 }
 
@@ -67,10 +100,20 @@ public struct SessionAppearancePalette: Hashable, Codable, Sendable {
     public init(hex: String, name: String? = nil) {
       self.hex = SessionAppearancePalette.normalizedHex(hex) ?? hex
       let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
-      self.name = trimmed?.isEmpty == false ? trimmed : nil
+        .prefix(Self.maximumNameLength)
+      self.name = trimmed?.isEmpty == false ? trimmed.map(String.init) : nil
     }
 
+    /// A word or two for VoiceOver, not a description.
+    public static let maximumNameLength = 40
+
     public var id: String { hex }
+
+    /// What VoiceOver and the Settings call it: the name given, else the shipped colour's own.
+    /// `nil` for a colour added without a name, which is then said by its hex.
+    public var displayName: String? {
+      name ?? SessionAppearanceCatalog.colorName(of: hex)
+    }
   }
 
   public private(set) var symbols: [String]
@@ -117,6 +160,18 @@ public struct SessionAppearancePalette: Hashable, Codable, Sendable {
       swatches: (try? container.decode([Swatch].self, forKey: .swatches)) ?? [])
   }
 
+  /// A list left as shipped is written as nothing: it then follows the application when a later
+  /// version ships another, and changing the colours does not freeze the symbols.
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    if symbols != Self.default.symbols {
+      try container.encode(symbols, forKey: .symbols)
+    }
+    if swatches != Self.default.swatches {
+      try container.encode(swatches, forKey: .swatches)
+    }
+  }
+
   private enum CodingKeys: String, CodingKey {
     case symbols, swatches
   }
@@ -124,6 +179,12 @@ public struct SessionAppearancePalette: Hashable, Codable, Sendable {
   public var isDefault: Bool { self == .default }
 
   public var colorHexValues: [String] { swatches.map(\.hex) }
+
+  /// The same lists without the symbols `isKept` refuses — those this Mac cannot draw. The shipped
+  /// symbols when none is left, so that a picker always has one to offer.
+  public func keepingSymbols(where isKept: (String) -> Bool) -> SessionAppearancePalette {
+    SessionAppearancePalette(symbols: symbols.filter(isKept), swatches: swatches)
+  }
 
   // MARK: - Editing
 
@@ -214,13 +275,15 @@ public struct SessionAppearancePalette: Hashable, Codable, Sendable {
   }
 
   public mutating func moveSwatch(_ hex: String, by offset: Int) {
-    guard let hex = Self.normalizedHex(hex), let from = swatches.firstIndex(where: { $0.hex == hex })
+    guard let hex = Self.normalizedHex(hex),
+      let from = swatches.firstIndex(where: { $0.hex == hex })
     else { return }
     moveSwatch(hex, to: from + offset)
   }
 
   public mutating func moveSwatch(_ hex: String, to index: Int) {
-    guard let hex = Self.normalizedHex(hex), let from = swatches.firstIndex(where: { $0.hex == hex })
+    guard let hex = Self.normalizedHex(hex),
+      let from = swatches.firstIndex(where: { $0.hex == hex })
     else { return }
     let moved = swatches.remove(at: from)
     swatches.insert(moved, at: min(max(index, 0), swatches.count))

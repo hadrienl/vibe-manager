@@ -108,7 +108,7 @@ struct SessionAppearancePopover: View {
     VStack(alignment: .leading, spacing: 12) {
       SessionAppearancePicker(
         appearance: editor.current,
-        palette: model.appearancePalette.palette,
+        palette: model.appearancePalette.offered,
         projectIcon: editor.projectIconID.map { .init(image: model.icons.image(for: $0)) },
         usesProjectIcon: editor.usesProjectIcon,
         pickSymbol: editor.pickSymbol,
@@ -172,6 +172,7 @@ extension View {
 /// What the symbols of the catalogue are called, for VoiceOver and their help tags: an SF Symbol's
 /// own name says nothing to a person.
 enum SessionSymbolName {
+  @MainActor
   static func label(for symbol: String) -> LocalizedStringResource {
     switch symbol {
     case "terminal":
@@ -191,7 +192,8 @@ enum SessionSymbolName {
     case "point.3.connected.trianglepath.dotted":
       LocalizedStringResource("Network", bundle: .module, comment: "A session's symbol.")
     default:
-      LocalizedStringResource(stringLiteral: symbol)
+      // Added in the Settings (#199): what macOS itself says of it, else its SF name as words.
+      LocalizedStringResource(stringLiteral: SymbolCatalog.systemDescription(of: symbol))
     }
   }
 }

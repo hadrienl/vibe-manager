@@ -48,4 +48,30 @@ struct UserDefaultsSessionAppearancePaletteStoreTests {
     UserDefaults(suiteName: suite)?.set(Data("not json".utf8), forKey: key)
     #expect(UserDefaultsSessionAppearancePaletteStore(suiteName: suite).palette == nil)
   }
+
+  @Test("Changing the colours leaves the symbols to follow the application")
+  func onlyTheChangedListIsKept() throws {
+    let suite = suiteName()
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    var palette = SessionAppearancePalette.default
+    palette.removeSwatch("#B42318")
+    UserDefaultsSessionAppearancePaletteStore(suiteName: suite).palette = palette
+
+    let data = try #require(UserDefaults(suiteName: suite)?.data(forKey: key))
+    let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(object["symbols"] == nil)
+    #expect(object["swatches"] != nil)
+  }
+
+  @Test("A list that cannot be read is the shipped one, and costs the other nothing")
+  func oneUnreadableList() {
+    let suite = suiteName()
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    UserDefaults(suiteName: suite)?.set(
+      Data(##"{"symbols": 12, "swatches": [{"hex": "#BB8D14"}]}"##.utf8), forKey: key)
+
+    let palette = UserDefaultsSessionAppearancePaletteStore(suiteName: suite).palette
+    #expect(palette?.symbols == SessionAppearanceCatalog.symbolNames)
+    #expect(palette?.colorHexValues == ["#BB8D14"])
+  }
 }

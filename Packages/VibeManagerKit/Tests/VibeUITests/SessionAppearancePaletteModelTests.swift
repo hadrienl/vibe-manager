@@ -59,12 +59,36 @@ struct SessionAppearancePaletteModelTests {
     #expect(sheet.draft.palette == .default)
     model.beginNewSession()
     #expect(model.newSessionModel === sheet)
-    #expect(sheet.draft.effectiveAppearance == SessionAppearancePalette.default.derived(forName: "Anything"))
+    #expect(
+      sheet.draft.effectiveAppearance
+        == SessionAppearancePalette.default.derived(forName: "Anything"))
   }
 }
 
 @Suite("The keyboard on the chips of the Badges settings")
 struct SessionAppearanceChipKeyboardTests {
+  @Test("A symbol this Mac cannot draw stays in the lists, but is neither offered nor given")
+  @MainActor func undrawableSymbolsAreNotOffered() {
+    let store = InMemorySessionAppearancePaletteStore(
+      palette: SessionAppearancePalette(
+        symbols: ["no.such.symbol.anywhere", "star"], swatches: [.init(hex: "#0B63E5")]))
+    let model = SessionAppearancePaletteModel(store: store)
+
+    #expect(model.palette.symbols == ["no.such.symbol.anywhere", "star"])
+    #expect(model.offered.symbols == ["star"])
+    #expect(model.offered.derived(forName: "Anything").symbolName == "star")
+  }
+
+  @Test("With none of its symbols drawn, the shipped ones are offered")
+  @MainActor func noDrawableSymbolFallsBack() {
+    let store = InMemorySessionAppearancePaletteStore(
+      palette: SessionAppearancePalette(
+        symbols: ["no.such.symbol.anywhere"], swatches: [.init(hex: "#0B63E5")]))
+    #expect(
+      SessionAppearancePaletteModel(store: store).offered.symbols
+        == SessionAppearanceCatalog.symbolNames)
+  }
+
   @Test("← and → go to the neighbours and stop at the ends")
   func neighbours() {
     let list = ["a", "b", "c"]

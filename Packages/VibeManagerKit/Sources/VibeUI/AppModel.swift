@@ -2543,7 +2543,7 @@ public final class AppModel {
       icons: icons,
       recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) },
-      palette: appearancePalette.palette
+      palette: appearancePalette.offered
     )
     if let template {
       model.selectTemplate(template)

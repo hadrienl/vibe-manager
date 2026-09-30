@@ -32,9 +32,11 @@ struct SessionAppearanceSettingsView: View {
               .paletteChip(
                 identifier: symbol, index: palette.symbols.firstIndex(of: symbol) ?? 0,
                 count: palette.symbols.count, canRemove: palette.canRemoveSymbol,
-                label: Text(verbatim: symbol),
+                label: SymbolChip.label(symbol),
                 focus: $focusedChip,
-                step: { offset in focusedChip = Self.neighbour(of: symbol, by: offset, in: palette.symbols) },
+                step: { offset in
+                  focusedChip = Self.neighbour(of: symbol, by: offset, in: palette.symbols)
+                },
                 move: { offset in model.update { $0.moveSymbol(symbol, by: offset) } },
                 takePlace: { dropped in
                   let index = palette.symbols.firstIndex(of: symbol) ?? 0
@@ -82,7 +84,8 @@ struct SessionAppearanceSettingsView: View {
                 label: SwatchChip.label(swatch),
                 focus: $focusedChip,
                 step: { offset in
-                  focusedChip = Self.neighbour(of: swatch.hex, by: offset, in: palette.colorHexValues)
+                  focusedChip = Self.neighbour(
+                    of: swatch.hex, by: offset, in: palette.colorHexValues)
                 },
                 move: { offset in model.update { $0.moveSwatch(swatch.hex, by: offset) } },
                 takePlace: { dropped in
@@ -222,10 +225,23 @@ private struct SymbolChip: View {
   let symbol: String
 
   var body: some View {
-    Image(systemName: symbol)
+    // Added on a later macOS: kept in the list, but not drawn by this one — nor offered by the
+    // pickers. Shown so that it can still be seen, moved and removed.
+    Image(systemName: SymbolCatalog.isDrawable(symbol) ? symbol : "questionmark.square.dashed")
       .font(.system(size: 15))
+      .foregroundStyle(SymbolCatalog.isDrawable(symbol) ? .primary : .tertiary)
       .frame(width: 36, height: 36)
       .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+  }
+
+  @MainActor
+  static func label(_ symbol: String) -> Text {
+    guard SymbolCatalog.isDrawable(symbol) else {
+      return Text(
+        "\(symbol), not drawn by this version of macOS", bundle: .module,
+        comment: "Help and VoiceOver: a symbol of the list this Mac cannot draw. Its SF name.")
+    }
+    return Text(SessionSymbolName.label(for: symbol))
   }
 }
 
@@ -244,7 +260,8 @@ private struct SwatchChip: View {
   }
 
   static func label(_ swatch: SessionAppearancePalette.Swatch) -> Text {
-    if let name = swatch.name { return Text(verbatim: "\(name) (\(swatch.hex))") }
+    // The name first, then the hex: two colours may be given the same name.
+    if let name = swatch.displayName { return Text(verbatim: "\(name) (\(swatch.hex))") }
     return Text(verbatim: swatch.hex)
   }
 }
@@ -294,7 +311,8 @@ extension View {
         return .handled
       }
       .onDeleteCommand {
-        if canRemove { remove() }
+        // The last one stays: a picker with nothing to offer would have no way back.
+        if canRemove { remove() } else { NSSound.beep() }
       }
       .simultaneousGesture(TapGesture().onEnded { focus.wrappedValue = identifier })
       .draggable(identifier)
@@ -327,7 +345,7 @@ extension View {
       .accessibilityAction(named: Text("Move Left", bundle: .module)) { move(-1) }
       .accessibilityAction(named: Text("Move Right", bundle: .module)) { move(1) }
       .accessibilityAction(named: Text("Remove", bundle: .module)) {
-        if canRemove { remove() }
+        if canRemove { remove() } else { NSSound.beep() }
       }
   }
 }
