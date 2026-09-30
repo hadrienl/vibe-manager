@@ -152,5 +152,6 @@
   "theme.chip_contrast": "コントラストを確認済み",
   "avatar.shot_alt": "Vibe Manager のフローティングパネル。アバターと吹き出しに、エージェントからのリクエストと「許可」「拒否」ボタンが表示されている。",
   "avatar.sprites_aria": "アバターの10種類の表情",
-  "theme.shot_alt": "独自のテーマを適用した Vibe Manager の会話。配色、フォント、背景画像がカスタマイズされている。"
+  "theme.shot_alt": "独自のテーマを適用した Vibe Manager の会話。配色、フォント、背景画像がカスタマイズされている。",
+  "hero.cta_docs": "ドキュメントを読む"
 }

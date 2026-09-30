@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Geprüfte Kontraste",
   "avatar.shot_alt": "Das schwebende Panel von Vibe Manager: der Avatar mit seiner Sprechblase, die die Anfrage eines Agents mit den Buttons „Erlauben“ und „Ablehnen“ zeigt.",
   "avatar.sprites_aria": "Die zehn Gesichtsausdrücke des Avatars",
-  "theme.shot_alt": "Eine Unterhaltung in Vibe Manager mit einem eigenen Theme, mit seinen Farben, seiner Schrift und seinem Hintergrundbild."
+  "theme.shot_alt": "Eine Unterhaltung in Vibe Manager mit einem eigenen Theme, mit seinen Farben, seiner Schrift und seinem Hintergrundbild.",
+  "hero.cta_docs": "Dokumentation lesen"
 }

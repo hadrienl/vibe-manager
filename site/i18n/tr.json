@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Kontrol edilmiş kontrastlar",
   "avatar.shot_alt": "Vibe Manager'ın yüzen paneli: avatar ve konuşma balonu, balonda bir ajanın isteği ile İzin ver ve Reddet düğmeleri.",
   "avatar.sprites_aria": "Avatarın on ifadesi",
-  "theme.shot_alt": "Kişisel bir temayla, kendi renkleri, yazı tipi ve arka plan görseliyle bir Vibe Manager konuşması."
+  "theme.shot_alt": "Kişisel bir temayla, kendi renkleri, yazı tipi ve arka plan görseliyle bir Vibe Manager konuşması.",
+  "hero.cta_docs": "Belgeleri oku"
 }

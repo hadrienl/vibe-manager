@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Contrastes vérifiés",
   "avatar.shot_alt": "Le panneau flottant de Vibe Manager : l'avatar et sa bulle, qui montre la demande d'un agent avec les boutons Autoriser et Refuser.",
   "avatar.sprites_aria": "Les dix expressions de l'avatar",
-  "theme.shot_alt": "Une conversation de Vibe Manager dans un thème personnel, avec ses couleurs, sa police et son image de fond."
+  "theme.shot_alt": "Une conversation de Vibe Manager dans un thème personnel, avec ses couleurs, sa police et son image de fond.",
+  "hero.cta_docs": "Lire la documentation"
 }

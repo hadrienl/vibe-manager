@@ -152,5 +152,6 @@
   "theme.chip_contrast": "대비 확인 완료",
   "avatar.shot_alt": "Vibe Manager의 플로팅 패널: 아바타와 말풍선에 에이전트의 요청과 허용, 거부 버튼이 보여요.",
   "avatar.sprites_aria": "아바타의 표정 열 가지",
-  "theme.shot_alt": "나만의 색상, 글꼴, 배경 이미지로 꾸민 개인 테마를 적용한 Vibe Manager 대화."
+  "theme.shot_alt": "나만의 색상, 글꼴, 배경 이미지로 꾸민 개인 테마를 적용한 Vibe Manager 대화.",
+  "hero.cta_docs": "문서 읽기"
 }

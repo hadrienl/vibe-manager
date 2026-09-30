@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Contrastes comprobados",
   "avatar.shot_alt": "El panel flotante de Vibe Manager: el avatar y su bocadillo, que muestra la petición de un agente con los botones Permitir y Rechazar.",
   "avatar.sprites_aria": "Las diez expresiones del avatar",
-  "theme.shot_alt": "Una conversación de Vibe Manager con un tema personal, con sus colores, su fuente y su imagen de fondo."
+  "theme.shot_alt": "Una conversación de Vibe Manager con un tema personal, con sus colores, su fuente y su imagen de fondo.",
+  "hero.cta_docs": "Leer la documentación"
 }

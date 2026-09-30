@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Sprawdzone kontrasty",
   "avatar.shot_alt": "Pływający panel Vibe Manager: awatar i jego dymek z prośbą agenta oraz przyciskami Zezwól i Odmów.",
   "avatar.sprites_aria": "Dziesięć min awatara",
-  "theme.shot_alt": "Rozmowa w Vibe Manager we własnym motywie, z jego kolorami, czcionką i obrazem tła."
+  "theme.shot_alt": "Rozmowa w Vibe Manager we własnym motywie, z jego kolorami, czcionką i obrazem tła.",
+  "hero.cta_docs": "Czytaj dokumentację"
 }

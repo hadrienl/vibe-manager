@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Contrast checked",
   "avatar.shot_alt": "The Vibe Manager floating panel: the avatar and its speech bubble, showing an agent's request with Allow and Deny buttons.",
   "avatar.sprites_aria": "The avatar's ten expressions",
-  "theme.shot_alt": "A Vibe Manager conversation in a personal theme, with its own colors, font and background picture."
+  "theme.shot_alt": "A Vibe Manager conversation in a personal theme, with its own colors, font and background picture.",
+  "hero.cta_docs": "Read the docs"
 }

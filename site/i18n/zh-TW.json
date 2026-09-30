@@ -152,5 +152,6 @@
   "theme.chip_contrast": "對比已檢查",
   "avatar.shot_alt": "Vibe Manager 的浮動面板：頭像和它的對話框，顯示代理的請求以及「允許」和「拒絕」按鈕。",
   "avatar.sprites_aria": "頭像的十種表情",
-  "theme.shot_alt": "套用個人主題的 Vibe Manager 對話，有專屬的顏色、字型和背景圖片。"
+  "theme.shot_alt": "套用個人主題的 Vibe Manager 對話，有專屬的顏色、字型和背景圖片。",
+  "hero.cta_docs": "閱讀文件"
 }

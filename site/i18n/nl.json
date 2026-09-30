@@ -152,5 +152,6 @@
   "theme.chip_contrast": "Gecontroleerde contrasten",
   "avatar.shot_alt": "Het zwevende paneel van Vibe Manager: de avatar en zijn tekstballon, met het verzoek van een agent en de knoppen Toestaan en Weigeren.",
   "avatar.sprites_aria": "De tien gezichtsuitdrukkingen van de avatar",
-  "theme.shot_alt": "Een gesprek in Vibe Manager met een eigen thema, met eigen kleuren, lettertype en achtergrondafbeelding."
+  "theme.shot_alt": "Een gesprek in Vibe Manager met een eigen thema, met eigen kleuren, lettertype en achtergrondafbeelding.",
+  "hero.cta_docs": "Lees de documentatie"
 }
