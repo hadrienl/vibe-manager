@@ -33,7 +33,7 @@ final class WakeSignal: @unchecked Sendable {
     let timer = timeout.map { timeout in
       Task {
         do {
-          try await Task.sleep(for: timeout)
+          try await Task.sleep(for: timeout, tolerance: timeout / 10)
           self.fire()
         } catch {}
       }
