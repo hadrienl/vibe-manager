@@ -76,18 +76,20 @@ struct PromptComposer: View {
           // ↑ and ↓ recall the messages sent, from the first and the last line only: elsewhere,
           // with a modifier, over a selection or while an input method composes, they move the
           // cursor as always (#123).
-          .onKeyPress(keys: [.upArrow, .downArrow], phases: .down) { press in
+          .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
             // An arrow comes flagged as a function key of the numeric pad: only the modifiers the
             // user holds count.
             guard press.modifiers.isDisjoint(with: [.shift, .command, .option, .control]),
               !Self.isComposingText
             else { return .ignored }
-            // The list open, the arrows are its own.
+            // The list open, the arrows are its own — held down, they walk it.
             if model.showsCommandSuggestions {
               return model.moveCommandSelection(by: press.key == .upArrow ? -1 : 1)
                 ? .handled : .ignored
             }
-            guard let caret = ComposerCaret.current(showing: model.draft) else { return .ignored }
+            // A held arrow recalls no message: it moves the cursor, as it always did.
+            guard press.phase == .down, let caret = ComposerCaret.current(showing: model.draft)
+            else { return .ignored }
             let recalled =
               press.key == .upArrow
               ? caret.isOnFirstLine && model.recallOlderPrompt()

@@ -233,6 +233,18 @@ struct ComposerCommandsTests {
   func down() async {
     await press(125, NSDownArrowFunctionKey, modifiers: [.numericPad, .function])
   }
+  /// ↓ held: the key down, then the repeats the keyboard sends.
+  func holdDown(repeats: Int) async {
+    let characters = String(Character(UnicodeScalar(UInt32(NSDownArrowFunctionKey))!))
+    for index in 0...repeats {
+      let event = NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [.numericPad, .function], timestamp: 0,
+        windowNumber: window.windowNumber, context: nil, characters: characters,
+        charactersIgnoringModifiers: characters, isARepeat: index > 0, keyCode: 125)
+      window.sendEvent(event!)
+      for _ in 0..<5 { await Task.yield() }
+    }
+  }
   func up() async {
     await press(126, NSUpArrowFunctionKey, modifiers: [.numericPad, .function])
   }
@@ -265,6 +277,15 @@ extension ComposerHistoryKeysTests {
       composer.textView.selectedRange().location == ("/prisme-ai:debug-events " as NSString).length
     }
     #expect(composer.terminal.written.isEmpty)
+  }
+
+  @Test("↓ held down walks the list")
+  func heldArrow() async throws {
+    let composer = try await CommandComposer()
+    defer { composer.close() }
+    await composer.type("/")
+    await composer.holdDown(repeats: 2)
+    await composer.until { composer.model.selectedCommandIndex == 2 }
   }
 
   @Test("↩ inserts and sends nothing while the list is open; closed, it sends")
