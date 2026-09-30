@@ -132,6 +132,7 @@ struct SubagentTypeCapsule: View {
 /// "in the background · 2 min 14 s · 14 tools": the time runs while the sub-agent does.
 struct SubagentFigures: View {
   let call: ToolCall
+  @Environment(\.conversationIsLive) private var isLive
 
   var body: some View {
     if call.state.isFinished {
@@ -139,7 +140,7 @@ struct SubagentFigures: View {
         .lineLimit(1)
         .fixedSize()
     } else {
-      TimelineView(.periodic(from: .now, by: 1)) { context in
+      TimelineView(LivePeriodicSchedule(from: .now, by: 1, isLive: isLive)) { context in
         Text(verbatim: SubagentPresentation.figures(of: call, now: context.date))
           .lineLimit(1)
           .fixedSize()
@@ -429,8 +430,11 @@ struct SubagentGroupView: View {
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(
         Text(
-          verbatim: [SubagentPresentation.groupTitle(calls), SubagentPresentation.groupProgress(calls)]
-            .joined(separator: ", ")))
+          verbatim: [
+            SubagentPresentation.groupTitle(calls), SubagentPresentation.groupProgress(calls),
+          ]
+          .joined(separator: ", "))
+      )
       .accessibilityValue(
         isExpanded ? Text("expanded", bundle: .module) : Text("collapsed", bundle: .module))
 
@@ -525,6 +529,7 @@ struct SubagentPill: View {
   let item: SubagentTrayItem
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationIsLive) private var isLive
 
   var body: some View {
     let call = item.call
@@ -549,7 +554,7 @@ struct SubagentPill: View {
           .foregroundStyle(theme.text.color)
           .lineLimit(1)
         if !item.hasEnded {
-          TimelineView(.periodic(from: .now, by: 1)) { context in
+          TimelineView(LivePeriodicSchedule(from: .now, by: 1, isLive: isLive)) { context in
             Text(verbatim: SubagentPresentation.elapsed(of: call, now: context.date) ?? "")
               .monospacedDigit()
               .foregroundStyle(theme.secondaryText.color)
@@ -562,7 +567,8 @@ struct SubagentPill: View {
       .background(theme.surface.color, in: Capsule())
       .overlay(
         Capsule().stroke(
-          call.state == .awaitingPermission ? theme.warning.color : theme.border.color))
+          call.state == .awaitingPermission ? theme.warning.color : theme.border.color)
+      )
       .opacity(item.hasEnded ? 0.6 : 1)
       .fixedSize()
     }
@@ -628,7 +634,8 @@ enum SubagentPresentation {
     }
     let tools =
       call.state.isFinished
-      ? run.usage?.toolUses ?? run.activityEntries.map { SubagentActivitySummary(entries: $0).toolCount }
+      ? run.usage?.toolUses
+        ?? run.activityEntries.map { SubagentActivitySummary(entries: $0).toolCount }
       : run.activityEntries.map { SubagentActivitySummary(entries: $0).toolCount }
     if let tools {
       parts.append(String(localized: "\(tools) tools", bundle: .module))
