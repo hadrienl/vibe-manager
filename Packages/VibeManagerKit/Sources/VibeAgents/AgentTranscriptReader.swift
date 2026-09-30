@@ -14,7 +14,28 @@ import VibeDomain
 /// again each time it grows, so each file is resumed where the last reading stopped.
 public actor AgentTranscriptReader: SessionTranscriptSource {
   private let locator: AgentTranscriptLocator
+  private let now: @Sendable () -> Date
   private var progress: [String: FileProgress] = [:]
+  /// The files found for each conversation, and when the agent's folders were last listed for
+  /// them. The report reads the transcript every second while the agent writes; listing every
+  /// folder of `~/.claude/projects`, or one folder per day of a Codex session, each time would
+  /// cost more than reading what the files gained.
+  ///
+  /// Local to this reader until the transcript index of #255, shared with the conversation view,
+  /// takes its place.
+  private var located: [String: Located] = [:]
+
+  struct Located {
+    var files: [URL]
+    var listedAt: Date
+  }
+
+  /// How long files once found are trusted before every folder is listed again: a conversation
+  /// resumed from another folder writes a second file there.
+  static let relistInterval: TimeInterval = 60
+  /// How often the folders are listed while nothing is found yet: the agent has not written.
+  static let claudeSearchInterval: TimeInterval = 2
+  static let codexSearchInterval: TimeInterval = 10
 
   struct FileProgress {
     var offset: UInt64 = 0
@@ -25,9 +46,13 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
 
   public init(
     claudeProjects: URL = ClaudeCodeHome.projectsDirectory(),
-    codexSessions: URL = CodexHome.sessionsDirectory()
+    codexSessions: URL = CodexHome.sessionsDirectory(),
+    list: @escaping AgentTranscriptLocator.ListDirectory = AgentTranscriptLocator.contents(of:),
+    now: @escaping @Sendable () -> Date = { Date() }
   ) {
-    locator = AgentTranscriptLocator(claudeProjects: claudeProjects, codexSessions: codexSessions)
+    locator = AgentTranscriptLocator(
+      claudeProjects: claudeProjects, codexSessions: codexSessions, list: list)
+    self.now = now
   }
 
   /// Every conversation the session has had is read, not only the current one: after a switch of
@@ -41,10 +66,10 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       let isCodex: Bool
       switch conversation.providerID {
       case ClaudeCodeAgentProvider.id.rawValue:
-        files = locator.claudeTranscripts(for: identifier)
+        files = claudeTranscripts(for: identifier)
         isCodex = false
       case CodexAgentProvider.id.rawValue:
-        files = locator.codexRollouts(for: identifier, since: session.createdAt)
+        files = codexRollouts(for: identifier, since: session.createdAt)
         isCodex = true
       default:
         continue
@@ -82,6 +107,56 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       if !directories.contains(directory) { directories.append(directory) }
     }
     return directories
+  }
+
+  // MARK: - Finding them
+
+  /// Once its file is found, only the folder of its sub-agents is listed again, where new ones
+  /// appear; every project folder only if the file went away, or once a minute.
+  private func claudeTranscripts(for identifier: String) -> [URL] {
+    let key = "claude:" + identifier
+    let moment = now()
+    if let known = located[key] {
+      let age = moment.timeIntervalSince(known.listedAt)
+      let mains = known.files.filter { $0.lastPathComponent == "\(identifier).jsonl" }
+      if mains.isEmpty {
+        if age < Self.claudeSearchInterval { return [] }
+      } else if age < Self.relistInterval,
+        mains.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) })
+      {
+        return mains.flatMap { [$0] + locator.claudeSubagents(of: $0, identifier: identifier) }
+      }
+    }
+    let files = locator.claudeTranscripts(for: identifier)
+    located[key] = Located(files: files, listedAt: moment)
+    return files
+  }
+
+  /// Once a rollout is found, only the folders of yesterday and today are listed again, where a
+  /// resumed conversation writes a new one; every day since the session began only if a rollout
+  /// went away, or once a minute.
+  private func codexRollouts(for identifier: String, since created: Date) -> [URL] {
+    let key = "codex:" + identifier
+    let moment = now()
+    if let known = located[key] {
+      let age = moment.timeIntervalSince(known.listedAt)
+      if known.files.isEmpty {
+        if age < Self.codexSearchInterval { return [] }
+      } else if age < Self.relistInterval,
+        known.files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) })
+      {
+        var files = known.files
+        for recent in locator.codexRollouts(for: identifier, since: moment, until: moment)
+        where !files.contains(recent) {
+          files.append(recent)
+        }
+        located[key]?.files = files
+        return files
+      }
+    }
+    let files = locator.codexRollouts(for: identifier, since: created, until: moment)
+    located[key] = Located(files: files, listedAt: moment)
+    return files
   }
 
   private static func identifier(of conversation: SessionAgentConfiguration) -> String? {

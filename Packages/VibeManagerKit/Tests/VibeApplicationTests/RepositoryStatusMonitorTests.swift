@@ -48,6 +48,30 @@ struct RepositoryStatusMonitorTests {
     #expect(await reader.readCount("/work/api") == 1)
   }
 
+  @Test("The branch report takes a status only from a fresh reading of the session on screen")
+  func knownStatus() async {
+    let reader = ScriptedStatusReader()
+    await reader.answer(
+      "/work/api",
+      entries: [
+        WorkingTreeEntry(path: "Sources/A.swift", kind: .tracked(staged: nil, unstaged: .modified))
+      ])
+    let monitor = makeMonitor(reader: reader)
+    let recorder = StatusUpdateRecorder.listening(to: monitor)
+    #expect(await monitor.knownStatus(of: session.id, atPath: "/work/api") == nil)
+
+    await monitor.observe(session, repositories: [ObservedRepository(path: "/work/api")])
+    #expect(await eventually { await recorder.latest("/work/api")?.phase == .fresh })
+
+    let known = await monitor.knownStatus(of: session.id, atPath: "/work/api")
+    #expect(known?.counts == WorkingTreeCounts(staged: 0, unstaged: 1, untracked: 0))
+    #expect(await monitor.knownStatus(of: SessionID(), atPath: "/work/api") == nil)
+    #expect(await monitor.knownStatus(of: session.id, atPath: "/work/web") == nil)
+
+    await monitor.stopObserving()
+    #expect(await monitor.knownStatus(of: session.id, atPath: "/work/api") == nil)
+  }
+
   @Test("The files a branch committed are attributed like the others, renames by their origin")
   func committedAttribution() async {
     let reader = ScriptedStatusReader()
