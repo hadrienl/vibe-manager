@@ -73,4 +73,17 @@ struct AppModelLocalizationTests {
       Localization.string("new process, given a summary", module: "VibeUI", in: "fr")
         == "nouveau processus, avec un résumé")
   }
+
+  @Test("Where Full Disk Access is granted, it says it reaches a project's scripts too (#245)")
+  func fullDiskAccessReach() {
+    let french = Localization.string(
+      """
+      Everything a session runs gets this access too: the agents and the commands they start, a \
+      project's scripts included.
+      """, module: "VibeUI", in: "fr")
+    #expect(
+      french
+        == "Tout ce qu’une session exécute en profite aussi\u{00A0}: les agents et les commandes "
+        + "qu’ils lancent, scripts des projets compris.")
+  }
 }

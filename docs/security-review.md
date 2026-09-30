@@ -78,6 +78,7 @@ pid, so a `git` that started a helper or a login shell whose profile started one
 | A12 | Claude Code is started with `--allowedTools mcp__vibe-browser` | Claude no longer asks before a web view tool | **Accepted**: Vibe Manager asks before anything is done as the user, and a second question on the same call adds nothing. The user's other tools keep their own rules. |
 | A14 | The application replaces itself with what a feed on the Internet offers (#92) | A compromised feed, Pages site or GitHub account delivering a malicious build to every copy | **Decided in ADR 0033**: an archive is installed only if its EdDSA signature verifies with the key the application carries **and** the application inside is signed with the same Developer ID — checked before anything is extracted. The private key is a secret of the protected `release` environment and a copy offline, never in the repository nor in the feed's workflow, which holds no secret. Feed and archives over HTTPS only. `release.sh` checks each archive against the application's own key, and the designated requirement against `Configuration/DesignatedRequirement.txt`. Copies built from source, or isolated, never update themselves. Rotation of a lost key is in [operations](operations.md#rotating-the-update-key). |
 | A13 | A new session's ticket addresses are loaded in its web view, where the user is signed in, to read their titles (#89) | A crafted address loading a page on the user's behalf; another page's title passed off as the ticket's | **Decided in ADR 0031**: only an address an enabled resolver's pattern recognises is loaded, the way a click would load it; nothing is ever handed to a shell or a command. A title is read only once the page's own address is recognised again by the same resolver as the same ticket, with a 2xx answer: a sign-in page or a redirection to another ticket gives none. No token is stored: the session is the web view's. `TicketPageReadingTests` prove the redirections, and `TicketTitlesTests` that nothing is read when the feature is off. |
+| A15 | « Open in Browser » (the tab's menu, the address bar, the failure page, Web › Open Page in Browser) handed the tab's address to macOS as it was (#245) | An agent opens `file:///…/x.command` with `tab_open`; the user clicks « Open in Browser » and Terminal runs it | **Fixed**: those buttons go through `LinkRouting.externalRoute(for:)`, like every other link — a page to the default browser, a mail address to Mail, nothing else — and are greyed otherwise. `Scripts/check-external-opens.sh`, run by `ci.sh`, refuses any direct `NSWorkspace.shared.open(` that does not say, in a `// Opens outside:` comment, why its address is safe. `LinkRoutingTests` and `AppModelLinkTests` prove a `.command` is never handed over. |
 
 ## Residual risks
 
@@ -90,6 +91,11 @@ pid, so a `git` that started a helper or a login shell whose profile started one
   it cannot already reach. The application does not defend against its own user.
 - **Agents' own permissions.** What Claude Code or Codex are allowed to do inside a session is their
   configuration, not the application's.
+- **Full Disk Access reaches everything a session runs** (#245). The terminal host answers to macOS
+  for the processes it starts (ADR 0010), so the agents and whatever they start — a repository's
+  scripts, a dependency's install script — read what the access opens: Mail, Messages, the rest of
+  `~/Library`. Settings › Privacy and the Full Disk Access step say so. Not done: a host without
+  the access, for the sessions that do not need it.
 - **What an agent reads in the web view.** Reading is free on every site, including those the user
   is signed in to: an agent can read a private ticket, and a page can try to steer the agent
   through its content. The tools say a page is data; the policy bounds what the agent can do about

@@ -305,6 +305,11 @@ struct PrivacySettingsView: View {
         FullDiskAccessRow(permissions: permissions)
       } header: {
         Text("Full Disk Access", bundle: .module, comment: "A section of the Settings window.")
+      } footer: {
+        FullDiskAccessSheet.reach
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
       }
       if let report = permissions.report, !report.isConsistent {
         Section {
