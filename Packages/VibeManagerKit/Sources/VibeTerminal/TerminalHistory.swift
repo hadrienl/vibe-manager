@@ -14,6 +14,9 @@ struct TerminalHistory {
   private var byteCount = 0
   private var newlineCount = 0
   private(set) var droppedByteCount = 0
+  /// Every byte ever appended, trimmed or not: where the stream stands (#248). Bytes lost before
+  /// they reached this buffer are not counted — nobody was shown them.
+  private(set) var appendedByteCount = 0
 
   init(limits: TerminalScrollbackLimits) {
     self.limits = limits
@@ -25,7 +28,9 @@ struct TerminalHistory {
     for block in blocks[head...] {
       bytes.append(contentsOf: block.bytes)
     }
-    return TerminalHistorySnapshot(bytes: bytes, droppedByteCount: droppedByteCount)
+    return TerminalHistorySnapshot(
+      bytes: bytes, droppedByteCount: droppedByteCount,
+      startOffset: appendedByteCount - bytes.count)
   }
 
   /// Memory held by the blocks still in the history, which the budget only bounds while each block
@@ -49,10 +54,12 @@ struct TerminalHistory {
     }
     // The budget counts bytes, not the storage behind them: a block kept with a buffer sized for a
     // much larger read would let the history weigh many times its limit.
-    let stored = bytes.capacity > 2 * bytes.count ? bytes.withUnsafeBufferPointer(Array.init) : bytes
+    let stored =
+      bytes.capacity > 2 * bytes.count ? bytes.withUnsafeBufferPointer(Array.init) : bytes
     blocks.append(Block(bytes: stored, newlineCount: newlines))
     byteCount += bytes.count
     newlineCount += newlines
+    appendedByteCount += bytes.count
 
     let droppedNow = trim()
     droppedByteCount += droppedNow

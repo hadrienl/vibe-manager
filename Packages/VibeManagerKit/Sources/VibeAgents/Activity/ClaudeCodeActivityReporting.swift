@@ -152,17 +152,25 @@ public struct ClaudeCodeInterruptionWatch: Sendable {
     "[Request interrupted by user]", "[Request interrupted by user for tool use]",
   ]
 
-  private let transcript: URL
-  private let pollInterval: Duration
+  static let needle = Data("[Request interrupted by user".utf8)
 
-  public init(transcript: URL, pollInterval: Duration = .milliseconds(500)) {
+  private let transcript: URL
+  private let onWatching: (@Sendable (AppendedLines.Watching) -> Void)?
+
+  public init(transcript: URL) {
+    self.init(transcript: transcript, onWatching: nil)
+  }
+
+  init(transcript: URL, onWatching: (@Sendable (AppendedLines.Watching) -> Void)?) {
     self.transcript = transcript
-    self.pollInterval = pollInterval
+    self.onWatching = onWatching
   }
 
   /// Interruptions written from now on; what the transcript already holds belongs to the past.
   public func signals() -> AsyncStream<AgentSignal> {
-    let lines = AppendedLines(file: transcript, start: .end, pollInterval: pollInterval).lines()
+    var appended = AppendedLines(file: transcript, start: .end, needles: [Self.needle])
+    appended.onWatching = onWatching
+    let lines = appended.lines()
     return AsyncStream { continuation in
       let task = Task {
         for await line in lines where Self.isInterruption(line) {
@@ -177,7 +185,7 @@ public struct ClaudeCodeInterruptionWatch: Sendable {
   static func isInterruption(_ line: Data) -> Bool {
     // Most lines are tool calls and their output, some of them large: the words are looked for
     // before any JSON is decoded.
-    guard line.range(of: Data("[Request interrupted by user".utf8)) != nil,
+    guard LineSplitter.contains(line, anyOf: [needle]),
       let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
       object["type"] as? String == "user",
       let message = object["message"] as? [String: Any]

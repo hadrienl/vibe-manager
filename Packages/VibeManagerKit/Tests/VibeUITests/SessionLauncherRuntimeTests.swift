@@ -41,14 +41,10 @@ struct SessionLauncherRuntimeTests {
     for session in [detached, ended, stopped] {
       await launcher.launch(session: session, plan: plan())
     }
-    // Said again until heard: the launcher's reader attaches on its own time.
-    await waitUntil("the output of the three sessions noted") {
-      var heard = true
-      for session in [detached, ended, stopped] where launcher.lastOutput(of: session.id) == nil {
-        await supervisor.emit(.output([0x41]), to: session.id)
-        heard = false
-      }
-      return heard
+    // What the terminal last wrote is the terminal's to note, not the launcher's (#248): what the
+    // launcher holds is its readers, its observer and when each process started.
+    await waitUntil("the three runs tracked") {
+      Set([detached, ended, stopped].map(\.id)).isSubset(of: launcher.trackedSessionIDs)
     }
 
     _ = await launcher.detach(detached.id)
@@ -58,7 +54,6 @@ struct SessionLauncherRuntimeTests {
     await waitUntil("the process that ended forgotten") {
       !launcher.trackedSessionIDs.contains(ended.id)
     }
-    #expect(launcher.lastOutput(of: ended.id) == nil)
 
     await launcher.stopAll(gracePeriod: .zero)
     #expect(launcher.trackedSessionIDs.isEmpty)

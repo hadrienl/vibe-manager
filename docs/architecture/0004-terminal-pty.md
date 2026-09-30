@@ -2,7 +2,9 @@
 
 - Status: Accepted; partly superseded by [0017](0017-terminal-host.md), where the sessions now run
   in a terminal host that can outlive the application; amended by [0030](0030-side-terminals.md),
-  which keys terminals by `TerminalID` and writes the history of side terminals to disk
+  which keys terminals by `TerminalID` and writes the history of side terminals to disk, and by
+  [0036](0036-hidden-terminals.md), where each subscriber reads only what it needs and a hidden view
+  is suspended
 - Date: 2026-09-21
 - Decision owners: Vibe Manager maintainers
 - Related issue: [#4](https://github.com/hadrienl/vibe-manager/issues/4)

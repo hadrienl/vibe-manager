@@ -275,9 +275,10 @@ struct ClaudeCodeInterruptionWatchTests {
   func followsTheFile() async throws {
     let url = try temporaryLog().deletingLastPathComponent().appendingPathComponent("t.jsonl")
     try Data((Self.interrupted + "\n").utf8).write(to: url)
-    let watch = ClaudeCodeInterruptionWatch(transcript: url, pollInterval: .milliseconds(20))
+    let log = WatchLog()
+    let watch = ClaudeCodeInterruptionWatch(transcript: url) { log.record($0) }
     let stream = watch.signals()
-    try await Task.sleep(for: .milliseconds(60))
+    await log.wait(for: .file)
     let handle = try FileHandle(forWritingTo: url)
     try handle.seekToEnd()
     try handle.write(contentsOf: Data((Self.quoted + "\n" + Self.interruptedTool + "\n").utf8))

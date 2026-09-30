@@ -272,7 +272,7 @@ struct CodexQuestionWatchTests {
 
     let watch = CodexQuestionWatch(
       sessionsDirectory: sessions, workingDirectoryPath: work, since: since,
-      pollInterval: .milliseconds(20), discoveryTimeout: .seconds(2))
+      discoveryInterval: .milliseconds(20), discoveryTimeout: .seconds(2))
     var iterator = watch.signals().makeAsyncIterator()
     let first = await iterator.next()
     #expect(requestNotice(in: first)?.key == "codex:call_3")

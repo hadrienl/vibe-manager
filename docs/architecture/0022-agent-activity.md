@@ -89,6 +89,14 @@ typed in the session also end the turn at once, and Claude's `idle_prompt` notif
 later, catches anything else. No silence timer is used for agents with hooks: how often a TUI
 redraws is guaranteed nowhere. Codex has an `Interrupt` hook.
 
+The transcript — and Codex's rollout, for its questions — is followed by `AppendedLines`, woken by the
+file's own `vnode` events rather than polled (#251): an idle session costs a descriptor and no
+wake-up, and an interruption is seen as soon as it is written. While the file does not exist yet,
+its folder is watched instead. A safety net of 30 s (`FileWatching.safetyNet`) catches an event
+lost; files on a network volume, whose events may never come, are not handled. The file is read by
+blocks of 1 MiB and cut into lines in one pass (`LineSplitter`, by `memchr`), and only the lines that
+hold the words a watch looks for reach it.
+
 ### Answering from the terminal
 
 After a permission is granted, the CLIs say nothing until the tool ends, so the keystroke that

@@ -30,6 +30,8 @@ public final class AppModel {
     // it follows the active sessions, and gives one that stopped its last pass.
     didSet {
       if case .loaded(let sessions) = state {
+        sessionIndexes = Dictionary(
+          sessions.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
         journal?.track(sessions)
         quickOpen.sessionsChanged(sessions)
         conversations.sessionsChanged(sessions)
@@ -38,9 +40,15 @@ public final class AppModel {
         if readsJournalsForQuickOpen, let journal {
           quickOpen.loadJournals(for: sessions.map(\.id), read: journal.reader)
         }
+        // A session renamed, archived or gone changes the requests listed without any activity
+        // saying so; the count the toolbar reads is stored, so it follows here (#254).
+        requestsDidChange()
       }
     }
   }
+  /// Where each listed session sits in the list, for `session(withID:)`. Not observed: reading
+  /// it goes through `sessions`, which is.
+  @ObservationIgnored private var sessionIndexes: [SessionID: Int] = [:]
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   /// The name of each detected agent, by provider identifier, for the places that name one.
@@ -66,8 +74,15 @@ public final class AppModel {
   /// What each session's agent can do right now, refreshed with the detections. Held here so
   /// that the sidebar and the inspector read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
-  /// What each session's agent is doing, as the tracker last said (#45).
-  public internal(set) var activities: [SessionID: AgentActivityState] = [:]
+  /// What each session's agent is doing, as the tracker last said (#45), one cell per session
+  /// (#254): a view reading one session's activity is not woken by another's.
+  @ObservationIgnored let activityCells = ObservedCells<SessionID, AgentActivityState>()
+  /// Every session's activity at once. Never from a view, which would depend on them all: a view
+  /// reads `activity(for:)`.
+  public internal(set) var activities: [SessionID: AgentActivityState] {
+    get { activityCells.snapshot }
+    set { activityCells.replace(with: newValue) }
+  }
   /// The conversation views of the sessions (#38), and the settings they share.
   public let conversations: ConversationWorkspace
   /// A CLI's hooks waiting for the user's consent before its agent starts.
@@ -119,9 +134,13 @@ public final class AppModel {
   }
   /// The requests already accounted for: notified, or seen arriving while the application was in
   /// front. Only one arriving in the background is notified.
-  var knownRequestIDs: Set<AgentRequestID> = []
-  var postedRequestIDs: Set<AgentRequestID> = []
-  var announcedRequestIDs: Set<AgentRequestID> = []
+  @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
+  @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
+  @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
+  /// How many requests wait in sessions other than the one on screen: what the toolbar and the
+  /// menu need to know. Stored rather than counted when read (#254): the count reads every
+  /// session's activity, and the window would be evaluated again at each of their transitions.
+  public internal(set) var pendingRequestCount = 0
   /// Mirrored here so the settings window changes what the notifications do at once.
   public var notifiesRequests: Bool {
     didSet {
@@ -153,6 +172,9 @@ public final class AppModel {
   /// What the agent did to the branches of each session, as last read. Only the session on
   /// screen is read, so the others keep what was true when they were last looked at.
   public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
+  /// When each report was last checked against the disk, apart from what it says: a reading
+  /// that found nothing new moves only this, and only the age beside the Git list is redrawn.
+  private(set) var branchReportCheckedAt: [SessionID: Date] = [:]
   /// What `git status` says of each repository of each session, as last read. The session on
   /// screen is kept live by the monitor; the others keep what was true when they left it.
   public private(set) var repositoryStatuses: [RepositoryStatusKey: RepositoryStatusState] = [:]
@@ -162,6 +184,12 @@ public final class AppModel {
   /// commits costs two readings of the report, not one per commit.
   private var reportReadings: [SessionID: Task<Void, Never>] = [:]
   private var pendingReports: Set<SessionID> = []
+  /// Reports to read again without trusting anything already read: the user asked, came back to
+  /// the application, or the agent stopped.
+  private var forcedReports: Set<SessionID> = []
+  /// What the monitor was last handed, so that a report that names the same repositories does
+  /// not make it read the transcript and its folders again.
+  private var lastObservation: ObservationRequest?
   private var statusUpdates: Task<Void, Never>?
   /// The last stop sent to the monitor, which the next one and every `observe` wait for.
   private var pendingStop: Task<Void, Never>?
@@ -1995,7 +2023,7 @@ public final class AppModel {
   private func briefInput(for session: WorkSession, names: [String: String]) -> SessionBriefInput {
     SessionBriefInput(
       session: session,
-      branches: branchReports[session.id],
+      branches: checkedBranchReport(for: session.id),
       statuses: repositoryStatuses.values.filter { $0.key.sessionID == session.id },
       agentNames: names,
       notes: notes.text(for: session.id)
@@ -2542,6 +2570,20 @@ public final class AppModel {
     launcher?.pane(for: id)
   }
 
+  /// The sessions whose terminal is mounted in the window, in a stable order (#254).
+  public var paneSessionIDs: [SessionID] {
+    launcher?.paneSessionIDs ?? []
+  }
+
+  /// The session listed under this identifier, found without walking the list.
+  public func session(withID id: SessionID) -> WorkSession? {
+    let sessions = sessions
+    guard let index = sessionIndexes[id], sessions.indices.contains(index),
+      sessions[index].id == id
+    else { return sessions.first { $0.id == id } }
+    return sessions[index]
+  }
+
   /// Whether this session's agent runs inside the application — the terminal host could not be
   /// used for it — and so will stop when the application quits, whatever is answered then.
   public func willStopWithApplication(_ id: SessionID) -> Bool {
@@ -2858,8 +2900,26 @@ public final class AppModel {
 // MARK: - Branch report
 
 extension AppModel {
+  /// What the report says. Its `readAt` is when that last changed: `branchReportCheckedAt(for:)`
+  /// says when it was last checked, apart, so that a view of the report is not redrawn for it.
   public func branchReport(for id: SessionID) -> SessionBranchReport? {
     branchReports[id]
+  }
+
+  /// The report dated by its last check, for what is written down rather than shown: the summary
+  /// of a session handed to another agent says when its branches were read.
+  func checkedBranchReport(for id: SessionID) -> SessionBranchReport? {
+    guard let report = branchReports[id] else { return nil }
+    guard let checkedAt = branchReportCheckedAt[id], checkedAt != report.readAt else {
+      return report
+    }
+    return report.checked(at: checkedAt)
+  }
+
+  /// When the report of `id` was last checked against the disk. Read apart from the report, so
+  /// that only what shows the age depends on it.
+  public func branchReportCheckedAt(for id: SessionID) -> Date? {
+    branchReportCheckedAt[id] ?? branchReports[id]?.readAt
   }
 
   public var reportsBranches: Bool { readBranchReport != nil }
@@ -2878,6 +2938,7 @@ extension AppModel {
   func watchBranches() {
     guard readBranchReport != nil, let id = selectedSessionID else {
       observedSessionID = nil
+      lastObservation = nil
       if let repositoryStatus {
         stopObserving(with: repositoryStatus, unless: nil)
       }
@@ -2887,6 +2948,7 @@ extension AppModel {
     guard observedSessionID != id else { return }
     let hadPrevious = observedSessionID != nil
     observedSessionID = id
+    lastObservation = nil
     // The session left is no longer watched even if the new one's report never comes. A stop that
     // lands after the new session's first `observe` leaves it alone.
     if hadPrevious, let repositoryStatus {
@@ -2912,6 +2974,7 @@ extension AppModel {
     guard let id = selectedSessionID else { return }
     await repositoryStatus?.refresh()
     watchBranches()
+    forcedReports.insert(id)
     // Through the same queue as every other reading: two reports read side by side could land in
     // the wrong order and hand the monitor the older list of repositories last.
     await requestBranchReport(of: id).value
@@ -3037,13 +3100,18 @@ extension AppModel {
     await journal?.stop()
   }
 
-  func readBranches(of id: SessionID) async {
+  func readBranches(of id: SessionID, forced: Bool = false) async {
     guard let readBranchReport, let session = sessions.first(where: { $0.id == id }) else {
       return
     }
-    let report = await readBranchReport(for: session)
+    let report = await readBranchReport(for: session, forced: forced)
     guard !Task.isCancelled else { return }
-    branchReports[id] = report
+    // Published only when it says something new: the agent writing makes a reading every
+    // second, and most of them find what the last one found.
+    if branchReports[id]?.hasSameContent(as: report) != true {
+      branchReports[id] = report
+    }
+    branchReportCheckedAt[id] = report.readAt
   }
 
   /// One reading of the report at a time, and one more for whatever asked during it — after a
@@ -3061,8 +3129,9 @@ extension AppModel {
       let clock = ContinuousClock()
       while true {
         self.pendingReports.remove(id)
+        let forced = self.forcedReports.remove(id) != nil
         let started = clock.now
-        await self.readBranches(of: id)
+        await self.readBranches(of: id, forced: forced)
         await self.observeRepositories(of: id)
         guard self.pendingReports.contains(id), self.observedSessionID == id else { break }
         let pause = max(Self.minimumReportPause, (clock.now - started) * 2)
@@ -3088,7 +3157,22 @@ extension AppModel {
       ObservedRepository(
         path: repository.path, sharedWith: sharers(of: repository.path, besides: id))
     }
+    // The same repositories, the same transcript and the same conversations: the monitor already
+    // watches all of it, and would only read the transcript and its folders again.
+    let request = ObservationRequest(
+      sessionID: id, repositories: repositories, hasTranscript: report.hasTranscript,
+      conversations: session.conversations.map(\.resumeIdentifier))
+    guard request != lastObservation else { return }
+    lastObservation = request
     await repositoryStatus.observe(session, repositories: repositories)
+  }
+
+  /// What `observeRepositories` hands the monitor, and what it depends on.
+  struct ObservationRequest: Equatable {
+    let sessionID: SessionID
+    let repositories: [ObservedRepository]
+    let hasTranscript: Bool
+    let conversations: [String?]
   }
 
   /// The other sessions whose last report names this repository. Only what has been read in this
