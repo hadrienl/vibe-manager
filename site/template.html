@@ -183,6 +183,52 @@
     </div>
   </section>
 
+  <section class="block perso" id="personnalisation">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow" data-i18n="perso.eyebrow">Personnalisation</span>
+        <h2 data-i18n="perso.title">Décrivez-le, un agent le fabrique</h2>
+        <p data-i18n="perso.lede">L'avatar qui vous prévient et le thème de vos conversations se créent en une phrase. L'app vérifie chaque résultat avant de le garder, et tout s'exporte.</p>
+      </div>
+
+      <div class="feature-row">
+        <div class="copy">
+          <span class="eyebrow" data-i18n="avatar.eyebrow">Avatar</span>
+          <h3 data-i18n="avatar.title">Un avatar qui vous fait signe</h3>
+          <p data-i18n="avatar.text">Quand une session attend votre réponse et que vous êtes dans une autre app, votre avatar apparaît par-dessus avec la question. Vous répondez sans revenir dans Vibe Manager. Codex le dessine avec ses dix expressions en une minute environ, ou vous importez le vôtre.</p>
+          <figure class="prompt">
+            <figcaption><svg aria-hidden="true"><use href="#i-bubble"/></svg><span data-i18n="perso.prompt_label">Votre description</span></figcaption>
+            <blockquote data-i18n="avatar.prompt">Un petit renard roux en sweat à capuche bleu nuit, style illustration 3D douce, grands yeux expressifs, l’air curieux et sympathique.</blockquote>
+          </figure>
+        </div>
+        <div class="avatar-stage">
+          <picture><source srcset="../assets/img/floating-dark.png" media="(prefers-color-scheme: dark)"><img class="floating" src="../assets/img/floating-light.png" width="864" height="504" data-i18n-attr="alt:avatar.shot_alt" alt="Le panneau flottant de Vibe Manager : l'avatar et sa bulle, qui montre la demande d'un agent avec les boutons Autoriser et Refuser." loading="lazy"></picture>
+          <ul class="sprites" data-i18n-attr="aria-label:avatar.sprites_aria" aria-label="Les dix expressions de l'avatar">%%AVATAR_SPRITES%%</ul>
+        </div>
+      </div>
+
+      <div class="feature-row flip">
+        <div class="copy">
+          <span class="eyebrow" data-i18n="theme.eyebrow">Thèmes</span>
+          <h3 data-i18n="theme.title">Un thème à votre goût</h3>
+          <p data-i18n="theme.text">Six thèmes sont fournis. Pour le vôtre, décrivez l'ambiance : Claude Code ou Codex compose les couleurs, les polices et même l'image de fond. Chaque version s'applique en direct, les contrastes sont vérifiés pour que tout reste lisible, et vous pouvez l'exporter.</p>
+          <figure class="prompt">
+            <figcaption><svg aria-hidden="true"><use href="#i-bubble"/></svg><span data-i18n="perso.prompt_label">Votre description</span></figcaption>
+            <blockquote class="only-dark" data-i18n="theme.prompt_dark">Un thème sombre de forêt de nuit : verts profonds, un accent ambré, et une forêt brumeuse au crépuscule en fond.</blockquote>
+            <blockquote class="only-light" data-i18n="theme.prompt_light">Un papier japonais : fond crème, encre noire, une touche de vermillon, une police à empattements et des montagnes au lavis en fond.</blockquote>
+          </figure>
+          <div class="chips">
+            <span class="chip" data-i18n="theme.chip_colors">27 couleurs</span>
+            <span class="chip" data-i18n="theme.chip_fonts">Polices Google Fonts</span>
+            <span class="chip" data-i18n="theme.chip_backdrop">Image de fond</span>
+            <span class="chip" data-i18n="theme.chip_contrast">Contrastes vérifiés</span>
+          </div>
+        </div>
+        <picture class="pic-theme"><source srcset="../assets/shots/theme.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/theme-light.jpg" width="1400" height="1098" data-i18n-attr="alt:theme.shot_alt" alt="Une conversation de Vibe Manager dans un thème personnel, avec ses couleurs, sa police et son image de fond." loading="lazy"></picture>
+      </div>
+    </div>
+  </section>
+
   <section class="block keys">
     <div class="wrap">
       <div class="head">

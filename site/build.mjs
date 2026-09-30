@@ -9,7 +9,7 @@
 // (Scripts/publish-appcast.sh passes the one it reads for the feed). Without it, the list is
 // fetched from the API; if that fails too, the changelog links to GitHub Releases instead.
 
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +34,10 @@ const PAGES = [
   { id: "changelog", file: "changelog.html", href: "changelog.html", title: (t) => `${strip(t("nav.changelog"))} · Vibe Manager`, description: "cl.lede" },
   { id: "contribute", file: "contribute.html", href: "contribute.html", title: (t) => `${strip(t("nav.contribute"))} · Vibe Manager`, description: "contrib.lede" },
 ];
+
+// The avatar's expressions, in the order of AvatarExpression.allCases: the page shows them in a row.
+const AVATAR_EXPRESSIONS = ["neutral", "mouthHalfOpen", "mouthOpen", "mouthRound", "eyesHalfClosed",
+  "eyesClosed", "pleased", "surprised", "thinking", "worried"];
 
 const here = dirname(fileURLToPath(import.meta.url));
 const [outArg, releasesArg] = process.argv.slice(2);
@@ -128,6 +132,9 @@ function renderPage(code, dir, ogLocale, page, t) {
     VERSION_LONG: version ? withVersion(t, "js.version_long", version) : escapeHTML(strip(t("hero.meta_macos"))),
     RELEASE_NAV: releases.map((r) => releaseNavItem(r, code)).join(""),
     RELEASE_LIST: releaseList(code, t),
+    AVATAR_SPRITES: AVATAR_EXPRESSIONS
+      .filter((name) => existsSync(join(here, "assets", "img", "sprites", `${name}.png`)))
+      .map((name) => `<li><img src="../assets/img/sprites/${name}.png" alt="" width="44" height="44" loading="lazy"></li>`).join(""),
     ISSUE_BUG: escapeAttr(issueURL("bug", t)),
     ISSUE_IDEA: escapeAttr(issueURL("idea", t)),
   };
