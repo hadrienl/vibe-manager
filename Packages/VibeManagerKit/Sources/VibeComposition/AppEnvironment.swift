@@ -348,7 +348,10 @@ public final class AppEnvironment {
       themes: Self.conversationThemes(
         directory: data.store.deletingLastPathComponent()
           .appendingPathComponent("Themes", isDirectory: true),
-        agents: registry, diagnostics: diagnostics))
+        agents: registry, diagnostics: diagnostics),
+      // The skills an agent could not read, and the listings that failed, go to the diagnostics:
+      // a list that never opens is otherwise left unexplained (#219).
+      commands: AgentCommandCatalog(diagnostics: diagnostics.log))
     appModel = AppModel(
       repository: repository,
       recovery: repository,
