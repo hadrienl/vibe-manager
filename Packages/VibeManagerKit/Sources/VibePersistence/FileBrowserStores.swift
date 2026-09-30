@@ -116,12 +116,11 @@ extension JSONDecoder {
   }
 }
 
-/// The sites where an agent may act without asking (#69), and the choices of Settings › Web View:
-/// preferences of this Mac.
+/// The choices of Settings › Web View: preferences of this Mac. The sites always allowed are not
+/// kept here, where any process of the user could add one (#239): `VaultBrowserPermissionStore`.
 @MainActor
-public final class UserDefaultsBrowserSettings: BrowserPermissionStore, BrowserPreferences {
+public final class UserDefaultsBrowserSettings: BrowserPreferences {
   private let defaults: UserDefaults
-  private let grantsKey = "browser.alwaysAllowedSites.v1"
   private let agentsKey = "browser.givesAgentsWebView.v1"
   private let showKey = "browser.showsWebViewWhenAgentOpensPage.v1"
   // Named when it was only the terminal's: kept, so that the choice made then still holds (#186).
@@ -129,18 +128,6 @@ public final class UserDefaultsBrowserSettings: BrowserPermissionStore, BrowserP
 
   public init(suiteName: String? = nil) {
     defaults = suiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
-  }
-
-  public var grants: Set<String> {
-    Set(defaults.stringArray(forKey: grantsKey) ?? [])
-  }
-
-  public func grant(_ key: String) {
-    defaults.set((grants.union([key])).sorted(), forKey: grantsKey)
-  }
-
-  public func revoke(_ key: String) {
-    defaults.set(grants.subtracting([key]).sorted(), forKey: grantsKey)
   }
 
   public var givesAgentsWebView: Bool {
