@@ -243,6 +243,8 @@ public struct ToolParameter: Hashable, Sendable {
     /// What the user answered a question, after its options: an option's label, several joined
     /// by ", ", or their own words.
     case answer
+    /// Follows an option of a question: what it would look like.
+    case preview
   }
 
   public let key: Key

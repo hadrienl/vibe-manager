@@ -147,10 +147,14 @@ public struct AgentQuestion: Hashable, Codable, Sendable {
   public struct Option: Hashable, Codable, Sendable {
     public let label: String
     public let description: String?
+    /// What the option would look like — a mockup, often drawn in characters — shown beside the
+    /// options while it is highlighted.
+    public let preview: String?
 
-    public init(label: String, description: String? = nil) {
+    public init(label: String, description: String? = nil, preview: String? = nil) {
       self.label = label
       self.description = description
+      self.preview = preview
     }
   }
 
@@ -172,6 +176,12 @@ public struct AgentQuestion: Hashable, Codable, Sendable {
     self.options = options
     self.allowsMultipleChoices = allowsMultipleChoices
     self.allowsFreeText = allowsFreeText
+  }
+
+  /// Whether the question's options come with previews, which Claude Code draws in a dialog of
+  /// its own: one choice only, and no place for the user's own words.
+  public var showsPreviews: Bool {
+    !allowsMultipleChoices && options.contains { $0.preview != nil }
   }
 }
 

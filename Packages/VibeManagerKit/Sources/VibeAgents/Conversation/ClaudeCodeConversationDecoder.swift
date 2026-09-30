@@ -329,7 +329,8 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       words.append(arguments)
     }
     call.kind = .subagent
-    call.parameters = words.isEmpty ? [] : [ToolParameter(.description, words.joined(separator: " "))]
+    call.parameters =
+      words.isEmpty ? [] : [ToolParameter(.description, words.joined(separator: " "))]
     call.subagent = SubagentRun(
       type: name, mode: details["background"] as? Bool == false ? .foreground : .background,
       startedAt: startedAt)
@@ -601,7 +602,9 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
         add(.question, question["question"] as? String)
         if question["multiSelect"] as? Bool == true { add(.multipleChoices, "true") }
         for option in question["options"] as? [[String: Any]] ?? [] {
-          add(.arguments, option["label"] as? String)
+          guard let label = option["label"] as? String else { continue }
+          add(.arguments, label)
+          add(.preview, AgentRequestReading.preview(of: option))
         }
       }
     default:

@@ -84,8 +84,12 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
     }
     switch answer {
     case .option(let index):
-      guard question.options.indices.contains(index) else { return nil }
-      return TerminalKeys.digit(forOption: index).map { [$0] }
+      guard question.options.indices.contains(index),
+        let digit = TerminalKeys.digit(forOption: index)
+      else { return nil }
+      // Beside previews, a digit only moves the highlight (2.1.285): Return takes it, sent apart
+      // so that the dialog has moved first.
+      return question.showsPreviews ? [digit, TerminalKeys.enter] : [digit]
     case .text(let text):
       let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty, question.allowsFreeText,

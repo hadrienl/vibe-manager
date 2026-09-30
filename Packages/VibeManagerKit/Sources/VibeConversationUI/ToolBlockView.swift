@@ -350,7 +350,7 @@ struct ToolCallDetails: View {
           Text(verbatim: question.text)
             .font(theme.messageFont(size: size / 0.86).weight(.semibold))
             .foregroundStyle(theme.text.color)
-          ForEach(Array(question.options.enumerated()), id: \.offset) { _, option in
+          ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
             let isChosen = question.chosen.contains(option)
             Label {
               Text(verbatim: option)
@@ -362,6 +362,10 @@ struct ToolCallDetails: View {
             }
             .font(theme.messageFont(size: size / 0.86))
             .accessibilityAddTraits(isChosen ? .isSelected : [])
+            // Once answered, only the preview of what was chosen still says something.
+            if let preview = question.previews[index], question.answer == nil || isChosen {
+              OptionPreview(text: preview, size: size).padding(.leading, 24)
+            }
           }
           if let other = question.otherAnswer {
             Label {
@@ -396,6 +400,7 @@ struct ToolCallDetails: View {
     case .multipleChoices:
       return LocalizedStringResource("Several Choices", bundle: .module)
     case .question: return LocalizedStringResource("Question", bundle: .module)
+    case .preview: return LocalizedStringResource("Preview", bundle: .module)
     case .todo: return LocalizedStringResource("Task", bundle: .module)
     }
   }
@@ -595,6 +600,10 @@ struct AnswerableQuestions: View {
               choice, option: option, question: index,
               isMultiple: question.allowsMultipleChoices,
               isEnabled: request.canChoose(in: question))
+            if let preview = choice.preview {
+              OptionPreview(text: DisplaySafeText.visible(preview), size: size)
+                .padding(.leading, 32)
+            }
           }
         }
       }
@@ -645,6 +654,31 @@ struct AnswerableQuestions: View {
     .buttonStyle(OptionButtonStyle())
     .disabled(!isEnabled)
     .accessibilityAddTraits(isChosen ? .isSelected : [])
+  }
+}
+
+/// What an option would look like, as the agent drew it: often a mockup in characters, kept in a
+/// fixed-width font and never wrapped, so that its lines stay aligned.
+struct OptionPreview: View {
+  let text: String
+  let size: Double
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: true) {
+      Text(verbatim: text)
+        .font(theme.codeFont(size: size))
+        .foregroundStyle(theme.codeText.color)
+        .fixedSize()
+        .textSelection(.enabled)
+        .padding(8)
+    }
+    .fixedSize(horizontal: false, vertical: true)
+    .background(theme.codeBackground.color)
+    .clipShape(RoundedRectangle(cornerRadius: theme.layout.innerRadius))
+    .overlay(RoundedRectangle(cornerRadius: theme.layout.innerRadius).stroke(theme.border.color))
+    .accessibilityLabel(Text("Preview", bundle: .module))
+    .accessibilityValue(Text(verbatim: text))
   }
 }
 
@@ -777,6 +811,8 @@ struct RequestActions: View {
 struct AskedQuestion: Equatable {
   var text: String
   var options: [String] = []
+  /// Each option's preview, by its index.
+  var previews: [Int: String] = [:]
   var allowsMultipleChoices = false
   var answer: String?
 
@@ -789,6 +825,9 @@ struct AskedQuestion: Equatable {
         questions[questions.count - 1].allowsMultipleChoices = true
       case .arguments where !questions.isEmpty:
         questions[questions.count - 1].options.append(parameter.value)
+      case .preview where !questions.isEmpty && !questions[questions.count - 1].options.isEmpty:
+        let question = questions[questions.count - 1]
+        questions[questions.count - 1].previews[question.options.count - 1] = parameter.value
       case .answer where !questions.isEmpty: questions[questions.count - 1].answer = parameter.value
       default: break
       }

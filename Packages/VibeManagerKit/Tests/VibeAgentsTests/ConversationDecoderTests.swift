@@ -70,6 +70,18 @@ struct ClaudeCodeConversationDecoderTests {
       ])
   }
 
+  @Test("An option's preview follows it, a blank one is left out")
+  func questionPreviews() {
+    let entries = decode([
+      #"{"type":"assistant","uuid":"a1","message":{"content":[{"type":"tool_use","id":"t1","name":"AskUserQuestion","input":{"questions":[{"question":"Layout?","header":"Layout","options":[{"label":"Grid","preview":"┌─┐\n└─┘"},{"label":"List","preview":"  "}],"multiSelect":false}]}}]}}"#
+    ])
+    #expect(
+      entries.first?.toolCall?.parameters == [
+        ToolParameter(.question, "Layout?"), ToolParameter(.arguments, "Grid"),
+        ToolParameter(.preview, "┌─┐\n└─┘"), ToolParameter(.arguments, "List"),
+      ])
+  }
+
   @Test("A call runs until its result, fails with its exit code, or is refused")
   func states() {
     let use = { (id: String) in
