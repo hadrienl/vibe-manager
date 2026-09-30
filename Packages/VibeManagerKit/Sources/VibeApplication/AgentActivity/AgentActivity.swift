@@ -65,6 +65,14 @@ public enum AgentSignal: Hashable, Sendable {
   /// another tool is still waiting on. `agentID` and `subject` tell which call it was, when the
   /// report says: sub-agents run the same tools side by side.
   case toolFinished(String, agentID: String? = nil, subject: String? = nil)
+  /// The CLI said a dialog is up, and no more than what `prompt` holds (#273). It stands for a
+  /// request only when none that is drawn already waits: the dialog would then be that one.
+  case dialogAnnounced(AgentTerminalPrompt)
+  /// The CLI said the dialog of a request it had reported is now drawn (#273): Codex reports a
+  /// permission before its automatic review, which may answer it with nothing ever drawn. `dialog`
+  /// tells which request it is; with none that matches, the dialog is `otherwise`, when that is
+  /// said: Codex draws a form for an MCP tool's permission and for a server's own request alike.
+  case dialogDrawn(AgentDrawnDialog, otherwise: AgentTerminalPrompt? = nil)
   /// The agent finished its answer.
   case turnEnded
   /// The user stopped the turn. Nothing was answered, so nothing is left to read.

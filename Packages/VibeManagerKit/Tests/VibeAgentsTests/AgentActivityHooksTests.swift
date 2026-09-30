@@ -314,7 +314,8 @@ struct CodexActivityReportingTests {
     let count = CodexActivityHooks.hooks.count
     #expect(Array(reported.arguments.prefix(3)) == ["resume", "-C", "/Users/a/dev"])
     #expect(Array(reported.arguments.suffix(2)) == ["--", "rollout-1"])
-    #expect(reported.arguments.filter { $0 == "-c" }.count == count)
+    let notifications = CodexActivityHooks.notificationOptions.count / 2
+    #expect(reported.arguments.filter { $0 == "-c" }.count == count + notifications)
     #expect(CodexActivityHooks.hookOptions(in: reported.arguments).count == count * 2)
   }
 

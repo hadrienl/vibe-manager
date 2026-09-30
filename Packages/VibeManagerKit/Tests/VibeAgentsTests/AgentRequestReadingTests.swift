@@ -297,15 +297,16 @@ struct AnswerKeymapTests {
       tool: .shell, toolName: "Bash", subject: "touch a",
       alwaysAllow: AgentAlwaysAllow(rules: [.mode("acceptEdits")], scope: .session)))
 
-  @Test("Claude Code: 1 allows, 2 always allows when offered, Escape refuses")
+  @Test("Claude Code: Yes allows, Yes and always allows when offered, Escape refuses")
   func claudePermission() {
-    #expect(claude.keystrokes(for: .allowOnce, to: permission) == [[0x31]])
-    #expect(claude.keystrokes(for: .allowAlways, to: permission) == [[0x32]])
+    let screen = DialogScreens.dialog(DialogScreens.claudeBash)
+    #expect(claude.keystrokes(for: .allowOnce, to: permission, screen: screen) == [[0x31]])
+    #expect(claude.keystrokes(for: .allowAlways, to: permission, screen: screen) == [[0x32]])
     #expect(claude.keystrokes(for: .deny, to: permission) == [[0x1B]])
     let once = AgentRequestContent.permission(
       AgentToolPermission(tool: .shell, toolName: "Bash", subject: "touch a"))
     #expect(claude.answers(for: once) == [.allowOnce, .deny])
-    #expect(claude.keystrokes(for: .allowAlways, to: once) == nil)
+    #expect(claude.keystrokes(for: .allowAlways, to: once, screen: screen) == nil)
   }
 
   @Test("Claude Code: a digit per question, a free answer pasted, a review submitted")
@@ -356,11 +357,14 @@ struct AnswerKeymapTests {
     #expect(claude.keystrokes(for: .answers([.text("Cards")]), to: .questions([layout])) == nil)
   }
 
-  @Test("Claude Code: a plan is accepted with a digit, rejected with Escape")
+  @Test("Claude Code: a plan is accepted with the digit of its option, rejected with Escape")
   func claudePlan() {
     let plan = AgentRequestContent.plan(excerpt: "x", isComplete: true)
-    #expect(claude.keystrokes(for: .approvePlan(.acceptEdits), to: plan) == [[0x31]])
-    #expect(claude.keystrokes(for: .approvePlan(.reviewEdits), to: plan) == [[0x32]])
+    let screen = DialogScreens.dialog(DialogScreens.claudePlanEdits)
+    #expect(
+      claude.keystrokes(for: .approvePlan(.acceptEdits), to: plan, screen: screen) == [[0x31]])
+    #expect(
+      claude.keystrokes(for: .approvePlan(.reviewEdits), to: plan, screen: screen) == [[0x32]])
     #expect(claude.keystrokes(for: .rejectPlan, to: plan) == [[0x1B]])
     #expect(claude.answers(for: .elicitation).isEmpty)
   }
@@ -369,12 +373,24 @@ struct AnswerKeymapTests {
   func codex() {
     let codex = CodexAnswerKeymap()
     let command = AgentRequestContent.permission(
-      AgentToolPermission(tool: .shell, toolName: "Bash", subject: "ls"))
+      AgentToolPermission(
+        tool: .shell, toolName: "Bash", subject: "ls",
+        alwaysAllow: CodexAnswerKeymap.alwaysAllow(for: "Bash")))
     let patch = AgentRequestContent.permission(
-      AgentToolPermission(tool: .patch, toolName: "apply_patch", subject: "a.txt"))
-    #expect(codex.keystrokes(for: .allowOnce, to: command) == [Array("y".utf8)])
-    #expect(codex.keystrokes(for: .allowAlways, to: command) == [Array("p".utf8)])
-    #expect(codex.keystrokes(for: .allowAlways, to: patch) == [Array("a".utf8)])
+      AgentToolPermission(
+        tool: .patch, toolName: "apply_patch", subject: "a.txt",
+        alwaysAllow: CodexAnswerKeymap.alwaysAllow(for: "apply_patch")))
+    let screen = DialogScreens.dialog(DialogScreens.codexCommand)
+    #expect(codex.keystrokes(for: .allowOnce, to: command, screen: screen) == [Array("y".utf8)])
+    #expect(codex.keystrokes(for: .allowAlways, to: command, screen: screen) == [Array("p".utf8)])
+    let patchScreen = DialogScreens.dialog(
+      """
+      › 1. Yes, proceed (y)
+        2. Yes, and don't ask again for these files (a)
+        3. No, and tell Codex what to do differently (esc)
+      """)
+    #expect(
+      codex.keystrokes(for: .allowAlways, to: patch, screen: patchScreen) == [Array("a".utf8)])
     #expect(codex.keystrokes(for: .deny, to: patch) == [[0x1B]])
     #expect(codex.answers(for: .questions([])).isEmpty)
   }
@@ -387,7 +403,8 @@ struct AnswerKeymapTests {
         toolName: "mcp__prisme_ai_builder__call_api", input: ["path": "/me"],
         workingDirectory: nil, alwaysAllow: CodexAnswerKeymap.alwaysAllow(for: "mcp__x__y")))
     #expect(codex.answers(for: tool) == [.allowOnce, .deny])
-    #expect(codex.keystrokes(for: .allowOnce, to: tool) == [Array("1".utf8)])
+    let screen = DialogScreens.dialog(DialogScreens.codexMCPTool)
+    #expect(codex.keystrokes(for: .allowOnce, to: tool, screen: screen) == [Array("1".utf8)])
     #expect(codex.keystrokes(for: .allowAlways, to: tool) == nil)
     #expect(codex.keystrokes(for: .deny, to: tool) == [[0x1B]])
   }

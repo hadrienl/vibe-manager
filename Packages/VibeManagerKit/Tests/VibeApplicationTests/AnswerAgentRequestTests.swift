@@ -32,9 +32,10 @@ private actor Terminals {
 /// Reads permissions as Claude Code reports them, and answers them with its digits.
 private struct PermissionDecoder: AgentSignalDecoding {
   let approvalAnswerKeys: Set<[UInt8]> = [[0x31]]
+  var keymap: any AgentAnswerKeymap = TwoStepKeymap()
 
   var answerKeymap: (any AgentAnswerKeymap)? {
-    TwoStepKeymap()
+    keymap
   }
 
   func signal(for event: AgentActivityEvent) -> AgentSignal? {
@@ -62,7 +63,9 @@ private struct TwoStepKeymap: AgentAnswerKeymap {
     [.allowOnce, .deny]
   }
 
-  func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
     switch answer {
     case .allowOnce: return [[0x31]]
     case .deny: return [[0x33], [0x0D]]
@@ -71,18 +74,37 @@ private struct TwoStepKeymap: AgentAnswerKeymap {
   }
 }
 
+/// Allows with the digit its dialog shows beside "Yes", as Claude Code's keymap does (#273).
+private struct ScreenKeymap: AgentAnswerKeymap {
+  func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
+    [.allowOnce, .deny]
+  }
+
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    guard answer == .allowOnce, let yes = screen?.option(where: { $0 == "Yes" }) else {
+      return nil
+    }
+    return [Array(String(yes.number).utf8)]
+  }
+}
+
 private struct Fixture {
   let logs = ScriptedActivityLogs()
   let tracker: TrackAgentActivity
   let terminals = Terminals()
   let answer: AnswerAgentRequest
+  let decoder: PermissionDecoder
 
-  init() {
+  init(screen: String? = nil, keymap: any AgentAnswerKeymap = TwoStepKeymap()) {
     tracker = makeTracker(logs: logs, store: MemoryActivityStore(), clock: TestClock(t1))
+    decoder = PermissionDecoder(keymap: keymap)
     let terminals = terminals
     answer = AnswerAgentRequest(
       tracker: tracker,
       write: { id, bytes in await terminals.write(bytes, to: id) },
+      screen: { _ in screen },
       sleep: { _ in })
   }
 
@@ -90,7 +112,7 @@ private struct Fixture {
   func asking(_ command: String) async -> (SessionID, AgentRequestID) {
     let id = SessionID()
     await terminals.run(id)
-    await tracker.processStarted(id, decoder: PermissionDecoder())
+    await tracker.processStarted(id, decoder: decoder)
     #expect(await following(logs, id))
     await logs.write("start", at: t1, for: id)
     await logs.write("ask", at: t1, for: id, payload: command)
@@ -133,6 +155,27 @@ struct AnswerAgentRequestTests {
     let (id, request) = await fixture.asking("touch a")
     #expect(await fixture.answer(.allowAlways, to: request) == .notAnswerable)
     #expect(await fixture.terminals.written[id] == nil)
+  }
+
+  @Test("The key is the one the dialog on screen shows for the answer (#273)")
+  func readOffTheScreen() async {
+    let fixture = Fixture(
+      screen: " Do you want to proceed?\n ❯ 1. Yes, and switch to auto mode\n   2. Yes\n   3. No",
+      keymap: ScreenKeymap())
+    let (id, request) = await fixture.asking("touch a")
+    #expect(await fixture.answer(.allowOnce, to: request) == .sent)
+    #expect(await fixture.terminals.written[id] == [Array("2".utf8)])
+  }
+
+  @Test("An answer the dialog on screen does not offer, or a screen unread, types nothing (#273)")
+  func notOnScreen() async {
+    for screen in [" ❯ 1. Yes, and switch to auto mode\n   2. No", nil] {
+      let fixture = Fixture(screen: screen, keymap: ScreenKeymap())
+      let (id, request) = await fixture.asking("touch a")
+      #expect(await fixture.answer(.allowOnce, to: request) == .notOnScreen)
+      #expect(await fixture.terminals.written[id] == nil)
+      #expect(await fixture.tracker.state(for: id)?.requests.count == 1)
+    }
   }
 
   @Test("A request that goes away between two keystrokes stops the answer halfway")

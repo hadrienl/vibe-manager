@@ -790,6 +790,13 @@ struct RequestActions: View {
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(theme.codeBackground.color, in: RoundedRectangle(cornerRadius: 6))
       }
+      // A dialog the agent only announced (#273): its own words are all there is to show.
+      if case .inTerminal(let prompt) = request.request.content, let message = prompt.message {
+        Text(verbatim: DisplaySafeText.visible(message))
+          .font(theme.interfaceFont(size: 12.5))
+          .foregroundStyle(theme.text.color)
+          .textSelection(.enabled)
+      }
       buttons
     }
   }
@@ -826,6 +833,12 @@ struct RequestActions: View {
             } label: {
               Text("Approve, Accepting Edits", bundle: .module)
             }
+            // Where Claude Code offers its auto mode, in place of accepting edits (#273).
+            Button {
+              model.answer(.approvePlan(.autoMode))
+            } label: {
+              Text("Approve in Auto Mode", bundle: .module)
+            }
             Button {
               model.answer(.approvePlan(.reviewEdits))
             } label: {
@@ -844,7 +857,7 @@ struct RequestActions: View {
           }
           .help(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation:
+      case .questions, .elicitation, .inTerminal:
         EmptyView()
       }
       if request.isSending {
