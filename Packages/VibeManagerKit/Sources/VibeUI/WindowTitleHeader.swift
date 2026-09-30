@@ -105,6 +105,7 @@ struct WindowTitleHeader: View {
     // The whole name, truncated or not: knowing whether it is would take a measurement for
     // nothing.
     .help(title.full)
+    .modifier(MovesWindow())
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title.spoken)
     .accessibilityAddTraits(.isHeader)
@@ -318,5 +319,19 @@ private final class NotificationObservers: @unchecked Sendable {
 
   deinit {
     for token in tokens { NotificationCenter.default.removeObserver(token) }
+  }
+}
+
+/// Dragging the title moves the window, as the system's own title does: drawn by SwiftUI in the
+/// toolbar, it kept the click for itself.
+private struct MovesWindow: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(macOS 15, *) {
+      content
+        .gesture(WindowDragGesture())
+        .allowsWindowActivationEvents(true)
+    } else {
+      content
+    }
   }
 }
