@@ -62,8 +62,13 @@ name, read as words.
 ## Consequences
 
 - The Settings gain a Badges tab. Every change is kept at once, like the other tabs.
-- The symbol search is a list of about 230 names with English keywords, filtered by what this Mac
-  draws; any other SF Symbol can be typed by its exact name. macOS offers no public list of symbols,
-  and the SF Symbols app's metadata is not ours to ship.
+- The symbol search offers about 230 chosen names first, with English keywords, then every other
+  SF Symbol this Mac has — about 6,600 on macOS 27 — with the words the system finds each by. macOS
+  has no public list of symbols, and the SF Symbols app's metadata is not ours to ship, but the
+  system keeps its own in `CoreGlyphs.bundle` (`symbol_order.plist`, `symbol_search.plist`,
+  `symbol_restrictions.strings`). It is read, never shipped: the variants for a script (`.ar`,
+  `.hi`, `.rtl`…) and the symbols Apple restricts to its own products are left out, and anything
+  unexpected in those files leaves the search with its own list. Any symbol can still be typed by
+  its exact name.
 - Two copies of the application share the preference through the user defaults, as they share the
   other interface preferences.

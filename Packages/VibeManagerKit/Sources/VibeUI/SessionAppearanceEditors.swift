@@ -115,8 +115,8 @@ struct SymbolSearch: View {
   }
 }
 
-/// The SF Symbols offered by the search. macOS has no public list of them: these are the ones
-/// that suit a kind of work, and any other can still be typed by its exact name.
+/// The SF Symbols offered by the search: first a few that suit a kind of work, then every other
+/// this Mac has (`SystemSymbols`). Any symbol can still be typed by its exact name.
 enum SymbolCatalog {
   static let names = [
     "terminal", "apple.terminal", "chevron.left.forwardslash.chevron.right",
@@ -237,7 +237,9 @@ enum SymbolCatalog {
     var results = available.filter { name in
       !palette.containsSymbol(name)
         && words.allSatisfy { word in
-          name.contains(word) || keywords[name, default: []].contains { $0.hasPrefix(word) }
+          name.contains(word)
+            || keywords[name, default: []].contains { $0.hasPrefix(word) }
+            || system.keywords[name, default: []].contains { $0.hasPrefix(word) }
         }
     }
     if !typed.isEmpty, !results.contains(typed), exists(typed), !palette.containsSymbol(typed) {
@@ -276,10 +278,60 @@ enum SymbolCatalog {
   }
 
   /// Read once: a name this version of macOS does not know is never offered.
+  /// Read once: the chosen ones first, then the rest of the system's, in its own order. Without
+  /// the system's list, only the chosen ones this version of macOS draws.
   private static let available: [String] = {
     var seen: Set<String> = []
-    return names.filter { seen.insert($0).inserted && exists($0) }
+    let chosen = names.filter { seen.insert($0).inserted && exists($0) }
+    return chosen + system.names.filter { seen.insert($0).inserted }
   }()
+
+  private static let system = SystemSymbols.installed ?? SystemSymbols(names: [], keywords: [:])
+}
+
+/// Every SF Symbol this Mac has, and the words the system finds each by, as macOS keeps them for
+/// itself in CoreGlyphs. Not a public interface: read with care, and absent — `nil` — as soon as
+/// anything is not as expected, the search then offering its own list.
+///
+/// Left out: the variants of a symbol for a script (`character.book.closed.ar`, `.hi`, `.rtl`…),
+/// which the system picks by itself, and the symbols Apple restricts to its own products.
+struct SystemSymbols: Sendable {
+  let names: [String]
+  let keywords: [String: [String]]
+
+  static let installed = SystemSymbols(
+    resources: URL(
+      fileURLWithPath: "/System/Library/CoreServices/CoreGlyphs.bundle/Contents/Resources"))
+
+  /// The endings of a symbol's variants for a script or a writing direction.
+  static let scriptVariants: Set<String> = [
+    "ar", "bn", "cy", "dv", "el", "fa", "gu", "he", "hi", "ja", "km", "kn", "ko", "lo", "ml",
+    "mni", "mr", "my", "or", "pa", "rtl", "sat", "si", "ta", "te", "th", "ur", "zh",
+  ]
+
+  init(names: [String], keywords: [String: [String]]) {
+    self.names = names
+    self.keywords = keywords
+  }
+
+  init?(resources: URL) {
+    func plist(_ name: String) -> Any? {
+      guard let data = try? Data(contentsOf: resources.appendingPathComponent(name)) else {
+        return nil
+      }
+      return try? PropertyListSerialization.propertyList(from: data, format: nil)
+    }
+    guard let order = plist("symbol_order.plist") as? [String], !order.isEmpty else { return nil }
+    let restricted = (plist("symbol_restrictions.strings") as? [String: Any]).map { Set($0.keys) }
+    let all = Set(order)
+    names = order.filter { name in
+      if restricted?.contains(name) == true { return false }
+      guard let dot = name.lastIndex(of: ".") else { return true }
+      let ending = String(name[name.index(after: dot)...])
+      return !(Self.scriptVariants.contains(ending) && all.contains(String(name[..<dot])))
+    }
+    keywords = (plist("symbol_search.plist") as? [String: [String]]) ?? [:]
+  }
 }
 
 // MARK: - Adding a colour
