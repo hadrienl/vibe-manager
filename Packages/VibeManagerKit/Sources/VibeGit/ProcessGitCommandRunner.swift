@@ -16,15 +16,18 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
   private let executable: GitExecutable
   private let timeout: Duration
   private let diagnostics: any DiagnosticLog
+  private let filters: RepositoryFilterGuard
 
   public init(
     candidates: [String] = ProcessGitCommandRunner.defaultCandidates,
     timeout: Duration = .seconds(120),
-    diagnostics: any DiagnosticLog = NullDiagnosticLog()
+    diagnostics: any DiagnosticLog = NullDiagnosticLog(),
+    filters: RepositoryFilterGuard = .shared
   ) {
     executable = GitExecutable(candidates: candidates)
     self.timeout = timeout
     self.diagnostics = diagnostics
+    self.filters = filters
   }
 
   public static let defaultCandidates = [
@@ -44,8 +47,39 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
   /// truncated `-z` listing would parse into a wrong one.
   static let outputByteLimit = 64 << 20
 
+  /// Where `status` sits in `arguments`: the one command that reads the working tree, and so the
+  /// one a repository's filter drivers and submodules could run code through.
+  static func statusIndex(in arguments: [String]) -> Int? {
+    switch arguments.first {
+    case "status": return 0
+    case "--no-optional-locks" where arguments.dropFirst().first == "status": return 1
+    default: return nil
+    }
+  }
+
   public func run(_ arguments: [String], in directory: String) async throws -> GitCommandResult {
     let path = try await executable.resolve()
+    var arguments = arguments
+    var environment = Self.environment()
+    if let status = Self.statusIndex(in: arguments) {
+      guard let drivers = await driversToNeutralize(in: directory, git: path) else {
+        diagnostics.record(
+          .git, .error, "git.filtersUnknown", ["repository": .path(RedactedPath(directory))])
+        return GitCommandResult(
+          exitCode: 128,
+          errorOutput: String(
+            localized: "git could not read this repository's configuration.", bundle: .module))
+      }
+      if !drivers.isEmpty {
+        environment.merge(FilterConfiguration.environment(neutralizing: drivers)) { $1 }
+        diagnostics.record(
+          .git, .info, "git.filtersNeutralized",
+          ["count": .count(drivers.count), "repository": .path(RedactedPath(directory))])
+      }
+      // An option, not `diff.ignoreSubmodules`: a repository's `submodule.<name>.ignore` would
+      // override the configuration, and the Git run in a submodule reads that submodule's filters.
+      arguments.insert("--ignore-submodules=dirty", at: status + 1)
+    }
     let startedAt = ContinuousClock.now
     let result: BoundedProcessResult
     do {
@@ -53,7 +87,7 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
         BoundedProcessRequest(
           executablePath: path,
           arguments: Self.hardeningOptions + arguments,
-          environment: Self.environment(),
+          environment: environment,
           workingDirectoryPath: directory,
           timeout: timeout,
           outputByteLimit: Self.outputByteLimit
@@ -89,6 +123,33 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
   }
 
   /// The verb alone: every other argument may be a path, a branch name or a revision.
+  /// The filter drivers the repository at `directory` defines for itself, or `nil` when Git could
+  /// not list them. Listing runs nothing of the repository's: `git config` starts no filter, hook or
+  /// monitor.
+  private func driversToNeutralize(in directory: String, git path: String) async -> [String]? {
+    let timeout = timeout
+    return await filters.drivers(in: directory) {
+      guard
+        let result = try? await BoundedProcess.run(
+          BoundedProcessRequest(
+            executablePath: path,
+            arguments: Self.hardeningOptions + FilterConfiguration.arguments,
+            environment: Self.environment(),
+            workingDirectoryPath: directory,
+            timeout: timeout,
+            outputByteLimit: Self.outputByteLimit
+          )
+        ), !result.didTimeOut, !result.outputTruncated
+      else { return nil }
+      // `--get-regexp` answers 1 when nothing matched: outside a repository, nothing to switch off.
+      switch result.exitCode {
+      case 0: return result.standardOutput
+      case 1 where result.standardOutput.isEmpty: return Data()
+      default: return nil
+      }
+    }
+  }
+
   static func verb(of arguments: [String]) -> DiagnosticToken {
     switch arguments.first {
     case "status": return DiagnosticToken("status")
@@ -99,6 +160,7 @@ public struct ProcessGitCommandRunner: GitCommandRunner {
     case "merge-base": return DiagnosticToken("merge-base")
     case "rev-list": return DiagnosticToken("rev-list")
     case "diff": return DiagnosticToken("diff")
+    case "config": return DiagnosticToken("config")
     case "--no-optional-locks": return verb(of: Array(arguments.dropFirst()))
     default: return DiagnosticToken("other")
     }
