@@ -31,7 +31,7 @@ public final class ConversationWorkspace {
   @ObservationIgnored private let store: any ConversationAppearanceStore
   @ObservationIgnored private let agents: (any AgentProviderResolving)?
   /// The skills and commands read from the agents, shared by the sessions of a folder (#219).
-  @ObservationIgnored private let commands: AgentCommandCatalog
+  @ObservationIgnored let commands: AgentCommandCatalog
   /// Which list each model reads: another agent or folder starts from an empty one.
   @ObservationIgnored private var commandKeys: [SessionID: AgentCommandCatalog.Key] = [:]
   /// The user's own themes, and the one on trial (#118).

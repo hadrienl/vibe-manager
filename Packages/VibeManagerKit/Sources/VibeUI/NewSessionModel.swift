@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 @MainActor
@@ -24,7 +25,16 @@ public final class NewSessionModel {
   /// Edited directly by the sheet's bindings. Reacting to a change is an explicit call rather
   /// than an observer that fires a detached task: the model list the user sees must follow the
   /// agent they just picked, not the scheduler.
-  public var draft = SessionDraft()
+  public var draft = SessionDraft() {
+    didSet { commandsFollowDraft() }
+  }
+
+  /// The list under a `/` typed first in the initial prompt (#219).
+  public let commands = ComposerCommands()
+  private let commandCatalog: AgentCommandCatalog
+  /// The agent and folder the list is read for.
+  private var commandKey: AgentCommandCatalog.Key?
+  private var commandConnection: Task<Void, Never>?
 
   /// The templates offered, in the user's order.
   public private(set) var templates: [PromptTemplate] = []
@@ -91,8 +101,11 @@ public final class NewSessionModel {
     recentFolderProbeBudget: Duration = .milliseconds(300),
     forgetRecentFolder: (@MainActor (RecentFolder) -> Void)? = nil,
     /// The symbols and colours the Settings offer (#199), and what a name is given among them.
-    palette: SessionAppearancePalette = .default
+    palette: SessionAppearancePalette = .default,
+    /// The skills and commands read from the agents, shared with the conversations (#219).
+    commandCatalog: AgentCommandCatalog = AgentCommandCatalog()
   ) {
+    self.commandCatalog = commandCatalog
     self.projectIcons = projectIcons
     self.icons = icons
     self.templates = templates
@@ -105,6 +118,40 @@ public final class NewSessionModel {
     self.revalidationDelay = revalidationDelay
     self.fullDiskAccess = fullDiskAccess
     draft.palette = palette
+  }
+
+  /// The list follows the prompt, and the agent and folder chosen: it is read for them — only once
+  /// a `/` is typed, a folder being typed starting no CLI at each letter.
+  private func commandsFollowDraft() {
+    commands.update(
+      text: draft.initialPrompt, isEnabled: draft.templateFill == nil && !isSubmitting)
+    guard let providerID = draft.providerID, !providerID.isEmpty,
+      let folder = draft.resolvedWorkingDirectoryPath, folder.hasPrefix("/")
+    else {
+      if commandKey != nil {
+        commandKey = nil
+        commandConnection?.cancel()
+        commands.read = nil
+      }
+      return
+    }
+    let key = AgentCommandCatalog.Key(
+      providerID: AgentProviderID(providerID), workingDirectoryPath: folder)
+    guard key != commandKey else { return }
+    commandKey = key
+    commands.read = nil
+    commandConnection?.cancel()
+    commandConnection = Task { [weak self, registry, commandCatalog] in
+      guard let listing = await registry.provider(id: key.providerID) as? any AgentCommandListing,
+        let self, !Task.isCancelled, self.commandKey == key
+      else { return }
+      self.commands.read = { await commandCatalog.refreshed(key, from: listing) }
+    }
+  }
+
+  /// Puts `command` in the prompt in place of what was typed after `/`.
+  public func insertCommand(_ command: AgentCommand) {
+    draft.initialPrompt = commands.inserting(command)
   }
 
   /// What the sheet says under a working folder macOS guards — a remark, never a problem.

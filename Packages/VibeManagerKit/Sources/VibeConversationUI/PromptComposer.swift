@@ -158,14 +158,19 @@ struct PromptComposer: View {
     )
     .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
     // Above the composer, as wide, over the end of the conversation (#219).
+    // The guide is set outside the condition: set within it, SwiftUI drops it, and the list hangs
+    // down from the composer's top instead.
     .overlay(alignment: .top) {
-      if model.showsCommandSuggestions {
-        CommandSuggestionList(model: model) {
-          isFocused = true
-          Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+      Group {
+        if model.showsCommandSuggestions {
+          CommandSuggestionList(commands: model.commands) { command in
+            model.insertCommand(command)
+            isFocused = true
+            Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
+          }
         }
-        .alignmentGuide(.top) { $0[.bottom] + 8 }
       }
+      .alignmentGuide(.top) { $0[.bottom] + 8 }
     }
     // A request waits for the composer to be on screen, and is spent once: made before the view
     // existed, it is honoured when it appears (#105).

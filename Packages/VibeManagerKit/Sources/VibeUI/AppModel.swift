@@ -2641,7 +2641,8 @@ public final class AppModel {
       icons: icons,
       recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) },
-      palette: appearancePalette.offered
+      palette: appearancePalette.offered,
+      commandCatalog: conversations.commands
     )
     if let template {
       model.selectTemplate(template)

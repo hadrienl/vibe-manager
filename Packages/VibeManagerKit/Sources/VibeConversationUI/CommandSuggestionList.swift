@@ -6,18 +6,23 @@ import VibeApplication
 ///
 /// The keyboard stays in the composer: ↑ and ↓ move the selection there, ⇥ and ↩ insert, Escape
 /// closes. A click inserts too.
-struct CommandSuggestionList: View {
-  let model: ConversationModel
-  /// Gives the keyboard back to the composer, after a click.
-  let refocus: () -> Void
+public struct CommandSuggestionList: View {
+  let commands: ComposerCommands
+  /// Puts the command clicked in the text, and the keyboard back in it.
+  let insert: (AgentCommand) -> Void
   @Environment(\.conversationTheme) private var theme
   @State private var contentHeight: CGFloat = 0
 
   /// About seven entries and a half: the next one shows there is more.
   private static let maximumHeight: CGFloat = 380
 
-  var body: some View {
-    let matches = model.commandSuggestions ?? []
+  public init(commands: ComposerCommands, insert: @escaping (AgentCommand) -> Void) {
+    self.commands = commands
+    self.insert = insert
+  }
+
+  public var body: some View {
+    let matches = commands.suggestions ?? []
     VStack(alignment: .leading, spacing: 0) {
       if matches.isEmpty {
         Text("No skill matches", bundle: .module)
@@ -32,7 +37,7 @@ struct CommandSuggestionList: View {
               .onGeometryChange(for: CGFloat.self, of: \.size.height) { contentHeight = $0 }
           }
           .frame(height: min(contentHeight, Self.maximumHeight))
-          .onChange(of: model.selectedCommandIndex) { _, index in
+          .onChange(of: commands.selectedIndex) { _, index in
             proxy.scrollTo(index)
             announce(matches, at: index)
           }
@@ -50,6 +55,8 @@ struct CommandSuggestionList: View {
     .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 12))
     .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme.border.color))
     .shadow(color: .black.opacity(theme.isDark ? 0.35 : 0.12), radius: 10, y: 3)
+    // As tall as its entries, whatever the view it stands above proposes.
+    .fixedSize(horizontal: false, vertical: true)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("\(matches.count) skills and commands", bundle: .module))
     .onAppear { announceCount(matches.count) }
@@ -61,18 +68,12 @@ struct CommandSuggestionList: View {
         if index == 0 || matches[index - 1].command.kind != match.command.kind {
           header(match.command.kind)
         }
-        CommandSuggestionRow(match: match, isSelected: index == model.selectedCommandIndex)
+        CommandSuggestionRow(match: match, isSelected: index == commands.selectedIndex)
           .id(index)
           .contentShape(Rectangle())
-          .onTapGesture {
-            model.insertCommand(match.command)
-            refocus()
-          }
+          .onTapGesture { insert(match.command) }
           .accessibilityAddTraits(.isButton)
-          .accessibilityAction {
-            model.insertCommand(match.command)
-            refocus()
-          }
+          .accessibilityAction { insert(match.command) }
       }
     }
     .padding(.vertical, 4)

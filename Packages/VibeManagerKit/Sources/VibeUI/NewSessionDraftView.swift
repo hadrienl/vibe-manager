@@ -628,7 +628,8 @@ public struct NewSessionDraftView: View {
             focusRequested: editorRequest == .draft(.initialPrompt),
             isBordered: false,
             onSubmit: submit,
-            onCancel: dismissed
+            onCancel: dismissed,
+            commands: model.commands
           )
           .focused($focus, equals: .draft(.initialPrompt))
           .accessibilityIdentifier("new-session-prompt")
@@ -642,6 +643,18 @@ public struct NewSessionDraftView: View {
       .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
       .overlay {
         RoundedRectangle(cornerRadius: 16).strokeBorder(.separator)
+      }
+      // The agent's skills and commands, above the prompt, as in a conversation (#219).
+      // The guide outside the condition, which would drop it (see `PromptComposer`).
+      .overlay(alignment: .top) {
+        Group {
+          if model.commands.isShowing, model.renderedPrompt == nil {
+            CommandSuggestionList(commands: model.commands) { command in
+              model.insertCommand(command)
+            }
+          }
+        }
+        .alignmentGuide(.top) { $0[.bottom] + 8 }
       }
 
       Text(

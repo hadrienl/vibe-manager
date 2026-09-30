@@ -49,6 +49,13 @@ list is read when a conversation is first shown. Each time the list opens, the l
 once and read again behind it if it is older than 30 s. A skill added on disk therefore shows the next
 time the list opens, without FSEvents. A reading that fails keeps the list read before.
 
+### Two places, one list
+
+`ComposerCommands` holds the list's state for a text: the composer of a conversation and the initial
+prompt of a new session each own one. The new session reads the list for the agent and folder chosen
+in the draft, only once `/` is typed: typing a folder starts no CLI. Claude Code runs a command given
+as its initial prompt (measured with `/context`).
+
 ### The state is read from the draft
 
 As with the shell mode (#188), the list is open when the whole draft (blanks aside) is a trigger
