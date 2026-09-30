@@ -178,7 +178,9 @@ public final class AccessibleTerminalView: TerminalView {
     // The width SwiftTerm reserves for its scroller, unless it hides it.
     let scroller = subviews.lazy.compactMap { $0 as? NSScroller }.first
     let reserved =
-      scroller.map { $0.isHidden ? 0 : NSScroller.scrollerWidth(for: .regular, scrollerStyle: scrollerStyle) }
+      scroller.map {
+        $0.isHidden ? 0 : NSScroller.scrollerWidth(for: .regular, scrollerStyle: scrollerStyle)
+      }
       ?? 0
     let width = frame.width - reserved
     return (width / CGFloat(terminal.cols), frame.height / CGFloat(terminal.rows))
@@ -205,7 +207,8 @@ public final class AccessibleTerminalView: TerminalView {
     let pointer = LinkPointer(view: self)
     addTrackingArea(
       NSTrackingArea(
-        rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+        rect: .zero,
+        options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
         owner: pointer))
     linkPointer = pointer
     syncLinkMode()

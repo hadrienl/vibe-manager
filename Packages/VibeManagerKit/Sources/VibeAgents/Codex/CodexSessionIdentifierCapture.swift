@@ -189,8 +189,12 @@ public actor CodexSessionIdentifierCapture {
   /// The reads are queued before anything suspends, and a single drain consumes them: the
   /// accumulator splices an identifier straddling two reads, so handing it the second read
   /// first would splice the wrong halves and lose the identifier for the whole launch.
-  public func observe(output text: String) async {
-    guard captured == nil, pending == nil, named == nil else { return }
+  ///
+  /// Answers `.enough` once the identifier is known, from the terminal or elsewhere: nothing the
+  /// terminal writes afterwards is read (#248).
+  @discardableResult
+  public func observe(output text: String) async -> AgentOutputDemand {
+    guard captured == nil, pending == nil, named == nil else { return .enough }
     queued.append(text)
     queuedByteCount += text.utf8.count
     // A pane can write faster than the accumulator drains. Older reads go first: the
@@ -198,7 +202,8 @@ public actor CodexSessionIdentifierCapture {
     while queuedByteCount > Self.maximumQueuedByteCount, queued.count > 1 {
       queuedByteCount -= queued.removeFirst().utf8.count
     }
-    guard !draining else { return }
+    // The drain under way reads this one too.
+    guard !draining else { return .more }
 
     draining = true
     defer { draining = false }
@@ -210,6 +215,7 @@ public actor CodexSessionIdentifierCapture {
     }
     queued.removeAll()
     queuedByteCount = 0
+    return captured == nil && pending == nil && named == nil ? .more : .enough
   }
 
   /// The agent named its session through its hook (#144): stored, in place of whatever another

@@ -76,6 +76,10 @@ public struct TerminalPaneView<Accessory: View>: View {
           ProgressView {
             Text("Starting terminal…", bundle: .module)
           }
+        } else if model.isCatchingUp {
+          ProgressView {
+            Text("Updating the terminal…", bundle: .module)
+          }
         }
       }
 

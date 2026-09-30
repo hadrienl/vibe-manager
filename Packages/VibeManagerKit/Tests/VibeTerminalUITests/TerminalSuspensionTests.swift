@@ -1,0 +1,311 @@
+import AppKit
+import Foundation
+import SwiftTerm
+import Testing
+import VibeApplication
+import VibeDomain
+
+@testable import VibeTerminalUI
+
+/// A process that writes what the test says, keeps it all in its history, and records what the
+/// terminal answers.
+private actor ScriptedSession: TerminalSession {
+  nonisolated let id: TerminalID
+  private var printed: [UInt8] = []
+  /// How many bytes of `printed` the history has let go of.
+  private var trimmed = 0
+  private var subscribers: [UUID: AsyncStream<TerminalEvent>.Continuation] = [:]
+  /// The pane's watch of the state, which reads no bytes and is told nothing here.
+  private var stateReaders: [AsyncStream<TerminalEvent>.Continuation] = []
+  /// Everything the view sent back, write by write.
+  private(set) var written: [[UInt8]] = []
+
+  init(id: TerminalID) {
+    self.id = id
+  }
+
+  func attach() -> TerminalAttachment {
+    let (events, continuation) = AsyncStream<TerminalEvent>.makeStream()
+    let subscriberID = UUID()
+    subscribers[subscriberID] = continuation
+    continuation.onTermination = { _ in Task { await self.remove(subscriberID) } }
+    return TerminalAttachment(
+      state: .running(processIdentifier: 7), history: history(), events: events)
+  }
+
+  func attach(_ interest: TerminalEventInterest) -> TerminalAttachment {
+    guard interest == .state else { return attach() }
+    let (events, continuation) = AsyncStream<TerminalEvent>.makeStream()
+    stateReaders.append(continuation)
+    return TerminalAttachment(
+      state: .running(processIdentifier: 7), history: history(), events: events)
+  }
+
+  private func remove(_ subscriberID: UUID) {
+    subscribers[subscriberID] = nil
+  }
+
+  /// How many readers of the bytes are attached.
+  var readerCount: Int { subscribers.count }
+
+  func print(_ text: String) {
+    let bytes = [UInt8](text.utf8)
+    printed += bytes
+    for continuation in subscribers.values {
+      continuation.yield(.output(bytes))
+    }
+  }
+
+  /// The answers the terminal sent that report the cursor's position.
+  /// Output that never reaches the readers, whose streams say they dropped it — as a bounded stream
+  /// does when its reader falls behind.
+  func printDropped(_ text: String) {
+    let bytes = [UInt8](text.utf8)
+    printed += bytes
+    for continuation in subscribers.values {
+      continuation.yield(.outputDropped(byteCount: bytes.count))
+    }
+  }
+
+  /// The history lets go of all but its last `count` bytes.
+  func trimHistory(keepingLast count: Int) {
+    trimmed = max(trimmed, printed.count - count)
+  }
+
+  var cursorReports: Int {
+    written.map { String(decoding: $0, as: UTF8.self) }.filter { $0.hasSuffix("R") }.count
+  }
+
+  func state() -> TerminalProcessState { .running(processIdentifier: 7) }
+  func history() -> TerminalHistorySnapshot {
+    TerminalHistorySnapshot(
+      bytes: Array(printed[trimmed...]), droppedByteCount: trimmed, startOffset: trimmed)
+  }
+  func write(_ bytes: [UInt8]) { written.append(bytes) }
+  func resize(to size: TerminalSize) {}
+  func stop(gracePeriod: Duration) {}
+  func kill() {}
+}
+
+private actor NoSupervisor: TerminalSupervisor {
+  func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
+    throw TerminalError.spawnFailed(code: 1)
+  }
+  func session(for id: TerminalID) -> (any TerminalSession)? { nil }
+  func stop(id: TerminalID, gracePeriod: Duration) {}
+  func stopAll(gracePeriod: Duration) {}
+}
+
+@MainActor
+private struct Harness {
+  let session: ScriptedSession
+  let pane: TerminalPaneModel
+  let coordinator: TerminalSurfaceCoordinator
+  let view: TerminalView
+
+  static func make() async -> Harness {
+    let id = TerminalID()
+    let session = ScriptedSession(id: id)
+    let pane = TerminalPaneModel(
+      terminalID: id, supervisor: NoSupervisor(), spec: nil, viewportTimeout: .zero)
+    // The pane sends the view's answers to the process, as it does to a real one.
+    await pane.adopt(session)
+    let coordinator = TerminalSurfaceCoordinator(pane: pane, suspensionDelay: .zero)
+    // Never put in a window, never shown.
+    let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 640, height: 400))
+    view.terminalDelegate = coordinator
+    coordinator.bind(to: view)
+    coordinator.attachIfNeeded(to: session)
+    return Harness(session: session, pane: pane, coordinator: coordinator, view: view)
+  }
+
+  var screen: String {
+    let terminal = view.getTerminal()
+    return (0..<terminal.rows).compactMap { terminal.getLine(row: $0)?.translateToString() }
+      .joined(separator: "\n")
+  }
+
+  /// The rows of the screen and of its scrollback, top to bottom.
+  var allLines: [String] {
+    let terminal = view.getTerminal()
+    let top = -terminal.getTopVisibleRow()
+    return (top..<terminal.rows).compactMap { terminal.getLine(row: $0)?.translateToString() }
+  }
+
+  func waitForScreen(containing text: String) async {
+    while !screen.contains(text) { try? await Task.sleep(for: .milliseconds(5)) }
+  }
+
+  func putAway() async {
+    coordinator.followActivation(false, in: view)
+    while !coordinator.isSuspended { try? await Task.sleep(for: .milliseconds(5)) }
+    // Only the sentinel reads the bytes now.
+    while await session.readerCount != 1 { try? await Task.sleep(for: .milliseconds(5)) }
+  }
+}
+
+@MainActor
+@Suite("A terminal put away is not fed, and catches up when shown (#248)", .timeLimit(.minutes(1)))
+struct TerminalSuspensionTests {
+  @Test("Hidden, written to, then shown: the screen is the one a view fed all along would show")
+  func catchesUpToTheSameScreen() async {
+    let harness = await Harness.make()
+    await harness.session.print("first line\r\n")
+    await harness.waitForScreen(containing: "first line")
+
+    await harness.putAway()
+    var written = "first line\r\n"
+    // Well past one slice of catch-up.
+    for index in 0..<4_000 {
+      let line = "\u{1B}[3\(index % 8)mline \(index)\u{1B}[0m\r\n"
+      written += line
+      await harness.session.print(line)
+    }
+    await harness.session.print("\u{1B}[2;5Hover")
+    written += "\u{1B}[2;5Hover"
+    #expect(!harness.screen.contains("line 3999"))
+
+    harness.coordinator.followActivation(true, in: harness.view)
+    await harness.waitForScreen(containing: "line 3999")
+    while !harness.screen.contains("over") { try? await Task.sleep(for: .milliseconds(5)) }
+
+    let reference = TerminalView(frame: harness.view.frame)
+    reference.feed(byteArray: Array(written.utf8)[...])
+    let referenceScreen = (0..<reference.getTerminal().rows)
+      .compactMap { reference.getTerminal().getLine(row: $0)?.translateToString() }
+      .joined(separator: "\n")
+    #expect(harness.screen == referenceScreen)
+    let cursor = harness.view.getTerminal().getCursorLocation()
+    let referenceCursor = reference.getTerminal().getCursorLocation()
+    #expect(cursor.x == referenceCursor.x)
+    #expect(cursor.y == referenceCursor.y)
+    #expect(!harness.coordinator.isSuspended)
+    #expect(written.utf8.count > TerminalSurfaceCoordinator.catchUpSliceSize)
+    // Drawn again, and the pane no longer says it is catching up.
+    #expect(harness.view.alphaValue == 1)
+    #expect(!harness.pane.isCatchingUp)
+  }
+
+  @Test("A question asked of a suspended terminal is answered without showing it")
+  func sentinelAnswersWhileSuspended() async {
+    let harness = await Harness.make()
+    await harness.putAway()
+
+    await harness.session.print("prompt> \u{1B}[6n")
+    while await harness.session.cursorReports < 1 { try? await Task.sleep(for: .milliseconds(5)) }
+
+    let answer = String(decoding: await harness.session.written.last ?? [], as: UTF8.self)
+    // Row 1, column 9: after the eight characters of the prompt.
+    #expect(answer == "\u{1B}[1;9R")
+    #expect(harness.coordinator.sentinelWakeCount >= 1)
+    #expect(harness.coordinator.isSuspended)
+    #expect(harness.view.isHidden)
+  }
+
+  @Test("A question the view already answered is not answered again when it catches up")
+  func caughtUpBytesAreNotAnsweredTwice() async {
+    let harness = await Harness.make()
+    await harness.session.print("\u{1B}[6n")
+    while await harness.session.cursorReports < 1 { try? await Task.sleep(for: .milliseconds(5)) }
+
+    await harness.putAway()
+    await harness.session.print("quiet output\r\n")
+    harness.coordinator.followActivation(true, in: harness.view)
+    await harness.waitForScreen(containing: "quiet output")
+    // A new question after the catch-up is answered once.
+    await harness.session.print("\u{1B}[6n")
+    while await harness.session.cursorReports < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+
+    #expect(await harness.session.cursorReports == 2)
+  }
+
+  @Test("A process relaunched while its view was suspended still shows how the old one ended")
+  func relaunchShowsTheEndOfTheSuspendedProcess() async {
+    let harness = await Harness.make()
+    await harness.session.print("working\r\n")
+    await harness.waitForScreen(containing: "working")
+    await harness.putAway()
+    await harness.session.print("bye from the old one\r\n")
+
+    // A relaunch builds a new pane for the new process, under the same view.
+    let next = ScriptedSession(id: harness.session.id)
+    let pane = TerminalPaneModel(
+      terminalID: next.id, supervisor: NoSupervisor(), spec: nil, viewportTimeout: .zero)
+    await pane.adopt(next)
+    harness.coordinator.adopt(pane: pane)
+    harness.coordinator.attachIfNeeded(to: next)
+    harness.coordinator.followActivation(true, in: harness.view)
+    await next.print("new process\r\n")
+    await harness.waitForScreen(containing: "new process")
+
+    let lines = harness.allLines
+    let bye = lines.firstIndex { $0.contains("bye from the old one") }
+    let new = lines.firstIndex { $0.contains("new process") }
+    #expect(bye != nil)
+    if let bye, let new { #expect(bye < new) }
+  }
+
+  @Test("Output the history let go of during a suspension starts the screen over")
+  func trimmedHistoryRepaintsTheScreen() async {
+    let harness = await Harness.make()
+    await harness.session.print("stale screen\r\n")
+    await harness.waitForScreen(containing: "stale screen")
+    await harness.putAway()
+
+    var kept = ""
+    for index in 0..<200 { await harness.session.print("lost \(index)\r\n") }
+    for index in 0..<5 {
+      let line = "kept \(index)\r\n"
+      kept += line
+      await harness.session.print(line)
+    }
+    await harness.session.trimHistory(keepingLast: kept.utf8.count)
+    harness.coordinator.followActivation(true, in: harness.view)
+    await harness.waitForScreen(containing: "kept 4")
+
+    let reference = TerminalView(frame: harness.view.frame)
+    reference.feed(byteArray: Array(kept.utf8)[...])
+    let referenceScreen = (0..<reference.getTerminal().rows)
+      .compactMap { reference.getTerminal().getLine(row: $0)?.translateToString() }
+      .joined(separator: "\n")
+    #expect(harness.screen == referenceScreen)
+    #expect(!harness.allLines.contains { $0.contains("stale screen") })
+  }
+
+  @Test("Output the live feed dropped is drawn again from the history, and not answered twice")
+  func droppedOutputIsRepainted() async {
+    let harness = await Harness.make()
+    await harness.session.print("one \u{1B}[6n\r\n")
+    while await harness.session.cursorReports < 1 { try? await Task.sleep(for: .milliseconds(5)) }
+
+    await harness.session.printDropped("two\r\n")
+    await harness.session.print("three\r\n")
+    await harness.waitForScreen(containing: "three")
+    await harness.waitForScreen(containing: "two")
+
+    #expect(await harness.session.cursorReports == 1)
+  }
+
+  @Test("A view shown again before its delay is never suspended")
+  func quickLookAwayKeepsFeeding() async {
+    let id = TerminalID()
+    let session = ScriptedSession(id: id)
+    let pane = TerminalPaneModel(
+      terminalID: id, supervisor: NoSupervisor(), spec: nil, viewportTimeout: .zero)
+    let coordinator = TerminalSurfaceCoordinator(pane: pane, suspensionDelay: .seconds(3_600))
+    let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 640, height: 400))
+    coordinator.bind(to: view)
+    coordinator.attachIfNeeded(to: session)
+
+    coordinator.followActivation(false, in: view)
+    await session.print("still fed\r\n")
+    while !(0..<view.getTerminal().rows).contains(where: {
+      view.getTerminal().getLine(row: $0)?.translateToString().contains("still fed") ?? false
+    }) {
+      try? await Task.sleep(for: .milliseconds(5))
+    }
+    coordinator.followActivation(true, in: view)
+
+    #expect(!coordinator.isSuspended)
+  }
+}

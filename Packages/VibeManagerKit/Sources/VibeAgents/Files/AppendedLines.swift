@@ -115,12 +115,19 @@ struct AppendedLines: Sendable {
         offset = 0
       }
       inode = identifier
-      // Armed before reading: whatever is written while the file is read wakes the next wait.
+      // Armed before the size is taken: whatever is written while the file is read wakes the next
+      // wait. A source just armed makes the file be looked at once more, for what was written
+      // between `fstat` and the arming — the line of a file created empty, then written — would
+      // send no event and wait for the safety net.
       if watching != .file || watcher?.inode != identifier {
         watcher = FileWatcher(path: file.path, wake: wake)
         watching = watcher == nil ? nil : .file
         folder = nil
-        if watching == .file { onWatching?(.file) }
+        if watching == .file {
+          onWatching?(.file)
+          close(descriptor)
+          continue
+        }
       }
 
       var read = 0
