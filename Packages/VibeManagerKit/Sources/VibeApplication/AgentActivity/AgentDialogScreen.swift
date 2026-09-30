@@ -48,13 +48,24 @@ public struct AgentDialogScreen: Hashable, Sendable {
         parsed.append((index, option.number, option.indent, option.isPointed, option.text))
       }
     }
-    // The last run of options numbered 1, 2, 3… one after the other.
+    // A label wrapped onto the lines under it, indented further, until an option or a blank.
+    func continuation(of option: Parsed) -> [String] {
+      var words: [String] = []
+      for line in lines[(option.line + 1)...] {
+        let indent = line.prefix { $0 == " " }.count
+        let rest = line.trimmingCharacters(in: .whitespaces)
+        guard indent > option.indent, !rest.isEmpty, Self.optionLine(line) == nil else { break }
+        words.append(rest)
+      }
+      return words
+    }
+    // The last run of options numbered 1, 2, 3… one right under the other's words.
     var run: [Parsed] = []
     for option in parsed {
       if option.number == 1 {
         run = [option]
       } else if let last = run.last, option.number == last.number + 1,
-        option.line - last.line <= 3
+        option.line == last.line + 1 + continuation(of: last).count
       {
         run.append(option)
       } else {
@@ -65,16 +76,8 @@ public struct AgentDialogScreen: Hashable, Sendable {
       run.filter(\.isPointed).count == 1
     else { return nil }
     var options: [Option] = []
-    for (position, option) in run.enumerated() {
-      var words = option.text
-      // A label wrapped onto the next lines, indented under it, until the next option.
-      let end = position + 1 < run.count ? run[position + 1].line : last.line + 1
-      for line in lines[(option.line + 1)..<end] {
-        let indent = line.prefix { $0 == " " }.count
-        let rest = line.trimmingCharacters(in: .whitespaces)
-        guard indent > option.indent, !rest.isEmpty else { break }
-        words += " " + rest
-      }
+    for option in run {
+      let words = ([option.text] + continuation(of: option)).joined(separator: " ")
       let (label, shortcut) = Self.splitShortcut(words)
       options.append(Option(number: option.number, label: label, shortcut: shortcut))
     }

@@ -245,7 +245,9 @@ public actor TrackAgentActivity {
 
   /// The agent wrote a notification to its terminal (#273).
   public func terminalNotification(_ id: SessionID, _ message: String) {
-    guard var tracked = sessions[id],
+    // Only beside hooks that speak: settings reach the CLI where its hooks may not, and a word from
+    // the terminal alone must not stand for a channel that says when turns end.
+    guard var tracked = sessions[id], tracked.state.isStructured,
       let signal = tracked.decoder?.signal(forTerminalNotification: message)
     else { return }
     let previous = tracked.state

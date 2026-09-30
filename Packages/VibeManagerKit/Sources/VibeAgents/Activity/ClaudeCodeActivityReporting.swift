@@ -125,8 +125,10 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       // no other report at all — a sandboxed command's network access above all (#273).
       guard var kind = Self.announcedKinds[type ?? ""] else { return nil }
       let message = event.string("message")
-      // "A sandboxed command needs network access": the one dialog of its kind with no report.
-      if kind == .permission, message?.localizedCaseInsensitiveContains("network") == true {
+      if type == "permission_prompt" {
+        // "A sandboxed command needs network access": the one permission with no report. Any
+        // other repeats one, and may come once it is answered, as a request nothing ends.
+        guard message?.localizedCaseInsensitiveContains("network") == true else { return nil }
         kind = .network
       }
       return .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))

@@ -111,6 +111,21 @@ struct AgentDialogScreenTests {
     #expect(codex.options[0].label == "Yes, proceed")
   }
 
+  @Test("A label wrapped over several lines, in a narrow pane, keeps the options in one dialog")
+  func wrapped() throws {
+    let narrow = try #require(
+      DialogScreens.dialog(
+        """
+         ❯ 1. Yes
+           2. Yes, and always allow access to
+              /Users/a/a-rather-long/path/to/a
+              project from this project
+           3. No
+        """))
+    #expect(narrow.options.map(\.number) == [1, 2, 3])
+    #expect(narrow.options[1].label.hasSuffix("project from this project"))
+  }
+
   @Test("An agent's numbered list, or nothing numbered, is no dialog")
   func none() {
     #expect(DialogScreens.dialog(DialogScreens.agentList) == nil)

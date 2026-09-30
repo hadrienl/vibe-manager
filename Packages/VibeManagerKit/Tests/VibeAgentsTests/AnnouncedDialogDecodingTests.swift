@@ -29,7 +29,7 @@ struct AnnouncedDialogDecodingTests {
   func claudeOthers() {
     let decoder = ClaudeCodeSignalDecoder()
     let kinds: [String: AgentTerminalPrompt.Kind] = [
-      "permission_prompt": .permission, "worker_permission_prompt": .permission,
+      "worker_permission_prompt": .permission,
       "elicitation_url_dialog": .form, "agent_needs_input": .other,
       "quota_auto_resume_stale": .other,
     ]
@@ -42,6 +42,8 @@ struct AnnouncedDialogDecodingTests {
     #expect(
       decoder.signal(for: notification("idle_prompt", "Claude is waiting for your input"))
         == .waitingForInput)
+    // Any other permission repeats its `PermissionRequest`, and may come once it is answered.
+    #expect(decoder.signal(for: notification("permission_prompt", "Claude needs your permission")) == nil)
     // Its `Elicitation` hook reports the same dialog, and says when it ends.
     #expect(decoder.signal(for: notification("elicitation_dialog", "Form")) == nil)
     #expect(decoder.signal(for: notification("auth_success", "Signed in")) == nil)
@@ -62,8 +64,8 @@ struct AnnouncedDialogDecodingTests {
     // What codex-cli 0.159.2 wrote to its terminal as it drew the dialog.
     #expect(
       decoder.signal(forTerminalNotification: "Approval requested: /bin/zsh -lc 'touch made-by...")
-        == .dialogDrawn)
-    #expect(decoder.signal(forTerminalNotification: "Codex wants to edit a.swift") == .dialogDrawn)
+        == .dialogDrawn())
+    #expect(decoder.signal(forTerminalNotification: "Codex wants to edit a.swift") == .dialogDrawn())
   }
 
   @Test("Codex: the dialogs no hook reports")
@@ -73,7 +75,8 @@ struct AnnouncedDialogDecodingTests {
       .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))
     }
     let expected: [String: AgentSignal?] = [
-      "Approval requested by github": announced(.form, "Approval requested by github"),
+      "Approval requested by github": .dialogDrawn(
+        otherwise: AgentTerminalPrompt(kind: .form, message: "Approval requested by github")),
       "Plan mode prompt: Implement this plan?": announced(
         .plan, "Plan mode prompt: Implement this plan?"),
       "Plan mode prompt: Which database?": announced(.question, "Plan mode prompt: Which database?"),

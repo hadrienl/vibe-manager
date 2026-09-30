@@ -226,17 +226,10 @@ struct ClaudeCodeSignalDecoderTests {
     #expect(decoder.signal(for: event("Notification", ClaudePayloads.idle)) == .waitingForInput)
   }
 
-  @Test("What cannot be read says nothing; a notification repeating a hook is left to the machine")
+  @Test("What cannot be read, or repeats another hook, says nothing")
   func silence() {
-    // It only stands for a request when no drawn one waits (#273).
-    guard
-      case .dialogAnnounced(let prompt) = decoder.signal(
-        for: event("Notification", ClaudePayloads.permissionNotification))
-    else {
-      Issue.record("not announced")
-      return
-    }
-    #expect(prompt.kind == .permission)
+    #expect(
+      decoder.signal(for: event("Notification", ClaudePayloads.permissionNotification)) == nil)
     #expect(decoder.signal(for: event("PreToolUse", #"{"tool_name":"Bash"}"#)) == nil)
     #expect(decoder.signal(for: event("SubagentStop")) == nil)
   }

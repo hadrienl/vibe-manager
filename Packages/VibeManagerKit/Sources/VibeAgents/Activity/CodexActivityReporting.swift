@@ -153,9 +153,12 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
     func announced(_ kind: AgentTerminalPrompt.Kind) -> AgentSignal {
       .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))
     }
-    if message.hasPrefix("Approval requested by ") { return announced(.form) }
+    // The form of an MCP tool's permission, or a server's own request, which has no report.
+    if message.hasPrefix("Approval requested by ") {
+      return .dialogDrawn(otherwise: AgentTerminalPrompt(kind: .form, message: message))
+    }
     if message.hasPrefix("Approval requested: ") || message.hasPrefix("Codex wants to edit ") {
-      return .dialogDrawn
+      return .dialogDrawn()
     }
     if let title = message.trimmingPrefix("Plan mode prompt: ") {
       switch title {
