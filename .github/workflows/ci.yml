@@ -32,6 +32,23 @@ jobs:
       - name: Build and test
         run: Scripts/ci.sh
 
+  # The landing page renders in every language: a missing text stops the build, and on `main` that
+  # would also hold back the Sparkle feed deployed with it (Scripts/publish-appcast.sh).
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Build the site
+        run: node site/build.mjs "$RUNNER_TEMP/site"
+
   # The nominal journey on the built application, driven by XCUITest (#19). Not on pull requests:
   # a shared runner's graphical session is not stable enough to fail a pull request over, and the
   # release checklist is where this job has to be green.

@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# Builds the site that GitHub Pages serves: the `site/` folder of the repository, and the Sparkle
+# Builds the site that GitHub Pages serves: the landing page rendered from `site/`, and the Sparkle
 # feed `appcast.xml` computed beside it from the published releases (ADR 0033). Two places run it:
 #
 # - **The Appcast workflow**, `.github/workflows/appcast.yml`, when a release is published,
@@ -30,6 +30,7 @@ fail() {
 
 (( $# == 1 )) || fail "usage: Scripts/publish-appcast.sh <folder>"
 command -v gh >/dev/null || fail "gh is required"
+command -v node >/dev/null || fail "node is required"
 
 mkdir -p "$1"
 readonly site="${1:A}"
@@ -37,11 +38,12 @@ readonly work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/items"
 
-echo "Copying the site"
-cp -R "$repository_root/site/." "$site/"
-
 echo "Reading the releases of $repository"
 gh api --paginate --slurp "repos/$repository/releases" > "$work/releases.json"
+
+# The landing page, one folder per language, its changelog rendered from the same releases.
+echo "Building the site"
+node "$repository_root/site/build.mjs" "$site" "$work/releases.json"
 
 # The tag of every published release that has an appcast item; the tool decides the rest.
 tags=("${(@f)$(

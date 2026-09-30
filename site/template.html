@@ -1,0 +1,369 @@
+<!doctype html>
+<!--
+  Template of the landing page. site/build.mjs renders it once per language and per page
+  (index, changelog, contribute) into the folder GitHub Pages serves: every element carrying
+  data-i18n gets its text from i18n/<lang>.json, and every marker between double percent signs is filled by the build.
+  The French text written here is the reference, and i18n/fr.json mirrors it.
+-->
+<html lang="%%LANG%%" dir="%%DIR%%">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>%%TITLE%%</title>
+<meta name="description" content="%%DESCRIPTION%%">
+<link rel="canonical" href="%%CANONICAL%%">
+%%ALTERNATES%%
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Vibe Manager">
+<meta property="og:title" content="%%TITLE%%">
+<meta property="og:description" content="%%DESCRIPTION%%">
+<meta property="og:url" content="%%CANONICAL%%">
+<meta property="og:image" content="%%SITE_URL%%assets/shots/overview-light.jpg">
+<meta property="og:locale" content="%%OG_LOCALE%%">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="../assets/icon-64.png">
+<link rel="apple-touch-icon" href="../assets/icon-256.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="ib" x1="150" y1="110" x2="870" y2="920" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#202536"/><stop offset="1" stop-color="#0d1020"/></linearGradient>
+    <linearGradient id="ia" x1="250" y1="300" x2="760" y2="760" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff8b65"/><stop offset="1" stop-color="#d650b5"/></linearGradient>
+    <symbol id="appicon" viewBox="72 72 880 880">
+      <rect x="72" y="72" width="880" height="880" rx="210" fill="url(#ib)"/>
+      <rect x="190" y="206" width="644" height="612" rx="86" fill="#171b2b" stroke="#383f58" stroke-width="8"/>
+      <rect x="190" y="206" width="644" height="116" rx="86" fill="#292f43"/>
+      <rect x="190" y="272" width="644" height="50" fill="#292f43"/>
+      <circle cx="266" cy="264" r="18" fill="#ff765f"/><circle cx="326" cy="264" r="18" fill="#ffc35a"/><circle cx="386" cy="264" r="18" fill="#56d58a"/>
+      <rect x="224" y="358" width="94" height="392" rx="36" fill="#22283b"/>
+      <rect x="240" y="386" width="62" height="82" rx="22" fill="#ff8b65"/><rect x="240" y="488" width="62" height="82" rx="22" fill="#7667e8"/><rect x="240" y="590" width="62" height="82" rx="22" fill="#47c3a2"/>
+      <path d="M398 466L482 536L398 606" fill="none" stroke="url(#ia)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M538 620H696" fill="none" stroke="#f3f4ff" stroke-width="42" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.9 1.2 1.9 2.6 3.2 2.5 1.3 0 1.8-.8 3.3-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.2 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.9-1.1-2.9-4.1zM13.9 5.4c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></symbol>
+    <symbol id="i-gh" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></g></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="7" r="2.2"/><path d="M6 7.2v9.6M18 9.2c0 4-6 3.5-11.2 7.7"/></g></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></g></symbol>
+    <symbol id="i-bubble" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 5.5h16v10H10l-4 3.5v-3.5H4z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9l4 4v13H6z"/><path d="M9.5 12h6M9.5 16h4"/></g></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3.2 3 13.8 0 17M12 3.5c-3 3.2-3 13.8 0 17"/></g></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19V11M10 19V6M15 19v-5M20 19V9"/></g></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12 20.5s-7.5-4.6-9.2-9.3C1.6 7.9 3.8 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.8 1.2-1.7 2.8-2.8 4.8-2.8 3.4 0 5.6 3.4 4.4 6.7-1.7 4.7-9.2 9.3-9.2 9.3z"/></symbol>
+    <symbol id="i-coins" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="9" cy="7" rx="5.5" ry="2.5"/><path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5M3.5 11v4c0 1.4 2.5 2.5 5.5 2.5"/><ellipse cx="15.5" cy="13.5" rx="5" ry="2.3"/><path d="M10.5 13.5v3.8c0 1.3 2.2 2.3 5 2.3s5-1 5-2.3v-3.8"/></g></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 10.5h1.5a2.5 2.5 0 0 1 0 5H17M8 3.5v2M12 3.5v2"/></g></symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="./"><svg aria-hidden="true"><use href="#appicon"/></svg>Vibe Manager</a>
+    <nav class="nav-links" data-i18n-attr="aria-label:nav.aria" aria-label="Navigation principale">
+      <a href="./#fonctionnalites" data-i18n="nav.features">Fonctionnalités</a>
+      <a href="changelog.html" data-nav="changelog" data-i18n="nav.changelog">Changelog</a>
+      <a href="contribute.html" data-nav="contribute" data-i18n="nav.contribute">Contribuer</a>
+      <a href="./#soutenir" data-i18n="nav.support">Soutenir</a>
+      <a href="https://github.com/hadrienl/vibe-manager">GitHub</a>
+    </nav>
+    <label class="lang"><span class="sr" data-i18n="nav.language">Langue</span><svg aria-hidden="true"><use href="#i-globe"/></svg><select id="lang">%%LANG_OPTIONS%%</select></label>
+    <a class="btn btn-primary btn-sm js-dl" href="%%DOWNLOAD_URL%%"><svg aria-hidden="true"><use href="#i-apple"/></svg><span data-i18n="nav.download">Télécharger</span></a>
+  </div>
+</header>
+
+<!-- ============ ACCUEIL ============ -->
+<!--PAGE:index-->
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <h1 data-i18n="hero.title">Tous vos agents de code. <span class="grad">Une seule fenêtre.</span></h1>
+      <p class="lede" data-i18n="hero.lede">Vibe Manager est une app macOS native pour mener plusieurs sessions Claude Code et Codex en parallèle, sans perdre le fil d'aucune. Gratuite et open source.</p>
+      <div class="ctas">
+        <a class="btn btn-primary js-dl" href="%%DOWNLOAD_URL%%"><svg aria-hidden="true"><use href="#i-apple"/></svg><span data-i18n="hero.cta_download">Télécharger pour macOS</span></a>
+        <a class="btn btn-ghost" href="https://github.com/hadrienl/vibe-manager"><svg aria-hidden="true"><use href="#i-gh"/></svg><span data-i18n="hero.cta_code">Voir le code</span></a>
+      </div>
+      <p class="meta">
+        <span class="js-ver">%%VERSION%%</span>
+        <span><svg aria-hidden="true"><use href="#i-check"/></svg><span data-i18n="hero.meta_macos">macOS 14 ou plus récent</span></span>
+        <span><svg aria-hidden="true"><use href="#i-check"/></svg><span data-i18n="hero.meta_signed">Signée et notarisée par Apple</span></span>
+      </p>
+      <div class="shot-stage">
+        <picture class="pic-hero"><source srcset="../assets/shots/overview.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/overview-light.jpg" data-i18n-attr="alt:hero.shot_alt" alt="Fenêtre de Vibe Manager : la liste des sessions à gauche, une conversation avec un agent au centre, l'état Git et les notes de la session à droite." width="2400" height="1735"></picture>
+      </div>
+    </div>
+  </section>
+
+  <section class="pain">
+    <div class="wrap">
+      <div class="copy">
+        <h2 data-i18n="pain.title">Six terminaux, trois dépôts, deux agents. Lequel attend votre réponse&nbsp;?</h2>
+        <p data-i18n="pain.text">Quand on fait tourner plusieurs agents à la fois, le plus dur n'est pas de coder. C'est de savoir où en est chacun, lequel est bloqué et sur quelle branche il travaille. Vibe Manager range tout ça pour vous.</p>
+        <ul class="pain-list" data-i18n-attr="aria-label:pain.list_aria" aria-label="Exemple de sessions en parallèle">
+          <li><span class="dot" style="background:var(--amber)"></span><span data-i18n="pain.s1">Corriger le calcul de TVA du panier</span><span class="when" data-i18n="status.waiting_short">attend</span></li>
+          <li><span class="dot" style="background:var(--violet)"></span><span data-i18n="pain.s2">#142 Pagination des factures</span><span class="when" data-i18n="status.running_short">en cours</span></li>
+          <li><span class="dot" style="background:var(--violet)"></span><span data-i18n="pain.s3">Migrer l'auth vers les passkeys</span><span class="when" data-i18n="status.running_short">en cours</span></li>
+          <li><span class="dot" style="background:var(--teal)"></span><span data-i18n="pain.s4">Revue de la MR !87</span><span class="when" data-i18n="status.done_short">terminé</span></li>
+        </ul>
+      </div>
+      <img src="../assets/img/hero-illu.jpg" data-i18n-attr="alt:pain.illu_alt" alt="Illustration : une fenêtre centrale reliée à quatre agents, chacun dans sa carte." loading="lazy">
+    </div>
+  </section>
+
+  <section class="block" id="fonctionnalites">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow" data-i18n="features.eyebrow">Fonctionnalités</span>
+        <h2 data-i18n="features.title">Pensé pour ceux qui ont toujours quatre agents sur le feu</h2>
+        <p data-i18n="features.lede">Chaque session garde son dossier, son agent, son terminal, ses notes et son historique. Vous passez de l'une à l'autre sans rien relancer.</p>
+      </div>
+
+      <div class="feature-row">
+        <div class="copy">
+          <span class="eyebrow" data-i18n="tasks.eyebrow">Sessions</span>
+          <h3 data-i18n="tasks.title">Vos sessions deviennent une liste de tâches</h3>
+          <p data-i18n="tasks.text">À faire, en cours, en attente, terminé : chaque session a un statut, et la barre latérale vous montre d'un coup d'œil ce qui avance et ce qui attend. Regroupez-les par projet, triez-les à la main, archivez-les sans jamais rien perdre.</p>
+          <div class="chips">
+            <span class="chip"><span class="dot" style="background:var(--ink-soft)"></span><span data-i18n="status.todo">À faire</span></span>
+            <span class="chip"><span class="dot" style="background:var(--violet)"></span><span data-i18n="status.running">En cours</span></span>
+            <span class="chip"><span class="dot" style="background:var(--amber)"></span><span data-i18n="status.waiting">En attente</span></span>
+            <span class="chip"><span class="dot" style="background:var(--teal)"></span><span data-i18n="status.done">Terminé</span></span>
+          </div>
+        </div>
+        <picture class="pic-fade"><source srcset="../assets/shots/sidebar.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/sidebar-light.jpg" data-i18n-attr="alt:tasks.shot_alt" alt="La barre latérale de Vibe Manager, avec les sessions rangées par statut et les demandes des agents en attente de réponse." loading="lazy" width="1420" height="1500"></picture>
+      </div>
+
+      <div class="feature-row flip">
+        <div class="copy">
+          <span class="eyebrow" data-i18n="git.eyebrow">Git en direct</span>
+          <h3 data-i18n="git.title">Ce que l'agent a changé, sans taper <code>git status</code></h3>
+          <p data-i18n="git.text">L'inspecteur suit chaque dépôt touché par la session : fichiers modifiés, indexés, en conflit, commits d'avance sur l'amont. Les changements sont rattachés à l'agent qui les a faits, même quand deux sessions partagent le même dossier. Et vos notes de session sont juste en dessous.</p>
+        </div>
+        <picture class="pic-narrow"><source srcset="../assets/shots/inspector.jpg" media="(prefers-color-scheme: dark)"><img class="shot" src="../assets/shots/inspector-light.jpg" data-i18n-attr="alt:git.shot_alt" alt="L'inspecteur Git de Vibe Manager, avec les fichiers modifiés d'une session et ses notes." loading="lazy" width="682" height="950"></picture>
+      </div>
+
+      <div class="grid3">
+        <article class="card">
+          <span class="ico" style="background:var(--violet)"><svg aria-hidden="true"><use href="#i-moon"/></svg></span>
+          <h3 data-i18n="card.quit.title">Quittez, ils continuent</h3>
+          <p data-i18n="card.quit.text">Les agents peuvent tourner pendant que l'app est fermée. À la relance, chacun est à l'écran comme vous l'avez laissé.</p>
+        </article>
+        <article class="card">
+          <span class="ico" style="background:var(--coral)"><svg aria-hidden="true"><use href="#i-bubble"/></svg></span>
+          <h3 data-i18n="card.reply.title">Répondez sans changer de session</h3>
+          <p data-i18n="card.reply.text">Une session en arrière-plan pose une question ? Répondez depuis une palette, sans quitter ce que vous faites.</p>
+        </article>
+        <article class="card">
+          <span class="ico" style="background:var(--teal)"><svg aria-hidden="true"><use href="#i-swap"/></svg></span>
+          <h3 data-i18n="card.switch.title">Changez d'agent en cours de route</h3>
+          <p data-i18n="card.switch.text">Passez de Claude Code à Codex, ou d'un modèle à l'autre. Le nouvel agent reçoit un résumé du travail, que vous relisez avant l'envoi.</p>
+        </article>
+        <article class="card">
+          <span class="ico" style="background:var(--magenta)"><svg aria-hidden="true"><use href="#i-note"/></svg></span>
+          <h3 data-i18n="card.templates.title">Templates de prompt</h3>
+          <p data-i18n="card.templates.text">« Revue de {{url}} » : un formulaire, un aperçu exact, et la session démarre nommée d'après la MR.</p>
+        </article>
+        <article class="card">
+          <span class="ico" style="background:var(--amber)"><svg aria-hidden="true"><use href="#i-globe"/></svg></span>
+          <h3 data-i18n="card.web.title">Terminaux et vue web par session</h3>
+          <p data-i18n="card.web.text">Un tiroir de terminaux pour le serveur et les logs, et une vue web que l'agent sait piloter : ouvrir, lire la console, capturer.</p>
+        </article>
+        <article class="card">
+          <span class="ico" style="background:var(--ink)"><svg aria-hidden="true"><use href="#i-lock"/></svg></span>
+          <h3 data-i18n="card.local.title">Tout reste sur votre Mac</h3>
+          <p data-i18n="card.local.text">Aucun compte, aucune télémétrie. L'app ne lit aucune clé d'API et ne baisse jamais les permissions de vos CLI.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="block keys">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow" data-i18n="keys.eyebrow">Au clavier</span>
+        <h2 data-i18n="keys.title">Tout est à portée de raccourci</h2>
+      </div>
+      <div class="keys-grid">
+        <div class="key"><kbd>⌘ P</kbd><p data-i18n="keys.p">Retrouver une session par numéro de ticket, URL de MR, branche ou mot de ses notes.</p></div>
+        <div class="key"><kbd>⌘ J</kbd><p data-i18n="keys.j">Ouvrir le tiroir de terminaux de la session, dans son dossier.</p></div>
+        <div class="key"><kbd>⌃ ⌘ G</kbd><p data-i18n="keys.g">Grouper la barre latérale par projet.</p></div>
+        <div class="key"><kbd>⌥ ⌘ U</kbd><p data-i18n="keys.u">Voir le temps et les tokens consommés, par session, agent ou modèle.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow" data-i18n="oss.eyebrow">Open source</span>
+        <h2 data-i18n="oss.title">Gratuit, ouvert, et construit en public</h2>
+        <p data-i18n="oss.lede">Le code est sur GitHub, chaque décision d'architecture y est documentée, et la feuille de route se décide dans les tickets.</p>
+      </div>
+      <div class="oss">
+        <div class="stat"><b data-i18n="oss.free_value">0 €</b><span data-i18n="oss.free">Pas d'abonnement, pas de version pro.</span></div>
+        <div class="stat"><b>38</b><span data-i18n="oss.adr">Décisions d'architecture publiées, du stockage des sessions au terminal.</span></div>
+        <div class="stat"><b>2</b><span data-i18n="oss.agents">Agents pris en charge aujourd'hui : Claude Code et Codex CLI.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block support" id="soutenir">
+    <div class="wrap">
+      <div class="support-grid">
+        <div class="head">
+          <span class="eyebrow" data-i18n="support.eyebrow">Soutenir le projet</span>
+          <h2 data-i18n="support.title">Vibe Manager est gratuit. Un pourboire l'aide à grandir.</h2>
+          <p data-i18n="support.lede">Pas de version payante, pas de publicité, aucune donnée collectée. Si l'app vous fait gagner du temps, vous pouvez soutenir son développement. Chaque contribution finance du temps passé sur vos tickets.</p>
+        </div>
+        <div class="tips">
+          <a class="tip" href="https://github.com/sponsors/hadrienl" data-support="sponsors">
+            <span class="tip-ico" style="background:var(--magenta)"><svg aria-hidden="true"><use href="#i-heart"/></svg></span>
+            <span class="tip-body">
+              <span class="tip-kind" data-i18n="support.with_github">Avec un compte GitHub</span>
+              <strong data-i18n="support.sponsors_title">Devenir sponsor sur GitHub</strong>
+              <span class="tip-text" data-i18n="support.sponsors_text">Mensuel ou ponctuel, à partir de 1 $. GitHub ne prélève aucune commission.</span>
+            </span>
+            <span class="tip-go" aria-hidden="true">→</span>
+          </a>
+          <a class="tip" href="https://liberapay.com/HashAle/" data-support="liberapay">
+            <span class="tip-ico" style="background:var(--amber)"><svg aria-hidden="true"><use href="#i-coins"/></svg></span>
+            <span class="tip-body">
+              <span class="tip-kind" data-i18n="support.no_github">Sans compte GitHub</span>
+              <strong data-i18n="support.liberapay_title">Donner sur Liberapay</strong>
+              <span class="tip-text" data-i18n="support.liberapay_text">Par carte, prélèvement SEPA ou PayPal. Une association française à but non lucratif, sans commission.</span>
+            </span>
+            <span class="tip-go" aria-hidden="true">→</span>
+          </a>
+          <div class="free-help">
+            <span data-i18n="support.free_title">Sans dépenser un centime :</span>
+            <a href="https://github.com/hadrienl/vibe-manager" data-i18n="support.free_star">une étoile sur GitHub</a>
+            <a href="contribute.html" data-i18n="support.free_ticket">un ticket</a>
+            <span data-i18n="support.free_share">un mot à un collègue</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div class="panel">
+        <svg class="app" aria-hidden="true"><use href="#appicon"/></svg>
+        <h2 data-i18n="final.title">Reprenez la main sur vos agents</h2>
+        <p class="js-ver-long">%%VERSION_LONG%%</p>
+        <div class="ctas" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+          <a class="btn btn-primary js-dl" href="%%DOWNLOAD_URL%%"><svg aria-hidden="true"><use href="#i-apple"/></svg><span data-i18n="final.download">Télécharger le .dmg</span></a>
+          <a class="btn btn-ghost" href="contribute.html" style="background:transparent;color:inherit;border-color:rgba(255,255,255,.25)" data-i18n="final.idea">Proposer une idée</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<!--/PAGE:index-->
+
+<!-- ============ CHANGELOG ============ -->
+<!--PAGE:changelog-->
+<main>
+  <div class="wrap">
+    <div class="page-head">
+      <span class="eyebrow" data-i18n="cl.eyebrow">Changelog</span>
+      <h1 data-i18n="cl.title">Quoi de neuf</h1>
+      <p data-i18n="cl.lede">Chaque version de Vibe Manager, ce qu'elle apporte et ce qu'elle corrige. Les numéros renvoient aux tickets GitHub.</p>
+      <p class="cl-lang" id="cl-lang" hidden data-i18n="cl.notes_language">Les notes de version sont rédigées en français.</p>
+    </div>
+    <div class="cl">
+      <nav class="cl-side" id="cl-side" aria-label="Versions">%%RELEASE_NAV%%</nav>
+      <div id="cl-list">%%RELEASE_LIST%%</div>
+    </div>
+  </div>
+</main>
+<!--/PAGE:changelog-->
+
+<!-- ============ CONTRIBUER ============ -->
+<!--PAGE:contribute-->
+<main>
+  <div class="wrap">
+    <div class="contrib-hero">
+      <div>
+        <span class="eyebrow" data-i18n="contrib.eyebrow">Contribuer</span>
+        <h1 data-i18n="contrib.title">Vibe Manager avance au rythme de vos tickets</h1>
+        <p data-i18n="contrib.lede">Un bug qui vous agace, un flux de travail qui manque, une idée à moitié formée : ouvrez un ticket. Chaque version est construite à partir de ce que les utilisateurs y écrivent.</p>
+      </div>
+      <img src="../assets/img/contribute.jpg" data-i18n-attr="alt:contrib.illu_alt" alt="Illustration : des cartes de tickets posées sur un tableau, une main en ajoute une nouvelle." loading="lazy">
+    </div>
+
+    <div class="tickets">
+      <article class="ticket">
+        <span class="chip tag"><span class="dot" style="background:var(--coral)"></span><span data-i18n="contrib.bug.tag">Bug</span></span>
+        <h3 data-i18n="contrib.bug.title">Quelque chose ne marche pas</h3>
+        <p data-i18n="contrib.bug.text">Plus c'est précis, plus c'est vite corrigé.</p>
+        <ul>
+          <li data-i18n="contrib.bug.l1">Ce que vous avez fait, ce que vous attendiez</li>
+          <li data-i18n="contrib.bug.l2">Votre version de macOS et de l'app</li>
+          <li data-i18n="contrib.bug.l3">L'export de diagnostic (Aide ▸ Exporter les diagnostics…)</li>
+        </ul>
+        <a class="btn btn-primary js-issue" data-kind="bug" href="%%ISSUE_BUG%%" data-i18n="contrib.bug.cta">Signaler un bug</a>
+      </article>
+      <article class="ticket">
+        <span class="chip tag"><span class="dot" style="background:var(--violet)"></span><span data-i18n="contrib.idea.tag">Idée</span></span>
+        <h3 data-i18n="contrib.idea.title">Il manque quelque chose</h3>
+        <p data-i18n="contrib.idea.text">Décrivez la situation plutôt que la solution.</p>
+        <ul>
+          <li data-i18n="contrib.idea.l1">Ce que vous essayiez de faire</li>
+          <li data-i18n="contrib.idea.l2">Comment vous vous en sortez aujourd'hui</li>
+          <li data-i18n="contrib.idea.l3">Ce qui vous ferait gagner du temps</li>
+        </ul>
+        <a class="btn btn-primary js-issue" data-kind="idea" href="%%ISSUE_IDEA%%" data-i18n="contrib.idea.cta">Proposer une idée</a>
+      </article>
+      <article class="ticket">
+        <span class="chip tag"><span class="dot" style="background:var(--teal)"></span><span data-i18n="contrib.code.tag">Code</span></span>
+        <h3 data-i18n="contrib.code.title">Vous voulez mettre les mains dedans</h3>
+        <p data-i18n="contrib.code.text">Swift 6, SwiftUI, et une architecture documentée.</p>
+        <ul>
+          <li data-i18n="contrib.code.l1">Choisissez un ticket ouvert et dites-le en commentaire</li>
+          <li data-i18n="contrib.code.l2">Le README explique comment builder et tester</li>
+          <li data-i18n="contrib.code.l3">Une pull request par ticket</li>
+        </ul>
+        <a class="btn btn-ghost" href="https://github.com/hadrienl/vibe-manager/issues" data-i18n="contrib.code.cta">Voir les tickets ouverts</a>
+      </article>
+    </div>
+
+    <p class="lang-note" data-i18n="contrib.any_language">Écrivez dans la langue de votre choix.</p>
+
+    <section class="block" style="padding-block:72px 96px">
+      <div class="head" style="margin-bottom:12px">
+        <h2 data-i18n="contrib.flow.title">Ce que devient votre ticket</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><h3 data-i18n="contrib.flow.s1.title">Il est lu et qualifié</h3><p data-i18n="contrib.flow.s1.text">Bug, amélioration ou question : il reçoit une étiquette et, si besoin, quelques questions.</p></div>
+        <div class="step"><h3 data-i18n="contrib.flow.s2.title">Il est conçu en public</h3><p data-i18n="contrib.flow.s2.text">La proposition de conception est écrite en commentaire, sur le ticket, avant la moindre ligne de code.</p></div>
+        <div class="step"><h3 data-i18n="contrib.flow.s3.title">Il part dans une version</h3><p data-i18n="contrib.flow.s3.text">La pull request cite le ticket, et le changelog le mentionne à la sortie.</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+<!--/PAGE:contribute-->
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="./" style="font-size:.95rem"><svg aria-hidden="true" style="width:22px;height:22px"><use href="#appicon"/></svg>Vibe Manager</a>
+    <span data-i18n="footer.tagline">Gratuit et open source.</span>
+    <nav data-i18n-attr="aria-label:footer.aria" aria-label="Pied de page">
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a href="contribute.html" data-i18n="nav.contribute">Contribuer</a>
+      <a href="./#soutenir" data-i18n="nav.support">Soutenir</a>
+      <a href="https://github.com/hadrienl/vibe-manager">GitHub</a>
+      <a href="https://github.com/hadrienl/vibe-manager/releases" data-i18n="footer.all_versions">Toutes les versions</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js" defer></script>
+</body>
+</html>
