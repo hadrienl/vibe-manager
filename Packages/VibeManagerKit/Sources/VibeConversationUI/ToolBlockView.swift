@@ -605,17 +605,31 @@ struct PreviewedOptions<Options: View>: View {
       HStack(alignment: .top, spacing: 14) {
         VStack(alignment: .leading, spacing: 4) { options }
           .frame(width: 260, alignment: .leading)
-        if let preview = previews[shown] {
-          OptionPreview(text: DisplaySafeText.visible(preview), size: size)
-        } else {
-          Text("No preview for this option", bundle: .module)
-            .font(theme.interfaceFont(size: size * 0.95))
-            .foregroundStyle(theme.secondaryText.color)
-            .padding(8)
+        // Every preview laid out, one visible: the block keeps the size of the largest, and what
+        // follows it does not move as the pointer goes from one option to the next.
+        ZStack(alignment: .topLeading) {
+          ForEach(Array(previews.enumerated()), id: \.offset) { option, preview in
+            self.preview(preview)
+              .opacity(option == shown ? 1 : 0)
+              .allowsHitTesting(option == shown)
+              .accessibilityHidden(option != shown)
+          }
         }
       }
     } else {
       VStack(alignment: .leading, spacing: 4) { options }
+    }
+  }
+
+  @ViewBuilder
+  private func preview(_ text: String?) -> some View {
+    if let text {
+      OptionPreview(text: DisplaySafeText.visible(text), size: size)
+    } else {
+      Text("No preview for this option", bundle: .module)
+        .font(theme.interfaceFont(size: size * 0.95))
+        .foregroundStyle(theme.secondaryText.color)
+        .padding(8)
     }
   }
 }

@@ -411,7 +411,17 @@ struct RequestCard: View {
         highlighted: highlighted[index],
         chosen: question.options.indices.first { isChosen(option: $0, ofQuestion: index) })
       {
-        preview(question.options[shown].preview)
+        // Every preview laid out, one visible: the bubble takes the size of the largest once and
+        // for all. Growing with the one pointed at, it moved the options under the pointer, which
+        // then pointed at another.
+        ZStack(alignment: .topLeading) {
+          ForEach(Array(question.options.enumerated()), id: \.offset) { option, choice in
+            preview(choice.preview)
+              .opacity(option == shown ? 1 : 0)
+              .allowsHitTesting(option == shown)
+              .accessibilityHidden(option != shown)
+          }
+        }
       }
       if case .text(let text) = choices[index] {
         // The free answer given, chosen as an option would be.
