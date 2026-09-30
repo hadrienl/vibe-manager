@@ -221,7 +221,12 @@ public final class ConversationModel {
   @ObservationIgnored private var repositioning = false
 
   public var activity: AgentActivity? {
-    didSet { if activity != oldValue { rebuild(changedFrom: nil) } }
+    didSet {
+      guard activity != oldValue else { return }
+      rebuild(changedFrom: nil)
+      // A skill or a prompt the agent took up: nothing waits in a panel of its terminal.
+      if activity == .working { terminalPanel = nil }
+    }
   }
   /// Whether the agent has said it is ready for a prompt. Until its hooks speak, a CLI may still
   /// show a screen of its own — an update offer, a folder to trust — where the Return that sends a
@@ -598,6 +603,7 @@ public final class ConversationModel {
   /// observes the terminal tells: sub-agents that will not end are settled, and the reader told.
   public func processStateChanged() {
     if isProcessRunning != reportedAgentRunning { rebuild(changedFrom: nil) }
+    if !isProcessRunning { terminalPanel = nil }
   }
 
   /// Asks when the process started — the kernel knows, whenever the application was opened — and
@@ -1208,12 +1214,17 @@ public final class ConversationModel {
       recallText =
         shell == nil ? text : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
     }
+    let echoID = UUID()
+    // A command of the CLI — `/mcp` — may open a panel of its terminal, and be written to the
+    // transcript only once the panel is closed: it is waited for as long (#219).
+    let opensPanel = kind == .message && text.hasPrefix("/") && !isAgentWorking
     echoes.append(
       PendingEcho(
-        id: UUID(), text: text, kind: kind, attachmentCount: attachments.count,
+        id: echoID, text: text, kind: kind, attachmentCount: attachments.count,
         sentAt: Date(), recallText: recallText, countAtSend: count,
         // Queued, a command is written once the turn ended, then run.
-        waitsForEnd: kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
+        waitsForEnd: opensPanel
+          || kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
         state: .sending))
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
@@ -1228,7 +1239,57 @@ public final class ConversationModel {
     try? await Task.sleep(for: submitDelay)
     await write(keystrokes.submit)
     scheduleEchoCheck()
+    if opensPanel { watchForTerminalPanel(echoID, command: text) }
     return true
+  }
+
+  // MARK: - A panel of the agent's terminal
+
+  /// A command sent from the composer that the agent answers with a panel of its terminal — `/mcp`,
+  /// `/model` without an argument — rather than in its transcript (#219). The terminal is then
+  /// shown in the conversation, live, until the transcript says the command ran, the agent starts
+  /// working, or the user closes it.
+  public struct TerminalPanel: Hashable, Sendable {
+    public let echoID: UUID
+    /// `/mcp`, without what follows it.
+    public let command: String
+  }
+
+  public private(set) var terminalPanel: TerminalPanel?
+  @ObservationIgnored private var panelWatch: Task<Void, Never>?
+  /// How long a command may take to be written before its panel is looked for: a command that
+  /// runs at once — `/compact`, a skill — never shows one.
+  static let terminalPanelDelay = Duration.milliseconds(600)
+
+  private func watchForTerminalPanel(_ id: UUID, command text: String) {
+    panelWatch?.cancel()
+    let command = String(text.prefix { !$0.isWhitespace })
+    panelWatch = Task { [weak self] in
+      try? await Task.sleep(for: Self.terminalPanelDelay)
+      guard !Task.isCancelled, let self, !self.isAgentWorking, self.isProcessRunning,
+        self.echoes.contains(where: { $0.id == id && $0.state == .sending })
+      else { return }
+      self.terminalPanel = TerminalPanel(echoID: id, command: command)
+    }
+  }
+
+  /// Closes the panel from the conversation: Escape, as in the terminal, then the block goes. The
+  /// command is no longer waited for.
+  public func closeTerminalPanel() async {
+    guard let panel = terminalPanel else { return }
+    terminalPanel = nil
+    dismissEcho(panel.echoID)
+    await write?(promptFormat.interruptKey)
+    requestComposerFocus()
+  }
+
+  /// The block goes once its command is no longer waited for.
+  private func settleTerminalPanel() {
+    guard let panel = terminalPanel, !echoes.contains(where: { $0.id == panel.echoID }) else {
+      return
+    }
+    terminalPanel = nil
+    requestComposerFocus()
   }
 
   // MARK: - Skills and commands
@@ -1351,6 +1412,7 @@ public final class ConversationModel {
       claimed.insert(index)
       return true
     }
+    settleTerminalPanel()
   }
 
   /// Wakes at the next echo past its wait, marks those past theirs, and waits for the next one.
@@ -1373,5 +1435,6 @@ public final class ConversationModel {
 
   public func dismissEcho(_ id: UUID) {
     echoes.removeAll { $0.id == id }
+    settleTerminalPanel()
   }
 }

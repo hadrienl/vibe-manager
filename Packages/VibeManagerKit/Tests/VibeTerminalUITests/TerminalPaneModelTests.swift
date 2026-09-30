@@ -268,3 +268,21 @@ private func settles(_ condition: @MainActor () -> Bool) async -> Bool {
   }
   return condition()
 }
+
+@MainActor
+@Test("A mirror of the terminal sizes the process while shown, and gives the pane's size back (#219)")
+func mirrorSizesTheProcess() async throws {
+  let id = TerminalID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+  let own = TerminalSize(columns: 160, rows: 48)
+  await model.reportViewportSize(own)
+  await model.start()
+  let session = try #require(await supervisor.session(for: id) as? FakeTerminalSession)
+  let block = TerminalSize(columns: 100, rows: 24)
+  await model.reportMirrorViewportSize(block)
+  #expect(model.viewportSize == own)
+  await model.restorePrimaryViewportSize()
+  #expect(await session.resizes.suffix(2) == [block, own])
+}

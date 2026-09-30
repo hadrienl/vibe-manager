@@ -254,6 +254,20 @@ public final class TerminalPaneModel {
     await session?.resize(to: size)
   }
 
+  /// A second view of the terminal — the block a panel of the agent opens in its conversation
+  /// (#219) — sizes the process to itself while it is on screen, without taking the place of the
+  /// size the terminal's own view measured.
+  public func reportMirrorViewportSize(_ size: TerminalSize) async {
+    guard size.isUsable else { return }
+    await session?.resize(to: size)
+  }
+
+  /// The mirror is gone: the process is given back the size of the terminal's own view.
+  public func restorePrimaryViewportSize() async {
+    guard let viewportSize else { return }
+    await session?.resize(to: viewportSize)
+  }
+
   /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
   /// agent's question is how its state is known to have moved before the agent says so (#45).
   @ObservationIgnored public var onUserInput: (([UInt8]) -> Void)?

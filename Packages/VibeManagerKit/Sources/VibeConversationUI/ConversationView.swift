@@ -16,6 +16,9 @@ public struct ConversationView: View {
   let isActive: Bool
   /// Whether the composer takes the keyboard when its session comes on screen (#105).
   let claimsKeyboardOnActivation: Bool
+  /// A second view of the session's terminal, shown while a command waits in one of its panels
+  /// (#219). `nil` where there is no terminal to show.
+  let liveTerminal: (() -> AnyView)?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
 
@@ -23,8 +26,10 @@ public struct ConversationView: View {
 
   public init(
     model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance,
-    isActive: Bool = true, claimsKeyboardOnActivation: Bool = true
+    isActive: Bool = true, claimsKeyboardOnActivation: Bool = true,
+    liveTerminal: (() -> AnyView)? = nil
   ) {
+    self.liveTerminal = liveTerminal
     self.model = model
     self.theme = theme
     self.appearance = appearance
@@ -241,6 +246,9 @@ public struct ConversationView: View {
             Text("Restart", bundle: .module)
           }
         }
+      }
+      if let panel = model.terminalPanel, let liveTerminal {
+        TerminalPanelBlock(model: model, panel: panel, terminal: liveTerminal())
       }
       PromptComposer(model: model, isActive: isActive)
     }

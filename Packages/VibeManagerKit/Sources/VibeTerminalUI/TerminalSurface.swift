@@ -20,6 +20,8 @@ public struct TerminalSurface: NSViewRepresentable {
   /// (#43) does not: shown with its session, it would take the keyboard from the agent's terminal.
   /// It takes it when asked to, through `focusRequest`.
   private let claimsKeyboardOnActivation: Bool
+  /// A second view of a terminal shown elsewhere (#219): see `TerminalSurfaceCoordinator.isMirror`.
+  private let isMirror: Bool
 
   public init(
     pane: TerminalPaneModel,
@@ -27,8 +29,10 @@ public struct TerminalSurface: NSViewRepresentable {
     isActive: Bool = true,
     focusRequest: Int = 0,
     accessibilityTitle: String? = nil,
-    claimsKeyboardOnActivation: Bool = true
+    claimsKeyboardOnActivation: Bool = true,
+    isMirror: Bool = false
   ) {
+    self.isMirror = isMirror
     self.pane = pane
     self.session = session
     self.isActive = isActive
@@ -38,7 +42,7 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
-    TerminalSurfaceCoordinator(pane: pane)
+    TerminalSurfaceCoordinator(pane: pane, isMirror: isMirror)
   }
 
   public func makeNSView(context: Context) -> TerminalView {
@@ -154,9 +158,19 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// starts reading a little before, so the question is not taken for text.
   static let sentinelLookBehind = 32
 
-  init(pane: TerminalPaneModel, suspensionDelay: Duration = defaultSuspensionDelay) {
+  /// A second view of a terminal whose own view stays mounted elsewhere (#219). It sizes the
+  /// process to itself only while it is on screen, gives the terminal's own size back when it
+  /// goes, and leaves to the terminal's own view what the pane learns of it: the keyboard, the
+  /// paste mode.
+  let isMirror: Bool
+
+  init(
+    pane: TerminalPaneModel, suspensionDelay: Duration = defaultSuspensionDelay,
+    isMirror: Bool = false
+  ) {
     self.pane = pane
     self.suspensionDelay = suspensionDelay
+    self.isMirror = isMirror
 
     var continuation: AsyncStream<TerminalCommand>.Continuation?
     let stream = AsyncStream<TerminalCommand> { continuation = $0 }
@@ -170,12 +184,17 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     commandTask = Task { @MainActor [weak self] in
       for await command in stream {
         // Read the pane on each command rather than capturing it: `adopt` can have replaced it.
-        guard let pane = self?.pane else { continue }
+        guard let self else { continue }
+        let pane = self.pane
         switch command {
         case .write(let bytes):
           await pane.write(bytes)
         case .resize(let size):
-          await pane.reportViewportSize(size)
+          if self.isMirror {
+            await pane.reportMirrorViewportSize(size)
+          } else {
+            await pane.reportViewportSize(size)
+          }
         }
       }
     }
@@ -192,7 +211,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func bind(to view: TerminalView) {
     if self.view !== view { hasFed = false }
     self.view = view
-    connectPasteMode()
+    if !isMirror { connectPasteMode() }
     connectLinkMenu()
   }
 
@@ -221,7 +240,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func adopt(pane: TerminalPaneModel) {
     guard self.pane !== pane else { return }
     self.pane = pane
-    connectPasteMode()
+    if !isMirror { connectPasteMode() }
     connectLinkMenu()
     eventTask?.cancel()
     eventTask = nil
@@ -301,7 +320,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   /// Tells the pane whether its view holds the keyboard, from the window's first responder.
   func observeKeyboardFocus(of view: TerminalView) {
-    guard let window = view.window, observedWindow !== window else { return }
+    guard !isMirror, let window = view.window, observedWindow !== window else { return }
     observedWindow = window
     // Compared by identity: the view itself cannot cross into the observation's closure.
     let target = ObjectIdentifier(view)
@@ -346,7 +365,13 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     stopSuspension()
     focusObservation = nil
     observedWindow = nil
-    pane.setKeyboardFocus(false)
+    if isMirror {
+      // Its size was the process's while it was shown: the terminal's own view gets its back.
+      let pane = pane
+      Task { await pane.restorePrimaryViewportSize() }
+    } else {
+      pane.setKeyboardFocus(false)
+    }
     view = nil
   }
 

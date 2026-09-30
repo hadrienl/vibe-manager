@@ -71,6 +71,17 @@
         }
       }
     },
+    "%@ in %@’s terminal" : {
+      "comment" : "A command, then the agent's name, as VoiceOver reads the panel.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ dans le terminal de %2$@"
+          }
+        }
+      }
+    },
     "%@ is asking you a question" : {
       "localizations" : {
         "fr" : {
@@ -1030,6 +1041,27 @@
         }
       }
     },
+    "Close" : {
+      "comment" : "Closes a panel of the agent's terminal shown in the conversation.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        }
+      }
+    },
+    "Closes the panel, as Escape does in the terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferme le panneau, comme Échap dans le terminal"
+          }
+        }
+      }
+    },
     "Code font" : {
       "localizations" : {
         "fr" : {
@@ -1903,6 +1935,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un test échoue sur un fichier **remplacé** : je compare d’abord l’`inode`."
+          }
+        }
+      }
+    },
+    "Open in the Terminal" : {
+      "comment" : "Shows the session's terminal, from a panel shown in the conversation.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans le terminal"
           }
         }
       }
@@ -3305,6 +3348,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente de votre autorisation"
+          }
+        }
+      }
+    },
+    "waits for your choice in %@’s terminal" : {
+      "comment" : "A command's panel, in the conversation: the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "attend votre choix dans le terminal de %@"
           }
         }
       }

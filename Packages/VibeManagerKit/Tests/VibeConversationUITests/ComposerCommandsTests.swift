@@ -168,6 +168,69 @@ struct ComposerCommandsTests {
     #expect(model.echoes.isEmpty)
   }
 
+  private func until(_ condition: @escaping @MainActor () -> Bool) async {
+    while !condition(), !Task.isCancelled { await Task.yield() }
+  }
+
+  private static func commandWritten(_ command: String) -> ConversationSnapshot {
+    ConversationSnapshot(
+      entries: [ConversationEntry(id: "c", content: .notice(.command(command)))],
+      availability: .available)
+  }
+
+  @Test(
+    "A command not written at once waits in a panel of the terminal, shown until it is written",
+    .timeLimit(.minutes(1)))
+  func terminalPanel() async {
+    let (model, _) = await readyModel()
+    model.draft = "/mcp"
+    #expect(await model.send())
+    #expect(model.terminalPanel == nil)
+    await until { model.terminalPanel != nil }
+    #expect(model.terminalPanel?.command == "/mcp")
+    // Past ten seconds, still waited for: the panel may stay open long.
+    #expect(
+      model.echoes.first?.confirmationDeadline ?? .distantPast > Date().addingTimeInterval(60))
+    model.apply(Self.commandWritten("/mcp"))
+    #expect(model.terminalPanel == nil)
+    #expect(model.echoes.isEmpty)
+  }
+
+  @Test(
+    "Closing the panel from the conversation types Escape and drops the command's echo",
+    .timeLimit(.minutes(1)))
+  func closingThePanel() async {
+    let (model, terminal) = await readyModel()
+    model.draft = "/model"
+    #expect(await model.send())
+    await until { model.terminalPanel != nil }
+    terminal.written = []
+    await model.closeTerminalPanel()
+    #expect(model.terminalPanel == nil)
+    #expect(model.echoes.isEmpty)
+    #expect(terminal.written == [[0x1B]])
+  }
+
+  @Test(
+    "A command written at once, a message, or the agent at work open no panel",
+    .timeLimit(.minutes(1)))
+  func noPanel() async throws {
+    let (model, _) = await readyModel()
+    model.draft = "/prisme-ai:debug-events 3f2c"
+    #expect(await model.send())
+    model.apply(Self.commandWritten("/prisme-ai:debug-events 3f2c"))
+    model.draft = "hello"
+    #expect(await model.send())
+    try await Task.sleep(for: ConversationModel.terminalPanelDelay * 2)
+    #expect(model.terminalPanel == nil)
+
+    model.draft = "/mcp"
+    #expect(await model.send())
+    await until { model.terminalPanel != nil }
+    model.activity = .working
+    #expect(model.terminalPanel == nil)
+  }
+
   @Test("Another agent's list is not kept: a reading for the one before is dropped")
   func replaced() async {
     let (model, _) = await readyModel()

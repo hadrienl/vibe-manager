@@ -2428,7 +2428,17 @@ private struct SessionConversationSlot: View {
         ConversationView(
           model: conversation, theme: theme,
           appearance: model.conversations.appearance, isActive: isActive,
-          claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation
+          claimsKeyboardOnActivation: model.composerClaimsKeyboardOnActivation,
+          // The session's terminal, a second view of it, for a panel its agent opens (#219).
+          liveTerminal: model.pane(for: id).map { pane in
+            {
+              AnyView(
+                TerminalSurface(
+                  pane: pane, session: pane.session, isActive: isActive,
+                  accessibilityTitle: terminalTitle(for: listed, pane: pane, in: model),
+                  isMirror: true))
+            }
+          }
         )
         .conversationLinks(of: id, in: model)
         // The terminal's bar, and its button of the drawer, whichever form the session is
