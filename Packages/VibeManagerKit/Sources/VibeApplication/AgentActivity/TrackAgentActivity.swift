@@ -238,6 +238,24 @@ public actor TrackAgentActivity {
     changed(id, from: previous)
   }
 
+  /// Whether the session's agent says anything through its terminal's notifications (#273).
+  public func readsTerminalNotifications(_ id: SessionID) -> Bool {
+    sessions[id]?.decoder?.readsTerminalNotifications ?? false
+  }
+
+  /// The agent wrote a notification to its terminal (#273).
+  public func terminalNotification(_ id: SessionID, _ message: String) {
+    guard var tracked = sessions[id],
+      let signal = tracked.decoder?.signal(forTerminalNotification: message)
+    else { return }
+    let previous = tracked.state
+    tracked.state = reduce(
+      tracked.state, .signal(signal), for: id,
+      requestID: AgentRequestID(sessionID: id, key: "notification:\(UUID().uuidString)"))
+    sessions[id] = tracked
+    changed(id, from: previous)
+  }
+
   public func userInput(_ id: SessionID, _ bytes: [UInt8]) {
     guard var tracked = sessions[id] else { return }
     let previous = tracked.state

@@ -75,6 +75,16 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
     ClaudeCodeAnswerKeymap()
   }
 
+  /// The notifications that say a dialog is up, checked against 2.1.285 and its documentation.
+  /// `elicitation_dialog` is left out: the `Elicitation` hook reports the same dialog, and ends it.
+  static let announcedKinds: [String: AgentTerminalPrompt.Kind] = [
+    "permission_prompt": .permission,
+    "worker_permission_prompt": .permission,
+    "elicitation_url_dialog": .form,
+    "agent_needs_input": .other,
+    "quota_auto_resume_stale": .other,
+  ]
+
   private let makeInterruptionWatch: @Sendable (URL) -> AsyncStream<AgentSignal>
 
   public init(
@@ -108,10 +118,18 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
           ? .questionAsked(.approval, tool: tool, notice: notice) : nil
       }
     case "Notification":
-      // Only the idle reminder is read. `permission_prompt` and `elicitation_dialog` repeat what
-      // `PermissionRequest` and `Elicitation` already said, and may arrive once the user has
-      // answered — putting back a question that is gone.
-      return event.string("notification_type") == "idle_prompt" ? .waitingForInput : nil
+      let type = event.string("notification_type")
+      if type == "idle_prompt" { return .waitingForInput }
+      // Most of these repeat what `PermissionRequest` said, and may come once the user answered:
+      // the machine lets them stand for a request only when no drawn one waits. Some dialogs have
+      // no other report at all — a sandboxed command's network access above all (#273).
+      guard var kind = Self.announcedKinds[type ?? ""] else { return nil }
+      let message = event.string("message")
+      // "A sandboxed command needs network access": the one dialog of its kind with no report.
+      if kind == .permission, message?.localizedCaseInsensitiveContains("network") == true {
+        kind = .network
+      }
+      return .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))
     case "Elicitation":
       return .questionAsked(
         .question,

@@ -58,10 +58,46 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   case elicitation
   /// The agent asked something its report does not let us read: cut short, or not JSON.
   case unreadable(tool: String?)
+  /// A dialog the CLI only announces, in its own words, without saying what it asks for in a
+  /// form that can be answered from outside (#273): answered in the terminal.
+  case inTerminal(AgentTerminalPrompt)
 
   public var isUnreadable: Bool {
     if case .unreadable = self { return true }
     return false
+  }
+
+  /// Whether the CLI only announced the dialog, without a report of what it asks.
+  public var isAnnouncedOnly: Bool {
+    if case .inTerminal = self { return true }
+    return false
+  }
+}
+
+/// A dialog known only by what the CLI says of it — a notification, not a report (#273).
+public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
+  public enum Kind: String, Hashable, Codable, Sendable {
+    /// A command wants the network: Claude Code's sandbox asks without a `PermissionRequest`.
+    case network
+    /// A permission of some other kind.
+    case permission
+    /// A form or a page an MCP server asks the user to fill in or open.
+    case form
+    /// A question to answer.
+    case question
+    /// A plan to accept.
+    case plan
+    /// Anything else the agent stopped for.
+    case other
+  }
+
+  public let kind: Kind
+  /// The CLI's own words, shown as they came: they may quote what the agent is working on.
+  public let message: String?
+
+  public init(kind: Kind, message: String?) {
+    self.kind = kind
+    self.message = message
   }
 }
 

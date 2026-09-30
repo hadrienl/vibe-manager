@@ -226,10 +226,17 @@ struct ClaudeCodeSignalDecoderTests {
     #expect(decoder.signal(for: event("Notification", ClaudePayloads.idle)) == .waitingForInput)
   }
 
-  @Test("What cannot be read, or repeats another hook, says nothing")
+  @Test("What cannot be read says nothing; a notification repeating a hook is left to the machine")
   func silence() {
-    #expect(
-      decoder.signal(for: event("Notification", ClaudePayloads.permissionNotification)) == nil)
+    // It only stands for a request when no drawn one waits (#273).
+    guard
+      case .dialogAnnounced(let prompt) = decoder.signal(
+        for: event("Notification", ClaudePayloads.permissionNotification))
+    else {
+      Issue.record("not announced")
+      return
+    }
+    #expect(prompt.kind == .permission)
     #expect(decoder.signal(for: event("PreToolUse", #"{"tool_name":"Bash"}"#)) == nil)
     #expect(decoder.signal(for: event("SubagentStop")) == nil)
   }
@@ -314,7 +321,8 @@ struct CodexActivityReportingTests {
     let count = CodexActivityHooks.hooks.count
     #expect(Array(reported.arguments.prefix(3)) == ["resume", "-C", "/Users/a/dev"])
     #expect(Array(reported.arguments.suffix(2)) == ["--", "rollout-1"])
-    #expect(reported.arguments.filter { $0 == "-c" }.count == count)
+    let notifications = CodexActivityHooks.notificationOptions.count / 2
+    #expect(reported.arguments.filter { $0 == "-c" }.count == count + notifications)
     #expect(CodexActivityHooks.hookOptions(in: reported.arguments).count == count * 2)
   }
 

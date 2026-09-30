@@ -866,10 +866,27 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     guard let activity else { return }
     activityTasks[id]?.cancel()
     activityTasks[id] = Task.detached {
-      let attachment = await terminal.attach(.pulses(every: Self.activityPulseInterval))
-      for await event in attachment.events {
-        guard case .outputPulse = event else { continue }
-        await activity.output(id)
+      await withTaskGroup(of: Void.self) { group in
+        group.addTask {
+          let attachment = await terminal.attach(.pulses(every: Self.activityPulseInterval))
+          for await event in attachment.events {
+            guard case .outputPulse = event else { continue }
+            await activity.output(id)
+          }
+        }
+        // What the agent announces on its terminal, which no hook reports (#273): its bytes are
+        // read only for an agent that says something that way — Codex.
+        guard await activity.readsTerminalNotifications(id) else { return }
+        group.addTask {
+          let attachment = await terminal.attach()
+          var notifications = TerminalNotificationScanner()
+          for await event in attachment.events {
+            guard case .output(let bytes) = event else { continue }
+            for message in notifications.scan(bytes) {
+              await activity.terminalNotification(id, message)
+            }
+          }
+        }
       }
     }
   }

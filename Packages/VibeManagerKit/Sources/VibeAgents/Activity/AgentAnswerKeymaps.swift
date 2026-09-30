@@ -33,7 +33,7 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       return [.approvePlan, .rejectPlan]
     case .unreadable:
       return [.deny]
-    case .elicitation:
+    case .elicitation, .inTerminal:
       return []
     }
   }
@@ -122,7 +122,7 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
         ? [.allowOnce, .deny] : [.allowOnce, .allowAlways, .deny]
     case .unreadable:
       return [.deny]
-    case .questions, .plan, .elicitation:
+    case .questions, .plan, .elicitation, .inTerminal:
       return []
     }
   }
@@ -171,7 +171,7 @@ public struct MockAnswerKeymap: AgentAnswerKeymap {
     case .permission: return [.allowOnce, .allowAlways, .deny]
     case .questions: return [.chooseOption, .writeText]
     case .unreadable: return [.deny]
-    case .plan, .elicitation: return []
+    case .plan, .elicitation, .inTerminal: return []
     }
   }
 

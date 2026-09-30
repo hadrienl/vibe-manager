@@ -8206,6 +8206,17 @@
         }
       }
     },
+    "Network access" : {
+      "comment" : "The title of a request of an agent: a command wants to reach the network.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès réseau"
+          }
+        }
+      }
+    },
     "Neutral" : {
       "comment" : "An avatar expression.",
       "localizations" : {
@@ -14943,6 +14954,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Attend votre accord dans la vue web"
+          }
+        }
+      }
+    },
+    "Waiting in the terminal" : {
+      "comment" : "The title of a request of an agent: a dialog of its terminal, of no known kind.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente dans le terminal"
           }
         }
       }

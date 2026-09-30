@@ -338,6 +338,13 @@ struct RequestCard: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+    case .inTerminal:
+      if let message = RequestPresentation.subject(of: request.content) {
+        Text(verbatim: message)
+          .font(.callout)
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
     case .elicitation, .unreadable:
       EmptyView()
     }
@@ -525,7 +532,7 @@ struct RequestCard: View {
           .help(Text(Self.stopsTheTurn))
           .accessibilityHint(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation:
+      case .questions, .elicitation, .inTerminal:
         EmptyView()
       }
       Spacer(minLength: 0)

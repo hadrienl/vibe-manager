@@ -790,6 +790,13 @@ struct RequestActions: View {
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(theme.codeBackground.color, in: RoundedRectangle(cornerRadius: 6))
       }
+      // A dialog the agent only announced (#273): its own words are all there is to show.
+      if case .inTerminal(let prompt) = request.request.content, let message = prompt.message {
+        Text(verbatim: DisplaySafeText.visible(message))
+          .font(theme.interfaceFont(size: 12.5))
+          .foregroundStyle(theme.text.color)
+          .textSelection(.enabled)
+      }
       buttons
     }
   }
@@ -844,7 +851,7 @@ struct RequestActions: View {
           }
           .help(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation:
+      case .questions, .elicitation, .inTerminal:
         EmptyView()
       }
       if request.isSending {
