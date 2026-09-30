@@ -412,11 +412,6 @@ struct SwatchEditor: View {
         SessionBadge(
           appearance: SessionAppearance(symbolName: "terminal", colorHex: normalized ?? "#8E8E96"),
           size: 26)
-        if let contrast, !isTaken {
-          Text(verbatim: "\(Self.ratio(contrast)):1")
-            .monospacedDigit()
-            .foregroundStyle(isLegible ? Color.secondary : Color.orange)
-        }
       }
 
       TextField(text: $name) {
