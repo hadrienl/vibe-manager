@@ -160,6 +160,7 @@ public final class PermissionsModel {
   /// good by clicking there and then changing their mind.
   public func openSystemSettings() {
     awaitsGrantUntil = now().addingTimeInterval(Self.grantWatchDuration)
+    // Opens outside: the constant address of System Settings' Full Disk Access.
     openURL(Self.fullDiskAccessSettingsURL)
   }
 
