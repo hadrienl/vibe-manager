@@ -218,7 +218,11 @@ final class SmokeTests: XCTestCase {
     XCTAssertTrue(app.menuItems["Archive 3 Sessions…"].waitForExistence(timeout: 5))
     app.typeKey(.escape, modifierFlags: [])
 
-    // The keyboard gone to the terminal, the commands are back on the session on screen.
+    // The keyboard gone to the terminal, the commands are back on the session on screen. The mock
+    // agent's session opens as a conversation (#177), whose empty area takes no keyboard: shown
+    // as a terminal first.
+    let asTerminal = app.radioButtons["Terminal"]
+    if asTerminal.waitForExistence(timeout: 5) { asTerminal.click() }
     let terminal = app.descendants(matching: .any).matching(identifier: "terminal").firstMatch
     if terminal.waitForExistence(timeout: 5) {
       terminal.click()
