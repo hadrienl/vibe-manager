@@ -384,9 +384,9 @@ public actor FollowConversation {
   /// while transcripts are first read, and longer still for a conversation nobody sees.
   private func schedulePublish(_ following: Following, key: UUID) {
     guard following.publishTask == nil else { return }
-    var interval = publishInterval
+    var interval =
+      hidden.contains(following.session.id) ? hiddenPublishInterval : publishInterval
     if isCatchingUp(following) { interval = max(interval, Self.catchingUpPublishInterval) }
-    if hidden.contains(following.session.id) { interval = max(interval, hiddenPublishInterval) }
     following.publishTask = Task { [weak self] in
       try? await Task.sleep(for: interval)
       // Cut short by the conversation coming on screen, which published already.

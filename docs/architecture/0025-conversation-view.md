@@ -93,8 +93,8 @@ Past those, the model is let go of with what was kept aside, and the placeholder
 transcript is read.
 
 Of the five mounted, only the one on screen is laid out (#250). The four others are still read, so
-that coming back to one is instant, but published once a second rather than every 50 ms — the longer of that pause and the 250 ms
-of a first reading when both apply — and their
+that coming back to one is instant, but published once a second rather than every 50 ms — and never less than the 250 ms of a
+first reading while one is under way — and their
 model keeps the last snapshot without laying it out: only the echoes are confirmed, so that a prompt
 sent just before switching is not said lost. Shown again, what waits is published at once and laid
 out once. The view says when it is on screen, through the `isActive` it already has; the reader is
