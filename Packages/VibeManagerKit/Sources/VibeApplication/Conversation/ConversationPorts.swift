@@ -20,6 +20,30 @@ public protocol AgentConversationReporting: Sendable {
 
   /// How a prompt reaches this agent through its terminal.
   var promptFormat: AgentPromptFormat { get }
+
+  /// The transcripts of the sub-agents of the conversation written to `root` (#180), listed
+  /// without being opened. `agentIDs` are those the conversation named so far, for a CLI that
+  /// finds a sub-agent's file by its identifier.
+  func subagentTranscripts(beside root: URL, agentIDs: Set<String>) -> [SubagentTranscriptInfo]
+
+  /// A decoder for the transcript of one of the sub-agents of the conversation written to `root`.
+  func subagentDecoder(for file: URL, root: URL) -> any ConversationDecoding
+
+  /// The first prompt a sub-agent's transcript holds: only read to tie a transcript that names no
+  /// call to the call whose prompt it is.
+  func firstPrompt(ofSubagent file: URL) -> String?
+}
+
+extension AgentConversationReporting {
+  public func subagentTranscripts(beside root: URL, agentIDs: Set<String>)
+    -> [SubagentTranscriptInfo]
+  { [] }
+
+  public func subagentDecoder(for file: URL, root: URL) -> any ConversationDecoding {
+    conversationDecoder(for: file)
+  }
+
+  public func firstPrompt(ofSubagent file: URL) -> String? { nil }
 }
 
 /// Turns the lines of one transcript into entries.

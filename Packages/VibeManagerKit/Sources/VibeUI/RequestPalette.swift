@@ -280,6 +280,17 @@ struct RequestCard: View {
           .lineLimit(1)
           .truncationMode(.middle)
           .help(Text(verbatim: pending.folderPath ?? ""))
+        if let subagent = RequestPresentation.subagentLine(for: pending) {
+          Label {
+            Text(subagent)
+          } icon: {
+            Image(systemName: "person.2")
+          }
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.tail)
+        }
       }
     }
     .accessibilityHidden(true)

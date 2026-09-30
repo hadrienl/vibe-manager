@@ -340,6 +340,98 @@
         }
       }
     },
+    "%lld done" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld done"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld done"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld terminés"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld terminé"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld terminés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld files edited" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file edited"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files edited"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld fichiers modifiés"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld fichier modifié"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld fichiers modifiés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld more lines not shown" : {
       "localizations" : {
         "en" : {
@@ -379,6 +471,52 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld lignes de plus, non affichées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld more sub-agents" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more sub-agent"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more sub-agents"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld autres sous-agents"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld autre sous-agent"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld autres sous-agents"
                 }
               }
             }
@@ -432,6 +570,190 @@
         }
       }
     },
+    "%lld running" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld running"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld running"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en cours"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en cours"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld en cours"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sub-agents" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sub-agent"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sub-agents"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sous-agents"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sous-agent"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sous-agents"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tasks" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld task"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tâches"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tâche"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tâches"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld tools" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tool"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tools"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outils"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outils"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "A forest at night: moss greens, quiet, easy on the eyes…" : {
       "localizations" : {
         "fr" : {
@@ -448,6 +770,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couleur d’accent"
+          }
+        }
+      }
+    },
+    "Activity" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité"
           }
         }
       }
@@ -1191,6 +1523,26 @@
         }
       }
     },
+    "Its activity was not found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité introuvable"
+          }
+        }
+      }
+    },
+    "Its answer was not found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat introuvable"
+          }
+        }
+      }
+    },
     "Its file is deleted." : {
       "localizations" : {
         "fr" : {
@@ -1207,6 +1559,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grand"
+          }
+        }
+      }
+    },
+    "Last action: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière action : %@"
+          }
+        }
+      }
+    },
+    "Last actions: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernières actions : %@"
           }
         }
       }
@@ -1292,6 +1664,16 @@
         }
       }
     },
+    "Mission" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mission"
+          }
+        }
+      }
+    },
     "More contrast, a green accent, darker code…" : {
       "localizations" : {
         "fr" : {
@@ -1328,6 +1710,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nuit"
+          }
+        }
+      }
+    },
+    "No action yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune action pour l’instant"
           }
         }
       }
@@ -1378,6 +1770,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas encore confirmé par l’agent"
+          }
+        }
+      }
+    },
+    "Not given by the agent" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non transmise par l’agent"
+          }
+        }
+      }
+    },
+    "Not shown at this depth" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non affichée à cette profondeur"
+          }
+        }
+      }
+    },
+    "Nothing yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien pour l’instant"
           }
         }
       }
@@ -1562,6 +1984,26 @@
         }
       }
     },
+    "Reading its activity…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de son activité…"
+          }
+        }
+      }
+    },
+    "Reading its answer…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de sa réponse…"
+          }
+        }
+      }
+    },
     "Reading the conversation…" : {
       "localizations" : {
         "fr" : {
@@ -1660,6 +2102,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rétablir les réglages par défaut"
+          }
+        }
+      }
+    },
+    "Result" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat"
           }
         }
       }
@@ -1900,12 +2352,32 @@
         }
       }
     },
+    "Shows or hides its mission, its activity and its answer." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche ou masque sa mission, son activité et sa réponse."
+          }
+        }
+      }
+    },
     "Shows or hides the details." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Affiche ou masque les détails."
+          }
+        }
+      }
+    },
+    "Shows the sub-agent in the conversation." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montre le sous-agent dans la conversation."
           }
         }
       }
@@ -1966,6 +2438,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arrêter l’agent"
+          }
+        }
+      }
+    },
+    "Sub-agent" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sous-agent"
+          }
+        }
+      }
+    },
+    "Sub-agent %@ %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sous-agent %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Sub-agents" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sous-agents"
+          }
+        }
+      }
+    },
+    "Sub-agents running" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sous-agents en cours"
           }
         }
       }
@@ -2472,6 +2984,16 @@
         }
       }
     },
+    "in the background" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en arrière-plan"
+          }
+        }
+      }
+    },
     "interrupted" : {
       "localizations" : {
         "fr" : {
@@ -2558,6 +3080,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "certaines de ses couleurs ne se lisent pas l’une sur l’autre"
+          }
+        }
+      }
+    },
+    "stopped" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "arrêté"
+          }
+        }
+      }
+    },
+    "stopped without an answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "arrêté sans résultat"
           }
         }
       }

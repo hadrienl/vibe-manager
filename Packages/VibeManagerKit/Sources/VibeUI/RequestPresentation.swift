@@ -16,13 +16,31 @@ public struct PendingRequest: Identifiable, Equatable {
   public let folderName: String?
   public let folderPath: String?
   public let branch: String?
+  /// What the sub-agent that asked was started for, when its conversation shows it (#180).
+  public var subagentDescription: String? = nil
 
   public var id: AgentRequestID { request.id }
+
+  /// Asked by one of the agent's sub-agents rather than by the agent itself.
+  public var isFromSubagent: Bool { request.reference.agentID != nil }
 }
 
 /// The words and symbols of a request, the same in the palette, in VoiceOver and in a
 /// notification.
 public enum RequestPresentation {
+  /// Which sub-agent asked, when one did rather than the agent (#180).
+  public static func subagentLine(for pending: PendingRequest) -> LocalizedStringResource? {
+    guard pending.isFromSubagent else { return nil }
+    guard let description = pending.subagentDescription else {
+      return LocalizedStringResource(
+        "Asked by a sub-agent", bundle: .module,
+        comment: "On a request's card: one of the agent's sub-agents asks, not the agent itself.")
+    }
+    return LocalizedStringResource(
+      "Asked by the sub-agent “\(description)”", bundle: .module,
+      comment: "On a request's card: which of the agent's sub-agents asks.")
+  }
+
   public static func title(of content: AgentRequestContent) -> LocalizedStringResource {
     switch content {
     case .permission(let permission): return toolTitle(permission.tool)
@@ -231,6 +249,7 @@ public enum RequestPresentation {
             "branch \(branch)", bundle: .module, comment: "Said by VoiceOver on a request's card."))
       )
     }
+    if let subagent = subagentLine(for: pending) { parts.append(String(localized: subagent)) }
     parts.append(pending.request.receivedAt.formatted(.relative(presentation: .named)))
     var label = parts.joined(separator: ", ") + ". "
     label += String(localized: title(of: pending.request.content))

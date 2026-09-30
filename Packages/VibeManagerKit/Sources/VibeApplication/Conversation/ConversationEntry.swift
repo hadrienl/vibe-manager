@@ -103,8 +103,8 @@ public struct ToolCall: Hashable, Sendable {
   /// The agent's own words about the call, when it gave some — Claude Code's `description` of a
   /// command. Preferred as a title: it says why, where the command says how.
   public var summary: String?
-  /// A sub-agent's own transcript, read only when the call is unfolded.
-  public var subTranscript: URL?
+  /// What a sub-agent the call started did and answered (#180). Set for `kind == .subagent`.
+  public var subagent: SubagentRun?
 
   public init(
     callID: String,
@@ -115,7 +115,7 @@ public struct ToolCall: Hashable, Sendable {
     changes: [FileDiff] = [],
     facts: ToolFacts = ToolFacts(),
     summary: String? = nil,
-    subTranscript: URL? = nil
+    subagent: SubagentRun? = nil
   ) {
     self.callID = callID
     self.kind = kind
@@ -125,7 +125,7 @@ public struct ToolCall: Hashable, Sendable {
     self.changes = changes
     self.facts = facts
     self.summary = summary
-    self.subTranscript = subTranscript
+    self.subagent = subagent
   }
 
   public func parameter(_ key: ToolParameter.Key) -> String? {

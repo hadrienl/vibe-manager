@@ -9,8 +9,8 @@ import VibeDomain
 /// 0.156 and 0.157, with their words replaced: nothing a user wrote is kept in the repository.
 @Suite("Reading a Claude Code transcript into a conversation")
 struct ClaudeCodeConversationDecoderTests {
-  private func decode(_ lines: [String], file: URL? = nil) -> [ConversationEntry] {
-    let decoder = ClaudeCodeConversationDecoder(file: file)
+  private func decode(_ lines: [String]) -> [ConversationEntry] {
+    let decoder = ClaudeCodeConversationDecoder()
     for line in lines { decoder.consume(Data(line.utf8)) }
     return decoder.entries
   }
@@ -156,15 +156,21 @@ struct ClaudeCodeConversationDecoderTests {
       ])
   }
 
-  @Test("A sub-agent points at its own transcript, a to-do list counts what is done")
+  @Test("A sub-agent in front answers in its result, a to-do list counts what is done")
   func subagentAndTodos() {
-    let file = URL(fileURLWithPath: "/projects/p/abc.jsonl")
-    let entries = decode(
-      [
-        #"{"type":"assistant","uuid":"a1","message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"description":"Review","prompt":"…"}},{"type":"tool_use","id":"t2","name":"TodoWrite","input":{"todos":[{"content":"A","status":"completed"},{"content":"B","status":"pending"}]}}]}}"#,
-        #"{"type":"user","uuid":"u","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"done"}]},"toolUseResult":{"agentId":"a9","status":"completed"}}"#,
-      ], file: file)
-    #expect(entries[0].toolCall?.subTranscript?.path == "/projects/p/abc/subagents/agent-a9.jsonl")
+    let entries = decode([
+      #"{"type":"assistant","uuid":"a1","message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"description":"Review","prompt":"…","subagent_type":"Explore"}},{"type":"tool_use","id":"t2","name":"TodoWrite","input":{"todos":[{"content":"A","status":"completed"},{"content":"B","status":"pending"}]}}]}}"#,
+      #"{"type":"user","uuid":"u","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"done"}]},"toolUseResult":{"agentId":"a9","status":"completed","totalToolUseCount":4,"totalDurationMs":2500}}"#,
+    ])
+    let run = entries[0].toolCall?.subagent
+    #expect(entries[0].toolCall?.state == .succeeded)
+    #expect(run?.agentID == "a9")
+    #expect(run?.type == "Explore")
+    #expect(run?.mode == .foreground)
+    #expect(run?.result == "done")
+    #expect(run?.usage?.toolUses == 4)
+    #expect(run?.usage?.duration == .milliseconds(2500))
+    #expect(entries[0].toolCall?.output == nil)
     #expect(entries[1].toolCall?.kind == .todo)
     #expect(entries[1].toolCall?.facts.resultCount == 1)
     #expect(entries[1].toolCall?.facts.lineCount == 2)
@@ -560,7 +566,7 @@ struct MockConversationTests {
     try input.fileHandleForWriting.close()
     process.waitUntilExit()
     let file = folder.appendingPathComponent("m2.jsonl")
-    let decoder = ClaudeCodeConversationDecoder(file: file)
+    let decoder = ClaudeCodeConversationDecoder()
     for line in await FileTranscriptTail().read(file) { decoder.consume(line) }
     #expect(
       decoder.entries.map(\.content) == [

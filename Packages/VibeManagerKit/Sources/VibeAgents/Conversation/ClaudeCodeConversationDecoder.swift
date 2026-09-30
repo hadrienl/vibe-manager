@@ -12,24 +12,33 @@ import VibeApplication
 /// Lines are shown in the order they were written. The `parentUuid` tree is not followed: calls
 /// made in parallel branch it on every turn, so walking back from the last line would hide what
 /// the agent did. A conversation rewound with `/rewind` therefore still shows what was abandoned.
+///
+/// A sub-agent (#180, measured against 2.1.284 and 2.1.285) is an `Agent` call — or a skill run
+/// apart, a `Skill` call whose result says `forked`. Most return at once (`async_launched`, with the
+/// sub-agent's `agentId`) and end later: a `<task-notification>` names the call, its status, what it
+/// used and, sometimes, its answer; otherwise the answer comes as a hand-back, a message from the
+/// sub-agent (`origin.handback`). Its own transcript is decoded by this same class, as a sub-agent's.
 public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   public private(set) var entries: [ConversationEntry] = []
   private var indexByCallID: [String: Int] = [:]
-  private let subagents: URL?
+  /// Sub-agent calls by the sub-agent's identifier, once the call returned it.
+  private var indexByAgentID: [String: Int] = [:]
+  /// Whether this is a sub-agent's own transcript: its lines are all `isSidechain`, its first
+  /// prompt is its mission — shown by the call that started it — and its hand-back is its answer.
+  private let isSubagent: Bool
+  private var hasSeenMission = false
 
-  /// - Parameter file: the transcript, whose sub-agents are written beside it, under
-  ///   `<session id>/subagents/`.
-  public init(file: URL?) {
-    subagents = file.map {
-      $0.deletingPathExtension().appendingPathComponent("subagents", isDirectory: true)
-    }
+  /// - Parameter isSubagent: a sub-agent's own transcript, written beside the conversation's under
+  ///   `<session id>/subagents/`, rather than the conversation's.
+  public init(isSubagent: Bool = false) {
+    self.isSubagent = isSubagent
   }
 
   public func consume(_ line: Data) {
     guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
       let type = object["type"] as? String
     else { return }
-    if object["isSidechain"] as? Bool == true { return }
+    if object["isSidechain"] as? Bool == true, !isSubagent { return }
     let uuid = object["uuid"] as? String ?? UUID().uuidString
     let date = (object["timestamp"] as? String).flatMap(TranscriptDates.parse)
     switch type {
@@ -70,7 +79,13 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
           continue
         }
         let input = block["input"] as? [String: Any] ?? [:]
-        let call = Self.call(id: callID, name: name, input: input)
+        // A sub-agent's hand-back is its answer, shown as such by the call that started it.
+        if isSubagent, name == "SubagentHandback" { continue }
+        var call = Self.call(id: callID, name: name, input: input)
+        if call.kind == .subagent { call.subagent?.startedAt = date }
+        if name == "SendMessage", let agent = input["to"] as? String {
+          resume(agent: agent)
+        }
         indexByCallID[callID] = entries.count
         append(ConversationEntry(id: callID, date: date, content: .tool(call)))
       default:
@@ -80,6 +95,12 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   }
 
   private func readUser(_ object: [String: Any], uuid: String, date: Date?) {
+    if let origin = object["origin"] as? [String: Any], origin["handback"] as? Bool == true,
+      let agent = origin["from"] as? String, let body = origin["body"] as? String
+    {
+      readHandback(body, from: agent)
+      return
+    }
     guard object["isMeta"] as? Bool != true, let message = object["message"] as? [String: Any]
     else { return }
     if object["isCompactSummary"] as? Bool == true {
@@ -87,10 +108,24 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       return
     }
     if let text = message["content"] as? String {
+      if text.hasPrefix("<task-notification>") {
+        readNotification(text)
+        return
+      }
+      if isSubagent, !hasSeenMission {
+        hasSeenMission = true
+        return
+      }
       readTypedText(text, uuid: uuid, date: date, attachments: 0)
       return
     }
     guard let content = message["content"] as? [[String: Any]] else { return }
+    if isSubagent, !hasSeenMission,
+      !content.contains(where: { $0["type"] as? String == "tool_result" })
+    {
+      hasSeenMission = true
+      return
+    }
     readBlocks(content, uuid: uuid, date: date) { block in
       apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
     }
@@ -101,9 +136,15 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   /// and other sessions' messages travel the same way; only what a person typed is a prompt.
   private func readAttachment(_ object: [String: Any], uuid: String, date: Date?) {
     guard let attachment = object["attachment"] as? [String: Any],
-      attachment["type"] as? String == "queued_command",
-      attachment["commandMode"] as? String == "prompt"
+      attachment["type"] as? String == "queued_command"
     else { return }
+    if attachment["commandMode"] as? String == "task-notification",
+      let text = attachment["prompt"] as? String
+    {
+      readNotification(text)
+      return
+    }
+    guard attachment["commandMode"] as? String == "prompt" else { return }
     let origin = (attachment["origin"] as? [String: Any])?["kind"] as? String
     guard origin == nil || origin == "human" else { return }
     if let text = attachment["prompt"] as? String {
@@ -262,8 +303,132 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     } else {
       call.state = details["interrupted"] as? Bool == true ? .interrupted : .succeeded
     }
-    readDetails(details, text: text, isError: isError, into: &call)
+    if call.kind == .other("Skill"), details["status"] as? String == "forked",
+      details["agentId"] is String
+    {
+      Self.forkSkill(&call, details: details, startedAt: entries[index].date)
+    }
+    if call.kind == .subagent {
+      readSubagentResult(details, text: text, isError: isError, into: &call, at: index)
+    } else {
+      readDetails(details, text: text, isError: isError, into: &call)
+    }
     entries[index].content = .tool(call)
+  }
+
+  // MARK: - Sub-agents
+
+  /// A skill run apart is a sub-agent named after the skill.
+  static func forkSkill(_ call: inout ToolCall, details: [String: Any], startedAt: Date?) {
+    let name = details["commandName"] as? String
+    var words = name.map { ["/" + $0] } ?? []
+    if let json = call.parameter(.arguments), let data = json.data(using: .utf8),
+      let input = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let arguments = input["args"] as? String, !arguments.isEmpty
+    {
+      words.append(arguments)
+    }
+    call.kind = .subagent
+    call.parameters = words.isEmpty ? [] : [ToolParameter(.description, words.joined(separator: " "))]
+    call.subagent = SubagentRun(
+      type: name, mode: details["background"] as? Bool == false ? .foreground : .background,
+      startedAt: startedAt)
+  }
+
+  /// What a sub-agent's call returned: the sub-agent itself when it runs in the background, its
+  /// answer when it ran in front.
+  private func readSubagentResult(
+    _ details: [String: Any], text: String, isError: Bool, into call: inout ToolCall, at index: Int
+  ) {
+    var run = call.subagent ?? SubagentRun()
+    if let agent = details["agentId"] as? String {
+      run.agentID = agent
+      indexByAgentID[agent] = index
+    }
+    let status = details["status"] as? String
+    call.output = nil
+    if !isError, status == "async_launched" || (status == "forked" && run.mode == .background) {
+      // Started, not done: its end is notified later.
+      run.mode = .background
+      call.state = .running
+    } else if isError {
+      if case .failed = call.state { run.failure = Self.bounded(text) }
+    } else {
+      let answer = status == "forked" ? details["result"] as? String ?? text : text
+      run.result = answer.isEmpty ? nil : Self.bounded(answer)
+      run.usage = SubagentUsage(
+        toolUses: details["totalToolUseCount"] as? Int,
+        duration: (details["totalDurationMs"] as? Int).map { .milliseconds($0) },
+        tokens: details["totalTokens"] as? Int)
+    }
+    call.subagent = run
+  }
+
+  /// A sub-agent's end, notified to the agent: `completed`, `failed`, `killed` or `stopped`. The
+  /// same sub-agent notifies again when it is given more work: the last word stands.
+  private func readNotification(_ text: String) {
+    guard
+      let index = Self.tag("tool-use-id", in: text).flatMap({ indexByCallID[$0] })
+        ?? Self.tag("task-id", in: text).flatMap({ indexByAgentID[$0] }),
+      case .tool(var call) = entries[index].content, call.kind == .subagent
+    else { return }
+    var run = call.subagent ?? SubagentRun()
+    let status = Self.tag("status", in: text)
+    switch status {
+    case "completed": call.state = .succeeded
+    case "failed": call.state = .failed(exitCode: nil)
+    case "killed", "stopped": call.state = .interrupted
+    default: return
+    }
+    if let agent = Self.tag("task-id", in: text), run.agentID == nil {
+      run.agentID = agent
+      indexByAgentID[agent] = index
+    }
+    let result = Self.tag("result", in: text) ?? ""
+    // "This agent's report was delivered to you as a message": the hand-back holds it.
+    if status == "completed", !result.isEmpty, !result.contains("delivered to you as a message") {
+      run.result = Self.bounded(result)
+    }
+    if status == "failed" {
+      let summary = Self.tag("summary", in: text) ?? ""
+      let reason = summary.range(of: " failed: ").map { String(summary[$0.upperBound...]) }
+      run.failure = Self.bounded(reason ?? summary)
+    }
+    run.usage = SubagentUsage(
+      toolUses: Self.tag("tool_uses", in: text).flatMap { Int($0) },
+      duration: Self.tag("duration_ms", in: text).flatMap { Int($0) }.map { .milliseconds($0) },
+      tokens: Self.tag("subagent_tokens", in: text).flatMap { Int($0) })
+    call.subagent = run
+    entries[index].content = .tool(call)
+  }
+
+  /// A sub-agent's answer, handed back as a message: the report, whose every line the CLI
+  /// indents by two spaces, follows a frame of its own.
+  private func readHandback(_ body: String, from agent: String) {
+    guard let index = indexByAgentID[agent], case .tool(var call) = entries[index].content,
+      var run = call.subagent
+    else { return }
+    let report = body.range(of: "The report follows:\n").map { String(body[$0.upperBound...]) }
+    guard let report else { return }
+    let lines = report.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+      line.hasPrefix("  ") ? line.dropFirst(2) : line
+    }
+    run.result = Self.bounded(lines.joined(separator: "\n"))
+    call.subagent = run
+    entries[index].content = .tool(call)
+  }
+
+  /// A sub-agent given more work by a message: it runs again, its last answer kept until the next.
+  private func resume(agent: String) {
+    guard let index = indexByAgentID[agent], case .tool(var call) = entries[index].content,
+      call.subagent?.mode == .background, call.state.isFinished
+    else { return }
+    call.state = .running
+    entries[index].content = .tool(call)
+  }
+
+  static func bounded(_ text: String) -> String {
+    ToolOutput.bounded(text.trimmingCharacters(in: .whitespacesAndNewlines)).text
   }
 
   private func readDetails(
@@ -310,11 +475,6 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
         return
       }
       call.parameters = Self.answering(call.parameters, with: answers)
-    case .subagent:
-      if let agent = details["agentId"] as? String, let subagents {
-        call.subTranscript = subagents.appendingPathComponent("agent-\(agent).jsonl")
-      }
-      call.output = ToolOutput.bounded(text, isError: isError)
     default:
       call.output = text.isEmpty ? nil : ToolOutput.bounded(text, isError: isError)
     }
@@ -342,6 +502,8 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     return result
   }
 
+  /// The user stopped the turn. A sub-agent in the background goes on: only its notification, or
+  /// the user stopping it, ends it.
   private func interruptRunningCalls() {
     for index in entries.indices {
       if var run = entries[index].shellRun, run.state == .running {
@@ -349,7 +511,9 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
         entries[index].content = .notice(.shell(run))
         continue
       }
-      guard case .tool(var call) = entries[index].content, !call.state.isFinished else { continue }
+      guard case .tool(var call) = entries[index].content, !call.state.isFinished,
+        call.subagent?.mode != .background
+      else { continue }
       call.state = .interrupted
       entries[index].content = .tool(call)
     }
@@ -372,6 +536,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     let kind: ToolKind
     var summary: String?
     var facts = ToolFacts()
+    var subagent: SubagentRun?
     switch name {
     case "Read":
       kind = .read
@@ -415,6 +580,9 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       kind = .subagent
       add(.description, string("description"))
       add(.prompt, string("prompt"))
+      subagent = SubagentRun(
+        type: string("subagent_type") ?? string("name"),
+        mode: input["run_in_background"] as? Bool == true ? .background : .foreground)
     case "TodoWrite":
       kind = .todo
       let todos = input["todos"] as? [[String: Any]] ?? []
@@ -446,7 +614,8 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       add(.arguments, Self.compactJSON(input))
     }
     return ToolCall(
-      callID: id, kind: kind, parameters: parameters, facts: facts, summary: summary)
+      callID: id, kind: kind, parameters: parameters, facts: facts, summary: summary,
+      subagent: subagent)
   }
 
   static func change(path: String, patch: [[String: Any]]) -> FileDiff {

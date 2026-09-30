@@ -54,11 +54,33 @@ public actor FollowConversation {
     let makeDecoder: () -> any ConversationDecoding
     var hasLoaded = false
     var task: Task<Void, Never>?
+    /// Followed as it grows, rather than read once to its end.
+    var isFollowed = false
+    /// Bumped at each start, so that what an earlier start still delivers is dropped.
+    var generation = 0
+    /// The transcripts of the sub-agents this one started, by the call that started each (#180):
+    /// only those running, or unfolded by the user.
+    var subreadings: [String: Reading] = [:]
+    /// Sub-agent calls whose transcript was looked for once they were done, and not found: not
+    /// looked for again.
+    var notFound: Set<String> = []
+    /// The sub-agent this transcript is the own of, when it is one.
+    var agentID: String?
+    /// Read again from its start: what was read stays shown until the new reading replaces it.
+    var isRereading = false
 
-    init(file: URL, makeDecoder: @escaping () -> any ConversationDecoding) {
+    init(
+      file: URL, agentID: String? = nil, makeDecoder: @escaping () -> any ConversationDecoding
+    ) {
       self.file = file
+      self.agentID = agentID
       self.makeDecoder = makeDecoder
       decoder = makeDecoder()
+    }
+
+    /// This reading and every one below it.
+    var all: [Reading] {
+      [self] + subreadings.values.flatMap(\.all)
     }
   }
 
@@ -77,6 +99,11 @@ public actor FollowConversation {
     var lastPublished: ConversationSnapshot?
     var publishTask: Task<Void, Never>?
     var tasks: [Task<Void, Never>] = []
+    /// When the sub-agents of a transcript were last looked for: a sub-agent whose transcript
+    /// cannot be found yet is looked for again, not at every line.
+    var lastSubagentLook: [URL: ContinuousClock.Instant] = [:]
+
+    var allReadings: [Reading] { chapters.flatMap(\.readings).flatMap(\.all) }
 
     init(
       session: WorkSession, live: Bool,
@@ -89,6 +116,14 @@ public actor FollowConversation {
   }
 
   private var followings: [UUID: Following] = [:]
+  /// The sub-agents whose activity the user unfolded, by session: their transcripts are read,
+  /// whether they run or not. Kept across the follows of a session.
+  private var unfolded: [SessionID: Set<String>] = [:]
+  /// Sessions whose agent does not run: a sub-agent that never said it ended there will not, and
+  /// is not followed.
+  private var stoppedAgents: Set<SessionID> = []
+  /// How often, at most, the sub-agents of one transcript are looked for.
+  static let subagentLookInterval = Duration.seconds(1)
 
   public init(
     agents: any AgentProviderResolving,
@@ -126,9 +161,39 @@ public actor FollowConversation {
     guard let following = followings.removeValue(forKey: key) else { return }
     following.tasks.forEach { $0.cancel() }
     following.publishTask?.cancel()
-    for chapter in following.chapters {
-      chapter.readings.forEach { $0.task?.cancel() }
+    following.allReadings.forEach { $0.task?.cancel() }
+  }
+
+  /// The sub-agents whose activity the user unfolded in the session (#180): their transcripts are
+  /// read now, and kept read while they stay unfolded.
+  public func setUnfoldedSubagents(_ callIDs: Set<String>, for session: SessionID) {
+    guard unfolded[session, default: []] != callIDs else { return }
+    unfolded[session] = callIDs
+    for (key, following) in followings where following.session.id == session {
+      following.lastSubagentLook = [:]
+      refreshSubagents(following, key: key)
+      following.isDirty = true
+      if following.live { schedulePublish(following, key: key) }
     }
+  }
+
+  /// Whether the session's agent runs. Its sub-agents that never said they ended are not followed
+  /// while it does not: they will not end (#180).
+  public func setAgentRunning(_ isRunning: Bool, for session: SessionID) {
+    guard stoppedAgents.contains(session) == isRunning else { return }
+    if isRunning { stoppedAgents.remove(session) } else { stoppedAgents.insert(session) }
+    for (key, following) in followings where following.session.id == session {
+      refreshSubagents(following, key: key)
+      following.isDirty = true
+      if following.live { schedulePublish(following, key: key) }
+    }
+  }
+
+  /// A sub-agent at work, as far as reading it goes: not done, under no sub-agent that ended —
+  /// its own calls end with it, results or not — in a session followed live whose agent runs.
+  private func isRunning(_ call: ToolCall, in following: Following, underEnded: Bool) -> Bool {
+    !underEnded && !call.state.isFinished && following.live
+      && !stoppedAgents.contains(following.session.id)
   }
 
   private func run(_ key: UUID) async {
@@ -152,12 +217,14 @@ public actor FollowConversation {
         following.continuation.finish()
         return
       }
+      // A sub-agent's transcript may appear with nothing new in the conversation's own.
+      refreshSubagents(following, key: key)
       if following.isDirty { schedulePublish(following, key: key) }
       // Nothing wakes the reader but the disk: lines are published as they arrive. The folders
       // are looked at again for new files, often while one is still awaited, rarely after.
-      let everyFileFound = following.chapters.allSatisfy {
-        $0.reporter == nil || !$0.readings.isEmpty
-      }
+      let everyFileFound =
+        following.chapters.allSatisfy { $0.reporter == nil || !$0.readings.isEmpty }
+        && !hasUnreadRunningSubagent(following)
       try? await Task.sleep(for: everyFileFound ? refreshInterval * 5 : refreshInterval)
     }
   }
@@ -175,7 +242,114 @@ public actor FollowConversation {
   private func publishNow(_ key: UUID) {
     guard let following = followings[key] else { return }
     following.publishTask = nil
+    refreshSubagents(following, key: key)
     publishIfNeeded(following)
+  }
+
+  // MARK: - Sub-agents
+
+  /// Starts reading the transcripts of the sub-agents that run or that the user unfolded, and
+  /// stops following those that ended folded (#180). A conversation of fifty sub-agents that are
+  /// done opens none of their files.
+  private func refreshSubagents(_ following: Following, key: UUID) {
+    let wanted = unfolded[following.session.id] ?? []
+    for chapter in following.chapters {
+      guard let reporter = chapter.reporter else { continue }
+      for root in chapter.readings {
+        refreshSubagents(
+          of: root, root: root.file, depth: 1, underEnded: false, reporter: reporter,
+          wanted: wanted, following: following, key: key)
+      }
+    }
+  }
+
+  private func refreshSubagents(
+    of reading: Reading, root: URL, depth: Int, underEnded: Bool,
+    reporter: any AgentConversationReporting, wanted: Set<String>, following: Following, key: UUID
+  ) {
+    guard depth <= SubagentRun.maximumShownDepth else { return }
+    var needed: [ToolCall] = []
+    for call in reading.decoder.entries.compactMap(\.subagentCall) {
+      let running = isRunning(call, in: following, underEnded: underEnded)
+      let isWanted = running || wanted.contains(call.callID)
+      guard let sub = reading.subreadings[call.callID] else {
+        // One that is done and was not found once will not be.
+        if isWanted, running || !reading.notFound.contains(call.callID) { needed.append(call) }
+        continue
+      }
+      if sub.isFollowed, !running {
+        // Ended: read once more to its end, then left alone.
+        restart(sub, key: key, follows: false)
+      } else if !sub.isFollowed, running {
+        // Given another task.
+        restart(sub, key: key, follows: true)
+      }
+      refreshSubagents(
+        of: sub, root: root, depth: depth + 1,
+        underEnded: underEnded || call.state.isFinished, reporter: reporter, wanted: wanted,
+        following: following, key: key)
+    }
+    guard !needed.isEmpty else { return }
+    let now = ContinuousClock.now
+    if let last = following.lastSubagentLook[reading.file],
+      now - last < Self.subagentLookInterval
+    {
+      return
+    }
+    following.lastSubagentLook[reading.file] = now
+    let transcripts = reporter.subagentTranscripts(
+      beside: root, agentIDs: Set(needed.compactMap { $0.subagent?.agentID }))
+    let links = SubagentLinker.link(
+      needed.map {
+        SubagentLinker.Call(
+          callID: $0.callID, agentID: $0.subagent?.agentID, prompt: $0.parameter(.prompt),
+          date: $0.subagent?.startedAt)
+      },
+      among: transcripts, taken: Set(following.allReadings.map(\.file)),
+      firstPrompt: reporter.firstPrompt(ofSubagent:))
+    for call in needed {
+      guard let transcript = links[call.callID] else {
+        if !isRunning(call, in: following, underEnded: underEnded) {
+          reading.notFound.insert(call.callID)
+          following.isDirty = true
+        }
+        continue
+      }
+      let file = transcript.file
+      let sub = Reading(file: file, agentID: transcript.agentID) {
+        reporter.subagentDecoder(for: file, root: root)
+      }
+      reading.subreadings[call.callID] = sub
+      start(sub, key: key, live: isRunning(call, in: following, underEnded: underEnded))
+      following.isDirty = true
+    }
+  }
+
+  /// A sub-agent runs, within the depth shown, whose transcript was not found yet: it is looked
+  /// for often.
+  private func hasUnreadRunningSubagent(_ following: Following) -> Bool {
+    func unread(_ reading: Reading, depth: Int, underEnded: Bool) -> Bool {
+      guard depth <= SubagentRun.maximumShownDepth else { return false }
+      return reading.decoder.entries.contains { entry in
+        guard let call = entry.subagentCall else { return false }
+        if let sub = reading.subreadings[call.callID] {
+          return unread(
+            sub, depth: depth + 1, underEnded: underEnded || call.state.isFinished)
+        }
+        return isRunning(call, in: following, underEnded: underEnded)
+      }
+    }
+    return following.chapters.flatMap(\.readings).contains {
+      unread($0, depth: 1, underEnded: false)
+    }
+  }
+
+  /// Read again from its start — once to its end, or followed — what it showed staying until the
+  /// new reading replaces it: an activity does not blink when its sub-agent ends.
+  private func restart(_ reading: Reading, key: UUID, follows: Bool) {
+    reading.task?.cancel()
+    reading.isRereading = true
+    start(reading, key: key, live: follows)
   }
 
   /// Follows the session as it is now: the chapters it already had keep what they read, a
@@ -193,7 +367,7 @@ public actor FollowConversation {
     }
     let reused = Set(following.chapters.flatMap(\.readings).map(ObjectIdentifier.init))
     for reading in previous.flatMap(\.readings) where !reused.contains(ObjectIdentifier(reading)) {
-      reading.task?.cancel()
+      reading.all.forEach { $0.task?.cancel() }
     }
     following.isDirty = true
   }
@@ -238,28 +412,41 @@ public actor FollowConversation {
   private func start(_ reading: Reading, key: UUID, live: Bool) {
     let tail = tail
     let file = reading.file
+    reading.generation += 1
+    reading.isFollowed = live
+    let generation = reading.generation
     reading.task = Task { [weak self] in
       if live {
         for await chunk in tail.follow(file) {
           guard let self else { return }
-          await self.received(chunk, file: file, key: key)
+          await self.received(chunk, file: file, generation: generation, key: key)
         }
       } else {
         let lines = await tail.read(file)
-        await self?.received(.lines(lines), file: file, key: key)
+        await self?.received(.lines(lines), file: file, generation: generation, key: key)
       }
     }
   }
 
-  private func received(_ chunk: TranscriptChunk, file: URL, key: UUID) {
+  private func received(_ chunk: TranscriptChunk, file: URL, generation: Int, key: UUID) {
     guard let following = followings[key],
-      let reading = following.chapters.lazy.flatMap(\.readings).first(where: { $0.file == file })
+      let reading = following.allReadings.first(where: { $0.file == file }),
+      // What a reading started before it was restarted says is forgotten with it.
+      reading.generation == generation
     else { return }
     switch chunk {
     case .reset:
-      reading.decoder = reading.makeDecoder()
+      if !reading.isRereading { reading.decoder = reading.makeDecoder() }
     case .lines(let lines):
-      for line in lines { reading.decoder.consume(line) }
+      if reading.isRereading {
+        // The whole file again, read apart before it replaces what was shown.
+        let decoder = reading.makeDecoder()
+        for line in lines { decoder.consume(line) }
+        reading.decoder = decoder
+        reading.isRereading = false
+      } else {
+        for line in lines { reading.decoder.consume(line) }
+      }
       reading.hasLoaded = true
     }
     following.isDirty = true
@@ -284,7 +471,11 @@ public actor FollowConversation {
     let showsChapters = following.chapters.count > 1
     for (index, chapter) in following.chapters.enumerated() {
       guard chapter.reporter != nil else { continue }
-      let chapterEntries = chapter.readings.flatMap(\.decoder.entries)
+      let chapterEntries = chapter.readings.flatMap {
+        shownEntries(
+          of: $0, depth: 1, underEnded: false, wanted: unfolded[following.session.id] ?? [],
+          following: following)
+      }
       if showsChapters, index > 0, !chapterEntries.isEmpty {
         entries.append(
           ConversationEntry(
@@ -305,22 +496,111 @@ public actor FollowConversation {
     }
     return ConversationSnapshot(entries: entries, availability: availability)
   }
+
+  /// A transcript's entries, each sub-agent carrying its depth and, when its transcript was read,
+  /// its activity (#180). Under a sub-agent that ended, a call still waiting for its result will
+  /// not have it: it is shown stopped.
+  private func shownEntries(
+    of reading: Reading, depth: Int, underEnded: Bool, wanted: Set<String>, following: Following
+  ) -> [ConversationEntry] {
+    var entries = reading.decoder.entries
+    for index in entries.indices {
+      guard case .tool(var call) = entries[index].content else { continue }
+      if underEnded, !call.state.isFinished {
+        call.state = .interrupted
+        entries[index].content = .tool(call)
+      }
+      guard call.kind == .subagent else { continue }
+      var run = call.subagent ?? SubagentRun()
+      run.depth = depth
+      if let sub = reading.subreadings[call.callID] {
+        run.transcript = sub.file
+        // A sub-agent in front says who it is only when it returns: its transcript says it first.
+        if run.agentID == nil { run.agentID = sub.agentID }
+        if sub.hasLoaded {
+          let inner = shownEntries(
+            of: sub, depth: depth + 1, underEnded: underEnded || call.state.isFinished,
+            wanted: wanted, following: following)
+          run.activity = .read(inner)
+          // What it said last is its answer, when the main transcript does not carry it: Codex
+          // writes it in the sub-agent's rollout only.
+          if run.result == nil, call.state == .succeeded,
+            let last = inner.last(where: {
+              if case .agentText = $0.content { return true }
+              return false
+            }), case .agentText(let text) = last.content
+          {
+            run.result = text
+          }
+        } else {
+          run.activity = .loading
+        }
+      } else if reading.notFound.contains(call.callID) {
+        run.activity = .notFound
+      } else if depth <= SubagentRun.maximumShownDepth,
+        isRunning(call, in: following, underEnded: underEnded) || wanted.contains(call.callID)
+      {
+        run.activity = .loading
+      }
+      call.subagent = run
+      entries[index].content = .tool(call)
+    }
+    return entries
+  }
 }
 
 extension ConversationEntry {
   /// The call an agent is waiting on the user for, marked as such: the last call still running
   /// when the agent says it waits for a permission.
+  ///
+  /// A request a sub-agent made (`agentID`, from the hook that reported it) marks the last call
+  /// running in that sub-agent's activity, or the sub-agent itself while its activity is not read
+  /// (#180). Otherwise a sub-agent, which runs on its own, is never the call waited on.
   public static func markingPendingPermission(
-    _ entries: [ConversationEntry], activity: AgentActivity?
+    _ entries: [ConversationEntry], activity: AgentActivity?, agentID: String? = nil
   ) -> [ConversationEntry] {
-    guard activity == .awaitingUser(.approval),
-      let index = entries.lastIndex(where: { $0.toolCall?.state == .running }),
+    guard activity == .awaitingUser(.approval) else { return entries }
+    if let agentID, let marked = marking(agentID: agentID, in: entries) { return marked }
+    guard
+      let index = entries.lastIndex(where: {
+        $0.toolCall?.state == .running && $0.toolCall?.kind != .subagent
+      }),
       case .tool(var call) = entries[index].content
     else { return entries }
     var marked = entries
     call.state = .awaitingPermission
     marked[index].content = .tool(call)
     return marked
+  }
+
+  private static func marking(agentID: String, in entries: [ConversationEntry])
+    -> [ConversationEntry]?
+  {
+    for index in entries.indices {
+      guard case .tool(var call) = entries[index].content, call.kind == .subagent,
+        var run = call.subagent
+      else { continue }
+      var marked = entries
+      if run.agentID == agentID {
+        if let inner = run.activityEntries,
+          inner.contains(where: { $0.toolCall?.state == .running })
+        {
+          run.activity = .read(markingPendingPermission(inner, activity: .awaitingUser(.approval)))
+          call.subagent = run
+        }
+        call.state = .awaitingPermission
+        marked[index].content = .tool(call)
+        return marked
+      }
+      if let inner = run.activityEntries, let found = marking(agentID: agentID, in: inner) {
+        run.activity = .read(found)
+        call.subagent = run
+        call.state = .awaitingPermission
+        marked[index].content = .tool(call)
+        return marked
+      }
+    }
+    return nil
   }
 }
 

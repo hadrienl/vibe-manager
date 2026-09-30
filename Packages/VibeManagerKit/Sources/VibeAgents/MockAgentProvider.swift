@@ -271,7 +271,7 @@ extension MockAgentProvider: AgentConversationReporting {
   }
 
   public func conversationDecoder(for file: URL) -> any ConversationDecoding {
-    ClaudeCodeConversationDecoder(file: file)
+    ClaudeCodeConversationDecoder()
   }
 
   /// The mock reads a line at a time: a paste without brackets, then Return. A line typed

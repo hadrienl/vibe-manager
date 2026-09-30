@@ -102,11 +102,21 @@ public final class ConversationWorkspace {
   @discardableResult
   public func show(_ session: WorkSession) -> ConversationModel {
     let model: ConversationModel
+    let isNew = models[session.id] == nil
     if let existing = models[session.id] {
       model = existing
     } else {
       model = ConversationModel(sessionID: session.id)
       model.appearance = appearance
+      if let follow {
+        let id = session.id
+        model.unfoldSubagents = { callIDs in
+          Task { await follow.setUnfoldedSubagents(callIDs, for: id) }
+        }
+        model.agentRunningChanged = { isRunning in
+          Task { await follow.setAgentRunning(isRunning, for: id) }
+        }
+      }
       models[session.id] = model
       connect?(model, session)
       if pendingComposerFocus == session.id {
@@ -131,7 +141,12 @@ public final class ConversationWorkspace {
       let generation = (generations[session.id] ?? 0) + 1
       generations[session.id] = generation
       let id = session.id
+      // Told before the first reading: the sub-agents of a session whose agent stopped are not
+      // opened, and a new model starts with everything folded (#180).
+      let isAgentRunning = model.isProcessRunning
       Task { [weak self] in
+        await follow.setAgentRunning(isAgentRunning, for: id)
+        if isNew { await follow.setUnfoldedSubagents([], for: id) }
         let stream = await follow.follow(session)
         guard let self, self.generations[id] == generation, self.models[id] === model else {
           return
@@ -181,6 +196,7 @@ public final class ConversationWorkspace {
   private func apply(_ state: AgentActivityState?, to model: ConversationModel) {
     model.activity = state?.activity
     model.isAgentReady = Self.isReady(state)
+    model.processStateChanged()
   }
 
   /// Ready once the agent's hooks have spoken, or once the activity falls back on the terminal's

@@ -48,6 +48,20 @@ public struct ConversationScrollState: Hashable, Sendable {
     isFollowing = true
     unseenCount = 0
   }
+
+  /// The reader asked to see something above: the end is no longer followed.
+  public mutating func jumpedAway() {
+    isFollowing = false
+  }
+}
+
+/// A sub-agent in the bar over the composer (#180).
+public struct SubagentTrayItem: Hashable, Sendable, Identifiable {
+  public let call: ToolCall
+  /// Ended a moment ago: shown dimmed, then gone.
+  public let hasEnded: Bool
+
+  public var id: String { call.callID }
 }
 
 /// A prompt sent from the composer, shown until the agent's transcript has it.
@@ -267,45 +281,225 @@ public final class ConversationModel {
   }
 
   private func rebuild() {
-    var entries = ConversationEntry.markingPendingPermission(snapshot.entries, activity: activity)
+    var entries = ConversationEntry.markingPendingPermission(
+      snapshot.entries, activity: activity,
+      agentID: activity == .awaitingUser(.approval)
+        ? pendingRequest()?.request.reference.agentID : nil)
+    // A sub-agent whose end never came, in a session whose agent no longer runs, will not end.
+    let isRunning = isProcessRunning
+    if isRunning != reportedAgentRunning {
+      reportedAgentRunning = isRunning
+      agentRunningChanged?(isRunning)
+    }
+    if !isRunning, snapshot.availability != .loading {
+      entries = Self.settlingSubagents(entries)
+    }
+    shownEntries = entries
+    let rebuilt = displayedBlocks(of: entries)
+    let previousIDs = Set(blocks.map(\.id))
+    let appended = rebuilt.filter { !previousIDs.contains($0.id) }.count
+    let wasEmpty = blocks.isEmpty
+    blocks = rebuilt
+    updateTray()
+    if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }
+  }
+
+  /// The session's process started or ended. Its activity may say nothing of it — an agent idle
+  /// while its sub-agents work in the background stays idle when the CLI quits — so the view that
+  /// observes the terminal tells: sub-agents that will not end are settled, and the reader told.
+  public func processStateChanged() {
+    if isProcessRunning != reportedAgentRunning { rebuild() }
+  }
+
+  /// Entries laid out as blocks, with the settings of the view: the conversation's, and a
+  /// sub-agent's activity alike (#180).
+  public func displayedBlocks(of entries: [ConversationEntry]) -> [ConversationBlock] {
+    var entries = entries
     if !appearance.showsReasoning {
       entries.removeAll {
         if case .reasoning = $0.content { return true }
         return false
       }
     }
-    let rebuilt = ConversationGrouping.blocks(entries, grouping: appearance.groupsToolCalls)
-    let previousIDs = Set(blocks.map(\.id))
-    let appended = rebuilt.filter { !previousIDs.contains($0.id) }.count
-    let wasEmpty = blocks.isEmpty
-    blocks = rebuilt
-    if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }
+    return ConversationGrouping.blocks(entries, grouping: appearance.groupsToolCalls)
+  }
+
+  /// Sub-agents still running, at any depth, marked as stopped — and every call still running in
+  /// their activity.
+  static func settlingSubagents(_ entries: [ConversationEntry], inside: Bool = false)
+    -> [ConversationEntry]
+  {
+    entries.map { entry in
+      guard case .tool(var call) = entry.content, inside || call.kind == .subagent else {
+        return entry
+      }
+      if !call.state.isFinished { call.state = .interrupted }
+      if var run = call.subagent, let inner = run.activityEntries {
+        run.activity = .read(settlingSubagents(inner, inside: true))
+        call.subagent = run
+      }
+      var settled = entry
+      settled.content = .tool(call)
+      return settled
+    }
+  }
+
+  // MARK: - Sub-agents (#180)
+
+  /// The entries as shown: the permission waited on marked, sub-agents that will not end settled.
+  public private(set) var shownEntries: [ConversationEntry] = []
+  /// The bar over the composer: the sub-agents running, and those that just ended, for a moment.
+  public private(set) var trayItems: [SubagentTrayItem] = []
+  /// How long a sub-agent that ended stays in the bar.
+  @ObservationIgnored public var trayLinger = Duration.seconds(4)
+  /// Tells the reader whether the session's agent runs: a sub-agent whose end never came is not
+  /// followed once it does not.
+  @ObservationIgnored public var agentRunningChanged: ((Bool) -> Void)?
+  @ObservationIgnored private var reportedAgentRunning: Bool?
+  @ObservationIgnored private var lingering: [String: (call: ToolCall, until: ContinuousClock.Instant)] =
+    [:]
+  @ObservationIgnored private var lingerTask: Task<Void, Never>?
+  /// Tells the reader which sub-agents' transcripts to read besides those running.
+  @ObservationIgnored public var unfoldSubagents: ((Set<String>) -> Void)?
+  @ObservationIgnored private var unfoldedSubagents: Set<String> = []
+  /// The block to bring into view, and a counter: the same one twice in a row still moves.
+  public private(set) var revealedBlockID: String?
+  public private(set) var revealRequest = 0
+
+  private func updateTray() {
+    let running = ConversationEntry.runningSubagents(in: shownEntries)
+    let runningIDs = Set(running.map(\.callID))
+    let now = ContinuousClock.now
+    for item in trayItems where !item.hasEnded && !runningIDs.contains(item.call.callID) {
+      let ended = ConversationEntry.subagentCalls([item.call.callID], in: shownEntries).first
+      if let ended, ended.state.isFinished {
+        lingering[ended.callID] = (ended, now + trayLinger)
+      }
+    }
+    lingering = lingering.filter { $0.value.until > now && !runningIDs.contains($0.key) }
+    let items =
+      running.map { SubagentTrayItem(call: $0, hasEnded: false) }
+      + lingering.values.sorted { $0.until < $1.until }.map {
+        SubagentTrayItem(call: $0.call, hasEnded: true)
+      }
+    if items != trayItems { trayItems = items }
+    scheduleLingerEnd()
+  }
+
+  private func scheduleLingerEnd() {
+    lingerTask?.cancel()
+    guard let next = lingering.values.map(\.until).min() else { return }
+    lingerTask = Task { [weak self] in
+      try? await Task.sleep(until: next, clock: .continuous)
+      guard !Task.isCancelled else { return }
+      self?.updateTray()
+    }
+  }
+
+  /// A sub-agent's activity unfolded or folded: its transcript is read while it is unfolded.
+  public func setSubagentActivityExpanded(_ isExpanded: Bool, callID: String) {
+    setExpanded(isExpanded, for: Self.activityToggleID(callID))
+    requestSubagentReading(callID, isExpanded)
+  }
+
+  /// A sub-agent whose answer only its own transcript holds — Codex's — is read when its block is
+  /// unfolded.
+  private func subagentBlockExpanded(_ call: ToolCall, isExpanded: Bool) {
+    if isExpanded {
+      guard call.subagent?.result == nil, call.state.isFinished else { return }
+      requestSubagentReading(call.callID, true)
+    } else if !self.isExpanded(id: Self.activityToggleID(call.callID), default: false) {
+      requestSubagentReading(call.callID, false)
+    }
+  }
+
+  private func requestSubagentReading(_ callID: String, _ isRead: Bool) {
+    let before = unfoldedSubagents
+    if isRead { unfoldedSubagents.insert(callID) } else { unfoldedSubagents.remove(callID) }
+    if unfoldedSubagents != before { unfoldSubagents?(unfoldedSubagents) }
+  }
+
+  public static func activityToggleID(_ callID: String) -> String { "sub:\(callID):activity" }
+  public static func missionToggleID(_ callID: String) -> String { "sub:\(callID):mission" }
+  public static func resultToggleID(_ callID: String) -> String { "sub:\(callID):result" }
+
+  /// Shows a sub-agent: the block that holds it is brought into view and unfolded down to it.
+  public func revealSubagent(_ callID: String) {
+    guard let path = Self.path(to: callID, in: shownEntries), let top = path.first,
+      let block = blocks.first(where: { $0.calls.contains { $0.callID == top } })
+    else { return }
+    if case .subagentGroup = block { setExpanded(true, for: block.id) }
+    for ancestor in path.dropLast() {
+      setExpanded(true, for: Self.rowToggleID(ancestor))
+      setSubagentActivityExpanded(true, callID: ancestor)
+    }
+    setExpanded(true, for: Self.rowToggleID(callID))
+    scroll.jumpedAway()
+    revealedBlockID = block.id
+    revealRequest += 1
+  }
+
+  /// Whether a sub-agent's block is unfolded, wherever it is shown: on its own, as a line of a
+  /// group, inside another one's activity. Unfolded unasked when it failed and the settings say so,
+  /// or when it waits for the user.
+  public func isSubagentExpanded(_ call: ToolCall) -> Bool {
+    if let toggled = toggles[Self.rowToggleID(call.callID)] { return toggled }
+    if call.state == .awaitingPermission { return true }
+    if case .failed = call.state { return appearance.expandsFailures }
+    return false
+  }
+
+  public func setSubagentExpanded(_ isExpanded: Bool, call: ToolCall) {
+    setExpanded(isExpanded, for: Self.rowToggleID(call.callID))
+    subagentBlockExpanded(call, isExpanded: isExpanded)
+  }
+
+  public static func rowToggleID(_ callID: String) -> String { "sub:\(callID):row" }
+
+  /// The sub-agents from the top of the conversation down to the one asked for.
+  static func path(to callID: String, in entries: [ConversationEntry]) -> [String]? {
+    for entry in entries {
+      guard let call = entry.subagentCall else { continue }
+      if call.callID == callID { return [callID] }
+      if let inner = call.subagent?.activityEntries, let rest = path(to: callID, in: inner) {
+        return [call.callID] + rest
+      }
+    }
+    return nil
   }
 
   // MARK: - Reading
 
   public var isReadable: Bool { snapshot.isReadable }
 
-  /// The call the agent waits on, for the banner.
-  public var pendingCall: ToolCall? {
-    guard case .awaitingUser = activity else { return nil }
-    return blocks.reversed().lazy.compactMap { block -> ToolCall? in
-      guard case .entry(let entry) = block, let call = entry.toolCall,
-        call.state == .awaitingPermission || (call.kind == .question && !call.state.isFinished)
-      else { return nil }
-      return call
-    }.first
+  /// The sub-agent of that identifier, for the palette to say which one asks (#40, #180).
+  public func subagent(agentID: String) -> ToolCall? {
+    ConversationEntry.subagent(agentID: agentID, in: snapshot.entries)
   }
 
-  /// The call still running, for the activity line.
+  /// The call the agent waits on, for the banner: one of a sub-agent's included — the deepest
+  /// marked, the sub-agent's own call rather than the sub-agent, when one asks (#180).
+  public var pendingCall: ToolCall? {
+    guard case .awaitingUser = activity else { return nil }
+    return ConversationEntry.allCalls(in: shownEntries).last {
+      $0.state == .awaitingPermission || ($0.kind == .question && !$0.state.isFinished)
+    }
+  }
+
+  /// The call still running, for the activity line. Not a sub-agent: the bar over the composer
+  /// shows those, and one in the background runs while the agent does something else.
   public var runningCall: ToolCall? {
     guard activity == .working else { return nil }
     for block in blocks.reversed() {
       switch block {
       case .entry(let entry):
-        if let call = entry.toolCall, call.state == .running { return call }
+        if let call = entry.toolCall, call.state == .running, call.kind != .subagent {
+          return call
+        }
       case .toolGroup(_, let calls):
         if let call = calls.last?.toolCall, call.state == .running { return call }
+      case .subagentGroup:
+        continue
       }
     }
     return nil
@@ -314,6 +508,8 @@ public final class ConversationModel {
   public func isExpanded(_ block: ConversationBlock) -> Bool {
     if let toggled = toggles[block.id] { return toggled }
     switch block {
+    case .subagentGroup:
+      return true
     case .toolGroup(_, let calls):
       return appearance.expandsFailures
         && calls.contains {
@@ -498,12 +694,8 @@ public final class ConversationModel {
     guard case .permission(let permission) = request.request.content,
       let subject = permission.subject
     else { return pendingCall }
-    let unfinished = blocks.flatMap { block -> [ToolCall] in
-      switch block {
-      case .entry(let entry): return entry.toolCall.map { [$0] } ?? []
-      case .toolGroup(_, let entries): return entries.compactMap(\.toolCall)
-      }
-    }.filter { !$0.state.isFinished || $0.state == .awaitingPermission }
+    let unfinished = ConversationEntry.allCalls(in: shownEntries)
+      .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
     return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
   }
 
