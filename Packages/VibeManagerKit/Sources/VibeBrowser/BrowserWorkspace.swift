@@ -430,15 +430,16 @@ public final class BrowserWorkspace {
     return tab
   }
 
+  /// The tab becomes the agent's until the user acts in it: what its page does later — a download,
+  /// another application's address — is the agent's doing, however long after (#241).
   func willAct(on tab: BrowserTabModel) {
     tab.isAgentActing = true
-    tab.agentDrivenUntil = Date().addingTimeInterval(3)
+    tab.isAgentDriven = true
     touch(tab)
   }
 
   func didAct(on tab: BrowserTabModel) {
     tab.isAgentActing = false
-    tab.agentDrivenUntil = Date().addingTimeInterval(2)
   }
 
   func noteAgentOpenedPage(in id: SessionID) {
