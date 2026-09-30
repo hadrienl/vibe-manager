@@ -14,8 +14,8 @@ private func makeFormatter(fractional: Bool) -> ISO8601DateFormatter {
 func storeDatesMatchTheFormatterBitForBit() throws {
   let formatter = makeFormatter(fractional: true)
   var generator = SystemRandomNumberGenerator()
-  // 2017 to 2039, to the millisecond.
-  let range: ClosedRange<Int64> = 1_483_228_800_000...2_208_988_800_000
+  // 1970 to 9999, to the millisecond: every date the fast path accepts.
+  let range: ClosedRange<Int64> = 0...253_402_300_799_999
 
   for _ in 0..<10_000 {
     let milliseconds = Int64.random(in: range, using: &generator)
