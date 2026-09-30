@@ -718,7 +718,8 @@ private struct SessionCloseRow: View {
 
   var body: some View {
     Toggle(isOn: $model.confirmsStoppingRunningAgent) {
-      Text("Ask before closing a session whose agent is running", bundle: .module)
+      // Closing and archiving (#115) share it: both stop what runs.
+      Text("Ask before closing or archiving a session where work is running", bundle: .module)
     }
   }
 }

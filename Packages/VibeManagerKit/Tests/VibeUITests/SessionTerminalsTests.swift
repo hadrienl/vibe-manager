@@ -637,4 +637,31 @@ struct SessionTerminalsTests {
     #expect(await harness.store.scrollbackByteCount() == 0)
     #expect(!harness.preferences.keepsScrollback)
   }
+
+  @Test("A command at work in a side terminal makes Archive ask first (#115)")
+  func drawerCommandMakesArchiveAsk() async throws {
+    let harness = Harness()
+    let stored = WorkSession(
+      name: "Serving", initialPrompt: "Run the dev server",
+      agent: SessionAgentConfiguration(providerID: "stub"), status: .closed,
+      closedAt: Date(timeIntervalSince1970: 1), repositories: [RepositoryContext(path: "/work/app")]
+    )
+    let model = AppModel(
+      repository: WorkspaceRepository(sessions: [stored]),
+      agents: WorkspaceRegistry(providers: []), terminals: harness.terminals)
+    await model.load()
+    #expect(!model.archiveAsks(stored))
+
+    harness.inspector.set(command: "npm run dev", directory: "/work/app")
+    let drawer = harness.terminals.drawer(for: stored.id)
+    await drawer.show()
+    await waitUntil("the command is seen running") {
+      model.runningDrawerCommands(of: stored.id) == ["npm run dev"]
+    }
+
+    #expect(model.interruptsWork(stored))
+    #expect(model.archiveAsks(stored))
+    await model.requestArchive(stored.id)
+    #expect(model.pendingArchive?.id == stored.id)
+  }
 }

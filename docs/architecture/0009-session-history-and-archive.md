@@ -153,6 +153,14 @@ stopped when that is true, and states plainly that nothing is deleted and that t
 stops being reopenable. Cancel is the default button: the pointer slip that opened the dialog must
 not also answer it.
 
+> Amended by [#115](https://github.com/hadrienl/vibe-manager/issues/115): the question is asked
+> only when archiving stops work in progress — the agent, or a command in a side terminal — by the
+> rule and the setting of Close Session, whose "Don't ask again" it now carries. A session where
+> nothing runs is archived at once: the gesture is reversible and stops nothing, and ⌃⌘A pressed
+> again and again empties a column. The session that takes its place leaves the keyboard in the
+> sidebar, so that nothing typed between two presses reaches its agent. Archiving several
+> sessions at once keeps its question, which gives their count.
+
 The dialog hands the session to its buttons through `presenting:` rather than letting them read it
 back from the model. SwiftUI dismisses a confirmation dialog *before* running a button's action,
 and the dismissal clears the pending session — read there, Archive found nothing and did nothing

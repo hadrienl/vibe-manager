@@ -158,7 +158,7 @@ alone; so is an expression the avatar lacks, said "missing".
 | Undo / Redo the last rename or change of icon, with the keyboard in the sidebar or the inspector | ⌘Z / ⇧⌘Z | Edit |
 | Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
 | Close Session | ⇧⌘W | Session |
-| Archive… / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
+| Archive / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
 | Move to Next / Previous Status, without a swipe | ⌥⌘→ / ⌥⌘← | Session › Status |
 | Close Window | —, or the window's close button | File |
 | Usage window | ⌥⌘U | Window |
@@ -169,6 +169,11 @@ view, a side terminal — and the File menu's item names which. With the keyboar
 agent's terminal, the conversation, the sidebar — it is unavailable. Close Session is ⇧⌘W, as
 closing the window is in Safari, and asks first while the agent is at work. Over Settings or Usage,
 ⌘W closes that window.
+
+Archive, ⌃⌘A, archives at once a session where nothing runs, and says so ("‹name› archived.").
+While its agent or a side terminal is at work it asks first, and its name in the Session menu and
+the row's context menu ends with an ellipsis — "Archive…" (#115). The session that takes its place is selected and the keyboard
+stays in the sidebar, so the next ⌃⌘A archives it.
 
 ## What VoiceOver reads
 
@@ -191,7 +196,7 @@ closing the window is in Safari, and asks first while the agent is at work. Over
 | A session's name, being renamed | "Session name", the reason as the hint when it is refused; "Session renamed: ‹name›" or "Name refused: ‹reason›" is announced | the name typed | editable | `session-name-field` |
 | The inspector's header | its badge, "Change Icon"; its pencil, "Rename" | — | activate | `inspector-session-badge`, `inspector-session-rename` |
 | Change Icon popover | the symbols by their names ("Tools", "Lightning"), the colours by their code, "Project icon" | selected | activate; Revert to Default Icon, Done | `session-appearance-popover`, `session-appearance-revert` |
-| Swipe buttons | "Move to ‹status›", "Archive…" | — | — | `swipe-‹status›` |
+| Swipe buttons | "Move to ‹status›", "Archive" | — | — | `swipe-‹status›` |
 | Archived sessions | "Archived (N)", opens the list | — | Show, Unarchive | `archived-sessions` |
 | Terminal | "Terminal — ‹session› — ‹status›" | the visible screen, as text, read-only | Read Last Output (⌃⌥⌘O) | `terminal` |
 | Notes | "Notes for ‹session›" | the text | editable | `notes-editor` |

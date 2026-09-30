@@ -78,6 +78,17 @@
         }
       }
     },
+    "%@ archived." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ archivée."
+          }
+        }
+      }
+    },
     "%@ asks for new hooks to be approved once. Vibe Manager approves these ones, and no other." : {
       "comment" : "What approving does; the argument is the agent's name.",
       "localizations" : {
@@ -4644,12 +4655,12 @@
         }
       }
     },
-    "Ask before closing a session whose agent is running" : {
+    "Ask before closing or archiving a session where work is running" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Demander avant de fermer une session dont l’agent est en cours d’exécution"
+            "value" : "Demander avant de fermer ou d’archiver une session où un travail est en cours"
           }
         }
       }
@@ -15026,6 +15037,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui tourne dans ses terminaux annexes sera arrêté : %@."
+          }
+        }
+      }
+    },
+    "What runs in their side terminals will be stopped." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui tourne dans leurs terminaux annexes sera arrêté."
           }
         }
       }

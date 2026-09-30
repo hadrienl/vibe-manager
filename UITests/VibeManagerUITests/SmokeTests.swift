@@ -223,7 +223,11 @@ final class SmokeTests: XCTestCase {
     if terminal.waitForExistence(timeout: 5) {
       terminal.click()
       session.click()
-      XCTAssertTrue(app.menuItems["Archive…"].waitForExistence(timeout: 5))
+      // "Archive…" while the mock agent runs, "Archive" once it has exited (#115).
+      let single = app.menuItems.matching(
+        NSPredicate(format: "title == 'Archive' OR title == 'Archive…'")
+      ).firstMatch
+      XCTAssertTrue(single.waitForExistence(timeout: 5))
       app.typeKey(.escape, modifierFlags: [])
     }
 
@@ -243,6 +247,40 @@ final class SmokeTests: XCTestCase {
 
     expectSessionRows(0, in: app, timeout: 20)
     XCTAssertTrue(app.buttons["archived-sessions"].label.contains("3"))
+    app.terminate()
+  }
+
+  /// ⌃⌘A archives a session where nothing runs at once, and pressed again archives the one that
+  /// took its place (#115): no question, no tolerance.
+  func testArchivingInABurstFromTheKeyboard() throws {
+    let app = launch()
+    for index in 1...2 {
+      createSession(named: "Burst \(index)", isFirst: index == 1, in: app)
+    }
+    expectSessionRows(2, in: app)
+
+    // Both agents stopped first: ⇧⌘W, confirmed when one still runs.
+    for _ in 1...2 {
+      app.typeKey("w", modifierFlags: [.command, .shift])
+      let confirm = app.sheets.buttons["Close Session"]
+      if confirm.waitForExistence(timeout: 3) {
+        confirm.click()
+      }
+      app.typeKey(.downArrow, modifierFlags: [.command, .option])
+    }
+    let session = app.menuBars.menuBarItems["Session"]
+    session.click()
+    XCTAssertTrue(app.menuItems["Archive"].waitForExistence(timeout: 10))
+    app.typeKey(.escape, modifierFlags: [])
+
+    app.typeKey("a", modifierFlags: [.command, .control])
+    XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 2), "Archive asked")
+    expectSessionRows(1, in: app)
+
+    app.typeKey("a", modifierFlags: [.command, .control])
+    XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 2), "Archive asked")
+    expectSessionRows(0, in: app)
+    XCTAssertTrue(app.buttons["archived-sessions"].label.contains("2"))
     app.terminate()
   }
 
