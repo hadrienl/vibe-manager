@@ -180,7 +180,9 @@ public final class SessionJournalModel {
     notice = nil
     switch row {
     case .resource(let key):
-      guard let resource = journals.value(for: id)?.resources.first(where: { $0.key == key }) else { return }
+      guard let resource = journals.value(for: id)?.resources.first(where: { $0.key == key }) else {
+        return
+      }
       open(resource, from: id)
     case .entry(let entryID):
       guard let entry = journals.value(for: id)?.entries.first(where: { $0.id == entryID }),
@@ -280,10 +282,14 @@ public final class SessionJournalModel {
   func copy(_ row: ActivityRowID, in id: SessionID) {
     switch row {
     case .resource(let key):
-      guard let resource = journals.value(for: id)?.resources.first(where: { $0.key == key }) else { return }
+      guard let resource = journals.value(for: id)?.resources.first(where: { $0.key == key }) else {
+        return
+      }
       copy(ActivityPresentation.copyText(resource))
     case .entry(let entryID):
-      guard let entry = journals.value(for: id)?.entries.first(where: { $0.id == entryID }) else { return }
+      guard let entry = journals.value(for: id)?.entries.first(where: { $0.id == entryID }) else {
+        return
+      }
       copy(entry.text)
     }
   }
