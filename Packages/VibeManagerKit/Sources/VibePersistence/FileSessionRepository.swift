@@ -63,6 +63,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   private var lastRead: (data: Data, sessions: [WorkSession])?
   /// How many times the document was decoded, for the tests that keep decoding rare.
   private(set) var decodeCount = 0
+  private var removedOrphans = false
 
   public init(
     storeURL: URL = FileSessionRepository.defaultStoreURL(),
@@ -305,6 +306,7 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
     _ data: Data, preservingCurrentAsBackup: Bool, caching sessions: [WorkSession]
   ) throws {
     try ensureStoreDirectory()
+    removeOrphanedTemporaryFiles()
     if preservingCurrentAsBackup,
       FileManager.default.fileExists(atPath: storeURL.path)
     {
@@ -330,18 +332,45 @@ public actor FileSessionRepository: SessionRepository, SessionStoreRecovery {
   }
 
   private func linkCurrentAsBackup() -> Bool {
+    // A write that failed after the backup was linked leaves both names on the store's file: the
+    // backup already holds the current document, and linking it again would ask `rename` to move
+    // a name onto another name of the same file, which does nothing and leaves the link behind.
+    if let store = fileIdentity(storeURL), store == fileIdentity(backupURL) { return true }
     let temporaryURL = backupURL.deletingLastPathComponent()
       .appendingPathComponent(".\(backupURL.lastPathComponent).\(UUID().uuidString).tmp")
     guard link(storeURL.path, temporaryURL.path) == 0 else { return false }
-    guard rename(temporaryURL.path, backupURL.path) == 0 else {
-      unlink(temporaryURL.path)
-      return false
-    }
+    // Removed whatever `rename` did: gone when it moved it, still there when it had nothing to do.
+    defer { unlink(temporaryURL.path) }
+    guard rename(temporaryURL.path, backupURL.path) == 0 else { return false }
     // The backup shares the store's file, and so its mode: a store someone else wrote more
     // openly is kept owner only, as a copy would have been.
     try? FileManager.default.setAttributes(
       [.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
     return true
+  }
+
+  private func fileIdentity(_ url: URL) -> [Int]? {
+    var status = stat()
+    guard stat(url.path, &status) == 0 else { return nil }
+    return [Int(status.st_dev), Int(status.st_ino)]
+  }
+
+  /// Removes the temporary files a crash left beside the store, between a write and its rename:
+  /// once, at the first write, and only those old enough not to belong to a write in progress.
+  private func removeOrphanedTemporaryFiles() {
+    guard !removedOrphans else { return }
+    removedOrphans = true
+    let manager = FileManager.default
+    let directory = storeURL.deletingLastPathComponent()
+    let prefixes = [storeURL, backupURL].map { ".\($0.lastPathComponent)." }
+    let limit = Date(timeIntervalSinceNow: -60)
+    guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else { return }
+    for name in names
+    where name.hasSuffix(".tmp") && prefixes.contains(where: { name.hasPrefix($0) }) {
+      let url = directory.appendingPathComponent(name)
+      let modified = (try? manager.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+      if let modified, modified < limit { try? manager.removeItem(at: url) }
+    }
   }
 
   private func atomicWrite(_ data: Data, to destination: URL, invokingInterruption: Bool) throws {

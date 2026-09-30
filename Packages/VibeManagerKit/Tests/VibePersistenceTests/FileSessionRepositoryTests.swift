@@ -611,6 +611,51 @@ func backupHoldsThePreviousDocument(backsUpByLink: Bool) async throws {
   #expect(leftovers.isEmpty)
 }
 
+@Test("A write after a failed one leaves no temporary file and parts the backup from the store")
+func writeAfterFailedWriteLeavesNothingBehind() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let backupURL = storeURL.deletingPathExtension().appendingPathExtension("backup.json")
+  let writes = WriteSwitch()
+  let repository = FileSessionRepository(storeURL: storeURL) {
+    if writes.fails { throw TestWriteError.interrupted }
+  }
+  let session = makeCompleteSession(name: "First")
+  try await repository.save(session)
+
+  writes.fails = true
+  _ = try? await repository.mutate(id: session.id) { $0.name = "Never written" }
+  writes.fails = false
+  _ = try await repository.mutate(id: session.id) { $0.name = "Second" }
+
+  let leftovers = try FileManager.default.contentsOfDirectory(
+    atPath: storeURL.deletingLastPathComponent().path
+  ).filter { $0.hasSuffix(".tmp") }
+  #expect(leftovers.isEmpty)
+  #expect(try inode(of: storeURL) != inode(of: backupURL))
+  #expect(try await FileSessionRepository(storeURL: backupURL).sessions().map(\.name) == ["First"])
+  #expect(try await FileSessionRepository(storeURL: storeURL).sessions().map(\.name) == ["Second"])
+}
+
+@Test("A temporary file a crash left behind is removed at the next write")
+func orphanedTemporaryFilesAreRemoved() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let directory = storeURL.deletingLastPathComponent()
+  let orphan = directory.appendingPathComponent(".sessions.backup.json.\(UUID().uuidString).tmp")
+  let unrelated = directory.appendingPathComponent(".other.json.\(UUID().uuidString).tmp")
+  for url in [orphan, unrelated] {
+    try Data("x".utf8).write(to: url)
+    try FileManager.default.setAttributes(
+      [.modificationDate: Date(timeIntervalSinceNow: -3_600)], ofItemAtPath: url.path)
+  }
+
+  try await FileSessionRepository(storeURL: storeURL).save(makeCompleteSession())
+
+  #expect(!FileManager.default.fileExists(atPath: orphan.path))
+  #expect(FileManager.default.fileExists(atPath: unrelated.path))
+}
+
 @Test("A store written openly by someone else is backed up owner only")
 func linkedBackupIsPrivate() async throws {
   let storeURL = try makeStoreURL()

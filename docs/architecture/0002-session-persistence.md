@@ -44,7 +44,11 @@ Writes are serialized by the repository actor. Data is written and synchronized 
 temporary file in the destination directory, then atomically moved or replaced. Before replacing
 an existing primary file, that file is atomically kept as `sessions.backup.json`: a hard link to it
 is renamed over the backup, and the replacement then gives the store a new file while the backup
-keeps the old one. A volume without hard links gets a copy of its bytes instead (#253). The store
+keeps the old one. A volume without hard links gets a copy of its bytes instead (#253). After a
+write that failed between the two, the store and the backup are two names of one file: the next
+write leaves the backup as it is instead of linking it again, since `rename` between two names of
+one file does nothing. The first write also removes the temporary files, older than a minute, that
+a crash left beside the store. The store
 is never renamed to the backup, which would leave no store on disk until its replacement. Files use
 mode `0600`, and a store directory created by the application uses `0700`. A directory that
 already exists keeps its own permissions: the store location is caller-provided and may sit inside
