@@ -102,6 +102,16 @@ struct NewSessionCommandsTests {
     #expect(model.commands.insertedInvocation == "/prisme-ai:debug-events")
   }
 
+  @Test("A folder typed under a prompt already on `/` is read once it settles, not at each letter")
+  func folderTyped() async {
+    let (model, log) = model()
+    model.draft.providerID = "claude-code"
+    model.draft.initialPrompt = "/deb"
+    for path in ["/t", "/tm", "/tmp", "/tmp/project"] { model.draft.workingDirectoryPath = path }
+    await until { model.commands.isShowing }
+    #expect(await log.folders == ["/tmp/project"])
+  }
+
   @Test("Without an agent or a folder, `/` is text")
   func nothingChosen() async {
     let (model, log) = model()

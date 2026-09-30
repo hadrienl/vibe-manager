@@ -120,8 +120,9 @@ public final class NewSessionModel {
     draft.palette = palette
   }
 
-  /// The list follows the prompt, and the agent and folder chosen: it is read for them — only once
-  /// a `/` is typed, a folder being typed starting no CLI at each letter.
+  /// The list follows the prompt, and the agent and folder chosen: it is read for them once a `/`
+  /// is typed. A folder or agent waits for the field to settle before it is taken, so a path typed
+  /// under a prompt that already opens on `/` starts no CLI at each letter.
   private func commandsFollowDraft() {
     commands.update(
       text: draft.initialPrompt, isEnabled: draft.templateFill == nil && !isSubmitting)
@@ -141,7 +142,9 @@ public final class NewSessionModel {
     commandKey = key
     commands.read = nil
     commandConnection?.cancel()
-    commandConnection = Task { [weak self, registry, commandCatalog] in
+    commandConnection = Task { [weak self, registry, commandCatalog, revalidationDelay] in
+      try? await Task.sleep(for: revalidationDelay)
+      guard !Task.isCancelled else { return }
       guard let listing = await registry.provider(id: key.providerID) as? any AgentCommandListing,
         let self, !Task.isCancelled, self.commandKey == key
       else { return }
