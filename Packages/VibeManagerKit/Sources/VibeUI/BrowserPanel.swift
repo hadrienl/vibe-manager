@@ -952,7 +952,7 @@ private struct BrowserPermissionBanner: View {
       return Text(verbatim: target + " · ") + expiry
     case .read:
       return Text(
-        "Allowed, it can read \(request.site) for the rest of this session — including what you see there while signed in — and use it in what it does.",
+        "If you allow it, it can read \(request.site) for the rest of this session — including what you see there once signed in — and use it in what it does.",
         bundle: .module) + Text(verbatim: " · ") + expiry
     default:
       return expiry
@@ -960,7 +960,12 @@ private struct BrowserPermissionBanner: View {
   }
 
   private var expiry: Text {
-    Text(
+    if case .read = request.kind {
+      return Text(
+        "Nothing is read unless you allow it; the request expires \(request.expiresAt, style: .relative).",
+        bundle: .module)
+    }
+    return Text(
       "Nothing is done unless you allow it; the request expires \(request.expiresAt, style: .relative).",
       bundle: .module)
   }

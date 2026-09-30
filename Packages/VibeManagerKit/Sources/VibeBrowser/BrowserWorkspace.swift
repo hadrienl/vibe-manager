@@ -303,6 +303,9 @@ public final class BrowserWorkspace {
       guard let self, let tab, !tab.isPinnedTicket else { return }
       self.close(tab.id, in: id)
     }
+    tab.willLeaveThisMac = { [weak self] tab in
+      self?.bringForward(tab, in: id)
+    }
     tab.confirmAgentEffect = { [weak self] effect, tab in
       guard let self else { return false }
       let outcome = await self.ask(
@@ -310,6 +313,16 @@ public final class BrowserWorkspace {
       return outcome.isAllowed
     }
     return tab
+  }
+
+  /// A page the agent drives is about to load a site away from this Mac: it is the tab in front,
+  /// and the web view is shown as when the agent opens a page (#239).
+  func bringForward(_ tab: BrowserTabModel, in id: SessionID) {
+    guard let browser = browsers[id], browser.tab(tab.id) != nil else { return }
+    if browser.activeTab?.id != tab.id { browser.activate(tab.id) }
+    if !browser.isVisible, preferences.showsWebViewWhenAgentOpensPage {
+      setVisible(true, for: id)
+    }
   }
 
   func touch(_ tab: BrowserTabModel) {
@@ -379,13 +392,15 @@ public final class BrowserWorkspace {
     }
   }
 
+  /// - Parameter site: the site the answer is about, as a person reads it: the one decided on,
+  ///   which is not always the tab's own address — a blank page a site opened, a frame.
   func ask(
     _ kind: BrowserPermissionRequest.Kind, tab: BrowserTabModel, in id: SessionID,
-    grantKey: String?
+    grantKey: String?, site: String? = nil
   ) async -> AnswerOutcome {
     let request = BrowserPermissionRequest(
       id: UUID(), sessionID: id, tabID: tab.id, kind: kind,
-      site: tab.origin?.description ?? tab.url.absoluteString, grantKey: grantKey,
+      site: site ?? tab.origin?.description ?? tab.url.absoluteString, grantKey: grantKey,
       expiresAt: Date().addingTimeInterval(
         TimeInterval(Self.permissionTimeout.components.seconds)))
     pendingRequests.append(request)

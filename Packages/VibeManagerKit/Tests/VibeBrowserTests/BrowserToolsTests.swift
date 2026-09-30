@@ -346,24 +346,21 @@ struct BrowserWorkspaceToolsTests {
     #expect(listed["title"] == "")
     #expect(listed["readable"] == false)
 
-    // Refused: nothing is read, and the next read asks again.
-    let refused = Task { @MainActor in
-      await workspace.run(tool: "page_read", arguments: [:], session: session)
-    }
-    let question = try await answerNext(workspace, in: session, with: .deny)
-    #expect(question.kind == .read(tool: "page_read"))
-    #expect(question.grantKey == nil)
-    let refusal = await refused.value
-    #expect(refusal.isError)
-    #expect(!text(refusal).contains("Tasks"))
-
-    for tool in ["page_screenshot", "page_console"] {
-      let asked = Task { @MainActor in
-        await workspace.run(tool: tool, arguments: [:], session: session)
+    // Each tool that reads asks first.
+    for tool in ["page_read", "page_screenshot", "page_console"] {
+      let reader = SessionID()
+      _ = await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(remoteURL(server).absoluteString)],
+        session: reader)
+      let refused = Task { @MainActor in
+        await workspace.run(tool: tool, arguments: [:], session: reader)
       }
-      let request = try await answerNext(workspace, in: session, with: .deny)
-      #expect(request.kind == .read(tool: tool))
-      #expect(await asked.value.isError)
+      let question = try await answerNext(workspace, in: reader, with: .deny)
+      #expect(question.kind == .read(tool: tool))
+      #expect(question.grantKey == nil)
+      let refusal = await refused.value
+      #expect(refusal.isError)
+      #expect(!text(refusal).contains("Tasks"))
     }
 
     // Allowed: read now, and for the rest of the session without asking.
@@ -375,6 +372,8 @@ struct BrowserWorkspaceToolsTests {
     let again = await workspace.run(
       tool: "page_read", arguments: ["mode": "text"], session: session)
     #expect(text(again).contains("3 open"))
+    let console = await workspace.run(tool: "page_console", arguments: [:], session: session)
+    #expect(!console.isError)
     #expect(workspace.pendingRequests.isEmpty)
     let relisted = try first(
       await workspace.run(tool: "tabs_list", arguments: [:], session: session))
@@ -394,9 +393,12 @@ struct BrowserWorkspaceToolsTests {
     workspace.release(session)
     #expect(workspace.browser(for: session).readableSites.isEmpty)
 
-    let records = workspace.browser(for: session).actionLog.records
+    let records = workspace.browser(for: other).actionLog.records
     #expect(records.contains { $0.tool == "page_read" && $0.decision == .denied })
-    #expect(records.contains { $0.tool == "page_read" && $0.decision == .confirmed })
+    #expect(
+      workspace.browser(for: session).actionLog.records.contains {
+        $0.tool == "page_read" && $0.decision == .confirmed
+      })
   }
 
   @Test("A page of this Mac is read without a question, and may wait in the background")
@@ -447,6 +449,147 @@ struct BrowserWorkspaceToolsTests {
     #expect(
       BrowserWorkspace.siteAddress(URL(string: "http://[::1]:3000/a")!) == "http://[::1]:3000/")
     #expect(BrowserWorkspace.siteAddress(URL(string: "about:blank")!) == "about:")
+  }
+
+  @Test("No answer shows the whole address or the title of a site that may not be read (#239)")
+  func nothingLeaksWithoutAnAnswer() async throws {
+    let secret = "/secret?token=abc"
+    let server = try TestPageServer(pages: ["/": Self.page, secret: Self.page])
+    defer { server.stop() }
+    let remoteSecret = URL(string: "http://[::ffff:127.0.0.1]:\(server.port)\(secret)")!
+    server.setRedirect("/r", to: remoteSecret.absoluteString)
+    server.setPage(
+      "/link", "<title>Link</title><a id=\"go\" href=\"\(remoteSecret.absoluteString)\">go</a>")
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+
+    // The user's own tab, signed in: listed and reloaded, it shows only its site.
+    let user = workspace.open(remoteSecret, in: session, openedBy: .user)
+    await user.waitUntilSettled(timeout: .seconds(15))
+    let listed = try first(await workspace.run(tool: "tabs_list", arguments: [:], session: session))
+    #expect(listed["url"]?.stringValue?.contains("token") == false)
+    #expect(listed["title"] == "")
+    let reloaded = await workspace.run(
+      tool: "tab_reload", arguments: ["tab": .string(user.id.description)], session: session)
+    #expect(!text(reloaded).contains("token"))
+    #expect(!text(reloaded).contains("Tasks"))
+
+    // A redirection from a local address the agent gave: the address it ends on is not shown.
+    let redirected = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/r").absoluteString)],
+      session: session)
+    #expect(!text(redirected).contains("token"), "\(text(redirected))")
+    let all = try object(await workspace.run(tool: "tabs_list", arguments: [:], session: session))
+    #expect(!all.jsonText.contains("token"))
+
+    // A click on a local page that goes to a site away from this Mac says where only by its site.
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/link").absoluteString)],
+      session: session)
+    let clicked = await workspace.run(
+      tool: "page_click", arguments: ["selector": "#go"], session: session)
+    #expect(!clicked.isError, "\(text(clicked))")
+    #expect(!text(clicked).contains("token"), "\(text(clicked))")
+  }
+
+  @Test("A page the agent drives never goes to a site away from this Mac behind (#239)")
+  func remoteLoadsComeForward() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page, "/b": "<title>B</title>"])
+    defer { server.stop() }
+    server.setRedirect("/r", to: remoteURL(server).absoluteString)
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    let browser = workspace.browser(for: session)
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+      session: session)
+
+    // A local address, opened behind, that redirects away from this Mac.
+    let redirected = try object(
+      await workspace.run(
+        tool: "tab_open",
+        arguments: ["url": .string(server.url("/r").absoluteString), "activate": false],
+        session: session))
+    #expect(redirected["inFront"] == true)
+    #expect(browser.activeTab?.id.description == redirected["id"]?.stringValue)
+
+    // A local page left behind, sent away by a script the agent ran.
+    let front = try object(
+      await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+        session: session))
+    let behind = try object(
+      await workspace.run(
+        tool: "tab_open",
+        arguments: ["url": .string(server.url("/b").absoluteString), "activate": false],
+        session: session))
+    let behindID = try #require(behind["id"]?.stringValue)
+    #expect(browser.activeTab?.id.description == front["id"]?.stringValue)
+    let script = "location.href = '\(remoteURL(server).absoluteString)'; 1"
+    _ = await workspace.run(
+      tool: "page_evaluate", arguments: ["tab": .string(behindID), "script": .string(script)],
+      session: session)
+    let tab = try #require(browser.allTabs.first { $0.id.description == behindID })
+    await tab.waitUntilSettled(timeout: .seconds(15))
+    #expect(browser.activeTab?.id.description == behindID)
+
+    // A tab behind sent away by tab_navigate.
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+      session: session)
+    let navigated = try object(
+      await workspace.run(
+        tool: "tab_navigate",
+        arguments: [
+          "tab": .string(behindID), "url": .string(remoteURL(server).absoluteString),
+        ], session: session))
+    #expect(navigated["inFront"] == true)
+    #expect(browser.activeTab?.id.description == behindID)
+  }
+
+  @Test("A site the user refused to let the session read is not asked again (#239)")
+  func refusalIsKept() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(remoteURL(server).absoluteString)],
+      session: session)
+    let asked = Task { @MainActor in
+      await workspace.run(tool: "page_read", arguments: [:], session: session)
+    }
+    _ = try await answerNext(workspace, in: session, with: .deny)
+    #expect(await asked.value.isError)
+    let again = await workspace.run(tool: "page_read", arguments: [:], session: session)
+    #expect(again.isError)
+    #expect(text(again).contains("refused"))
+    #expect(workspace.pendingRequests.isEmpty)
+  }
+
+  @Test("A capture asks for the sites of the frames it would show (#239)")
+  func framesAreAsked() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let remote = remoteURL(server)
+    server.setPage(
+      "/framed",
+      "<title>Framed</title><iframe src=\"\(remote.absoluteString)\" width=300 height=200>"
+        + "</iframe>")
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    _ = await workspace.run(
+      tool: "tab_open", arguments: ["url": .string(server.url("/framed").absoluteString)],
+      session: session)
+    let capture = Task { @MainActor in
+      await workspace.run(tool: "page_screenshot", arguments: [:], session: session)
+    }
+    let question = try await answerNext(workspace, in: session, with: .deny)
+    #expect(question.kind == .read(tool: "page_screenshot"))
+    // The frame's site, as WebKit wrote its address — not the local page's.
+    #expect(question.site.hasPrefix("[::ffff:"))
+    #expect(question.site.hasSuffix(":\(server.port)"))
+    #expect(await capture.value.isError)
   }
 
   @Test("The ticket's tab follows the ticket, and cannot be closed")

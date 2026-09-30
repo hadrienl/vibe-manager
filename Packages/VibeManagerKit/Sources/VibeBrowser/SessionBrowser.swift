@@ -27,6 +27,9 @@ public final class SessionBrowser {
   /// The sites away from this Mac the user let this session's agent read (#239), by
   /// `BrowserOrigin.grantKey`. Kept for this run only: a relaunch asks again.
   @ObservationIgnored public private(set) var readableSites: Set<String> = []
+  /// The sites the user refused to let this session's agent read: not asked again this session,
+  /// so that an agent cannot ask until the user gives in.
+  @ObservationIgnored public private(set) var refusedSites: Set<String> = []
 
   @ObservationIgnored var stateDidChange: (@MainActor () -> Void)?
   @ObservationIgnored var logDidChange: (@MainActor () -> Void)?
@@ -163,10 +166,16 @@ public final class SessionBrowser {
 
   func allowReading(_ site: String) {
     readableSites.insert(site)
+    refusedSites.remove(site)
+  }
+
+  func refuseReading(_ site: String) {
+    refusedSites.insert(site)
   }
 
   func forgetReadableSites() {
     readableSites = []
+    refusedSites = []
   }
 
   func record(_ record: BrowserActionRecord, isRead: Bool) {

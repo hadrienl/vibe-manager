@@ -4274,17 +4274,6 @@
         }
       }
     },
-    "Allowed, it can read %@ for the rest of this session — including what you see there while signed in — and use it in what it does." : {
-      "comment" : "What allowing a read gives the agent. %@ is the site.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si vous l’autorisez, il pourra lire %@ jusqu’à la fin de cette session — y compris ce que vous y voyez connecté — et s’en servir dans ce qu’il fait."
-          }
-        }
-      }
-    },
     "Also looked in: %@" : {
       "comment" : "A list of folders the agent visited that are not repositories.",
       "localizations" : {
@@ -7315,6 +7304,17 @@
         }
       }
     },
+    "If you allow it, it can read %@ for the rest of this session — including what you see there once signed in — and use it in what it does." : {
+      "comment" : "What allowing a read gives the agent. %@ is the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si vous l’autorisez, il pourra lire %@ jusqu’à la fin de cette session — y compris ce que vous y voyez une fois connecté — et s’en servir dans ce qu’il fait."
+          }
+        }
+      }
+    },
     "Ignore" : {
       "localizations" : {
         "fr" : {
@@ -9130,6 +9130,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien n’écoute encore sur %@"
+          }
+        }
+      }
+    },
+    "Nothing is read unless you allow it; the request expires %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’est lu sans votre accord ; la demande expire %@."
           }
         }
       }

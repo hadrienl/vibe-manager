@@ -51,9 +51,10 @@ extension BrowserWorkspace: BrowserToolRunning {
         throw BrowserToolFailure(
           "The ticket's tab stays on the ticket: open the address in a new tab with tab_open.")
       }
-      // A page away from this Mac is never loaded out of sight (#239).
-      let broughtForward = Self.isRemote(url) && browser.activeTab?.id != tab.id
-      if broughtForward { browser.activate(tab.id) }
+      // A page away from this Mac is never loaded out of sight (#239): the tab comes to the front
+      // before it leaves, whatever address it ends on.
+      let wasInFront = browser.activeTab?.id == tab.id
+      if Self.isRemote(url) { bringForward(tab, in: browser.sessionID) }
       willAct(on: tab)
       defer { didAct(on: tab) }
       tab.ensureWebView()
@@ -62,7 +63,9 @@ extension BrowserWorkspace: BrowserToolRunning {
       record(
         tool, in: browser, tab: tab, target: url.absoluteString, decision: .automatic,
         succeeded: tab.failure == nil)
-      return status(of: tab, in: browser, broughtForward: broughtForward)
+      return status(
+        of: tab, in: browser, given: url,
+        broughtForward: !wasInFront && browser.activeTab?.id == tab.id)
     case "tab_reload":
       willAct(on: tab)
       defer { didAct(on: tab) }
@@ -97,16 +100,18 @@ extension BrowserWorkspace: BrowserToolRunning {
       // The page is asked for its origin in the same turn as the read: the web process may have
       // committed a navigation the application has not heard of yet.
       let text = try await configuration.callAgent(
-        "if (expected !== null && location.origin !== expected) { throw new Error('The page changed before it could be read: nothing was read.'); } return window.__vibeAgent.\(mode)(limit);",
-        arguments: [
-          "limit": limit, "expected": read.origin.flatMap { Self.scriptOrigin($0) } ?? NSNull(),
-        ], in: webView)
+        "if (expected !== null && (expected === 'file:' ? location.protocol !== 'file:' : location.origin !== expected)) { throw new Error('The page changed before it could be read: nothing was read.'); } return window.__vibeAgent.\(mode)(limit);",
+        arguments: ["limit": limit, "expected": Self.expectedInPage(read.origin) ?? NSNull()],
+        in: webView)
       try stillOn(read, tab)
       record(tool, in: browser, tab: tab, target: mode, decision: read.decision)
       return .text((text as? String) ?? "")
     case "page_screenshot":
       let webView = try await ready(tab)
       let read = try await mayRead(tool, tab, webView: webView, browser: browser)
+      // What frames of other sites show is captured too: each site is asked like the page's.
+      try await mayCaptureFrames(of: tab, webView: webView, browser: browser, tool: tool)
+      try stillOn(read, tab)
       let png = try await Self.screenshot(of: webView)
       try stillOn(read, tab)
       record(tool, in: browser, tab: tab, target: "", decision: read.decision)
@@ -114,7 +119,8 @@ extension BrowserWorkspace: BrowserToolRunning {
     case "page_console":
       // A page that failed to load still has a console worth reading: it says why.
       let webView = tab.isLoaded ? tab.ensureWebView() : try await ready(tab)
-      let read = try await mayRead(tool, tab, webView: webView, browser: browser)
+      let read = try await mayRead(
+        tool, tab, webView: webView, browser: browser, evenWhileLoading: true)
       try stillOn(read, tab)
       let minimum =
         arguments["level"]?.stringValue.flatMap(BrowserConsoleEntry.Level.init) ?? .debug
@@ -195,7 +201,7 @@ extension BrowserWorkspace: BrowserToolRunning {
       tab.isAgentActing = true
       let outcome = await ask(
         .act(tool: tool.name, target: description, value: value), tab: tab,
-        in: browser.sessionID, grantKey: site?.grantKey)
+        in: browser.sessionID, grantKey: site?.grantKey, site: site?.description)
       tab.isAgentActing = false
       switch outcome {
       case .allowed(let always):
@@ -244,7 +250,8 @@ extension BrowserWorkspace: BrowserToolRunning {
           "return window.__vibeAgent.click(target);", arguments: ["target": target], in: webView)
         try? await Task.sleep(for: .milliseconds(300))
         await tab.waitUntilSettled(timeout: .seconds(5))
-        let moved = tab.url != before ? " The page went to \(tab.url.absoluteString)." : ""
+        let moved =
+          tab.url != before ? " The page went to \(shownAddress(of: tab, in: browser))." : ""
         result = .text("Clicked \((clicked as? String) ?? description).\(moved)")
       case "page_fill":
         let filled = try await configuration.callAgent(
@@ -323,8 +330,8 @@ extension BrowserWorkspace: BrowserToolRunning {
     let asked = arguments["activate"]?.boolValue ?? true
     // A page away from this Mac is never opened out of sight (#239): the user sees what the agent
     // loads with their cookies. A preview on this Mac may still wait behind.
-    let broughtForward = !asked && Self.isRemote(url)
-    let tab = open(url, in: browser.sessionID, openedBy: .agent, activate: asked || broughtForward)
+    let tab = open(
+      url, in: browser.sessionID, openedBy: .agent, activate: asked || Self.isRemote(url))
     tab.ensureWebView()
     noteAgentOpenedPage(in: browser.sessionID)
     willAct(on: tab)
@@ -333,7 +340,8 @@ extension BrowserWorkspace: BrowserToolRunning {
     record(
       tool, in: browser, tab: tab, target: url.absoluteString, decision: .automatic,
       succeeded: tab.failure == nil)
-    return status(of: tab, in: browser, broughtForward: broughtForward)
+    return status(
+      of: tab, in: browser, given: url, broughtForward: !asked && browser.activeTab?.id == tab.id)
   }
 
   /// An address an agent typed: `localhost:5173` is taken for `http://localhost:5173`. Only what
@@ -364,16 +372,12 @@ extension BrowserWorkspace: BrowserToolRunning {
   private func listTabs(_ browser: SessionBrowser) -> BrowserToolResult {
     let active = browser.activeTab?.id
     let tabs: [JSONValue] = browser.allTabs.map { tab in
-      // A page the agent may not read shows neither its title nor, unless the agent opened it,
-      // more of its address than its site (#239): a title says what a private page is about.
-      let readable = mayRead(tab.committedURL ?? tab.url, in: browser)
-      let shownURL =
-        readable || tab.openedBy == .agent ? tab.url.absoluteString : Self.siteAddress(tab.url)
+      let shown = presented(tab, in: browser)
       return [
         "id": .string(tab.id.description),
-        "title": .string(readable ? tab.displayTitle : ""),
-        "url": .string(shownURL),
-        "readable": .bool(readable),
+        "title": .string(shown.title),
+        "url": .string(shown.url),
+        "readable": .bool(shown.isReadable),
         "active": .bool(tab.id == active),
         "pinned": .bool(tab.isPinnedTicket),
         "loaded": .bool(tab.isLoaded),
@@ -385,17 +389,36 @@ extension BrowserWorkspace: BrowserToolRunning {
     return .text(JSONValue.array(tabs).jsonText)
   }
 
+  /// A tab as the agent may see it (#239): its title and its whole address only when the site
+  /// it holds now — and the one it is heading to — may be read; else no title, and the address cut
+  /// to its site, unless it is the very address the agent gave in this call. Decided on where the
+  /// tab is, never on how it got there: a redirection, a navigation of the user's, a pop-up.
+  func presented(_ tab: BrowserTabModel, in browser: SessionBrowser, given: URL? = nil)
+    -> (url: String, title: String, isReadable: Bool)
+  {
+    let isReadable =
+      mayRead(tab.committedURL ?? tab.url, in: browser) && mayRead(tab.url, in: browser)
+    guard !isReadable else { return (tab.url.absoluteString, tab.displayTitle, true) }
+    let url = tab.url == given ? tab.url.absoluteString : Self.siteAddress(tab.url)
+    return (url, "", false)
+  }
+
+  func shownAddress(of tab: BrowserTabModel, in browser: SessionBrowser) -> String {
+    presented(tab, in: browser).url
+  }
+
   private func status(
-    of tab: BrowserTabModel, in browser: SessionBrowser, broughtForward: Bool = false
+    of tab: BrowserTabModel, in browser: SessionBrowser, given: URL? = nil,
+    broughtForward: Bool = false
   ) -> BrowserToolResult {
-    let readable = mayRead(tab.committedURL ?? tab.url, in: browser)
+    let shown = presented(tab, in: browser, given: given)
     var fields: [String: JSONValue] = [
       "id": .string(tab.id.description),
-      "title": .string(readable ? tab.displayTitle : ""),
-      "url": .string(tab.url.absoluteString),
+      "title": .string(shown.title),
+      "url": .string(shown.url),
       "loading": .bool(tab.isLoading),
     ]
-    if !readable {
+    if !shown.isReadable {
       fields["readable"] = false
       fields["note"] =
         "The title is withheld: page_read asks the user before anything of this site is read."
@@ -403,8 +426,8 @@ extension BrowserWorkspace: BrowserToolRunning {
     if broughtForward {
       fields["inFront"] = true
       fields["note"] = .string(
-        "Opened in front: a page away from this Mac never loads in the background."
-          + (readable ? "" : " The title is withheld: page_read asks the user first."))
+        "Brought to the front: a page away from this Mac never loads in the background."
+          + (shown.isReadable ? "" : " The title is withheld: page_read asks the user first."))
     }
     if let failure = tab.failure {
       fields["error"] = .string(failure.agentDescription)
@@ -431,11 +454,15 @@ extension BrowserWorkspace: BrowserToolRunning {
   /// Whether the agent may read what the tab holds (#239): free on this Mac, on a site always
   /// allowed, and on a site the user let the session read; asked anywhere else, once per site and
   /// session. Decided on the document the page holds, never on where a navigation is heading.
+  /// - Parameter evenWhileLoading: a console is read while the page loads, on this Mac only.
   func mayRead(
     _ tool: BrowserToolCatalog.Tool, _ tab: BrowserTabModel, webView: WKWebView,
-    browser: SessionBrowser
+    browser: SessionBrowser, evenWhileLoading: Bool = false
   ) async throws -> AllowedRead {
-    guard !tab.isLoading else {
+    let loadingHere =
+      evenWhileLoading && mayRead(tab.committedURL ?? tab.url, in: browser)
+      && mayRead(tab.url, in: browser)
+    guard !tab.isLoading || loadingHere else {
       throw BrowserToolFailure(
         "The page is still loading: nothing was read. Wait a moment, then try again.")
     }
@@ -461,28 +488,73 @@ extension BrowserWorkspace: BrowserToolRunning {
     case .deny(let reason):
       throw BrowserToolFailure(reason)
     case .ask:
-      tab.isAgentActing = true
-      let outcome = await ask(
-        .read(tool: tool.name), tab: tab, in: browser.sessionID, grantKey: nil)
-      tab.isAgentActing = false
-      switch outcome {
-      case .allowed:
-        if let site { browser.allowReading(site.grantKey) }
-      case .denied:
-        record(tool, in: browser, tab: tab, target: "", decision: .denied, succeeded: false)
-        throw BrowserToolFailure(
-          "The user refused: nothing was read on \(site?.description ?? "the page").")
-      case .expired:
-        record(tool, in: browser, tab: tab, target: "", decision: .expired, succeeded: false)
-        throw BrowserToolFailure(
-          "Nobody answered within two minutes: nothing was read. Ask the user, then try again.")
-      }
+      try await askToRead(site, tool: tool, tab: tab, browser: browser)
       let read = AllowedRead(address: committed, origin: site, decision: .confirmed)
       // What was allowed was this site: a page that moved while the question was on screen is
       // not read.
       try stillOn(read, tab)
       return read
     }
+  }
+
+  /// Asks the user whether the session's agent may read a site, unless they already refused it in
+  /// this session: an agent does not get to ask until the user gives in.
+  private func askToRead(
+    _ site: BrowserOrigin?, tool: BrowserToolCatalog.Tool, tab: BrowserTabModel,
+    browser: SessionBrowser
+  ) async throws {
+    let name = site?.description ?? "the page"
+    if let site, browser.refusedSites.contains(site.grantKey) {
+      record(tool, in: browser, tab: tab, target: name, decision: .denied, succeeded: false)
+      throw BrowserToolFailure(
+        "The user refused to let this session read \(name): nothing was read. Do not ask again; "
+          + "tell the user what you needed from it.")
+    }
+    tab.isAgentActing = true
+    let outcome = await ask(
+      .read(tool: tool.name), tab: tab, in: browser.sessionID, grantKey: nil,
+      site: site?.description)
+    tab.isAgentActing = false
+    switch outcome {
+    case .allowed:
+      if let site { browser.allowReading(site.grantKey) }
+    case .denied:
+      if let site { browser.refuseReading(site.grantKey) }
+      record(tool, in: browser, tab: tab, target: name, decision: .denied, succeeded: false)
+      throw BrowserToolFailure(
+        "The user refused: nothing was read on \(name), and it will not be asked again in this "
+          + "session.")
+    case .expired:
+      record(tool, in: browser, tab: tab, target: name, decision: .expired, succeeded: false)
+      throw BrowserToolFailure(
+        "Nobody answered within two minutes: nothing was read. Ask the user, then try again.")
+    }
+  }
+
+  /// The sites of the page's frames that may not be read yet: a capture shows what they hold, so
+  /// each is asked like the page's own (#239). Frames within those frames are not seen from here.
+  private func mayCaptureFrames(
+    of tab: BrowserTabModel, webView: WKWebView, browser: SessionBrowser,
+    tool: BrowserToolCatalog.Tool
+  ) async throws {
+    let sources =
+      try await configuration.callAgent(
+        "return Array.from(document.querySelectorAll('iframe, frame, embed, object')).map(e => e.src || e.data || '').filter(Boolean);",
+        arguments: [:], in: webView) as? [String] ?? []
+    var asked: Set<String> = []
+    for source in sources {
+      guard let url = URL(string: source), let origin = BrowserOrigin(url: url), !origin.isLocal,
+        !mayRead(url, in: browser), asked.insert(origin.grantKey).inserted
+      else { continue }
+      try await askToRead(origin, tool: tool, tab: tab, browser: browser)
+    }
+  }
+
+  /// What the page must still report when it is read: its origin, or `file:` for a local file.
+  static func expectedInPage(_ origin: BrowserOrigin?) -> String? {
+    guard let origin else { return nil }
+    if origin.scheme == "file" { return "file:" }
+    return scriptOrigin(origin)
   }
 
   /// The page still holds the document the read was decided on — its site, at least: a local

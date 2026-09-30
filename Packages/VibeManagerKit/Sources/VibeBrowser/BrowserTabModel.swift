@@ -96,6 +96,14 @@ public final class BrowserTabModel: NSObject, Identifiable {
     (@MainActor (_ kind: BrowserAgentEffect, _ tab: BrowserTabModel) async -> Bool)?
   /// Until when what the page does counts as the agent's doing: set by each of its actions.
   @ObservationIgnored var agentDrivenUntil: Date = .distantPast
+  /// Told before the page leaves for a site away from this Mac while the agent drives it — a
+  /// tab it opened, or one it acts on — so that such a page never loads out of sight (#239).
+  @ObservationIgnored var willLeaveThisMac: (@MainActor (BrowserTabModel) -> Void)?
+
+  /// Whether what the page loads now is the agent's doing.
+  var isDrivenByAgent: Bool {
+    openedBy == .agent || isAgentActing || isAgentDriven
+  }
 
   @ObservationIgnored private let configuration: BrowserWebConfiguration
   @ObservationIgnored private var observations: [NSKeyValueObservation] = []
@@ -451,6 +459,10 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
 
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
     committedURL = webView.url
+    // A redirection the policy was not asked about still comes to the front once it commits.
+    if let url = webView.url, BrowserWorkspace.isRemote(url), isDrivenByAgent {
+      willLeaveThisMac?(self)
+    }
     (webView as? SessionWebView)?.hoveredLink = nil
     console.reset()
     stopRetrying()
@@ -502,6 +514,13 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     {
       openInNewTab?(target, false, activate)
       return (.cancel, preferences)
+    }
+    // A page the agent drives never goes to a site away from this Mac out of sight: brought to
+    // the front before the request leaves, redirections included (#239).
+    if navigationAction.targetFrame?.isMainFrame ?? true, BrowserWorkspace.isRemote(target),
+      isDrivenByAgent
+    {
+      willLeaveThisMac?(self)
     }
     if ["http", "https", "file", "about", "blob", "data"].contains(scheme) {
       // `data:` and `blob:` are refused as a top-level destination by the agent's tools, but a
