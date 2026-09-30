@@ -67,10 +67,20 @@ case would be an invention, and every screen reading it would be showing a guess
 
 ### The probe must not raise the alert it exists to prevent
 
-The status is read empirically, by opening `~/Library/Application Support/com.apple.TCC/TCC.db`:
-it exists on every Mac, and only Full Disk Access opens it. Crucially, a process without the
-access is refused *silently* — the path is hidden rather than denied (`errno = 2` observed), with
-no alert. Nothing is read from the file; being allowed to open it is the whole answer.
+The status is read empirically, by opening TCC's own databases, which only Full Disk Access opens.
+Crucially, a process without the access is refused *silently*, with no alert. Nothing is read from
+the file; being allowed to open it is the whole answer.
+
+The witnesses are asked in order, and each answers only when it is there:
+
+| Witness | Without the access | With it |
+|---|---|---|
+| `/Library/Application Support/com.apple.TCC/TCC.db` (system) | `EPERM` | opens |
+| `~/Library/Application Support/com.apple.TCC/TCC.db` (user) | `ENOENT` | opens before macOS 27, `ENOENT` since |
+
+Opened: granted. Refused: not granted. Missing (`ENOENT`): the next witness; none left, not granted.
+The first version read only the user's database and took its `ENOENT` for the refusal. On macOS 27
+that path is missing whatever the access (measured for #225), and every Mac was told "not granted".
 
 ### Which process has the access
 

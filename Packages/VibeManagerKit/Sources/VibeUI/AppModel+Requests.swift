@@ -46,7 +46,7 @@ extension AppModel {
   var allPendingRequests: [PendingRequest] {
     var result: [PendingRequest] = []
     for session in sessions where session.taskStatus != .archived {
-      guard let requests = activities[session.id]?.requests, !requests.isEmpty else { continue }
+      guard let requests = activity(for: session.id)?.requests, !requests.isEmpty else { continue }
       let folder = RestartSession.workingDirectoryPath(of: session)
       for (position, request) in requests.enumerated() {
         result.append(
@@ -189,6 +189,7 @@ extension AppModel {
   func requestsDidChange() {
     let all = allPendingRequests
     let ids = Set(all.map(\.id))
+    pendingRequestCount = all.count(where: { $0.session.id != selectedSessionID })
 
     requestNotifier?.setBadge(showsRequestDockBadge && !all.isEmpty ? all.count : nil)
 
