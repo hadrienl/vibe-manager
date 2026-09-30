@@ -1,0 +1,76 @@
+import AppKit
+import SwiftUI
+import Testing
+import VibeApplication
+import VibeDomain
+
+@testable import VibeConversationUI
+
+/// The conversation under a toolbar, in a window never put on screen (#228). macOS 26 lays the
+/// toolbar's edge effect over the whole top inset of the scroll view: that inset must stay the
+/// toolbar's, however short the conversation.
+@MainActor
+@Suite(
+  "The empty space above a short conversation is not veiled", .serialized, .timeLimit(.minutes(1)))
+struct ConversationEdgeEffectTests {
+  private static let height = 800.0
+
+  private func host(messages: Int) -> (NSWindow, ConversationModel) {
+    let model = ConversationModel(sessionID: SessionID())
+    model.write = { _ in }
+    model.processRunning = { true }
+    model.apply(
+      ConversationSnapshot(
+        entries: (0..<messages).map {
+          ConversationEntry(id: "m\($0)", content: .agentText("Message \($0)"))
+        }, availability: .available))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 600, height: Self.height),
+      styleMask: [.titled, .fullSizeContentView, .resizable], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.toolbar = NSToolbar()
+    window.contentView = NSHostingView(
+      rootView: ConversationView(
+        model: model, theme: .systemDark, appearance: ConversationAppearance()))
+    return (window, model)
+  }
+
+  private func scrollView(in view: NSView?) -> NSScrollView? {
+    guard let view else { return nil }
+    return view as? NSScrollView ?? view.subviews.lazy.compactMap(scrollView(in:)).first
+  }
+
+  /// Laid out, measured, and laid out again with what was measured.
+  private func settled(_ window: NSWindow) async throws -> NSScrollView {
+    for _ in 0..<50 {
+      window.layoutIfNeeded()
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    return try #require(scrollView(in: window.contentView))
+  }
+
+  @Test("A short conversation leaves the scroll view no top inset beyond the toolbar's")
+  func short() async throws {
+    let (window, _) = host(messages: 1)
+    defer { window.close() }
+    let scroll = try await settled(window)
+    let toolbar = window.contentView!.safeAreaInsets.top
+    #expect(toolbar > 0)
+    #expect(scroll.contentInsets.top == toolbar)
+    let document = try #require(scroll.documentView)
+    #expect(document.frame.height >= scroll.contentView.bounds.height - toolbar)
+    // The emptiness is the conversation's own, from the bottom: nothing to scroll.
+    #expect(abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1)
+  }
+
+  @Test("A conversation taller than the view keeps that inset, and its end in view")
+  func tall() async throws {
+    let (window, _) = host(messages: 80)
+    defer { window.close() }
+    let scroll = try await settled(window)
+    let document = try #require(scroll.documentView)
+    #expect(document.frame.height > Self.height)
+    #expect(scroll.contentInsets.top == window.contentView!.safeAreaInsets.top)
+    #expect(abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1)
+  }
+}

@@ -141,6 +141,10 @@ public struct ConversationView: View {
         .padding(.top, layout.topPadding)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
+        // Short, the conversation fills the view from the bottom rather than leaving its emptiness
+        // to the scroll view's top inset, which macOS 26 covers with the toolbar's edge effect
+        // (#228).
+        .frame(minHeight: viewportHeight, alignment: .bottom)
         .onGeometryChange(for: CGRect.self) {
           $0.frame(in: .scrollView)
         } action: { frame in
