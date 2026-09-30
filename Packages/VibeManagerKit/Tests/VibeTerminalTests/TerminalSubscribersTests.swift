@@ -182,22 +182,31 @@ struct TerminalSessionInterestTests {
 
   @Test("A subscriber of pulses hears of output, and of its last block")
   func pulseSubscriberOfARealProcess() async throws {
+    // The last block is written only once the first pulse was heard, so the pulse that finds it
+    // can only be one that followed it — the one a burst always ends with.
     let session = try TerminalTestSupport.makeSession(
-      script: "read go; for i in $(seq 1 50); do echo line-$i; done; read end")
+      script:
+        "read go; echo line-1; read more; for i in $(seq 2 50); do echo line-$i; done; read end")
     let attachment = await session.attach(.pulses(every: .milliseconds(50)))
 
     await session.write("go\n")
     var pulses = 0
+    var sawTheEnd = false
     for await event in attachment.events {
       if case .output = event { Issue.record("A subscriber of pulses was handed bytes") }
-      if event == .outputPulse {
-        pulses += 1
-        let text = String(decoding: await session.history().bytes, as: UTF8.self)
+      guard event == .outputPulse else { continue }
+      pulses += 1
+      let text = String(decoding: await session.history().bytes, as: UTF8.self)
+      if pulses == 1 {
+        #expect(!text.contains("line-50"))
+        await session.write("more\n")
+      } else if text.contains("line-50") {
         // Waits for the pulse that follows the last line rather than for a duration.
-        if text.contains("line-50") { break }
+        sawTheEnd = true
+        break
       }
     }
-    #expect(pulses >= 1)
+    #expect(sawTheEnd)
     await session.stop(gracePeriod: .seconds(2))
   }
 }

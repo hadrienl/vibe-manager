@@ -36,8 +36,19 @@ sessions without paying for it — its live feed is cancelled and it is fed noth
 session keeps anyway (ADR 0004) says where it starts in the stream (`startOffset`), and the view
 remembers how far it was fed; shown again, it is fed only what follows, in 64 KB slices with a yield
 between two, hidden until done and with « Updating the terminal… » past 150 ms. Every byte fed then is
-new to the view, so it answers what they ask, exactly once. Output the history already let go of is
-lost to the view, as it is to a view opened now.
+new to the view, so it answers what they ask, exactly once.
+
+**A view that missed output starts over.** When the history let go of output the view never saw — an
+interface that redraws itself fills it in a minute or two — or when the view's own bounded stream
+dropped blocks it had not read (`outputDropped`, distinct from `historyTruncated`), going on from the
+stale screen would show the rest out of place, from the middle of a frame or of a sequence. The screen
+is reset and drawn again from what the history holds: without answers for the output that already went
+past the view, with answers for what follows. What the history let go of is lost to the view, as it
+is to a view opened now, but the screen is coherent.
+
+**A relaunch shows how the old process ended.** A process replaced while its view was suspended, or
+not fed all its output yet, is caught up first — without answers, its reader is gone — so its last
+answer or its error stays above the separator of the next one.
 
 **A suspended terminal still answers.** A sentinel reads a suspended view's output off the main actor
 — no emulation, a few states that follow escape sequences across reads — for what SwiftTerm answers
