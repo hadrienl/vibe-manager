@@ -206,7 +206,8 @@ public final class AppEnvironment {
       vault: KeychainBrowserGrantVault(
         service: (Bundle.main.bundleIdentifier ?? "eu.hadrien.VibeManager") + ".browser-grants",
         account: data.defaultsSuite ?? "standard"),
-      legacyDefaults: data.defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard)
+      legacyDefaults: data.defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard,
+      log: diagnostics.log)
     let browserStore = FileBrowserStore(
       directory: dataFolder.appendingPathComponent("Browser", isDirectory: true))
     let browser = BrowserWorkspace(
