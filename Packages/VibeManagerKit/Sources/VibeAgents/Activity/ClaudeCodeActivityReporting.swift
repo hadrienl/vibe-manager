@@ -77,9 +77,10 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
 
   /// The notifications that say a dialog is up, checked against 2.1.285 and its documentation.
   /// `elicitation_dialog` is left out: the `Elicitation` hook reports the same dialog, and ends it.
+  /// So is `worker_permission_prompt`: a teammate's permission, reported by its own hooks, which
+  /// may come once it is answered.
   static let announcedKinds: [String: AgentTerminalPrompt.Kind] = [
     "permission_prompt": .permission,
-    "worker_permission_prompt": .permission,
     "elicitation_url_dialog": .form,
     "agent_needs_input": .other,
     "quota_auto_resume_stale": .other,

@@ -32,9 +32,9 @@ public struct AgentActivityState: Hashable, Sendable {
   /// A request was taken away on a guess: the dialog on screen may be one the queue no longer
   /// holds, however few are left in it. The doubt then lasts until the queue drains.
   var isTrackLost = false
-  /// When the CLI said a dialog was drawn with no report waiting to be drawn (#273): its report,
+  /// A dialog the CLI said was drawn before any report matched it (#273), and when: its report,
   /// read from another file, may come a moment after what the terminal wrote.
-  var drawnBeforeReportAt: Date?
+  var drawnBeforeReport: DrawnBeforeReport?
 
   public init(
     activity: AgentActivity = .idle,
@@ -50,6 +50,12 @@ public struct AgentActivityState: Hashable, Sendable {
   public var isWorthKeeping: Bool {
     activity != .idle || unreadSince != nil
   }
+}
+
+/// A dialog said to be drawn before any report matched it (#273).
+struct DrawnBeforeReport: Hashable, Sendable {
+  let dialog: AgentDrawnDialog
+  let at: Date
 }
 
 /// Everything that can move an agent's state.
@@ -148,7 +154,7 @@ public enum AgentActivityMachine {
       // whose letters answer nothing: only Return or Escape ends it.
       if case .inTerminal(let prompt) = next.requests.first?.content {
         let ends =
-          [.form, .question].contains(prompt.kind)
+          [.form, .question, .plan].contains(prompt.kind)
           ? bytes == [0x0D] : context.approvalAnswerKeys.contains(bytes)
         if ends || interruptKeys.contains(bytes) {
           next.settleFirstRequest(isKnownAnswered: true)
@@ -223,12 +229,13 @@ public enum AgentActivityMachine {
       let count = next.requests.count
       next.enqueue(notice, kind: kind, tool: tool, context: context)
       // Its dialog was said to be drawn a moment before the report was read.
-      if let drawn = next.drawnBeforeReportAt, next.requests.count > count,
+      if let drawn = next.drawnBeforeReport, next.requests.count > count,
         let last = next.requests.indices.last, !next.requests[last].isShown,
-        abs(context.now.timeIntervalSince(drawn)) <= drawnBeforeReportWindow
+        drawn.dialog.matches(next.requests[last]),
+        abs(context.now.timeIntervalSince(drawn.at)) <= drawnBeforeReportWindow
       {
-        next.requests[last].isShown = true
-        next.drawnBeforeReportAt = nil
+        next.markDrawn(at: last)
+        next.drawnBeforeReport = nil
       }
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
     case .questionResolved:
@@ -241,9 +248,8 @@ public enum AgentActivityMachine {
         next.activity = .working
       }
     case .toolFinished(let tool, let agentID, let subject):
-      // The main agent ran a tool: whatever it announced is behind it. A sub-agent's tool says
-      // nothing of the main agent's dialog (#271).
-      if agentID == nil { next.dropAnnouncedRequests() }
+      // A tool finishing says nothing of an announced dialog: tools run side by side, and another
+      // may end while it is still up (#271, #273).
       guard !next.requests.isEmpty else {
         // Sub-agents run tools side by side: one finishing answers nothing another is waiting on.
         if case .awaitingUser = next.activity, let pending = next.pendingTool, pending != tool {
@@ -264,26 +270,25 @@ public enum AgentActivityMachine {
           content: .inTerminal(prompt), reference: AgentToolReference(tool: nil), isShown: true),
         kind: kind, tool: nil, context: context)
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
-    case .dialogDrawn(let otherwise):
-      // The dialog on screen is the latest report's: an earlier one never drawn was settled
-      // without a dialog — by Codex's automatic review — and nothing says so. With more than one
-      // waiting, which is on screen is not known for sure.
-      guard let index = next.requests.lastIndex(where: { !$0.isShown }) else {
-        next.drawnBeforeReportAt = context.now
+    case .dialogDrawn(let dialog, let otherwise):
+      // Only the request the dialog names is armed: a key typed for another's card would answer
+      // this dialog. None reported yet, its report may be read a moment later.
+      guard
+        let index = next.requests.lastIndex(where: { !$0.isShown && dialog.matches($0) })
+      else {
+        next.drawnBeforeReport = DrawnBeforeReport(dialog: dialog, at: context.now)
         if let otherwise { next = apply(.dialogAnnounced(otherwise), to: next, context: context) }
         break
       }
-      next.requests[index].isShown = true
-      if next.requests.indices.contains(where: { $0 != index && !next.requests[$0].content.isAnnouncedOnly })
-      {
-        next.isFirstRequestUncertain = true
-      }
+      next.markDrawn(at: index)
     case .turnEnded:
       // A sub-agent in the background can still be waiting on the user once the main turn ends —
       // on a dialog it drew. One announced by its tool and never drawn may never be: a hook of
       // the user's own can stop the tool before either. Should it be drawn after all, its
-      // `PermissionRequest` queues it again. A dialog the main agent only announced is behind it.
-      next.dropAnnouncedRequests()
+      // `PermissionRequest` queues it again. A permission the main agent only announced is behind
+      // it; a plan, a question or a form may be drawn as the turn ends — Codex's "Implement this
+      // plan?" is — and its word read before the end's.
+      next.dropAnnouncedRequests { [.network, .permission, .other].contains($0.kind) }
       next.requests.removeAll { !$0.isShown }
       if next.requests.isEmpty { next.clearRequests() }
       next.activity = next.requests.first.map { .awaitingUser($0.kind) } ?? .idle
@@ -326,12 +331,38 @@ extension AgentActivityState {
 
   // MARK: - Requests (#40)
 
-  /// Takes away the dialogs only announced (#273): nothing reports their end, so the next sign of
-  /// the main agent at work is taken as it.
-  mutating func dropAnnouncedRequests() {
-    guard requests.contains(where: \.content.isAnnouncedOnly) else { return }
-    let wasFirst = requests.first?.content.isAnnouncedOnly == true
-    requests.removeAll { $0.content.isAnnouncedOnly }
+  /// Marks the request drawn. Reported before it and never drawn, the other permissions were
+  /// settled with no dialog — the CLI draws its dialogs in the order it reported them — and
+  /// nothing said so.
+  mutating func markDrawn(at index: Int) {
+    let id = requests[index].id
+    let settled = Set(
+      requests[..<index].filter {
+        !$0.isShown && !$0.content.isAnnouncedOnly && $0.kind == .approval
+      }.map(\.id))
+    requests[index].isShown = true
+    requests.removeAll { settled.contains($0.id) }
+    if let first = requests.first, first.id != id, !first.content.isAnnouncedOnly {
+      // Another request drawn before it still waits: which dialog is on screen is not known.
+      isFirstRequestUncertain = true
+    } else if !settled.isEmpty, requests.count == 1, !isTrackLost {
+      // Alone once the settled ones are gone, it is the dialog on screen.
+      isFirstRequestUncertain = false
+    }
+  }
+
+  /// Takes away the dialogs only announced (#273), or those of them `which` names: nothing
+  /// reports their end, so the next sign of the main agent at work is taken as it.
+  mutating func dropAnnouncedRequests(
+    _ which: (AgentTerminalPrompt) -> Bool = { _ in true }
+  ) {
+    func dropped(_ request: AgentRequest) -> Bool {
+      guard case .inTerminal(let prompt) = request.content else { return false }
+      return which(prompt)
+    }
+    guard requests.contains(where: dropped) else { return }
+    let wasFirst = requests.first.map(dropped) == true
+    requests.removeAll(where: dropped)
     if requests.isEmpty {
       clearRequests()
       if case .awaitingUser = activity { activity = .working }

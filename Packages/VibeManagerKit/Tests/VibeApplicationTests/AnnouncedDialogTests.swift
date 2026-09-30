@@ -27,12 +27,13 @@ private func feed(_ signals: AgentSignal..., to state: AgentActivityState? = nil
 private let network = AgentSignal.dialogAnnounced(
   AgentTerminalPrompt(kind: .network, message: "A sandboxed command needs network access"))
 
-private func permission(shown: Bool) -> AgentSignal {
+private func permission(shown: Bool, command: String = "ls", agent: String? = nil) -> AgentSignal {
   .questionAsked(
     .approval, tool: "Bash",
     notice: AgentRequestNotice(
-      content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "ls")),
-      reference: AgentToolReference(tool: "Bash", subject: "ls"), isShown: shown))
+      content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: command)),
+      reference: AgentToolReference(tool: "Bash", agentID: agent, subject: command),
+      isShown: shown))
 }
 
 @Suite("Dialogs the CLI only announces (#273)")
@@ -68,9 +69,8 @@ struct AnnouncedDialogTests {
     #expect(state.requests.count == 1)
   }
 
-  @Test("The main agent at work again takes the announced dialog away", arguments: [
-    AgentSignal.toolFinished("Bash"), .promptSubmitted(byUser: true), .turnEnded,
-    .interrupted, .questionResolved,
+  @Test("The main agent's turn or prompt takes the announced dialog away", arguments: [
+    AgentSignal.promptSubmitted(byUser: true), .turnEnded, .interrupted, .questionResolved,
   ])
   func settledBy(_ signal: AgentSignal) {
     let state = feed(network, signal)
@@ -78,12 +78,23 @@ struct AnnouncedDialogTests {
     #expect(state.activity != .awaitingUser(.approval))
   }
 
-  @Test("A sub-agent's tool, or a task resuming the agent, leaves it waiting (#271)")
-  func notSettledBySubagents() {
+  @Test("A tool ending — another one, run beside it — or a task resuming the agent leaves it up")
+  func notSettledByOtherTools() {
     let state = feed(
-      network, .toolFinished("Bash", agentID: "a1"), .promptSubmitted(byUser: false))
+      network, .toolFinished("Bash"), .toolFinished("Bash", agentID: "a1"),
+      .promptSubmitted(byUser: false))
     #expect(state.requests.count == 1)
     #expect(state.activity == .awaitingUser(.approval))
+  }
+
+  @Test("A plan or a question announced as the turn ends outlives the end's report")
+  func drawnAtTheEnd() {
+    let plan = AgentSignal.dialogAnnounced(
+      AgentTerminalPrompt(kind: .plan, message: "Plan mode prompt: Implement this plan?"))
+    let state = feed(plan, .turnEnded)
+    #expect(state.requests.first?.content.isAnnouncedOnly == true)
+    #expect(state.activity == .awaitingUser(.approval))
+    #expect(feed(.promptSubmitted(byUser: true), to: state).requests.isEmpty)
   }
 
   @Test("A key that answers dialogs, typed in the terminal, is its answer")
@@ -104,16 +115,11 @@ struct AnnouncedDialogTests {
 
   @Test("A sub-agent's question leaves the main agent's announced dialog up")
   func subagentQuestion() {
-    let subagent = AgentSignal.questionAsked(
-      .approval, tool: "Bash",
-      notice: AgentRequestNotice(
-        content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "ls")),
-        reference: AgentToolReference(tool: "Bash", agentID: "a1", subject: "ls"), isShown: false))
-    let state = feed(network, subagent)
+    let state = feed(network, permission(shown: false, agent: "a1"))
     #expect(state.requests.first?.content.isAnnouncedOnly == true)
   }
 
-  @Test("A form or a question announced is ended by Return or Escape, not by its letters")
+  @Test("A form, a question or a plan announced is ended by Return or Escape, not by its letters")
   func formKeys() {
     let form = feed(.dialogAnnounced(AgentTerminalPrompt(kind: .form, message: "Server")))
     let typed = AgentActivityMachine.reduce(form, .userInput([0x31]), context: context("k"))
@@ -125,52 +131,61 @@ struct AnnouncedDialogTests {
   @Test("Codex's form for an MCP tool arms the permission it reported, adding nothing")
   func codexMCPTool() {
     let form = AgentSignal.dialogDrawn(
-      otherwise: AgentTerminalPrompt(kind: .form, message: "Approval requested by github"))
-    let state = feed(permission(shown: false), form)
+      AgentDrawnDialog(.server("prisme-ai-builder")),
+      otherwise: AgentTerminalPrompt(
+        kind: .form, message: "Approval requested by prisme-ai-builder"))
+    let tool = AgentSignal.questionAsked(
+      .approval, tool: "mcp__prisme_ai_builder__call_api",
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(
+            tool: .mcp(server: "prisme_ai_builder", tool: "call_api"),
+            toolName: "mcp__prisme_ai_builder__call_api", subject: nil)),
+        reference: AgentToolReference(tool: "mcp__prisme_ai_builder__call_api"), isShown: false))
+    let state = feed(tool, form)
     #expect(state.requests.count == 1)
     #expect(state.requests[0].isShown)
     #expect(!state.isFirstRequestUncertain)
-    // A server's own form, no permission waiting: a request answered in the terminal.
+    // A server's own form, no permission of it waiting: a request answered in the terminal.
     let own = feed(form)
     #expect(own.requests.first?.content.isAnnouncedOnly == true)
   }
 
-  @Test("A permission settled with no dialog leaves the next one uncertain, never armed in its place")
-  func staleUnshown() {
-    let stale = feed(permission(shown: false))
-    let next = AgentActivityMachine.reduce(
-      stale,
-      .signal(
-        .questionAsked(
-          .approval, tool: "Bash",
-          notice: AgentRequestNotice(
-            content: .permission(
-              AgentToolPermission(tool: .shell, toolName: "Bash", subject: "rm x")),
-            reference: AgentToolReference(tool: "Bash", subject: "rm x"), isShown: false))),
-      context: context("second", at: 10))
-    let drawn = feed(.dialogDrawn(), to: next)
-    #expect(!drawn.requests[0].isShown)
-    #expect(drawn.requests[1].isShown)
-    #expect(drawn.isFirstRequestUncertain)
-    #expect(drawn.answering(drawn.requests[0], keymap: nil) == .inTerminalOnly(.notSupported))
+  @Test("A dialog arms only the request it names: an older one settled with no dialog is dropped")
+  func stale() {
+    // `ls` was settled by Codex's automatic review, with no dialog and no report of it.
+    let stale = feed(permission(shown: false, command: "ls"))
+    let drawnB = AgentSignal.dialogDrawn(AgentDrawnDialog(.commandStart("rm x")))
+    // B's dialog read before B's report: `ls` is not armed in its place.
+    let early = feed(drawnB, to: stale)
+    #expect(!early.requests[0].isShown)
+    let reported = AgentActivityMachine.reduce(
+      early, .signal(permission(shown: false, command: "rm x")), context: context("b", at: 1))
+    #expect(reported.requests.map(\.reference.subject) == ["rm x"])
+    #expect(reported.requests[0].isShown)
+    #expect(!reported.isFirstRequestUncertain)
+    // B's report read first: B is armed, `ls` goes.
+    let later = feed(permission(shown: false, command: "rm x"), drawnB, to: stale)
+    #expect(later.requests.map(\.reference.subject) == ["rm x"])
+    #expect(later.requests[0].isShown)
   }
 
-  @Test("A dialog said drawn a moment before its report is read arms that report")
-  func drawnBeforeReport() {
-    let drawn = feed(.dialogDrawn())
-    #expect(drawn.requests.isEmpty)
-    let reported = feed(permission(shown: false), to: drawn)
-    #expect(reported.requests[0].isShown)
+  @Test("A dialog said drawn long before a report arms nothing")
+  func drawnLongBefore() {
+    let drawn = feed(.dialogDrawn(AgentDrawnDialog(.commandStart("ls"))))
+    let reported = AgentActivityMachine.reduce(
+      drawn, .signal(permission(shown: false)), context: context("late", at: 60))
+    #expect(!reported.requests[0].isShown)
   }
 
   @Test("Codex's word that its dialog is drawn arms the permission it reported")
   func drawn() {
     let reported = feed(permission(shown: false))
-    #expect(
-      reported.answering(reported.requests[0], keymap: nil) == .inTerminalOnly(.notSupported))
     #expect(!reported.requests[0].isShown)
-    let drawn = feed(.dialogDrawn(), to: reported)
+    let drawn = feed(.dialogDrawn(AgentDrawnDialog(.commandStart("l"))), to: reported)
     #expect(drawn.requests[0].isShown)
+    // Another command's dialog does not arm it.
+    #expect(!feed(.dialogDrawn(AgentDrawnDialog(.commandStart("rm"))), to: reported).requests[0].isShown)
     // Never drawn — its automatic review settled it — it is gone with the turn.
     #expect(feed(.turnEnded, to: reported).requests.isEmpty)
   }

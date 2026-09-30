@@ -29,7 +29,6 @@ struct AnnouncedDialogDecodingTests {
   func claudeOthers() {
     let decoder = ClaudeCodeSignalDecoder()
     let kinds: [String: AgentTerminalPrompt.Kind] = [
-      "worker_permission_prompt": .permission,
       "elicitation_url_dialog": .form, "agent_needs_input": .other,
       "quota_auto_resume_stale": .other,
     ]
@@ -46,6 +45,8 @@ struct AnnouncedDialogDecodingTests {
     #expect(decoder.signal(for: notification("permission_prompt", "Claude needs your permission")) == nil)
     // Its `Elicitation` hook reports the same dialog, and says when it ends.
     #expect(decoder.signal(for: notification("elicitation_dialog", "Form")) == nil)
+    // A teammate's permission, reported by its own hooks, may come once answered.
+    #expect(decoder.signal(for: notification("worker_permission_prompt", "Worker needs it")) == nil)
     #expect(decoder.signal(for: notification("auth_success", "Signed in")) == nil)
   }
 
@@ -64,8 +65,16 @@ struct AnnouncedDialogDecodingTests {
     // What codex-cli 0.159.2 wrote to its terminal as it drew the dialog.
     #expect(
       decoder.signal(forTerminalNotification: "Approval requested: /bin/zsh -lc 'touch made-by...")
-        == .dialogDrawn())
-    #expect(decoder.signal(forTerminalNotification: "Codex wants to edit a.swift") == .dialogDrawn())
+        == .dialogDrawn(AgentDrawnDialog(.commandStart("touch made-by"))))
+    #expect(
+      decoder.signal(forTerminalNotification: "Codex wants to edit a.swift")
+        == .dialogDrawn(AgentDrawnDialog(.file("a.swift"))))
+    #expect(
+      decoder.signal(forTerminalNotification: "Codex wants to edit 3 files")
+        == .dialogDrawn(AgentDrawnDialog(.files)))
+    // A command short enough to be quoted whole, its closing quote taken off.
+    #expect(CodexSignalDecoder.commandStart(quoted: "/bin/zsh -lc 'pwd'") == "pwd")
+    #expect(CodexSignalDecoder.commandStart(quoted: "git status") == "git status")
   }
 
   @Test("Codex: the dialogs no hook reports")
@@ -76,6 +85,7 @@ struct AnnouncedDialogDecodingTests {
     }
     let expected: [String: AgentSignal?] = [
       "Approval requested by github": .dialogDrawn(
+        AgentDrawnDialog(.server("github")),
         otherwise: AgentTerminalPrompt(kind: .form, message: "Approval requested by github")),
       "Plan mode prompt: Implement this plan?": announced(
         .plan, "Plan mode prompt: Implement this plan?"),

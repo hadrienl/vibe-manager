@@ -148,17 +148,38 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
       reference: notice.reference, isShown: notice.isShown, key: notice.key)
   }
 
+  /// The start of a command as its report gives it, out of the notification that quotes it: the
+  /// command Codex runs — `/bin/zsh -lc 'touch a…` — cut at thirty characters.
+  static func commandStart(quoted: String) -> String {
+    var text = Substring(quoted)
+    let isCut = text.hasSuffix("...") || text.hasSuffix("…")
+    if text.hasSuffix("...") { text = text.dropLast(3) } else if text.hasSuffix("…") { text = text.dropLast() }
+    // The shell Codex wraps the model's command in, and the quote around it.
+    if let wrapper = text.range(of: #"^\S*sh -l?c ['"]?"#, options: .regularExpression) {
+      let quote = text[wrapper].last.flatMap { "'\"".contains($0) ? $0 : nil }
+      text = text[wrapper.upperBound...]
+      if !isCut, let quote, text.last == quote { text = text.dropLast() }
+    }
+    return String(text)
+  }
+
   /// Codex's notifications, as `tui/src/chatwidget/notifications.rs` words them in 0.159.
   public func signal(forTerminalNotification message: String) -> AgentSignal? {
     func announced(_ kind: AgentTerminalPrompt.Kind) -> AgentSignal {
       .dialogAnnounced(AgentTerminalPrompt(kind: kind, message: message))
     }
     // The form of an MCP tool's permission, or a server's own request, which has no report.
-    if message.hasPrefix("Approval requested by ") {
-      return .dialogDrawn(otherwise: AgentTerminalPrompt(kind: .form, message: message))
+    if let server = message.trimmingPrefix("Approval requested by ") {
+      return .dialogDrawn(
+        AgentDrawnDialog(.server(server)),
+        otherwise: AgentTerminalPrompt(kind: .form, message: message))
     }
-    if message.hasPrefix("Approval requested: ") || message.hasPrefix("Codex wants to edit ") {
-      return .dialogDrawn()
+    if let command = message.trimmingPrefix("Approval requested: ") {
+      return .dialogDrawn(AgentDrawnDialog(.commandStart(Self.commandStart(quoted: command))))
+    }
+    if let edited = message.trimmingPrefix("Codex wants to edit ") {
+      let isSeveral = edited.hasSuffix(" files") && Int(edited.dropLast(" files".count)) != nil
+      return .dialogDrawn(AgentDrawnDialog(isSeveral ? .files : .file(edited)))
     }
     if let title = message.trimmingPrefix("Plan mode prompt: ") {
       switch title {
