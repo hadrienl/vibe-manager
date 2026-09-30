@@ -40,26 +40,42 @@ struct ConversationEdgeEffectTests {
     return view as? NSScrollView ?? view.subviews.lazy.compactMap(scrollView(in:)).first
   }
 
-  /// Laid out, measured, and laid out again with what was measured.
-  private func settled(_ window: NSWindow) async throws -> NSScrollView {
-    for _ in 0..<50 {
+  /// Laid out, measured, and laid out again with what was measured, until `condition` holds.
+  /// Cancelled by the time limit: the test fails then, rather than spinning on.
+  private func settled(
+    _ window: NSWindow, until condition: (NSScrollView, NSView) -> Bool
+  ) async throws -> NSScrollView {
+    while !Task.isCancelled {
       window.layoutIfNeeded()
+      if let scroll = scrollView(in: window.contentView), let document = scroll.documentView,
+        condition(scroll, document)
+      {
+        return scroll
+      }
       try await Task.sleep(for: .milliseconds(10))
     }
-    return try #require(scrollView(in: window.contentView))
+    throw CancellationError()
+  }
+
+  /// The height of the scroll view below the toolbar.
+  private func visible(_ scroll: NSScrollView) -> Double {
+    scroll.contentView.bounds.height - scroll.contentInsets.top
   }
 
   @Test("A short conversation leaves the scroll view no top inset beyond the toolbar's")
   func short() async throws {
     let (window, _) = host(messages: 1)
     defer { window.close() }
-    let scroll = try await settled(window)
     let toolbar = window.contentView!.safeAreaInsets.top
+    // Before the fix, the document stays as short as its one message.
+    let scroll = try await settled(window) { scroll, document in
+      document.frame.height >= scroll.contentView.bounds.height - toolbar - 1
+    }
     #expect(toolbar > 0)
     #expect(scroll.contentInsets.top == toolbar)
     let document = try #require(scroll.documentView)
-    #expect(document.frame.height >= scroll.contentView.bounds.height - toolbar)
     // The emptiness is the conversation's own, from the bottom: nothing to scroll.
+    #expect(abs(document.frame.height - visible(scroll)) < 1)
     #expect(abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1)
   }
 
@@ -67,9 +83,11 @@ struct ConversationEdgeEffectTests {
   func tall() async throws {
     let (window, _) = host(messages: 80)
     defer { window.close() }
-    let scroll = try await settled(window)
+    let scroll = try await settled(window) { scroll, document in
+      document.frame.height > Self.height
+        && abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1
+    }
     let document = try #require(scroll.documentView)
-    #expect(document.frame.height > Self.height)
     #expect(scroll.contentInsets.top == window.contentView!.safeAreaInsets.top)
     #expect(abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1)
   }
