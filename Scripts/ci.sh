@@ -8,6 +8,10 @@ readonly derived_data_path="${DERIVED_DATA_PATH:-$repository_root/DerivedData/CI
 readonly module_cache_path="$repository_root/.build/ModuleCache"
 readonly source_packages_path="$derived_data_path/SourcePackages"
 
+# Run from an agent's terminal, the suites would find its session's activity log and report into
+# it: a mock agent's `SessionEnd` takes the real agent's pending question away (#271).
+unset VIBE_AGENT_ACTIVITY_LOG
+
 export CLANG_MODULE_CACHE_PATH="$module_cache_path"
 export SWIFTPM_MODULECACHE_OVERRIDE="$module_cache_path"
 

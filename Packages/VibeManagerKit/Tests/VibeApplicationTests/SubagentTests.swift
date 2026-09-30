@@ -14,8 +14,8 @@ private final class ScriptDecoder: ConversationDecoding {
     self.file = file
   }
 
-  func consume(_ line: Data) {
-    let text = String(decoding: line, as: UTF8.self)
+  func consume(_ record: TranscriptRecord) {
+    let text = record.text
     let id = "\(file)#\(entries.count)"
     if text.hasPrefix("agent:") {
       entries.append(ConversationEntry(id: id, content: .agentText(String(text.dropFirst(6)))))
@@ -23,7 +23,8 @@ private final class ScriptDecoder: ConversationDecoding {
       entries.append(
         ConversationEntry(
           id: id,
-          content: .tool(ToolCall(callID: id, kind: .other(String(text.dropFirst(5))), state: .succeeded))))
+          content: .tool(
+            ToolCall(callID: id, kind: .other(String(text.dropFirst(5))), state: .succeeded))))
     } else if text.hasPrefix("sub:") {
       let parts = text.split(separator: ":").map(String.init)
       let callID = parts[1]
@@ -98,7 +99,9 @@ private actor RecordingTail: TranscriptTailing {
     self.contents = contents
   }
 
-  nonisolated func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+  nonisolated func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<
+    TranscriptChunk
+  > {
     let (stream, continuation) = AsyncStream<TranscriptChunk>.makeStream()
     Task { await self.opened(file, continuation) }
     return stream
@@ -107,17 +110,17 @@ private actor RecordingTail: TranscriptTailing {
   private func opened(_ file: URL, _ continuation: AsyncStream<TranscriptChunk>.Continuation) {
     opened.append(file)
     continuations[file] = continuation
-    continuation.yield(.lines((contents[file] ?? []).map { Data($0.utf8) }))
+    continuation.yield(.lines(contents[file] ?? []))
   }
 
-  func read(_ file: URL) async -> [Data] {
+  func read(_ file: URL) async -> [TranscriptRecord] {
     opened.append(file)
-    return (contents[file] ?? []).map { Data($0.utf8) }
+    return (contents[file] ?? []).map(TranscriptRecord.init(text:))
   }
 
   func write(_ lines: [String], to file: URL) {
     contents[file, default: []].append(contentsOf: lines)
-    continuations[file]?.yield(.lines(lines.map { Data($0.utf8) }))
+    continuations[file]?.yield(.lines(lines))
   }
 }
 
@@ -232,7 +235,8 @@ struct SubagentFollowTests {
   func earlierProcess() async throws {
     let tail = RecordingTail([
       root: ["sub:s1:running:1000", "sub:s2:running:3000"],
-      ScriptProvider.transcript("s1"): ["tool:Read"], ScriptProvider.transcript("s2"): ["tool:Read"],
+      ScriptProvider.transcript("s1"): ["tool:Read"],
+      ScriptProvider.transcript("s2"): ["tool:Read"],
     ])
     let follow = follow(tail)
     let session = session()
@@ -248,7 +252,9 @@ struct SubagentFollowTests {
 
   @Test("In a session whose agent stopped, a sub-agent that never ended is not opened")
   func stoppedAgent() async throws {
-    let tail = RecordingTail([root: ["sub:s1:running"], ScriptProvider.transcript("s1"): ["tool:Read"]])
+    let tail = RecordingTail([
+      root: ["sub:s1:running"], ScriptProvider.transcript("s1"): ["tool:Read"],
+    ])
     let follow = follow(tail)
     let session = session()
     await follow.setAgentRunning(false, for: session.id)
@@ -318,8 +324,10 @@ struct SubagentLinkerTests {
   func noGuess() {
     let start = Date(timeIntervalSince1970: 1_000)
     let transcripts = [
-      SubagentTranscriptInfo(agentID: "old", file: file("old"), createdAt: start.addingTimeInterval(-60)),
-      SubagentTranscriptInfo(agentID: "named", toolUseID: "other", file: file("named"), createdAt: start),
+      SubagentTranscriptInfo(
+        agentID: "old", file: file("old"), createdAt: start.addingTimeInterval(-60)),
+      SubagentTranscriptInfo(
+        agentID: "named", toolUseID: "other", file: file("named"), createdAt: start),
     ]
     let links = SubagentLinker.link(
       [.init(callID: "t1", prompt: "p", date: start)], among: transcripts
@@ -330,7 +338,9 @@ struct SubagentLinkerTests {
 
 @Suite("Sub-agents in the conversation's blocks")
 struct SubagentBlockTests {
-  private func subagent(_ id: String, _ state: ToolCallState = .running, inner: [ConversationEntry]? = nil)
+  private func subagent(
+    _ id: String, _ state: ToolCallState = .running, inner: [ConversationEntry]? = nil
+  )
     -> ConversationEntry
   {
     ConversationEntry(
@@ -370,7 +380,8 @@ struct SubagentBlockTests {
       entries, activity: .awaitingUser(.approval), agentID: "agent-s")
     #expect(marked[0].toolCall?.state == .running)
     #expect(marked[1].toolCall?.state == .awaitingPermission)
-    #expect(marked[1].toolCall?.subagent?.activityEntries?.first?.toolCall?.state == .awaitingPermission)
+    #expect(
+      marked[1].toolCall?.subagent?.activityEntries?.first?.toolCall?.state == .awaitingPermission)
     // The agent's own request never lands on a sub-agent running beside it.
     let own = ConversationEntry.markingPendingPermission(
       entries, activity: .awaitingUser(.approval))

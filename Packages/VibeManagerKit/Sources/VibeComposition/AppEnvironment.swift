@@ -331,7 +331,7 @@ public final class AppEnvironment {
     // The conversation view (#38): the same transcripts, read to be shown and never kept.
     let conversations = ConversationWorkspace(
       follow: FollowConversation(
-        agents: registry, tail: FileTranscriptTail(),
+        agents: registry, tail: FileTranscriptTail(diagnostics: diagnostics.log),
         hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) },
         current: { [repository] id in try? await repository.session(id: id) }),
       store: UserDefaultsConversationAppearanceStore(suiteName: data.defaultsSuite),

@@ -34,9 +34,9 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     self.isSubagent = isSubagent
   }
 
-  public func consume(_ line: Data) {
-    guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-      let type = object["type"] as? String
+  public func consume(_ record: TranscriptRecord) {
+    let object = record.object
+    guard let type = object["type"] as? String
     else { return }
     if object["isSidechain"] as? Bool == true, !isSubagent { return }
     let uuid = object["uuid"] as? String ?? UUID().uuidString

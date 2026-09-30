@@ -15,6 +15,10 @@ public protocol AgentConversationReporting: Sendable {
     hint: AgentActivityEvent?
   ) -> [URL]
 
+  /// Whether `hint` names a transcript the CLI has not written yet — the new file a `/clear`
+  /// announces, written at the next exchange: it is looked for often until it appears (#255).
+  func awaitsFile(named hint: AgentActivityEvent?) -> Bool
+
   /// A decoder for one file of this provider, fresh: it keeps what it read so far.
   func conversationDecoder(for file: URL) -> any ConversationDecoding
 
@@ -35,6 +39,8 @@ public protocol AgentConversationReporting: Sendable {
 }
 
 extension AgentConversationReporting {
+  public func awaitsFile(named hint: AgentActivityEvent?) -> Bool { false }
+
   public func subagentTranscripts(beside root: URL, agentIDs: Set<String>)
     -> [SubagentTranscriptInfo]
   { [] }
@@ -51,10 +57,39 @@ extension AgentConversationReporting {
 /// Stateful — a result names the call it answers, which came lines earlier — and used by one
 /// reader at a time, so it is a class rather than a value.
 public protocol ConversationDecoding: AnyObject {
-  /// One complete line, in the order the CLI wrote it.
-  func consume(_ line: Data)
+  /// One complete line, parsed, in the order the CLI wrote it.
+  func consume(_ record: TranscriptRecord)
   /// Everything read so far, in the order it happened.
   var entries: [ConversationEntry] { get }
+}
+
+extension ConversationDecoding {
+  /// One complete line, parsed here: for one-off readers and tests. A line that is not a JSON
+  /// object is left out.
+  public func consume(_ line: Data) {
+    TranscriptRecord(line: line).map(consume)
+  }
+}
+
+/// One line of a transcript, parsed ahead of its decoder, off the actor that decodes it (#249).
+///
+/// `JSONSerialization` without `.mutableContainers` hands out immutable containers: read from any
+/// task, they are never written — hence the unchecked conformance. Keep it that way.
+public struct TranscriptRecord: @unchecked Sendable {
+  public let object: [String: Any]
+
+  /// For tests only: an object from anywhere else might hold mutable containers.
+  init(_ object: [String: Any]) {
+    self.object = object
+  }
+
+  /// The line parsed, or nil when it is not a JSON object.
+  public init?(line: Data) {
+    guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+      return nil
+    }
+    self.object = object
+  }
 }
 
 /// How the text of a prompt reaches the agent's input.
@@ -165,14 +200,55 @@ public struct AgentPromptFormat: Hashable, Sendable {
 
 /// Follows a transcript file as the CLI appends to it.
 public protocol TranscriptTailing: Sendable {
-  /// Complete lines from the start of the file, then as they are written. `.reset` means the
-  /// file was replaced or cut short: what was read from it is to be forgotten.
-  func follow(_ file: URL) -> AsyncStream<TranscriptChunk>
+  /// Complete lines from `position` — the start of the file when nil — then as they are written.
+  /// `.reset` means the file was replaced or cut short, or is no longer the one `position` was
+  /// in: what was read from it is to be forgotten, and it is read again from its start.
+  func follow(_ file: URL, from position: TranscriptPosition?) -> AsyncStream<TranscriptChunk>
   /// Reads the file once to its end, without following it.
-  func read(_ file: URL) async -> [Data]
+  func read(_ file: URL) async -> [TranscriptRecord]
+  /// Reads the file once to its end, without following it, a chunk at a time: the last chunk is
+  /// the one caught up, then the stream finishes.
+  func readChunks(_ file: URL) -> AsyncStream<TranscriptChunk>
+}
+
+extension TranscriptTailing {
+  /// Complete lines from the start of the file, then as they are written.
+  public func follow(_ file: URL) -> AsyncStream<TranscriptChunk> {
+    follow(file, from: nil)
+  }
+
+  /// The whole file in one chunk: for readers of small files, and tests.
+  public func readChunks(_ file: URL) -> AsyncStream<TranscriptChunk> {
+    AsyncStream { continuation in
+      let task = Task {
+        continuation.yield(.records(await read(file), isCaughtUp: true))
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
 }
 
 public enum TranscriptChunk: Sendable {
-  case lines([Data])
+  /// Complete lines, parsed, in the order of the file; lines that are not JSON objects are left
+  /// out. `through` is where the reading stands after them, to resume it there; `isCaughtUp` says
+  /// the file held nothing more once they were read.
+  case records([TranscriptRecord], through: TranscriptPosition? = nil, isCaughtUp: Bool)
   case reset
+}
+
+/// Where a reading of a transcript stands (#249): resumable while the file is the same one.
+public struct TranscriptPosition: Hashable, Sendable {
+  public var inode: UInt64
+  /// Where the complete lines read end.
+  public var offset: UInt64
+  /// The last bytes before `offset`, 64 at most: a file rewritten in place — same inode, as long
+  /// or longer — no longer has them there, and is read again from its start.
+  public var fingerprint: Data
+
+  public init(inode: UInt64, offset: UInt64, fingerprint: Data) {
+    self.inode = inode
+    self.offset = offset
+    self.fingerprint = fingerprint
+  }
 }

@@ -34,6 +34,7 @@ public final class AppModel {
           sessions.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
         journal?.track(sessions)
         quickOpen.sessionsChanged(sessions)
+        conversations.sessionsChanged(sessions)
         // Every journal, archived sessions' included, for Open Quickly, from the first list that
         // holds sessions: a first load that failed or came back empty leaves it to the next one.
         if readsJournalsForQuickOpen, let journal {
