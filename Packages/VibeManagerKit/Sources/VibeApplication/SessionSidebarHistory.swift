@@ -20,11 +20,16 @@ public struct SessionStatusUndo: Hashable, Sendable {
   public let id: SessionID
   public let from: SessionTaskStatus
   public let to: SessionTaskStatus
+  /// Whether it was the session on screen: it is selected again then.
+  public let wasSelected: Bool
 
-  public init(id: SessionID, from: SessionTaskStatus, to: SessionTaskStatus) {
+  public init(
+    id: SessionID, from: SessionTaskStatus, to: SessionTaskStatus, wasSelected: Bool = false
+  ) {
     self.id = id
     self.from = from
     self.to = to
+    self.wasSelected = wasSelected
   }
 }
 

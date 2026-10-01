@@ -158,8 +158,7 @@ extension AppModel {
 
   /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard:
   /// the last rename, change of icon (#183), archive (#242) or status changed from the keyboard
-  /// (#240). `nil` with nothing to undo: it
-  /// then goes on to the window, as it did before.
+  /// (#240). `nil` with nothing to undo: it then goes on to the window, as it did before.
   ///
   /// A text being edited there — the name field, the notes — undoes its own typing: the command
   /// is taken above it, by the view that declares it, before the window would have handed it

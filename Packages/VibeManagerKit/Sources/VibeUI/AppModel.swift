@@ -1562,13 +1562,16 @@ public final class AppModel {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
     let candidates = forward ? nextTaskStatuses(of: session) : previousTaskStatuses(of: session)
     guard let target = candidates.first, target != .archived else { return }
+    let wasSelected = selectedSessionID == id
     if Self.restartsWhenMoved(session, to: target), canRestart(session) {
       pendingStatusRestart = StatusRestart(session: session, status: target)
       return
     }
     await setTaskStatus(target, for: id)
     if sessions.first(where: { $0.id == id })?.taskStatus == target {
-      sidebarHistory.record(SessionStatusUndo(id: id, from: session.taskStatus, to: target))
+      sidebarHistory.record(
+        SessionStatusUndo(
+          id: id, from: session.taskStatus, to: target, wasSelected: wasSelected))
     }
   }
 
@@ -1583,12 +1586,14 @@ public final class AppModel {
   }
 
   /// ⌘Z after a status changed from the keyboard (#240): the session goes back to the status it
-  /// left, and no agent is started on the way. Moved again since, it beeps.
+  /// left, and no agent is started on the way; selected again if it was. Moved again since, it
+  /// beeps.
   func undoStatusChange(_ undo: SessionStatusUndo) async {
     guard sessions.first(where: { $0.id == undo.id })?.taskStatus == undo.to else {
       return NSSound.beep()
     }
     await setTaskStatus(undo.from, for: undo.id, restarting: false)
+    if undo.wasSelected { select(undo.id) }
   }
 
   // MARK: - Restart
@@ -3285,8 +3290,7 @@ extension AppModel {
 }
 
 /// A session to move to a status whose move restarts its agent, and the status (#240).
-public struct StatusRestart: Identifiable, Equatable, Sendable {
+public struct StatusRestart: Sendable {
   public let session: WorkSession
   public let status: SessionTaskStatus
-  public var id: SessionID { session.id }
 }

@@ -127,16 +127,21 @@ struct SessionTaskBoardTests {
 
   @Test("⌘Z takes back a status changed from the keyboard, and only while it stands (#240)")
   func undoingAKeyboardMove() async {
-    let subject = session("Subject", in: .waiting)
-    let (model, _, repository) = makeWorkspace([subject])
+    let subject = session("Subject", in: .waiting, updatedAt: 200)
+    let other = session("Other", in: .waiting, updatedAt: 100)
+    let (model, _, repository) = makeWorkspace([subject, other])
     await model.load()
+    model.setColumn(.waiting)
+    model.select(subject.id)
 
     await model.moveTaskStatus(of: subject.id, forward: true)
     #expect(await repository.session(id: subject.id)?.taskStatus == .done)
+    #expect(model.selectedSessionID == other.id)
     #expect(model.canUndoSidebarChange)
 
     await model.undoSidebarChange()
     #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
+    #expect(model.selectedSessionID == subject.id)
     #expect(!model.canUndoSidebarChange)
 
     // Moved again by another way since: ⌘Z leaves it where it is.
