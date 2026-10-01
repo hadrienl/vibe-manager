@@ -2140,12 +2140,12 @@
         }
       }
     },
-    "Pause" : {
+    "Pause %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pause"
+            "value" : "Mettre en pause %@"
           }
         }
       }
@@ -2170,12 +2170,12 @@
         }
       }
     },
-    "Play" : {
+    "Play %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lire"
+            "value" : "Lire %@"
           }
         }
       }

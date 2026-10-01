@@ -435,8 +435,10 @@ public struct AttachmentChip: View {
   private var thumbnail: some View {
     if let image = preview?.thumbnail {
       Image(decorative: image, scale: displayScale).resizable().scaledToFill()
+    } else if let icon = preview?.icon {
+      Image(nsImage: icon).resizable()
     } else {
-      Image(nsImage: NSWorkspace.shared.icon(forFile: file.path)).resizable()
+      Image(systemName: "doc").resizable().scaledToFit().foregroundStyle(secondary).padding(5)
     }
   }
 

@@ -38,7 +38,11 @@ struct AttachmentStrip: View {
     var items: [URL] = []
     var selected: URL?
     for other in attachments {
-      guard let url = await AttachmentPreviews.shared.previewableFile(for: other) else { continue }
+      let rank = attachments.firstIndex(of: other) ?? 0
+      guard
+        let url = await AttachmentPreviews.shared.previewableFile(
+          for: other, name: Self.name(of: other, rank: rank))
+      else { continue }
       items.append(url)
       if other.id == attachment.id { selected = url }
     }
@@ -65,6 +69,8 @@ private func announce(_ text: String) {
 /// One attachment, drawn for its type.
 struct AttachmentTile: View {
   static let imageHeight: Double = 120
+  /// A chip's: an icon of 28 points and its margins.
+  static let chipHeight: Double = 40
   /// A panorama is cropped to it.
   static let maximumWidth: Double = 360
 
@@ -72,6 +78,20 @@ struct AttachmentTile: View {
   let name: String
   let open: () -> Void
   @State private var preview: AttachmentPreview?
+
+  /// The thumbnails' size in pixels: one for every screen, so that the cache answers at once.
+  static let maxPixel = Int(imageHeight * 2 * 2)
+
+  init(attachment: MessageAttachment, name: String, open: @escaping () -> Void) {
+    self.attachment = attachment
+    self.name = name
+    self.open = open
+    // What the cache already holds is drawn at once: a row built again while scrolling keeps
+    // its height.
+    _preview = State(
+      initialValue: AttachmentPreviews.shared.cachedPreview(
+        for: attachment, maxPixel: Self.maxPixel))
+  }
   @Environment(\.displayScale) private var displayScale
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationLinks) private var links
@@ -80,9 +100,11 @@ struct AttachmentTile: View {
     content
       .contextMenu { menu }
       .help(attachment.file?.path ?? name)
-      .task(id: attachment.id) {
-        preview = await AttachmentPreviews.shared.preview(
-          for: attachment, maxPixel: Int(Self.imageHeight * 2 * displayScale))
+      // Again when its source changes: the file of a pasted image is named a line later.
+      .task(id: attachment) {
+        let preview = await AttachmentPreviews.shared.preview(
+          for: attachment, maxPixel: Self.maxPixel)
+        if !Task.isCancelled { self.preview = preview }
       }
   }
 
@@ -108,9 +130,13 @@ struct AttachmentTile: View {
   private var content: some View {
     switch Self.style(for: attachment.kind, preview: preview) {
     case .loading:
-      RoundedRectangle(cornerRadius: 8)
+      // The size of what comes: a picture, or a chip.
+      let isPicture = [.image, .video, .pdf, .text].contains(attachment.kind)
+      RoundedRectangle(cornerRadius: isPicture ? 8 : 9)
         .fill(theme.surface.color)
-        .frame(width: attachment.kind == .image ? 160 : 200, height: Self.imageHeight)
+        .frame(
+          width: isPicture ? 160 : 200,
+          height: isPicture ? Self.imageHeight : Self.chipHeight)
     case .image:
       tileButton { thumbnail }
     case .video:
@@ -181,7 +207,7 @@ struct AttachmentTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(10)
-    .frame(width: 260, alignment: .leading)
+    .frame(width: 260, height: Self.imageHeight, alignment: .topLeading)
     .background(theme.surface.color, in: RoundedRectangle(cornerRadius: 8))
     .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border.color))
   }
@@ -217,8 +243,7 @@ struct AttachmentTile: View {
     }
     .padding(.leading, 6)
     .padding(.trailing, 10)
-    .padding(.vertical, 5)
-    .frame(maxWidth: 260, alignment: .leading)
+    .frame(maxWidth: 260, minHeight: Self.chipHeight, alignment: .leading)
     .background(theme.surface.color, in: RoundedRectangle(cornerRadius: 9))
     .overlay(RoundedRectangle(cornerRadius: 9).stroke(theme.border.color))
     .opacity(missing ? 0.7 : 1)
@@ -333,10 +358,12 @@ struct AttachmentAudioPlayer: View {
       .buttonStyle(.plain)
       .disabled(file == nil)
       .accessibilityLabel(
-        playback.isPlaying ? Text("Pause", bundle: .module) : Text("Play", bundle: .module))
+        playback.isPlaying
+          ? Text("Pause \(name)", bundle: .module) : Text("Play \(name)", bundle: .module))
       Button(action: open) {
         VStack(alignment: .leading, spacing: 4) {
           Text(verbatim: name)
+            .accessibilityLabel(Text("Audio", bundle: .module) + Text(verbatim: ", \(name)"))
             .font(theme.interfaceFont(size: 12, weight: .semibold))
             .foregroundStyle(theme.text.color)
             .lineLimit(1)

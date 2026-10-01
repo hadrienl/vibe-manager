@@ -18,7 +18,8 @@ struct UserPromptView: View {
 
   var body: some View {
     let size = appearance.textSize.pointSize
-    let shown = attachments.isEmpty ? text : AttachedPaths.displayText(text)
+    // An echo's text never holds the paths joined: it is shown as it is.
+    let shown = attachments.isEmpty || isEcho ? text : AttachedPaths.displayText(text)
     Group {
       if appearance.userMessageStyle == .bubbles {
         HStack {

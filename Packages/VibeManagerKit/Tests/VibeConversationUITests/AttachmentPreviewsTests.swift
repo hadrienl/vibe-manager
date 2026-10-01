@@ -60,7 +60,7 @@ struct AttachmentPreviewsTests {
     #expect(preview.thumbnail.map { max($0.width, $0.height) } == 64)
 
     // Quick Look is handed a copy, removed once it closes.
-    let copy = try #require(await previews.previewableFile(for: attachment))
+    let copy = try #require(await previews.previewableFile(for: attachment, name: "Image 1"))
     #expect(FileManager.default.fileExists(atPath: copy.path))
     #expect(copy.pathExtension == "png")
     await previews.discardTemporaryFiles()
@@ -72,7 +72,7 @@ struct AttachmentPreviewsTests {
     let attachment = MessageAttachment.file(folder.appendingPathComponent("gone.txt"), id: "m")
     let previews = previews()
     #expect(await previews.preview(for: attachment, maxPixel: 64).isMissing)
-    #expect(await previews.previewableFile(for: attachment) == nil)
+    #expect(await previews.previewableFile(for: attachment, name: "Image 1") == nil)
   }
 
   @Test("A file gone whose copy the transcript holds is shown from the copy")
@@ -102,7 +102,7 @@ struct AttachmentPreviewsTests {
     #expect(preview.lines == lines.prefix(AttachmentPreviews.textLineCount).joined(separator: "\n"))
   }
 
-  @Test("Asked twice, read once")
+  @Test("Asked twice at once, read once; read again once the file changed")
   func cached() async throws {
     let file = folder.appendingPathComponent("once.txt")
     try Data("first".utf8).write(to: file)
@@ -112,8 +112,43 @@ struct AttachmentPreviewsTests {
     async let second = previews.preview(for: attachment, maxPixel: 64)
     #expect(await first.lines == "first")
     #expect(await second.lines == "first")
-    try Data("changed".utf8).write(to: file)
     #expect(await previews.preview(for: attachment, maxPixel: 64).lines == "first")
+    #expect(await previews.loadCount == 1)
+    #expect(previews.cachedPreview(for: attachment, maxPixel: 64)?.lines == "first")
+
+    try Data("changed".utf8).write(to: file)
+    try FileManager.default.setAttributes(
+      [.modificationDate: Date().addingTimeInterval(60)], ofItemAtPath: file.path)
+    #expect(await previews.preview(for: attachment, maxPixel: 64).lines == "changed")
+    #expect(await previews.loadCount == 2)
+  }
+
+  @Test("A file missing is not remembered as such: back, it is shown")
+  func missingThenBack() async throws {
+    let file = folder.appendingPathComponent("later.txt")
+    let previews = previews()
+    let attachment = MessageAttachment.file(file, id: "l")
+    #expect(await previews.preview(for: attachment, maxPixel: 64).isMissing)
+    try Data("here".utf8).write(to: file)
+    #expect(await previews.preview(for: attachment, maxPixel: 64).lines == "here")
+  }
+
+  @Test("The copy for Quick Look is named as the message names the image, with its type")
+  func copyName() async throws {
+    let base64 = try png(width: 4, height: 4).base64EncodedString()
+    let line = #"{"message":{"content":[{"type":"image","source":{"data":"\#(base64)"}}]}}"#
+    let transcript = folder.appendingPathComponent("t3.jsonl")
+    try Data((line + "\n").utf8).write(to: transcript)
+    let image = EmbeddedImage(
+      line: TranscriptLineLocation(file: transcript, offset: 0, length: line.utf8.count),
+      container: ["message", "content"], index: 0, mediaType: "image/png",
+      encodedLength: base64.utf8.count)
+    let attachment = MessageAttachment(
+      id: "n", kind: .image,
+      source: .fileWithEmbedded(folder.appendingPathComponent("run.command"), image),
+      name: "run.command")
+    let copy = try #require(await previews().previewableFile(for: attachment, name: "run.command"))
+    #expect(copy.lastPathComponent == "run.png")
   }
 
   @Test("The tile drawn for each kind of file, and for one gone")
