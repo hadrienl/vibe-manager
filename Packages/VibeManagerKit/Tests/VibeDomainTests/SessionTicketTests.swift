@@ -185,7 +185,9 @@ struct SessionTicketTests {
     let state = try JSONDecoder().decode(SessionBrowserState.self, from: Data(json.utf8))
     #expect(state.tabs.count == 2)
     #expect(state.tabs[0].openedBy == .agent)
-    #expect(state.tabs[1].openedBy == .user)
+    // An opener a later build wrote is the agent's: what cannot be known is its doing (#241).
+    #expect(state.tabs[1].openedBy == .agent)
+    #expect(state.tabs[1].isAgentDriven)
     #expect(state.tabs[1].title == "")
     // Naming a tab that is not there puts the ticket in front instead.
     #expect(state.activeTabID == nil)

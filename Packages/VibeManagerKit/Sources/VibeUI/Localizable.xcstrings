@@ -13299,6 +13299,16 @@
         }
       }
     },
+    "The page opens %@ in another application, which connects to another computer." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page ouvre %@ dans une autre application, qui se connecte à un autre ordinateur."
+          }
+        }
+      }
+    },
     "The page was not loaded." : {
       "localizations" : {
         "fr" : {
