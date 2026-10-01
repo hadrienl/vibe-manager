@@ -681,7 +681,8 @@ public struct NewSessionDraftView: View {
           .contentShape(Circle())
       }
       .buttonStyle(.plain)
-      // Return goes to the line in a template's multiline fields; ⌘↩ creates from anywhere in the draft.
+      // Return goes to the line in a template's multiline fields; ⌘↩ creates from anywhere in
+      // the draft.
       .keyboardShortcut(.return, modifiers: .command)
       .disabled(!model.canSubmit)
       .help(
