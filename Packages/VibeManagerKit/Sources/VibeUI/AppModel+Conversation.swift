@@ -96,6 +96,14 @@ extension AppModel {
         guard let status = self?.pane(for: id)?.status else { return false }
         return status == .running || status == .starting
       }
+      model.endedOnError = { [weak self] in
+        guard let pane = self?.pane(for: id), !pane.wasStoppedOnPurpose else { return false }
+        switch pane.status {
+        case .exited(let code): return code != 0
+        case .terminated, .failed: return true
+        case .starting, .running: return false
+        }
+      }
       // As the kernel says: the same whether the application was open when it started or not.
       model.processStartDate = { [weak self] in
         guard let terminal = self?.pane(for: id)?.session,

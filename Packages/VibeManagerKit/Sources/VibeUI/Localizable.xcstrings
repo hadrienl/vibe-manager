@@ -5941,6 +5941,17 @@
         }
       }
     },
+    "Could not start" : {
+      "comment" : "A session's state: its agent could not be launched.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "N’a pas pu démarrer"
+          }
+        }
+      }
+    },
     "Could not switch to %@: %@" : {
       "comment" : "An agent's name, then why it could not be started.",
       "localizations" : {
@@ -6730,13 +6741,13 @@
         }
       }
     },
-    "Exited with code %@" : {
-      "comment" : "A session's state: its agent ended with this exit status.",
+    "Exit code %@" : {
+      "comment" : "Beside a session's state: the exit status its agent ended with.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminée avec le code %@"
+            "value" : "Code de sortie %@"
           }
         }
       }
@@ -12430,6 +12441,17 @@
         }
       }
     },
+    "Signal %@" : {
+      "comment" : "Beside a session's state: the signal number its agent was killed by.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal %@"
+          }
+        }
+      }
+    },
     "Silence in an answer" : {
       "localizations" : {
         "fr" : {
@@ -12638,6 +12660,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les arrêter"
+          }
+        }
+      }
+    },
+    "Stopped on an error" : {
+      "comment" : "A session's state: its agent ended with an exit status other than 0.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêtée sur une erreur"
+          }
+        }
+      }
+    },
+    "Stopped unexpectedly" : {
+      "comment" : "A session's state: its agent was killed by a signal nobody here sent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêtée de façon inattendue"
           }
         }
       }
@@ -12955,17 +12999,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminaux"
-          }
-        }
-      }
-    },
-    "Terminated by signal %@" : {
-      "comment" : "A session's state: its agent was killed by this signal number.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrompue par le signal %@"
           }
         }
       }

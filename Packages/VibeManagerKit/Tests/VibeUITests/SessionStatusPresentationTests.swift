@@ -145,9 +145,45 @@ struct SessionStatusPresentationTests {
 
     #expect(failed.severity == .error)
     #expect(exited.severity == .error)
-    #expect(english(exited.label).contains("127"))
     #expect(terminated.severity == .error)
-    #expect(english(terminated.label).contains("9"))
+    // Words first, the code after them, for whoever wants it (#235).
+    #expect(english(failed.label) == "Could not start")
+    #expect(failed.detail == "No such file")
+    #expect(english(exited.label) == "Stopped on an error")
+    #expect(exited.detail == "Exit code 127")
+    #expect(english(terminated.label) == "Stopped unexpectedly")
+    #expect(terminated.detail == "Signal 9")
+    #expect(Localization.string(exited.label, in: "fr") == "Arrêtée sur une erreur")
+    let spoken = SessionStatusPresentation.accessibilityLabel(for: session(), status: exited)
+    #expect(spoken.hasSuffix("Stopped on an error (Exit code 127)"))
+  }
+
+  @Test("In conversation, an agent that could not be launched says why over the conversation (#235)")
+  func launchFailureInConversation() {
+    #expect(
+      SessionDetailCover.of(
+        presentation: .conversation, isArchived: false, hasPane: false, hasLaunchFailure: true)
+        == .unavailable)
+    #expect(
+      SessionDetailCover.of(
+        presentation: .conversation, isArchived: false, hasPane: false, hasLaunchFailure: false)
+        == .none)
+    #expect(
+      SessionDetailCover.of(
+        presentation: .conversation, isArchived: true, hasPane: false, hasLaunchFailure: false)
+        == .none)
+    #expect(
+      SessionDetailCover.of(
+        presentation: .terminal, isArchived: false, hasPane: false, hasLaunchFailure: false)
+        == .unavailable)
+    #expect(
+      SessionDetailCover.of(
+        presentation: .terminal, isArchived: true, hasPane: false, hasLaunchFailure: false)
+        == .archived)
+    #expect(
+      SessionDetailCover.of(
+        presentation: .terminal, isArchived: false, hasPane: true, hasLaunchFailure: false)
+        == .none)
   }
 
   @Test("A clean exit is not a failure")

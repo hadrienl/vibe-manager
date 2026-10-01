@@ -260,7 +260,30 @@ public struct ConversationView: View {
       if model.isAgentWorking {
         ActivityLine(model: model)
       }
-      if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
+      if model.composerState == .stopped, model.hasStoppedOnError {
+        HStack {
+          Label {
+            Text(
+              "The agent stopped on an error. Its terminal says why.", bundle: .module,
+              comment: "Under a conversation whose agent ended on its own, not closed by the user.")
+          } icon: {
+            Image(systemName: "exclamationmark.triangle")
+          }
+          .font(theme.interfaceFont(size: 12.5))
+          .foregroundStyle(theme.secondaryText.color)
+          Spacer()
+          if let showTerminal = model.showTerminal {
+            Button(action: showTerminal) {
+              Text("Show the Terminal", bundle: .module)
+            }
+          }
+          if model.canRestart(), let restart = model.restart {
+            Button(action: restart) {
+              Text("Restart", bundle: .module)
+            }
+          }
+        }
+      } else if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
         HStack {
           Label {
             Text("The session is stopped. Its history stays readable.", bundle: .module)

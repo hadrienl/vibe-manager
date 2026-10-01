@@ -2690,6 +2690,17 @@
         }
       }
     },
+    "The agent stopped on an error. Its terminal says why." : {
+      "comment" : "Under a conversation whose agent ended on its own, not closed by the user.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent s’est arrêté sur une erreur. Son terminal dit pourquoi."
+          }
+        }
+      }
+    },
     "The first answer could not be used: it is asked once more." : {
       "localizations" : {
         "fr" : {

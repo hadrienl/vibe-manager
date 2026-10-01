@@ -957,9 +957,11 @@ public struct RootView: View {
       // An archived session has no pane by construction — archiving released it — so its own
       // card is what the column shows, rather than the "no terminal" message of a session
       // that simply has not been started.
-      if presentation == .conversation {
-        EmptyView()
-      } else if session.status == .archived {
+      let cover = SessionDetailCover.of(
+        presentation: presentation, isArchived: session.status == .archived,
+        hasPane: model.pane(for: session.id) != nil,
+        hasLaunchFailure: model.launchFailure(for: session.id) != nil)
+      if cover == .archived {
         let appearance = model.displayedAppearance(of: session)
         ArchivedSessionDetail(
           session: session, appearance: appearance,
@@ -967,7 +969,7 @@ public struct RootView: View {
         ) {
           Task { await model.restore(session.id) }
         }
-      } else if model.pane(for: session.id) == nil {
+      } else if cover == .unavailable {
         ContentUnavailableView {
           Label(session.name, systemImage: session.appearance.symbolName)
         } description: {
@@ -2103,6 +2105,8 @@ struct SessionRow: View {
         // What waits for the user is the one state set apart from the others by more than its
         // colour and its symbol.
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
+        // The exit code or the signal, for whoever wants it, behind words that say what happened.
+        .help(status.detail ?? "")
         .foregroundStyle(isRestoring ? Color.secondary : tint)
         .lineLimit(1)
       }
@@ -2376,6 +2380,26 @@ private func terminalTitle(
 @MainActor
 private func sessionRestart(for id: SessionID, in model: AppModel) -> () -> Void {
   { Task { await model.restart(id) } }
+}
+
+/// What covers the session's column, above its terminal or its conversation.
+enum SessionDetailCover: Equatable {
+  case none
+  /// The archived session's card: it has no pane by construction.
+  case archived
+  /// Why the session has no terminal: in conversation too when its agent could not be launched,
+  /// whose reason would otherwise be shown nowhere (#235).
+  case unavailable
+
+  static func of(
+    presentation: SessionPresentation, isArchived: Bool, hasPane: Bool, hasLaunchFailure: Bool
+  ) -> SessionDetailCover {
+    if presentation == .conversation {
+      return !hasPane && hasLaunchFailure ? .unavailable : .none
+    }
+    if isArchived { return .archived }
+    return hasPane ? .none : .unavailable
+  }
 }
 
 /// One session's terminal in the window's stack, shown or kept behind the one shown (#254).

@@ -244,6 +244,12 @@ public final class ConversationModel {
   /// that a view showing the composer follows it.
   @ObservationIgnored public var processRunning: () -> Bool = { false }
   public var isProcessRunning: Bool { processRunning() }
+  /// Whether the process ended on an error nobody asked for — an exit status other than 0, a
+  /// signal, a launch that failed — rather than closed by the user. Read like `processRunning`.
+  @ObservationIgnored public var endedOnError: () -> Bool = { false }
+  /// The session's agent stopped on its own, on an error: said apart from a session closed on
+  /// purpose, with the way to the terminal where the reason is (#235).
+  public var hasStoppedOnError: Bool { !isProcessRunning && endedOnError() }
   public var agentName = ""
   public var promptFormat = AgentPromptFormat()
   public var appearance = ConversationAppearance() {
