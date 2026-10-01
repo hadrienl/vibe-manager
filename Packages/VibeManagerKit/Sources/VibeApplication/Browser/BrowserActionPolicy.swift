@@ -88,22 +88,34 @@ public enum BrowserActionDecision: Equatable, Sendable {
 
 /// Whether an agent may do something to a page without asking (#69).
 ///
-/// Reading and moving around are free everywhere. Acting is free on this Mac — the preview the
-/// agent is building — and asked anywhere else, where it would act as the user. Pure: the whole
-/// rule is tested as a table.
+/// Moving around is free everywhere. Reading and acting are free on this Mac — the preview the
+/// agent is building — and asked anywhere else, where the page carries the user's cookies (#239):
+/// reading a site once allowed in the session is free for the rest of it; acting is asked each
+/// time, unless the site is always allowed. Pure: the whole rule is tested as a table.
 public enum BrowserActionPolicy {
   /// The schemes a tab may be sent to. `javascript:` and `data:` would run code or show content
   /// the agent made up under an address the user trusts: refused outright.
   public static let navigableSchemes: Set<String> = ["http", "https", "file", "about"]
 
+  /// - Parameter sessionReads: the sites the user let the session's agent read, by `grantKey`.
   public static func decide(
     _ action: BrowserActionClass,
     url: URL?,
-    grants: Set<String>
+    grants: Set<String>,
+    sessionReads: Set<String> = []
   ) -> BrowserActionDecision {
     switch action {
     case .read:
-      return .allow
+      guard let url else { return .allow }
+      guard let origin = BrowserOrigin(url: url) else {
+        return url.scheme?.lowercased() == "about" ? .allow : .ask
+      }
+      if origin.isLocal { return .allow }
+      // A site the user lets the agent act on, it lets it read.
+      if grants.contains(origin.grantKey) || sessionReads.contains(origin.grantKey) {
+        return .allow
+      }
+      return .ask
     case .navigate:
       guard let url else { return .allow }
       return decideNavigation(to: url)

@@ -12,13 +12,16 @@ public enum BrowserPermissionAnswer: Sendable {
   case deny
 }
 
-/// An agent waiting for the user: to act on a page away from this Mac, to download a file, or to
-/// open another application (#69).
+/// An agent waiting for the user: to read or act on a page away from this Mac (#69, #239), to
+/// download a file, or to open another application.
 public struct BrowserPermissionRequest: Identifiable, Hashable, Sendable {
   public enum Kind: Hashable, Sendable {
     /// `page_click`, `page_fill`, `page_evaluate`. `value` is what would be typed, masked in a
     /// sensitive field.
     case act(tool: String, target: String, value: String?)
+    /// `page_read`, `page_screenshot`, `page_console` on a site the session may not read yet:
+    /// allowed, the site stays readable for the rest of the session (#239).
+    case read(tool: String)
     case effect(BrowserAgentEffect)
   }
 
@@ -76,6 +79,7 @@ public final class BrowserWorkspace {
   @ObservationIgnored private let stateStore: any BrowserStateStore
   @ObservationIgnored private let logStore: any BrowserActionLogStore
   @ObservationIgnored private let saveDelay: Duration
+  @ObservationIgnored private var permissionsLoading: Task<Void, Never>?
 
   public init(
     stateStore: any BrowserStateStore = InMemoryBrowserStateStore(),
@@ -92,6 +96,17 @@ public final class BrowserWorkspace {
     self.configuration = configuration
     self.saveDelay = saveDelay
     grants = permissions.grants
+    // The store may read its sites in the background (the keychain, #239): the list Settings
+    // shows follows once it has. The policy reads the store itself, never this copy.
+    permissionsLoading = Task { [weak self, permissions] in
+      await permissions.loaded()
+      self?.grants = permissions.grants
+    }
+  }
+
+  /// Waits for the sites always allowed to have been read, and listed.
+  public func permissionsLoaded() async {
+    await permissionsLoading?.value
   }
 
   // MARK: - Sessions
@@ -167,6 +182,7 @@ public final class BrowserWorkspace {
   /// The session is archived: its pages are let go, what it was is kept.
   public func release(_ id: SessionID) {
     browsers[id]?.discardAll()
+    browsers[id]?.forgetReadableSites()
     cancelRequests(of: id)
   }
 
@@ -308,6 +324,9 @@ public final class BrowserWorkspace {
       guard let self, let tab, !tab.isPinnedTicket else { return }
       self.close(tab.id, in: id)
     }
+    tab.willLeaveThisMac = { [weak self] tab in
+      self?.bringForward(tab, in: id)
+    }
     tab.confirmAgentEffect = { [weak self] effect, tab in
       guard let self else { return false }
       let outcome = await self.ask(
@@ -315,6 +334,16 @@ public final class BrowserWorkspace {
       return outcome.isAllowed
     }
     return tab
+  }
+
+  /// A page the agent drives is about to load a site away from this Mac: it is the tab in front,
+  /// and the web view is shown as when the agent opens a page (#239).
+  func bringForward(_ tab: BrowserTabModel, in id: SessionID) {
+    guard let browser = browsers[id], browser.tab(tab.id) != nil else { return }
+    if browser.activeTab?.id != tab.id { browser.activate(tab.id) }
+    if !browser.isVisible, preferences.showsWebViewWhenAgentOpensPage {
+      setVisible(true, for: id)
+    }
   }
 
   func touch(_ tab: BrowserTabModel) {
@@ -384,13 +413,15 @@ public final class BrowserWorkspace {
     }
   }
 
+  /// - Parameter site: the site the answer is about, as a person reads it: the one decided on,
+  ///   which is not always the tab's own address — a blank page a site opened, a frame.
   func ask(
     _ kind: BrowserPermissionRequest.Kind, tab: BrowserTabModel, in id: SessionID,
-    grantKey: String?
+    grantKey: String?, site: String? = nil
   ) async -> AnswerOutcome {
     let request = BrowserPermissionRequest(
       id: UUID(), sessionID: id, tabID: tab.id, kind: kind,
-      site: tab.origin?.description ?? tab.url.absoluteString, grantKey: grantKey,
+      site: site ?? tab.origin?.description ?? tab.url.absoluteString, grantKey: grantKey,
       expiresAt: Date().addingTimeInterval(
         TimeInterval(Self.permissionTimeout.components.seconds)))
     pendingRequests.append(request)

@@ -69,7 +69,8 @@ public enum BrowserToolCatalog {
           "url": ["type": "string", "description": "http, https or file address."],
           "activate": [
             "type": "boolean",
-            "description": "Bring the tab to the front. Default true.",
+            "description":
+              "Bring the tab to the front. Default true. A page away from this Mac always opens in front.",
           ],
         ], required: ["url"], namesTab: false)),
     Tool(
@@ -98,7 +99,8 @@ public enum BrowserToolCatalog {
       description: """
         Reads a page. mode "snapshot" (default) lists its visible elements with references \
         ([e12] button "Save") for page_click and page_fill; mode "text" gives its text. \
-        Bounded by maxChars.
+        Bounded by maxChars. Free on this Mac; the first read of a site anywhere else in this \
+        session waits for the user's answer in Vibe Manager.
         """ + untrusted,
       inputSchema: schema([
         "mode": ["type": "string", "enum": ["snapshot", "text"]],

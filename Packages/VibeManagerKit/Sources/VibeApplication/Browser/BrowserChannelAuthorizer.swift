@@ -52,6 +52,10 @@ public struct SessionProcess: Hashable, Sendable {
 /// script it runs — all of them descend from the session's terminal, and are accepted for that
 /// session alone. A process that left the tree (a daemon that forked twice, and was taken in by
 /// `launchd`) is refused, and that is written down as the one limit of the rule.
+///
+/// Every descendant is accepted by choice (#239): a script could start the signed bridge itself, so
+/// checking a signature would guard nothing. What a descendant may do to a signed-in site is asked
+/// of the user.
 public enum BrowserChannelAuthorizer {
   /// - Parameter lineage: the connecting process first, then its parent, and so on up to
   ///   `launchd`, as far as it could be read.

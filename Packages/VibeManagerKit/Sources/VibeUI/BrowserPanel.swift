@@ -888,7 +888,12 @@ private struct BrowserPermissionBanner: View {
         Button {
           answer(.allowOnce)
         } label: {
-          Text("Allow Once", bundle: .module)
+          if case .read = request.kind {
+            // A site read once is read for the rest of the session: the button says so.
+            Text("Allow in This Session", bundle: .module)
+          } else {
+            Text("Allow Once", bundle: .module)
+          }
         }
         .buttonStyle(.borderedProminent)
       }
@@ -925,6 +930,15 @@ private struct BrowserPermissionBanner: View {
       default:
         return Text("The agent wants to click \(target) on \(request.site).", bundle: .module)
       }
+    case .read(let tool):
+      switch tool {
+      case "page_screenshot":
+        return Text("The agent wants to capture a page of \(request.site).", bundle: .module)
+      case "page_console":
+        return Text("The agent wants to read the console of \(request.site).", bundle: .module)
+      default:
+        return Text("The agent wants to read a page of \(request.site).", bundle: .module)
+      }
     case .effect(.download(let filename)):
       return Text("The agent’s action downloads “\(filename)”.", bundle: .module)
     case .effect(.externalApplication(let url)):
@@ -945,13 +959,22 @@ private struct BrowserPermissionBanner: View {
         + Text(verbatim: " · ") + expiry
     case .act(let tool, let target, nil) where tool == "page_evaluate":
       return Text(verbatim: target + " · ") + expiry
+    case .read:
+      return Text(
+        "If you allow it, it can read \(request.site) for the rest of this session — including what you see there once signed in — and use it in what it does.",
+        bundle: .module) + Text(verbatim: " · ") + expiry
     default:
       return expiry
     }
   }
 
   private var expiry: Text {
-    Text(
+    if case .read = request.kind {
+      return Text(
+        "Nothing is read unless you allow it; the request expires \(request.expiresAt, style: .relative).",
+        bundle: .module)
+    }
+    return Text(
       "Nothing is done unless you allow it; the request expires \(request.expiresAt, style: .relative).",
       bundle: .module)
   }

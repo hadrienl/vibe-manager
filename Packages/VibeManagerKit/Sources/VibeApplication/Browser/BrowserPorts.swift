@@ -22,9 +22,16 @@ public protocol BrowserActionLogStore: Sendable {
 /// Mac.
 @MainActor
 public protocol BrowserPermissionStore: AnyObject {
+  /// The sites as far as they are known: none until the store has been read.
   var grants: Set<String> { get }
   func grant(_ key: String)
   func revoke(_ key: String)
+  /// Waits for the store to have been read, for whoever shows the list.
+  func loaded() async
+}
+
+extension BrowserPermissionStore {
+  public func loaded() async {}
 }
 
 /// The choices of Settings › Web View.

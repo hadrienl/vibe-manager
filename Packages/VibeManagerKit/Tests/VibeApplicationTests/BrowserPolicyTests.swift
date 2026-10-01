@@ -6,10 +6,12 @@ import VibeDomain
 
 @Suite("What an agent may do in a web view without asking")
 struct BrowserPolicyTests {
-  private func decide(_ action: BrowserActionClass, _ address: String, grants: Set<String> = [])
-    -> BrowserActionDecision
-  {
-    BrowserActionPolicy.decide(action, url: URL(string: address), grants: grants)
+  private func decide(
+    _ action: BrowserActionClass, _ address: String, grants: Set<String> = [],
+    sessionReads: Set<String> = []
+  ) -> BrowserActionDecision {
+    BrowserActionPolicy.decide(
+      action, url: URL(string: address), grants: grants, sessionReads: sessionReads)
   }
 
   @Test(
@@ -43,9 +45,41 @@ struct BrowserPolicyTests {
     #expect(decide(.act, "https://github.com:8443/o/r", grants: grants) == .ask)
   }
 
-  @Test("Reading is free everywhere")
-  func reading() {
-    #expect(decide(.read, "https://mail.example.com/inbox") == .allow)
+  @Test(
+    "Reading this Mac is free",
+    arguments: [
+      "http://localhost:5173/", "http://127.0.0.1:8080", "http://[::1]:4000/",
+      "file:///tmp/index.html", "about:blank",
+    ])
+  func localReadIsFree(address: String) {
+    #expect(decide(.read, address) == .allow)
+  }
+
+  @Test(
+    "Reading a site away from this Mac is asked, where the user is signed in (#239)",
+    arguments: [
+      "https://mail.example.com/inbox", "https://github.com/acme/private/issues/1",
+      "http://0.0.0.0:8000/", "http://192.168.1.10/", "http://localhost@evil.com/",
+      "http://[::ffff:127.0.0.1]:8000/",
+    ])
+  func remoteReadIsAsked(address: String) {
+    #expect(decide(.read, address) == .ask)
+  }
+
+  @Test("A read allowed in the session covers its site, and only its site")
+  func sessionReads() {
+    let reads: Set<String> = ["https://github.com"]
+    #expect(decide(.read, "https://github.com/o/r", sessionReads: reads) == .allow)
+    #expect(decide(.read, "https://gist.github.com/x", sessionReads: reads) == .ask)
+    #expect(decide(.read, "http://github.com/o/r", sessionReads: reads) == .ask)
+    #expect(decide(.read, "https://github.com:8443/o/r", sessionReads: reads) == .ask)
+    // Reading is not acting.
+    #expect(decide(.act, "https://github.com/o/r", sessionReads: reads) == .ask)
+  }
+
+  @Test("A site always allowed to act on may be read")
+  func grantsCoverReads() {
+    #expect(decide(.read, "https://github.com/o/r", grants: ["https://github.com"]) == .allow)
   }
 
   @Test("A tab may go to the web and to local files, never to code in an address")
@@ -93,6 +127,9 @@ struct BrowserChannelAuthorizerTests {
     ]
   }
 
+  /// Kept by choice (#239, ADR 0023): `vibe browser`, `BROWSER` and a script the agent runs speak
+  /// for the session, and a script could start the signed bridge itself anyway. What guards the
+  /// user is the question before reading or acting on a signed-in site, not who asks.
   @Test("The agent's child and grandchild belong to its session")
   func descendants() {
     let bridge = [entry(101, parent: 100, at: 11), entry(100, parent: 50, at: 10)]

@@ -94,6 +94,9 @@ public final class BrowserTabModel: NSObject, Identifiable {
   /// Asked before a download or another application's address that an agent caused.
   @ObservationIgnored var confirmAgentEffect:
     (@MainActor (_ kind: BrowserAgentEffect, _ tab: BrowserTabModel) async -> Bool)?
+  /// Told before the page leaves for a site away from this Mac while it is the agent's
+  /// (`asksBeforeEffects`), so that such a page never loads out of sight (#239).
+  @ObservationIgnored var willLeaveThisMac: (@MainActor (BrowserTabModel) -> Void)?
   /// What the page does counts as the agent's doing: from the tab's opening by the agent, or the
   /// agent's first action on it, until the user clicks in the page or types into it (#241). A
   /// click the agent dispatches is no event of AppKit's and never hands the tab back. Kept between
@@ -495,6 +498,10 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
 
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
     committedURL = webView.url
+    // A redirection the policy was not asked about still comes to the front once it commits.
+    if let url = webView.url, BrowserWorkspace.isRemote(url), asksBeforeEffects {
+      willLeaveThisMac?(self)
+    }
     (webView as? SessionWebView)?.hoveredLink = nil
     console.reset()
     stopRetrying()
@@ -546,6 +553,13 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     {
       openInNewTab?(target, false, activate)
       return (.cancel, preferences)
+    }
+    // A page the agent drives never goes to a site away from this Mac out of sight: brought to
+    // the front before the request leaves, redirections included (#239).
+    if navigationAction.targetFrame?.isMainFrame ?? true, BrowserWorkspace.isRemote(target),
+      asksBeforeEffects
+    {
+      willLeaveThisMac?(self)
     }
     if ["http", "https", "file", "about", "blob", "data"].contains(scheme) {
       // `data:` and `blob:` are refused as a top-level destination by the agent's tools, but a

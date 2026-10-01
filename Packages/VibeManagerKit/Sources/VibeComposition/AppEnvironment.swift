@@ -200,10 +200,18 @@ public final class AppEnvironment {
     // its cookies in a website data store of this copy's own.
     let hostLocation = TerminalHostLocation(dataDirectory: dataFolder)
     let browserSettings = UserDefaultsBrowserSettings(suiteName: data.defaultsSuite)
+    // The sites always allowed in the web view, in the keychain where no script can add one
+    // (#239); the list the user defaults held is forgotten.
+    let browserGrants = VaultBrowserPermissionStore(
+      vault: KeychainBrowserGrantVault(
+        service: (Bundle.main.bundleIdentifier ?? "eu.hadrien.VibeManager") + ".browser-grants",
+        account: data.defaultsSuite ?? "standard"),
+      legacyDefaults: data.defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard,
+      log: diagnostics.log)
     let browserStore = FileBrowserStore(
       directory: dataFolder.appendingPathComponent("Browser", isDirectory: true))
     let browser = BrowserWorkspace(
-      stateStore: browserStore, logStore: browserStore, permissions: browserSettings,
+      stateStore: browserStore, logStore: browserStore, permissions: browserGrants,
       preferences: browserSettings,
       configuration: BrowserWebConfiguration(
         storeIdentifierFile: dataFolder.appendingPathComponent("browser-store-identifier")))
