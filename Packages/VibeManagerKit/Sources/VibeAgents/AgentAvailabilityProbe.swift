@@ -564,19 +564,13 @@ enum AgentDiagnosticFactory {
         .update(minimumVersion: required, documentationURL: hints.documentationURL),
         .retryDetection,
       ]
-    case .notFound:
-      return [
-        .install(documentationURL: hints.documentationURL), .defineExecutablePath, .retryDetection,
-      ]
-    case .notExecutable:
-      return [.defineExecutablePath, .retryDetection]
+    case .notFound, .notExecutable:
+      // Installing again also repairs an executable that cannot be run.
+      return [.install(documentationURL: hints.documentationURL), .retryDetection]
     case .unauthenticated:
       return [.authenticate(command: hints.authenticationCommandLine), .retryDetection]
-    case .probeFailed(let reason):
-      // Retrying explains nothing anywhere else, so it comes last. Here it is the explanation.
-      return reason.isTransient
-        ? [.retryDetection, .defineExecutablePath]
-        : [.defineExecutablePath, .retryDetection]
+    case .probeFailed:
+      return [.retryDetection]
     }
   }
 }
