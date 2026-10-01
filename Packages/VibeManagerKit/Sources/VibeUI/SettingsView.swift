@@ -39,8 +39,11 @@ public struct SettingsView: View {
           PrivacySettingsView(permissions: permissions, sessionName: model.sessionName(for:))
             .settingsPage(.privacy)
         }
-        PromptTemplatesView(model: model.templates)
-          .settingsPage(.templates)
+        PromptTemplatesView(
+          model: model.templates, themes: model.conversations.themes,
+          conversationAppearance: model.conversations.appearance
+        )
+        .settingsPage(.templates)
         if let browser = model.browser {
           WebViewSettings(browser: browser)
             .settingsPage(.webView)
