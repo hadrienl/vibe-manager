@@ -65,7 +65,8 @@ struct SessionLauncherRuntimeTests {
     let supervisor = OutputSupervisor()
     let launcher = launcher([session], supervisor: supervisor)
     await launcher.launch(session: session, plan: plan())
-    let pane = try? #require(launcher.pane(for: session.id))
+    let pane = launcher.pane(for: session.id)
+    #expect(pane != nil)
     #expect(pane?.wasStoppedOnPurpose == false)
 
     await launcher.stopAll(gracePeriod: .zero)

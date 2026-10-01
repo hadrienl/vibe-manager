@@ -31,7 +31,8 @@ struct ConversationStopReportTests {
         workingDirectoryURL: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)),
       viewportTimeout: .zero)
     await pane.start()
-    let failure = try? #require(pane.failure)
+    let failure = pane.failure
+    #expect(failure != nil)
 
     let conversation = ConversationModel(sessionID: SessionID())
     conversation.processRunning = { false }
