@@ -42,4 +42,21 @@ struct AppModelLinkTests {
     model.openLink(url, from: session, gesture: .newTab)
     #expect(browser.browser(for: session).tabs.map(\.url) == [url, url])
   }
+
+  @Test("Open in Browser hands a page to macOS, and never a file that would run (#245)")
+  func openOutsideRunsNothing() {
+    let (model, _) = makeModel()
+    var opened: [URL] = []
+    model.openOutsideHandler = { opened.append($0) }
+    let script = URL(fileURLWithPath: "/tmp/x.command")
+    let page = URL(string: "https://github.com/o/r/pull/3")!
+
+    #expect(!model.opensOutside(script))
+    model.openOutside(script)
+    #expect(opened.isEmpty)
+
+    #expect(model.opensOutside(page))
+    model.openOutside(page)
+    #expect(opened == [page])
+  }
 }

@@ -1,0 +1,13 @@
+# The workflows' actions are pinned to a commit, their tag in a comment (#245): Dependabot proposes
+# each new release as a pull request that moves both, a week after it came out: a release
+# compromised on its first day is usually withdrawn before then.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci

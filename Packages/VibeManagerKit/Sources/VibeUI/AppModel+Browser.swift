@@ -227,10 +227,25 @@ extension AppModel {
     case .newTab:
       openInNewTab(url, from: id)
     case .browser, .system:
-      NSWorkspace.shared.open(url)
+      openOutsideHandler(url)
     case .refused:
       NSSound.beep()
     }
+  }
+
+  /// « Open in Browser » and « Open Page in Browser » (#245): a page goes to the default browser, a
+  /// mail address to the mail application, and anything else — a tab showing `file:///…/x.command`
+  /// — is not run; its buttons are greyed (`opensOutside`), and a beep answers what gets through.
+  public func openOutside(_ url: URL) {
+    switch LinkRouting.externalRoute(for: url) {
+    case .browser, .system: openOutsideHandler(url)
+    case .refused, .webView, .newTab: NSSound.beep()
+    }
+  }
+
+  /// Whether `openOutside` opens the address somewhere.
+  public func opensOutside(_ url: URL) -> Bool {
+    LinkRouting.opensOutside(url)
   }
 
   /// Whether the session has a web view a link can open in: not when archived.

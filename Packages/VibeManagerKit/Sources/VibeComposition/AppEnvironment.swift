@@ -619,6 +619,9 @@ public final class AppEnvironment {
     let directory = location.directory.appendingPathComponent("bin", isDirectory: true)
     let quoted = "'" + executable.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
     let flag = BrowserBridge.commandLineFlag
+    // Opens outside: the agent's own `open` command, which it could run itself; only its web
+    // addresses are kept for the session's web view.
+    let systemOpen = "/usr/bin/open"
     let scripts = [
       "vibe": "#!/bin/sh\nexec \(quoted) \(flag) \"$@\"\n",
       "open": """
@@ -631,7 +634,7 @@ public final class AppEnvironment {
             ;;
         esac
       fi
-      exec /usr/bin/open "$@"
+      exec \(systemOpen) "$@"
 
       """,
     ]

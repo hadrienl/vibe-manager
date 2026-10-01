@@ -63,6 +63,7 @@ public final class PermissionsModel {
     gate: FullDiskAccessGate,
     control: (any AgentRunnerControl)? = nil,
     restartHost: RestartAgentHost? = nil,
+    // Opens outside: the constant address of System Settings' Full Disk Access.
     openURL: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) },
     now: @escaping @MainActor () -> Date = Date.init
   ) {
@@ -159,6 +160,7 @@ public final class PermissionsModel {
   /// good by clicking there and then changing their mind.
   public func openSystemSettings() {
     awaitsGrantUntil = now().addingTimeInterval(Self.grantWatchDuration)
+    // Opens outside: the constant address of System Settings' Full Disk Access.
     openURL(Self.fullDiskAccessSettingsURL)
   }
 
