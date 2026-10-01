@@ -232,22 +232,6 @@ struct ComposerCommandsTests {
   }
 
   @Test(
-    "Leaving for the terminal ends the panel's block, and the command is no longer waited for",
-    .timeLimit(.minutes(1)))
-  func leavingForTheTerminal() async {
-    let (model, terminal) = await readyModel()
-    model.draft = "/mcp"
-    #expect(await model.send())
-    await until { model.terminalPanel != nil }
-    terminal.written = []
-    model.leaveTerminalPanel()
-    #expect(model.terminalPanel == nil)
-    #expect(model.echoes.isEmpty)
-    // Nothing typed: the panel is finished in the terminal.
-    #expect(terminal.written.isEmpty)
-  }
-
-  @Test(
     "Read for the first time, the list opens at once and says it is on its way",
     .timeLimit(.minutes(1)))
   func firstReading() async {
@@ -317,6 +301,25 @@ struct ComposerCommandsTests {
     stopped.processRunning = { true }
     stopped.processStateChanged()
     #expect(stopped.terminalPanel?.command == "/model")
+  }
+
+  @Test("A session started on a command finds its panel even if the agent seemed to work first")
+  func initialPromptAfterStart() async {
+    let (model, _) = await readyModel()
+    model.activity = .working
+    model.expectTerminalPanel(forInitialPrompt: "/mcp")
+    #expect(model.terminalPanel == nil)
+    model.activity = nil
+    #expect(model.terminalPanel?.command == "/mcp")
+    model.activity = .working
+    #expect(model.terminalPanel == nil)
+    model.activity = nil
+    #expect(model.terminalPanel?.command == "/mcp")
+    // Seen: looked for no more.
+    model.terminalScreenChanged("Manage MCP servers\nEsc to cancel")
+    model.activity = .working
+    model.activity = nil
+    #expect(model.terminalPanel == nil)
   }
 
   @Test("Another agent's list is not kept: a reading for the one before is dropped")

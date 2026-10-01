@@ -107,6 +107,8 @@ public struct TerminalSurface: NSViewRepresentable {
 private enum TerminalCommand: Sendable {
   case write([UInt8])
   case resize(TerminalSize)
+  /// Back on screen: the view's size, given to the process only if another view changed it.
+  case reclaim(TerminalSize)
 }
 
 @MainActor
@@ -207,6 +209,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
           } else {
             await pane.reportViewportSize(size)
           }
+        case .reclaim(let size):
+          await pane.reclaimProcessSize(size, isMirror: self.isMirror)
         }
       }
     }
@@ -264,12 +268,9 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     stopSuspension()
   }
 
-  /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
-  /// that kept the first responder would quietly receive what was typed for its neighbour.
-  ///
-  /// Only a *change* of activation moves the keyboard. Claiming it on every update would fight
-  /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
-  /// active terminal would steal the focus back from the sidebar mid-keystroke.
+  /// Whether the view was on screen at the last update: `nil` before the first.
+  private var wasShown: Bool?
+
   /// The activation last asked for, acted on again when a mirror joins its window.
   private var requestedActivation: (isActive: Bool, claimingKeyboard: Bool)?
 
@@ -281,6 +282,12 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       following: requested.isActive, claimingKeyboard: requested.claimingKeyboard, in: view)
   }
 
+  /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
+  /// that kept the first responder would quietly receive what was typed for its neighbour.
+  ///
+  /// Only a *change* of activation moves the keyboard. Claiming it on every update would fight
+  /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
+  /// active terminal would steal the focus back from the sidebar mid-keystroke.
   func followActivation(_ isActive: Bool, claimingKeyboard: Bool = true, in view: TerminalView) {
     requestedActivation = (isActive, claimingKeyboard)
     // Every pane stays mounted, and a pane at zero opacity is still drawn: each busy agent behind
@@ -301,8 +308,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     }
     // Hidden, it is still fed for a while, then suspended; shown, it catches up (#248).
     if isActive {
+      // Another view of the same terminal may have sized the process meanwhile (#219).
+      if wasShown == false {
+        let terminal = view.getTerminal()
+        commands.yield(.reclaim(TerminalSize(columns: terminal.cols, rows: terminal.rows)))
+      }
+      wasShown = true
       resumeIfSuspended()
     } else {
+      wasShown = false
       scheduleSuspension()
     }
   }
@@ -337,7 +351,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     guard lastFocusRequest != request else { return }
     let isFirstSight = lastFocusRequest == nil
     lastFocusRequest = request
-    let isWaiting = pane.takePendingFocusRequest()
+    // A mirror's requests are its own: the terminal's own view keeps the pane's.
+    let isWaiting = isMirror ? false : pane.takePendingFocusRequest()
     if isFirstSight, !claimingOnFirstSight, !isWaiting { return }
     if isActive { window.makeFirstResponder(view) }
   }
@@ -678,7 +693,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
       try? await Task.sleep(for: .milliseconds(100))
       guard let self else { return }
       self.screenReport = nil
-      guard let view = self.view, let onScreen = self.onScreen else { return }
+      // Put away, its screen tells nothing: the program redraws for the view shown instead.
+      guard let view = self.view, !view.isHidden, let onScreen = self.onScreen else { return }
       onScreen(TerminalText.visibleScreen(of: view.getTerminal()))
     }
   }

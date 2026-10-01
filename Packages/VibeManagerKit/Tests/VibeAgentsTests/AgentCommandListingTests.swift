@@ -287,3 +287,39 @@ struct CodexCommandListingTests {
     #expect(list.problems.count == 1)
   }
 }
+
+@Suite("A session started on a command of its CLI (#219)")
+struct InitialCommandDeliveryTests {
+  private let descriptor = ClaudeCodeAgentProvider.descriptor
+
+  @Test("A command alone is typed once the agent is ready; any other prompt is an argument")
+  func delivery() throws {
+    #expect(
+      try AgentLaunchValidation.promptDelivery(for: "  /mcp ", descriptor: descriptor)
+        == .typedOnceReady("/mcp"))
+    #expect(
+      try AgentLaunchValidation.promptDelivery(
+        for: "/prisme-ai:debug-events 3f2c", descriptor: descriptor)
+        == .typedOnceReady("/prisme-ai:debug-events 3f2c"))
+    #expect(
+      try AgentLaunchValidation.promptDelivery(for: "/review\nthen fix", descriptor: descriptor)
+        == .argument)
+    #expect(
+      try AgentLaunchValidation.promptDelivery(for: "fix /tmp/a", descriptor: descriptor)
+        == .argument)
+    #expect(try AgentLaunchValidation.promptDelivery(for: "/", descriptor: descriptor) == .argument)
+  }
+
+  @Test("Claude Code and Codex are not given a command typed later")
+  func arguments() throws {
+    let request = AgentLaunchRequest(workingDirectoryPath: "/tmp/a", initialPrompt: "/mcp")
+    let claude = try ClaudeCodeArgumentBuilder().arguments(
+      for: request, promptDelivery: .typedOnceReady("/mcp"),
+      descriptor: ClaudeCodeAgentProvider.descriptor)
+    #expect(!claude.contains("/mcp"))
+    let codex = try CodexArgumentBuilder().arguments(
+      for: request, promptDelivery: .typedOnceReady("/mcp"),
+      descriptor: CodexAgentProvider.descriptor)
+    #expect(!codex.contains("/mcp"))
+  }
+}

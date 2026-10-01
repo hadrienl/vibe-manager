@@ -178,6 +178,11 @@ struct PromptComposer: View {
     // existed, it is honoured when it appears (#105).
     .onAppear { takePendingFocusRequest() }
     .onChange(of: model.focusComposerRequest) { takePendingFocusRequest() }
+    // A panel's block takes the keyboard: the field lets it go, or SwiftUI would take it back
+    // (#219).
+    .onChange(of: model.terminalPanel != nil) { _, isOpen in
+      if isOpen { isFocused = false }
+    }
     .onChange(of: isActive) { takePendingFocusRequest() }
   }
 

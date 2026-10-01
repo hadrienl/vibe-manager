@@ -286,3 +286,26 @@ func mirrorSizesTheProcess() async throws {
   await model.restorePrimaryViewportSize()
   #expect(await session.resizes.suffix(2) == [block, own])
 }
+
+@MainActor
+@Test("A view back on screen gives the process its size again, only if another view changed it")
+func viewBackOnScreen() async throws {
+  let id = TerminalID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+  let own = TerminalSize(columns: 160, rows: 48)
+  await model.reportViewportSize(own)
+  await model.start()
+  let session = try #require(await supervisor.session(for: id) as? FakeTerminalSession)
+  let before = await session.resizes.count
+  await model.reclaimProcessSize(own, isMirror: false)
+  #expect(await session.resizes.count == before)
+  let block = TerminalSize(columns: 100, rows: 24)
+  await model.reportMirrorViewportSize(block)
+  await model.reclaimProcessSize(own, isMirror: false)
+  #expect(await session.resizes.suffix(2) == [block, own])
+  await model.reclaimProcessSize(block, isMirror: true)
+  #expect(await session.resizes.last == block)
+  #expect(model.viewportSize == own)
+}

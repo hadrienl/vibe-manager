@@ -32,6 +32,18 @@ public enum PromptDelivery: Hashable, Sendable {
   case none
   case argument
   case standardInput(String)
+  /// A command of the CLI — `/mcp` — typed into its prompt once it is ready, as the composer
+  /// sends one (#219). Given as an argument, Claude Code runs it before it has read its MCP
+  /// servers, and `/mcp` says there are none.
+  case typedOnceReady(String)
+
+  /// The command to type once the agent is ready, for a prompt that is one.
+  public static func command(in prompt: String) -> String? {
+    let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.hasPrefix("/"), trimmed.count > 1, !trimmed.contains(where: \.isNewline)
+    else { return nil }
+    return trimmed
+  }
 }
 
 public struct AgentLaunchPlan: Hashable, Sendable {

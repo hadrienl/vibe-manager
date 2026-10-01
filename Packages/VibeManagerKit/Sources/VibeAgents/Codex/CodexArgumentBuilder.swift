@@ -33,7 +33,7 @@ public struct CodexArgumentBuilder: CommandLineAgentArgumentBuilder {
     arguments.append(contentsOf: ["-C", request.workingDirectoryPath])
 
     switch promptDelivery {
-    case .none:
+    case .none, .typedOnceReady:
       break
     case .argument:
       positionals.append(request.initialPrompt ?? "")

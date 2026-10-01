@@ -303,6 +303,13 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       processDidStart?(session.id, processIdentifier)
     }
     startedAt[session.id] = launchedAt
+    if case .typedOnceReady(let command) = plan.promptDelivery {
+      let id = session.id
+      let providerID = plan.providerID
+      Task { [weak self] in
+        await self?.type(command, into: id, once: terminal, isReadyFor: providerID)
+      }
+    }
     // Not waited for: a drawer left open comes back with its session, and its shells take their
     // own time to start.
     let startedID = session.id
@@ -317,6 +324,42 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
         "duration": .duration(ContinuousClock.now - launchedAt),
       ])
     return .started
+  }
+
+  /// How long an agent's hooks are waited for before its initial command is typed all the same.
+  static let commandReadinessLimit = Duration.seconds(6)
+  /// Once the agent is ready, before its command is typed: Claude Code connects its MCP servers
+  /// after it started.
+  static let commandSettleDelay = Duration.milliseconds(1_500)
+
+  /// Types a session's initial command once its agent is ready — its hooks have spoken, or a
+  /// few seconds went by — as the composer sends one (#219). The process replaced meanwhile
+  /// gets nothing.
+  private func type(
+    _ command: String, into id: SessionID, once terminal: any TerminalSession,
+    isReadyFor providerID: AgentProviderID
+  ) async {
+    let clock = ContinuousClock()
+    let deadline = clock.now + Self.commandReadinessLimit
+    while clock.now < deadline {
+      if case .structured = await activity?.state(for: id)?.source { break }
+      try? await Task.sleep(for: .milliseconds(200))
+    }
+    try? await Task.sleep(for: Self.commandSettleDelay)
+    guard let pane = pane(for: id), let current = pane.session, current === terminal else {
+      return
+    }
+    let format =
+      (await agents.provider(id: providerID) as? any AgentConversationReporting)?.promptFormat
+      ?? AgentPromptFormat()
+    let keystrokes = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: command), format: format, whileWorking: false)
+    for (index, keys) in keystrokes.writes.enumerated() {
+      if index > 0 { try? await Task.sleep(for: keystrokes.delay(before: index)) }
+      await pane.write(keys)
+    }
+    try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
+    await pane.write(keystrokes.submit)
   }
 
   /// From the launch to the first byte the agent writes, for Instruments.

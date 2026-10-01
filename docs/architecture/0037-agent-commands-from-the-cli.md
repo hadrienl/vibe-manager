@@ -77,6 +77,37 @@ read. The order within each group (skills first, then commands) is:
 4. a name that contains it;
 5. a description that contains it.
 
+### A panel of the CLI is shown in its own terminal
+
+Some commands answer with a panel of the terminal UI, not in the transcript: `/mcp`, `/model` without
+an argument. Nothing of such a panel is drawn again here. The conversation shows the session's
+terminal itself, as a second view of it (`TerminalSurface(isMirror:)`), in a block above the composer.
+- **Opening.** The block opens when a `/` command sent from the composer is still not written to the
+  transcript 0.6 s later. It also opens for a session started on a command: see "A command as the
+  initial prompt" below. The block takes the keyboard; the composer lets go of its SwiftUI focus first,
+  or SwiftUI would give it back.
+- **Closing.** The CLIs write nothing of a panel closed with Escape, so the block reads the last lines
+  of its screen (`AgentPanelRecognition`). Every panel ends on the keys that close it ("Esc to cancel"
+  in Claude Code 2.1.285, "esc back" in Codex 0.159.2), which neither prompt shows at rest or at work
+  ("esc to interrupt"). The block closes when one of these happens:
+  - the panel was seen, then gone for 0.8 s;
+  - no panel was seen after 4 s (10 s for an agent starting);
+  - the agent starts working;
+  - the user presses Escape in the block, or clicks Close. Both type Escape into the panel. Escape is
+    caught by a local event monitor, as SwiftTerm's key handling cannot be overridden.
+- **Sizes.** The mirror sizes the process to itself while it is shown. A view coming back on screen
+  gives the process its own size again, and only if another view changed it, since each new size makes
+  the program redraw. A hidden mirror does not read its screen, which is then the other view's redraw.
+  Going to the terminal and back leaves an open panel's block in place.
+
+### A command as the initial prompt
+
+Given as an argument, Claude Code runs a command before it has read its MCP servers: `/mcp` then says
+there are none. A one-line `/` prompt is therefore delivered as `PromptDelivery.typedOnceReady`. The CLI
+is started without it, and `SessionLauncher` types it as the composer would. It does so once the
+agent's hooks have spoken (6 s at most), then 1.5 s later. This holds for every first launch: a new
+session, a planned one started later, or an agent switch.
+
 ### Sending is unchanged
 
 The text sent is the text shown. Measured: Claude Code runs a command that is typed to it, and Codex
