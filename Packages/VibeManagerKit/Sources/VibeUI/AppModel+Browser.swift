@@ -114,6 +114,13 @@ extension AppModel {
     addressBarFocusRequest += 1
   }
 
+  /// New Tab — the “+” of the tab bar, and ⌘T while the web view holds the keyboard (#247): the
+  /// address bar takes it, and what is typed there opens in a tab of its own.
+  public func newWebTab() {
+    focusAddressBar()
+    opensNewWebTab = true
+  }
+
   /// The tab in front of the selected session.
   public var activeWebTab: BrowserTabModel? {
     selectedBrowser?.activeTab
@@ -179,6 +186,11 @@ extension AppModel {
 
   /// Sends the tab in front to an address typed in the address bar.
   public func navigateWebTab(to text: String) {
+    if opensNewWebTab {
+      opensNewWebTab = false
+      openInWebView(text)
+      return
+    }
     guard let tab = activeWebTab else {
       openInWebView(text)
       return

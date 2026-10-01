@@ -198,6 +198,32 @@ struct CloseCommandRoutingTests {
     #expect(model.sessions.first?.status == .active, "\(workspace.state)")
   }
 
+  @Test("New Tab opens what is typed beside the page in front; ⌘L still sends that page away")
+  func newTabOpensBeside() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let model = workspace.model
+    let front = try #require(model.activeWebTab)
+    let address = front.url
+
+    // The “+” of the tab bar, the Web menu's New Tab and ⌘T in the web view (#247).
+    model.newWebTab()
+    try await waitUntil("the address bar holding the keyboard", in: workspace) {
+      model.isAddressBarFocused
+    }
+    model.navigateWebTab(to: "about:blank")
+    try await waitUntil("a fourth tab", in: workspace) { workspace.tabs.count == 4 }
+    #expect(front.url == address, "\(workspace.state)")
+
+    // Open Location, ⌘L, is unchanged: what is typed replaces the page in front.
+    model.focusAddressBar()
+    try await waitUntil("the address bar holding the keyboard", in: workspace) {
+      model.isAddressBarFocused
+    }
+    model.navigateWebTab(to: "about:blank")
+    #expect(workspace.tabs.count == 4, "\(workspace.state)")
+  }
+
   @Test("Another tab brought forward takes the keyboard the page had")
   func switchingTabsKeepsTheKeyboard() async throws {
     let workspace = try await workspace()

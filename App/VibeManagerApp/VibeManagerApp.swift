@@ -53,6 +53,9 @@ struct VibeManagerApp: App {
   /// How long a help tag waits before showing, in milliseconds. The system's own delay is long
   /// enough that the small buttons of the sidebar's foot read as unlabelled. Registered as a
   /// default, so a value the user set with `defaults write` still wins.
+  /// The workspace's window, opened again by ⌘N once closed (#247).
+  static let workspaceWindowID = "workspace"
+
   private static let toolTipDelay = 400
 
   init() {
@@ -60,7 +63,7 @@ struct VibeManagerApp: App {
   }
 
   var body: some Scene {
-    WindowGroup {
+    WindowGroup(id: Self.workspaceWindowID) {
       RootView(model: environment.appModel)
         .onAppear {
           appDelegate.environment = environment
@@ -96,11 +99,7 @@ struct VibeManagerApp: App {
       }
 
       CommandGroup(replacing: .newItem) {
-        Button("New Session") {
-          environment.appModel.beginNewSession()
-        }
-        .keyboardShortcut("n", modifiers: .command)
-        .disabled(!environment.appModel.canCreateSession)
+        NewSessionButton(model: environment.appModel, focus: windowFocus)
 
         TemplateCommands(model: environment.appModel)
       }
@@ -196,11 +195,20 @@ struct VibeManagerApp: App {
         .keyboardShortcut("j", modifiers: .command)
         .disabled(!environment.appModel.canToggleDrawer)
 
-        Button("New Terminal") {
-          environment.appModel.newDrawerTerminal()
+        // ⌘T follows the keyboard, like ⌘W (#165): in the web view a new tab, as in a browser
+        // (#247); anywhere else a new side terminal.
+        if environment.appModel.closesWebTab {
+          Button("New Tab") {
+            environment.appModel.newWebTab()
+          }
+          .keyboardShortcut("t", modifiers: .command)
+        } else {
+          Button("New Terminal") {
+            environment.appModel.newDrawerTerminal()
+          }
+          .keyboardShortcut("t", modifiers: .command)
+          .disabled(!environment.appModel.canAddDrawerTerminal)
         }
-        .keyboardShortcut("t", modifiers: .command)
-        .disabled(!environment.appModel.canAddDrawerTerminal)
 
         Divider()
 
@@ -276,7 +284,7 @@ struct VibeManagerApp: App {
         .keyboardShortcut("2", modifiers: [.command, .option])
         .disabled(!environment.appModel.isSessionOnScreen)
 
-        Button("Focus Inspector") {
+        Button("Focus Context") {
           environment.appModel.focusInspector()
         }
         .keyboardShortcut("3", modifiers: [.command, .option])
@@ -779,6 +787,23 @@ private struct SessionHistoryCommands: Commands {
   }
 }
 
+/// ⌘N, which also brings back the workspace window its red button closed (#247): without it, only
+/// the Dock could.
+private struct NewSessionButton: View {
+  let model: AppModel
+  let focus: WindowFocus
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    Button("New Session") {
+      if !focus.hasWorkspace { openWindow(id: VibeManagerApp.workspaceWindowID) }
+      model.beginNewSession()
+    }
+    .keyboardShortcut("n", modifiers: .command)
+    .disabled(!model.canCreateSession)
+  }
+}
+
 /// ⌘W: the element inside the session that holds the keyboard, and the menu names it (#165) — the
 /// web view's tab (ADR 0023), a side terminal (#43). With the keyboard anywhere else in the
 /// workspace — the agent's terminal, the conversation, the sidebar — it is unavailable: it never
@@ -833,6 +858,12 @@ private struct WebCommands: Commands {
 
   var body: some Commands {
     CommandMenu("Web") {
+      // Without a key here: ⌘T is in the View menu, where it follows the keyboard (#247).
+      Button("New Tab") {
+        model.newWebTab()
+      }
+      .disabled(!model.isWebViewAvailable)
+
       Button("Open Location…") {
         model.focusAddressBar()
       }

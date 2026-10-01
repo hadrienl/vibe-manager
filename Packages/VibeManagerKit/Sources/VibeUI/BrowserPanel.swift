@@ -102,7 +102,7 @@ private struct BrowserTabStrip: View {
         .padding(.horizontal, 6)
       }
       Button {
-        model.focusAddressBar()
+        model.newWebTab()
       } label: {
         Image(systemName: "plus")
           .frame(width: 24, height: 24)
