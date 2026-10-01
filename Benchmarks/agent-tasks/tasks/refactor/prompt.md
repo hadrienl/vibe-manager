@@ -1,0 +1,1 @@
+Refactor `billing/invoice.py`: replace `calc` and `calc_with_discount` with a single function `total_with_vat(lines, country, discount=0.0)`, with the VAT rates in one table `VAT_RATES` and no duplicated code. Update every caller. Behaviour must not change; `tests/test_billing.py` already describes the new function. Run `python3 -m unittest discover -s tests -t .`.

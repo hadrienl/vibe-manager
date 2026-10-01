@@ -95,6 +95,11 @@ public final class ConversationWorkspace {
     // The user's own themes first: a conversation drawn with one of them needs it at launch, not
     // only once the settings are opened (#118).
     await themes.load()
+    await refreshReadableAgents()
+  }
+
+  /// Learns again which agents can be read: the endpoints (#107) come and go with the settings.
+  public func refreshReadableAgents() async {
     guard follow != nil, let agents else { return }
     var readable: [String: Agent] = [:]
     for descriptor in await agents.descriptors() {

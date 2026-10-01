@@ -168,12 +168,27 @@ public struct SessionAgentConfiguration: Hashable, Codable, Sendable {
   /// to `--model` as if it named a model.
   public var modelID: String?
   public var resumeIdentifier: String?
+  /// The command line agent that actually ran this conversation, when the agent is not one itself.
+  ///
+  /// An endpoint (#107) is an agent of its own, `endpoint.<uuid>`, driven by Claude Code or Codex:
+  /// its transcripts, usage and journal are that CLI's, in that CLI's folders and format. Recorded
+  /// at launch rather than looked up in the endpoint's settings, which may have changed since.
+  /// `nil` for Claude Code, Codex and every conversation stored before it existed.
+  public var harnessID: String?
 
-  public init(providerID: String, modelID: String? = nil, resumeIdentifier: String? = nil) {
+  public init(
+    providerID: String, modelID: String? = nil, resumeIdentifier: String? = nil,
+    harnessID: String? = nil
+  ) {
     self.providerID = providerID
     self.modelID = modelID
     self.resumeIdentifier = resumeIdentifier
+    self.harnessID = harnessID
   }
+
+  /// The agent whose transcripts this conversation left: the harness of an endpoint, the agent
+  /// itself otherwise.
+  public var transcriptProviderID: String { harnessID ?? providerID }
 }
 
 public struct SessionAppearance: Hashable, Codable, Sendable {

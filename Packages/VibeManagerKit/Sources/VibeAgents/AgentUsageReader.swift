@@ -49,7 +49,7 @@ public struct AgentUsageReader: TokenUsageReading {
         else { continue }
         let files: [URL]
         let isCodex: Bool
-        switch conversation.providerID {
+        switch conversation.transcriptProviderID {
         case ClaudeCodeAgentProvider.id.rawValue:
           files = locator.claudeTranscripts(for: identifier)
           isCodex = false
