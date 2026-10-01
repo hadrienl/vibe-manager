@@ -238,16 +238,18 @@ struct VibeManagerApp: App {
 
         Divider()
 
-        // The columns of the sidebar (#80), in their order, stopping at both ends.
+        // The columns of the sidebar (#80), in their order, stopping at both ends. ⌥⌘ walks, on
+        // both axes — ↑↓ the sessions, ←→ the columns — and ⌃⌘ changes, ↑↓ the order and ←→ the
+        // status (#240).
         Button("Next Column") {
           environment.appModel.showNextColumn()
         }
-        .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+        .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
 
         Button("Previous Column") {
           environment.appModel.showPreviousColumn()
         }
-        .keyboardShortcut(.leftArrow, modifiers: [.command, .control])
+        .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
 
         Divider()
 
@@ -487,8 +489,8 @@ private struct SessionPositionCommands: View {
   }
 }
 
-/// The sidebar by working folder (#27): the mode, and folding from the keyboard. ⌥⌘← and ⌥⌘→
-/// fold and unfold the group of the selected session, beside ⌥⌘↑ and ⌥⌘↓ that walk it.
+/// The sidebar by working folder (#27): the mode, and folding from the keyboard. ⌃⌥⌘← and ⌃⌥⌘→
+/// fold and unfold the group of the selected session.
 private struct GroupCommands: View {
   let model: AppModel
 
@@ -640,7 +642,8 @@ private struct SessionHistoryCommands: Commands {
   private var statusMenu: some View {
     Divider()
 
-    // The swipe's keyboard equivalent (#80): the shortcut is the decision, so it asks nothing.
+    // The swipe's keyboard equivalent (#80), on ⌃⌘ like every arrow that changes a session
+    // (#240): ⌘Z takes the move back, and only a move that would restart an agent asks first.
     Menu("Status") {
       if model.hasMultipleSelection {
         ForEach(SessionTaskStatus.columns, id: \.self) { status in
@@ -665,7 +668,7 @@ private struct SessionHistoryCommands: Commands {
         guard let session = model.selectedSession else { return }
         Task { await model.moveTaskStatus(of: session.id, forward: true) }
       }
-      .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+      .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
       Button("Move to Previous Status") {
         if let plan = model.batchMovePlan(forward: false), model.hasMultipleSelection {
           request(plan)
@@ -674,7 +677,7 @@ private struct SessionHistoryCommands: Commands {
         guard let session = model.selectedSession else { return }
         Task { await model.moveTaskStatus(of: session.id, forward: false) }
       }
-      .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+      .keyboardShortcut(.leftArrow, modifiers: [.command, .control])
     }
     .disabled(model.selectedSession.map { $0.taskStatus == .archived } ?? true)
   }

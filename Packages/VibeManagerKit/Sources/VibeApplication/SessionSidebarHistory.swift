@@ -16,12 +16,31 @@ public struct SessionArchiveUndo: Hashable, Sendable {
   }
 }
 
+/// A status changed from the keyboard, and the one it left: what ⌘Z puts back (#240).
+public struct SessionStatusUndo: Hashable, Sendable {
+  public let id: SessionID
+  public let from: SessionTaskStatus
+  public let to: SessionTaskStatus
+  /// Whether it was the session on screen: it is selected again then.
+  public let wasSelected: Bool
+
+  public init(
+    id: SessionID, from: SessionTaskStatus, to: SessionTaskStatus, wasSelected: Bool = false
+  ) {
+    self.id = id
+    self.from = from
+    self.to = to
+    self.wasSelected = wasSelected
+  }
+}
+
 /// What ⌘Z undoes where the sidebar or the inspector holds the keyboard, last first: a rename, a
-/// change of icon (#183), an archive (#242).
+/// change of icon (#183), an archive (#242), a status changed from the keyboard (#240).
 public struct SessionSidebarHistory: Hashable, Sendable {
   public enum Entry: Hashable, Sendable {
     case identity(SessionIdentityChange)
     case archive([SessionArchiveUndo])
+    case status(SessionStatusUndo)
 
     /// What is left of the entry once the sessions no longer stored are taken out of it.
     func keeping(only ids: Set<SessionID>) -> Entry? {
@@ -31,6 +50,8 @@ public struct SessionSidebarHistory: Hashable, Sendable {
       case .archive(let archives):
         let kept = archives.filter { ids.contains($0.id) }
         return kept.isEmpty ? nil : .archive(kept)
+      case .status(let status):
+        return ids.contains(status.id) ? self : nil
       }
     }
   }
@@ -38,7 +59,7 @@ public struct SessionSidebarHistory: Hashable, Sendable {
   public static let limit = 50
 
   public private(set) var undoStack: [Entry] = []
-  /// Only renames and badge changes are done again: an archive undone is not redone, ⌃⌘A does it.
+  /// Only renames and badge changes are done again: an archive or a status undone is not redone.
   public private(set) var redoStack: [SessionIdentityChange] = []
 
   public init() {}
@@ -54,6 +75,11 @@ public struct SessionSidebarHistory: Hashable, Sendable {
   public mutating func record(_ archives: [SessionArchiveUndo]) {
     guard !archives.isEmpty else { return }
     push(.archive(archives))
+    redoStack.removeAll()
+  }
+
+  public mutating func record(_ status: SessionStatusUndo) {
+    push(.status(status))
     redoStack.removeAll()
   }
 

@@ -108,7 +108,7 @@ struct SessionTaskBoardTests {
     #expect(model.selectedSessionID == only.id)
   }
 
-  @Test("⌥⌘→ and ⌥⌘← move one status at a time, and never archive")
+  @Test("⌃⌘→ and ⌃⌘← move one status at a time, and never archive")
   func shortcutsStepOneStatus() async {
     let subject = session("Subject", in: .waiting)
     let (model, _, repository) = makeWorkspace([subject])
@@ -123,6 +123,76 @@ struct SessionTaskBoardTests {
 
     await model.moveTaskStatus(of: subject.id, forward: false)
     #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
+  }
+
+  @Test("⌘Z takes back a status changed from the keyboard, and only while it stands (#240)")
+  func undoingAKeyboardMove() async {
+    let subject = session("Subject", in: .waiting, updatedAt: 200)
+    let other = session("Other", in: .waiting, updatedAt: 100)
+    let (model, _, repository) = makeWorkspace([subject, other])
+    await model.load()
+    model.setColumn(.waiting)
+    model.select(subject.id)
+
+    await model.moveTaskStatus(of: subject.id, forward: true)
+    #expect(await repository.session(id: subject.id)?.taskStatus == .done)
+    #expect(model.selectedSessionID == other.id)
+    #expect(model.canUndoSidebarChange)
+
+    await model.undoSidebarChange()
+    #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
+    #expect(model.selectedSessionID == subject.id)
+    #expect(!model.canUndoSidebarChange)
+
+    // Moved again by another way since: ⌘Z leaves it where it is.
+    await model.moveTaskStatus(of: subject.id, forward: true)
+    await model.setTaskStatus(.todo, for: subject.id)
+    await model.undoSidebarChange()
+    #expect(await repository.session(id: subject.id)?.taskStatus == .todo)
+  }
+
+  @Test("⌘Z on a move out of In Progress puts it back without starting its agent (#240)")
+  func undoingNeverRestarts() async throws {
+    let path = folder()
+    let subject = session("Subject", in: .doing, path: path)
+    let (model, launcher, repository) = makeWorkspace([subject])
+    await model.load()
+    await model.refreshResolutions()
+
+    await model.moveTaskStatus(of: subject.id, forward: true)
+    #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
+    await model.undoSidebarChange()
+
+    let stored = try #require(await repository.session(id: subject.id))
+    #expect(stored.taskStatus == .doing)
+    #expect(stored.status == .closed)
+    #expect(!launcher.isRunning(subject.id))
+  }
+
+  @Test("A keyboard move that would restart an agent asks first, and nothing moves until then")
+  func keyboardRestartAsks() async throws {
+    let path = folder()
+    let subject = session("Subject", in: .waiting, path: path)
+    let (model, launcher, repository) = makeWorkspace([subject])
+    await model.load()
+    await model.refreshResolutions()
+
+    await model.moveTaskStatus(of: subject.id, forward: false)
+    let pending = try #require(model.pendingStatusRestart)
+    #expect(pending.status == .doing)
+    #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
+    #expect(!launcher.isRunning(subject.id))
+
+    model.cancelStatusRestart()
+    #expect(model.pendingStatusRestart == nil)
+    #expect(await repository.session(id: subject.id)?.taskStatus == .waiting)
+
+    await model.moveTaskStatus(of: subject.id, forward: false)
+    await model.confirmStatusRestart(try #require(model.pendingStatusRestart))
+    #expect(await repository.session(id: subject.id)?.taskStatus == .doing)
+    #expect(launcher.isRunning(subject.id))
+    // A move that restarted an agent is not taken back by ⌘Z.
+    #expect(!model.canUndoSidebarChange)
   }
 
   @Test("Archive from the swipe archives a session where nothing runs, at once (#115)")
@@ -519,7 +589,7 @@ struct SessionTaskBoardTests {
 
   // MARK: - Columns
 
-  @Test("⌃⌘→ and ⌃⌘← walk the four columns and stop at both ends")
+  @Test("⌥⌘→ and ⌥⌘← walk the four columns and stop at both ends")
   func columnShortcuts() async {
     let (model, _, _) = makeWorkspace([session("Any")])
     await model.load()

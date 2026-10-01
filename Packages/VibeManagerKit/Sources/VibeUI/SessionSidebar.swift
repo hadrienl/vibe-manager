@@ -176,9 +176,9 @@ struct SessionSidebar: View {
     }
     .onPreferenceChange(SessionBadgeEdgeKey.self) { badgeTrailingEdge = $0 }
     .focused($isListFocused)
-    // ⌘Z and ⇧⌘Z undo a rename or a change of icon (#183), ⌘Z an archive (#242), while the
-    // keyboard is in the list; anywhere else, they go on to what holds it. A name being typed
-    // undoes its own typing.
+    // ⌘Z and ⇧⌘Z undo a rename or a change of icon (#183), ⌘Z an archive (#242) or a status
+    // (#240), while the keyboard is in the list; anywhere else, they go on to what holds it. A
+    // name being typed undoes its own typing.
     .onCommand(
       Selector(("undo:")),
       perform: model.sidebarUndoAction(redo: false, keyboardHere: isListFocused)
