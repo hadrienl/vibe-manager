@@ -245,7 +245,8 @@ struct SessionStatusPresentationTests {
     )
 
     #expect(english(finished.label) == "Agent unavailable")
-    #expect(english(failed.label).contains("127"))
+    #expect(english(failed.label) == "Stopped on an error")
+    #expect(failed.detail == "Exit code 127")
   }
 
   @Test("VoiceOver hears the name, the agent and the state")
@@ -267,9 +268,9 @@ struct SessionStatusFrenchTests {
       (.starting, "Démarrage"),
       (.running, "En attente"),
       (.exited(code: 0), "Terminée"),
-      (.exited(code: 127), "Terminée avec le code 127"),
-      (.terminated(signal: 9), "Interrompue par le signal 9"),
-      (.failed(message: "x"), "Échec"),
+      (.exited(code: 127), "Arrêtée sur une erreur"),
+      (.terminated(signal: 9), "Arrêtée de façon inattendue"),
+      (.failed(message: "x"), "N’a pas pu démarrer"),
     ]
     for (pane, french) in expected {
       let status = SessionStatusPresentation.make(
