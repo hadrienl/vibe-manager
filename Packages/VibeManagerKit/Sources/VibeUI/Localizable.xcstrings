@@ -3865,19 +3865,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               }
             }
@@ -4392,6 +4392,17 @@
         }
       }
     },
+    "Also interrupts the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request from the palette does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
     "Also looked in: %@" : {
       "comment" : "A list of folders the agent visited that are not repositories.",
       "localizations" : {
@@ -4399,17 +4410,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autres dossiers consultés : %@"
-          }
-        }
-      }
-    },
-    "Also stops the agent's turn: it waits for your next message." : {
-      "comment" : "What refusing a request from the palette does besides refusing.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }
@@ -5969,6 +5969,142 @@
         }
       }
     },
+    "Couldn’t archive this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t archive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t close this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t close “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t restart this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t restart “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t save the new order of the sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer le nouvel ordre des sessions."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver « %@ »."
+          }
+        }
+      }
+    },
     "Create & Launch" : {
       "localizations" : {
         "fr" : {
@@ -7052,7 +7188,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminée"
+            "value" : "Processus terminé"
           }
         }
       }
@@ -7743,7 +7879,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En attente"
+            "value" : "Prête"
           }
         }
       }
@@ -11137,6 +11273,17 @@
         }
       }
     },
+    "Restart All" : {
+      "comment" : "Restarts every session the terminal host stopped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout redémarrer"
+          }
+        }
+      }
+    },
     "Restart Now" : {
       "localizations" : {
         "fr" : {
@@ -14491,6 +14638,53 @@
         }
       }
     },
+    "The terminal host stopped: %lld sessions were interrupted." : {
+      "comment" : "How many sessions lost their agent.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The terminal host stopped: %lld session was interrupted."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The terminal host stopped: %lld sessions were interrupted."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld sessions ont été interrompues."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld session a été interrompue."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld sessions ont été interrompues."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "The ticket's page stays pinned first among this session's tabs. Leave the field empty to remove it." : {
       "localizations" : {
         "fr" : {
@@ -16293,7 +16487,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Travaille…"
           }
         }
       }

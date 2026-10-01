@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Close Session…" : {
+      "comment" : "Stops a session's agent, asking first when it is at work.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la session…"
+          }
+        }
+      }
+    },
     "Exited with code %@" : {
       "comment" : "A terminal's state: its process ended with this exit status.",
       "localizations" : {
@@ -18,7 +29,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminé"
+            "value" : "Processus terminé"
           }
         }
       }
@@ -51,7 +62,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Processus en cours"
           }
         }
       }
@@ -73,17 +84,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Démarrage…"
-          }
-        }
-      }
-    },
-    "Stop" : {
-      "comment" : "Stops the terminal's process.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêter"
           }
         }
       }

@@ -117,6 +117,33 @@ extension AppModel {
     return plan.isEmpty ? nil : plan
   }
 
+  // MARK: - Stopped with the terminal host
+
+  /// The sessions the terminal host took down with it when it stopped (#237): one banner says
+  /// why for all of them, rather than a row of "Failed" each. Restarting one, or archiving it,
+  /// takes it off the list; the banner's ✕ sets them all aside.
+  public var sessionsStoppedWithHost: [SessionID] {
+    guard let launcher else { return [] }
+    return sessions.compactMap { session in
+      session.status != .archived && launcher.pane(for: session.id)?.stoppedWithHost == true
+        ? session.id : nil
+    }
+  }
+
+  /// The banner dismissed: the sessions stay as they are, closed, and Restart still works on
+  /// each of them.
+  public func setAsideSessionsStoppedWithHost() {
+    for id in sessionsStoppedWithHost {
+      launcher?.pane(for: id)?.setAsideHostStop()
+    }
+  }
+
+  /// Restarts them together, as Restart on the same selection would — asking first, as it does
+  /// for several agents at once. Nothing restarts without this.
+  public func restartSessionsStoppedWithHost() async {
+    await requestBatch(batchPlan(.restart, for: sessionsStoppedWithHost))
+  }
+
   // MARK: - Asking
 
   /// Runs the command, or asks first when it would do so for one session — and for a restart
