@@ -183,6 +183,35 @@ struct AgentAvailabilityProbeTests {
       ])
   }
 
+  @Test("A file that cannot run offers to install the agent again, then to detect again")
+  func nonExecutableOffersInstall() async {
+    let availability = await probe(
+      locator: StubLocator(
+        location: .notExecutable(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)
+      ),
+      processProbe: StubProcessProbe()
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .notExecutable)
+    #expect(
+      availability.diagnostic.remediations == [
+        .install(documentationURL: nil), .retryDetection,
+      ])
+  }
+
+  @Test("An agent that could not be inspected offers only to detect again")
+  func failedProbeOffersRetryOnly() async {
+    let availability = await probe(
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      processProbe: StubProcessProbe(defaultResponse: .failure(.launchFailed))
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .probeFailed(reason: .failed(exitCode: -1)))
+    #expect(availability.diagnostic.remediations == [.retryDetection])
+  }
+
   @Test("A non executable file is distinguished from a missing one")
   func reportsNonExecutable() async {
     let availability = await probe(
