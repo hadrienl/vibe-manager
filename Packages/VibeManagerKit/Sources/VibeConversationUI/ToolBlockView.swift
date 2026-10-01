@@ -875,7 +875,7 @@ struct RequestActions: View {
   }
 
   static let stopsTheTurn = LocalizedStringResource(
-    "Also stops the agent's turn: it waits for your next message.", bundle: .module,
+    "Also interrupts the agent's turn: it waits for your next message.", bundle: .module,
     comment: "What refusing a request does besides refusing.")
 
   private var denyButton: some View {
