@@ -252,6 +252,43 @@ struct CreateSessionTests {
     #expect(creation.session.initialPrompt.trimmingCharacters(in: .whitespaces).isEmpty)
   }
 
+  @Test("With files joined, the agent starts without a prompt, which becomes its first message")
+  func attachmentsMakeAFirstMessage() async throws {
+    let (create, _) = makeSubject()
+    var withFiles = draft(prompt: "Look at\n")
+    let image = FileManager.default.temporaryDirectory.appendingPathComponent("Capture d’écran.png")
+    withFiles.attachments = [image]
+
+    let creation = try await create(withFiles)
+
+    #expect(creation.plan.promptDelivery == .none)
+    #expect(creation.firstMessage == PromptSubmission(text: "Look at", attachments: [image]))
+    // What the session keeps, and starts with again, holds the files' paths.
+    #expect(creation.session.initialPrompt == "Look at " + ShellPath.escaped(image.path))
+  }
+
+  @Test("With files joined, a prompt the agent would refuse is still reported")
+  func attachmentsKeepThePromptChecked() async {
+    var provider = StubProvider()
+    provider.promptFailure = .promptTooLarge(byteCount: 10, limit: 5)
+    let (create, repository) = makeSubject(provider: provider)
+    var withFiles = draft()
+    withFiles.attachments = [FileManager.default.temporaryDirectory.appendingPathComponent("a.png")]
+
+    await #expect(throws: SessionCreationRejected.self) { try await create(withFiles) }
+    #expect(await repository.savedSessions.isEmpty)
+  }
+
+  @Test("Without files, the prompt is the agent's argument and there is no first message")
+  func noAttachmentsNoFirstMessage() async throws {
+    let (create, _) = makeSubject()
+
+    let creation = try await create(draft())
+
+    #expect(creation.plan.promptDelivery == .argument)
+    #expect(creation.firstMessage == nil)
+  }
+
   @Test("A refused draft leaves the store untouched")
   func refusedDraftWritesNothing() async {
     let (create, repository) = makeSubject()
@@ -342,6 +379,8 @@ private struct StubProvider: AgentProvider {
   var state: AgentAvailabilityState = .available
   var models: [AgentModel] = []
   var launchFailure: AgentLaunchError?
+  /// Refused only for a launch that carries a prompt.
+  var promptFailure: AgentLaunchError?
 
   init(
     state: AgentAvailabilityState = .available,
@@ -372,6 +411,7 @@ private struct StubProvider: AgentProvider {
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
     if let launchFailure { throw launchFailure }
+    if let promptFailure, request.initialPrompt != nil { throw promptFailure }
     return AgentLaunchPlan(
       providerID: descriptor.id,
       executablePath: "/usr/bin/true",

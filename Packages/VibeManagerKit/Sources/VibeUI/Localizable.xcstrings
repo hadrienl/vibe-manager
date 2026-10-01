@@ -3929,6 +3929,17 @@
         }
       }
     },
+    "A template’s prompt takes no files" : {
+      "comment" : "Over the new session's draft, while files are dragged over it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prompt d’un modèle ne prend pas de fichiers"
+          }
+        }
+      }
+    },
     "A transcript is no longer found; what it reported until %@ is kept." : {
       "comment" : "A date and time.",
       "localizations" : {
@@ -6237,12 +6248,33 @@
         }
       }
     },
+    "Drop to attach to your prompt" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez pour joindre à votre prompt"
+          }
+        }
+      }
+    },
     "Drop to type the paths in the terminal" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déposez pour saisir les chemins dans le terminal"
+          }
+        }
+      }
+    },
+    "Drop to work in this folder" : {
+      "comment" : "Over the new session's draft, while a folder is dragged over its working folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez pour travailler dans ce dossier"
           }
         }
       }

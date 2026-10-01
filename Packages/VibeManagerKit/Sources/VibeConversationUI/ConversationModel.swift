@@ -1124,7 +1124,9 @@ public final class ConversationModel {
 
   public var isAgentWorking: Bool { activity == .working && isProcessRunning }
 
-  public func attach(_ files: [URL]) {
+  /// Joins files to the draft. `focusing`: the composer takes the keyboard — not for a message
+  /// put there for the user (#291).
+  public func attach(_ files: [URL], focusing: Bool = true) {
     let writable = files.filter { PathInsertion.isWritablePath($0.path) }
     if composerMode == .shell {
       // A command takes no attachment: the files are named in it, escaped for the shell.
@@ -1138,7 +1140,7 @@ public final class ConversationModel {
         attachments.append(file)
       }
     }
-    requestComposerFocus()
+    if focusing { requestComposerFocus() }
   }
 
   /// Asks the composer to take the keyboard, now if it is on screen, or as soon as it is.

@@ -98,14 +98,34 @@ struct NewSessionModelTests {
     #expect(!appearance.isPristine)
   }
 
-  @Test("Files joined to a free prompt are written at its end, as a terminal reads them")
-  func attachedFilesJoinThePrompt() {
+  @Test("Files joined to a free prompt are chips, apart from its text, each once and in order")
+  func attachedFilesAreChips() {
     let model = makeModel()
     model.draft.initialPrompt = "Look at"
+    let folder = FileManager.default.temporaryDirectory
+    let first = folder.appendingPathComponent("a b.png")
+    let second = folder.appendingPathComponent("c.txt")
 
-    model.attach([URL(fileURLWithPath: "/tmp/a b.png"), URL(fileURLWithPath: "/tmp/c.txt")])
+    model.attach([first, second])
+    model.attach([first])
 
-    #expect(model.draft.initialPrompt == #"Look at /tmp/a\ b.png /tmp/c.txt"#)
+    #expect(model.draft.initialPrompt == "Look at")
+    #expect(model.draft.attachments == [first, second])
+    #expect(!model.isPristine)
+
+    model.removeAttachment(first)
+    #expect(model.draft.attachments == [second])
+  }
+
+  @Test("A template's prompt takes no file")
+  func templateTakesNoFile() {
+    let model = makeModel()
+    model.draft.templateFill = PromptTemplateFill(
+      template: PromptTemplate(name: "Review", body: "Review the branch"))
+
+    model.attach([FileManager.default.temporaryDirectory.appendingPathComponent("c.txt")])
+
+    #expect(model.draft.attachments.isEmpty)
   }
 
   @Test("The default agent is the first usable one, and the others stay listed")

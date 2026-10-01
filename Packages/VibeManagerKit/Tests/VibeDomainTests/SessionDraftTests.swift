@@ -226,4 +226,31 @@ struct SuggestedNameTests {
     let named = SessionDraft(name: "Fix the scroll")
     #expect(unnamed.effectiveAppearance == named.effectiveAppearance)
   }
+
+  @Test("Files joined to the prompt reach the agent after its text, as a terminal reads them")
+  func attachmentsJoinTheSentPrompt() {
+    let folder = FileManager.default.temporaryDirectory
+    let shot = folder.appendingPathComponent("Capture d’écran (1).png")
+    let notes = folder.appendingPathComponent("c.txt")
+    let draft = SessionDraft(initialPrompt: "Look at\n", attachments: [shot, notes])
+
+    #expect(draft.effectivePrompt.hasPrefix("Look at "))
+    #expect(draft.effectivePrompt.hasSuffix(#"Capture\ d’écran\ \(1\).png "# + notes.path))
+    #expect(
+      SessionDraft(attachments: draft.attachments).trimmedPrompt
+        == ShellPath.escaped(shot.path) + " " + notes.path)
+  }
+
+  @Test("A session named after its prompt is not named after the files joined to it")
+  func attachmentsDoNotNameTheSession() {
+    let folder = FileManager.default.temporaryDirectory
+    let draft = SessionDraft(
+      attachments: [folder.appendingPathComponent("a.png")],
+      workingDirectoryPath: folder.appendingPathComponent("api").path)
+
+    #expect(draft.suggestedName == "api")
+    #expect(
+      SessionDraft(initialPrompt: "Fix it", attachments: draft.attachments).suggestedName
+        == "Fix it")
+  }
 }

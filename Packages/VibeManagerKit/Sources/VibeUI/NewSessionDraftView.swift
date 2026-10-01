@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// A new session, before it exists (#177): a conversation not started yet, in the main area.
@@ -22,6 +23,26 @@ public struct NewSessionDraftView: View {
   @State private var showsMoreOptions = false
   /// The symbol and the colour, in a popover from the badge next to the name.
   @State private var showsAppearancePicker = false
+  @State private var dropHover: NewSessionDropHover?
+  /// Where the working folder lies in the draft, for a folder dropped on it.
+  @State private var folderZone = CGRect.null
+
+  private static let dropSpace = "new-session-draft"
+
+  private static func message(for hover: NewSessionDropHover) -> String {
+    switch hover {
+    case .attaching:
+      String(localized: "Drop to attach to your prompt", bundle: .module)
+    case .choosingFolder:
+      String(
+        localized: "Drop to work in this folder", bundle: .module,
+        comment: "Over the new session's draft, while a folder is dragged over its working folder.")
+    case .refusingTemplate:
+      String(
+        localized: "A template’s prompt takes no files", bundle: .module,
+        comment: "Over the new session's draft, while files are dragged over it.")
+    }
+  }
 
   /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
   enum FocusTarget: Hashable {
@@ -111,11 +132,37 @@ public struct NewSessionDraftView: View {
       if firstIssueTarget != nil { placeCaret() }
     }
     // A file dropped anywhere on the draft joins its prompt, as the composer of a conversation
-    // takes one.
-    .dropDestination(for: URL.self) { urls, _ in
-      guard model.draft.templateFill == nil, !model.isSubmitting else { return false }
-      model.attach(urls.filter(\.isFileURL))
-      return true
+    // takes one; a folder dropped on the working folder becomes the session's.
+    .coordinateSpace(.named(Self.dropSpace))
+    .overlay {
+      if let dropHover {
+        DropVeil(isRefusing: !dropHover.isAccepting, message: Self.message(for: dropHover))
+      }
+    }
+    // Over the veil: the catcher is the frontmost view under the drag, the prompt's field
+    // included.
+    .overlay {
+      NewSessionDropCatcher(
+        hover: { files, location in
+          guard !model.isSubmitting else { return nil }
+          if files.count == 1, files[0].hasDirectoryPath, folderZone.contains(location) {
+            return .choosingFolder
+          }
+          return model.draft.templateFill == nil ? .attaching : .refusingTemplate
+        },
+        hovering: { hover in
+          if dropHover != hover { dropHover = hover }
+        },
+        dropped: { files, hover in
+          // Let go from the Finder: the draft comes forward.
+          NSApp?.activate()
+          if hover == .choosingFolder, let folder = files.first {
+            Task { await model.folderChosen(folder.path) }
+            return
+          }
+          model.attach(files)
+          moveFocus(to: .draft(.initialPrompt))
+        })
     }
     // Escape sets the draft aside — only from inside it: a key equivalent would take Escape from
     // the whole window, Open Quickly and the sidebar included. The prompt, an AppKit text view,
@@ -455,6 +502,11 @@ public struct NewSessionDraftView: View {
         folderPathField
       }
     }
+    .onGeometryChange(for: CGRect.self) {
+      $0.frame(in: .named(Self.dropSpace))
+    } action: {
+      folderZone = $0
+    }
   }
 
   /// What is said under the folder: the last folder gone, and a folder macOS guards, both when
@@ -553,6 +605,18 @@ public struct NewSessionDraftView: View {
         if let rendered = model.renderedPrompt, let fill = model.draft.templateFill {
           renderedPrompt(rendered, of: fill)
         } else {
+          if !model.draft.attachments.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+              HStack(spacing: 8) {
+                ForEach(model.draft.attachments, id: \.self) { file in
+                  AttachmentChip(file: file, usesSystemColors: true) {
+                    model.removeAttachment(file)
+                  }
+                }
+              }
+            }
+            .accessibilityIdentifier("new-session-attachments")
+          }
           PromptTextEditor(
             text: $model.draft.initialPrompt,
             minimumLines: 3,

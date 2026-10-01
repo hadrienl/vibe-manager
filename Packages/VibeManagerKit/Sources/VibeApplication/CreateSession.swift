@@ -10,10 +10,19 @@ public struct SessionCreation: Sendable {
   /// Empty when the feature is off.
   public let tickets: [TicketRecognition]
 
-  public init(session: WorkSession, plan: AgentLaunchPlan, tickets: [TicketRecognition] = []) {
+  /// The first message, when files were joined to the prompt (#291): the agent is launched
+  /// without a prompt, and this is sent through its conversation's composer once it is ready, as
+  /// the user would send it — given as an argument, an image is only a path, never an image.
+  public let firstMessage: PromptSubmission?
+
+  public init(
+    session: WorkSession, plan: AgentLaunchPlan, tickets: [TicketRecognition] = [],
+    firstMessage: PromptSubmission? = nil
+  ) {
     self.session = session
     self.plan = plan
     self.tickets = tickets
+    self.firstMessage = firstMessage
   }
 }
 
@@ -98,7 +107,16 @@ public struct CreateSession: Sendable {
       session.ticket = SessionTicket(url: url, source: .detected)
     }
     try await repository.save(session)
-    return SessionCreation(session: session, plan: plan, tickets: tickets)
+    let files = draft.sentAttachments
+    let firstMessage =
+      files.isEmpty
+      ? nil
+      : PromptSubmission(
+        text: PromptText.normalizingLineBreaks(draft.initialPrompt)
+          .trimmingCharacters(in: .whitespacesAndNewlines),
+        attachments: files)
+    return SessionCreation(
+      session: session, plan: plan, tickets: tickets, firstMessage: firstMessage)
   }
 
   /// The tickets the session's fields name: its ticket, its name, then its prompt — which holds a
@@ -199,7 +217,7 @@ public struct CreateSession: Sendable {
     guard let path = draft.resolvedWorkingDirectoryPath else { return (issues, nil) }
 
     let prompt = draft.trimmedPrompt
-    let request = AgentLaunchRequest(
+    var request = AgentLaunchRequest(
       workingDirectoryPath: path,
       modelID: draft.modelID,
       initialPrompt: prompt.isEmpty ? nil : draft.effectivePrompt,
@@ -207,6 +225,11 @@ public struct CreateSession: Sendable {
     )
 
     do {
+      // Checked with its prompt, which the session keeps and a later launch gives as an argument.
+      let plan = try await provider.launchPlan(for: request)
+      guard !draft.sentAttachments.isEmpty else { return (issues, plan) }
+      // With files joined, the prompt is the first message, sent once the agent runs.
+      request.initialPrompt = nil
       return (issues, try await provider.launchPlan(for: request))
     } catch let error as AgentLaunchError {
       issues.append(Self.issue(for: error, agentName: provider.descriptor.displayName))

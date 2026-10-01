@@ -56,6 +56,24 @@ finds a drag's destination without asking `hitTest(_:)`, so the overlay answers 
 I-beam, the clicks and the scrolling stay the field's, and VoiceOver does not see it. Pasting is
 left alone.
 
+A new session's draft (#177) is drawn over the session selected, and takes files the same way. A
+SwiftUI drop destination on the draft was never reached: SwiftUI lays the view it registers behind
+every other view, and AppKit found nothing on the draft but its prompt's field, which typed the path
+where it was let go. A transparent view laid over the whole draft is registered for files only, and
+wins their drags from end to end, the field included: the files become chips of the draft, as in a
+conversation's composer, and Attach Files… makes the same chips. The session is not named after
+them. Given as an argument, an image is only a path, which Claude Code reads with a tool: with files
+joined, the agent is launched without a prompt, and the text and the files are put in its
+conversation's composer and sent from there once the agent is known to run — pasted, so that Claude
+Code takes an image as one, and as a message even when it opens on `!`. A composer the user changed
+meanwhile, or an agent that stops before it is ready, leaves them there; over a launch that failed,
+nothing is put there, since the restart gives the initial prompt. The prompt is still checked as an
+argument at creation. One folder let go on the working folder becomes the session's instead. The session keeps the text followed by the escaped paths as its initial
+prompt, which a later launch — from To Do — gives as an argument.
+Over a template's prompt, which takes no file, it refuses them with
+the red veil. A text, a web address or an image with no file of its own meets none of its types and
+goes where it went before; an image with no file has no session folder yet to be written in.
+
 Where the drop goes is decided by `SessionDropRoute`, a pure function of the session's presentation,
 its process and its composer:
 
