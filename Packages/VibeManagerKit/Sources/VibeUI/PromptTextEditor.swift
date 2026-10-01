@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import VibeConversationUI
 import VibeDomain
 
 /// Where a prompt is written: a plain-text area as tall as what it holds.
@@ -26,6 +27,9 @@ public struct PromptTextEditor: View {
   private let isBordered: Bool
   private let onSubmit: (() -> Void)?
   private let onCancel: (() -> Void)?
+  /// The list of skills and commands a `/` typed first opens (#219): its keys go first while it
+  /// is open.
+  private let commands: ComposerCommands?
   @State private var height: CGFloat?
 
   public init(
@@ -39,8 +43,10 @@ public struct PromptTextEditor: View {
     isEditable: Bool = true,
     isBordered: Bool = true,
     onSubmit: (() -> Void)? = nil,
-    onCancel: (() -> Void)? = nil
+    onCancel: (() -> Void)? = nil,
+    commands: ComposerCommands? = nil
   ) {
+    self.commands = commands
     _text = text
     self.minimumLines = minimumLines
     self.maximumLines = maximumLines
@@ -65,9 +71,22 @@ public struct PromptTextEditor: View {
       focusRequested: focusRequested,
       isEditable: isEditable,
       onSubmit: onSubmit,
-      onCancel: onCancel
+      onCancel: onCancel,
+      commands: commands,
+      token: commands?.insertedInvocation
     )
     .frame(height: height ?? PromptTextStyle.height(forLines: minimumLines))
+    .overlay(alignment: .topLeading) {
+      // What the command inserted expects, dimmed after it until something is typed.
+      if let hint = commands?.pendingArgumentHint {
+        Text(Self.hinted(text, hint))
+          .font(.body)
+          .padding(.leading, PromptTextStyle.inset.width + 5)
+          .padding(.top, PromptTextStyle.inset.height)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+      }
+    }
     .overlay(alignment: .topLeading) {
       if text.isEmpty, let placeholder {
         Text(placeholder)
@@ -88,6 +107,17 @@ public struct PromptTextEditor: View {
         RoundedRectangle(cornerRadius: 6).strokeBorder(.separator)
       }
     }
+  }
+}
+
+extension PromptTextEditor {
+  /// The text, invisible, then the hint: laid out as the text is, the hint follows its end.
+  fileprivate static func hinted(_ text: String, _ hint: String) -> AttributedString {
+    var shown = AttributedString(text)
+    shown.foregroundColor = .clear
+    var dimmed = AttributedString(hint)
+    dimmed.foregroundColor = Color(nsColor: .tertiaryLabelColor)
+    return shown + dimmed
   }
 }
 
@@ -141,6 +171,9 @@ private struct GrowingTextView: NSViewRepresentable {
   let isEditable: Bool
   let onSubmit: (() -> Void)?
   let onCancel: (() -> Void)?
+  let commands: ComposerCommands?
+  /// The command inserted from the list, tinted as a token.
+  let token: String?
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
@@ -193,6 +226,10 @@ private struct GrowingTextView: NSViewRepresentable {
         textView.undoManager?.removeAllActions(withTarget: storage)
       }
       textView.string = text
+      // Put in from elsewhere — a command chosen with a click — the text is carried on at its end.
+      textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+      coordinator.highlight()
+    } else if coordinator.shownToken != token {
       coordinator.highlight()
     }
     textView.setAccessibilityLabel(accessibilityLabel)
@@ -217,6 +254,8 @@ private struct GrowingTextView: NSViewRepresentable {
     var frameObserver: (any NSObjectProtocol)?
     private(set) var isEditing = false
     var focusWasRequested = false
+    /// The token tinted last.
+    private(set) var shownToken: String?
 
     func takeFocus(attempts: Int) {
       DispatchQueue.main.async { [weak self] in
@@ -232,6 +271,7 @@ private struct GrowingTextView: NSViewRepresentable {
     /// Return submits when the editor was given something to submit to. ⇧↩ and ⌥↩ still go to the
     /// line, and so does Return while an input method is composing: it confirms the characters.
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+      if handleCommandList(textView, selector) { return true }
       // Escape, which a text view otherwise keeps for completion, goes to `onCancel` when given.
       if selector == #selector(NSResponder.cancelOperation(_:))
         || selector == #selector(NSTextView.complete(_:)),
@@ -247,6 +287,35 @@ private struct GrowingTextView: NSViewRepresentable {
       guard modifiers.isDisjoint(with: [.shift, .option]) else { return false }
       onSubmit()
       return true
+    }
+
+    /// While the list under `/` is open, ↑ and ↓ move in it, ⇥ inserts the entry selected, ↩ too
+    /// when it completes a name begun — sending nothing — and Escape closes it. Otherwise ↩ submits
+    /// as ever: nothing matching, a match by its description only, a name typed in full.
+    private func handleCommandList(_ textView: NSTextView, _ selector: Selector) -> Bool {
+      guard let commands = parent?.commands, commands.isShowing, !textView.hasMarkedText()
+      else { return false }
+      switch selector {
+      case #selector(NSResponder.moveUp(_:)):
+        return commands.moveSelection(by: -1)
+      case #selector(NSResponder.moveDown(_:)):
+        return commands.moveSelection(by: 1)
+      case #selector(NSResponder.insertTab(_:)), #selector(NSResponder.insertNewline(_:)):
+        guard let command = commands.selectedCommand else { return false }
+        if selector == #selector(NSResponder.insertNewline(_:)), !commands.returnInserts {
+          return false
+        }
+        let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+        guard modifiers.isDisjoint(with: [.shift, .option]) else { return false }
+        // Typed in, as the user would: ⌘Z takes it back.
+        let whole = NSRange(location: 0, length: (textView.string as NSString).length)
+        textView.insertText(commands.inserting(command), replacementRange: whole)
+        return true
+      case #selector(NSResponder.cancelOperation(_:)):
+        return commands.dismiss()
+      default:
+        return false
+      }
     }
 
     func textDidChange(_ notification: Notification) {
@@ -276,10 +345,10 @@ private struct GrowingTextView: NSViewRepresentable {
     /// Fields in a template's text are tinted, and double braces that are not a field underlined.
     /// Drawn as temporary attributes: nothing of it reaches the text itself.
     func highlight() {
-      guard let parent, parent.highlightsPlaceholders, let textView,
-        let layoutManager = textView.layoutManager
-      else { return }
+      guard let parent, let textView, let layoutManager = textView.layoutManager else { return }
       let whole = NSRange(location: 0, length: (textView.string as NSString).length)
+      tintToken(parent.token, in: textView, layoutManager: layoutManager, whole: whole)
+      guard parent.highlightsPlaceholders else { return }
       layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: whole)
       layoutManager.removeTemporaryAttribute(.underlineStyle, forCharacterRange: whole)
       layoutManager.removeTemporaryAttribute(.underlineColor, forCharacterRange: whole)
@@ -300,6 +369,26 @@ private struct GrowingTextView: NSViewRepresentable {
           forCharacterRange: NSRange(range))
       }
     }
+  }
+}
+
+extension GrowingTextView.Coordinator {
+  /// The command inserted from the list, at the head of the text, tinted as a token (#219).
+  fileprivate func tintToken(
+    _ token: String?, in textView: NSTextView, layoutManager: NSLayoutManager, whole: NSRange
+  ) {
+    guard token != nil || shownToken != nil else { return }
+    if let shown = shownToken {
+      let range = NSRange(location: 0, length: min((shown as NSString).length, whole.length))
+      layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: range)
+    }
+    shownToken = nil
+    let text = textView.string as NSString
+    guard let token, text.hasPrefix(token) else { return }
+    layoutManager.addTemporaryAttribute(
+      .backgroundColor, value: NSColor.controlAccentColor.withAlphaComponent(0.18),
+      forCharacterRange: NSRange(location: 0, length: (token as NSString).length))
+    shownToken = token
   }
 }
 

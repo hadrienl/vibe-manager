@@ -19,7 +19,7 @@ extension TerminalSpec {
     switch plan.promptDelivery {
     case .standardInput(let text):
       initialInput = text
-    case .argument, .none:
+    case .argument, .none, .typedOnceReady:
       initialInput = nil
     }
 

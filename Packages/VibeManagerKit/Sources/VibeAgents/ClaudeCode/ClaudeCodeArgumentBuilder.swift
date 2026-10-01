@@ -39,7 +39,7 @@ public struct ClaudeCodeArgumentBuilder: CommandLineAgentArgumentBuilder {
     }
 
     switch promptDelivery {
-    case .none:
+    case .none, .typedOnceReady:
       break
     case .argument:
       // Without `--`, a prompt starting with a dash is read as an option and the CLI refuses

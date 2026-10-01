@@ -132,6 +132,14 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   }
 }
 
+extension ConversationEntry {
+  /// A command of the CLI the user ran — `/mcp`, a skill — as the transcript writes it.
+  fileprivate var isCommand: Bool {
+    if case .notice(.command) = content { return true }
+    return false
+  }
+}
+
 /// What confirms the echoes: the prompts of the conversation and its shell commands, counted
 /// again only among the entries that changed (#250).
 struct EchoTallies {
@@ -143,7 +151,9 @@ struct EchoTallies {
     while let last = commands.last, last.index >= from { commands.removeLast() }
     for index in entries.indices.dropFirst(from) {
       let entry = entries[index]
-      if entry.isUserPrompt { promptIndices.append(index) }
+      // A skill or a command sent with `/` is written as a command, not a prompt (#219): it
+      // confirms a message as well.
+      if entry.isUserPrompt || entry.isCommand { promptIndices.append(index) }
       if let run = entry.shellRun { commands.append((index, run.command)) }
     }
   }
@@ -211,7 +221,20 @@ public final class ConversationModel {
   @ObservationIgnored private var repositioning = false
 
   public var activity: AgentActivity? {
-    didSet { if activity != oldValue { rebuild(changedFrom: nil) } }
+    didSet {
+      guard activity != oldValue else { return }
+      rebuild(changedFrom: nil)
+      // A skill or a prompt the agent took up: nothing waits in a panel of its terminal, and the
+      // composer gets the keyboard back from the block.
+      if activity == .working {
+        initialCommand = nil
+        if terminalPanel != nil {
+          terminalPanel = nil
+          requestComposerFocus()
+        }
+      }
+      openInitialPanelIfRunning()
+    }
   }
   /// Whether the agent has said it is ready for a prompt. Until its hooks speak, a CLI may still
   /// show a screen of its own — an update offer, a folder to trust — where the Return that sends a
@@ -235,7 +258,9 @@ public final class ConversationModel {
 
   // MARK: Composer
 
-  public var draft = ""
+  public var draft = "" {
+    didSet { if draft != oldValue { updateCommandSuggestions() } }
+  }
   public private(set) var attachments: [URL] = []
   public private(set) var echoes: [PendingEcho] = []
   /// A prompt pasted whose Return is not written yet: another pasted now would join it.
@@ -586,6 +611,8 @@ public final class ConversationModel {
   /// observes the terminal tells: sub-agents that will not end are settled, and the reader told.
   public func processStateChanged() {
     if isProcessRunning != reportedAgentRunning { rebuild(changedFrom: nil) }
+    if !isProcessRunning { terminalPanel = nil }
+    openInitialPanelIfRunning()
   }
 
   /// Asks when the process started — the kernel knows, whenever the application was opened — and
@@ -1024,8 +1051,9 @@ public final class ConversationModel {
   public func editAgain(_ run: ShellRun) {
     guard composerState == .ready else { return }
     // As if recalled with ↑: the draft put aside comes back with ↓ or Escape.
-    draft = historyNavigation.recall(
-      PromptHistory.recalled(command: run.command), in: promptHistory, draft: draft)
+    showRecalled(
+      historyNavigation.recall(
+        PromptHistory.recalled(command: run.command), in: promptHistory, draft: draft))
     requestComposerFocus()
   }
 
@@ -1195,12 +1223,17 @@ public final class ConversationModel {
       recallText =
         shell == nil ? text : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
     }
+    let echoID = UUID()
+    // A command of the CLI — `/mcp` — may open a panel of its terminal, and be written to the
+    // transcript only once the panel is closed: it is waited for as long (#219).
+    let opensPanel = kind == .message && text.hasPrefix("/") && !isAgentWorking
     echoes.append(
       PendingEcho(
-        id: UUID(), text: text, kind: kind, attachmentCount: attachments.count,
+        id: echoID, text: text, kind: kind, attachmentCount: attachments.count,
         sentAt: Date(), recallText: recallText, countAtSend: count,
         // Queued, a command is written once the turn ended, then run.
-        waitsForEnd: kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
+        waitsForEnd: opensPanel
+          || kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
         state: .sending))
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
@@ -1215,7 +1248,230 @@ public final class ConversationModel {
     try? await Task.sleep(for: submitDelay)
     await write(keystrokes.submit)
     scheduleEchoCheck()
+    if opensPanel { watchForTerminalPanel(echoID, command: text) }
     return true
+  }
+
+  // MARK: - A panel of the agent's terminal
+
+  /// A command sent from the composer that the agent answers with a panel of its terminal — `/mcp`,
+  /// `/model` without an argument — rather than in its transcript (#219). The terminal is then
+  /// shown in the conversation, live, until the transcript says the command ran, the agent starts
+  /// working, or the user closes it.
+  public struct TerminalPanel: Hashable, Sendable {
+    /// The echo of the command sent from the composer; `nil` for the initial prompt.
+    public let echoID: UUID?
+    /// `/mcp`, without what follows it.
+    public let command: String
+  }
+
+  public private(set) var terminalPanel: TerminalPanel? {
+    didSet {
+      guard terminalPanel != oldValue else { return }
+      panelSeen = false
+      panelGone?.cancel()
+      panelGone = nil
+      panelFirstSight?.cancel()
+      panelFirstSight = nil
+    }
+  }
+  @ObservationIgnored private var panelWatch: Task<Void, Never>?
+  /// Bumped for the block's terminal to take the keyboard: once the composer has let it go —
+  /// SwiftUI gives it back to the field it last focused, after the terminal took it.
+  public private(set) var terminalPanelFocusRequest = 0
+  /// Whether the block's terminal has shown the panel: from then on, the panel gone closes it.
+  @ObservationIgnored private var panelSeen = false
+  @ObservationIgnored private var panelGone: Task<Void, Never>?
+  @ObservationIgnored private var panelFirstSight: Task<Void, Never>?
+  /// A session's initial command, typed into its agent once ready (#219): its panel is looked for
+  /// while the agent runs and does not work, until it is seen, the agent works on it, or
+  /// `initialCommandDeadline`.
+  @ObservationIgnored private var initialCommand: String?
+  @ObservationIgnored private var initialCommandDeadline = Date.distantPast
+  /// How long a session's initial command, once typed, has its panel looked for.
+  static let initialCommandWindow: TimeInterval = 10
+  /// How long a block waits to see a panel before it takes the command for one that opened none.
+  static let panelFirstSightLimit = Duration.seconds(4)
+  /// A panel's hint gone this long is the panel closed, not a screen being redrawn — a new size
+  /// makes the program draw it again.
+  static let panelGoneDelay = Duration.milliseconds(800)
+  /// How long a command may take to be written before its panel is looked for: a command that
+  /// runs at once — `/compact`, a skill — never shows one.
+  static let terminalPanelDelay = Duration.milliseconds(600)
+
+  private func watchForTerminalPanel(_ id: UUID, command text: String) {
+    panelWatch?.cancel()
+    let command = String(text.prefix { !$0.isWhitespace })
+    panelWatch = Task { [weak self] in
+      try? await Task.sleep(for: Self.terminalPanelDelay)
+      guard !Task.isCancelled, let self, !self.isAgentWorking, self.isProcessRunning,
+        self.echoes.contains(where: { $0.id == id && $0.state == .sending })
+      else { return }
+      self.openTerminalPanel(TerminalPanel(echoID: id, command: command))
+    }
+  }
+
+  private func openTerminalPanel(_ panel: TerminalPanel, firstSight: Duration? = nil) {
+    defer {
+      Task { [weak self] in
+        try? await Task.sleep(for: .milliseconds(150))
+        guard let self, self.terminalPanel == panel else { return }
+        self.terminalPanelFocusRequest += 1
+      }
+    }
+    terminalPanel = panel
+    // A command that opened no panel after all: the block goes by itself.
+    panelFirstSight = Task { [weak self] in
+      try? await Task.sleep(for: firstSight ?? Self.panelFirstSightLimit)
+      guard !Task.isCancelled, let self, self.terminalPanel == panel, !self.panelSeen else {
+        return
+      }
+      // No panel after all: a session started on a command that opened none.
+      if panel.echoID == nil { self.initialCommand = nil }
+      self.endTerminalPanel()
+    }
+  }
+
+  /// A session's initial command — a command of its CLI, typed once the agent was ready — may open
+  /// a panel as well.
+  public func expectTerminalPanel(forInitialPrompt prompt: String) {
+    let command = String(prompt.prefix { !$0.isWhitespace })
+    guard command.hasPrefix("/"), command.count > 1 else { return }
+    initialCommand = command
+    initialCommandDeadline = Date().addingTimeInterval(Self.initialCommandWindow)
+    openInitialPanelIfRunning()
+  }
+
+  private func openInitialPanelIfRunning() {
+    guard let command = initialCommand else { return }
+    guard Date() < initialCommandDeadline else {
+      initialCommand = nil
+      return
+    }
+    guard isProcessRunning, !isAgentWorking, terminalPanel == nil else { return }
+    openTerminalPanel(TerminalPanel(echoID: nil, command: command))
+  }
+
+  /// What the block's terminal shows, as it changes: the panel seen, then gone, closes the block
+  /// — the CLI writes nothing of a panel closed with Escape.
+  public func terminalScreenChanged(_ screen: String) {
+    guard terminalPanel != nil else { return }
+    if AgentPanelRecognition.showsPanel(screen: screen) {
+      panelSeen = true
+      // Found: a session started on a command looks for it no more.
+      if terminalPanel?.echoID == nil { initialCommand = nil }
+      panelGone?.cancel()
+      panelGone = nil
+    } else if panelSeen, panelGone == nil {
+      let panel = terminalPanel
+      panelGone = Task { [weak self] in
+        try? await Task.sleep(for: Self.panelGoneDelay)
+        guard !Task.isCancelled, let self, self.terminalPanel == panel else { return }
+        self.endTerminalPanel()
+      }
+    }
+  }
+
+  /// The panel is gone from the terminal: the block goes, and the keyboard back to the composer.
+  private func endTerminalPanel() {
+    guard let panel = terminalPanel else { return }
+    terminalPanel = nil
+    if let echo = panel.echoID { dismissEcho(echo) }
+    requestComposerFocus()
+  }
+
+  /// Escape typed in the block: it goes on to the panel, which goes back a level or closes, and the
+  /// screen says which. A panel never recognised on screen closes the block all the same.
+  public func escapeInTerminalPanel() {
+    guard let panel = terminalPanel, !panelSeen else { return }
+    Task { [weak self] in
+      try? await Task.sleep(for: Self.panelGoneDelay)
+      guard let self, self.terminalPanel == panel, !self.panelSeen else { return }
+      self.endTerminalPanel()
+    }
+  }
+
+  /// Closes the panel from the conversation: Escape, as in the terminal, then the block goes. The
+  /// command is no longer waited for.
+  public func closeTerminalPanel() async {
+    guard let panel = terminalPanel else { return }
+    terminalPanel = nil
+    if let echo = panel.echoID { dismissEcho(echo) }
+    await write?(promptFormat.interruptKey)
+    requestComposerFocus()
+  }
+
+  /// The block goes once its command is no longer waited for.
+  private func settleTerminalPanel() {
+    guard let panel = terminalPanel, let echo = panel.echoID,
+      !echoes.contains(where: { $0.id == echo })
+    else { return }
+    terminalPanel = nil
+    requestComposerFocus()
+  }
+
+  // MARK: - Skills and commands
+
+  /// The list under a `/` typed first in the composer (#219).
+  public let commands = ComposerCommands()
+
+  /// Reads the skills and commands of the session's agent: the list kept, read again when it is
+  /// stale. `nil` for an agent that cannot list them — `/` is then text.
+  public var readCommands: (() async -> AgentCommandIndex?)? {
+    get { commands.read }
+    set { commands.read = newValue }
+  }
+  public var commandIndex: AgentCommandIndex { commands.index }
+  public var commandSuggestions: [AgentCommandMatch]? { commands.suggestions }
+  public var selectedCommandIndex: Int { commands.selectedIndex }
+
+  public func refreshCommands() { commands.refresh() }
+
+  private func updateCommandSuggestions() {
+    commands.update(text: draft, isEnabled: composerState == .ready)
+  }
+
+  /// Whether the list is on screen: while a message can be written.
+  public var showsCommandSuggestions: Bool {
+    commands.isShowing && composerState == .ready
+  }
+
+  /// ↑ or ↓ while the list is open. Returns whether the key was used.
+  public func moveCommandSelection(by offset: Int) -> Bool {
+    showsCommandSuggestions && commands.moveSelection(by: offset)
+  }
+
+  /// ⇥ or ↩ while the list is open: the entry selected replaces what was typed. Returns whether
+  /// one was inserted. ↩ inserts only to complete a name begun: with nothing matching, a match
+  /// found by its description only, or a name typed in full, it sends the text as it is.
+  public func insertSelectedCommand(onReturn: Bool = false) -> Bool {
+    guard showsCommandSuggestions, let command = commands.selectedCommand else { return false }
+    guard !onReturn || commands.returnInserts else { return false }
+    insertCommand(command)
+    return true
+  }
+
+  public func insertCommand(_ command: AgentCommand) {
+    guard composerState == .ready else { return }
+    draft = commands.inserting(command)
+  }
+
+  /// Escape while the list is open: it closes, the draft left as it is.
+  public func dismissCommandSuggestions() -> Bool {
+    showsCommandSuggestions && commands.dismiss()
+  }
+
+  /// The command the draft opens on, as inserted from the list: shown as a token.
+  public var insertedInvocation: String? { commands.insertedInvocation }
+
+  /// What the command inserted expects, dimmed after it until something is typed.
+  public var pendingArgumentHint: String? { commands.pendingArgumentHint }
+
+  /// A message recalled from the history is shown without its list: ↑ and ↓ keep walking the
+  /// history.
+  private func showRecalled(_ text: String) {
+    commands.willShowRecalled(text)
+    draft = text
   }
 
   // MARK: - History
@@ -1233,7 +1489,7 @@ public final class ConversationModel {
     guard composerState == .ready,
       let text = historyNavigation.older(in: promptHistory, draft: draft)
     else { return false }
-    draft = text
+    showRecalled(text)
     return true
   }
 
@@ -1242,7 +1498,7 @@ public final class ConversationModel {
     guard composerState == .ready,
       let text = historyNavigation.newer(in: promptHistory, draft: draft)
     else { return false }
-    draft = text
+    showRecalled(text)
     return true
   }
 
@@ -1251,7 +1507,7 @@ public final class ConversationModel {
     guard composerState == .ready,
       let text = historyNavigation.cancel(in: promptHistory, draft: draft)
     else { return false }
-    draft = text
+    showRecalled(text)
     return true
   }
 
@@ -1276,6 +1532,7 @@ public final class ConversationModel {
       claimed.insert(index)
       return true
     }
+    settleTerminalPanel()
   }
 
   /// Wakes at the next echo past its wait, marks those past theirs, and waits for the next one.
@@ -1298,5 +1555,6 @@ public final class ConversationModel {
 
   public func dismissEcho(_ id: UUID) {
     echoes.removeAll { $0.id == id }
+    settleTerminalPanel()
   }
 }

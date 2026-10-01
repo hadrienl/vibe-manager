@@ -16,6 +16,17 @@ public struct ConversationView: View {
   let isActive: Bool
   /// Whether the composer takes the keyboard when its session comes on screen (#105).
   let claimsKeyboardOnActivation: Bool
+  /// A second view of the session's terminal, shown while a command waits in one of its panels
+  /// (#219). `nil` where there is no terminal to show.
+  /// It is given what Escape does in it: close the block.
+  /// and what to tell of what its screen shows.
+  let liveTerminal:
+    (
+      (
+        _ focusRequest: Int, _ onEscape: @escaping () -> Void,
+        _ onScreen: @escaping (String) -> Void
+      ) -> AnyView
+    )?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
 
@@ -23,8 +34,15 @@ public struct ConversationView: View {
 
   public init(
     model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance,
-    isActive: Bool = true, claimsKeyboardOnActivation: Bool = true
+    isActive: Bool = true, claimsKeyboardOnActivation: Bool = true,
+    liveTerminal: (
+      (
+        _ focusRequest: Int, _ onEscape: @escaping () -> Void,
+        _ onScreen: @escaping (String) -> Void
+      ) -> AnyView
+    )? = nil
   ) {
+    self.liveTerminal = liveTerminal
     self.model = model
     self.theme = theme
     self.appearance = appearance
@@ -53,6 +71,21 @@ public struct ConversationView: View {
         }
       default:
         conversation
+      }
+      // Out of the footer: a session started on a command shows its panel while its conversation,
+      // empty, is still read and the composer not shown yet (#219).
+      if let panel = model.terminalPanel, let liveTerminal {
+        TerminalPanelBlock(
+          model: model, panel: panel,
+          terminal: liveTerminal(
+            model.terminalPanelFocusRequest,
+            { model.escapeInTerminalPanel() },
+            { model.terminalScreenChanged($0) })
+        )
+        .frame(maxWidth: layout.contentWidth)
+        .padding(.horizontal, layout.sideMargin)
+        .padding(.bottom, showsComposer ? 8 : 16)
+        .frame(maxWidth: .infinity)
       }
       // Outside the switch: the first prompt sent turns the empty conversation into a list, and a
       // composer drawn in each case would be a new one then, the keyboard dropped with the old

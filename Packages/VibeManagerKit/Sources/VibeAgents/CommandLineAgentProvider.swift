@@ -252,6 +252,7 @@ public enum AgentLaunchValidation {
         limit: AgentPromptLimits.maximumByteLimit
       )
     }
+    if let command = PromptDelivery.command(in: prompt) { return .typedOnceReady(command) }
     return byteCount <= AgentPromptLimits.argumentByteLimit ? .argument : .standardInput(prompt)
   }
 }

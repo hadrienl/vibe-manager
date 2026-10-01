@@ -20,6 +20,13 @@ public struct TerminalSurface: NSViewRepresentable {
   /// (#43) does not: shown with its session, it would take the keyboard from the agent's terminal.
   /// It takes it when asked to, through `focusRequest`.
   private let claimsKeyboardOnActivation: Bool
+  /// A second view of a terminal shown elsewhere (#219): see `TerminalSurfaceCoordinator.isMirror`.
+  private let isMirror: Bool
+  /// Escape, taken rather than sent to the program: see `AccessibleTerminalView.onEscape`.
+  private let onEscape: (() -> Void)?
+  /// Told what the screen shows once output has been drawn — a tenth of a second apart at most —
+  /// for a panel's block to see the panel go (#219).
+  private let onScreen: ((String) -> Void)?
 
   public init(
     pane: TerminalPaneModel,
@@ -27,8 +34,14 @@ public struct TerminalSurface: NSViewRepresentable {
     isActive: Bool = true,
     focusRequest: Int = 0,
     accessibilityTitle: String? = nil,
-    claimsKeyboardOnActivation: Bool = true
+    claimsKeyboardOnActivation: Bool = true,
+    isMirror: Bool = false,
+    onEscape: (() -> Void)? = nil,
+    onScreen: ((String) -> Void)? = nil
   ) {
+    self.isMirror = isMirror
+    self.onEscape = onEscape
+    self.onScreen = onScreen
     self.pane = pane
     self.session = session
     self.isActive = isActive
@@ -38,7 +51,7 @@ public struct TerminalSurface: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> TerminalSurfaceCoordinator {
-    TerminalSurfaceCoordinator(pane: pane)
+    TerminalSurfaceCoordinator(pane: pane, isMirror: isMirror)
   }
 
   public func makeNSView(context: Context) -> TerminalView {
@@ -57,6 +70,7 @@ public struct TerminalSurface: NSViewRepresentable {
     view.onWindowChange = { [weak coordinator, weak view] in
       guard let coordinator, let view else { return }
       coordinator.observeKeyboardFocus(of: view)
+      coordinator.joinedWindow(view)
     }
     context.coordinator.bind(to: view)
     return view
@@ -69,6 +83,8 @@ public struct TerminalSurface: NSViewRepresentable {
     if let accessibilityTitle {
       (nsView as? AccessibleTerminalView)?.accessibilityTitle = accessibilityTitle
     }
+    (nsView as? AccessibleTerminalView)?.onEscape = onEscape
+    context.coordinator.onScreen = onScreen
     if let session {
       context.coordinator.attachIfNeeded(to: session)
     }
@@ -91,6 +107,8 @@ public struct TerminalSurface: NSViewRepresentable {
 private enum TerminalCommand: Sendable {
   case write([UInt8])
   case resize(TerminalSize)
+  /// Back on screen: the view's size, given to the process only if another view changed it.
+  case reclaim(TerminalSize)
 }
 
 @MainActor
@@ -154,9 +172,19 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// starts reading a little before, so the question is not taken for text.
   static let sentinelLookBehind = 32
 
-  init(pane: TerminalPaneModel, suspensionDelay: Duration = defaultSuspensionDelay) {
+  /// A second view of a terminal whose own view stays mounted elsewhere (#219). It sizes the
+  /// process to itself only while it is on screen, gives the terminal's own size back when it
+  /// goes, and leaves to the terminal's own view what the pane learns of it: the keyboard, the
+  /// paste mode.
+  let isMirror: Bool
+
+  init(
+    pane: TerminalPaneModel, suspensionDelay: Duration = defaultSuspensionDelay,
+    isMirror: Bool = false
+  ) {
     self.pane = pane
     self.suspensionDelay = suspensionDelay
+    self.isMirror = isMirror
 
     var continuation: AsyncStream<TerminalCommand>.Continuation?
     let stream = AsyncStream<TerminalCommand> { continuation = $0 }
@@ -170,12 +198,19 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     commandTask = Task { @MainActor [weak self] in
       for await command in stream {
         // Read the pane on each command rather than capturing it: `adopt` can have replaced it.
-        guard let pane = self?.pane else { continue }
+        guard let self else { continue }
+        let pane = self.pane
         switch command {
         case .write(let bytes):
           await pane.write(bytes)
         case .resize(let size):
-          await pane.reportViewportSize(size)
+          if self.isMirror {
+            await pane.reportMirrorViewportSize(size)
+          } else {
+            await pane.reportViewportSize(size)
+          }
+        case .reclaim(let size):
+          await pane.reclaimProcessSize(size, isMirror: self.isMirror)
         }
       }
     }
@@ -192,7 +227,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func bind(to view: TerminalView) {
     if self.view !== view { hasFed = false }
     self.view = view
-    connectPasteMode()
+    if !isMirror { connectPasteMode() }
     connectLinkMenu()
   }
 
@@ -221,7 +256,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func adopt(pane: TerminalPaneModel) {
     guard self.pane !== pane else { return }
     self.pane = pane
-    connectPasteMode()
+    if !isMirror { connectPasteMode() }
     connectLinkMenu()
     eventTask?.cancel()
     eventTask = nil
@@ -233,6 +268,20 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     stopSuspension()
   }
 
+  /// Whether the view was on screen at the last update: `nil` before the first.
+  private var wasShown: Bool?
+
+  /// The activation last asked for, acted on again when a mirror joins its window.
+  private var requestedActivation: (isActive: Bool, claimingKeyboard: Bool)?
+
+  /// A mirror appears in a window that is already there: SwiftUI updated it before it had one,
+  /// and it takes the keyboard now, as a panel's block must (#219).
+  func joinedWindow(_ view: TerminalView) {
+    guard isMirror, view.window != nil, let requested = requestedActivation else { return }
+    moveKeyboard(
+      following: requested.isActive, claimingKeyboard: requested.claimingKeyboard, in: view)
+  }
+
   /// Keystrokes must reach the terminal the user is looking at, and only that one: a hidden pane
   /// that kept the first responder would quietly receive what was typed for its neighbour.
   ///
@@ -240,6 +289,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   /// the user for it: the surrounding view redraws whenever a pane's status changes, and the
   /// active terminal would steal the focus back from the sidebar mid-keystroke.
   func followActivation(_ isActive: Bool, claimingKeyboard: Bool = true, in view: TerminalView) {
+    requestedActivation = (isActive, claimingKeyboard)
     // Every pane stays mounted, and a pane at zero opacity is still drawn: each busy agent behind
     // the visible one repainted its whole screen on the main thread at every spinner frame, and the
     // terminal being typed in waited behind them for its echo. A hidden view is not drawn at all.
@@ -258,8 +308,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     }
     // Hidden, it is still fed for a while, then suspended; shown, it catches up (#248).
     if isActive {
+      // Another view of the same terminal may have sized the process meanwhile (#219).
+      if wasShown == false {
+        let terminal = view.getTerminal()
+        commands.yield(.reclaim(TerminalSize(columns: terminal.cols, rows: terminal.rows)))
+      }
+      wasShown = true
       resumeIfSuspended()
     } else {
+      wasShown = false
       scheduleSuspension()
     }
   }
@@ -294,14 +351,15 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     guard lastFocusRequest != request else { return }
     let isFirstSight = lastFocusRequest == nil
     lastFocusRequest = request
-    let isWaiting = pane.takePendingFocusRequest()
+    // A mirror's requests are its own: the terminal's own view keeps the pane's.
+    let isWaiting = isMirror ? false : pane.takePendingFocusRequest()
     if isFirstSight, !claimingOnFirstSight, !isWaiting { return }
     if isActive { window.makeFirstResponder(view) }
   }
 
   /// Tells the pane whether its view holds the keyboard, from the window's first responder.
   func observeKeyboardFocus(of view: TerminalView) {
-    guard let window = view.window, observedWindow !== window else { return }
+    guard !isMirror, let window = view.window, observedWindow !== window else { return }
     observedWindow = window
     // Compared by identity: the view itself cannot cross into the observation's closure.
     let target = ObjectIdentifier(view)
@@ -338,6 +396,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
   func unbind() {
     eventTask?.cancel()
     eventTask = nil
+    screenReport?.cancel()
+    screenReport = nil
     attachedSession = nil
     session = nil
     fedThrough = nil
@@ -346,7 +406,13 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     stopSuspension()
     focusObservation = nil
     observedWindow = nil
-    pane.setKeyboardFocus(false)
+    if isMirror {
+      // Its size was the process's while it was shown: the terminal's own view gets its back.
+      let pane = pane
+      Task { await pane.restorePrimaryViewportSize() }
+    } else {
+      pane.setKeyboardFocus(false)
+    }
     view = nil
   }
 
@@ -613,6 +679,23 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     hasFed = true
     Signposts.interval("terminal.feed") {
       view?.feed(byteArray: bytes[...])
+    }
+    reportScreen()
+  }
+
+  /// See `TerminalSurface.onScreen`.
+  var onScreen: ((String) -> Void)?
+  private var screenReport: Task<Void, Never>?
+
+  private func reportScreen() {
+    guard onScreen != nil, screenReport == nil else { return }
+    screenReport = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(100))
+      guard let self else { return }
+      self.screenReport = nil
+      // Put away, its screen tells nothing: the program redraws for the view shown instead.
+      guard let view = self.view, !view.isHidden, let onScreen = self.onScreen else { return }
+      onScreen(TerminalText.visibleScreen(of: view.getTerminal()))
     }
   }
 

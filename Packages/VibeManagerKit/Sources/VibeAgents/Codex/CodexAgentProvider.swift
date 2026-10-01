@@ -56,15 +56,19 @@ public struct CodexAgentProvider: AgentProvider {
   private let base: CommandLineAgentProvider
   private let catalog: any CodexModelCatalogSource
   private let discovery: any CodexSessionDiscovering
+  /// Asks the CLI for its skills (#219).
+  let appServer: any CodexAppServerConnecting
 
   public init(
     base: CommandLineAgentProvider,
     catalog: any CodexModelCatalogSource,
-    discovery: any CodexSessionDiscovering
+    discovery: any CodexSessionDiscovering,
+    appServer: any CodexAppServerConnecting = CodexAppServerProcess()
   ) {
     self.base = base
     self.catalog = catalog
     self.discovery = discovery
+    self.appServer = appServer
   }
 
   /// Wires the provider to the real file system, the real process probe and the user's

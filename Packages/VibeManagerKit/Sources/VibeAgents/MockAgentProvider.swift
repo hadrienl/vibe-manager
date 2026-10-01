@@ -283,3 +283,26 @@ extension MockAgentProvider: AgentConversationReporting {
       shellEntry: ShellEntry(switchDelay: .milliseconds(20)))
   }
 }
+
+/// A few skills and commands, as Claude Code lists them, for the composer's list to be driven
+/// end to end (#219).
+extension MockAgentProvider: AgentCommandListing {
+  public func commands(inWorkingDirectory workingDirectoryPath: String, refresh: Bool)
+    async throws -> AgentCommandList
+  {
+    AgentCommandList(commands: [
+      AgentCommand(
+        name: "mock:debug-events", invocation: "/mock:debug-events",
+        description: "Trace an execution from its correlation identifier.",
+        argumentHint: "[correlationId]", kind: .skill, origin: .plugin("mock")),
+      AgentCommand(
+        name: "review-notes", invocation: "/review-notes",
+        description: "Review the notes of the session.", kind: .skill, origin: .user),
+      AgentCommand(
+        name: "compact", invocation: "/compact",
+        description: "Free up context by summarizing the conversation so far",
+        argumentHint: "<optional custom summarization instructions>", kind: .command,
+        origin: .builtin),
+    ])
+  }
+}

@@ -204,7 +204,7 @@ struct PassthroughArgumentBuilder: CommandLineAgentArgumentBuilder {
       arguments.append(contentsOf: ["--resume", identifier])
     }
     switch promptDelivery {
-    case .none:
+    case .none, .typedOnceReady:
       break
     case .argument:
       arguments.append(contentsOf: ["--prompt", request.initialPrompt ?? ""])

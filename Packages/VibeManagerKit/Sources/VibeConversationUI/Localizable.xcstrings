@@ -71,6 +71,17 @@
         }
       }
     },
+    "%@ in %@’s terminal" : {
+      "comment" : "A command, then the agent's name, as VoiceOver reads the panel.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ dans le terminal de %2$@"
+          }
+        }
+      }
+    },
     "%@ is asking you a question" : {
       "localizations" : {
         "fr" : {
@@ -616,6 +627,47 @@
         }
       }
     },
+    "%lld skills and commands" : {
+      "comment" : "The composer's list of skills and commands, as VoiceOver reads it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skill or command"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skills and commands"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skill ou commande"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skills et commandes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sub-agents" : {
       "localizations" : {
         "en" : {
@@ -989,6 +1041,27 @@
         }
       }
     },
+    "Close" : {
+      "comment" : "Closes a panel of the agent's terminal shown in the conversation.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        }
+      }
+    },
+    "Closes the panel, as Escape does in the terminal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferme le panneau, comme Échap dans le terminal"
+          }
+        }
+      }
+    },
     "Code font" : {
       "localizations" : {
         "fr" : {
@@ -1015,6 +1088,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commande"
+          }
+        }
+      }
+    },
+    "Commands" : {
+      "comment" : "A section of the composer's list: the agent's commands.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commandes"
           }
         }
       }
@@ -1774,6 +1858,17 @@
         }
       }
     },
+    "No skill matches" : {
+      "comment" : "The composer's list of skills and commands, when nothing matches what is typed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune skill ne correspond"
+          }
+        }
+      }
+    },
     "No version is on trial any more." : {
       "localizations" : {
         "fr" : {
@@ -1840,6 +1935,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un test échoue sur un fichier **remplacé** : je compare d’abord l’`inode`."
+          }
+        }
+      }
+    },
+    "Open in the Terminal" : {
+      "comment" : "Shows the session's terminal, from a panel shown in the conversation.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans le terminal"
           }
         }
       }
@@ -2030,6 +2136,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lecture de la conversation…"
+          }
+        }
+      }
+    },
+    "Reading the skills and commands…" : {
+      "comment" : "The composer's list, while it is read from the agent the first time.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture des skills et des commandes…"
           }
         }
       }
@@ -2398,6 +2515,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Montre le sous-agent dans la conversation."
+          }
+        }
+      }
+    },
+    "Skills" : {
+      "comment" : "A section of the composer's list: the agent's skills.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skills"
           }
         }
       }
@@ -2974,6 +3102,17 @@
         }
       }
     },
+    "built-in" : {
+      "comment" : "Where a command comes from: the agent's own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "intégrée"
+          }
+        }
+      }
+    },
     "collapsed" : {
       "localizations" : {
         "fr" : {
@@ -3084,6 +3223,17 @@
         }
       }
     },
+    "project" : {
+      "comment" : "Where a skill comes from: the session's folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "projet"
+          }
+        }
+      }
+    },
     "running" : {
       "localizations" : {
         "fr" : {
@@ -3130,6 +3280,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "réussi"
+          }
+        }
+      }
+    },
+    "system" : {
+      "comment" : "Where a skill comes from: shipped with the agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "système"
           }
         }
       }
@@ -3181,12 +3342,34 @@
         }
       }
     },
+    "user" : {
+      "comment" : "Where a skill comes from: the user's own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "utilisateur"
+          }
+        }
+      }
+    },
     "waiting for your permission" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente de votre autorisation"
+          }
+        }
+      }
+    },
+    "waits for your choice in %@’s terminal" : {
+      "comment" : "A command's panel, in the conversation: the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "attend votre choix dans le terminal de %@"
           }
         }
       }
@@ -3227,6 +3410,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » est inconnu"
+          }
+        }
+      }
+    },
+    "↑↓ navigate · ⇥ or ↩ insert · Esc close" : {
+      "comment" : "The keys of the composer's list of skills and commands.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↑↓ naviguer · ⇥ ou ↩ insérer · Échap fermer"
           }
         }
       }

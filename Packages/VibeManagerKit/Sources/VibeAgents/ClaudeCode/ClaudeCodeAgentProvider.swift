@@ -43,10 +43,16 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
 
   private let base: CommandLineAgentProvider
   private let catalog: any ClaudeCodeModelCatalogSource
+  /// Lists the skills and commands a prompt may invoke (#219).
+  let commandReader: any ClaudeCodeCommandReading
 
-  public init(base: CommandLineAgentProvider, catalog: any ClaudeCodeModelCatalogSource) {
+  public init(
+    base: CommandLineAgentProvider, catalog: any ClaudeCodeModelCatalogSource,
+    commandReader: any ClaudeCodeCommandReading = ClaudeCodeCommandProcess()
+  ) {
     self.base = base
     self.catalog = catalog
+    self.commandReader = commandReader
   }
 
   public static func make(

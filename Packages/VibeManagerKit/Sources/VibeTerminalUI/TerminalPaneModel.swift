@@ -245,6 +245,7 @@ public final class TerminalPaneModel {
     guard size.isUsable else { return }
     let isFirst = viewportSize == nil
     viewportSize = size
+    processSize = size
 
     if isFirst {
       let waiters = viewportWaiters
@@ -252,6 +253,37 @@ public final class TerminalPaneModel {
       waiters.forEach { $0.resume() }
     }
     await session?.resize(to: size)
+  }
+
+  /// A second view of the terminal — the block a panel of the agent opens in its conversation
+  /// (#219) — sizes the process to itself while it is on screen, without taking the place of the
+  /// size the terminal's own view measured.
+  public func reportMirrorViewportSize(_ size: TerminalSize) async {
+    guard size.isUsable else { return }
+    processSize = size
+    await session?.resize(to: size)
+  }
+
+  /// The mirror is gone: the process is given back the size of the terminal's own view.
+  public func restorePrimaryViewportSize() async {
+    guard let viewportSize else { return }
+    processSize = viewportSize
+    await session?.resize(to: viewportSize)
+  }
+
+  /// The size the process was last given, by the terminal's own view or a mirror of it.
+  private var processSize: TerminalSize?
+
+  /// A view of the terminal back on screen gives the process its size again, if another view —
+  /// the terminal's own, or a panel's block (#219) — changed it meanwhile. Nothing is sent
+  /// otherwise: each new size makes the program redraw.
+  public func reclaimProcessSize(_ size: TerminalSize, isMirror: Bool) async {
+    guard size.isUsable, processSize != size else { return }
+    if isMirror {
+      await reportMirrorViewportSize(size)
+    } else {
+      await reportViewportSize(size)
+    }
   }
 
   /// Told of everything the user types, in the writes it arrives in: the keystroke that answers an
