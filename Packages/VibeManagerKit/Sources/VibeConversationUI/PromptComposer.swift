@@ -445,7 +445,7 @@ struct ActivityLine: View {
       } label: {
         HStack(spacing: 6) {
           Image(systemName: "stop.fill").font(.system(size: 9))
-          Text("Stop", bundle: .module)
+          Text("Interrupt", bundle: .module, comment: "Interrupts the agent's turn.")
           Text("Esc", bundle: .module, comment: "The Escape key.")
             .foregroundStyle(theme.secondaryText.color)
         }
@@ -455,7 +455,7 @@ struct ActivityLine: View {
         .overlay(RoundedRectangle(cornerRadius: 7).stroke(theme.border.color))
       }
       .buttonStyle(.plain)
-      .accessibilityLabel(Text("Stop the agent", bundle: .module))
+      .accessibilityLabel(Text("Interrupt the agent", bundle: .module))
     }
     .font(theme.interfaceFont(size: 12.5))
     .foregroundStyle(theme.secondaryText.color)
