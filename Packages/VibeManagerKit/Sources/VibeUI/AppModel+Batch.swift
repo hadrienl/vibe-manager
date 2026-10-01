@@ -108,7 +108,7 @@ extension AppModel {
     }
   }
 
-  /// ⌥⌘→ and ⌥⌘← on a selection of several: the column next to the one on screen.
+  /// ⌃⌘→ and ⌃⌘← on a selection of several: the column next to the one on screen.
   public func batchMovePlan(forward: Bool) -> SessionBatchPlan? {
     guard let session = selectedSession else { return nil }
     let candidates = forward ? nextTaskStatuses(of: session) : previousTaskStatuses(of: session)

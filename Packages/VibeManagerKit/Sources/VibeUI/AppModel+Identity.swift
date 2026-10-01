@@ -157,7 +157,8 @@ extension AppModel {
   public var canRedoSidebarChange: Bool { sidebarHistory.canRedo }
 
   /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard:
-  /// the last rename, change of icon (#183) or archive (#242). `nil` with nothing to undo: it
+  /// the last rename, change of icon (#183), archive (#242) or status changed from the keyboard
+  /// (#240). `nil` with nothing to undo: it
   /// then goes on to the window, as it did before.
   ///
   /// A text being edited there — the name field, the notes — undoes its own typing: the command
@@ -187,8 +188,8 @@ extension AppModel {
     responder is NSText
   }
 
-  /// ⌘Z in the sidebar or the inspector: the last rename, badge change or archive, unless the
-  /// session has changed since — then nothing is undone, and the Mac beeps.
+  /// ⌘Z in the sidebar or the inspector: the last rename, badge change, archive or status change,
+  /// unless the session has changed since — then nothing is undone, and the Mac beeps.
   public func undoSidebarChange() async {
     sidebarHistory.keep(only: Set(sessions.map(\.id)))
     switch sidebarHistory.popUndo() {
@@ -200,6 +201,8 @@ extension AppModel {
       }
     case .archive(let archive):
       await undoArchive(archive)
+    case .status(let status):
+      await undoStatusChange(status)
     }
   }
 

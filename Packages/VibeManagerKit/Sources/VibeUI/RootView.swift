@@ -637,6 +637,33 @@ public struct RootView: View {
     .onChange(of: model.pendingArchive?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
     }
+    // ⌃⌘→ or ⌃⌘← that would restart a closed session's agent (#240): a key pressed by mistake
+    // must not start one. After the suppression toggle: this question has no "Don't ask again".
+    .confirmationDialog(
+      model.pendingStatusRestart.map {
+        Text("Restart “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Restart this session?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingStatusRestart != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelStatusRestart()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingStatusRestart
+    ) { restart in
+      Button(LocalizedStringResource("Move and Restart", bundle: .module)) {
+        Task { await model.confirmStatusRestart(restart) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelStatusRestart()
+      }
+    } message: { restart in
+      Text(
+        "Moving it to \(String(localized: restart.status.label)) starts its agent again.",
+        bundle: .module, comment: "A task status.")
+    }
     // A side terminal is closed at once, unless a command runs in its foreground (#43). After
     // the suppression toggle: this question has no "Don't ask again" (#115).
     .confirmationDialog(

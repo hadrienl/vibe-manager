@@ -335,6 +335,19 @@ struct SessionSidebarHistoryTests {
     #expect(history.popUndo() == .identity(change(id, "B", "A")))
   }
 
+  @Test("A status change is undone in its turn, and not redone")
+  func statusAmongArchives() {
+    let status = SessionStatusUndo(id: SessionID(), from: .waiting, to: .done)
+    let archive = SessionArchiveUndo(id: SessionID(), taskStatus: .todo, wasSelected: false)
+    var history = SessionSidebarHistory()
+    history.record(archive)
+    history.record(status)
+
+    #expect(history.popUndo() == .status(status))
+    #expect(history.popUndo() == .archive(archive))
+    #expect(!history.canRedo)
+  }
+
   @Test("An archive clears what could be redone, as any change does")
   func archiveClearsRedo() {
     let id = SessionID()

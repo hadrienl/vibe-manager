@@ -15,17 +15,32 @@ public struct SessionArchiveUndo: Hashable, Sendable {
   }
 }
 
+/// A status changed from the keyboard, and the one it left: what ⌘Z puts back (#240).
+public struct SessionStatusUndo: Hashable, Sendable {
+  public let id: SessionID
+  public let from: SessionTaskStatus
+  public let to: SessionTaskStatus
+
+  public init(id: SessionID, from: SessionTaskStatus, to: SessionTaskStatus) {
+    self.id = id
+    self.from = from
+    self.to = to
+  }
+}
+
 /// What ⌘Z undoes where the sidebar or the inspector holds the keyboard, last first: a rename, a
-/// change of icon (#183), an archive (#242).
+/// change of icon (#183), an archive (#242), a status changed from the keyboard (#240).
 public struct SessionSidebarHistory: Hashable, Sendable {
   public enum Entry: Hashable, Sendable {
     case identity(SessionIdentityChange)
     case archive(SessionArchiveUndo)
+    case status(SessionStatusUndo)
 
     var sessionID: SessionID {
       switch self {
       case .identity(let change): change.id
       case .archive(let archive): archive.id
+      case .status(let status): status.id
       }
     }
   }
@@ -33,7 +48,7 @@ public struct SessionSidebarHistory: Hashable, Sendable {
   public static let limit = 50
 
   public private(set) var undoStack: [Entry] = []
-  /// Only renames and badge changes are done again: an archive undone is not redone, ⌃⌘A does it.
+  /// Only renames and badge changes are done again: an archive or a status undone is not redone.
   public private(set) var redoStack: [SessionIdentityChange] = []
 
   public init() {}
@@ -48,6 +63,11 @@ public struct SessionSidebarHistory: Hashable, Sendable {
 
   public mutating func record(_ archive: SessionArchiveUndo) {
     push(.archive(archive))
+    redoStack.removeAll()
+  }
+
+  public mutating func record(_ status: SessionStatusUndo) {
+    push(.status(status))
     redoStack.removeAll()
   }
 

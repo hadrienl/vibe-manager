@@ -8195,6 +8195,17 @@
         }
       }
     },
+    "Moving it to %@ starts its agent again." : {
+      "comment" : "A task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passer à « %@ » relance son agent."
+          }
+        }
+      }
+    },
     "Multiline" : {
       "localizations" : {
         "fr" : {
@@ -10557,12 +10568,33 @@
         }
       }
     },
+    "Restart this session?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer cette session ?"
+          }
+        }
+      }
+    },
     "Restart “%@” in a new process?" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relancer « %@ » dans un nouveau processus ?"
+          }
+        }
+      }
+    },
+    "Restart “%@”?" : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer « %@ » ?"
           }
         }
       }
