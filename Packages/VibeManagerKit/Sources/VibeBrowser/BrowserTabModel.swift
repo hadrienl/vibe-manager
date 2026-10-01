@@ -91,17 +91,27 @@ public final class BrowserTabModel: NSObject, Identifiable {
   @ObservationIgnored var openerID: BrowserTabID?
   /// Told when the page closes its own window, as a pop-up does once it is done.
   @ObservationIgnored var didCloseWindow: (@MainActor () -> Void)?
-  /// Opens another application's address: macOS does, the tests only note it.
-  @ObservationIgnored var openApplicationAddress: @MainActor (URL) -> Void = { url in
-    NSWorkspace.shared.open(url)
-  }
   /// Asked before a download or another application's address that an agent caused.
   @ObservationIgnored var confirmAgentEffect:
     (@MainActor (_ kind: BrowserAgentEffect, _ tab: BrowserTabModel) async -> Bool)?
   /// What the page does counts as the agent's doing: from the tab's opening by the agent, or the
-  /// agent's first action on it, until the user presses a key or a button in the page (#241). A
-  /// click the agent dispatches is no event of AppKit's and never hands the tab back.
-  @ObservationIgnored var isAgentDriven: Bool
+  /// agent's first action on it, until the user clicks in the page or types into it (#241). A
+  /// click the agent dispatches is no event of AppKit's and never hands the tab back. Kept between
+  /// launches with the tab.
+  @ObservationIgnored var isAgentDriven: Bool {
+    didSet { if isAgentDriven != oldValue { didChange?() } }
+  }
+  /// The tab is a window a page of the agent's opened: its opener can still script it, so what it
+  /// downloads or opens is asked even once the user has clicked in it (#241).
+  let isOpenedByAgentPage: Bool
+  /// The tab was closed: a download it started and nobody decided on yet is refused.
+  @ObservationIgnored var isClosed = false
+  /// Opens another application's address: macOS does, the tests only note it.
+  @ObservationIgnored var openApplicationAddress: @MainActor (URL) -> Void = { url in
+    // Opens outside: only reached from the navigation policy below, whose every call says why it
+    // may open there (#241).
+    NSWorkspace.shared.open(url)
+  }
 
   @ObservationIgnored private let configuration: BrowserWebConfiguration
   @ObservationIgnored private var observations: [NSKeyValueObservation] = []
@@ -117,6 +127,8 @@ public final class BrowserTabModel: NSObject, Identifiable {
     url: URL,
     title: String = "",
     openedBy: BrowserTab.Opener,
+    isAgentDriven: Bool? = nil,
+    isOpenedByAgentPage: Bool = false,
     isPinnedTicket: Bool = false,
     configuration: BrowserWebConfiguration
   ) {
@@ -126,13 +138,15 @@ public final class BrowserTabModel: NSObject, Identifiable {
     self.openedBy = openedBy
     self.isPinnedTicket = isPinnedTicket
     self.configuration = configuration
-    self.isAgentDriven = openedBy == .agent
+    self.isAgentDriven = (isAgentDriven ?? (openedBy == .agent)) || isOpenedByAgentPage
+    self.isOpenedByAgentPage = isOpenedByAgentPage
     super.init()
   }
 
   /// What is kept of this tab.
   public var persisted: BrowserTab {
-    BrowserTab(id: id, url: url, title: title, openedBy: openedBy)
+    BrowserTab(
+      id: id, url: url, title: title, openedBy: openedBy, isAgentDriven: asksBeforeEffects)
   }
 
   public var isLoaded: Bool {
@@ -155,9 +169,15 @@ public final class BrowserTabModel: NSObject, Identifiable {
     BrowserOrigin(url: url)
   }
 
-  /// The user pressed a key or a button in the page: what it does next is theirs.
+  /// The user clicked in the page or typed into it: what it does next is theirs — except in a
+  /// window a page of the agent's opened, which that page can still script.
   func userDidInteract() {
     isAgentDriven = false
+  }
+
+  /// A download or another application's address the page causes is asked.
+  var asksBeforeEffects: Bool {
+    isAgentDriven || isOpenedByAgentPage
   }
 
   // MARK: - Loading
@@ -445,6 +465,20 @@ private final class TitleReading {
 public enum BrowserAgentEffect: Hashable, Sendable {
   case download(filename: String)
   case externalApplication(URL)
+  /// Another application's address that reaches another computer — a share to mount, a remote
+  /// screen or shell: asked whoever's the tab is, even after a click of the user's (#241).
+  case networkAddress(URL)
+
+  /// The schemes macOS hands to an application that connects to another computer: Finder mounts
+  /// `smb:`, `afp:`, `nfs:`, `cifs:` and `ftp:` shares, Screen Sharing opens `vnc:`, Terminal
+  /// `ssh:` and `telnet:`.
+  static let networkSchemes: Set<String> = [
+    "smb", "afp", "vnc", "nfs", "ftp", "ssh", "telnet", "cifs",
+  ]
+
+  static func reachesAnotherComputer(_ url: URL) -> Bool {
+    networkSchemes.contains(url.scheme?.lowercased() ?? "")
+  }
 }
 
 // MARK: - WebKit delegates
@@ -518,17 +552,26 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       // decided with every other one.
       return (navigationAction.shouldPerformDownload ? .download : .allow, preferences)
     }
-    // Another application's address: asked when the tab is the agent's; otherwise opened only
-    // after a press of the user's. A click the page's script dispatches is `.linkActivated` too,
-    // and must not open an application unasked (#241).
-    if isAgentDriven {
+    // Another application's address. One that reaches another computer — a share to mount, a
+    // remote screen — is always asked. Any other is asked when the tab is the agent's, and opened
+    // otherwise only after a click of the user's: a click the page's script dispatches is
+    // `.linkActivated` too, and must not open an application unasked (#241).
+    if BrowserAgentEffect.reachesAnotherComputer(target) {
+      let allowed = await confirmAgentEffect?(.networkAddress(target), self) ?? false
+      // Opens outside: the user allowed this address in the question just answered.
+      if allowed { openApplicationAddress(target) }
+    } else if asksBeforeEffects {
       let allowed = await confirmAgentEffect?(.externalApplication(target), self) ?? false
+      // Opens outside: the user allowed this address in the question just answered.
       if allowed { openApplicationAddress(target) }
     } else if navigationAction.navigationType == .linkActivated,
       let sessionView = webView as? SessionWebView,
       sessionView.followsPress(
         with: navigationAction.modifierFlags, now: ProcessInfo.processInfo.systemUptime)
     {
+      // Unsafe open, to fix in #289: a click of the user's in the page opens, without a
+      // question, whatever application address the page's script sends within the second — no
+      // other computer, but any application that registered a scheme.
       openApplicationAddress(target)
     } else {
       record(
@@ -589,7 +632,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       activate = true
     }
     guard let openPopup else {
-      openInNewTab?(target, isAgentDriven, activate)
+      openInNewTab?(target, asksBeforeEffects, activate)
       return nil
     }
     // WebKit must be handed a view made with the configuration it gives: that is what ties the
@@ -598,7 +641,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     let popup = SessionWebView(frame: webView.bounds, configuration: configuration)
     popup.allowsBackForwardNavigationGestures = true
     popup.allowsMagnification = true
-    openPopup(popup, target, isAgentDriven, activate)
+    openPopup(popup, target, asksBeforeEffects, activate)
     return popup
   }
 
@@ -615,7 +658,12 @@ final class BrowserDownloads: NSObject, WKDownloadDelegate {
   static let shared = BrowserDownloads()
 
   private struct Tracked {
+    /// Kept so that its identity is not given to another download while this one is listed.
+    let download: WKDownload
     weak var tab: BrowserTabModel?
+    /// Decided when the download starts, not when its answer arrives: the server chooses when
+    /// that is, and the tab may be closed or taken back meanwhile.
+    let asks: Bool
     let page: URL?
     var destination: URL?
   }
@@ -629,21 +677,33 @@ final class BrowserDownloads: NSObject, WKDownloadDelegate {
   /// is what keeps the tab and the page each one came from.
   private var tracked: [ObjectIdentifier: Tracked] = [:]
 
+  /// How many downloads are started and not yet saved, refused or failed.
+  var underWay: Int { tracked.count }
+
   func track(_ download: WKDownload, from tab: BrowserTabModel, page: URL?) {
-    tracked[ObjectIdentifier(download)] = Tracked(tab: tab, page: page)
+    tracked[ObjectIdentifier(download)] = Tracked(
+      download: download, tab: tab, asks: tab.asksBeforeEffects, page: page)
     download.delegate = self
+  }
+
+  private func entry(for download: WKDownload) -> Tracked? {
+    guard let entry = tracked[ObjectIdentifier(download)], entry.download === download else {
+      return nil
+    }
+    return entry
   }
 
   func download(
     _ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String
   ) async -> URL? {
     let key = ObjectIdentifier(download)
-    let name = (suggestedFilename as NSString).lastPathComponent
-    if let tab = tracked[key]?.tab, tab.isAgentDriven {
-      let allowed =
-        await tab.confirmAgentEffect?(.download(filename: name.isEmpty ? "download" : name), tab)
-        ?? false
-      guard allowed else {
+    let name = Self.safeName(suggestedFilename)
+    guard let entry = entry(for: download) else { return nil }
+    if entry.asks {
+      // A tab closed before the answer arrived cannot show the question: the download is refused.
+      guard let tab = entry.tab, !tab.isClosed, let confirm = tab.confirmAgentEffect,
+        await confirm(.download(filename: name), tab), !tab.isClosed
+      else {
         tracked[key] = nil
         return nil
       }
@@ -654,9 +714,9 @@ final class BrowserDownloads: NSObject, WKDownloadDelegate {
   }
 
   func downloadDidFinish(_ download: WKDownload) {
-    guard let done = tracked.removeValue(forKey: ObjectIdentifier(download)),
-      let destination = done.destination
-    else { return }
+    guard let done = entry(for: download) else { return }
+    tracked[ObjectIdentifier(download)] = nil
+    guard let destination = done.destination else { return }
     do {
       try Self.quarantine(destination, from: download.originalRequest?.url, page: done.page)
     } catch {
@@ -668,13 +728,29 @@ final class BrowserDownloads: NSObject, WKDownloadDelegate {
   }
 
   func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) {
-    tracked[ObjectIdentifier(download)] = nil
+    if entry(for: download) != nil { tracked[ObjectIdentifier(download)] = nil }
+  }
+
+  /// The name a page suggests, without what would make it read as another — a right-to-left
+  /// override shows `fdp.command` as `dnammoc.pdf` — nor control characters or a folder.
+  static func safeName(_ suggested: String) -> String {
+    let hidden: Set<Unicode.Scalar> = [
+      "\u{061C}", "\u{200E}", "\u{200F}", "\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}",
+      "\u{202E}", "\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}",
+    ]
+    var scalars = String.UnicodeScalarView()
+    for scalar in suggested.unicodeScalars
+    where !hidden.contains(scalar) && !CharacterSet.controlCharacters.contains(scalar) {
+      scalars.append(scalar)
+    }
+    let name = (String(scalars) as NSString).lastPathComponent
+    return name.isEmpty || name == "/" ? "download" : name
   }
 
   static func freeName(for name: String, in folder: URL) -> URL {
     let base = (name as NSString).deletingPathExtension
     let ext = (name as NSString).pathExtension
-    var candidate = folder.appendingPathComponent(name.isEmpty ? "download" : name)
+    var candidate = folder.appendingPathComponent(name)
     var index = 2
     while FileManager.default.fileExists(atPath: candidate.path) {
       let numbered = ext.isEmpty ? "\(base) \(index)" : "\(base) \(index).\(ext)"
@@ -684,18 +760,30 @@ final class BrowserDownloads: NSObject, WKDownloadDelegate {
     return candidate
   }
 
-  /// Marks a file as downloaded from the web, by this application, from that address and page:
-  /// Gatekeeper checks it before it is opened, and names where it came from. WebKit marks it too,
-  /// without saying where from; this does not rely on it.
-  static func quarantine(_ file: URL, from address: URL?, page: URL?) throws {
+  /// What the quarantine says of a file: a web download, by this application, from that address
+  /// and page — when they are ones a person could open again. A `data:` address is the file
+  /// itself, possibly megabytes, and a `blob:` one means nothing once the page is gone.
+  static func quarantineProperties(address: URL?, page: URL?) -> [String: Any] {
     var properties: [String: Any] = [
       kLSQuarantineTypeKey as String: kLSQuarantineTypeWebDownload as String,
       kLSQuarantineAgentNameKey as String: "Vibe Manager",
     ]
-    if let address { properties[kLSQuarantineDataURLKey as String] = address }
-    if let page { properties[kLSQuarantineOriginURLKey as String] = page }
+    func kept(_ url: URL?) -> URL? {
+      guard let url, ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else {
+        return nil
+      }
+      return url
+    }
+    if let address = kept(address) { properties[kLSQuarantineDataURLKey as String] = address }
+    if let page = kept(page) { properties[kLSQuarantineOriginURLKey as String] = page }
+    return properties
+  }
+
+  /// Marks a file as downloaded from the web: Gatekeeper checks it before it is opened, and names
+  /// where it came from. WebKit marks it too, without saying where from; this does not rely on it.
+  static func quarantine(_ file: URL, from address: URL?, page: URL?) throws {
     var values = URLResourceValues()
-    values.quarantineProperties = properties
+    values.quarantineProperties = quarantineProperties(address: address, page: page)
     var file = file
     try file.setResourceValues(values)
   }

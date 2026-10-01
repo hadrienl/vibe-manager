@@ -108,7 +108,9 @@ public final class BrowserWorkspace {
       let records: [BrowserActionRecord] = await logStore.load(id)
       guard let self else { return }
       browser.restore(state, records: records) { tab in
-        self.makeTab(tab.url, id: tab.id, title: tab.title, openedBy: tab.openedBy, in: id)
+        self.makeTab(
+          tab.url, id: tab.id, title: tab.title, openedBy: tab.openedBy,
+          isAgentDriven: tab.isAgentDriven, in: id)
       }
       self.restoreTasks[id] = nil
       self.visibilityDidChange?(id)
@@ -200,7 +202,9 @@ public final class BrowserWorkspace {
     from origin: BrowserTabID? = nil
   ) -> BrowserTabModel {
     let browser = browser(for: id)
-    let tab = makeTab(url, openedBy: openedBy, in: id)
+    // A tab the agent's page opens stays asked of whatever its opener scripts in it (#241).
+    let tab = makeTab(
+      url, openedBy: openedBy, isOpenedByAgentPage: openedBy == .agent && origin != nil, in: id)
     browser.append(
       tab, activate: activate, after: anchor(origin, in: browser), isOpener: origin != nil)
     if activate || openedBy != .agent { tab.ensureWebView() }
@@ -220,7 +224,8 @@ public final class BrowserWorkspace {
     in id: SessionID
   ) {
     let browser = browser(for: id)
-    let tab = makeTab(url, openedBy: byAgent ? .agent : .user, in: id)
+    let tab = makeTab(
+      url, openedBy: byAgent ? .agent : .user, isOpenedByAgentPage: byAgent, in: id)
     tab.adopt(popup)
     browser.append(
       tab, activate: activate, after: anchor(origin, in: browser), isOpener: origin != nil)
@@ -250,6 +255,8 @@ public final class BrowserWorkspace {
     guard let browser = browsers[id], let tab = browser.tab(tabID), !tab.isPinnedTicket else {
       return
     }
+    // A download it started and nobody decided on yet is refused (#241).
+    tab.isClosed = true
     browser.remove(tabID)
     lastUse[tabID] = nil
   }
@@ -279,10 +286,12 @@ public final class BrowserWorkspace {
 
   func makeTab(
     _ url: URL, id tabID: BrowserTabID = BrowserTabID(), title: String = "",
-    openedBy: BrowserTab.Opener, isPinnedTicket: Bool = false, in id: SessionID
+    openedBy: BrowserTab.Opener, isAgentDriven: Bool? = nil, isOpenedByAgentPage: Bool = false,
+    isPinnedTicket: Bool = false, in id: SessionID
   ) -> BrowserTabModel {
     let tab = BrowserTabModel(
-      id: tabID, url: url, title: title, openedBy: openedBy, isPinnedTicket: isPinnedTicket,
+      id: tabID, url: url, title: title, openedBy: openedBy, isAgentDriven: isAgentDriven,
+      isOpenedByAgentPage: isOpenedByAgentPage, isPinnedTicket: isPinnedTicket,
       configuration: configuration)
     tab.didChange = { [weak self] in
       guard !isPinnedTicket else { return }
