@@ -32,6 +32,10 @@ echo "Checking the French translations"
 Scripts/test-check-localizations.sh
 Scripts/check-localizations.sh
 
+echo "Checking what is handed to macOS to open"
+Scripts/test-check-external-opens.sh
+Scripts/check-external-opens.sh
+
 echo "Testing the appcast generator"
 swift test --package-path "$repository_root/Packages/ReleaseTools"
 

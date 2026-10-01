@@ -13,6 +13,18 @@ struct FullDiskAccessSheet: View {
   let openSystemSettings: () -> Void
   let skip: () -> Void
 
+  /// What the access reaches besides the agents (#245): the processes of a session answer to macOS
+  /// through the background process (ADR 0010), so a project's scripts read what it opens too. Said
+  /// where the access is granted, and in Settings › Privacy.
+  static var reach: Text {
+    Text(
+      """
+      Everything a session runs gets this access too: the agents and the commands they start, a \
+      project's scripts included.
+      """,
+      bundle: .module)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Let agents read your folders", bundle: .module)
@@ -35,6 +47,10 @@ struct FullDiskAccessSheet: View {
         bundle: .module
       )
       .fixedSize(horizontal: false, vertical: true)
+
+      Self.reach
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
 
       VStack(alignment: .leading, spacing: 6) {
         step(

@@ -506,6 +506,7 @@ struct ProducedImageView: View {
         HStack(spacing: 14) {
           if let open = model?.openInWebView {
             Button {
+              // Opens outside: nothing — the session's web view shows the image's address.
               open(url, false)
             } label: {
               Label {

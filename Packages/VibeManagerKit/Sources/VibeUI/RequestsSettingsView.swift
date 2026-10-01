@@ -183,6 +183,7 @@ struct SignallingSettings: View {
       string:
         "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(identifier)")
     {
+      // Opens outside: the constant address of System Settings' notifications.
       NSWorkspace.shared.open(url)
     }
   }

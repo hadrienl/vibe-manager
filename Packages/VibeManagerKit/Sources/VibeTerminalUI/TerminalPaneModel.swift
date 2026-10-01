@@ -296,7 +296,7 @@ public final class TerminalPaneModel {
   public static func openOutside(_ url: URL) {
     switch LinkRouting.route(url, gesture: .browser, preference: .defaultBrowser, hasWebView: false)
     {
-    case .browser, .system: NSWorkspace.shared.open(url)
+    case .browser, .system: ExternalOpening.open(url)
     case .refused: NSSound.beep()
     case .webView, .newTab: break
     }
