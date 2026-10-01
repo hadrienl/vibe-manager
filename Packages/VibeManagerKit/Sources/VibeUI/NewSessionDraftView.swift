@@ -609,7 +609,9 @@ public struct NewSessionDraftView: View {
             ScrollView(.horizontal, showsIndicators: false) {
               HStack(spacing: 8) {
                 ForEach(model.draft.attachments, id: \.self) { file in
-                  AttachmentChip(file: file, usesSystemColors: true) {
+                  AttachmentChip(
+                    file: file, siblings: model.draft.attachments, usesSystemColors: true
+                  ) {
                     model.removeAttachment(file)
                   }
                 }

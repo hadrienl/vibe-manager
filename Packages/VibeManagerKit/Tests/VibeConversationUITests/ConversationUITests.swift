@@ -516,7 +516,7 @@ struct ConversationModelTests {
   private static func prompts(_ texts: String...) -> ConversationSnapshot {
     ConversationSnapshot(
       entries: texts.map {
-        ConversationEntry(id: $0, content: .userPrompt($0, attachments: 0))
+        ConversationEntry(id: $0, content: .userPrompt($0, attachments: []))
       }, availability: .available)
   }
 
@@ -870,7 +870,7 @@ struct ConversationModelTests {
     #expect(model.echoes.count == 1)
     model.apply(
       ConversationSnapshot(
-        entries: [ConversationEntry(id: "u", content: .userPrompt("hello", attachments: 0))],
+        entries: [ConversationEntry(id: "u", content: .userPrompt("hello", attachments: []))],
         availability: .available))
     #expect(model.echoes.isEmpty)
   }
@@ -882,10 +882,10 @@ struct ConversationModelTests {
     await model.send()
     model.draft = "second"
     await model.send()
-    let first = ConversationEntry(id: "1", content: .userPrompt("first", attachments: 0))
+    let first = ConversationEntry(id: "1", content: .userPrompt("first", attachments: []))
     model.apply(ConversationSnapshot(entries: [first], availability: .available))
     #expect(model.echoes.map(\.text) == ["second"])
-    let second = ConversationEntry(id: "2", content: .userPrompt("second", attachments: 0))
+    let second = ConversationEntry(id: "2", content: .userPrompt("second", attachments: []))
     model.apply(ConversationSnapshot(entries: [first, second], availability: .available))
     #expect(model.echoes.isEmpty)
   }

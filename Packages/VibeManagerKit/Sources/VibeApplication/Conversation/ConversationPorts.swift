@@ -77,18 +77,28 @@ extension ConversationDecoding {
 /// task, they are never written — hence the unchecked conformance. Keep it that way.
 public struct TranscriptRecord: @unchecked Sendable {
   public let object: [String: Any]
+  /// Where the line is in its file, to read an image it holds again when it is shown (#209). Nil
+  /// for a line read from anywhere else.
+  public let location: TranscriptLineLocation?
 
   /// For tests only: an object from anywhere else might hold mutable containers.
-  init(_ object: [String: Any]) {
+  init(_ object: [String: Any], location: TranscriptLineLocation? = nil) {
     self.object = object
+    self.location = location
   }
 
   /// The line parsed, or nil when it is not a JSON object.
   public init?(line: Data) {
+    self.init(line: line, location: nil)
+  }
+
+  /// The line parsed, and where it is in its file; nil when it is not a JSON object.
+  public init?(line: Data, location: TranscriptLineLocation?) {
     guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
       return nil
     }
     self.object = object
+    self.location = location
   }
 }
 

@@ -12,8 +12,10 @@ public struct ConversationEntry: Identifiable, Hashable, Sendable {
   public var content: Content
 
   public enum Content: Hashable, Sendable {
-    /// What the user typed, as Markdown. `attachments` counts the images that came with it.
-    case userPrompt(String, attachments: Int)
+    /// What the user typed, as Markdown, as the agent read it, and the files that came with it
+    /// (#209). The paths the composer joined stay in the text: `AttachedPaths` takes them out of
+    /// what is shown.
+    case userPrompt(String, attachments: [MessageAttachment])
     /// What the agent answered, as Markdown.
     case agentText(String)
     /// The agent's reasoning, `nil` when its provider keeps the text to itself.

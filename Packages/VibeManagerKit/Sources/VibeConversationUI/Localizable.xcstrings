@@ -305,52 +305,6 @@
         }
       }
     },
-    "%lld attachments" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld attachment"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld attachments"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld pièces jointes"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld pièce jointe"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld pièces jointes"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld done" : {
       "localizations" : {
         "en" : {
@@ -574,6 +528,52 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld nouveaux messages"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld pages" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages"
                 }
               }
             }
@@ -987,6 +987,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Joindre des fichiers…"
+          }
+        }
+      }
+    },
+    "Audio" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio"
           }
         }
       }
@@ -1415,6 +1425,36 @@
         }
       }
     },
+    "File" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier"
+          }
+        }
+      }
+    },
+    "File not found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier introuvable"
+          }
+        }
+      }
+    },
+    "File not found, %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier introuvable, %@"
+          }
+        }
+      }
+    },
     "Fold the panel" : {
       "localizations" : {
         "fr" : {
@@ -1531,6 +1571,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contraste élevé"
+          }
+        }
+      }
+    },
+    "Image" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image"
+          }
+        }
+      }
+    },
+    "Image %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image %lld"
           }
         }
       }
@@ -1939,6 +1999,26 @@
         }
       }
     },
+    "Open" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir"
+          }
+        }
+      }
+    },
+    "Open in Web View" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans la vue web"
+          }
+        }
+      }
+    },
     "Open in the Terminal" : {
       "comment" : "Shows the session's terminal, from a panel shown in the conversation.",
       "localizations" : {
@@ -1966,6 +2046,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir les sessions en"
+          }
+        }
+      }
+    },
+    "Opens a preview" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre un aperçu"
           }
         }
       }
@@ -2040,6 +2130,16 @@
         }
       }
     },
+    "Pause" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        }
+      }
+    },
     "Pink" : {
       "localizations" : {
         "fr" : {
@@ -2056,6 +2156,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plan"
+          }
+        }
+      }
+    },
+    "Play" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire"
           }
         }
       }
@@ -2680,6 +2790,16 @@
         }
       }
     },
+    "Text" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Texte"
+          }
+        }
+      }
+    },
     "Text size" : {
       "localizations" : {
         "fr" : {
@@ -3002,6 +3122,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Versions"
+          }
+        }
+      }
+    },
+    "Video" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo"
           }
         }
       }

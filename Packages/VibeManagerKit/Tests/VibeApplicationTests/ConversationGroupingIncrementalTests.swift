@@ -30,7 +30,7 @@ enum RandomConversation {
       let id = "e\(index)"
       switch Int.random(in: 0..<10, using: &generator) {
       case 0:
-        return ConversationEntry(id: id, content: .userPrompt("prompt \(index)", attachments: 0))
+        return ConversationEntry(id: id, content: .userPrompt("prompt \(index)", attachments: []))
       case 1: return ConversationEntry(id: id, content: .agentText("text \(index)"))
       case 2: return ConversationEntry(id: id, content: .reasoning(nil))
       case 3: return ConversationEntry(id: id, content: .reasoning("thought \(index)"))
@@ -105,7 +105,7 @@ struct ConversationGroupingIncrementalTests {
   @Test("Each block starts at its first entry, in order")
   func starts() {
     let entries = [
-      ConversationEntry(id: "p", content: .userPrompt("go", attachments: 0)),
+      ConversationEntry(id: "p", content: .userPrompt("go", attachments: [])),
       ConversationEntry(id: "r1", content: .tool(ToolCall(callID: "r1", kind: .read))),
       ConversationEntry(id: "silent", content: .reasoning(nil)),
       ConversationEntry(id: "r2", content: .tool(ToolCall(callID: "r2", kind: .read))),

@@ -27,6 +27,8 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   /// prompt is its mission — shown by the call that started it — and its hand-back is its answer.
   private let isSubagent: Bool
   private var hasSeenMission = false
+  /// Where the line being decoded is, for the images it holds (#209).
+  private var location: TranscriptLineLocation?
 
   /// - Parameter isSubagent: a sub-agent's own transcript, written beside the conversation's under
   ///   `<session id>/subagents/`, rather than the conversation's.
@@ -36,6 +38,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
 
   public func consume(_ record: TranscriptRecord) {
     let object = record.object
+    location = record.location
     guard let type = object["type"] as? String
     else { return }
     if object["isSidechain"] as? Bool == true, !isSubagent { return }
@@ -116,7 +119,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
         hasSeenMission = true
         return
       }
-      readTypedText(text, uuid: uuid, date: date, attachments: 0)
+      readTypedText(text, uuid: uuid, date: date, attachments: [])
       return
     }
     guard let content = message["content"] as? [[String: Any]] else { return }
@@ -126,7 +129,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       hasSeenMission = true
       return
     }
-    readBlocks(content, uuid: uuid, date: date) { block in
+    readBlocks(content, in: ["message", "content"], uuid: uuid, date: date) { block in
       apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
     }
   }
@@ -148,50 +151,101 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     let origin = (attachment["origin"] as? [String: Any])?["kind"] as? String
     guard origin == nil || origin == "human" else { return }
     if let text = attachment["prompt"] as? String {
-      readTypedText(text, uuid: uuid, date: date, attachments: 0)
+      readTypedText(text, uuid: uuid, date: date, attachments: [])
     } else if let content = attachment["prompt"] as? [[String: Any]] {
-      readBlocks(content, uuid: uuid, date: date) { _ in }
+      readBlocks(content, in: ["attachment", "prompt"], uuid: uuid, date: date) { _ in }
     }
   }
 
-  /// A prompt's blocks: its text, and the images that came with it.
+  /// A prompt's blocks: its text, and the images that came with it (#209).
+  ///
+  /// The CLI writes a placeholder for each image — `[Image #1]` where it was pasted, inside the
+  /// text, or `[Image: source: /path]` in a block of its own for a file — and the images, in the
+  /// same order: the n-th placeholder names the n-th image. An image keeps where its bytes are,
+  /// never the bytes.
   private func readBlocks(
-    _ content: [[String: Any]], uuid: String, date: Date?,
+    _ content: [[String: Any]], in container: [String], uuid: String, date: Date?,
     result: ([String: Any]) -> Void
   ) {
     var texts: [String] = []
-    var images = 0
-    // `[Image #1]` or `[Image: source: …]` alone in a block: the CLI's placeholder for a picture.
-    var placeholders = 0
-    for block in content {
+    var images: [(embedded: EmbeddedImage?, mediaType: String)] = []
+    // The file each placeholder names, nil for a pasted image.
+    var placeholders: [String?] = []
+    for (index, block) in content.enumerated() {
       switch block["type"] as? String {
       case "tool_result":
         result(block)
       case "image":
-        images += 1
+        let encoded = EmbeddedImage.encodedImage(in: block)
+        let mediaType = encoded?.mediaType ?? "image/png"
+        var embedded: EmbeddedImage?
+        if let location, let encoded {
+          embedded = EmbeddedImage(
+            line: location, container: container, index: index, mediaType: mediaType,
+            encodedLength: (encoded.base64 as NSString).length)
+        }
+        images.append((embedded, mediaType))
       case "text":
         guard let text = block["text"] as? String else { continue }
         if Self.isImagePlaceholder(text) {
-          placeholders += 1
+          placeholders.append(Self.imageSource(text))
           continue
         }
         // `[Image #1] [Image #2]Look at this`: the CLI writes its placeholders where the images
         // were pasted, inside the text.
         let (stripped, inline) = Self.strippingInlinePlaceholders(text)
-        placeholders += inline
+        placeholders += [String?](repeating: nil, count: inline)
         if !stripped.isEmpty { texts.append(stripped) }
       default:
         continue
       }
     }
-    // A placeholder usually stands beside the image it names; count the picture once.
-    let attachments = max(images, placeholders)
-    guard !texts.isEmpty || attachments > 0 else { return }
+    // A placeholder usually stands beside the image it names; each picture is counted once.
+    let attachments = (0..<max(images.count, placeholders.count)).map { rank in
+      let path = rank < placeholders.count ? placeholders[rank] : nil
+      let image = rank < images.count ? images[rank] : nil
+      return Self.image(
+        id: "\(uuid)/attachment-\(rank)", path: path, embedded: image?.embedded,
+        mediaType: image?.mediaType)
+    }
+    guard !texts.isEmpty || !attachments.isEmpty else { return }
     readTypedText(texts.joined(separator: "\n\n"), uuid: uuid, date: date, attachments: attachments)
   }
 
+  /// An image of a prompt: its file when the CLI named one, its bytes in the transcript when it
+  /// holds them, both when it can.
+  static func image(id: String, path: String?, embedded: EmbeddedImage?, mediaType: String?)
+    -> MessageAttachment
+  {
+    let file = path.map { URL(fileURLWithPath: $0) }
+    let source: MessageAttachment.Source =
+      switch (file, embedded) {
+      case (let file?, let embedded?): .fileWithEmbedded(file, embedded)
+      case (let file?, nil): .file(file)
+      case (nil, let embedded?): .embedded(embedded)
+      case (nil, nil): .missing
+      }
+    let kind =
+      file.map { MessageAttachment.kind(forExtension: $0.pathExtension) }
+      ?? mediaType.map(MessageAttachment.kind(forMediaType:)) ?? .image
+    return MessageAttachment(
+      id: id, kind: kind == .other ? .image : kind, source: source, name: file?.lastPathComponent)
+  }
+
+  /// The file an `[Image: source: /path]` placeholder names; nil for `[Image #1]`.
+  static func imageSource(_ placeholder: String) -> String? {
+    let trimmed = placeholder.trimmingCharacters(in: .whitespacesAndNewlines)
+    let prefix = "[Image: source: "
+    guard trimmed.hasPrefix(prefix), trimmed.hasSuffix("]") else { return nil }
+    let path = String(trimmed.dropFirst(prefix.count).dropLast())
+      .trimmingCharacters(in: .whitespaces)
+    return path.hasPrefix("/") ? path : nil
+  }
+
   /// What the user sent: a prompt, or one of the CLI's own messages dressed as one.
-  private func readTypedText(_ text: String, uuid: String, date: Date?, attachments: Int) {
+  private func readTypedText(
+    _ text: String, uuid: String, date: Date?, attachments: [MessageAttachment]
+  ) {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.hasPrefix("[Request interrupted by user") {
       interruptRunningCalls()
@@ -234,9 +288,13 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     }
     // The CLI's own plumbing: command output, caveats, reminders, background task notices.
     if Self.isPlumbing(trimmed) { return }
-    guard !trimmed.isEmpty || attachments > 0 else { return }
-    append(
-      ConversationEntry(id: uuid, date: date, content: .userPrompt(text, attachments: attachments)))
+    // The files the composer joined by their paths, at the end of the text (#209).
+    let joined = AttachedPaths.split(text).files.enumerated().map { rank, file in
+      MessageAttachment.file(file, id: "\(uuid)/file-\(rank)")
+    }
+    let all = attachments + joined
+    guard !trimmed.isEmpty || !all.isEmpty else { return }
+    append(ConversationEntry(id: uuid, date: date, content: .userPrompt(text, attachments: all)))
   }
 
   /// Tags the CLI wraps its own messages in. A prompt that merely starts with `<` — a pasted

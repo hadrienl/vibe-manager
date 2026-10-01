@@ -25,7 +25,7 @@ struct ClaudeCodeConversationDecoderTests {
       #"{"type":"cost-state","uuid":"x2","totalCostUSD":1}"#,
     ])
     #expect(entries.map(\.id) == ["u1", "a1", "a2"])
-    #expect(entries[0].content == .userPrompt("Fix the tail", attachments: 0))
+    #expect(entries[0].content == .userPrompt("Fix the tail", attachments: []))
     #expect(entries[0].date != nil)
     #expect(entries[1].content == .reasoning(nil))
     #expect(entries[2].content == .agentText("On it."))
@@ -206,7 +206,8 @@ struct ClaudeCodeConversationDecoderTests {
       #"{"type":"user","uuid":"u","message":{"content":[{"type":"text","text":"What is this?"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}}"#,
       #"{"type":"assistant","uuid":"a","message":{"content":[{"type":"tool_use","id":"t","name":"mcp__github__issues","input":{"action":"get"}}]}}"#,
     ])
-    #expect(entries[0].content == .userPrompt("What is this?", attachments: 1))
+    #expect(entries[0].promptText == "What is this?")
+    #expect(entries[0].attachments.map(\.kind) == [.image])
     #expect(entries[1].toolCall?.kind == .mcp(server: "github", tool: "issues"))
     #expect(entries[1].toolCall?.parameter(.arguments) == #"{"action":"get"}"#)
   }
@@ -220,12 +221,8 @@ struct ClaudeCodeConversationDecoderTests {
       #"{"type":"user","uuid":"d","message":{"content":[{"type":"text","text":"[Image #1] why is it cut?"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}}"#,
       #"{"type":"user","uuid":"e","message":{"content":[{"type":"text","text":"[Image: source: /tmp/a.png]"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}}"#,
     ])
-    #expect(
-      entries.map(\.content) == [
-        .userPrompt("<Button> is cut off", attachments: 0),
-        .userPrompt("why is it cut?", attachments: 1),
-        .userPrompt("", attachments: 1),
-      ])
+    #expect(entries.map(\.promptText) == ["<Button> is cut off", "why is it cut?", ""])
+    #expect(entries.map(\.attachments.count) == [0, 1, 1])
   }
 
   @Test("A prompt sent during a turn is shown where the turn took it; no other queued message")
@@ -242,14 +239,9 @@ struct ClaudeCodeConversationDecoderTests {
       #"{"type":"assistant","uuid":"b","message":{"content":[{"type":"text","text":"Taking B."}]}}"#,
     ])
     #expect(
-      entries.map(\.content) == [
-        .userPrompt("Look into it", attachments: 0),
-        .agentText("Looking."),
-        .userPrompt("take B", attachments: 0),
-        .userPrompt("here too", attachments: 2),
-        .userPrompt("older", attachments: 0),
-        .agentText("Taking B."),
-      ])
+      entries.map(\.promptText) == ["Look into it", nil, "take B", "here too", "older", nil])
+    #expect(entries[3].attachments.map(\.kind) == [.image, .image])
+    #expect(entries[5].content == .agentText("Taking B."))
   }
 
   @Test("A line that is not JSON, or cut short, is skipped")
@@ -313,7 +305,7 @@ struct CodexConversationDecoderTests {
     ])
     #expect(
       entries.map(\.content) == [
-        .userPrompt("Fix it", attachments: 0), .reasoning(nil), .agentText("Done."),
+        .userPrompt("Fix it", attachments: []), .reasoning(nil), .agentText("Done."),
       ])
   }
 
@@ -352,7 +344,7 @@ struct CodexConversationDecoderTests {
       item(
         #"{"type":"UserMessage","id":"u","content":[{"type":"text","text":"\u200b!important"}]}"#)
     ])
-    #expect(message.map(\.content) == [.userPrompt("!important", attachments: 0)])
+    #expect(message.map(\.content) == [.userPrompt("!important", attachments: [])])
   }
 
   @Test("A command is a read, a search or a listing when Codex parsed it as one")
@@ -455,7 +447,7 @@ struct CodexConversationDecoderTests {
     ])
     #expect(
       entries.map(\.content) == [
-        .notice(.olderFormat), .userPrompt("hello", attachments: 0), .agentText("hi"),
+        .notice(.olderFormat), .userPrompt("hello", attachments: []), .agentText("hi"),
       ])
   }
 }
@@ -837,7 +829,7 @@ struct MockConversationTests {
     let decoder = provider.conversationDecoder(for: files[0])
     for line in await FileTranscriptTail().read(files[0]) { decoder.consume(line) }
     let expected: [ConversationEntry.Content] = [
-      .userPrompt("hello", attachments: 0), .agentText("Mock received: hello"),
+      .userPrompt("hello", attachments: []), .agentText("Mock received: hello"),
     ]
     #expect(decoder.entries.map(\.content) == expected)
   }
@@ -868,7 +860,7 @@ struct MockConversationTests {
               command: #"printf 'a\nb "c"'"#, state: .succeeded,
               output: ToolOutput(text: "a\nb \"c\"")))),
         // Pasted, a `!` is text.
-        .userPrompt("!pasted", attachments: 0), .agentText("echo: !pasted"),
+        .userPrompt("!pasted", attachments: []), .agentText("echo: !pasted"),
       ])
   }
 

@@ -20,7 +20,7 @@ private final class PromptDecoder: ConversationDecoding {
     entries.append(
       ConversationEntry(
         id: "\(file)#\(entries.count)",
-        content: .userPrompt(String(text.dropFirst(5)), attachments: 0)))
+        content: .userPrompt(String(text.dropFirst(5)), attachments: [])))
   }
 }
 
@@ -109,7 +109,7 @@ struct ConversationWorkspaceFollowTests {
       handover: .initialPrompt, at: Date())
     workspace.sessionsChanged([session])
     await waitUntil("the second conversation shown") {
-      model.snapshot.entries.contains { $0.content == .userPrompt("second", attachments: 0) }
+      model.snapshot.entries.contains { $0.content == .userPrompt("second", attachments: []) }
     }
   }
 

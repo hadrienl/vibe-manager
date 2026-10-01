@@ -23,7 +23,7 @@ struct ComposerHistoryKeysTests {
       model.apply(
         ConversationSnapshot(
           entries: prompts.map {
-            ConversationEntry(id: $0, content: .userPrompt($0, attachments: 0))
+            ConversationEntry(id: $0, content: .userPrompt($0, attachments: []))
           }, availability: .available))
       window = NSWindow(
         contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled],

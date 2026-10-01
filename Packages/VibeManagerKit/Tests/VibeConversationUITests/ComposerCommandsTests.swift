@@ -133,7 +133,7 @@ struct ComposerCommandsTests {
   @Test("A message recalled from the history opens no list: ↑ keeps walking the history")
   func history() async {
     let (model, _) = await readyModel(entries: [
-      ConversationEntry(id: "1", content: .userPrompt("/weird", attachments: 0))
+      ConversationEntry(id: "1", content: .userPrompt("/weird", attachments: []))
     ])
     #expect(model.recallOlderPrompt())
     #expect(model.draft == "/weird")
@@ -541,7 +541,7 @@ extension ComposerHistoryKeysTests {
   @Test("Escape closes the list and leaves the draft; ↑ then walks the history")
   func escapeCloses() async throws {
     let composer = try await CommandComposer(entries: [
-      ConversationEntry(id: "1", content: .userPrompt("hello", attachments: 0))
+      ConversationEntry(id: "1", content: .userPrompt("hello", attachments: []))
     ])
     defer { composer.close() }
     await composer.type("/deb")
