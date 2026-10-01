@@ -992,6 +992,46 @@ struct AgentChoiceRow: View {
   let select: () -> Void
 
   var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      card
+      remedyActions
+    }
+  }
+
+  /// What the remedy asks for, done from here: the install page, the sign-in command (#234).
+  /// Beside the card rather than in it: the card is itself a button.
+  @ViewBuilder
+  private var remedyActions: some View {
+    if agent.installationPage != nil || agent.signInCommand != nil {
+      HStack(spacing: 8) {
+        if let page = agent.installationPage {
+          Button {
+            ExternalOpening.open(page)
+          } label: {
+            agent.installationPageUpdates
+              ? Text("Update \(agent.name)…", bundle: .module, comment: "An agent's name.")
+              : Text("Install \(agent.name)…", bundle: .module, comment: "An agent's name.")
+          }
+        }
+        if let command = agent.signInCommand {
+          Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+          } label: {
+            Text(
+              "Copy \(command)", bundle: .module,
+              comment: "A command line to paste in a terminal: claude auth login.")
+          }
+          .help(
+            Text("Paste it in a terminal to sign in, then detect again.", bundle: .module))
+        }
+      }
+      .controlSize(.small)
+      .padding(.leading, 28)
+    }
+  }
+
+  private var card: some View {
     // Unusable agents stay visible and readable, but cannot be chosen.
     ChoiceCard(isSelected: isSelected, isEnabled: agent.isUsable, select: select) {
       Image(systemName: agent.descriptor.symbolName)
