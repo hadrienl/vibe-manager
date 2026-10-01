@@ -4302,7 +4302,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }

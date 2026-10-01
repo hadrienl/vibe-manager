@@ -873,7 +873,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }
@@ -1567,6 +1567,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installez Claude Code ou Codex et connectez-vous depuis un terminal, puis vérifiez à nouveau."
+          }
+        }
+      }
+    },
+    "Interrupt" : {
+      "comment" : "Interrupts the agent's turn.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompre"
+          }
+        }
+      }
+    },
+    "Interrupt the agent" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompre l’agent"
           }
         }
       }
@@ -2566,26 +2587,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recommencez pour créer un thème de l’autre mode"
-          }
-        }
-      }
-    },
-    "Stop" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêter"
-          }
-        }
-      }
-    },
-    "Stop the agent" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêter l’agent"
           }
         }
       }
