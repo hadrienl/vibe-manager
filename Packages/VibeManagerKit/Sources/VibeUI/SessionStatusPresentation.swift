@@ -74,14 +74,15 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     paneStatus: TerminalPaneModel.Status?,
     resolution: SessionAgentResolution? = nil,
     wasStoppedOnPurpose: Bool = false,
-    activity: AgentActivityState? = nil
+    activity: AgentActivityState? = nil,
+    launchFailed: Bool = false
   ) -> SessionStatusPresentation {
     // The closure's type is written out: Xcode 16.4 cannot infer it on its own.
     let process: SessionStatusPresentation? =
       wasStoppedOnPurpose
       ? nil
       : paneStatus.flatMap { status -> SessionStatusPresentation? in
-        Self.process(status, activity: activity)
+        Self.process(status, activity: activity, launchFailed: launchFailed)
       }
     if wasStoppedOnPurpose, let paneStatus, hasEnded(paneStatus) {
       return stored(session)
@@ -179,9 +180,12 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     }
   }
 
+  /// - Parameter launchFailed: the process never started — `.failed` also says a terminal lost on
+  ///   the way, which is not a launch that failed.
   private static func process(
     _ status: TerminalPaneModel.Status,
-    activity: AgentActivityState?
+    activity: AgentActivityState?,
+    launchFailed: Bool
   ) -> SessionStatusPresentation? {
     switch status {
     case .starting:
@@ -201,8 +205,8 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     case .exited(let code):
       return SessionStatusPresentation(
         label: LocalizedStringResource(
-          "Stopped on an error", bundle: .module,
-          comment: "A session's state: its agent ended with an exit status other than 0."),
+          "Process failed", bundle: .module,
+          comment: "A session's state: its agent's process ended on an error."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error,
         detail: String(
@@ -212,8 +216,8 @@ public struct SessionStatusPresentation: Equatable, Sendable {
     case .terminated(let signal):
       return SessionStatusPresentation(
         label: LocalizedStringResource(
-          "Stopped unexpectedly", bundle: .module,
-          comment: "A session's state: its agent was killed by a signal nobody here sent."),
+          "Process interrupted", bundle: .module,
+          comment: "A session's state: its agent's process was killed by a signal."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error,
         detail: String(
@@ -222,9 +226,13 @@ public struct SessionStatusPresentation: Equatable, Sendable {
       )
     case .failed(let message):
       return SessionStatusPresentation(
-        label: LocalizedStringResource(
-          "Could not start", bundle: .module,
-          comment: "A session's state: its agent could not be launched."),
+        label: launchFailed
+          ? LocalizedStringResource(
+            "Couldn't start", bundle: .module,
+            comment: "A session's state: its agent could not be launched.")
+          : LocalizedStringResource(
+            "Process failed", bundle: .module,
+            comment: "A session's state: its agent's process ended on an error."),
         symbolName: "exclamationmark.triangle.fill",
         severity: .error,
         detail: message.isEmpty ? nil : message

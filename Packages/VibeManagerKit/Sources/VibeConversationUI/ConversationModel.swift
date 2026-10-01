@@ -245,11 +245,18 @@ public final class ConversationModel {
   @ObservationIgnored public var processRunning: () -> Bool = { false }
   public var isProcessRunning: Bool { processRunning() }
   /// Whether the process ended on an error nobody asked for — an exit status other than 0, a
-  /// signal, a launch that failed — rather than closed by the user. Read like `processRunning`.
+  /// signal, a terminal lost — rather than closed by the user. Read like `processRunning`.
   @ObservationIgnored public var endedOnError: () -> Bool = { false }
   /// The session's agent stopped on its own, on an error: said apart from a session closed on
   /// purpose, with the way to the terminal where the reason is (#235).
   public var hasStoppedOnError: Bool { !isProcessRunning && endedOnError() }
+  /// Why the agent could not be launched at all, read like `processRunning`.
+  @ObservationIgnored public var launchFailure: () -> ConversationLaunchFailure? = { nil }
+  /// What the foot of the conversation says of an agent that never started: in conversation as
+  /// in the terminal, where it was the only place it was said (#235).
+  public var shownLaunchFailure: ConversationLaunchFailure? {
+    isProcessRunning ? nil : launchFailure()
+  }
   public var agentName = ""
   public var promptFormat = AgentPromptFormat()
   public var appearance = ConversationAppearance() {
@@ -1562,5 +1569,16 @@ public final class ConversationModel {
   public func dismissEcho(_ id: UUID) {
     echoes.removeAll { $0.id == id }
     settleTerminalPanel()
+  }
+}
+
+/// Why a session's agent could not be launched, and what to do about it.
+public struct ConversationLaunchFailure: Equatable, Sendable {
+  public let message: String
+  public let suggestion: String?
+
+  public init(message: String, suggestion: String?) {
+    self.message = message
+    self.suggestion = suggestion
   }
 }

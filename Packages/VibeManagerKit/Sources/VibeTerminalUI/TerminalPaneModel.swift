@@ -373,6 +373,13 @@ public final class TerminalPaneModel {
     await session?.write(bytes)
   }
 
+  /// Says that the process is about to be stopped on purpose by someone other than this pane —
+  /// all of them at once, when the application quits and stops its agents: its end then reads
+  /// as what the user asked for, not as an error (#235).
+  public func markStoppingOnPurpose() {
+    wasStoppedOnPurpose = true
+  }
+
   public func stop(gracePeriod: Duration = .seconds(3)) async {
     wasStoppedOnPurpose = true
     await supervisor.stop(id: terminalID, gracePeriod: gracePeriod)

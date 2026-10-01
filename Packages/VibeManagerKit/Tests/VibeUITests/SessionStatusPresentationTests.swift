@@ -147,43 +147,21 @@ struct SessionStatusPresentationTests {
     #expect(exited.severity == .error)
     #expect(terminated.severity == .error)
     // Words first, the code after them, for whoever wants it (#235).
-    #expect(english(failed.label) == "Could not start")
-    #expect(failed.detail == "No such file")
-    #expect(english(exited.label) == "Stopped on an error")
+    #expect(english(exited.label) == "Process failed")
     #expect(exited.detail == "Exit code 127")
-    #expect(english(terminated.label) == "Stopped unexpectedly")
+    #expect(english(terminated.label) == "Process interrupted")
     #expect(terminated.detail == "Signal 9")
-    #expect(Localization.string(exited.label, in: "fr") == "Arrêtée sur une erreur")
+    #expect(Localization.string(exited.label, in: "fr") == "Processus en erreur")
     let spoken = SessionStatusPresentation.accessibilityLabel(for: session(), status: exited)
-    #expect(spoken.hasSuffix("Stopped on an error (Exit code 127)"))
-  }
-
-  @Test("In conversation, an agent that could not be launched says why over the conversation (#235)")
-  func launchFailureInConversation() {
-    #expect(
-      SessionDetailCover.of(
-        presentation: .conversation, isArchived: false, hasPane: false, hasLaunchFailure: true)
-        == .unavailable)
-    #expect(
-      SessionDetailCover.of(
-        presentation: .conversation, isArchived: false, hasPane: false, hasLaunchFailure: false)
-        == .none)
-    #expect(
-      SessionDetailCover.of(
-        presentation: .conversation, isArchived: true, hasPane: false, hasLaunchFailure: false)
-        == .none)
-    #expect(
-      SessionDetailCover.of(
-        presentation: .terminal, isArchived: false, hasPane: false, hasLaunchFailure: false)
-        == .unavailable)
-    #expect(
-      SessionDetailCover.of(
-        presentation: .terminal, isArchived: true, hasPane: false, hasLaunchFailure: false)
-        == .archived)
-    #expect(
-      SessionDetailCover.of(
-        presentation: .terminal, isArchived: false, hasPane: true, hasLaunchFailure: false)
-        == .none)
+    #expect(spoken.hasSuffix("Process failed (Exit code 127)"))
+    // Said "could not start" only of a process that never did: a terminal lost on the way failed
+    // after running, and keeps its reason beside the words.
+    #expect(english(failed.label) == "Process failed")
+    #expect(failed.detail == "No such file")
+    let neverStarted = SessionStatusPresentation.make(
+      session: session(), paneStatus: .failed(message: "No such file"), launchFailed: true)
+    #expect(english(neverStarted.label) == "Couldn't start")
+    #expect(neverStarted.detail == "No such file")
   }
 
   @Test("A clean exit is not a failure")
@@ -245,7 +223,7 @@ struct SessionStatusPresentationTests {
     )
 
     #expect(english(finished.label) == "Agent unavailable")
-    #expect(english(failed.label) == "Stopped on an error")
+    #expect(english(failed.label) == "Process failed")
     #expect(failed.detail == "Exit code 127")
   }
 
@@ -268,9 +246,9 @@ struct SessionStatusFrenchTests {
       (.starting, "Démarrage"),
       (.running, "En attente"),
       (.exited(code: 0), "Terminée"),
-      (.exited(code: 127), "Arrêtée sur une erreur"),
-      (.terminated(signal: 9), "Arrêtée de façon inattendue"),
-      (.failed(message: "x"), "N’a pas pu démarrer"),
+      (.exited(code: 127), "Processus en erreur"),
+      (.terminated(signal: 9), "Processus interrompu"),
+      (.failed(message: "x"), "Processus en erreur"),
     ]
     for (pane, french) in expected {
       let status = SessionStatusPresentation.make(

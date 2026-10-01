@@ -2365,7 +2365,8 @@ private func terminalTitle(
     paneStatus: pane.status,
     resolution: model.resolution(forID: session.id),
     wasStoppedOnPurpose: pane.wasStoppedOnPurpose,
-    activity: model.activity(for: session.id)
+    activity: model.activity(for: session.id),
+    launchFailed: pane.failure != nil
   )
   return String(
     localized: "Terminal — \(session.name) — \(String(localized: status.label))",

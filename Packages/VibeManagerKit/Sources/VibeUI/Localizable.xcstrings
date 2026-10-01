@@ -5952,17 +5952,6 @@
         }
       }
     },
-    "Could not start" : {
-      "comment" : "A session's state: its agent could not be launched.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "N’a pas pu démarrer"
-          }
-        }
-      }
-    },
     "Could not switch to %@: %@" : {
       "comment" : "An agent's name, then why it could not be started.",
       "localizations" : {
@@ -5976,6 +5965,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de passer à %1$@ : %2$@"
+          }
+        }
+      }
+    },
+    "Couldn't start" : {
+      "comment" : "A session's state: its agent could not be launched.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage impossible"
           }
         }
       }
@@ -6758,7 +6758,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Code de sortie %@"
+            "value" : "code de sortie %@"
           }
         }
       }
@@ -6899,7 +6899,7 @@
       }
     },
     "Failed" : {
-      "comment" : "A session's state, in the sidebar.\nAn agent action in the web view that failed.\nAn avatar that could not be drawn.",
+      "comment" : "An avatar, or an agent action in the web view, that failed.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -10337,6 +10337,28 @@
         }
       }
     },
+    "Process failed" : {
+      "comment" : "A session's state: its agent's process ended on an error.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus en erreur"
+          }
+        }
+      }
+    },
+    "Process interrupted" : {
+      "comment" : "A session's state: its agent's process was killed by a signal.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus interrompu"
+          }
+        }
+      }
+    },
     "Project icon" : {
       "comment" : "The icon found in the working folder.",
       "localizations" : {
@@ -12479,7 +12501,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Signal %@"
+            "value" : "signal %@"
           }
         }
       }
@@ -12692,28 +12714,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les arrêter"
-          }
-        }
-      }
-    },
-    "Stopped on an error" : {
-      "comment" : "A session's state: its agent ended with an exit status other than 0.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêtée sur une erreur"
-          }
-        }
-      }
-    },
-    "Stopped unexpectedly" : {
-      "comment" : "A session's state: its agent was killed by a signal nobody here sent.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêtée de façon inattendue"
           }
         }
       }

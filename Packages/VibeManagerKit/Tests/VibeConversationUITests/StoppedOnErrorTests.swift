@@ -18,7 +18,6 @@ struct StoppedOnErrorTests {
 
     // Closed by the user: stopped, not on an error.
     running = false
-    #expect(model.composerState == .stopped || model.composerState == .unavailable)
     #expect(!model.hasStoppedOnError)
 
     // Ended on its own.
