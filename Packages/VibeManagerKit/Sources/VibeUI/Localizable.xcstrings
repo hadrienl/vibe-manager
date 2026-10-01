@@ -4425,6 +4425,16 @@
         }
       }
     },
+    "Also when an agent stops. Only while Vibe Manager is not in front." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aussi quand un agent s’arrête. Seulement quand Vibe Manager n’est pas au premier plan."
+          }
+        }
+      }
+    },
     "Always" : {
       "comment" : "Allows what an agent asks, from now on.\nAn agent action allowed by Always Allow.",
       "localizations" : {
@@ -9884,16 +9894,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
-          }
-        }
-      }
-    },
-    "Of other sessions, and of agents that stop, while Vibe Manager is not in front." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des autres sessions, et des agents qui s’arrêtent, quand Vibe Manager n’est pas au premier plan."
           }
         }
       }
