@@ -104,10 +104,11 @@ public struct NewSessionDraftView: View {
     .task {
       showsMoreOptions = !model.draft.ticketText.isEmpty
       // At once, so that nothing typed meanwhile goes elsewhere; again once the agents and the
-      // folders are there, for a draft that came back refused.
+      // folders are there, for a draft that came back refused — only then: the folders can take
+      // seconds, and the caret would leave the name being typed meanwhile.
       placeCaret()
       await model.load()
-      placeCaret()
+      if firstIssueTarget != nil { placeCaret() }
     }
     // A file dropped anywhere on the draft joins its prompt, as the composer of a conversation
     // takes one.
@@ -182,6 +183,9 @@ public struct NewSessionDraftView: View {
       modelField
       moreOptions
     }
+    // Return creates from a one-line field too — the name, the folder, the ticket, a template's
+    // short field — as it does from the prompt: left to itself, the field only selected its text.
+    .onSubmit(submit)
     .padding(16)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
