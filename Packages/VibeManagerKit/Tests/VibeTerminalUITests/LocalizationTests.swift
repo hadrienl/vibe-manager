@@ -19,11 +19,11 @@ struct LocalizationTests {
         == "Terminé avec le code 2")
   }
 
-  @Test("A session's status bar says Close Session, which stops no other action than the agent (#238)")
+  @Test("A session's status bar says Close Session, a confirmation to come (#238)")
   func closeSession() {
     #expect(
-      Localization.string("Close Session", module: "VibeTerminalUI", in: "fr")
-        == "Fermer la session")
+      Localization.string("Close Session…", module: "VibeTerminalUI", in: "fr")
+        == "Fermer la session…")
   }
 
   @Test("VoiceOver names the terminal in the language of the application")

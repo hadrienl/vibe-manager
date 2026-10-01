@@ -4392,6 +4392,17 @@
         }
       }
     },
+    "Also interrupts the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request from the palette does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
     "Also looked in: %@" : {
       "comment" : "A list of folders the agent visited that are not repositories.",
       "localizations" : {
@@ -4399,17 +4410,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autres dossiers consultés : %@"
-          }
-        }
-      }
-    },
-    "Also stops the agent's turn: it waits for your next message." : {
-      "comment" : "What refusing a request from the palette does besides refusing.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }

@@ -867,7 +867,7 @@
         }
       }
     },
-    "Also stops the agent's turn: it waits for your next message." : {
+    "Also interrupts the agent's turn: it waits for your next message." : {
       "comment" : "What refusing a request does besides refusing.",
       "localizations" : {
         "fr" : {
@@ -3164,6 +3164,16 @@
         }
       }
     },
+    "interrupted without an answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "interrompu sans résultat"
+          }
+        }
+      }
+    },
     "its name cannot be used" : {
       "localizations" : {
         "fr" : {
@@ -3251,26 +3261,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "certaines de ses couleurs ne se lisent pas l’une sur l’autre"
-          }
-        }
-      }
-    },
-    "stopped" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "arrêté"
-          }
-        }
-      }
-    },
-    "stopped without an answer" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "arrêté sans résultat"
           }
         }
       }

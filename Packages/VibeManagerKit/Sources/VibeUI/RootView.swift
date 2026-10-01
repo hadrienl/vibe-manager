@@ -2380,6 +2380,7 @@ private func sessionRestart(for id: SessionID, in model: AppModel) -> () -> Void
 
 /// The status bar's button for a session's agent: Close Session, which asks first when the agent
 /// is at work, as ⇧⌘W does (#238).
+@MainActor
 private func sessionClose(for id: SessionID, in model: AppModel) -> () -> Void {
   { Task { await model.requestClose(id) } }
 }

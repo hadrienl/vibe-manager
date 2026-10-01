@@ -26,7 +26,7 @@ public struct TerminalPaneView<Accessory: View>: View {
   private let restart: (() -> Void)?
   /// See `TerminalStatusBar.canRestart`.
   private let canRestart: Bool
-  /// See `TerminalStatusBar.close`.
+  /// See `TerminalStatusBar.close`. Left out, the pane has no status bar.
   private let close: (() -> Void)?
 
   public init(
@@ -86,7 +86,8 @@ public struct TerminalPaneView<Accessory: View>: View {
         }
       }
 
-      if showsStatusBar {
+      // Only a session's terminal has one: its Close is the one way its agent is stopped from here.
+      if showsStatusBar, let close {
         Divider()
         TerminalStatusBar(
           pane: model, accessory: statusAccessory, restart: restart, canRestart: canRestart,
@@ -100,8 +101,9 @@ public struct TerminalPaneView<Accessory: View>: View {
   }
 }
 
-/// The foot of a session's terminal: its process's state, Close Session or Stop, or Restart, and
-/// what the app puts beside them. Also under the conversation view, which shows the same session in another form.
+/// The foot of a session's terminal: its process's state, Close Session or Restart, and what the
+/// app puts beside them. Also under the conversation view, which shows the same session in
+/// another form.
 public struct TerminalStatusBar<Accessory: View>: View {
   private let pane: TerminalPaneModel
   private let accessory: Accessory?
@@ -114,12 +116,12 @@ public struct TerminalStatusBar<Accessory: View>: View {
   /// switch of agent under way: the button is shown disabled, as the menu's command is.
   private let canRestart: Bool
   /// What ends the process of a session's terminal: the session's own Close, which asks first
-  /// when an agent is at work (#238). Left out, the button stops the process at once and says so.
-  private let close: (() -> Void)?
+  /// when an agent is at work (#238), never the pane's process stopped behind the user's back.
+  private let close: () -> Void
 
   public init(
     pane: TerminalPaneModel, accessory: Accessory?, restart: (() -> Void)? = nil,
-    canRestart: Bool = true, close: (() -> Void)? = nil
+    canRestart: Bool = true, close: @escaping () -> Void
   ) {
     self.pane = pane
     self.accessory = accessory
@@ -130,13 +132,7 @@ public struct TerminalStatusBar<Accessory: View>: View {
 
   private var status: TerminalPaneModel.Status { pane.status }
 
-  func stop() {
-    if let close {
-      close()
-    } else {
-      Task { await pane.stop() }
-    }
-  }
+  func stop() { close() }
 
   private func restart() {
     if let restartAction {
@@ -159,13 +155,9 @@ public struct TerminalStatusBar<Accessory: View>: View {
       }
       if status.isRunning {
         Button(action: stop) {
-          if close == nil {
-            Text("Stop", bundle: .module, comment: "Stops the terminal's process.")
-          } else {
-            Text(
-              "Close Session", bundle: .module,
-              comment: "Stops a session's agent, asking first when it is at work.")
-          }
+          Text(
+            "Close Session…", bundle: .module,
+            comment: "Stops a session's agent, asking first when it is at work.")
         }
         .controlSize(.small)
       } else {
@@ -200,7 +192,7 @@ extension TerminalPaneView where Accessory == EmptyView {
 extension TerminalStatusBar where Accessory == EmptyView {
   public init(
     pane: TerminalPaneModel, restart: (() -> Void)? = nil, canRestart: Bool = true,
-    close: (() -> Void)? = nil
+    close: @escaping () -> Void
   ) {
     self.init(pane: pane, accessory: nil, restart: restart, canRestart: canRestart, close: close)
   }

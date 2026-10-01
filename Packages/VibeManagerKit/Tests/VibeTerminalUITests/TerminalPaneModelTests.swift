@@ -313,7 +313,7 @@ func viewBackOnScreen() async throws {
 }
 
 @MainActor
-@Test("A session's status bar closes the session through its own Close, never stopping the process itself (#238)")
+@Test("A session's status bar closes the session through its Close, never its process (#238)")
 func statusBarCloseGoesThroughTheSession() async throws {
   let id = TerminalID()
   let supervisor = FakeSupervisor()
@@ -330,20 +330,4 @@ func statusBarCloseGoesThroughTheSession() async throws {
   #expect(closes == 1)
   #expect(await supervisor.stopCount == 0)
   #expect(model.status == .running)
-}
-
-@MainActor
-@Test("A terminal's status bar without a session's Close stops its process")
-func statusBarStopsAPlainTerminal() async throws {
-  let id = TerminalID()
-  let supervisor = FakeSupervisor()
-  let model = TerminalPaneModel(
-    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
-  await model.start()
-  await supervisor.emit(.running(processIdentifier: 1_234), for: id)
-  #expect(await settles { model.status == .running })
-
-  TerminalStatusBar(pane: model).stop()
-
-  #expect(await settles { model.status == .exited(code: 0) })
 }
