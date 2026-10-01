@@ -175,6 +175,30 @@ extension WorkspaceLayout {
     return min(max(value, range.lowerBound), range.upperBound)
   }
 
+  /// The widest the web view may be beside a terminal in `containerWidth`: the terminal keeps
+  /// `terminalMinimum`, the web view gives way first, down to its own minimum.
+  public static func browserWidthUpperBound(
+    in containerWidth: Double, handle: Double, terminalMinimum: Double
+  ) -> Double {
+    let available = containerWidth - terminalMinimum - handle
+    guard available.isFinite else { return browserWidthRange.lowerBound }
+    return max(browserWidthRange.lowerBound, available)
+  }
+
+  /// The web view's width that gives it and the terminal the same width, as far as the bounds
+  /// allow: the terminal keeps its minimum, the web view stays within `browserWidthRange` (#218).
+  public static func centeredBrowserWidth(
+    in containerWidth: Double, handle: Double, terminalMinimum: Double
+  ) -> Double {
+    let upper = min(
+      browserWidthRange.upperBound,
+      browserWidthUpperBound(
+        in: containerWidth, handle: handle, terminalMinimum: terminalMinimum))
+    let half = (containerWidth - handle) / 2
+    guard half.isFinite else { return browserWidthRange.lowerBound }
+    return min(max(half, browserWidthRange.lowerBound), upper)
+  }
+
   /// The width a column just measured, or `nil` when that measurement says nothing about what
   /// the user wants.
   ///

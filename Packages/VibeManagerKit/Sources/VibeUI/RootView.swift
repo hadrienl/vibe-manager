@@ -23,6 +23,7 @@ public struct RootView: View {
   @Environment(\.openSettings) private var openSettings
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   public init(model: AppModel) {
     self.model = model
@@ -895,9 +896,9 @@ public struct RootView: View {
     let arrangement = workspace == nil ? .hidden : model.layout.columns.browser
     return GeometryReader { proxy in
       // The terminal keeps its eighty columns: the web view gives way first.
-      let available =
-        Double(proxy.size.width) - Self.terminalMinimumWidth - Double(SplitHandle.thickness)
-      let upper = max(WorkspaceLayout.browserWidthRange.lowerBound, available)
+      let upper = WorkspaceLayout.browserWidthUpperBound(
+        in: Double(proxy.size.width), handle: Double(SplitHandle.thickness),
+        terminalMinimum: Self.terminalMinimumWidth)
       let width = min(model.layout.browserWidth, upper)
       HStack(spacing: 0) {
         terminalStack(for: session)
@@ -914,7 +915,17 @@ public struct RootView: View {
             length: width,
             range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
             label: Text("Divider between the terminal and the web view", bundle: .module),
-            onChange: { model.layout.browserWidthChanged(to: $0) })
+            onChange: { model.layout.browserWidthChanged(to: $0) },
+            onDoubleClick: {
+              let centered = WorkspaceLayout.centeredBrowserWidth(
+                in: Double(proxy.size.width), handle: Double(SplitHandle.thickness),
+                terminalMinimum: Self.terminalMinimumWidth)
+              withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                model.layout.browserWidthChanged(to: centered)
+              }
+            },
+            help: Text(
+              "Drag to resize. Double-click to give both sides the same width.", bundle: .module))
           BrowserPanel(
             model: model, workspace: workspace, browser: workspace.browser(for: session.id)
           )

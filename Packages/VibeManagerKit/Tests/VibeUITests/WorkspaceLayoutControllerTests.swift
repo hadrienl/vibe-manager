@@ -95,6 +95,20 @@ struct WorkspaceLayoutControllerTests {
     #expect(controller.intent.sidebarWidth == 320)
   }
 
+  @Test("The centred web view's width comes back after a relaunch", .timeLimit(.minutes(1)))
+  func centredBrowserWidthIsKept() async {
+    let store = RecordingLayoutStore()
+    let controller = WorkspaceLayoutController(store: store)
+
+    controller.browserWidthChanged(
+      to: WorkspaceLayout.centeredBrowserWidth(in: 1_409, handle: 9, terminalMinimum: 560))
+    await controller.flush()
+
+    let relaunched = WorkspaceLayoutController(store: store)
+    await relaunched.restore()
+    #expect(relaunched.browserWidth == 700)
+  }
+
   @Test("Folding, moving and sizing the sections are kept", .timeLimit(.minutes(1)))
   func inspectorSections() async throws {
     let store = RecordingLayoutStore()
