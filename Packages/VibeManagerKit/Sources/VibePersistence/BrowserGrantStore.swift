@@ -128,8 +128,8 @@ public struct KeychainBrowserGrantVault: BrowserGrantVault, @unchecked Sendable 
     ]
     if let keychain { item[kSecUseKeychain as String] = keychain }
     // No user presence asked at each read: the item holds site names, not a credential, and is read
-    // once per launch; what guards it is its access list, which trusts this application alone.
-    let added = SecItemAdd(item as CFDictionary, nil)  // NOSONAR: swift:S6288, ADR 0023
+    // once per launch; what guards it is its access list (ADR 0023).
+    let added = SecItemAdd(item as CFDictionary, nil)
 
     guard added == errSecSuccess else { throw KeychainError(status: added) }
   }

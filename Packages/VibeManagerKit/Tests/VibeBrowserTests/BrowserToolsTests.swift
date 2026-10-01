@@ -567,7 +567,7 @@ struct BrowserWorkspaceToolsTests {
     #expect(workspace.pendingRequests.isEmpty)
   }
 
-  @Test("A capture asks for the sites of the frames it would show (#239)")
+  @Test("A capture asks for the sites of the frames it would show (#239)", .timeLimit(.minutes(1)))
   func framesAreAsked() async throws {
     let server = try TestPageServer(pages: ["/": Self.page])
     defer { server.stop() }
@@ -581,15 +581,32 @@ struct BrowserWorkspaceToolsTests {
     _ = await workspace.run(
       tool: "tab_open", arguments: ["url": .string(server.url("/framed").absoluteString)],
       session: session)
+    let ended = Flag()
     let capture = Task { @MainActor in
-      await workspace.run(tool: "page_screenshot", arguments: [:], session: session)
+      let result = await workspace.run(tool: "page_screenshot", arguments: [:], session: session)
+      ended.isSet = true
+      return result
     }
-    let question = try await answerNext(workspace, in: session, with: .deny)
+    // Either a question comes, or the capture ends without one: the second is the failure.
+    while workspace.requests(for: session).isEmpty, !ended.isSet { await Task.yield() }
+    let question = try #require(
+      workspace.requests(for: session).first, "The capture was taken without a question.")
+    workspace.answer(question, with: .deny)
     #expect(question.kind == .read(tool: "page_screenshot"))
     // The frame's site, as WebKit wrote its address — not the local page's.
     #expect(question.site.hasPrefix("[::ffff:"))
     #expect(question.site.hasSuffix(":\(server.port)"))
     #expect(await capture.value.isError)
+  }
+
+  @Test("The sites always allowed are listed once the store has read them, after launch (#239)")
+  func grantsListedOnceLoaded() async {
+    let store = SlowPermissionStore()
+    let workspace = BrowserWorkspace(permissions: store)
+    #expect(workspace.grants.isEmpty)
+    store.finishLoading(with: ["https://github.com"])
+    await workspace.permissionsLoaded()
+    #expect(workspace.grants == ["https://github.com"])
   }
 
   @Test("The ticket's tab follows the ticket, and cannot be closed")
@@ -739,4 +756,32 @@ struct BrowserSignInTests {
     tab.didCloseWindow?()
     #expect(workspace.browser(for: session).tabs.isEmpty)
   }
+}
+
+/// A store that reads its sites in the background, as the keychain's does.
+@MainActor
+private final class SlowPermissionStore: BrowserPermissionStore {
+  private(set) var grants: Set<String> = []
+  private var waiting: [CheckedContinuation<Void, Never>] = []
+  private var isLoaded = false
+
+  func grant(_ key: String) { grants.insert(key) }
+  func revoke(_ key: String) { grants.remove(key) }
+
+  func loaded() async {
+    guard !isLoaded else { return }
+    await withCheckedContinuation { waiting.append($0) }
+  }
+
+  func finishLoading(with sites: Set<String>) {
+    grants = sites
+    isLoaded = true
+    for continuation in waiting { continuation.resume() }
+    waiting = []
+  }
+}
+
+@MainActor
+private final class Flag {
+  var isSet = false
 }

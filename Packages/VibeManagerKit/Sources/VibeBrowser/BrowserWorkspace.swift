@@ -79,6 +79,7 @@ public final class BrowserWorkspace {
   @ObservationIgnored private let stateStore: any BrowserStateStore
   @ObservationIgnored private let logStore: any BrowserActionLogStore
   @ObservationIgnored private let saveDelay: Duration
+  @ObservationIgnored private var permissionsLoading: Task<Void, Never>?
 
   public init(
     stateStore: any BrowserStateStore = InMemoryBrowserStateStore(),
@@ -95,6 +96,17 @@ public final class BrowserWorkspace {
     self.configuration = configuration
     self.saveDelay = saveDelay
     grants = permissions.grants
+    // The store may read its sites in the background (the keychain, #239): the list Settings
+    // shows follows once it has. The policy reads the store itself, never this copy.
+    permissionsLoading = Task { [weak self, permissions] in
+      await permissions.loaded()
+      self?.grants = permissions.grants
+    }
+  }
+
+  /// Waits for the sites always allowed to have been read, and listed.
+  public func permissionsLoaded() async {
+    await permissionsLoading?.value
   }
 
   // MARK: - Sessions
