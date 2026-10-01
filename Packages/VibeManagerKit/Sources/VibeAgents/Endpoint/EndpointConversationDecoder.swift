@@ -71,7 +71,9 @@ final class EndpointConversationDecoder: ConversationDecoding {
     switch record.kind {
     case .step:
       var parameters: [ToolParameter] = []
-      if let input = record.input, !input.isEmpty { parameters.append(ToolParameter(.arguments, input)) }
+      if let input = record.input, !input.isEmpty {
+        parameters.append(ToolParameter(.arguments, input))
+      }
       return ConversationEntry(
         id: id, date: record.date,
         content: .tool(
