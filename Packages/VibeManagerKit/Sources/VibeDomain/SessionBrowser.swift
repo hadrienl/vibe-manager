@@ -35,19 +35,28 @@ public struct BrowserTab: Identifiable, Hashable, Codable, Sendable {
   public var url: URL
   public var title: String
   public var openedBy: Opener
+  /// What the page does counts as the agent's (#241): an agent opened the tab, acted on it, or
+  /// opened it from one of its pages, and the user has not taken it back. Kept between launches:
+  /// a page the agent sent the user's tab to stays the agent's once the application relaunches.
+  public var isAgentDriven: Bool
 
-  public init(id: BrowserTabID = BrowserTabID(), url: URL, title: String = "", openedBy: Opener) {
+  public init(
+    id: BrowserTabID = BrowserTabID(), url: URL, title: String = "", openedBy: Opener,
+    isAgentDriven: Bool? = nil
+  ) {
     self.id = id
     self.url = url
     self.title = title
     self.openedBy = openedBy
+    self.isAgentDriven = isAgentDriven ?? (openedBy == .agent)
   }
 
   private enum CodingKeys: String, CodingKey {
-    case id, url, title, openedBy
+    case id, url, title, openedBy, isAgentDriven
   }
 
-  /// An opener written by a later build reads as the user's: it only changes a badge.
+  /// An opener written by a later build reads as the agent's, and a tab kept before the agent's
+  /// state was is the agent's too: what cannot be known is taken as the agent's doing (#241).
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     id = try container.decode(BrowserTabID.self, forKey: .id)
@@ -55,7 +64,8 @@ public struct BrowserTab: Identifiable, Hashable, Codable, Sendable {
     title = (try? container.decodeIfPresent(String.self, forKey: .title)) ?? ""
     openedBy =
       (try? container.decodeIfPresent(String.self, forKey: .openedBy)).flatMap(Opener.init)
-      ?? .user
+      ?? .agent
+    isAgentDriven = (try? container.decodeIfPresent(Bool.self, forKey: .isAgentDriven)) ?? true
   }
 }
 

@@ -109,6 +109,35 @@ final class SessionWebView: WKWebView {
   var hoveredLink: URL?
   var openInBackgroundTab: ((URL) -> Void)?
   var openExternally: ((URL) -> Void)?
+  /// Told when the user clicks in the page or types into it — never of a click the page's script
+  /// or an agent dispatches, which are not AppKit events (#241).
+  var onUserInput: (() -> Void)?
+
+  /// Whether an event of the user's hands the tab back to them: a click of the main button, or
+  /// keys that type text. A right click, a scroll with Space or the arrows, a shortcut do not: a
+  /// page that asks for any of them must not win the tab with it (#241).
+  static func handsTabBack(_ event: NSEvent) -> Bool {
+    let shortcut = !event.modifierFlags.intersection([.command, .control]).isEmpty
+    switch event.type {
+    case .leftMouseDown:
+      return !shortcut
+    case .keyDown:
+      guard !shortcut, let characters = event.characters else { return false }
+      return characters.unicodeScalars.contains { scalar in
+        // AppKit gives the arrows and function keys characters of the private use area.
+        !(0xF700...0xF8FF).contains(scalar.value)
+          && !CharacterSet.whitespacesAndNewlines.contains(scalar)
+          && !CharacterSet.controlCharacters.contains(scalar)
+      }
+    default:
+      return false
+    }
+  }
+
+  /// A press of the user's, as a gesture that opens a tab or an application must follow.
+  func notePress(at time: TimeInterval, modifiers: NSEvent.ModifierFlags) {
+    lastPress = (time, modifiers)
+  }
   /// When the user last pressed or let go of a button over the page, and with which keys pressed:
   /// a gesture that opens a tab must follow one, not a click the page's script made up. WebKit
   /// follows a link on the release, however long the press lasted.
@@ -129,13 +158,19 @@ final class SessionWebView: WKWebView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    lastPress = (event.timestamp, event.modifierFlags)
+    notePress(at: event.timestamp, modifiers: event.modifierFlags)
+    if Self.handsTabBack(event) { onUserInput?() }
     super.mouseDown(with: event)
   }
 
   override func otherMouseDown(with event: NSEvent) {
-    lastPress = (event.timestamp, event.modifierFlags)
+    notePress(at: event.timestamp, modifiers: event.modifierFlags)
     super.otherMouseDown(with: event)
+  }
+
+  override func keyDown(with event: NSEvent) {
+    if Self.handsTabBack(event) { onUserInput?() }
+    super.keyDown(with: event)
   }
 
   override func mouseUp(with event: NSEvent) {

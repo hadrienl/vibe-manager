@@ -8,6 +8,11 @@ final class TestPageServer: @unchecked Sendable {
   private var pages: [String: String]
   private var redirects: [String: String] = [:]
   private var statuses: [String: Int] = [:]
+  private var contentTypes: [String: String] = [:]
+  /// Paths whose answer waits until they are released, and those already asked for.
+  private let held = NSCondition()
+  private var heldPaths: Set<String> = []
+  private var askedPaths: Set<String> = []
   private var descriptor: Int32 = -1
   private(set) var port: UInt16 = 0
 
@@ -72,6 +77,28 @@ final class TestPageServer: @unchecked Sendable {
     }
   }
 
+  /// `path` answers with `type` rather than an HTML page.
+  func setContentType(_ path: String, _ type: String) {
+    lock.withLock { contentTypes[path] = type }
+  }
+
+  /// `path` keeps its answer until `release(_:)`: a download whose server takes its time.
+  func hold(_ path: String) {
+    held.withLock { _ = heldPaths.insert(path) }
+  }
+
+  func release(_ path: String) {
+    held.withLock {
+      heldPaths.remove(path)
+      held.broadcast()
+    }
+  }
+
+  /// Whether `path` was asked for, held or not.
+  func wasAsked(_ path: String) -> Bool {
+    held.withLock { askedPaths.contains(path) }
+  }
+
   func stop() {
     close(descriptor)
   }
@@ -85,7 +112,13 @@ final class TestPageServer: @unchecked Sendable {
     let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
     // A page that takes its time: a navigation still under way.
     if path == "/slow" { Thread.sleep(forTimeInterval: 3) }
-    let (body, redirect, code) = lock.withLock { (pages[path], redirects[path], statuses[path]) }
+    held.withLock {
+      askedPaths.insert(path)
+      while heldPaths.contains(path) { held.wait() }
+    }
+    let (body, redirect, code, type) = lock.withLock {
+      (pages[path], redirects[path], statuses[path], contentTypes[path])
+    }
     if let redirect {
       let header =
         "HTTP/1.1 302 Found\r\nLocation: \(redirect)\r\nContent-Length: 0\r\n"
@@ -96,7 +129,7 @@ final class TestPageServer: @unchecked Sendable {
     let status = body == nil ? "404 Not Found" : code.map { "\($0) Status" } ?? "200 OK"
     let payload = Data((body ?? "<h1>Not found</h1>").utf8)
     let header =
-      "HTTP/1.1 \(status)\r\nContent-Type: text/html; charset=utf-8\r\n"
+      "HTTP/1.1 \(status)\r\nContent-Type: \(type ?? "text/html; charset=utf-8")\r\n"
       + "Content-Length: \(payload.count)\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
     let response = Data(header.utf8) + payload
     response.withUnsafeBytes { _ = write(client, $0.baseAddress, $0.count) }
