@@ -256,7 +256,7 @@ struct CreateSessionTests {
   func attachmentsMakeAFirstMessage() async throws {
     let (create, _) = makeSubject()
     var withFiles = draft(prompt: "Look at\n")
-    let image = URL(fileURLWithPath: "/tmp/Capture d’écran.png")
+    let image = FileManager.default.temporaryDirectory.appendingPathComponent("Capture d’écran.png")
     withFiles.attachments = [image]
 
     let creation = try await create(withFiles)
@@ -264,7 +264,7 @@ struct CreateSessionTests {
     #expect(creation.plan.promptDelivery == .none)
     #expect(creation.firstMessage == PromptSubmission(text: "Look at", attachments: [image]))
     // What the session keeps, and starts with again, holds the files' paths.
-    #expect(creation.session.initialPrompt == #"Look at /tmp/Capture\ d’écran.png"#)
+    #expect(creation.session.initialPrompt == "Look at " + ShellPath.escaped(image.path))
   }
 
   @Test("Without files, the prompt is the agent's argument and there is no first message")

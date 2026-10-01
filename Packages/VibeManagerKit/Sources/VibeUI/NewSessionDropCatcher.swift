@@ -29,13 +29,13 @@ struct NewSessionDropCatcher: NSViewRepresentable {
     .fileURL, .init("NSFilenamesPboardType"),
   ]
 
-  func makeNSView(context: Context) -> CatcherView {
+  func makeNSView(context _: Context) -> CatcherView {
     let view = CatcherView()
     view.catcher = self
     return view
   }
 
-  func updateNSView(_ view: CatcherView, context: Context) {
+  func updateNSView(_ view: CatcherView, context _: Context) {
     view.catcher = self
   }
 
@@ -55,9 +55,9 @@ struct NewSessionDropCatcher: NSViewRepresentable {
       setAccessibilityElement(false)
     }
 
-    required init?(coder: NSCoder) { nil }
+    required init?(coder _: NSCoder) { nil }
 
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func hitTest(_: NSPoint) -> NSView? { nil }
 
     private func propose(_ drag: any NSDraggingInfo) -> NSDragOperation {
       let hover =
@@ -76,11 +76,11 @@ struct NewSessionDropCatcher: NSViewRepresentable {
       propose(drag)
     }
 
-    override func draggingExited(_ drag: (any NSDraggingInfo)?) {
+    override func draggingExited(_: (any NSDraggingInfo)?) {
       catcher?.hovering(nil)
     }
 
-    override func prepareForDragOperation(_ drag: any NSDraggingInfo) -> Bool {
+    override func prepareForDragOperation(_: any NSDraggingInfo) -> Bool {
       catcher?.hover() == .accepting
     }
 
@@ -92,7 +92,7 @@ struct NewSessionDropCatcher: NSViewRepresentable {
       return true
     }
 
-    override func draggingEnded(_ drag: any NSDraggingInfo) {
+    override func draggingEnded(_: any NSDraggingInfo) {
       catcher?.hovering(nil)
     }
   }

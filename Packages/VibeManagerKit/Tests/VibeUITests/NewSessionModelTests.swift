@@ -102,8 +102,9 @@ struct NewSessionModelTests {
   func attachedFilesAreChips() {
     let model = makeModel()
     model.draft.initialPrompt = "Look at"
-    let first = URL(fileURLWithPath: "/tmp/a b.png")
-    let second = URL(fileURLWithPath: "/tmp/c.txt")
+    let folder = FileManager.default.temporaryDirectory
+    let first = folder.appendingPathComponent("a b.png")
+    let second = folder.appendingPathComponent("c.txt")
 
     model.attach([first, second])
     model.attach([first])
@@ -122,7 +123,7 @@ struct NewSessionModelTests {
     model.draft.templateFill = PromptTemplateFill(
       template: PromptTemplate(name: "Review", body: "Review the branch"))
 
-    model.attach([URL(fileURLWithPath: "/tmp/c.txt")])
+    model.attach([FileManager.default.temporaryDirectory.appendingPathComponent("c.txt")])
 
     #expect(model.draft.attachments.isEmpty)
   }
