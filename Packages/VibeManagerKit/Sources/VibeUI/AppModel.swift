@@ -1802,6 +1802,14 @@ public final class AppModel {
     case .exited(let code):
       // A clean exit is an agent that finished, whatever it was handed.
       guard code != 0 else { return }
+    case .failed(.hostStopped):
+      // The terminal host went away under the agent (#237): the agent refused nothing, and its
+      // conversation is resumed like any other once restarted.
+      return
+    case .failed(.processOutcomeUnknown)
+    where launcher?.pane(for: id)?.session?.runsInTerminalHost == true:
+      // The host's connection lost under it: the same interruption, not a refusal.
+      return
     case .terminated, .failed:
       break
     case .running, .starting:

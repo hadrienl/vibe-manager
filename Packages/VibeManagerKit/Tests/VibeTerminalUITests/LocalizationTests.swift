@@ -14,7 +14,10 @@ struct LocalizationTests {
     #expect(
       TerminalPaneModel.Status.terminated(signal: 9).label == "Process interrupted (signal 9)")
     #expect(
-      Localization.string("Finished", module: "VibeTerminalUI", in: "fr") == "Terminé")
+      Localization.string("Finished", module: "VibeTerminalUI", in: "fr") == "Processus terminé")
+    // The process's words, not a column's (#246): the session's own column may be In Progress.
+    #expect(
+      Localization.string("Running", module: "VibeTerminalUI", in: "fr") == "Processus en cours")
     let code = "2"
     #expect(
       Localization.string("Process failed (code \(code))", module: "VibeTerminalUI", in: "fr")

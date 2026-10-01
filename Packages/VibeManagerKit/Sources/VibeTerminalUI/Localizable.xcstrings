@@ -18,7 +18,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminé"
+            "value" : "Processus terminé"
           }
         }
       }
@@ -73,7 +73,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Processus en cours"
           }
         }
       }
