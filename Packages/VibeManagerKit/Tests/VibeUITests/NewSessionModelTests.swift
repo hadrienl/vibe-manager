@@ -616,6 +616,13 @@ private actor GatedFolders: WorkingDirectoryProbe {
   }
 }
 
+/// The themes this Mac has, changed by a test while a draft is open.
+@MainActor
+private final class ThemeNames {
+  var names: Set<String>
+  init(_ names: Set<String>) { self.names = names }
+}
+
 private let templateReview = PromptTemplate(
   name: "Review", sessionNamePattern: "Review {{url}}", body: "Review {{url}}.\n\n{{focus?}}")
 private let templateFeedback = PromptTemplate(
@@ -771,12 +778,12 @@ struct NewSessionTemplateTests {
 
   @Test("A theme deleted before Send gives a session that follows the settings")
   func themeDeletedBeforeSend() async throws {
-    var available: Set<String> = ["mine"]
-    let model = makeModel(isThemeAvailable: { available.contains($0) })
+    let library = ThemeNames(["mine"])
+    let model = makeModel(isThemeAvailable: { library.names.contains($0) })
     model.draft.initialPrompt = "Fix the login"
     model.chooseConversationTheme("mine")
 
-    available = []
+    library.names = []
     let creation = try #require(await model.submit())
 
     #expect(creation.session.conversationTheme == nil)
