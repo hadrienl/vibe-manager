@@ -5720,6 +5720,82 @@
         }
       }
     },
+    "Couldn’t archive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t close “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t restart “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t save the new order of the sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer le nouvel ordre des sessions."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver « %@ »."
+          }
+        }
+      }
+    },
     "Create & Launch" : {
       "localizations" : {
         "fr" : {
