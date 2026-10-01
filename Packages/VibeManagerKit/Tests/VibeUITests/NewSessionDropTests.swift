@@ -273,9 +273,10 @@ struct NewSessionDropTests {
     #expect(draft.draft.workingDirectoryPath == folder.path)
     #expect(draft.draft.attachments.isEmpty)
 
-    // Elsewhere, the same folder is a file joined to the prompt.
-    let card = try #require(try points(of: workspace)["card"])
-    _ = try drop([folder as NSURL], at: card, on: workspace)
+    // Elsewhere, the same folder is a file joined to the prompt: over the header, which the
+    // working folder, grown with the folder chosen, never reaches.
+    let header = try #require(try points(of: workspace)["header"])
+    _ = try drop([folder as NSURL], at: header, on: workspace)
     #expect(draft.draft.attachments == [folder])
   }
 }
