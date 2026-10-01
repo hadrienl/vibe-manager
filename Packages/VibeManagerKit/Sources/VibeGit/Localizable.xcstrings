@@ -11,6 +11,16 @@
         }
       }
     },
+    "git could not read this repository's configuration." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "git n’a pas pu lire la configuration de ce dépôt."
+          }
+        }
+      }
+    },
     "git did not answer within %lld seconds." : {
       "localizations" : {
         "en" : {
