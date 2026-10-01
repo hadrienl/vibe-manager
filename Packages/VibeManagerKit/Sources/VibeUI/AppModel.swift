@@ -65,12 +65,10 @@ public final class AppModel {
   /// about the store, and kept through the reload that follows the action.
   public private(set) var actionFailure: ActionFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
-  /// The name of each detected agent, by provider identifier, for the places that name one.
-  public var agentNames: [String: String] {
-    Dictionary(
-      agentDiagnostics.map { ($0.providerID.rawValue, $0.providerName) },
-      uniquingKeysWith: { first, _ in first })
-  }
+  /// The name of each agent of this build, by provider identifier, for the places that name one
+  /// (#247). Read from what the providers say of themselves, not from their detection: a session
+  /// is named “Claude Code” from the first frame, and through every refresh.
+  public private(set) var agentNames: [String: String] = [:]
   public private(set) var isRefreshingAgents = false
   public private(set) var selectedSessionID: SessionID?
   /// Whether the new session's draft is what the main area shows (#177), over the session
@@ -574,7 +572,12 @@ public final class AppModel {
   public internal(set) var webViewFocusRequest = 0
   public internal(set) var addressBarFocusRequest = 0
   /// Whether the web view's address bar holds the keyboard: ⌘W then closes its tab.
-  public var isAddressBarFocused = false
+  public var isAddressBarFocused = false {
+    didSet { if !isAddressBarFocused { opensNewWebTab = false } }
+  }
+  /// The address bar was given the keyboard for a new tab (#247): what is typed opens beside the
+  /// tab in front instead of replacing it.
+  public internal(set) var opensNewWebTab = false
   var webPageFocus = false
   /// Absent in a workspace assembled without the system around it — tests and previews. The
   /// application always has one.
@@ -2435,6 +2438,7 @@ public final class AppModel {
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
+    if let agents { name(await agents.descriptors()) }
     await loadFolderLabels()
     // Beside the load rather than before it: the notes only serve the search, and the list must
     // not wait on reading them.
@@ -2500,6 +2504,12 @@ public final class AppModel {
     await resume(shutdown)
   }
 
+  private func name(_ descriptors: [AgentDescriptor]) {
+    let names = Dictionary(
+      descriptors.map { ($0.id.rawValue, $0.displayName) }, uniquingKeysWith: { first, _ in first })
+    if names != agentNames { agentNames = names }
+  }
+
   /// Detection never fails the application: an unavailable agent is data, not an error.
   ///
   /// Each agent is published as its own detection lands, in registration order. Waiting for the
@@ -2513,6 +2523,7 @@ public final class AppModel {
     defer { isRefreshingAgents = false }
 
     let descriptors = await agents.descriptors()
+    name(descriptors)
     usage?.reportingProviderIDs = Set(
       descriptors.filter(\.capabilities.reportsUsage).map(\.id.rawValue))
     var diagnostics: [AgentProviderID: AgentDiagnostic] = [:]

@@ -17,11 +17,11 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌘P | Open Quickly: find a session by ticket, request URL, branch, folder or title; arrows, ⌃N / ⌃P and Page Up / Down move, Return opens, Escape closes | File |
 | ⌥⌘1 | Focus Sidebar: the session list takes the keyboard | View |
 | ⌥⌘2 | Focus Session: the selected session's terminal, or its composer in the conversation view | View |
-| ⌥⌘3 | Focus Inspector: the Git list, the inspector shown if it was hidden | View |
+| ⌥⌘3 | Focus Context: the Git list, the context column shown if it was hidden | View |
 | ⌥⌘4 | Focus Web View: the page in front, the web view shown if it was hidden | View |
 | ⌥⌘5 | Focus Side Terminals: the terminal in front of the drawer, the drawer shown if it was hidden | View |
 | ⌘J | Show / Hide Terminals: the session's drawer of side terminals; hiding it stops nothing | View |
-| ⌘T | New Terminal: a new tab in the drawer, a shell in the session's folder | View |
+| ⌘T | New Terminal: a new tab in the drawer, a shell in the session's folder; with the keyboard in the web view, New Tab | View |
 | ⌥⌘P | Focus Pending Requests: the palette unfolds and its oldest request takes the keyboard | View |
 | ⌥⌘B | Show / Hide Web View; in a window where the two take turns, swaps terminal and web view | View |
 | ⌥⌘N | Edit Notes; Escape gives the keyboard back to the session: its terminal, or its composer | View |

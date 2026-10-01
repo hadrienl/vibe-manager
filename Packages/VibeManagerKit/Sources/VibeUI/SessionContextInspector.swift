@@ -108,8 +108,8 @@ extension SessionContextInspector {
       content: AnyView(
         ActivityPane(
           session: session,
-          agentName: session.agent.flatMap { agentNames[$0.providerID] }
-            ?? session.agent?.providerID ?? "",
+          agentName: session.agent.map { AgentNaming.name(of: $0.providerID, names: agentNames) }
+            ?? "",
           journal: journal)),
       accessibilityIdentifier: "inspector-activity-section"
     )
@@ -1324,8 +1324,7 @@ private struct AgentHistoryList: View {
   }
 
   static func label(_ agent: SessionAgentConfiguration, names: [String: String]) -> String {
-    let name = names[agent.providerID] ?? agent.providerID
-    return agent.modelID.map { "\(name) · \($0)" } ?? name
+    AgentNaming.label(agent, names: names)
   }
 
   static func handover(_ handover: AgentChange.Handover) -> String {
