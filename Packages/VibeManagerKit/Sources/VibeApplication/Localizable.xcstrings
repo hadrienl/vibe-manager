@@ -930,6 +930,26 @@
         }
       }
     },
+    "Endpoints couldn't be read: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les endpoints n’ont pas pu être lus : %@"
+          }
+        }
+      }
+    },
+    "Endpoints couldn't be saved: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les endpoints n’ont pas pu être enregistrés : %@"
+          }
+        }
+      }
+    },
     "Generated an image" : {
       "localizations" : {
         "fr" : {
@@ -1498,6 +1518,26 @@
         }
       }
     },
+    "The endpoint gateway couldn't be told about the session: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passerelle des endpoints n’a pas pu être informée de la session : %@"
+          }
+        }
+      }
+    },
+    "The endpoint gateway couldn't start: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passerelle des endpoints n’a pas pu démarrer : %@"
+          }
+        }
+      }
+    },
     "The folder of this session, %@, cannot be entered." : {
       "localizations" : {
         "fr" : {
@@ -1561,6 +1601,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le prompt initial fait %1$@ octets, et %2$@ en accepte %3$@."
+          }
+        }
+      }
+    },
+    "The keychain refused to keep the secret (error %@)." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le trousseau a refusé de garder le secret (erreur %@)."
           }
         }
       }

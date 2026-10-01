@@ -109,6 +109,24 @@
         }
       }
     },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Why the application asks to reach the local network.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager reaches the model servers you declared on your local network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager joint les serveurs de modèles que vous avez déclarés sur votre réseau local."
+          }
+        }
+      }
+    },
     "NSNetworkVolumesUsageDescription" : {
       "comment" : "Why the application asks for access to a network volume.",
       "extractionState" : "extracted_with_value",

@@ -118,6 +118,7 @@ public struct CodexAgentProvider: AgentProvider {
     for sessionID: SessionID,
     workingDirectoryPath: String,
     repository: any SessionRepository,
+    recording: AgentResumeRecording = AgentResumeRecording(providerID: id.rawValue),
     timeout: Duration = CodexSessionIdentifierCapture.defaultTimeout
   ) -> CodexSessionIdentifierCapture {
     CodexSessionIdentifierCapture(
@@ -125,7 +126,8 @@ public struct CodexAgentProvider: AgentProvider {
       workingDirectoryPath: workingDirectoryPath,
       discovery: discovery,
       record: RecordAgentResumeIdentifier(
-        repository: repository, providerID: Self.id.rawValue, launchedAt: Date()),
+        repository: repository, providerID: recording.providerID, launchedAt: Date(),
+        harnessID: recording.harnessID),
       timeout: timeout
     )
   }

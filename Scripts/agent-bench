@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""The reference tasks of #107, run on one agent: how often it succeeds, and at what cost.
+
+    Scripts/agent-bench --harness claude --model claude-sonnet-5-5 --label anthropic-direct
+    Scripts/agent-bench --harness claude --model qwen/qwen3-coder --label openrouter-qwen \\
+        --gateway "--base-url https://openrouter.ai/api/v1 --protocol chatCompletions \\
+                   --secret-env OPENROUTER_API_KEY" --context 262144
+
+Each task of Benchmarks/agent-tasks/tasks is copied to a throwaway folder, prepared by its
+setup.sh, committed, handed to the agent with its prompt.md, then judged by its verify.sh. With
+--gateway, the agent reaches its model through vibe-gateway (built by `swift build --product
+vibe-gateway`), exactly as a session on an endpoint does in the application.
+
+Recorded per run: success, tool calls, wall time, input and output tokens. Written to
+Benchmarks/results/<date>-<label>.json, with a Markdown table beside it. It costs money and
+depends on the network: it never runs in CI.
+"""
+
+import argparse
+import datetime
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TASKS = ROOT / "Benchmarks" / "agent-tasks" / "tasks"
+RESULTS = ROOT / "Benchmarks" / "results"
+GATEWAY = ROOT / "Packages" / "VibeManagerKit" / ".build" / "debug" / "vibe-gateway"
+
+
+def git(folder, *args):
+    subprocess.run(
+        ["git", *args], cwd=folder, check=True, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env={**os.environ, "GIT_AUTHOR_NAME": "bench", "GIT_AUTHOR_EMAIL": "bench@local",
+             "GIT_COMMITTER_NAME": "bench", "GIT_COMMITTER_EMAIL": "bench@local"})
+
+
+def prepare(task, work):
+    repo = work / "repo"
+    private = work / "private"
+    private.mkdir()
+    source = task / "repo"
+    if source.exists():
+        shutil.copytree(source, repo)
+    else:
+        repo.mkdir()
+    setup = task / "setup.sh"
+    if setup.exists():
+        subprocess.run(["/bin/sh", str(setup), str(repo), str(private)], check=True)
+    git(repo, "init", "-q")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "start", "--allow-empty")
+    return repo, private
+
+
+class Gateway:
+    """vibe-gateway in the background, for the length of the benchmark."""
+
+    def __init__(self, arguments, model):
+        if not GATEWAY.exists():
+            sys.exit("vibe-gateway is not built: swift build --product vibe-gateway")
+        self.process = subprocess.Popen(
+            [str(GATEWAY), *arguments.split(), "--model", model],
+            stdout=subprocess.PIPE, stderr=sys.stderr, text=True)
+        line = self.process.stdout.readline().strip()
+        fields = dict(part.split("=", 1) for part in line.split())
+        self.base_url = fields["ANTHROPIC_BASE_URL"]
+        self.token = fields["ANTHROPIC_AUTH_TOKEN"]
+
+    def stop(self):
+        self.process.send_signal(signal.SIGTERM)
+        self.process.wait(timeout=10)
+
+
+def command(harness, model, prompt, gateway, context):
+    environment = dict(os.environ)
+    if harness == "claude":
+        arguments = [
+            "claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
+            "--permission-mode", "bypassPermissions", "--model", model]
+        if gateway:
+            environment.update({
+                "ANTHROPIC_BASE_URL": gateway.base_url, "ANTHROPIC_AUTH_TOKEN": gateway.token,
+                "ANTHROPIC_MODEL": model, "ANTHROPIC_DEFAULT_HAIKU_MODEL": model,
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": model, "ANTHROPIC_DEFAULT_OPUS_MODEL": model,
+                "ANTHROPIC_SMALL_FAST_MODEL": model, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"})
+            environment.pop("ANTHROPIC_API_KEY", None)
+            if context:
+                environment["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = str(context)
+                environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(context)
+        return arguments, environment
+    arguments = [
+        "codex", "exec", "--json", "--skip-git-repo-check", "-s", "workspace-write", "-m", model]
+    if gateway:
+        provider = (
+            '{name="Vibe bench",base_url="%s/v1",env_key="VIBE_ENDPOINT_TOKEN",wire_api="responses"}'
+            % gateway.base_url)
+        arguments += ["-c", 'model_provider="vibe-endpoint"', "-c",
+                      "model_providers.vibe-endpoint=" + provider]
+        environment["VIBE_ENDPOINT_TOKEN"] = gateway.token
+    if context:
+        arguments += ["-c", f"model_context_window={context}",
+                      "-c", f"model_auto_compact_token_limit={context * 9 // 10}"]
+    return arguments + [prompt], environment
+
+
+def read_claude(lines):
+    """Tool calls, tokens and the final answer of a `claude -p --output-format stream-json`."""
+    calls, answer, usage = 0, "", {}
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") == "assistant":
+            content = event.get("message", {}).get("content", [])
+            calls += sum(1 for block in content if block.get("type") == "tool_use")
+        elif event.get("type") == "result":
+            answer = event.get("result") or ""
+            usage = event.get("usage") or {}
+    tokens_in = sum(usage.get(key, 0) or 0 for key in (
+        "input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+    return calls, answer, tokens_in, usage.get("output_tokens", 0) or 0
+
+
+def read_codex(lines):
+    """Tool calls, tokens and the final answer of a `codex exec --json`."""
+    calls, answer, tokens_in, tokens_out = 0, "", 0, 0
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = event.get("item") or {}
+        if event.get("type") == "item.completed":
+            if item.get("type") in ("command_execution", "file_change", "mcp_tool_call"):
+                calls += 1
+            elif item.get("type") == "agent_message":
+                answer = item.get("text") or answer
+        elif event.get("type") == "turn.completed":
+            usage = event.get("usage") or {}
+            tokens_in += usage.get("input_tokens", 0) or 0
+            tokens_out += usage.get("output_tokens", 0) or 0
+    return calls, answer, tokens_in, tokens_out
+
+
+def run(task, args, gateway):
+    with tempfile.TemporaryDirectory(prefix=f"bench-{task.name}-") as folder:
+        work = Path(folder)
+        repo, private = prepare(task, work)
+        prompt = (task / "prompt.md").read_text()
+        arguments, environment = command(args.harness, args.model, prompt, gateway, args.context)
+        started = time.monotonic()
+        try:
+            finished = subprocess.run(
+                arguments, cwd=repo, env=environment, stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=args.timeout)
+            output, timed_out = finished.stdout.splitlines(), False
+        except subprocess.TimeoutExpired as expired:
+            output = (expired.stdout or b"").decode(errors="replace").splitlines()
+            timed_out = True
+        seconds = round(time.monotonic() - started, 1)
+        reader = read_claude if args.harness == "claude" else read_codex
+        calls, answer, tokens_in, tokens_out = reader(output)
+        answer_file = work / "answer.txt"
+        answer_file.write_text(answer)
+        verdict = subprocess.run(
+            ["/bin/sh", str(task / "verify.sh"), str(repo), str(answer_file), str(private)],
+            capture_output=True, text=True)
+        return {
+            "task": task.name, "passed": verdict.returncode == 0 and not timed_out,
+            "timedOut": timed_out, "toolCalls": calls, "seconds": seconds,
+            "inputTokens": tokens_in, "outputTokens": tokens_out,
+            "verify": (verdict.stdout + verdict.stderr).strip()[-400:],
+        }
+
+
+def table(runs):
+    rows = ["| Task | Passed | Tool calls | Seconds | Tokens in | Tokens out |",
+            "|---|---|---|---|---|---|"]
+    for name in sorted({run["task"] for run in runs}):
+        mine = [run for run in runs if run["task"] == name]
+        passed = sum(run["passed"] for run in mine)
+
+        def mean(key):
+            return round(sum(run[key] for run in mine) / len(mine), 1)
+
+        rows.append(f"| {name} | {passed}/{len(mine)} | {mean('toolCalls')} | {mean('seconds')} "
+                    f"| {mean('inputTokens'):.0f} | {mean('outputTokens'):.0f} |")
+    total = sum(run["passed"] for run in runs)
+    rows.append(f"| **All** | **{total}/{len(runs)} ({100 * total / max(1, len(runs)):.0f} %)** "
+                "| | | | |")
+    return "\n".join(rows)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--harness", choices=["claude", "codex"], required=True)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--label", required=True, help="names the results file")
+    parser.add_argument("--gateway", help="vibe-gateway arguments, without --model")
+    parser.add_argument("--context", type=int, help="the model's context window, in tokens")
+    parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--tasks", help="comma-separated task names; all by default")
+    parser.add_argument("--timeout", type=int, default=1200, help="seconds per run")
+    args = parser.parse_args()
+
+    names = args.tasks.split(",") if args.tasks else sorted(p.name for p in TASKS.iterdir())
+    gateway = Gateway(args.gateway, args.model) if args.gateway else None
+    runs = []
+    try:
+        for name in names:
+            for index in range(args.runs):
+                result = run(TASKS / name, args, gateway)
+                runs.append(result)
+                mark = "✓" if result["passed"] else "✗"
+                print(f"{mark} {name} #{index + 1}: {result['toolCalls']} calls, "
+                      f"{result['seconds']} s, {result['inputTokens']}/{result['outputTokens']} "
+                      f"tokens", flush=True)
+    finally:
+        if gateway:
+            gateway.stop()
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    stem = f"{datetime.date.today().isoformat()}-{args.label}"
+    summary = {"harness": args.harness, "model": args.model, "label": args.label,
+               "gateway": bool(args.gateway), "context": args.context, "runs": runs}
+    (RESULTS / f"{stem}.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (RESULTS / f"{stem}.md").write_text(
+        f"# {args.label}\n\n{args.harness}, `{args.model}`"
+        f"{' through vibe-gateway' if args.gateway else ''}\n\n{table(runs)}\n")
+    print("\n" + table(runs))
+
+
+if __name__ == "__main__":
+    main()
