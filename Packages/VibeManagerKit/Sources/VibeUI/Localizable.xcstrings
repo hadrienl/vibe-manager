@@ -5838,6 +5838,17 @@
         }
       }
     },
+    "Copy %@" : {
+      "comment" : "A command line to paste in a terminal: claude auth login.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier %@"
+          }
+        }
+      }
+    },
     "Copy Address" : {
       "localizations" : {
         "fr" : {
@@ -7921,6 +7932,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Insérer le titre des tickets dans les notes"
+          }
+        }
+      }
+    },
+    "Install %@…" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer %@…"
           }
         }
       }
@@ -10119,6 +10141,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Palette"
+          }
+        }
+      }
+    },
+    "Paste it in a terminal to sign in, then detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez-la dans un terminal pour vous connecter, puis relancez la détection."
           }
         }
       }
@@ -15717,6 +15749,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les dossiers non suivis ne peuvent pas être lus ici."
+          }
+        }
+      }
+    },
+    "Update %@…" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à jour %@…"
           }
         }
       }

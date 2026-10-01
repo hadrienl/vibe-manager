@@ -992,10 +992,53 @@ struct AgentChoiceRow: View {
   let select: () -> Void
 
   var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      card
+      remedyActions
+    }
+  }
+
+  /// What the remedy asks for, done from here: the install page, the sign-in command (#234).
+  /// Beside the card rather than in it: the card is itself a button.
+  @ViewBuilder
+  private var remedyActions: some View {
+    if agent.installationPage != nil || agent.signInCommand != nil {
+      HStack(spacing: 8) {
+        if let page = agent.installationPage {
+          Button {
+            ExternalOpening.open(page)
+          } label: {
+            agent.installationPageUpdates
+              ? Text("Update \(agent.name)…", bundle: .module, comment: "An agent's name.")
+              : Text("Install \(agent.name)…", bundle: .module, comment: "An agent's name.")
+          }
+        }
+        if let command = agent.signInCommand {
+          Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+          } label: {
+            Text(
+              "Copy \(command)", bundle: .module,
+              comment: "A command line to paste in a terminal: claude auth login.")
+          }
+          .help(
+            Text("Paste it in a terminal to sign in, then detect again.", bundle: .module))
+        }
+      }
+      .controlSize(.small)
+      // Under the card's text: past its inset, its icon and the space after it.
+      .padding(.leading, ChoiceCardMetrics.inset + Self.iconWidth + ChoiceCardMetrics.spacing)
+    }
+  }
+
+  private static let iconWidth: CGFloat = 18
+
+  private var card: some View {
     // Unusable agents stay visible and readable, but cannot be chosen.
     ChoiceCard(isSelected: isSelected, isEnabled: agent.isUsable, select: select) {
       Image(systemName: agent.descriptor.symbolName)
-        .frame(width: 18)
+        .frame(width: Self.iconWidth)
       VStack(alignment: .leading, spacing: 2) {
         Text(agent.name)
           .fontWeight(.medium)
@@ -1027,6 +1070,12 @@ struct AgentChoiceRow: View {
   }
 }
 
+/// The measures of a `ChoiceCard`, for what lines up with its content outside it.
+enum ChoiceCardMetrics {
+  static let inset: CGFloat = 11
+  static let spacing: CGFloat = 10
+}
+
 /// One choice in a list the user picks one item from — an agent, a recent folder: tinted and
 /// outlined once chosen, dimmed when it cannot be. One component, so every such list looks alike.
 struct ChoiceCard<Content: View>: View {
@@ -1037,14 +1086,14 @@ struct ChoiceCard<Content: View>: View {
 
   var body: some View {
     Button(action: select) {
-      HStack(spacing: 10) {
+      HStack(spacing: ChoiceCardMetrics.spacing) {
         content
         if isSelected {
           Image(systemName: "checkmark")
             .foregroundStyle(.tint)
         }
       }
-      .padding(.horizontal, 11)
+      .padding(.horizontal, ChoiceCardMetrics.inset)
       .padding(.vertical, 8)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
