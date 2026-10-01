@@ -5894,7 +5894,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thème de la conversation : %@"
+            "value" : "Thème de la conversation : %@"
           }
         }
       }
@@ -15459,7 +15459,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce thème a été supprimé ou ne se lit plus : la conversation suit les Réglages."
+            "value" : "Ce thème a été supprimé ou ne se lit plus : la conversation suit les Réglages."
           }
         }
       }
