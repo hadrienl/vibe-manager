@@ -219,15 +219,20 @@ public struct AgentSwitchPlan: Sendable {
   /// on, none otherwise — the new agent's own is recorded once its launch reveals it.
   public var nextConfiguration: SessionAgentConfiguration {
     let identifier: String?
+    // The conversation goes on in the CLI that wrote it: an endpoint's keeps its harness (#107).
+    let harness: String?
     if case .resumeWithModel(let resumed) = mode {
       identifier = resumed
+      harness = session.agent?.harnessID
     } else {
       identifier = nil
+      harness = nil
     }
     return SessionAgentConfiguration(
       providerID: target.providerID,
       modelID: target.modelID,
-      resumeIdentifier: identifier
+      resumeIdentifier: identifier,
+      harnessID: harness
     )
   }
 }
@@ -384,7 +389,8 @@ public struct PlanAgentSwitch: Sendable {
             workingDirectoryPath: path,
             modelID: target.modelID,
             initialPrompt: nil,
-            resume: .identifier(identifier)
+            resume: .identifier(identifier),
+            harnessID: current.harnessID
           )
         )
         return planned(launch, .resumeWithModel(identifier: identifier))
