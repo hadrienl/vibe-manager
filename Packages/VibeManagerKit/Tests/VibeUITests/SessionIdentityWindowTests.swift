@@ -159,7 +159,7 @@ struct SessionIdentityWindowTests {
       workspace.list != nil && workspace.terminal != nil
     }
     await model.commitRename(id, to: "Bravo")
-    #expect(model.canUndoIdentityChange)
+    #expect(model.canUndoSidebarChange)
 
     let list = try #require(workspace.list)
     workspace.window.makeFirstResponder(list)
@@ -172,7 +172,7 @@ struct SessionIdentityWindowTests {
     #expect(!Self.answersUndo(before: workspace.window, from: terminal))
     _ = terminal.tryToPerform(Self.undo, with: nil)
     #expect(await workspace.repository.session(id: id)?.name == "Bravo")
-    #expect(model.canUndoIdentityChange)
+    #expect(model.canUndoSidebarChange)
 
     workspace.window.makeFirstResponder(list)
     await waitUntil("the sidebar answers ⌘Z again") {

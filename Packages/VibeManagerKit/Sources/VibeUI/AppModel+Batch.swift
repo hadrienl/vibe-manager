@@ -108,7 +108,7 @@ extension AppModel {
     }
   }
 
-  /// ⌥⌘→ and ⌥⌘← on a selection of several: the column next to the one on screen.
+  /// ⌃⌘→ and ⌃⌘← on a selection of several: the column next to the one on screen.
   public func batchMovePlan(forward: Bool) -> SessionBatchPlan? {
     guard let session = selectedSession else { return nil }
     let candidates = forward ? nextTaskStatuses(of: session) : previousTaskStatuses(of: session)
@@ -294,7 +294,15 @@ extension AppModel {
       // the other would hold the last one for half a minute.
       results.merge(await concurrently(current.eligible) { await $0.closeInBatch($1) }) { $1 }
     case .archive:
+      let columns = Dictionary(
+        uniqueKeysWithValues: sessions.map { ($0.id, $0.taskStatus) })
       results.merge(await concurrently(current.eligible) { await $0.archiveInBatch($1) }) { $1 }
+      // One ⌘Z brings the whole batch back, the session on screen selected again (#242).
+      sidebarHistory.record(
+        current.eligible.compactMap { id in
+          guard results[id]?.isDone == true, let column = columns[id] else { return nil }
+          return SessionArchiveUndo(id: id, taskStatus: column, wasSelected: id == shown)
+        })
     case .unarchive:
       for id in current.eligible { results[id] = await restoreInBatch(id) }
     case .restart:

@@ -8845,6 +8845,17 @@
         }
       }
     },
+    "Moving it to %@ starts its agent again." : {
+      "comment" : "A task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passer à « %@ » relance son agent."
+          }
+        }
+      }
+    },
     "Multiline" : {
       "localizations" : {
         "fr" : {
@@ -11390,12 +11401,33 @@
         }
       }
     },
+    "Restart this session?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer cette session ?"
+          }
+        }
+      }
+    },
     "Restart “%@” in a new process?" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relancer « %@ » dans un nouveau processus ?"
+          }
+        }
+      }
+    },
+    "Restart “%@”?" : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer « %@ » ?"
           }
         }
       }
@@ -11950,7 +11982,7 @@
       }
     },
     "Session" : {
-      "comment" : "What the Usage window groups its figures by.",
+      "comment" : "What the Usage window groups its figures by.\nOf the two views taking turns in a narrow window: the session's own.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

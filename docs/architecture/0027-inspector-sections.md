@@ -84,7 +84,7 @@ A click on a header folds or unfolds it; with Option, every section.
 
 ### Focus
 
-Edit Notes (⌥⌘N) unfolds the notes before giving them the keyboard. Focus Inspector (⌥⌘3) goes to
+Edit Notes (⌥⌘N) unfolds the notes before giving them the keyboard. Focus Context (⌥⌘3) goes to
 the first of Activity and Git the user left unfolded, and unfolds Git when neither is.
 
 ### The column's own width keeps the system divider
