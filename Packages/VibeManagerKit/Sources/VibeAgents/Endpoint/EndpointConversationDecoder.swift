@@ -19,8 +19,8 @@ final class EndpointConversationDecoder: ConversationDecoding {
     self.journal = journal
   }
 
-  func consume(_ line: Data) {
-    inner.consume(line)
+  func consume(_ record: TranscriptRecord) {
+    inner.consume(record)
   }
 
   var entries: [ConversationEntry] {

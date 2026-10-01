@@ -84,10 +84,6 @@
         }
       }
     },
-<<<<<<< HEAD
-    "Create an AGENTS.md file with instructions for Codex." : {
-      "comment" : "Codex's /init command, in the composer's list.",
-=======
     "%lld models" : {
       "comment" : "How many models an endpoint offers.",
       "localizations" : {
@@ -135,6 +131,17 @@
         }
       }
     },
+    "Create an AGENTS.md file with instructions for Codex." : {
+      "comment" : "Codex's /init command, in the composer's list.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crée un fichier AGENTS.md avec des instructions pour Codex."
+          }
+        }
+      }
+    },
     "Endpoint via %@" : {
       "comment" : "The coding agent that drives an endpoint.",
       "localizations" : {
@@ -157,35 +164,32 @@
       }
     },
     "Its last test failed. Test it again in Settings → Endpoints." : {
->>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-<<<<<<< HEAD
-            "value" : "Crée un fichier AGENTS.md avec des instructions pour Codex."
-=======
             "value" : "Son dernier test a échoué. Testez-le à nouveau dans Réglages → Endpoints."
->>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
           }
         }
       }
     },
-<<<<<<< HEAD
-    "Summarize the conversation to free up context." : {
-      "comment" : "Codex's /compact command, in the composer's list.",
-=======
     "No model of this endpoint can call tools. Add one in Settings → Endpoints." : {
->>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-<<<<<<< HEAD
-            "value" : "Résume la conversation pour libérer du contexte."
-=======
             "value" : "Aucun modèle de cet endpoint ne sait appeler d’outils. Ajoutez-en un dans Réglages → Endpoints."
->>>>>>> b9e32481 (feat: les endpoints comme agents, leur passerelle et leur onglet des Réglages)
+          }
+        }
+      }
+    },
+    "Summarize the conversation to free up context." : {
+      "comment" : "Codex's /compact command, in the composer's list.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résume la conversation pour libérer du contexte."
           }
         }
       }

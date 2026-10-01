@@ -10,7 +10,7 @@ struct EndpointConversationDecoderTests {
   private final class Fixed: ConversationDecoding {
     var entries: [ConversationEntry]
     init(_ entries: [ConversationEntry]) { self.entries = entries }
-    func consume(_ line: Data) {}
+    func consume(_ record: TranscriptRecord) {}
   }
 
   private func text(_ id: String, at seconds: TimeInterval?) -> ConversationEntry {
