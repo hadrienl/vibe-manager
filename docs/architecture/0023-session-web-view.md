@@ -109,14 +109,30 @@ page may have moved while the question was on screen, and once more inside the p
 (`location.origin`) in the same turn as the action. A tab cannot be sent to `javascript:` or `data:`; another
 application's address, and a download, caused by the agent are asked. What the page does counts as
 the agent's for as long as the tab is the agent's — opened by it, or acted on by one of its tools —
-until the user presses a key or a button in the page, however long that takes: never for a window
-of a few seconds, which a page only had to wait out (#241). A click the agent or the page's script
-dispatches is no event of AppKit's and never hands the tab back. Another application's address
-opens, outside the agent's tabs, only after a press of the user's: a scripted click is
-`.linkActivated` too, and is refused with a line in the page's console. Every download is decided
-in one place, where its destination is chosen, whichever way it started, and every downloaded file
-is marked with macOS's quarantine — web download, by Vibe Manager, from its address and page — so
-Gatekeeper checks it before it is opened. A question is a banner in
+until the user clicks the main button in the page or types text into it, however long that takes:
+never for a window of a few seconds, which a page only had to wait out (#241). A right click, a
+scroll with Space or the arrows, a shortcut do not hand the tab back, and a click the agent or the
+page's script dispatches is no event of AppKit's at all. The state is kept with the tab between
+launches: a page the agent sent the user's tab to is still the agent's after a relaunch, and a tab
+kept by an older build, or with an opener a later build wrote, reads as the agent's. A window a page
+of the agent's opens is the agent's too, and stays asked for downloads and other applications even
+once the user has clicked in it: its opener can still script it through `window.opener`.
+
+Every download is decided in one place, where its destination is chosen, whichever way it started —
+a response that cannot be shown, a `download` link, a `blob:` or `data:` address. Whether it is
+asked is fixed when it starts, not when the server answers: a download whose tab was closed before
+the answer is refused rather than saved unasked. Every downloaded file is marked with macOS's
+quarantine — a web download, by Vibe Manager, from its `http`, `https` or `file` address and page —
+so Gatekeeper checks it before it is opened; its name loses the characters that make it read as
+another, such as a right-to-left override.
+
+Another application's address that reaches another computer — `smb:`, `afp:`, `nfs:`, `cifs:`,
+`ftp:`, `vnc:`, `ssh:`, `telnet:` — is always asked, whoever's the tab is and even after a click of
+the user's. Any other is asked in the agent's tabs; outside them it opens only after a press of the
+user's in the page within the second, since a scripted click is `.linkActivated` too, and is
+refused otherwise with a line in the page's console. A page that scripts an application's address
+within that second still opens it unasked: asking every time, as browsers do, is #289.
+A question is a banner in
 the session's web view — the session's row says so when it is not on screen — and the agent waits
 two minutes at most. "Always Allow" covers clicks, typing and JavaScript on that site; the sites are
 listed, and removed, in Settings › Web View.
