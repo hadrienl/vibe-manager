@@ -3865,19 +3865,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               }
             }
@@ -7188,7 +7188,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminée"
+            "value" : "Processus terminé"
           }
         }
       }
@@ -7879,7 +7879,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En attente"
+            "value" : "Prête"
           }
         }
       }
@@ -16455,7 +16455,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Travaille…"
           }
         }
       }
