@@ -43,7 +43,11 @@ struct AttachmentStrip: View {
       if other.id == attachment.id { selected = url }
     }
     guard let selected else {
-      announce(String(localized: "File not found", bundle: .module))
+      let exists = attachment.file.map { FileManager.default.fileExists(atPath: $0.path) } == true
+      announce(
+        exists
+          ? String(localized: "No preview for this file", bundle: .module)
+          : String(localized: "File not found", bundle: .module))
       return
     }
     quickLookItems = items
@@ -185,8 +189,8 @@ struct AttachmentTile: View {
   private func chip(missing: Bool) -> some View {
     HStack(spacing: 8) {
       Group {
-        if !missing, let file = attachment.file {
-          Image(nsImage: NSWorkspace.shared.icon(forFile: file.path)).resizable()
+        if !missing, let icon = preview?.icon {
+          Image(nsImage: icon).resizable()
         } else {
           Image(systemName: missing ? "questionmark.folder" : "photo")
             .font(.system(size: 18))
@@ -236,22 +240,17 @@ struct AttachmentTile: View {
 
   // MARK: - Menu
 
-  private var existingFile: URL? {
-    guard let file = attachment.file, FileManager.default.fileExists(atPath: file.path) else {
-      return nil
-    }
-    return file
-  }
-
+  /// Read from the preview, worked out off the main actor: the menu is built with the tile.
   @ViewBuilder
   private var menu: some View {
-    let file = existingFile
+    let file = preview?.existingFile
     Button {
-      if let file { NSWorkspace.shared.open(file) }
+      // Checked again: the file may have changed since the tile was drawn.
+      if let file, AttachmentOpening.canOpen(file) { NSWorkspace.shared.open(file) }
     } label: {
       Text("Open", bundle: .module)
     }
-    .disabled(file.map(AttachmentOpening.canOpen) != true)
+    .disabled(preview?.canOpen != true)
     Button {
       if let file { NSWorkspace.shared.activateFileViewerSelecting([file]) }
     } label: {
@@ -264,7 +263,7 @@ struct AttachmentTile: View {
       Text("Copy", bundle: .module)
     }
     .disabled(file == nil && attachment.embeddedImage == nil)
-    if let links, links.hasWebView(), let file, AttachmentOpening.canShowInWebView(file) {
+    if let links, links.hasWebView(), let file, preview?.canShowInWebView == true {
       Button {
         links.open(file, .webView)
       } label: {

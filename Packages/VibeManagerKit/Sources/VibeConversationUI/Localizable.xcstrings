@@ -1908,6 +1908,16 @@
         }
       }
     },
+    "No preview for this file" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas d’aperçu pour ce fichier"
+          }
+        }
+      }
+    },
     "No preview for this option" : {
       "localizations" : {
         "fr" : {

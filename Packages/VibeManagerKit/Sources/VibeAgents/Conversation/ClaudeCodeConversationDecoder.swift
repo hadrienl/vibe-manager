@@ -104,7 +104,11 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       readHandback(body, from: agent)
       return
     }
-    guard object["isMeta"] as? Bool != true, let message = object["message"] as? [String: Any]
+    if object["isMeta"] as? Bool == true {
+      readImageSources(object)
+      return
+    }
+    guard let message = object["message"] as? [String: Any]
     else { return }
     if object["isCompactSummary"] as? Bool == true {
       append(ConversationEntry(id: uuid, date: date, content: .notice(.compacted)))
@@ -210,6 +214,36 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     }
     guard !texts.isEmpty || !attachments.isEmpty else { return }
     readTypedText(texts.joined(separator: "\n\n"), uuid: uuid, date: date, attachments: attachments)
+  }
+
+  /// The files of the images a prompt held (#209). Measured against 2.1.261 to 2.1.286: the prompt
+  /// is written `[Image #1]` and its image; the file each came from follows on a line of its own,
+  /// `isMeta`, of `[Image: source: /path]` blocks — a line or two later. Each path goes, in order,
+  /// to the images of the last prompt that have no file yet.
+  private func readImageSources(_ object: [String: Any]) {
+    guard let content = (object["message"] as? [String: Any])?["content"] as? [[String: Any]],
+      !content.isEmpty
+    else { return }
+    var paths: [String] = []
+    for block in content {
+      guard block["type"] as? String == "text", let text = block["text"] as? String,
+        Self.isImagePlaceholder(text), let path = Self.imageSource(text)
+      else { return }
+      paths.append(path)
+    }
+    guard let index = entries.lastIndex(where: \.isUserPrompt),
+      case .userPrompt(let text, var attachments) = entries[index].content
+    else { return }
+    var remaining = paths[...]
+    for rank in attachments.indices
+    where attachments[rank].kind == .image && attachments[rank].file == nil {
+      guard let path = remaining.popFirst() else { break }
+      let named = Self.image(
+        id: attachments[rank].id, path: path, embedded: attachments[rank].embeddedImage,
+        mediaType: attachments[rank].embeddedImage?.mediaType)
+      attachments[rank] = named
+    }
+    entries[index].content = .userPrompt(text, attachments: attachments)
   }
 
   /// An image of a prompt: its file when the CLI named one, its bytes in the transcript when it

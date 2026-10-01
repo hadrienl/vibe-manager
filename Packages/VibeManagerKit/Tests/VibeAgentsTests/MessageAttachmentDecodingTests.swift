@@ -72,6 +72,22 @@ struct MessageAttachmentDecodingTests {
     let (entries, _) = try await decode([
       #"{"type":"user","uuid":"u","message":{"content":[{"type":"text","text":"[Image: source: /tmp/shots/a b.png]"},\#(image())]}}"#
     ])
+    try expectNamed(entries)
+  }
+
+  @Test("The file of a pasted image, on the meta line the CLI writes after the prompt")
+  func imageSourceOnItsOwnLine() async throws {
+    let (entries, _) = try await decode([
+      #"{"type":"user","uuid":"u","message":{"content":[{"type":"text","text":"[Image #1]"},\#(image())]}}"#,
+      #"{"type":"attachment","uuid":"x","attachment":{"type":"hook_success"}}"#,
+      #"{"type":"user","uuid":"m","isMeta":true,"message":{"content":[{"type":"text","text":"[Image: source: /tmp/shots/a b.png]"}]}}"#,
+      #"{"type":"user","uuid":"r","isMeta":true,"message":{"content":[{"type":"text","text":"a reminder"}]}}"#,
+    ])
+    #expect(entries.count == 1)
+    try expectNamed(entries)
+  }
+
+  private func expectNamed(_ entries: [ConversationEntry]) throws {
     let attachment = try #require(entries.first?.attachments.first)
     guard case .fileWithEmbedded(let url, let embedded) = attachment.source else {
       Issue.record("\(attachment.source)")

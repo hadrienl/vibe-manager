@@ -48,6 +48,8 @@ struct UserPromptView: View {
               AttachmentStrip(attachments: attachments, alignment: .trailing)
             }
           }
+          // Files without text: the heading VoiceOver goes to is the group of them.
+          .modifier(EmptyPromptHeading(isEmpty: shown.isEmpty))
         }
       } else {
         HStack(alignment: .top, spacing: 12) {
@@ -88,6 +90,22 @@ struct UserPromptView: View {
       markdown: shown, hugsText: true
     )
     .environment(\.messageSelection, selection)
+  }
+}
+
+/// A prompt of files alone, as VoiceOver reads it: a heading, « You », holding them.
+private struct EmptyPromptHeading: ViewModifier {
+  let isEmpty: Bool
+
+  func body(content: Content) -> some View {
+    if isEmpty {
+      content
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("You", bundle: .module))
+        .accessibilityAddTraits(.isHeader)
+    } else {
+      content
+    }
   }
 }
 

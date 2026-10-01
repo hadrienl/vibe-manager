@@ -181,25 +181,53 @@ public enum AttachedPaths {
 /// revealed — never run. Opening an application, a script or a `.command` with its default
 /// application would run it.
 public enum AttachmentOpening {
-  /// Whether the file can be handed to its default application: a document, not a program. Links
-  /// and aliases are followed; a folder or a package is never opened.
+  /// Whether the file can be handed to its default application: a document of a kind known to
+  /// be read, never anything that launches — a program, a script, a `.fileloc` or `.webloc`, an
+  /// installer, a profile. Links and aliases are followed; a folder or a package is never opened.
   public static func canOpen(_ url: URL) -> Bool {
-    guard url.isFileURL else { return false }
+    guard let type = harmlessType(of: url) else { return false }
+    return documentTypes.contains { type.conforms(to: $0) }
+  }
+
+  /// Whether Quick Look may show it: anything that does not launch — Quick Look offers to open
+  /// what it shows.
+  public static func canPreview(_ url: URL) -> Bool {
+    harmlessType(of: url) != nil
+  }
+
+  /// The type of the file a link or an alias leads to, unless it is a folder, a package or
+  /// something that launches.
+  private static func harmlessType(of url: URL) -> UTType? {
+    guard url.isFileURL else { return nil }
     let resolved = (try? URL(resolvingAliasFileAt: url)) ?? url.resolvingSymlinksInPath()
     guard
       let values = try? resolved.resourceValues(forKeys: [
         .contentTypeKey, .isDirectoryKey, .isPackageKey,
       ]),
       values.isDirectory != true, values.isPackage != true, let type = values.contentType
-    else { return false }
-    let refused: [UTType] = [
-      .executable, .application, .applicationBundle, .script, .shellScript, .unixExecutable,
-      .package, .directory, .aliasFile, .symbolicLink,
+    else { return nil }
+    let refused: [UTType] = [.executable, .script, .package, .directory, .internetLocation]
+    let refusedIdentifiers = [
+      "com.apple.installer-package-archive", "com.apple.mobileconfig",
+      "com.apple.shortcut", "com.sun.java-web-start", "com.microsoft.internet-shortcut",
     ]
-    if refused.contains(where: { type.conforms(to: $0) }) { return false }
-    let refusedExtensions: Set<String> = ["command", "tool", "terminal", "app", "workflow"]
-    return !refusedExtensions.contains(resolved.pathExtension.lowercased())
+    if refused.contains(where: { type.conforms(to: $0) })
+      || refusedIdentifiers.contains(where: { identifier in
+        UTType(identifier).map { type.conforms(to: $0) } ?? false
+      })
+    {
+      return nil
+    }
+    return type
   }
+
+  /// What is opened: read by its application, never run.
+  private static let documentTypes: [UTType] = [
+    .image, .pdf, .audiovisualContent, .plainText, .sourceCode, .json, .xml, .yaml, .rtf,
+    .commaSeparatedText, .spreadsheet, .presentation,
+    UTType("org.openxmlformats.wordprocessingml.document"), UTType("com.microsoft.word.doc"),
+    UTType("org.oasis-open.opendocument.text"), UTType("com.apple.iwork.pages.sffpages"),
+  ].compactMap { $0 }
 
   /// Whether the session's web view can show it: a page `LinkRouting` would open, or an image.
   public static func canShowInWebView(_ url: URL) -> Bool {

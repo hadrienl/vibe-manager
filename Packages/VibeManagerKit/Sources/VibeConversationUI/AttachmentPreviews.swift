@@ -17,6 +17,13 @@ struct AttachmentPreview: @unchecked Sendable {
   var byteCount: Int?
   /// The file is not there any more, and the transcript holds no copy of it.
   var isMissing = false
+  /// The file, when it is on disk: what the menu acts on.
+  var existingFile: URL?
+  /// Its icon in the Finder.
+  var icon: NSImage?
+  /// Whether its application may open it, and the web view show it: see `AttachmentOpening`.
+  var canOpen = false
+  var canShowInWebView = false
 
   static let missing = AttachmentPreview(isMissing: true)
 
@@ -73,7 +80,8 @@ actor AttachmentPreviews {
   /// there.
   func previewableFile(for attachment: MessageAttachment) -> URL? {
     if let file = attachment.file, FileManager.default.fileExists(atPath: file.path) {
-      return file
+      // Quick Look offers to open what it shows: only a document goes to it (ADR 0025).
+      return AttachmentOpening.canPreview(file) ? file : nil
     }
     guard let image = attachment.embeddedImage else { return nil }
     let key = Self.key(.embedded(image), maxPixel: 0)
@@ -81,10 +89,12 @@ actor AttachmentPreviews {
       return file
     }
     guard let data = Self.decoded(image) else { return nil }
+    // Named after its media type, never after the transcript: a name it gives could make the copy
+    // something Quick Look offers to run.
     let name =
-      attachment.name
-      ?? "Image \(temporaryFiles.count + 1)."
-      + (UTType(mimeType: image.mediaType)?.preferredFilenameExtension ?? "png")
+      "Image \(temporaryFiles.count + 1)."
+      + (UTType(mimeType: image.mediaType)?.conforms(to: .image) == true
+        ? UTType(mimeType: image.mediaType)?.preferredFilenameExtension ?? "png" : "png")
     let folder = temporaryFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
     let file = folder.appendingPathComponent(name)
     do {
@@ -149,6 +159,10 @@ actor AttachmentPreviews {
   {
     var preview = AttachmentPreview()
     preview.byteCount = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+    preview.existingFile = file
+    preview.icon = NSWorkspace.shared.icon(forFile: file.path)
+    preview.canOpen = AttachmentOpening.canOpen(file)
+    preview.canShowInWebView = AttachmentOpening.canShowInWebView(file)
     switch kind {
     case .image:
       preview.thumbnail = autoreleasepool {

@@ -59,6 +59,15 @@ struct MessageAttachmentTests {
       at: link, withDestinationURL: folder.appendingPathComponent("run.command"))
     #expect(!AttachmentOpening.canOpen(link))
     #expect(!AttachmentOpening.canOpen(folder.appendingPathComponent("missing.txt")))
+    for launcher in ["x.fileloc", "x.webloc", "x.inetloc", "x.pkg", "x.mobileconfig", "x.py"] {
+      let url = try file(launcher)
+      #expect(!AttachmentOpening.canOpen(url), "\(launcher)")
+      #expect(!AttachmentOpening.canPreview(url), "\(launcher)")
+    }
+    // An archive is shown by Quick Look, but not handed to its application.
+    let archive = try file("bundle.zip")
+    #expect(AttachmentOpening.canPreview(archive))
+    #expect(!AttachmentOpening.canOpen(archive))
   }
 
   @Test("The web view shows a page or an image, nothing else")
