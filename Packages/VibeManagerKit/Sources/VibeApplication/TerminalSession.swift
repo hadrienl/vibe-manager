@@ -344,9 +344,14 @@ public protocol TerminalSession: AnyObject, Sendable {
   func resize(to size: TerminalSize) async
   func stop(gracePeriod: Duration) async
   func kill() async
+  /// Whether the process runs in the terminal host: its outcome is unknown, then, only when the
+  /// host itself went away (#237).
+  var runsInTerminalHost: Bool { get }
 }
 
 extension TerminalSession {
+  public var runsInTerminalHost: Bool { false }
+
   /// Relays the full stream, keeping only what `interest` reads: for a session that serves one
   /// stream to all, as the stand-ins of the tests do. The real sessions filter at the source.
   public func attach(_ interest: TerminalEventInterest) async -> TerminalAttachment {
