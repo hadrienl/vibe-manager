@@ -508,3 +508,24 @@ struct HandoverBriefTests {
     #expect(!restart.text.contains("previously"))
   }
 }
+
+@Test("Another model of the same endpoint goes on in the CLI that wrote the conversation")
+func endpointSwitchKeepsHarness() {
+  let endpoint = "endpoint.8CB1EF15-9CD2-46A8-87AE-1C38064F9B8A"
+  let session = WorkSession(
+    name: "Endpoint",
+    agent: SessionAgentConfiguration(
+      providerID: endpoint, modelID: "a", resumeIdentifier: "5b1f", harnessID: "claude-code"))
+  let plan = AgentLaunchPlan(
+    providerID: AgentProviderID(endpoint), executablePath: "/bin/claude", arguments: [],
+    environment: [:], workingDirectoryPath: "/tmp", promptDelivery: .none)
+  let target = AgentTarget(providerID: endpoint, modelID: "b")
+  let resumed = AgentSwitchPlan(
+    session: session, target: target, targetName: "LLM Gateway", plan: plan,
+    mode: .resumeWithModel(identifier: "5b1f"))
+  #expect(resumed.nextConfiguration.harnessID == "claude-code")
+  #expect(resumed.nextConfiguration.resumeIdentifier == "5b1f")
+  let fresh = AgentSwitchPlan(
+    session: session, target: target, targetName: "LLM Gateway", plan: plan, mode: .firstLaunch)
+  #expect(fresh.nextConfiguration.harnessID == nil)
+}

@@ -11,14 +11,19 @@ public struct AgentLaunchRequest: Hashable, Sendable {
   public var initialPrompt: String?
   public var resume: AgentResumeRequest
   public var additionalEnvironment: [String: String]
+  /// The command line agent that wrote the conversation being resumed, when an endpoint drove it
+  /// (#107): a conversation can only go back to the CLI that wrote it.
+  public var harnessID: String?
 
   public init(
     workingDirectoryPath: String,
     modelID: String? = nil,
     initialPrompt: String? = nil,
     resume: AgentResumeRequest = .none,
-    additionalEnvironment: [String: String] = [:]
+    additionalEnvironment: [String: String] = [:],
+    harnessID: String? = nil
   ) {
+    self.harnessID = harnessID
     self.workingDirectoryPath = workingDirectoryPath
     self.modelID = modelID
     self.initialPrompt = initialPrompt

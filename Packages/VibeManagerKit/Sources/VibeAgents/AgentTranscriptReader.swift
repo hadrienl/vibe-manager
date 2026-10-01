@@ -64,7 +64,7 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       guard let identifier = Self.identifier(of: conversation) else { continue }
       let files: [URL]
       let isCodex: Bool
-      switch conversation.providerID {
+      switch conversation.transcriptProviderID {
       case ClaudeCodeAgentProvider.id.rawValue:
         files = claudeTranscripts(for: identifier)
         isCodex = false
@@ -96,7 +96,7 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
     var directories: [String] = []
     for conversation in session.conversations where Self.identifier(of: conversation) != nil {
       let directory: String
-      switch conversation.providerID {
+      switch conversation.transcriptProviderID {
       case ClaudeCodeAgentProvider.id.rawValue:
         directory = locator.claudeProjects.path
       case CodexAgentProvider.id.rawValue:

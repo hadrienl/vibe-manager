@@ -170,3 +170,19 @@ func startedAtIsInferredForOlderStores() {
   )
   #expect(running.startedAt == createdAt)
 }
+
+@Test("A conversation stored before endpoints existed reads as its own agent's")
+func agentConfigurationWithoutHarness() throws {
+  let stored = Data(#"{"providerID":"codex","modelID":"gpt-5.5","resumeIdentifier":"019e"}"#.utf8)
+  let decoded = try JSONDecoder().decode(SessionAgentConfiguration.self, from: stored)
+  #expect(decoded.harnessID == nil)
+  #expect(decoded.transcriptProviderID == "codex")
+
+  let endpoint = SessionAgentConfiguration(
+    providerID: "endpoint.A", modelID: "qwen3-coder:30b", resumeIdentifier: "5b1f",
+    harnessID: "claude-code")
+  let roundTrip = try JSONDecoder().decode(
+    SessionAgentConfiguration.self, from: JSONEncoder().encode(endpoint))
+  #expect(roundTrip == endpoint)
+  #expect(roundTrip.transcriptProviderID == "claude-code")
+}

@@ -92,6 +92,7 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
   public func identifierCapture(
     for sessionID: SessionID,
     repository: any SessionRepository,
+    recording: AgentResumeRecording = AgentResumeRecording(providerID: id.rawValue),
     transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
     transcriptWatchLimit: Duration =
       ClaudeCodeSessionIdentifierCapture.defaultTranscriptWatchLimit,
@@ -100,7 +101,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
     ClaudeCodeSessionIdentifierCapture(
       sessionID: sessionID,
       record: RecordAgentResumeIdentifier(
-        repository: repository, providerID: Self.id.rawValue, launchedAt: Date()),
+        repository: repository, providerID: recording.providerID, launchedAt: Date(),
+        harnessID: recording.harnessID),
       transcripts: transcripts,
       transcriptWatchLimit: transcriptWatchLimit,
       persistenceWindow: persistenceWindow
