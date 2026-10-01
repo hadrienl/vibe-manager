@@ -596,33 +596,11 @@ public struct RootView: View {
     // Asked only when archiving stops work in progress (#115), with the close question's "Don't
     // ask again": the two share one setting. Cancel is the default button: the key that opened
     // this must not also answer it.
-    // `presenting:` hands the session to the buttons, rather than having them read it back from
-    // the model. SwiftUI dismisses the dialog before running a button's action, and the dismissal
-    // clears the pending session — read there, Archive found nothing and did nothing.
-    .confirmationDialog(
-      model.pendingArchive.map {
-        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
-      } ?? Text("Archive this session?", bundle: .module),
-      isPresented: Binding(
-        get: { model.pendingArchive != nil },
-        set: { isPresented in
-          guard !isPresented else { return }
-          model.cancelArchive()
-        }
-      ),
-      titleVisibility: .visible,
-      presenting: model.pendingArchive
-    ) { session in
-      Button(LocalizedStringResource("Archive", bundle: .module)) {
-        let askAgain = !suppressesCloseConfirmation
-        Task { await model.archive(session.id, askAgain: askAgain) }
-      }
-      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
-        model.cancelArchive()
-      }
-    } message: { session in
-      Text(archiveConfirmationMessage(for: session))
-    }
+    .archiveConfirmation(
+      model: model, isOffered: model.pendingArchive.map(model.archiveOffersDontAskAgain) == true,
+      suppressesConfirmation: $suppressesCloseConfirmation,
+      message: archiveConfirmationMessage(for:)
+    )
     // Before the side terminal's dialog and the other batch one in the chain: the toggle reaches
     // every dialog it wraps, and a question has a "Don't ask again" only when it is #51's.
     .dialogSuppressionToggle(
@@ -637,6 +615,12 @@ public struct RootView: View {
     .onChange(of: model.pendingArchive?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
     }
+    // The same question when only an agent in the middle of a turn asks it (#242): after the
+    // suppression toggle, since "Don't ask again" would change nothing — it is always asked.
+    .archiveConfirmation(
+      model: model, isOffered: model.pendingArchive.map(model.archiveOffersDontAskAgain) == false,
+      suppressesConfirmation: .constant(false), message: archiveConfirmationMessage(for:)
+    )
     // ⌃⌘→ or ⌃⌘← that would restart a closed session's agent (#240): a key pressed by mistake
     // must not start one. After the suppression toggle: this question has no "Don't ask again".
     .confirmationDialog(
@@ -2488,6 +2472,42 @@ private struct SessionConversationSlot: View {
       // A hidden composer must lose the keyboard: typed into, it would send to a session
       // nobody is looking at.
       .disabled(!isActive)
+    }
+  }
+}
+
+extension View {
+  /// The question before archiving a session (#115). `presenting:` hands the session to the
+  /// buttons, rather than having them read it back from the model: SwiftUI dismisses the dialog
+  /// before running a button's action, and the dismissal clears the pending session — read there,
+  /// Archive found nothing and did nothing.
+  fileprivate func archiveConfirmation(
+    model: AppModel, isOffered: Bool, suppressesConfirmation: Binding<Bool>,
+    message: @escaping (WorkSession) -> String
+  ) -> some View {
+    confirmationDialog(
+      model.pendingArchive.map {
+        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Archive this session?", bundle: .module),
+      isPresented: Binding(
+        get: { isOffered },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelArchive()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingArchive
+    ) { session in
+      Button(LocalizedStringResource("Archive", bundle: .module)) {
+        let askAgain = !suppressesConfirmation.wrappedValue
+        Task { await model.archive(session.id, askAgain: askAgain) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelArchive()
+      }
+    } message: { session in
+      Text(message(session))
     }
   }
 }

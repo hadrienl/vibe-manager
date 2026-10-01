@@ -328,9 +328,9 @@ struct SessionSidebarHistoryTests {
     let archived = SessionArchiveUndo(id: SessionID(), taskStatus: .waiting, wasSelected: true)
     var history = SessionSidebarHistory()
     history.record(change(id, "A", "B"))
-    history.record(archived)
+    history.record([archived])
 
-    #expect(history.popUndo() == .archive(archived))
+    #expect(history.popUndo() == .archive([archived]))
     #expect(!history.canRedo)
     #expect(history.popUndo() == .identity(change(id, "B", "A")))
   }
@@ -340,12 +340,24 @@ struct SessionSidebarHistoryTests {
     let status = SessionStatusUndo(id: SessionID(), from: .waiting, to: .done)
     let archive = SessionArchiveUndo(id: SessionID(), taskStatus: .todo, wasSelected: false)
     var history = SessionSidebarHistory()
-    history.record(archive)
+    history.record([archive])
     history.record(status)
 
     #expect(history.popUndo() == .status(status))
-    #expect(history.popUndo() == .archive(archive))
+    #expect(history.popUndo() == .archive([archive]))
     #expect(!history.canRedo)
+  }
+
+  @Test("A batch archive keeps the sessions still stored, and goes once none is")
+  func batchArchiveForgetsRemovedSessions() {
+    let kept = SessionArchiveUndo(id: SessionID(), taskStatus: .todo, wasSelected: false)
+    let gone = SessionArchiveUndo(id: SessionID(), taskStatus: .doing, wasSelected: true)
+    var history = SessionSidebarHistory()
+    history.record([kept, gone])
+    history.keep(only: [kept.id])
+    #expect(history.undoStack == [.archive([kept])])
+    history.keep(only: [])
+    #expect(!history.canUndo)
   }
 
   @Test("An archive clears what could be redone, as any change does")
@@ -358,7 +370,7 @@ struct SessionSidebarHistoryTests {
       return
     }
     history.didUndo(undo)
-    history.record(SessionArchiveUndo(id: id, taskStatus: .todo, wasSelected: false))
+    history.record([SessionArchiveUndo(id: id, taskStatus: .todo, wasSelected: false)])
     #expect(!history.canRedo)
   }
 }

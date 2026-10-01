@@ -216,7 +216,6 @@ extension AgentRemediation {
     case .install: return "install"
     case .update: return "update"
     case .authenticate: return "authenticate"
-    case .defineExecutablePath: return "defineExecutablePath"
     case .retryDetection: return "retryDetection"
     }
   }

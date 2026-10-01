@@ -121,6 +121,8 @@ public final class AppModel {
   }
   /// The library of avatars: the one in use, and those being made (#41, #154).
   public var avatars: AvatarLibraryModel?
+  /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
+  public var endpoints: EndpointsSettingsModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?
@@ -1214,14 +1216,8 @@ public final class AppModel {
 
   /// One session of a batch archive (#77).
   func archiveInBatch(_ id: SessionID) async -> SessionBatchItemResult {
-    let taskStatus = sessions.first { $0.id == id }?.taskStatus
     do {
       let archival = try await archiveProcess(id)
-      // ⌘Z brings the batch back one session at a time, last archived first (#242).
-      if let taskStatus {
-        sidebarHistory.record(
-          SessionArchiveUndo(id: id, taskStatus: taskStatus, wasSelected: false))
-      }
       return Self.result(of: archival.detachment, for: archival.session, action: .archived)
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
@@ -1315,6 +1311,12 @@ public final class AppModel {
     await archive(id)
   }
 
+  /// Whether the question before archiving offers "Don't ask again": only when the setting is
+  /// what asks it. Asked because the agent is in the middle of a turn (#242), it always will be.
+  public func archiveOffersDontAskAgain(_ session: WorkSession) -> Bool {
+    interruptsWork(session)
+  }
+
   /// Whether Archive will ask before archiving: the menus end its name with an ellipsis then.
   public func archiveAsks(_ session: WorkSession) -> Bool {
     canArchive(session) && (interruptsWork(session) || interruptsTurn(session))
@@ -1349,7 +1351,7 @@ public final class AppModel {
       archived = true
       if let session {
         sidebarHistory.record(
-          SessionArchiveUndo(id: id, taskStatus: session.taskStatus, wasSelected: wasSelected))
+          [SessionArchiveUndo(id: id, taskStatus: session.taskStatus, wasSelected: wasSelected)])
       }
       report(archival.detachment, for: archival.session, action: .archived)
       prepareHandOff(from: id, listedBefore: visible)
@@ -1406,25 +1408,28 @@ public final class AppModel {
     reconcileSelection()
   }
 
-  /// ⌘Z after an archive (#242): the session comes back to the column it left, and selected if
-  /// it was. Its agent stays stopped — it comes back closed, as any unarchived session, and
-  /// Restart picks it up. A session archived since by another way, or no longer archived, beeps.
-  func undoArchive(_ archive: SessionArchiveUndo) async {
-    guard let session = sessions.first(where: { $0.id == archive.id }),
-      session.status == .archived
-    else { return NSSound.beep() }
-    do {
-      _ = try await restoreSession(id: archive.id)
-      if archive.taskStatus != .done, archive.taskStatus != .archived {
-        try await changeTaskStatus(id: archive.id, to: archive.taskStatus)
+  /// ⌘Z after an archive (#242): the sessions come back to the columns they left — all of a
+  /// batch at once — and the one on screen selected again. Their agents stay stopped: they come
+  /// back closed, as any unarchived session, and Restart picks them up. One no longer archived
+  /// — unarchived since by another way — is left alone; with none left to bring back, it beeps.
+  func undoArchive(_ archives: [SessionArchiveUndo]) async {
+    let archived = Set(sessions.filter { $0.status == .archived }.map(\.id))
+    let back = archives.filter { archived.contains($0.id) }
+    guard !back.isEmpty else { return NSSound.beep() }
+    for archive in back {
+      do {
+        _ = try await restoreSession(id: archive.id)
+        if archive.taskStatus != .done, archive.taskStatus != .archived {
+          try await changeTaskStatus(id: archive.id, to: archive.taskStatus)
+        }
+        diagnostics.record(
+          .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(archive.id)])
+      } catch {
+        await report(error)
       }
-      diagnostics.record(
-        .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(archive.id)])
-    } catch {
-      await report(error)
     }
     await reload()
-    if archive.wasSelected { select(archive.id) }
+    if let selected = back.first(where: \.wasSelected) { select(selected.id) }
     reconcileSelection()
   }
 

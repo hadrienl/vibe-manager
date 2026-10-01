@@ -5,6 +5,7 @@ import VibeAvatar
 import VibeBrowser
 import VibeConversationUI
 import VibeDomain
+import VibeEndpoints
 import VibeGit
 import VibePersistence
 import VibeProcess
@@ -107,6 +108,8 @@ public final class AppEnvironment {
   /// Every session's web view, and the socket its agents reach it through (#69).
   public let browser: BrowserWorkspace
   private let browserChannel: BrowserChannelListener
+  /// The endpoints the user declared, as agents (#107).
+  public let endpointCatalog: EndpointCatalog
 
   public init(configuration: Configuration = Configuration()) {
     let data = Self.dataLocation(
@@ -142,7 +145,31 @@ public final class AppEnvironment {
     let providers =
       configuration.providers?(diagnostics.log)
       ?? Self.providers(environment: configuration.environment, diagnostics: diagnostics.log)
-    let registry = AgentProviderRegistry(providers: providers)
+    // The endpoints (#107): registered beside the command line agents from the start — a session
+    // the terminal host kept is adopted as soon as the workspace loads, and must find its agent —
+    // their secrets in the keychain, their sessions reaching them through the gateway.
+    let endpointSecrets = KeychainEndpointSecretStore(
+      service: Self.keychainService(isolated: data.defaultsSuite != nil))
+    let gatewayLocation = Self.gatewayLocation(
+      dataFolder: data.store.deletingLastPathComponent(), endpoints: data.endpoints)
+    let gateway = EndpointGatewayAdapter(
+      controller: EndpointGatewayController(
+        location: gatewayLocation,
+        launch: Self.gatewayLaunch(
+          location: gatewayLocation,
+          keychainService: Self.keychainService(isolated: data.defaultsSuite != nil))))
+    let registry = AgentProviderRegistry(
+      providers: providers,
+      endpoints: EndpointCatalog.providers(
+        for: (try? FileEndpointRepository.read(data.endpoints)) ?? [], among: providers,
+        gateway: gateway, secrets: endpointSecrets, gatewayDirectory: gatewayLocation.directory))
+    let endpointCatalog = EndpointCatalog(
+      repository: FileEndpointRepository(storeURL: data.endpoints),
+      secrets: endpointSecrets,
+      registry: registry,
+      gateway: gateway,
+      providers: providers, gatewayDirectory: gatewayLocation.directory)
+    self.endpointCatalog = endpointCatalog
     // Every terminal runs in the terminal host, so its agent can be left running when the
     // application quits (ADR 0017). One host per data directory: an isolated copy has its own.
     let supervisor = HostedTerminalSupervisor(
@@ -246,6 +273,7 @@ public final class AppEnvironment {
         agents: registry, tracker: activityTracker, consents: hookConsents,
         diagnostics: diagnostics),
       provideTools: provideTools,
+      prepareLaunch: PrepareAgentLaunch(agents: registry),
       diagnostics: diagnostics
     )
     self.launcher = launcher
@@ -442,6 +470,26 @@ public final class AppEnvironment {
     appModel.avatars = avatars
     Task { await avatars.load() }
     if let name = Self.bundleName() { appModel.applicationName = name }
+    appModel.endpoints = EndpointsSettingsModel(
+      repository: endpointCatalog.repository, secrets: endpointCatalog.secrets,
+      probing: EndpointProber(transport: URLSessionEndpointTransport()),
+      didSave: { [weak appModel] in
+        await endpointCatalog.reload()
+        // The names the sidebar, the usage and the requests give agents come from the detection,
+        // and the conversation view knows the agents it reads from when it was prepared.
+        await appModel?.refreshAgents()
+        await appModel?.conversations.refreshReadableAgents()
+      })
+    // The endpoints are registered before the first sheet asks for the agents, and the gateway is
+    // relieved of the tokens of sessions that ended: at launch, then every five minutes.
+    Task { [repository] in
+      while !Task.isCancelled {
+        if let sessions = try? await repository.sessions() {
+          await endpointCatalog.retainActive(in: sessions)
+        }
+        try? await Task.sleep(for: .seconds(300))
+      }
+    }
   }
 
   /// The application's name as the Finder and the menu bar say it, in the user's language: what
@@ -702,6 +750,8 @@ public final class AppEnvironment {
     let icons: URL
     /// What drops bring without a file of their own, per session (#42).
     let drops: URL
+    /// The endpoints (#107).
+    let endpoints: URL
     let defaultsSuite: String?
   }
 
@@ -726,6 +776,7 @@ public final class AppEnvironment {
         folders: FileFolderLabelStore.defaultURL(),
         icons: FileSessionIconStore.defaultDirectory(),
         drops: FileSessionDropStore.defaultDirectory(),
+        endpoints: FileEndpointRepository.defaultStoreURL(),
         defaultsSuite: defaultsSuite)
     }
     let folder = URL(fileURLWithPath: directory, isDirectory: true)
@@ -741,6 +792,7 @@ public final class AppEnvironment {
       folders: folder.appendingPathComponent("folders.json"),
       icons: folder.appendingPathComponent("Icons", isDirectory: true),
       drops: folder.appendingPathComponent("Drops", isDirectory: true),
+      endpoints: folder.appendingPathComponent("endpoints.json"),
       defaultsSuite: defaultsSuite ?? "com.hadrienl.VibeManager.isolated")
   }
 

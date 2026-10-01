@@ -307,7 +307,8 @@ struct SessionHistoryTests {
 
   @Test("⌘Z on an archive already undone another way beeps and changes nothing")
   func undoingAnArchiveAlreadyRestored() async {
-    let done = WorkSession(name: "Done", status: .closed, taskStatus: .done)
+    // Archived from Waiting: an undo that went ahead anyway would move it back there.
+    let done = WorkSession(name: "Done", status: .closed, taskStatus: .waiting)
     let repository = MutableRepository(sessions: [done])
     let model = AppModel(repository: repository, agents: EmptyRegistry())
     await model.load()
@@ -318,6 +319,44 @@ struct SessionHistoryTests {
     await model.undoSidebarChange()
 
     #expect(await repository.session(id: done.id)?.taskStatus == .todo)
+    // Left alone, rather than tried and failed: no error to show.
+    #expect(model.refreshFailure == nil)
+  }
+
+  @Test("One ⌘Z brings a batch archive back, the session on screen selected again")
+  func undoingABatchArchive() async {
+    let first = WorkSession(name: "First", status: .closed, taskStatus: .waiting)
+    let second = WorkSession(name: "Second", status: .closed, taskStatus: .waiting)
+    let third = WorkSession(name: "Third", status: .closed, taskStatus: .waiting)
+    let repository = MutableRepository(sessions: [first, second, third])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.setColumn(.waiting)
+    model.select(second.id)
+
+    let plan = model.batchPlan(.archive, for: [first.id, second.id])
+    await model.performBatch(plan, skipsAnnounced: true)
+    #expect(await repository.session(id: first.id)?.status == .archived)
+    #expect(await repository.session(id: second.id)?.status == .archived)
+
+    await model.undoSidebarChange()
+
+    #expect(await repository.session(id: first.id)?.taskStatus == .waiting)
+    #expect(await repository.session(id: second.id)?.taskStatus == .waiting)
+    #expect(model.selectedSessionID == second.id)
+    #expect(!model.canUndoSidebarChange)
+  }
+
+  @Test("⌘Z is the sidebar's only with the keyboard in it: elsewhere it is the window's")
+  func undoOnlyWithTheKeyboardHere() async {
+    let done = WorkSession(name: "Done", status: .closed, taskStatus: .done)
+    let repository = MutableRepository(sessions: [done])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    await model.requestArchive(done.id)
+
+    #expect(model.sidebarUndoAction(redo: false, keyboardHere: true) != nil)
+    #expect(model.sidebarUndoAction(redo: false, keyboardHere: false) == nil)
   }
 
   @Test("A confirmed archive takes the session out of the columns, and back to Done on request")

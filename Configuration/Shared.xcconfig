@@ -36,6 +36,8 @@ INFOPLIST_KEY_NSDownloadsFolderUsageDescription = Vibe Manager lets the coding a
 INFOPLIST_KEY_NSRemovableVolumesUsageDescription = Vibe Manager opens the working folder you chose on this volume.
 INFOPLIST_KEY_NSNetworkVolumesUsageDescription = Vibe Manager opens the working folder you chose on this volume.
 INFOPLIST_KEY_NSFileProviderDomainUsageDescription = Vibe Manager opens the working folder you chose in iCloud Drive.
+// The gateway of #107 reaches a model server on the local network, such as Ollama on another Mac.
+INFOPLIST_KEY_NSLocalNetworkUsageDescription = Vibe Manager reaches the model servers you declared on your local network.
 
 // Signing is not cosmetic: macOS keys a privacy grant to the code identity of the application, so
 // an ad-hoc signature gets a new identity at every build, and every permission granted the day
