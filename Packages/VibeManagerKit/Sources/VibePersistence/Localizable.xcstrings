@@ -87,7 +87,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ces modèles ont été exportés par une version plus récente de Vibe Manager (format %@). Mettez à jour Vibe Manager pour les importer."
+            "value" : "Ces gabarits ont été exportés par une version plus récente de Vibe Manager (format %@). Mettez à jour Vibe Manager pour les importer."
           }
         }
       }
@@ -97,7 +97,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce fichier ne contient pas de modèles de prompt Vibe Manager."
+            "value" : "Ce fichier ne contient pas de gabarits de prompt Vibe Manager."
           }
         }
       }
@@ -114,7 +114,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce fichier pèse %1$@ ; un fichier de modèles ne peut pas dépasser %2$@."
+            "value" : "Ce fichier pèse %1$@ ; un fichier de gabarits ne peut pas dépasser %2$@."
           }
         }
       }

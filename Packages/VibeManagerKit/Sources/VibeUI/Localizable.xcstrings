@@ -3619,19 +3619,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld modèles importés."
+                  "value" : "%lld gabarits importés."
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld modèle importé."
+                  "value" : "%lld gabarit importé."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld modèles importés."
+                  "value" : "%lld gabarits importés."
                 }
               }
             }
@@ -3914,7 +3914,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un modèle peut proposer le dossier, le nom et l’apparence."
+            "value" : "Un gabarit peut proposer le dossier, le nom et l’apparence."
           }
         }
       }
@@ -3924,7 +3924,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un modèle est un prompt avec des champs à remplir — « Revue {{url}} » — prêt à lancer une session."
+            "value" : "Un gabarit est un prompt avec des champs à remplir — « Revue {{url}} » — prêt à lancer une session."
           }
         }
       }
@@ -3935,7 +3935,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le prompt d’un modèle ne prend pas de fichiers"
+            "value" : "Le prompt d’un gabarit ne prend pas de fichiers"
           }
         }
       }
@@ -5849,7 +5849,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Supprimer le modèle"
+            "value" : "Supprimer le gabarit"
           }
         }
       }
@@ -6022,7 +6022,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abandonner ce modèle"
+            "value" : "Abandonner ce gabarit"
           }
         }
       }
@@ -6868,7 +6868,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "D’après le modèle « %@ »"
+            "value" : "D’après le gabarit « %@ »"
           }
         }
       }
@@ -6885,7 +6885,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "D’après le modèle « %1$@ », révision %2$@"
+            "value" : "D’après le gabarit « %1$@ », révision %2$@"
           }
         }
       }
@@ -7070,7 +7070,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Définie par le modèle — choisissez-en une autre si besoin."
+            "value" : "Définie par le gabarit — choisissez-en une autre si besoin."
           }
         }
       }
@@ -7383,7 +7383,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importer des modèles"
+            "value" : "Importer des gabarits"
           }
         }
       }
@@ -7779,7 +7779,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chargement des modèles…"
+            "value" : "Chargement des gabarits…"
           }
         }
       }
@@ -8390,7 +8390,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nouveau modèle"
+            "value" : "Nouveau gabarit"
           }
         }
       }
@@ -8727,7 +8727,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun modèle pour l’instant — cliquez sur « Gérer… » pour en écrire un, ou ajoutez les exemples."
+            "value" : "Aucun gabarit pour l’instant — cliquez sur « Gérer… » pour en écrire un, ou ajoutez les exemples."
           }
         }
       }
@@ -8737,7 +8737,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun modèle pour l’instant."
+            "value" : "Aucun gabarit pour l’instant."
           }
         }
       }
@@ -9277,7 +9277,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien à importer : tous les modèles sont déjà là."
+            "value" : "Rien à importer : tous les gabarits sont déjà là."
           }
         }
       }
@@ -9369,7 +9369,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Proposés pour l’apparence d’une session ou d’un modèle. Faites glisser pour réordonner."
+            "value" : "Proposés pour l’apparence d’une session ou d’un gabarit. Faites glisser pour réordonner."
           }
         }
       }
@@ -9533,7 +9533,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Facultatif — proposé comme dossier de travail quand ce modèle est choisi."
+            "value" : "Facultatif — proposé comme dossier de travail quand ce gabarit est choisi."
           }
         }
       }
@@ -9791,7 +9791,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle de prompt"
+            "value" : "Gabarit de prompt"
           }
         }
       }
@@ -9802,7 +9802,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèles de prompt"
+            "value" : "Gabarits de prompt"
           }
         }
       }
@@ -9813,7 +9813,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle de prompt"
+            "value" : "Gabarit de prompt"
           }
         }
       }
@@ -9823,7 +9823,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Proposé par le modèle — modifiez-le si besoin."
+            "value" : "Proposé par le gabarit — modifiez-le si besoin."
           }
         }
       }
@@ -11071,7 +11071,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sélectionnez un modèle."
+            "value" : "Sélectionnez un gabarit."
           }
         }
       }
@@ -12224,7 +12224,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèles"
+            "value" : "Gabarits"
           }
         }
       }
@@ -14153,7 +14153,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce modèle a changé depuis que vous l’avez choisi."
+            "value" : "Ce gabarit a changé depuis que vous l’avez choisi."
           }
         }
       }
@@ -14551,7 +14551,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Transforme le prompt en texte libre. La session ne fera plus référence au modèle."
+            "value" : "Transforme le prompt en texte libre. La session ne fera plus référence au gabarit."
           }
         }
       }
@@ -14766,7 +14766,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle sans titre"
+            "value" : "Gabarit sans titre"
           }
         }
       }
@@ -14973,7 +14973,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les valeurs à essayer apparaissent ici pour chaque champ du modèle."
+            "value" : "Les valeurs à essayer apparaissent ici pour chaque champ du gabarit."
           }
         }
       }

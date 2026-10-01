@@ -1453,7 +1453,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les modèles n’ont pas pu être lus : %@"
+            "value" : "Les gabarits n’ont pas pu être lus : %@"
           }
         }
       }
@@ -1463,7 +1463,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les modèles n’ont pas pu être enregistrés : %@"
+            "value" : "Les gabarits n’ont pas pu être enregistrés : %@"
           }
         }
       }
