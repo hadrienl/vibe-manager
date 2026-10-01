@@ -17,7 +17,7 @@ struct TemplatesLocalizationTests {
     // The test runner declares no localization of its own, so its strings are English.
     #expect(model.editing?.name == "Untitled Template")
     #expect(
-      Localization.string("Untitled Template", module: "VibeUI", in: "fr") == "Modèle sans titre")
+      Localization.string("Untitled Template", module: "VibeUI", in: "fr") == "Gabarit sans titre")
   }
 
   @Test(
