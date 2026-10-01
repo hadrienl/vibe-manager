@@ -164,8 +164,14 @@ extension AppModel {
   /// its composer:
   /// the one gesture of the palette that changes the session on screen.
   public func openSession(for id: AgentRequestID) {
+    guard let session = sessions.first(where: { $0.id == id.sessionID }) else { return }
     // From the floating panel, another application is in front (#41).
-    openSession(id.sessionID)
+    if !isApplicationActive { activateApplication() }
+    if session.taskStatus != .archived, filter.column != session.taskStatus {
+      setColumn(session.taskStatus)
+    }
+    select(session.id)
+    focusSession()
   }
 
   /// ⌥⌘P: unfolds the palette and gives it the keyboard.

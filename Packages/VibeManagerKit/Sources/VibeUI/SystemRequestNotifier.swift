@@ -119,7 +119,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
 
   fileprivate func open(_ id: SessionID) {
     NSApp.activate()
-    model?.openSession(id)
+    model?.openFromNotification(id)
   }
 
   private func isStillShown(_ identifier: String) async -> Bool {

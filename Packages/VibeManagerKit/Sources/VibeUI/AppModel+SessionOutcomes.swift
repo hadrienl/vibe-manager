@@ -1,22 +1,14 @@
 import Foundation
 import VibeApplication
 import VibeDomain
+import VibeTerminalUI
 
-/// How the turn or the process of a session the user is not looking at came to an end (#236).
-public enum SessionOutcome: Equatable, Sendable {
-  /// The agent finished its answer.
-  case replied
-  /// The process ended on an error: a non-zero exit, a signal, a launch that failed.
-  case failed
-  /// The process ended cleanly, on its own.
-  case stopped
-}
-
-/// A system notification about a session's outcome (#236).
+/// A system notification: a session out of sight replied, or its process ended (#236).
 public struct SessionOutcomeNotification: Equatable, Sendable {
   public let sessionID: SessionID
-  public let outcome: SessionOutcome
+  /// The session, and its agent.
   public let title: String
+  /// The state the sidebar now shows for it.
   public let body: String
 }
 
@@ -31,32 +23,46 @@ extension AppModel {
   ///
   /// The tracker marks an answer unread only when it ends while the session is not on screen, and
   /// only once until it is read: its first mark is the one transition said. A state seen for the
-  /// first time — one restored at launch — says nothing.
+  /// first time — one restored at launch — says nothing, nor does a line written while the
+  /// application was closed and read again on adoption (`isReplayed`). An answer that ends on a
+  /// request is said by the request.
   func activityDidChange(
-    _ id: SessionID, from previous: AgentActivityState?, to state: AgentActivityState
+    _ id: SessionID, from previous: AgentActivityState?, to state: AgentActivityState,
+    isReplayed: Bool = false
   ) {
-    guard let previous, previous.unreadSince == nil, state.unreadSince != nil else { return }
-    sessionDidEnd(id, .replied)
+    guard !isReplayed, let previous, previous.unreadSince == nil, state.unreadSince != nil,
+      state.requests.isEmpty
+    else { return }
+    sessionDidEnd(id, as: .running, activity: state)
   }
 
-  /// The process of a session ended on its own. One the application stopped — Close, Archive —
-  /// says nothing: the user asked for it.
+  /// The process of a session ended on its own. One the application stops — Close, Archive, a
+  /// switch, quitting — has its watch taken away first, and never comes here.
   func processDidEnd(_ id: SessionID, state: TerminalProcessState) {
-    if launcher?.pane(for: id)?.wasStoppedOnPurpose == true { return }
+    let status: TerminalPaneModel.Status
     switch state {
-    case .exited(let code):
-      sessionDidEnd(id, code == 0 ? .stopped : .failed)
-    case .terminated, .failed:
-      sessionDidEnd(id, .failed)
-    case .starting, .running:
-      return
+    case .exited(let code): status = .exited(code: code)
+    case .terminated(let signal): status = .terminated(signal: signal)
+    case .failed(let error): status = .failed(message: error.errorDescription ?? "")
+    case .starting, .running: return
     }
+    sessionDidEnd(id, as: status, activity: nil)
   }
 
-  /// VoiceOver hears it; with the application in the background, the Notification Center too.
-  func sessionDidEnd(_ id: SessionID, _ outcome: SessionOutcome) {
+  /// Says the state the sidebar now shows for the session — one wording for both — to VoiceOver
+  /// and, with the application in the background, in the Notification Center.
+  private func sessionDidEnd(
+    _ id: SessionID, as status: TerminalPaneModel.Status, activity: AgentActivityState?
+  ) {
     guard !isOnScreen(id), let session = sessions.first(where: { $0.id == id }) else { return }
-    Announcer.announce(Self.announcement(of: outcome, sessionName: session.name))
+    let state = String(
+      localized: SessionStatusPresentation.make(
+        session: session, paneStatus: status, activity: activity
+      ).label)
+    // Waits its turn: several sessions may end together, and a request said just before is not
+    // cut.
+    Announcer.announce(
+      Self.announcement(state: state, sessionName: session.name), priority: .medium)
     // The floating panel replaces the notifications (#41), as the Settings say.
     let floats = floatingPanel?.isEnabled ?? false
     guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {
@@ -66,55 +72,22 @@ extension AppModel {
     notifier.postOutcome(
       SessionOutcomeNotification(
         sessionID: id,
-        outcome: outcome,
-        title: DisplaySafeText.visible([session.name, agent].compactMap { $0 }.joined(separator: " — ")),
-        body: String(localized: Self.notificationBody(of: outcome))))
+        title: DisplaySafeText.visible(
+          [session.name, agent].compactMap { $0 }.joined(separator: " — ")),
+        body: state))
   }
 
-  /// A notification about a session was clicked: the application comes forward on that session.
-  public func openSession(_ id: SessionID) {
-    guard let session = sessions.first(where: { $0.id == id }) else { return }
-    if !isApplicationActive { activateApplication() }
-    if session.taskStatus != .archived, filter.column != session.taskStatus {
-      setColumn(session.taskStatus)
-    }
-    select(session.id)
-    focusSession()
+  /// A notification about a session was clicked: the application shows it as Open Quickly does,
+  /// an archived session, or one a filter hides, included.
+  public func openFromNotification(_ id: SessionID) {
+    goToSession(id)
   }
 
-  static func announcement(of outcome: SessionOutcome, sessionName: String)
-    -> LocalizedStringResource
-  {
-    switch outcome {
-    case .replied:
-      return LocalizedStringResource(
-        "Replied · \(sessionName)", bundle: .module,
-        comment: "Said when the agent of a session out of sight finished its answer.")
-    case .failed:
-      return LocalizedStringResource(
-        "Failed · \(sessionName)", bundle: .module,
-        comment: "Said when the agent of a session out of sight ended on an error.")
-    case .stopped:
-      return LocalizedStringResource(
-        "Stopped · \(sessionName)", bundle: .module,
-        comment: "Said when the agent of a session out of sight ended on its own.")
-    }
-  }
-
-  static func notificationBody(of outcome: SessionOutcome) -> LocalizedStringResource {
-    switch outcome {
-    case .replied:
-      return LocalizedStringResource(
-        "The agent finished its answer.", bundle: .module,
-        comment: "A notification: the agent of a session in the background finished its turn.")
-    case .failed:
-      return LocalizedStringResource(
-        "The agent ended on an error.", bundle: .module,
-        comment: "A notification: the agent of a session in the background ended on an error.")
-    case .stopped:
-      return LocalizedStringResource(
-        "The agent stopped.", bundle: .module,
-        comment: "A notification: the agent of a session in the background ended on its own.")
-    }
+  static func announcement(state: String, sessionName: String) -> LocalizedStringResource {
+    LocalizedStringResource(
+      "\(state) · \(sessionName)", bundle: .module,
+      comment:
+        "Said when a session out of sight replied or its agent ended: the state its row now shows, then its name."
+    )
   }
 }

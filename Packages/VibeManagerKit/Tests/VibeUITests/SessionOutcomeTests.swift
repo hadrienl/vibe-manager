@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import VibeApplication
 import VibeDomain
+import VibeTerminalUI
 
 @testable import VibeUI
 
@@ -17,9 +18,9 @@ private final class OutcomeRecorder: RequestNotifying {
 }
 
 @MainActor
-@Suite("What is said when a session out of sight replies, fails or stops (#236)")
+@Suite("What is said when a session out of sight replies or its agent ends (#236)")
 struct SessionOutcomeTests {
-  private func session(_ name: String) -> WorkSession {
+  private func session(_ name: String, in column: SessionTaskStatus = .doing) -> WorkSession {
     WorkSession(
       name: name,
       initialPrompt: "Do \(name)",
@@ -27,7 +28,7 @@ struct SessionOutcomeTests {
       status: .active,
       createdAt: Date(timeIntervalSince1970: 1),
       updatedAt: Date(timeIntervalSince1970: 1),
-      taskStatus: .doing
+      taskStatus: column
     )
   }
 
@@ -45,7 +46,18 @@ struct SessionOutcomeTests {
   private let unread = AgentActivityState(
     activity: .idle, unreadSince: Date(timeIntervalSince1970: 50), source: .structured)
 
-  @Test("An answer finished out of sight is said to VoiceOver, and notified in the background")
+  /// What the sidebar shows for the session in this state: the one wording said.
+  private func shown(
+    _ session: WorkSession, _ status: TerminalPaneModel.Status,
+    activity: AgentActivityState? = nil
+  ) -> String {
+    String(
+      localized: SessionStatusPresentation.make(
+        session: session, paneStatus: status, activity: activity
+      ).label)
+  }
+
+  @Test("An answer finished out of sight is said as its row says it, and notified in the background")
   func replied() async {
     let first = session("First")
     let second = session("Second")
@@ -54,9 +66,10 @@ struct SessionOutcomeTests {
     model.applicationWillResignActive()
 
     model.activityDidChange(first.id, from: working, to: unread)
-    #expect(Announcer.lastAnnouncement == "Replied · First")
+    let state = shown(first, .running, activity: unread)
+    #expect(Announcer.lastAnnouncement == "\(state) · First")
     #expect(recorder.outcomes.map(\.sessionID) == [first.id])
-    #expect(recorder.outcomes.first?.outcome == .replied)
+    #expect(recorder.outcomes.first?.body == state)
     #expect(recorder.outcomes.first?.title.hasPrefix("First") == true)
   }
 
@@ -68,11 +81,13 @@ struct SessionOutcomeTests {
     model.select(second.id)
 
     model.activityDidChange(first.id, from: working, to: unread)
-    #expect(Announcer.lastAnnouncement == "Replied · First")
+    #expect(Announcer.lastAnnouncement == "\(shown(first, .running, activity: unread)) · First")
     #expect(recorder.outcomes.isEmpty)
   }
 
-  @Test("Once per answer: an answer still unread, or a state first seen at launch, says nothing")
+  @Test(
+    "Once per answer, and never for one already unread, restored, replayed, or ending on a request"
+  )
   func once() async {
     let first = session("First")
     let second = session("Second")
@@ -83,6 +98,16 @@ struct SessionOutcomeTests {
     model.activityDidChange(first.id, from: nil, to: unread)
     model.activityDidChange(first.id, from: unread, to: unread)
     model.activityDidChange(first.id, from: working, to: working)
+    model.activityDidChange(first.id, from: working, to: unread, isReplayed: true)
+    var asking = unread
+    asking.activity = .awaitingUser(.question)
+    asking.requests = [
+      AgentRequest(
+        id: AgentRequestID(sessionID: first.id, key: "plan"), receivedAt: Date(), kind: .question,
+        content: .permission(AgentToolPermission(tool: .shell, toolName: "Bash", subject: "ls")),
+        reference: AgentToolReference(tool: "Bash", subject: "ls"), isShown: true)
+    ]
+    model.activityDidChange(first.id, from: working, to: asking)
     #expect(recorder.outcomes.isEmpty)
   }
 
@@ -93,12 +118,12 @@ struct SessionOutcomeTests {
     model.select(first.id)
     let before = Announcer.lastAnnouncement
 
-    model.sessionDidEnd(first.id, .failed)
+    model.processDidEnd(first.id, state: .exited(code: 1))
     #expect(Announcer.lastAnnouncement == before)
     #expect(recorder.outcomes.isEmpty)
   }
 
-  @Test("A process that fails or stops on its own is said, an error as one")
+  @Test("A process that ends is said as its row says it: an error, a signal, a clean exit, a launch")
   func processes() async {
     let first = session("First")
     let second = session("Second")
@@ -107,11 +132,18 @@ struct SessionOutcomeTests {
     model.applicationWillResignActive()
 
     model.processDidEnd(first.id, state: .exited(code: 1))
-    #expect(Announcer.lastAnnouncement == "Failed · First")
+    #expect(Announcer.lastAnnouncement == "\(shown(first, .exited(code: 1))) · First")
     model.processDidEnd(first.id, state: .terminated(signal: 9))
+    #expect(Announcer.lastAnnouncement == "\(shown(first, .terminated(signal: 9))) · First")
     model.processDidEnd(first.id, state: .exited(code: 0))
-    #expect(Announcer.lastAnnouncement == "Stopped · First")
-    #expect(recorder.outcomes.map(\.outcome) == [.failed, .failed, .stopped])
+    #expect(Announcer.lastAnnouncement == "\(shown(first, .exited(code: 0))) · First")
+    model.processDidEnd(first.id, state: .failed(.executableNotFound(path: "/nowhere/claude")))
+    #expect(Announcer.lastAnnouncement == "\(shown(first, .failed(message: ""))) · First")
+    #expect(
+      recorder.outcomes.map(\.body) == [
+        shown(first, .exited(code: 1)), shown(first, .terminated(signal: 9)),
+        shown(first, .exited(code: 0)), shown(first, .failed(message: "")),
+      ])
   }
 
   @Test("Notifications turned off notify nothing; VoiceOver still hears it")
@@ -124,18 +156,20 @@ struct SessionOutcomeTests {
     model.notifiesRequests = false
 
     model.activityDidChange(first.id, from: working, to: unread)
-    #expect(Announcer.lastAnnouncement == "Replied · First")
+    #expect(Announcer.lastAnnouncement?.hasSuffix(" · First") == true)
     #expect(recorder.outcomes.isEmpty)
   }
 
-  @Test("A click on the notification shows the session")
-  func opens() async {
-    let first = session("First")
-    let second = session("Second")
-    let (model, _) = await makeModel([first, second])
-    model.select(second.id)
+  @Test("A click on the notification shows the session, an archived one included")
+  func opensArchived() async {
+    let kept = session("Kept")
+    var archived = session("Archived", in: .done)
+    try? archived.archive(at: Date(timeIntervalSince1970: 500))
+    let (model, _) = await makeModel([kept, archived])
+    model.select(kept.id)
 
-    model.openSession(first.id)
-    #expect(model.selectedSessionID == first.id)
+    model.openFromNotification(archived.id)
+    await model.reload()
+    #expect(model.selectedSessionID == archived.id)
   }
 }

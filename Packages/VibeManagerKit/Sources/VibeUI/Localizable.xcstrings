@@ -594,6 +594,17 @@
         }
       }
     },
+    "%@ · %@" : {
+      "comment" : "Said when a session out of sight replied or its agent ended: the state its row now shows, then its name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
     "%@ — %@" : {
       "comment" : "An agent that cannot draw now, and why.",
       "localizations" : {
@@ -9846,12 +9857,12 @@
         }
       }
     },
-    "Notify me of requests" : {
+    "Notify me of requests and replies" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Me notifier des demandes"
+            "value" : "Me notifier des demandes et réponses"
           }
         }
       }
@@ -9873,6 +9884,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
+          }
+        }
+      }
+    },
+    "Of other sessions, and of agents that stop, while Vibe Manager is not in front." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des autres sessions, et des agents qui s’arrêtent, quand Vibe Manager n’est pas au premier plan."
           }
         }
       }
@@ -10920,17 +10941,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remplacer la description en cours ?"
-          }
-        }
-      }
-    },
-    "Replied · %@" : {
-      "comment" : "Said when the agent of a session out of sight finished its answer.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A répondu · %@"
           }
         }
       }
@@ -12685,17 +12695,6 @@
         }
       }
     },
-    "Stopped · %@" : {
-      "comment" : "Said when the agent of a session out of sight ended on its own.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêté · %@"
-          }
-        }
-      }
-    },
     "Streamed answer" : {
       "localizations" : {
         "fr" : {
@@ -13132,28 +13131,6 @@
         }
       }
     },
-    "The agent ended on an error." : {
-      "comment" : "A notification: the agent of a session in the background ended on an error.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’agent s’est arrêté sur une erreur."
-          }
-        }
-      }
-    },
-    "The agent finished its answer." : {
-      "comment" : "A notification: the agent of a session in the background finished its turn.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’agent a fini sa réponse."
-          }
-        }
-      }
-    },
     "The agent finished without producing an image. Try again, or describe the avatar differently." : {
       "comment" : "A generation gave no image.",
       "localizations" : {
@@ -13212,17 +13189,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’agent a ouvert une page dans la vue web"
-          }
-        }
-      }
-    },
-    "The agent stopped." : {
-      "comment" : "A notification: the agent of a session in the background ended on its own.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’agent s’est arrêté."
           }
         }
       }
@@ -16236,16 +16202,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quand une nouvelle session cite l’adresse d’un ticket, sa page s’ouvre dans la vue web de la session, là où vous êtes connecté, et son titre s’ajoute en tête des notes. Seules les adresses reconnues par un résolveur ci-dessous sont ouvertes."
-          }
-        }
-      }
-    },
-    "When an agent in the background asks for something, replies or stops." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quand un agent en arrière-plan demande quelque chose, répond ou s’arrête."
           }
         }
       }

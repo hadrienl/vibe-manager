@@ -27,7 +27,8 @@ extension AppModel {
         let previous = self.activityCells.value(for: update.sessionID)
         self.activityCells.set(update.state, for: update.sessionID)
         if let state = update.state {
-          self.activityDidChange(update.sessionID, from: previous, to: state)
+          self.activityDidChange(
+            update.sessionID, from: previous, to: state, isReplayed: update.isReplayed)
         }
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {

@@ -124,9 +124,9 @@ struct SignallingSettings: View {
     return Section {
       Group {
         Toggle(isOn: $model.notifiesRequests) {
-          Text("Notify me of requests", bundle: .module)
+          Text("Notify me of requests and replies", bundle: .module)
           Text(
-            "When an agent in the background asks for something, replies or stops.",
+            "Of other sessions, and of agents that stop, while Vibe Manager is not in front.",
             bundle: .module)
         }
         Picker(selection: $model.requestNotificationContent) {
