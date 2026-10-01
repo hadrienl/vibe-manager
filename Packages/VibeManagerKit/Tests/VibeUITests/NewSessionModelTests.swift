@@ -624,15 +624,17 @@ private let templateFeedback = PromptTemplate(
 @MainActor
 @Suite("Filling a template in the new session sheet")
 struct NewSessionTemplateTests {
-  private func makeModel(templates: [PromptTemplate] = [templateReview, templateFeedback])
-    -> NewSessionModel
-  {
+  private func makeModel(
+    templates: [PromptTemplate] = [templateReview, templateFeedback],
+    isThemeAvailable: @escaping @MainActor (String) -> Bool = { _ in true }
+  ) -> NewSessionModel {
     let registry = StubRegistry(providers: [StubProvider(id: "claude-code", state: .available)])
     let model = NewSessionModel(
       create: CreateSession(
         repository: SpyRepository(), agents: registry, folders: StubFolders(status: .usable)),
       registry: registry,
-      templates: templates
+      templates: templates,
+      isThemeAvailable: isThemeAvailable
     )
     model.draft.workingDirectoryPath = "/workspace"
     model.draft.providerID = "claude-code"
@@ -734,6 +736,50 @@ struct NewSessionTemplateTests {
     model.draft.appearance = mine
     model.selectTemplate(api.id)
     #expect(model.draft.appearance == mine)
+  }
+
+  @Test("A template's conversation theme follows it, and never replaces the user's (#274)")
+  func themePreset() {
+    var prod = templateReview
+    prod.conversationTheme = "night"
+    let model = makeModel(templates: [prod, templateFeedback])
+
+    model.selectTemplate(prod.id)
+    #expect(model.draft.conversationTheme == "night")
+    #expect(model.themeComesFromTemplate)
+    #expect(model.draft.session().conversationTheme == "night")
+    model.selectTemplate(templateFeedback.id)
+    #expect(model.draft.conversationTheme == nil)
+    #expect(!model.themeComesFromTemplate)
+
+    model.chooseConversationTheme("paper")
+    model.selectTemplate(prod.id)
+    #expect(model.draft.conversationTheme == "paper")
+    #expect(!model.themeComesFromTemplate)
+  }
+
+  @Test("A template's theme this Mac does not have is ignored, the template still filled in")
+  func missingTemplateTheme() {
+    var prod = templateReview
+    prod.conversationTheme = "deleted"
+    let model = makeModel(templates: [prod], isThemeAvailable: { $0 != "deleted" })
+
+    model.selectTemplate(prod.id)
+    #expect(model.draft.templateFill?.template.id == prod.id)
+    #expect(model.draft.conversationTheme == nil)
+  }
+
+  @Test("A theme deleted before Send gives a session that follows the settings")
+  func themeDeletedBeforeSend() async throws {
+    var available: Set<String> = ["mine"]
+    let model = makeModel(isThemeAvailable: { available.contains($0) })
+    model.draft.initialPrompt = "Fix the login"
+    model.chooseConversationTheme("mine")
+
+    available = []
+    let creation = try #require(await model.submit())
+
+    #expect(creation.session.conversationTheme == nil)
   }
 
   @Test("A folder the user chose is never replaced by a template's")
