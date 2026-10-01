@@ -9,6 +9,8 @@ import VibeDomain
 /// consistent value, exactly as `PTYTerminalSession` answers it: nobody above the supervisor can
 /// tell the two apart.
 public actor HostedTerminalSession: HostedTerminal {
+  public nonisolated var runsInTerminalHost: Bool { true }
+
   public nonisolated let id: TerminalID
   private let supervisor: HostedTerminalSupervisor
 

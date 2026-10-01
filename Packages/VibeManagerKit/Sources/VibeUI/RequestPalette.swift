@@ -551,7 +551,7 @@ struct RequestCard: View {
   /// Refusing is Escape in both CLIs, which ends the agent's turn as well — and, for Claude Code,
   /// drops the other requests its sub-agents were waiting on (#40).
   static let stopsTheTurn = LocalizedStringResource(
-    "Also stops the agent's turn: it waits for your next message.", bundle: .module,
+    "Also interrupts the agent's turn: it waits for your next message.", bundle: .module,
     comment: "What refusing a request from the palette does besides refusing.")
 
   private var denyButton: some View {

@@ -4392,6 +4392,17 @@
         }
       }
     },
+    "Also interrupts the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request from the palette does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
     "Also looked in: %@" : {
       "comment" : "A list of folders the agent visited that are not repositories.",
       "localizations" : {
@@ -4399,17 +4410,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autres dossiers consultés : %@"
-          }
-        }
-      }
-    },
-    "Also stops the agent's turn: it waits for your next message." : {
-      "comment" : "What refusing a request from the palette does besides refusing.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }
@@ -5965,6 +5965,142 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de passer à %1$@ : %2$@"
+          }
+        }
+      }
+    },
+    "Couldn’t archive this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t archive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t close this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t close “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t restart this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t restart “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t save the new order of the sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer le nouvel ordre des sessions."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver « %@ »."
           }
         }
       }
@@ -11126,6 +11262,17 @@
         }
       }
     },
+    "Restart All" : {
+      "comment" : "Restarts every session the terminal host stopped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout redémarrer"
+          }
+        }
+      }
+    },
     "Restart Now" : {
       "localizations" : {
         "fr" : {
@@ -14455,6 +14602,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le terminal n’a encore rien affiché."
+          }
+        }
+      }
+    },
+    "The terminal host stopped: %lld sessions were interrupted." : {
+      "comment" : "How many sessions lost their agent.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The terminal host stopped: %lld session was interrupted."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The terminal host stopped: %lld sessions were interrupted."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld sessions ont été interrompues."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld session a été interrompue."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld sessions ont été interrompues."
+                }
+              }
+            }
           }
         }
       }
