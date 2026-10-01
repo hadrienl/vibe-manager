@@ -104,8 +104,8 @@ struct SplitHandle: View {
       adjust((press.key == .downArrow ? step : -step) * verticalDirection)
       return .handled
     }
-    .onKeyPress(keys: [.return, KeyEquivalent("=")]) { _ in
-      guard let onDoubleClick else { return .ignored }
+    .onKeyPress(keys: [.return, KeyEquivalent("=")]) { press in
+      guard let onDoubleClick, press.modifiers.isEmpty else { return .ignored }
       onDoubleClick()
       return .handled
     }
