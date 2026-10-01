@@ -215,6 +215,9 @@ public final class AppModel {
   /// The session the user asked to archive while something was still running in it, held until
   /// they confirm. Archiving is reversible, the work in progress it stops is not (#115).
   public private(set) var pendingArchive: WorkSession?
+  /// A status move from the keyboard that would restart a closed session's agent, until it is
+  /// confirmed (#240).
+  public private(set) var pendingStatusRestart: StatusRestart?
   /// The session the user asked to close while its agent was still working, held until they
   /// confirm. Closing can be undone with Restart, but the agent's work in progress cannot.
   public private(set) var pendingClose: WorkSession?
@@ -663,8 +666,8 @@ public final class AppModel {
   public internal(set) var renaming: SessionIdentityEditing?
   /// The badge being chosen in its popover, previewed until it is kept.
   public internal(set) var appearanceEditor: SessionAppearanceEditor?
-  /// The renames and badge changes ⌘Z undoes, for this run.
-  var identityHistory = SessionIdentityHistory()
+  /// The renames, badge changes and archives ⌘Z undoes, for this run.
+  var sidebarHistory = SessionSidebarHistory()
   /// A name or a badge that could not be written, until the user has read why.
   public internal(set) var identityFailure: String?
 
@@ -1007,7 +1010,7 @@ public final class AppModel {
     reconcileSelection()
   }
 
-  /// ⌃⌘→ and ⌃⌘←. Stops at both ends, like the selection shortcuts.
+  /// ⌥⌘→ and ⌥⌘← (#240). Stops at both ends, like the selection shortcuts.
   public func showNextColumn() {
     guard let next = filter.column.next.first, next != .archived else { return }
     setColumn(next)
@@ -1140,6 +1143,17 @@ public final class AppModel {
   public func interruptsWork(_ session: WorkSession) -> Bool {
     confirmsStoppingRunningAgent
       && (launcher?.isRunning(session.id) == true || !runningDrawerCommands(of: session.id).isEmpty)
+  }
+
+  /// Whether the session's agent is in the middle of a turn: working, or waiting on an answer it
+  /// asked for. Archiving it is always asked about, "Don't ask again" or not (#242): the setting
+  /// spares the question for an agent that waits for nothing, not for one cut off mid-task.
+  public func interruptsTurn(_ session: WorkSession) -> Bool {
+    guard launcher?.isRunning(session.id) == true else { return false }
+    switch activity(for: session.id)?.activity {
+    case .working, .awaitingUser: return true
+    case .idle, nil: return false
+    }
   }
 
   /// What ⇧⌘W and every other Close Session run: closes at once, or asks first when work would
@@ -1307,16 +1321,22 @@ public final class AppModel {
   /// rule and the setting of Close Session. One key, repeated, empties a column.
   public func requestArchive(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canArchive(session) else { return }
-    guard !interruptsWork(session) else {
+    guard !archiveAsks(session) else {
       pendingArchive = session
       return
     }
     await archive(id)
   }
 
+  /// Whether the question before archiving offers "Don't ask again": only when the setting is
+  /// what asks it. Asked because the agent is in the middle of a turn (#242), it always will be.
+  public func archiveOffersDontAskAgain(_ session: WorkSession) -> Bool {
+    interruptsWork(session)
+  }
+
   /// Whether Archive will ask before archiving: the menus end its name with an ellipsis then.
   public func archiveAsks(_ session: WorkSession) -> Bool {
-    canArchive(session) && interruptsWork(session)
+    canArchive(session) && (interruptsWork(session) || interruptsTurn(session))
   }
 
   public func cancelArchive() {
@@ -1340,11 +1360,16 @@ public final class AppModel {
     defer { archivingSessionIDs.remove(id) }
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
-    let name = sessions.first { $0.id == id }?.name
+    let session = sessions.first { $0.id == id }
+    let name = session?.name
     var archived = false
     do {
       let archival = try await archiveProcess(id)
       archived = true
+      if let session {
+        sidebarHistory.record(
+          [SessionArchiveUndo(id: id, taskStatus: session.taskStatus, wasSelected: wasSelected)])
+      }
       report(archival.detachment, for: archival.session, action: .archived)
       prepareHandOff(from: id, listedBefore: visible)
       // Set before the reload that puts the neighbour on screen: its terminal must not take the
@@ -1400,6 +1425,31 @@ public final class AppModel {
     reconcileSelection()
   }
 
+  /// ⌘Z after an archive (#242): the sessions come back to the columns they left — all of a
+  /// batch at once — and the one on screen selected again. Their agents stay stopped: they come
+  /// back closed, as any unarchived session, and Restart picks them up. One no longer archived
+  /// — unarchived since by another way — is left alone; with none left to bring back, it beeps.
+  func undoArchive(_ archives: [SessionArchiveUndo]) async {
+    let archived = Set(sessions.filter { $0.status == .archived }.map(\.id))
+    let back = archives.filter { archived.contains($0.id) }
+    guard !back.isEmpty else { return NSSound.beep() }
+    for archive in back {
+      do {
+        _ = try await restoreSession(id: archive.id)
+        if archive.taskStatus != .done, archive.taskStatus != .archived {
+          try await changeTaskStatus(id: archive.id, to: archive.taskStatus)
+        }
+        diagnostics.record(
+          .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(archive.id)])
+      } catch {
+        await report(error)
+      }
+    }
+    await reload()
+    if let selected = back.first(where: \.wasSelected) { select(selected.id) }
+    reconcileSelection()
+  }
+
   public func dismissDetachWarning() {
     detachWarning = nil
   }
@@ -1416,7 +1466,7 @@ public final class AppModel {
     session.taskStatus == .archived ? [] : session.taskStatus.next
   }
 
-  /// Moves a session to another status (#80): a swipe button, the Status menu, ⌥⌘← and ⌥⌘→.
+  /// Moves a session to another status (#80): a swipe button, the Status menu, ⌃⌘← and ⌃⌘→.
   ///
   /// Archiving keeps its confirmation and goes through `ArchiveSession`, and unarchiving through
   /// `RestoreSession`: they stop or release a process.
@@ -1428,7 +1478,9 @@ public final class AppModel {
   /// Every other move writes the status and nothing else, and the column on screen stays where
   /// it is: the user sorting a column keeps their place in it. A session that leaves the column
   /// hands the selection to the row that takes its place, as closing one does.
-  public func setTaskStatus(_ status: SessionTaskStatus, for id: SessionID) async {
+  public func setTaskStatus(
+    _ status: SessionTaskStatus, for id: SessionID, restarting: Bool = true
+  ) async {
     guard let session = sessions.first(where: { $0.id == id }), session.taskStatus != status
     else { return }
     if status == .archived {
@@ -1469,7 +1521,7 @@ public final class AppModel {
     leaveNewSessionDraft()
     await reload()
     follow(id)
-    if Self.restartsWhenMoved(session, to: status), canRestart(session) {
+    if restarting, Self.restartsWhenMoved(session, to: status), canRestart(session) {
       // Started from the store rather than from the value above: the status was just written.
       await performRestart(id: id)
     }
@@ -1527,13 +1579,45 @@ public final class AppModel {
       ?? remaining[..<split].last { shown.contains($0.id) }
   }
 
-  /// ⌥⌘→ and ⌥⌘←: the next or the previous status, without a confirmation — the shortcut is
-  /// the decision. Archiving is not on this path: it keeps its own command and its question.
+  /// ⌃⌘→ and ⌃⌘←: the next or the previous status (#240). ⌘Z takes the move back. A move that
+  /// would restart the agent of a closed session asks first: a key pressed by mistake must not
+  /// start one. Archiving is not on this path: it keeps its own command and its question.
   public func moveTaskStatus(of id: SessionID, forward: Bool) async {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
     let candidates = forward ? nextTaskStatuses(of: session) : previousTaskStatuses(of: session)
     guard let target = candidates.first, target != .archived else { return }
+    let wasSelected = selectedSessionID == id
+    if Self.restartsWhenMoved(session, to: target), canRestart(session) {
+      pendingStatusRestart = StatusRestart(session: session, status: target)
+      return
+    }
     await setTaskStatus(target, for: id)
+    if sessions.first(where: { $0.id == id })?.taskStatus == target {
+      sidebarHistory.record(
+        SessionStatusUndo(
+          id: id, from: session.taskStatus, to: target, wasSelected: wasSelected))
+    }
+  }
+
+  /// The move the question was asked for, once answered: the status, then the restart.
+  public func confirmStatusRestart(_ restart: StatusRestart) async {
+    pendingStatusRestart = nil
+    await setTaskStatus(restart.status, for: restart.session.id)
+  }
+
+  public func cancelStatusRestart() {
+    pendingStatusRestart = nil
+  }
+
+  /// ⌘Z after a status changed from the keyboard (#240): the session goes back to the status it
+  /// left, and no agent is started on the way; selected again if it was. Moved again since, it
+  /// beeps.
+  func undoStatusChange(_ undo: SessionStatusUndo) async {
+    guard sessions.first(where: { $0.id == undo.id })?.taskStatus == undo.to else {
+      return NSSound.beep()
+    }
+    await setTaskStatus(undo.from, for: undo.id, restarting: false)
+    if undo.wasSelected { select(undo.id) }
   }
 
   // MARK: - Restart
@@ -1804,6 +1888,14 @@ public final class AppModel {
     case .exited(let code):
       // A clean exit is an agent that finished, whatever it was handed.
       guard code != 0 else { return }
+    case .failed(.hostStopped):
+      // The terminal host went away under the agent (#237): the agent refused nothing, and its
+      // conversation is resumed like any other once restarted.
+      return
+    case .failed(.processOutcomeUnknown)
+    where launcher?.pane(for: id)?.session?.runsInTerminalHost == true:
+      // The host's connection lost under it: the same interruption, not a refusal.
+      return
     case .terminated, .failed:
       break
     case .running, .starting:
@@ -3311,4 +3403,10 @@ extension AppModel {
       requestBranchReport(of: id)
     }
   }
+}
+
+/// A session to move to a status whose move restarts its agent, and the status (#240).
+public struct StatusRestart: Sendable {
+  public let session: WorkSession
+  public let status: SessionTaskStatus
 }

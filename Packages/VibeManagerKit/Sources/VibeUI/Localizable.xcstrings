@@ -3865,19 +3865,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               }
             }
@@ -7188,7 +7188,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminée"
+            "value" : "Processus terminé"
           }
         }
       }
@@ -7879,7 +7879,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En attente"
+            "value" : "Prête"
           }
         }
       }
@@ -8830,6 +8830,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déplacer vers En attente"
+          }
+        }
+      }
+    },
+    "Moving it to %@ starts its agent again." : {
+      "comment" : "A task status.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passer à « %@ » relance son agent."
           }
         }
       }
@@ -11262,6 +11273,17 @@
         }
       }
     },
+    "Restart All" : {
+      "comment" : "Restarts every session the terminal host stopped.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout redémarrer"
+          }
+        }
+      }
+    },
     "Restart Now" : {
       "localizations" : {
         "fr" : {
@@ -11346,12 +11368,33 @@
         }
       }
     },
+    "Restart this session?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer cette session ?"
+          }
+        }
+      }
+    },
     "Restart “%@” in a new process?" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relancer « %@ » dans un nouveau processus ?"
+          }
+        }
+      }
+    },
+    "Restart “%@”?" : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer « %@ » ?"
           }
         }
       }
@@ -14595,6 +14638,53 @@
         }
       }
     },
+    "The terminal host stopped: %lld sessions were interrupted." : {
+      "comment" : "How many sessions lost their agent.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The terminal host stopped: %lld session was interrupted."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The terminal host stopped: %lld sessions were interrupted."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld sessions ont été interrompues."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld session a été interrompue."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "L’hôte des terminaux s’est arrêté : %lld sessions ont été interrompues."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "The ticket's page stays pinned first among this session's tabs. Leave the field empty to remove it." : {
       "localizations" : {
         "fr" : {
@@ -16397,7 +16487,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Travaille…"
           }
         }
       }

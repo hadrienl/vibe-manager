@@ -27,7 +27,7 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌥⌘N | Edit Notes; Escape gives the keyboard back to the session: its terminal, or its composer | View |
 | ⌥⌘↓ / ⌥⌘↑ | Next / Previous Session | View |
 | ⌘1…⌘9 | The session at that position in the list, as drawn: folded groups are skipped | View |
-| ⌃⌘→ / ⌃⌘← | Next / Previous Column (To Do, In Progress, Waiting, Done) | View |
+| ⌥⌘→ / ⌥⌘← | Next / Previous Column (To Do, In Progress, Waiting, Done) | View |
 | ⌃⌘G | Group Sessions by Folder | View |
 | ⌃⌥⌘← / ⌃⌥⌘→ | Collapse / Expand the group of the selected session | View |
 | ⌥⌘I | Show / Hide Context | View |
@@ -132,7 +132,7 @@ Selecting an avatar only shows it; "Use This Avatar" changes the one of the floa
 | The pages Alerts and Avatars | the segmented control, with Full Keyboard Access |
 
 Return and ⌘⌫ typed in the description of the card stay the text's. There is no shortcut between
-the two pages: ⌥⌘← / ⌥⌘→ already move a session to another status, and the Settings of macOS have
+the two pages: ⌃⌘← / ⌃⌘→ already move a session to another status, and the Settings of macOS have
 none either.
 
 VoiceOver announces, without moving its cursor: a generation or an import that starts, and that
@@ -155,11 +155,11 @@ alone; so is an expression the avatar lacks, said "missing".
 | Switch Agent… | ⌃⌘M | Session |
 | Rename…: the name becomes a field, on its row or in the inspector's header; Return keeps it, Escape does not | ⌃⌘E, or a double-click on the row, off its badge | Session, and the row's context menu |
 | Change Icon…: symbol, colour, the project's icon, Revert to Default Icon; Escape leaves it as it was | ⌃⌘I, a double-click on the row's badge, or a click on the inspector's badge | Session, and the row's context menu |
-| Undo / Redo the last rename or change of icon, with the keyboard in the sidebar or the inspector | ⌘Z / ⇧⌘Z | Edit |
+| Undo / Redo the last rename or change of icon; Undo the last archive or status changed from the keyboard — with the keyboard in the sidebar or the inspector | ⌘Z / ⇧⌘Z | Edit |
 | Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
 | Close Session | ⇧⌘W | Session |
 | Archive / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
-| Move to Next / Previous Status, without a swipe | ⌥⌘→ / ⌥⌘← | Session › Status |
+| Move to Next / Previous Status, without a swipe; a move that would restart an agent asks first | ⌃⌘→ / ⌃⌘← | Session › Status |
 | Close Window | —, or the window's close button | File |
 | Usage window | ⌥⌘U | Window |
 | Export Diagnostics… | — | Help |

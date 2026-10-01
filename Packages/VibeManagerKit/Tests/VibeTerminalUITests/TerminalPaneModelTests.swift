@@ -109,6 +109,38 @@ func paneFollowsSessionLifecycle() async throws {
 }
 
 @MainActor
+@Test("A process stopped with the terminal host says so, until the pane starts again (#237)")
+func paneSaysItStoppedWithTheHost() async throws {
+  let id = TerminalID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+
+  await model.start()
+  await supervisor.emit(.running(processIdentifier: 1_234), for: id)
+  #expect(await settles { model.status == .running })
+  #expect(!model.stoppedWithHost)
+
+  await supervisor.emit(.failed(.hostStopped), for: id)
+  #expect(await settles { model.stoppedWithHost })
+
+  // Any other failure is the session's own, not the host's.
+  await supervisor.emit(.failed(.spawnFailed(code: 1)), for: id)
+  #expect(await settles { !model.stoppedWithHost })
+
+  await supervisor.emit(.failed(.hostStopped), for: id)
+  #expect(await settles { model.stoppedWithHost })
+  await supervisor.emit(.running(processIdentifier: 5_678), for: id)
+  #expect(await settles { !model.stoppedWithHost })
+
+  // A new process starts clear of it, whatever ended the previous one.
+  await supervisor.emit(.failed(.hostStopped), for: id)
+  #expect(await settles { model.stoppedWithHost })
+  await model.start()
+  #expect(!model.stoppedWithHost)
+}
+
+@MainActor
 @Test("A launch failure is presented with its remediation and without technical detail")
 func paneReportsLaunchFailure() async {
   let supervisor = FakeSupervisor(failure: .executableNotFound(path: "/bin/nope"))

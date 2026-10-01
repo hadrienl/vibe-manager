@@ -247,8 +247,8 @@ struct EditSessionIdentityTests {
   }
 }
 
-@Suite("The history of renames and badge changes")
-struct SessionIdentityHistoryTests {
+@Suite("The history of renames, badge changes and archives")
+struct SessionSidebarHistoryTests {
   private func change(_ id: SessionID, _ from: String, _ to: String) -> SessionIdentityChange {
     let appearance = SessionAppearance()
     return SessionIdentityChange(
@@ -259,12 +259,15 @@ struct SessionIdentityHistoryTests {
   @Test("Undo gives the reverse of the last change, and redo gives it back")
   func undoRedo() throws {
     let id = SessionID()
-    var history = SessionIdentityHistory()
+    var history = SessionSidebarHistory()
     history.record(change(id, "A", "B"))
     history.record(change(id, "B", "C"))
 
     let popped = history.popUndo()
-    let undo = try #require(popped)
+    guard case .identity(let undo) = popped else {
+      Issue.record("Not a rename: \(String(describing: popped))")
+      return
+    }
     #expect(undo == change(id, "C", "B"))
     history.didUndo(undo)
     #expect(history.canRedo)
@@ -280,17 +283,20 @@ struct SessionIdentityHistoryTests {
   @Test("A new change clears what could be redone")
   func newChangeClearsRedo() throws {
     let id = SessionID()
-    var history = SessionIdentityHistory()
+    var history = SessionSidebarHistory()
     history.record(change(id, "A", "B"))
-    let popped = history.popUndo()
-    history.didUndo(try #require(popped))
+    guard case .identity(let undo) = history.popUndo() else {
+      Issue.record("Not a rename")
+      return
+    }
+    history.didUndo(undo)
     history.record(change(id, "A", "D"))
     #expect(!history.canRedo)
   }
 
   @Test("An undo dropped because the session changed since is gone for good")
   func droppedUndo() {
-    var history = SessionIdentityHistory()
+    var history = SessionSidebarHistory()
     history.record(change(SessionID(), "A", "B"))
     _ = history.popUndo()
     #expect(!history.canUndo)
@@ -300,19 +306,71 @@ struct SessionIdentityHistoryTests {
   @Test("Only the last 50 changes are kept")
   func limit() {
     let id = SessionID()
-    var history = SessionIdentityHistory()
+    var history = SessionSidebarHistory()
     for index in 0..<60 { history.record(change(id, "\(index)", "\(index + 1)")) }
-    #expect(history.undoStack.count == SessionIdentityHistory.limit)
-    #expect(history.undoStack.first == change(id, "10", "11"))
+    #expect(history.undoStack.count == SessionSidebarHistory.limit)
+    #expect(history.undoStack.first == .identity(change(id, "10", "11")))
   }
 
   @Test("The changes of a session no longer stored are forgotten")
   func forgetsRemovedSessions() {
     let kept = SessionID()
-    var history = SessionIdentityHistory()
+    var history = SessionSidebarHistory()
     history.record(change(kept, "A", "B"))
     history.record(change(SessionID(), "C", "D"))
     history.keep(only: [kept])
-    #expect(history.undoStack == [change(kept, "A", "B")])
+    #expect(history.undoStack == [.identity(change(kept, "A", "B"))])
+  }
+
+  @Test("Renames and archives are undone in the order they were made, an archive is not redone")
+  func archivesAmongRenames() {
+    let id = SessionID()
+    let archived = SessionArchiveUndo(id: SessionID(), taskStatus: .waiting, wasSelected: true)
+    var history = SessionSidebarHistory()
+    history.record(change(id, "A", "B"))
+    history.record([archived])
+
+    #expect(history.popUndo() == .archive([archived]))
+    #expect(!history.canRedo)
+    #expect(history.popUndo() == .identity(change(id, "B", "A")))
+  }
+
+  @Test("A status change is undone in its turn, and not redone")
+  func statusAmongArchives() {
+    let status = SessionStatusUndo(id: SessionID(), from: .waiting, to: .done)
+    let archive = SessionArchiveUndo(id: SessionID(), taskStatus: .todo, wasSelected: false)
+    var history = SessionSidebarHistory()
+    history.record([archive])
+    history.record(status)
+
+    #expect(history.popUndo() == .status(status))
+    #expect(history.popUndo() == .archive([archive]))
+    #expect(!history.canRedo)
+  }
+
+  @Test("A batch archive keeps the sessions still stored, and goes once none is")
+  func batchArchiveForgetsRemovedSessions() {
+    let kept = SessionArchiveUndo(id: SessionID(), taskStatus: .todo, wasSelected: false)
+    let gone = SessionArchiveUndo(id: SessionID(), taskStatus: .doing, wasSelected: true)
+    var history = SessionSidebarHistory()
+    history.record([kept, gone])
+    history.keep(only: [kept.id])
+    #expect(history.undoStack == [.archive([kept])])
+    history.keep(only: [])
+    #expect(!history.canUndo)
+  }
+
+  @Test("An archive clears what could be redone, as any change does")
+  func archiveClearsRedo() {
+    let id = SessionID()
+    var history = SessionSidebarHistory()
+    history.record(change(id, "A", "B"))
+    guard case .identity(let undo) = history.popUndo() else {
+      Issue.record("Not a rename")
+      return
+    }
+    history.didUndo(undo)
+    history.record([SessionArchiveUndo(id: id, taskStatus: .todo, wasSelected: false)])
+    #expect(!history.canRedo)
   }
 }

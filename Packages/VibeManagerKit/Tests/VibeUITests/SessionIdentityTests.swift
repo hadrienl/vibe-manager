@@ -118,7 +118,7 @@ struct SessionIdentityTests {
     #expect(model.renaming?.sessionID == id)
     #expect(model.sessions.first { $0.id == id }?.name == "Running")
     #expect(await workspace.repository.session(id: id)?.name == "Running")
-    #expect(!model.canUndoIdentityChange)
+    #expect(!model.canUndoSidebarChange)
   }
 
   @Test("The window's title, ⌘1…⌘9, Open Quickly and the notifications follow the new name")
@@ -216,7 +216,7 @@ struct SessionIdentityTests {
     #expect(model.appearanceEditor == nil)
     #expect(model.displayedAppearance(of: session) == session.appearance)
     #expect(await workspace.repository.session(id: session.id)?.appearance == session.appearance)
-    #expect(!model.canUndoIdentityChange)
+    #expect(!model.canUndoSidebarChange)
   }
 
   @Test("Closing the popover keeps the icon chosen, as one change for ⌘Z")
@@ -236,12 +236,12 @@ struct SessionIdentityTests {
     await waitUntil("the icon is written") {
       await workspace.repository.session(id: id)?.appearance == chosen
     }
-    await waitUntil("the change can be undone") { model.canUndoIdentityChange }
+    await waitUntil("the change can be undone") { model.canUndoSidebarChange }
 
-    await model.undoIdentityChange()
+    await model.undoSidebarChange()
     #expect(await workspace.repository.session(id: id)?.appearance == workspace.running.appearance)
-    #expect(!model.canUndoIdentityChange)
-    #expect(model.canRedoIdentityChange)
+    #expect(!model.canUndoSidebarChange)
+    #expect(model.canRedoSidebarChange)
   }
 
   @Test("Revert to Default Icon gives what a creation would: the folder's icon, kept on disk")
@@ -275,16 +275,16 @@ struct SessionIdentityTests {
 
     await model.commitRename(id, to: "First")
     await model.commitRename(id, to: "Second")
-    await model.undoIdentityChange()
+    await model.undoSidebarChange()
     #expect(await workspace.repository.session(id: id)?.name == "First")
-    await model.redoIdentityChange()
+    await model.redoSidebarChange()
     #expect(await workspace.repository.session(id: id)?.name == "Second")
 
-    await model.undoIdentityChange()
+    await model.undoSidebarChange()
     // Changed behind the history's back: undoing "First" would lose it.
     _ = try await workspace.repository.mutate(id: id) { $0.name = "Elsewhere" }
     await model.reload()
-    await model.undoIdentityChange()
+    await model.undoSidebarChange()
     #expect(await workspace.repository.session(id: id)?.name == "Elsewhere")
   }
 
