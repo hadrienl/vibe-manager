@@ -269,6 +269,18 @@ public struct RootView: View {
           )
           Divider()
         }
+        if let failure = model.actionFailure {
+          // The store's banner, without what belongs to the store: there is no backup to offer
+          // over an archive that failed, and Try Again runs the action, not a reload.
+          RefreshFailureBanner(
+            failure: AppModel.RefreshFailure(message: failure.message, canRestoreBackup: false),
+            retry: { Task { await model.retryActionFailure() } },
+            restore: {},
+            export: nil,
+            dismiss: { model.dismissActionFailure() }
+          )
+          Divider()
+        }
         if let warning = model.detachWarning {
           DetachWarningBanner(warning: warning) { model.dismissDetachWarning() }
           Divider()

@@ -5980,6 +5980,142 @@
         }
       }
     },
+    "Couldn’t archive this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t archive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’archiver « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t change the status of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le statut de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t close this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t close “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de fermer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t restart this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t restart “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de redémarrer « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t save the new order of the sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer le nouvel ordre des sessions."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t switch the agent of “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer l’agent de « %@ »."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive this session." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver cette session."
+          }
+        }
+      }
+    },
+    "Couldn’t unarchive “%@”." : {
+      "comment" : "A session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de désarchiver « %@ »."
+          }
+        }
+      }
+    },
     "Create & Launch" : {
       "localizations" : {
         "fr" : {
