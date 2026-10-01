@@ -26,12 +26,9 @@ public final class AppModel {
   }
 
   /// What failed — the action and the session it was about — and how to run it again.
-  public struct ActionFailure: Equatable {
+  public struct ActionFailure {
     public let message: String
     let retry: @MainActor () async -> Void
-    private let id = UUID()
-
-    public static func == (lhs: ActionFailure, rhs: ActionFailure) -> Bool { lhs.id == rhs.id }
   }
 
   /// The actions on one session that can fail, each named in the message that reports it.
@@ -1188,7 +1185,7 @@ public final class AppModel {
       let closure = try await stopSession(id)
       report(closure.detachment, for: closure.session, action: .closed)
     } catch {
-      reportAction(error, .close, on: id) { [weak self] in await self?.close(id) }
+      reportAction(error, .close, on: id) { [weak self] in await self?.requestClose(id) }
     }
     let isStillSelected = selectedSessionID == id
     await reload()
@@ -1362,7 +1359,7 @@ public final class AppModel {
     } catch {
       // An archive that failed is not a silent no-op. The dialog is already gone, so the banner
       // is the only thing left that can say the session is still where it was.
-      reportAction(error, .archive, on: id) { [weak self] in await self?.archive(id) }
+      reportAction(error, .archive, on: id) { [weak self] in await self?.requestArchive(id) }
     }
     await reload()
     handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
@@ -1758,11 +1755,9 @@ public final class AppModel {
     } catch {
       result = .failed(message: Self.message(for: error), suggestion: nil)
       if !inBatch {
-        reportAction(error, .restart, on: id) { [weak self] in
-          _ = await self?.performRestart(
-            id: id, contextOverride: contextOverride, skippingResume: skippingResume,
-            confirmed: confirmed, follows: follows)
-        }
+        // Through Restart itself: what it asked the first time — a summary to read — it asks
+        // again, rather than replaying an answer given about another attempt.
+        reportAction(error, .restart, on: id) { [weak self] in await self?.restart(id) }
       }
     }
     guard !inBatch else { return result }
@@ -2006,10 +2001,9 @@ public final class AppModel {
         sessionID: id
       )
     } catch {
+      // The sheet again, on the agent that was chosen: the summary is read and confirmed anew.
       reportAction(error, .switchAgent, on: id) { [weak self] in
-        await self?.performAgentSwitch(
-          id: id, to: target, previous: previous, summary: summary, wasEdited: wasEdited,
-          skippingResume: skippingResume, expecting: expecting, names: names)
+        self?.beginAgentSwitch(id, preselected: target)
       }
     }
     await reload()
@@ -2923,7 +2917,7 @@ public final class AppModel {
     _ error: Error, _ action: SessionAction, on id: SessionID?,
     retry: @escaping @MainActor () async -> Void
   ) {
-    let name = id.flatMap { id in sessions.first { $0.id == id }?.name } ?? Self.unnamedSession
+    let name = id.flatMap { id in sessions.first { $0.id == id }?.name }
     var message = Self.headline(of: action, on: name)
     if let reason = (error as? LocalizedError)?.errorDescription {
       message += " " + reason
@@ -2931,8 +2925,9 @@ public final class AppModel {
     actionFailure = ActionFailure(message: message, retry: retry)
   }
 
-  private static func headline(of action: SessionAction, on name: String) -> String {
-    switch action {
+  private static func headline(of action: SessionAction, on name: String?) -> String {
+    guard let name else { return headline(ofUnlisted: action) }
+    return switch action {
     case .close:
       String(localized: "Couldn’t close “\(name)”.", bundle: .module, comment: "A session's name.")
     case .archive:
@@ -2954,6 +2949,21 @@ public final class AppModel {
         comment: "A session's name.")
     case .reorder:
       String(localized: "Couldn’t save the new order of the sessions.", bundle: .module)
+    }
+  }
+
+  /// The same, for a session no longer listed: named as "this session", without quotes.
+  private static func headline(ofUnlisted action: SessionAction) -> String {
+    switch action {
+    case .close: String(localized: "Couldn’t close this session.", bundle: .module)
+    case .archive: String(localized: "Couldn’t archive this session.", bundle: .module)
+    case .restore: String(localized: "Couldn’t unarchive this session.", bundle: .module)
+    case .moveStatus:
+      String(localized: "Couldn’t change the status of this session.", bundle: .module)
+    case .restart: String(localized: "Couldn’t restart this session.", bundle: .module)
+    case .switchAgent:
+      String(localized: "Couldn’t switch the agent of this session.", bundle: .module)
+    case .reorder: String(localized: "Couldn’t save the new order of the sessions.", bundle: .module)
     }
   }
 
