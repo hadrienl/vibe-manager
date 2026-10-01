@@ -22,6 +22,7 @@ public struct NewSessionDraftView: View {
   @State private var showsMoreOptions = false
   /// The symbol and the colour, in a popover from the badge next to the name.
   @State private var showsAppearancePicker = false
+  @State private var dropHover: NewSessionDropHover?
 
   /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
   enum FocusTarget: Hashable {
@@ -111,10 +112,34 @@ public struct NewSessionDraftView: View {
     }
     // A file dropped anywhere on the draft joins its prompt, as the composer of a conversation
     // takes one.
-    .dropDestination(for: URL.self) { urls, _ in
-      guard model.draft.templateFill == nil, !model.isSubmitting else { return false }
-      model.attach(urls.filter(\.isFileURL))
-      return true
+    .overlay {
+      if let dropHover {
+        DropVeil(
+          isRefusing: dropHover == .refusingTemplate,
+          message: dropHover == .accepting
+            ? String(localized: "Drop to attach to your prompt", bundle: .module)
+            : String(
+              localized: "A template’s prompt takes no files", bundle: .module,
+              comment: "Over the new session's draft, while files are dragged over it."))
+      }
+    }
+    // Over the veil: the catcher is the frontmost view under the drag, the prompt's field
+    // included.
+    .overlay {
+      NewSessionDropCatcher(
+        hover: {
+          guard !model.isSubmitting else { return nil }
+          return model.draft.templateFill == nil ? .accepting : .refusingTemplate
+        },
+        hovering: { hover in
+          if dropHover != hover { dropHover = hover }
+        },
+        dropped: { files in
+          model.attach(files)
+          // Let go from the Finder: the draft comes forward, its caret in the prompt.
+          NSApp?.activate()
+          moveFocus(to: .draft(.initialPrompt))
+        })
     }
     // Escape sets the draft aside — only from inside it: a key equivalent would take Escape from
     // the whole window, Open Quickly and the sidebar included. The prompt, an AppKit text view,

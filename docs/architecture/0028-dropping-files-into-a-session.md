@@ -56,6 +56,15 @@ finds a drag's destination without asking `hitTest(_:)`, so the overlay answers 
 I-beam, the clicks and the scrolling stay the field's, and VoiceOver does not see it. Pasting is
 left alone.
 
+A new session's draft (#177) is drawn over the session selected, and takes files the same way. A
+SwiftUI drop destination on the draft was never reached: SwiftUI lays the view it registers behind
+every other view, and AppKit found nothing on the draft but its prompt's field, which typed the path
+where it was let go. A transparent view laid over the whole draft is registered for files only, and
+wins their drags from end to end, the field included: the files join the prompt as Attach Files…
+joins them, escaped, at its end. Over a template's prompt, which takes no file, it refuses them with
+the red veil. A text, a web address or an image with no file of its own meets none of its types and
+goes where it went before; an image with no file has no session folder yet to be written in.
+
 Where the drop goes is decided by `SessionDropRoute`, a pure function of the session's presentation,
 its process and its composer:
 

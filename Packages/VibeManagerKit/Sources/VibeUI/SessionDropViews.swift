@@ -122,30 +122,9 @@ struct SessionDropDelegate: DropDelegate {
 /// will not, and a sentence either way.
 struct DropHoverOverlay: View {
   let hover: DropHover
-  @Environment(\.colorSchemeContrast) private var contrast
 
   var body: some View {
-    let color = hover.isRefusing ? Color.red : Color.accentColor
-    RoundedRectangle(cornerRadius: 12)
-      .stroke(
-        color,
-        style: StrokeStyle(lineWidth: 2, dash: contrast == .increased ? [] : [6, 4])
-      )
-      .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-      .overlay {
-        Label {
-          Text(message)
-        } icon: {
-          Image(systemName: hover.isRefusing ? "nosign" : "square.and.arrow.down")
-        }
-        .font(.system(size: 15, weight: .semibold))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
-      }
-      .padding(14)
-      .allowsHitTesting(false)
-      .accessibilityHidden(true)
+    DropVeil(isRefusing: hover.isRefusing, message: message)
   }
 
   private var message: String {
@@ -164,6 +143,37 @@ struct DropHoverOverlay: View {
         comment: "Over a side terminal, while a drag hovers: its shell has ended, it takes no drop."
       )
     }
+  }
+}
+
+/// The veil itself, over a session or over the new session's draft.
+struct DropVeil: View {
+  let isRefusing: Bool
+  let message: String
+  @Environment(\.colorSchemeContrast) private var contrast
+
+  var body: some View {
+    let color = isRefusing ? Color.red : Color.accentColor
+    RoundedRectangle(cornerRadius: 12)
+      .stroke(
+        color,
+        style: StrokeStyle(lineWidth: 2, dash: contrast == .increased ? [] : [6, 4])
+      )
+      .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+      .overlay {
+        Label {
+          Text(message)
+        } icon: {
+          Image(systemName: isRefusing ? "nosign" : "square.and.arrow.down")
+        }
+        .font(.system(size: 15, weight: .semibold))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+      }
+      .padding(14)
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
   }
 }
 
