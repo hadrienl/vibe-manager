@@ -1,22 +1,22 @@
-<h1>Modèles de prompt</h1>
-<p class="lede">Un modèle de prompt est un prompt à champs — <code>Review {{url}}</code> — prêt à lancer une session : un formulaire, un aperçu exact, et une session nommée d’après ce que vous avez saisi.</p>
+<h1>Gabarits de prompt</h1>
+<p class="lede">Un gabarit de prompt est un prompt à champs — <code>Review {{url}}</code> — prêt à lancer une session : un formulaire, un aperçu exact, et une session nommée d’après ce que vous avez saisi.</p>
 
-<h2 id="use">Démarrer une session à partir d’un modèle</h2>
-<p>Choisissez un modèle en haut du brouillon de nouvelle session, ou passez directement par <strong>Fichier › Nouvelle session à partir de</strong> ; <kbd>⇧⌘N</kbd> ouvre le premier. Chaque champ devient une commande de formulaire ; un champ obligatoire empêche de créer la session tant qu’il n’est pas rempli. La zone de saisie montre le prompt exactement tel que l’agent le recevra.</p>
-<vm-shot name="new-session-template" alt="Une nouvelle session à partir du modèle « Relire une merge request » : l’URL de la merge request remplie, le dossier storefront-web proposé par le modèle, et le prompt obtenu dans la zone de saisie.">Le modèle propose le dossier, le nom et le badge ; la zone de saisie montre le prompt exact.</vm-shot>
-<p>La session conserve le texte obtenu, avec le nom et la révision du modèle : modifier le modèle plus tard ne change rien de ce qui a déjà été créé, pas même ce qu’envoie <strong>Relancer</strong>.</p>
+<h2 id="use">Démarrer une session à partir d’un gabarit</h2>
+<p>Choisissez un gabarit en haut du brouillon de nouvelle session, ou passez directement par <strong>Fichier › Nouvelle session à partir de</strong> ; <kbd>⇧⌘N</kbd> ouvre le premier. Chaque champ devient une commande de formulaire ; un champ obligatoire empêche de créer la session tant qu’il n’est pas rempli. La zone de saisie montre le prompt exactement tel que l’agent le recevra.</p>
+<vm-shot name="new-session-template" alt="Une nouvelle session à partir du gabarit « Relire une merge request » : l’URL de la merge request remplie, le dossier storefront-web proposé par le gabarit, et le prompt obtenu dans la zone de saisie.">Le gabarit propose le dossier, le nom et le badge ; la zone de saisie montre le prompt exact.</vm-shot>
+<p>La session conserve le texte obtenu, avec le nom et la révision du gabarit : modifier le gabarit plus tard ne change rien de ce qui a déjà été créé, pas même ce qu’envoie <strong>Relancer</strong>.</p>
 
-<h2 id="edit">Écrire un modèle</h2>
-<p>Les modèles se modifient dans <strong>Réglages › Modèles</strong>, accessible aussi par <strong>Fichier › Gérer les modèles de prompt…</strong>.</p>
-<vm-shot name="settings-templates" alt="Réglages, onglet Modèles : la liste des modèles, l’éditeur de « Relire une merge request » avec ses champs, la colonne Essayer et l’aperçu.">L’éditeur de modèles, avec une valeur d’essai par champ.</vm-shot>
+<h2 id="edit">Écrire un gabarit</h2>
+<p>Les gabarits se modifient dans <strong>Réglages › Gabarits</strong>, accessible aussi par <strong>Fichier › Gérer les gabarits de prompt…</strong>.</p>
+<vm-shot name="settings-templates" alt="Réglages, onglet Gabarits : la liste des gabarits, l’éditeur de « Relire une merge request » avec ses champs, la colonne Essayer et l’aperçu.">L’éditeur de gabarits, avec une valeur d’essai par champ.</vm-shot>
 <dl>
-  <dt>À quoi sert-il ?</dt><dd>Le nom du modèle, tel qu’il apparaît dans les menus.</dd>
+  <dt>À quoi sert-il ?</dt><dd>Le nom du gabarit, tel qu’il apparaît dans les menus.</dd>
   <dt>Nom de la session</dt><dd>Facultatif, avec les mêmes champs : <code>Review !{{url|/merge_requests\/(\d+)/}}</code>. Il nomme la session jusqu’à ce que vous lui donniez un nom à vous.</dd>
-  <dt>Dossier</dt><dd>Facultatif : le dossier de travail proposé avec le modèle. Écrit avec <code>~</code>, il désigne le même dossier sur un autre Mac.</dd>
+  <dt>Dossier</dt><dd>Facultatif : le dossier de travail proposé avec le gabarit. Écrit avec <code>~</code>, il désigne le même dossier sur un autre Mac.</dd>
   <dt>Apparence</dt><dd>Facultatif : le symbole et la couleur donnés à ses sessions.</dd>
   <dt>Prompt</dt><dd>Le texte, avec ses champs. Le tableau en dessous définit pour chaque champ son libellé, son indication, s’il est obligatoire et s’il accepte plusieurs lignes.</dd>
 </dl>
-<p>La colonne <strong>Essayer</strong> prend une valeur par champ et montre ce que chaque motif en garde ; l’aperçu en dessous utilise les mêmes valeurs. <strong>Enregistrer</strong> ou <strong>Annuler les modifications</strong> quand vous avez terminé. Le menu <strong>⋯</strong> duplique, déplace, supprime, importe et exporte les modèles, et <strong>Ajouter les exemples</strong> en ajoute quelques-uns pour démarrer.</p>
+<p>La colonne <strong>Essayer</strong> prend une valeur par champ et montre ce que chaque motif en garde ; l’aperçu en dessous utilise les mêmes valeurs. <strong>Enregistrer</strong> ou <strong>Annuler les modifications</strong> quand vous avez terminé. Le menu <strong>⋯</strong> duplique, déplace, supprime, importe et exporte les gabarits, et <strong>Ajouter les exemples</strong> en ajoute quelques-uns pour démarrer.</p>
 
 <h2 id="syntax">Syntaxe</h2>
 <table>
@@ -28,7 +28,7 @@
     <tr><td><code>\{{</code></td><td>Deux accolades littérales : <code>\{{url}}</code> donne le texte <code>{{url}}</code>.</td></tr>
   </tbody>
 </table>
-<p>Un nom de champ commence par une lettre et contient des lettres, des chiffres, <code>-</code> et <code>_</code>. Tout le reste entre doubles accolades — <code>{{payload.url}}</code>, <code>{{#each}}</code> — reste du texte, car les prompts regorgent de code qui utilise les mêmes accolades ; l’éditeur le souligne. Un même champ utilisé deux fois n’est demandé qu’une fois. Un modèle compte au plus 20 champs et 16 Ko de texte.</p>
+<p>Un nom de champ commence par une lettre et contient des lettres, des chiffres, <code>-</code> et <code>_</code>. Tout le reste entre doubles accolades — <code>{{payload.url}}</code>, <code>{{#each}}</code> — reste du texte, car les prompts regorgent de code qui utilise les mêmes accolades ; l’éditeur le souligne. Un même champ utilisé deux fois n’est demandé qu’une fois. Un gabarit compte au plus 20 champs et 16 Ko de texte.</p>
 <p>Un motif qui ne trouve rien n’ajoute rien : le formulaire le signale sous le champ, et la session peut quand même être créée. <code>{{url|/(?:merge_requests|pull)\/(\d+)/}}</code> donne aussi bien le numéro d’une merge request GitLab que celui d’une pull request GitHub.</p>
 
 <h2 id="sent">Ce que reçoit l’agent</h2>
@@ -38,5 +38,5 @@
   <li>Un champ d’une ligne perd ses espaces de début et de fin ; les caractères de contrôle collés depuis un terminal en couleur sont supprimés.</li>
 </ul>
 
-<h2 id="share">Partager des modèles</h2>
-<p><strong>Exporter…</strong> écrit un fichier JSON ; <strong>Importer…</strong>, ou le dépôt d’un fichier sur la fenêtre, en lit un et montre d’abord quels modèles sont nouveaux, identiques ou modifiés. Un modèle modifié est conservé à côté du vôtre, sauf si vous choisissez <strong>Remplacer</strong>. Le format du fichier est documenté dans <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/prompt-templates.md">docs/prompt-templates.md</a>.</p>
+<h2 id="share">Partager des gabarits</h2>
+<p><strong>Exporter…</strong> écrit un fichier JSON ; <strong>Importer…</strong>, ou le dépôt d’un fichier sur la fenêtre, en lit un et montre d’abord quels gabarits sont nouveaux, identiques ou modifiés. Un gabarit modifié est conservé à côté du vôtre, sauf si vous choisissez <strong>Remplacer</strong>. Le format du fichier est documenté dans <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/prompt-templates.md">docs/prompt-templates.md</a>.</p>
