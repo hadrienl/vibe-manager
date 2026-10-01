@@ -318,7 +318,7 @@ struct NewSessionDraftTests {
     #expect(model.canAttachFiles)
     await model.attachChosenFiles([URL(fileURLWithPath: "/tmp/notes.md")])
 
-    #expect(draft.draft.initialPrompt == "/tmp/notes.md")
+    #expect(draft.draft.attachments == [URL(fileURLWithPath: "/tmp/notes.md")])
   }
 
   @Test("Open Quickly leaves the draft for the session chosen")

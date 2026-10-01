@@ -203,7 +203,7 @@ struct NewSessionDropTests {
     return url
   }
 
-  @Test("A file let go anywhere on the draft joins its prompt, and never the session behind it")
+  @Test("A file let go anywhere on the draft becomes a chip, and never reaches the session behind")
   func anywhere() async throws {
     let workspace = try await workspace()
     defer { workspace.close() }
@@ -212,18 +212,19 @@ struct NewSessionDropTests {
 
     for (place, location) in try points(of: workspace) {
       draft.draft.initialPrompt = "Read"
+      draft.draft.attachments = []
       let outcome = try drop([url as NSURL], at: location, on: workspace)
 
       #expect(outcome.destination === workspace.catcher, "\(place)")
       #expect(outcome.taken, "\(place)")
       #expect(outcome.proposed == .copy, "\(place)")
-      #expect(
-        draft.draft.initialPrompt == "Read " + PathInsertion.shellEscaped(url.path), "\(place)")
+      #expect(draft.draft.attachments == [url], "\(place)")
+      #expect(draft.draft.initialPrompt == "Read", "\(place)")
     }
     #expect(workspace.model.dropNotice == nil)
   }
 
-  @Test("Files let go together join the prompt in their order")
+  @Test("Files let go together become chips in their order")
   func several() async throws {
     let workspace = try await workspace()
     defer { workspace.close() }
@@ -235,9 +236,8 @@ struct NewSessionDropTests {
     let outcome = try drop([first as NSURL, second as NSURL], at: card, on: workspace)
 
     #expect(outcome.taken)
-    #expect(
-      draft.draft.initialPrompt
-        == [first, second].map { PathInsertion.shellEscaped($0.path) }.joined(separator: " "))
+    #expect(draft.draft.attachments == [first, second])
+    #expect(draft.draft.initialPrompt.isEmpty)
   }
 
   @Test("A file is refused over a template's prompt, which stays as it is")
@@ -256,6 +256,7 @@ struct NewSessionDropTests {
     #expect(!outcome.taken)
     #expect(!outcome.proposed.contains(.copy))
     #expect(draft.draft.initialPrompt.isEmpty)
+    #expect(draft.draft.attachments.isEmpty)
     #expect(workspace.model.dropNotice == nil)
   }
 

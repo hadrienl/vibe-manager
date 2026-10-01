@@ -7,6 +7,10 @@ import Foundation
 public struct SessionDraft: Hashable, Sendable {
   public var name: String
   public var initialPrompt: String
+  /// The files joined to the free prompt, shown apart from its text (#291): their paths join it,
+  /// escaped as a terminal reads them, only in the prompt the agent is sent. A template's prompt
+  /// is its own and takes none.
+  public var attachments: [URL]
   public var providerID: String?
   /// `nil` means "let the agent decide", which is a real answer: both CLIs read a default from
   /// their own configuration, and neither guarantees a model catalogue exists to choose from.
@@ -28,6 +32,7 @@ public struct SessionDraft: Hashable, Sendable {
   public init(
     name: String = "",
     initialPrompt: String = "",
+    attachments: [URL] = [],
     providerID: String? = nil,
     modelID: String? = nil,
     appearance: SessionAppearance? = nil,
@@ -39,6 +44,7 @@ public struct SessionDraft: Hashable, Sendable {
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
+    self.attachments = attachments
     self.providerID = providerID
     self.modelID = modelID
     self.appearance = appearance
@@ -73,9 +79,16 @@ public struct SessionDraft: Hashable, Sendable {
     SessionName.normalized(name)
   }
 
-  /// The prompt the agent is sent: the template's rendering, or what was typed.
+  /// The prompt the agent is sent: the template's rendering, or what was typed followed by the
+  /// paths of the files joined to it, as the composer of a conversation sends them.
   public var effectivePrompt: String {
-    templateFill?.render().prompt ?? PromptText.normalizingLineBreaks(initialPrompt)
+    if let templateFill { return templateFill.render().prompt }
+    let text = PromptText.normalizingLineBreaks(initialPrompt)
+    let paths = attachments.map(\.path).filter(ShellPath.isWritable).map(ShellPath.escaped)
+    guard !paths.isEmpty else { return text }
+    let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let files = paths.joined(separator: " ")
+    return body.isEmpty ? files : body + " " + files
   }
 
   public var trimmedPrompt: String {

@@ -178,6 +178,7 @@ public final class NewSessionModel {
       && (draft.providerID == nil || draft.providerID == defaultProviderID)
       && draft.modelID == nil && draft.appearance == nil
       && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && draft.attachments.isEmpty
       && draft.templateFill == nil
       && draft.ticketText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
@@ -205,16 +206,18 @@ public final class NewSessionModel {
     settledName = nil
   }
 
-  /// Files joined to the prompt: their paths, as the agent reads them in a terminal, at the end
-  /// of the text. A template's prompt is its own; nothing is added to it.
+  /// Files joined to the prompt (#291): chips under the text, as in a conversation's composer,
+  /// in the order they came and each once. Their paths reach the agent with the prompt. A
+  /// template's prompt is its own; nothing is joined to it.
   public func attach(_ files: [URL]) {
     guard draft.templateFill == nil else { return }
-    let paths = files.map(\.path).filter(PathInsertion.isWritablePath)
-      .map(PathInsertion.shellEscaped)
-    guard !paths.isEmpty else { return }
-    let text = draft.initialPrompt
-    let separator = text.isEmpty || text.last?.isWhitespace == true ? "" : " "
-    draft.initialPrompt = text + separator + paths.joined(separator: " ")
+    for file in files where ShellPath.isWritable(file.path) && !draft.attachments.contains(file) {
+      draft.attachments.append(file)
+    }
+  }
+
+  public func removeAttachment(_ file: URL) {
+    draft.attachments.removeAll { $0 == file }
   }
 
   // MARK: - Templates

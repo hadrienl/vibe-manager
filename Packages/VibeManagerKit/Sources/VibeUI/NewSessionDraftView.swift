@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// A new session, before it exists (#177): a conversation not started yet, in the main area.
@@ -574,6 +575,18 @@ public struct NewSessionDraftView: View {
         if let rendered = model.renderedPrompt, let fill = model.draft.templateFill {
           renderedPrompt(rendered, of: fill)
         } else {
+          if !model.draft.attachments.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+              HStack(spacing: 8) {
+                ForEach(model.draft.attachments, id: \.self) { file in
+                  AttachmentChip(file: file, usesSystemColors: true) {
+                    model.removeAttachment(file)
+                  }
+                }
+              }
+            }
+            .accessibilityIdentifier("new-session-attachments")
+          }
           PromptTextEditor(
             text: $model.draft.initialPrompt,
             minimumLines: 3,

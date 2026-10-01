@@ -264,31 +264,41 @@ struct PromptComposer: View {
 }
 
 /// A file joined to the message: its icon or thumbnail, its name, its size, and a way to remove it.
-struct AttachmentChip: View {
+///
+/// In the conversation's theme, or in the system's colours where no theme applies — the new
+/// session's draft (#291).
+public struct AttachmentChip: View {
   let file: URL
+  let usesSystemColors: Bool
   let remove: () -> Void
   @Environment(\.conversationTheme) private var theme
 
-  var body: some View {
+  public init(file: URL, usesSystemColors: Bool = false, remove: @escaping () -> Void) {
+    self.file = file
+    self.usesSystemColors = usesSystemColors
+    self.remove = remove
+  }
+
+  public var body: some View {
     HStack(spacing: 8) {
       thumbnail
         .frame(width: 28, height: 28)
         .clipShape(RoundedRectangle(cornerRadius: 5))
       VStack(alignment: .leading, spacing: 1) {
         Text(verbatim: file.lastPathComponent)
-          .font(theme.interfaceFont(size: 12, weight: .semibold))
-          .foregroundStyle(theme.text.color)
+          .font(font(size: 12, weight: .semibold))
+          .foregroundStyle(usesSystemColors ? Color.primary : theme.text.color)
           .lineLimit(1)
         if let size = fileSize {
           Text(verbatim: size)
-            .font(theme.interfaceFont(size: 11))
-            .foregroundStyle(theme.secondaryText.color)
+            .font(font(size: 11))
+            .foregroundStyle(secondary)
         }
       }
       Button(action: remove) {
         Image(systemName: "xmark")
           .font(.system(size: 10, weight: .bold))
-          .foregroundStyle(theme.secondaryText.color)
+          .foregroundStyle(secondary)
       }
       .buttonStyle(.plain)
       .accessibilityLabel(Text("Remove \(file.lastPathComponent)", bundle: .module))
@@ -296,9 +306,24 @@ struct AttachmentChip: View {
     .padding(.leading, 4)
     .padding(.trailing, 8)
     .padding(.vertical, 4)
-    .background(theme.surface.color, in: RoundedRectangle(cornerRadius: 9))
-    .overlay(RoundedRectangle(cornerRadius: 9).stroke(theme.border.color))
+    .background(
+      usesSystemColors ? Color(nsColor: .controlBackgroundColor) : theme.surface.color,
+      in: RoundedRectangle(cornerRadius: 9)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 9).stroke(
+        usesSystemColors ? Color(nsColor: .separatorColor) : theme.border.color)
+    )
     .help(file.path)
+  }
+
+  private var secondary: Color {
+    usesSystemColors ? Color.secondary : theme.secondaryText.color
+  }
+
+  private func font(size: Double, weight: Font.Weight = .regular) -> Font {
+    usesSystemColors
+      ? .system(size: size, weight: weight) : theme.interfaceFont(size: size, weight: weight)
   }
 
   @ViewBuilder

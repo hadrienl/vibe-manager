@@ -60,8 +60,10 @@ A new session's draft (#177) is drawn over the session selected, and takes files
 SwiftUI drop destination on the draft was never reached: SwiftUI lays the view it registers behind
 every other view, and AppKit found nothing on the draft but its prompt's field, which typed the path
 where it was let go. A transparent view laid over the whole draft is registered for files only, and
-wins their drags from end to end, the field included: the files join the prompt as Attach Files…
-joins them, escaped, at its end. Over a template's prompt, which takes no file, it refuses them with
+wins their drags from end to end, the field included: the files become chips of the draft, as in a
+conversation's composer, and Attach Files… makes the same chips. Their paths, escaped, follow the
+prompt's text only in the prompt the agent is launched with; the session is not named after them.
+Over a template's prompt, which takes no file, it refuses them with
 the red veil. A text, a web address or an image with no file of its own meets none of its types and
 goes where it went before; an image with no file has no session folder yet to be written in.
 

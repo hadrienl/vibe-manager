@@ -1,4 +1,5 @@
 import Foundation
+import VibeDomain
 
 /// What a drop hands to a session once it has been read (#42): a file on disk, or text.
 public enum DropPayload: Hashable, Sendable {
@@ -11,26 +12,14 @@ public enum DropPayload: Hashable, Sendable {
 /// The one encoder of paths: the composer's attachments, a drop on the terminal and a drop on a
 /// row of the sidebar all write a file the same way, as Terminal.app writes one dropped on it.
 public enum PathInsertion {
-  /// A path as Terminal.app writes a dropped file: every character a shell would read otherwise
-  /// escaped with a backslash. An agent reads it as the path it is, and Claude Code attaches an
-  /// image named that way. Accents and emoji are written as they are, like Terminal.app does, and
-  /// the name is never normalized: the path stays exactly the one on disk.
+  /// A path as Terminal.app writes a dropped file: see `ShellPath.escaped(_:)`.
   public static func shellEscaped(_ path: String) -> String {
-    let special = Set(" \t'\"\\$`!&*()[]{}|;<>?~#")
-    var escaped = ""
-    for character in path {
-      if special.contains(character) { escaped.append("\\") }
-      escaped.append(character)
-    }
-    return escaped
+    ShellPath.escaped(path)
   }
 
-  /// Whether a path can be written into the terminal: no control character anywhere in it. One
-  /// could close a bracketed paste and type on its own.
+  /// Whether a path can be written into the terminal: see `ShellPath.isWritable(_:)`.
   public static func isWritablePath(_ path: String) -> Bool {
-    !path.unicodeScalars.contains {
-      $0.value < 0x20 || $0.value == 0x7F || (0x80...0x9F).contains($0.value)
-    }
+    ShellPath.isWritable(path)
   }
 
   /// The words a drop types, in the order of the drop, and what could not be written.
