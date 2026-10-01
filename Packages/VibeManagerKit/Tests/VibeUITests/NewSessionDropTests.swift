@@ -17,7 +17,6 @@ import VibeDomain
 @MainActor
 @Suite("Dropping files on the new session's draft", .serialized, .timeLimit(.minutes(2)))
 struct NewSessionDropTests {
-  private static let provider = WorkspaceProvider()
   private static let size = NSSize(width: 1200, height: 800)
 
   @MainActor private final class Workspace {
@@ -69,30 +68,8 @@ struct NewSessionDropTests {
 
   /// A running session selected, its terminal on screen, and a new session's draft over it.
   private func workspace() async throws -> Workspace {
-    let folder = FileManager.default.temporaryDirectory
-      .appendingPathComponent("NewSessionDropTests-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    let session = WorkSession(
-      name: "Behind",
-      agent: SessionAgentConfiguration(providerID: "stub"),
-      status: .closed,
-      createdAt: Date(timeIntervalSince1970: 1),
-      updatedAt: Date(timeIntervalSince1970: 1),
-      closedAt: Date(timeIntervalSince1970: 1),
-      repositories: [RepositoryContext(path: folder.path)]
-    )
-    let repository = WorkspaceRepository(sessions: [session])
-    let registry = WorkspaceRegistry(providers: [Self.provider])
-    let launcher = SessionLauncher(
-      supervisor: WorkspaceSupervisor(), repository: repository, agents: registry,
-      viewportTimeout: .zero)
-    let model = AppModel(
-      repository: repository, agents: registry, launcher: launcher, dropStore: KeepingDropStore())
-    let plan = try await Self.provider.launchPlan(
-      for: AgentLaunchRequest(workingDirectoryPath: folder.path))
-    await launcher.launch(session: session, plan: plan)
-    await model.load()
-    model.select(session.id)
+    let launch = try await StubSessionLaunch.make(named: "Behind", dropStore: KeepingDropStore())
+    let (model, session, folder) = (launch.model, launch.session, launch.folder)
     await waitUntil { model.pane(for: session.id)?.status == .running }
 
     let window = NSWindow(

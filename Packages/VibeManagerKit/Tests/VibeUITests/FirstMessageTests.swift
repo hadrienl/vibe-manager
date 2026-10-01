@@ -11,7 +11,6 @@ import VibeDomain
 @MainActor
 @Suite("The first message of a session created with files", .serialized)
 struct FirstMessageTests {
-  private static let provider = WorkspaceProvider()
 
   private struct Fixture {
     let model: AppModel
@@ -30,33 +29,13 @@ struct FirstMessageTests {
 
   /// A running session shown in conversation, its transcript not yet written.
   private func running() async throws -> Fixture {
-    let folder = FileManager.default.temporaryDirectory
-      .appendingPathComponent("FirstMessageTests-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    let session = WorkSession(
-      name: "Files",
-      agent: SessionAgentConfiguration(providerID: "stub"),
-      status: .closed,
-      createdAt: Date(timeIntervalSince1970: 1),
-      updatedAt: Date(timeIntervalSince1970: 1),
-      closedAt: Date(timeIntervalSince1970: 1),
-      repositories: [RepositoryContext(path: folder.path)]
-    )
-    let repository = WorkspaceRepository(sessions: [session])
-    let registry = WorkspaceRegistry(providers: [Self.provider])
-    let launcher = SessionLauncher(
-      supervisor: WorkspaceSupervisor(), repository: repository, agents: registry,
-      viewportTimeout: .zero)
-    let model = AppModel(repository: repository, agents: registry, launcher: launcher)
-    model.connectConversations()
-    model.conversations.readableAgents = [
-      "stub": ConversationWorkspace.Agent(name: "Stub Agent", format: AgentPromptFormat())
-    ]
-    let plan = try await Self.provider.launchPlan(
-      for: AgentLaunchRequest(workingDirectoryPath: folder.path))
-    await launcher.launch(session: session, plan: plan)
-    await model.reload()
-    model.select(session.id)
+    let launch = try await StubSessionLaunch.make(named: "Files") { model in
+      model.connectConversations()
+      model.conversations.readableAgents = [
+        "stub": ConversationWorkspace.Agent(name: "Stub Agent", format: AgentPromptFormat())
+      ]
+    }
+    let (model, session, folder) = (launch.model, launch.session, launch.folder)
     await waitUntil { model.pane(for: session.id)?.status == .running }
     model.setPresentation(.conversation, of: session.id)
     let conversation = model.conversations.show(session)
