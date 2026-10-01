@@ -168,7 +168,7 @@ struct AgentAvailabilityProbeTests {
     #expect(availability.state == .probeFailed(reason: .failed(exitCode: -1)))
   }
 
-  @Test("A missing CLI offers install, manual path and retry")
+  @Test("A missing CLI offers install and retry, never a setting that does not exist")
   func missingCLIOffersRemediations() async {
     let availability = await probe(
       locator: StubLocator(location: .notFound),
@@ -177,8 +177,39 @@ struct AgentAvailabilityProbeTests {
 
     #expect(availability.state == .notFound)
     #expect(availability.installation == nil)
-    #expect(availability.diagnostic.remediations.contains(.defineExecutablePath))
-    #expect(availability.diagnostic.remediations.contains(.retryDetection))
+    #expect(
+      availability.diagnostic.remediations == [
+        .install(documentationURL: nil), .retryDetection,
+      ])
+  }
+
+  @Test("A file that cannot run offers to install the agent again, then to detect again")
+  func nonExecutableOffersInstall() async {
+    let availability = await probe(
+      locator: StubLocator(
+        location: .notExecutable(path: "/opt/homebrew/bin/stub-agent", source: .candidateDirectory)
+      ),
+      processProbe: StubProcessProbe()
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .notExecutable)
+    #expect(
+      availability.diagnostic.remediations == [
+        .install(documentationURL: nil), .retryDetection,
+      ])
+  }
+
+  @Test("An agent that could not be inspected offers only to detect again")
+  func failedProbeOffersRetryOnly() async {
+    let availability = await probe(
+      locator: StubLocator(
+        location: .found(path: "/opt/homebrew/bin/stub-agent", source: .processPath)
+      ),
+      processProbe: StubProcessProbe(defaultResponse: .failure(.launchFailed))
+    ).availability(forceRefresh: false)
+
+    #expect(availability.state == .probeFailed(reason: .failed(exitCode: -1)))
+    #expect(availability.diagnostic.remediations == [.retryDetection])
   }
 
   @Test("A non executable file is distinguished from a missing one")
