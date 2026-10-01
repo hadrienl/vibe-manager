@@ -58,27 +58,12 @@ public enum AgentProbeFailure: Hashable, Sendable {
   case timedOut
   case failed(exitCode: Int32)
   case cancelled
-
-  /// Whether the agent said nothing rather than said something wrong.
-  ///
-  /// A command that never answered and one that answered with an error deserve neither the same
-  /// sentence nor the same lifetime in a cache: the first one is likely to work on the next
-  /// attempt, the second one is not.
-  public var isTransient: Bool {
-    switch self {
-    case .timedOut, .cancelled:
-      return true
-    case .failed:
-      return false
-    }
-  }
 }
 
 public enum AgentRemediation: Hashable, Sendable, Identifiable {
   case install(documentationURL: URL?)
   case update(minimumVersion: AgentVersion, documentationURL: URL?)
   case authenticate(command: String?)
-  case defineExecutablePath
   case retryDetection
 
   public var id: String {
@@ -86,9 +71,22 @@ public enum AgentRemediation: Hashable, Sendable, Identifiable {
     case .install: return "install"
     case .update: return "update"
     case .authenticate: return "authenticate"
-    case .defineExecutablePath: return "defineExecutablePath"
     case .retryDetection: return "retryDetection"
     }
+  }
+
+  /// The page that installs or updates the agent, when its provider gives one.
+  public var documentationURL: URL? {
+    switch self {
+    case .install(let url), .update(_, let url): url
+    case .authenticate, .retryDetection: nil
+    }
+  }
+
+  /// The command line that signs in to the agent, when its provider gives one.
+  public var command: String? {
+    guard case .authenticate(let command) = self else { return nil }
+    return command
   }
 }
 
@@ -113,9 +111,6 @@ extension AgentRemediation {
       return String(
         localized: "Run \(command) in a terminal, then detect again.", bundle: .module,
         comment: "A command line to type: claude auth login.")
-    case .defineExecutablePath:
-      return String(
-        localized: "Set the path to its executable, then detect again.", bundle: .module)
     case .retryDetection:
       return String(localized: "Detect again.", bundle: .module)
     }

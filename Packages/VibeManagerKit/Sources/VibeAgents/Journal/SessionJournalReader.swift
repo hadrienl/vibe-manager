@@ -39,7 +39,7 @@ public actor SessionJournalReader: SessionJournalReading {
       else { continue }
       let files: [URL]
       let isCodex: Bool
-      switch conversation.providerID {
+      switch conversation.transcriptProviderID {
       case ClaudeCodeAgentProvider.id.rawValue:
         files = locator.claudeTranscripts(for: identifier)
         isCodex = false
@@ -65,7 +65,8 @@ public actor SessionJournalReader: SessionJournalReading {
   public func transcriptDirectories(for session: WorkSession) async -> [String] {
     var directories: [String] = []
     let providers =
-      session.conversations.map(\.providerID) + [session.agent?.providerID].compactMap { $0 }
+      session.conversations.map(\.transcriptProviderID)
+      + [session.agent?.transcriptProviderID].compactMap { $0 }
     for providerID in providers {
       let directory: String
       switch providerID {

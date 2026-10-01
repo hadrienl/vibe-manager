@@ -40,6 +40,17 @@
         }
       }
     },
+    "%@ drives this endpoint: %@" : {
+      "comment" : "The harness's name, then why it cannot run.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ pilote cet endpoint : %2$@"
+          }
+        }
+      }
+    },
     "%@ is installed but not signed in." : {
       "comment" : "An agent's name.",
       "localizations" : {
@@ -73,6 +84,53 @@
         }
       }
     },
+    "%lld models" : {
+      "comment" : "How many models an endpoint offers.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld model"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld models"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèles"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèle"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèles"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Create an AGENTS.md file with instructions for Codex." : {
       "comment" : "Codex's /init command, in the composer's list.",
       "localizations" : {
@@ -80,6 +138,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Crée un fichier AGENTS.md avec des instructions pour Codex."
+          }
+        }
+      }
+    },
+    "Endpoint via %@" : {
+      "comment" : "The coding agent that drives an endpoint.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endpoint via %@"
+          }
+        }
+      }
+    },
+    "Its key is not in the keychain. Add it in Settings → Endpoints." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sa clé n’est pas dans le trousseau. Ajoutez-la dans Réglages → Endpoints."
+          }
+        }
+      }
+    },
+    "Its last test failed. Test it again in Settings → Endpoints." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son dernier test a échoué. Testez-le à nouveau dans Réglages → Endpoints."
+          }
+        }
+      }
+    },
+    "No model of this endpoint can call tools. Add one in Settings → Endpoints." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun modèle de cet endpoint ne sait appeler d’outils. Ajoutez-en un dans Réglages → Endpoints."
           }
         }
       }
@@ -113,6 +212,49 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La commande %@ existe, mais ne peut pas être exécutée."
+          }
+        }
+      }
+    },
+    "The endpoint did not answer. Attempt %lld of %lld in %lld s." : {
+      "comment" : "A wait before another attempt: its number, how many at most, the seconds left.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint n’a pas répondu. Essai %1$lld sur %2$lld dans %3$lld s."
+          }
+        }
+      }
+    },
+    "The endpoint failed to answer. Attempt %lld of %lld in %lld s." : {
+      "comment" : "A wait before another attempt: its number, how many at most, the seconds left.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint a échoué à répondre. Essai %1$lld sur %2$lld dans %3$lld s."
+          }
+        }
+      }
+    },
+    "The endpoint limits its rate. Attempt %lld of %lld in %lld s." : {
+      "comment" : "A wait before another attempt: its number, how many at most, the seconds left.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint limite son débit. Essai %1$lld sur %2$lld dans %3$lld s."
+          }
+        }
+      }
+    },
+    "The endpoint's settings are incomplete. Finish them in Settings → Endpoints." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les réglages de l’endpoint sont incomplets. Complétez-les dans Réglages → Endpoints."
           }
         }
       }

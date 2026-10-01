@@ -1,0 +1,1 @@
+Each of the 25 modules in `handlers/` serves the route in its `ROUTE` constant. Give each `handle` function a docstring whose first line is exactly `Serves <route>.`, with the module's own route. Edit the files one by one with your file editing tool: do not use sed, perl, or a script. Keep `python3 -m unittest discover -s tests -t .` passing.

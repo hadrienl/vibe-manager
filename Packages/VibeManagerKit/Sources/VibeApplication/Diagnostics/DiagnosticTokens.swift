@@ -19,6 +19,10 @@ extension AgentProviderID: DiagnosticTokenConvertible {
     case "codex": return DiagnosticToken("codex")
     case "mock": return DiagnosticToken("mock")
     case "mock-b": return DiagnosticToken("mock-b")
+    // One token for every endpoint: its identifier is a UUID the user never sees, and its name
+    // is theirs to choose, so neither belongs in a log.
+    case let id where id.hasPrefix(AgentProviderID.endpointPrefix):
+      return DiagnosticToken("endpoint")
     default: return DiagnosticToken("other")
     }
   }
