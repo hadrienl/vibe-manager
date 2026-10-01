@@ -335,6 +335,7 @@ public enum WorkSessionValidationError: Error, Equatable, Sendable {
   case invalidTaskStatus
   case duplicateRepositoryIdentifier
   case emptyRepositoryPath
+  case emptyConversationTheme
 }
 
 public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
@@ -362,6 +363,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   /// column and every group is a subsequence of that one order. The store gives it: a session
   /// enters at the top, and keeps its place through a restart, a status change or an archive.
   public var rank: Int
+  /// The theme its conversation is drawn with, whatever the system's mode (#274). `nil` follows
+  /// the settings. An identifier that names no theme any more is kept, and drawn as `nil`.
+  public var conversationTheme: String?
 
   public var status: SessionStatus {
     lifecycle.status
@@ -413,6 +417,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     /// `nil` reads it from the lifecycle, as for a session stored before it existed.
     taskStatus: SessionTaskStatus? = nil,
     rank: Int = 0,
+    conversationTheme: String? = nil,
     /// See `SessionLifecycle.init`: whether a `nil` start is inferred or means never started.
     infersStartedAt: Bool = true
   ) {
@@ -439,6 +444,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       taskStatus
       ?? SessionTaskStatus.inferred(from: status, hasEverStarted: lifecycle.startedAt != nil)
     self.rank = rank
+    self.conversationTheme = conversationTheme
   }
 
   public mutating func close(at date: Date) throws {
@@ -555,6 +561,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     }
     guard repositories.allSatisfy({ !$0.path.isEmpty }) else {
       throw WorkSessionValidationError.emptyRepositoryPath
+    }
+    guard conversationTheme.map({ !$0.isEmpty }) ?? true else {
+      throw WorkSessionValidationError.emptyConversationTheme
     }
   }
 

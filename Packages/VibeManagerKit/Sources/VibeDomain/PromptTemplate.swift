@@ -90,6 +90,10 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   /// The symbol and colour given to the sessions made from it; `nil`: they keep their own. Only
   /// the ones the New Session sheet offers.
   public var appearance: SessionAppearance?
+  /// The conversation theme given to the sessions made from it (#274); `nil`: they keep their own.
+  /// One that names no theme on this Mac is ignored at creation, and does not make the template
+  /// invalid.
+  public var conversationTheme: String?
   /// Only the settings of fields present in the text are kept when the template is saved.
   public var fieldSettings: [PromptTemplateFieldSettings]
   /// One more at each save, and recorded by the sessions created from it.
@@ -104,6 +108,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     body: String,
     workingDirectoryPath: String? = nil,
     appearance: SessionAppearance? = nil,
+    conversationTheme: String? = nil,
     fieldSettings: [PromptTemplateFieldSettings] = [],
     revision: Int = 1,
     createdAt: Date = Date(),
@@ -115,6 +120,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
     self.body = body
     self.workingDirectoryPath = workingDirectoryPath
     self.appearance = appearance
+    self.conversationTheme = conversationTheme
     self.fieldSettings = fieldSettings
     self.revision = revision
     self.createdAt = createdAt.storageRounded
@@ -198,6 +204,7 @@ public struct PromptTemplate: Identifiable, Hashable, Sendable {
   public func hasSameContent(as other: PromptTemplate) -> Bool {
     name == other.name && sessionNamePattern == other.sessionNamePattern && body == other.body
       && folder == other.folder && appearance == other.appearance
+      && conversationTheme == other.conversationTheme
       && Set(trimmedFieldSettings) == Set(other.trimmedFieldSettings)
   }
 

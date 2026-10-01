@@ -28,6 +28,8 @@ public struct SessionDraft: Hashable, Sendable {
   public var projectIcon: ProjectIcon?
   /// What a name is given when nothing is picked (#199): the lists the Settings offer.
   public var palette: SessionAppearancePalette
+  /// The theme the session's conversation is drawn with (#274); `nil` follows the settings.
+  public var conversationTheme: String?
 
   public init(
     name: String = "",
@@ -40,7 +42,8 @@ public struct SessionDraft: Hashable, Sendable {
     templateFill: PromptTemplateFill? = nil,
     ticketText: String = "",
     projectIcon: ProjectIcon? = nil,
-    palette: SessionAppearancePalette = .default
+    palette: SessionAppearancePalette = .default,
+    conversationTheme: String? = nil
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
@@ -53,6 +56,7 @@ public struct SessionDraft: Hashable, Sendable {
     self.ticketText = ticketText
     self.projectIcon = projectIcon
     self.palette = palette
+    self.conversationTheme = conversationTheme
   }
 
   /// The name of the template field that names the ticket, whatever its case.
@@ -207,7 +211,8 @@ public struct SessionDraft: Hashable, Sendable {
       repositories: resolvedWorkingDirectoryPath.map { [RepositoryContext(path: $0)] } ?? [],
       // The rendered text is what the session keeps; the template is only where it came from.
       template: templateFill?.reference,
-      ticket: ticket(repository: repository)
+      ticket: ticket(repository: repository),
+      conversationTheme: conversationTheme
     )
   }
 
