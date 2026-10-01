@@ -2390,6 +2390,13 @@ private func sessionRestart(for id: SessionID, in model: AppModel) -> () -> Void
   { Task { await model.restart(id) } }
 }
 
+/// The status bar's button for a session's agent: Close Session, which asks first when the agent
+/// is at work, as ⇧⌘W does (#238).
+@MainActor
+private func sessionClose(for id: SessionID, in model: AppModel) -> () -> Void {
+  { Task { await model.requestClose(id) } }
+}
+
 /// One session's terminal in the window's stack, shown or kept behind the one shown (#254).
 ///
 /// A view of its own so that what changes while an agent works — the terminal's state, the
@@ -2414,7 +2421,8 @@ private struct SessionTerminalSlot: View {
         statusAccessory: model.terminals == nil
           ? nil : DrawerStatusButton(model: model, session: session),
         claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
-        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session)
+        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session),
+        close: sessionClose(for: id, in: model)
       )
       .id(id)
       .opacity(isActive ? 1 : 0)
@@ -2464,7 +2472,8 @@ private struct SessionConversationSlot: View {
             pane: pane,
             accessory: model.terminals == nil
               ? nil : DrawerStatusButton(model: model, session: listed),
-            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed))
+            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed),
+            close: sessionClose(for: id, in: model))
         }
       }
       .opacity(isActive ? 1 : 0)
