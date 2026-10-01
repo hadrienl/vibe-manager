@@ -30,8 +30,9 @@ struct InspectorSectionDescriptor: Identifiable {
   let sizing: Sizing
   /// Shown beside the title once folded: what the section holds, in a few words.
   var summary: AnyView?
-  /// The summary in words, for the header's help: folded, it keeps to one line (#279).
-  var summaryText: String?
+  /// The summary in words, for the header's help: folded, it keeps to one line (#279). Read by
+  /// the header alone, so that what it observes never redraws the whole column.
+  var summaryText: (@MainActor () -> String?)?
   /// On the right of the header, folded or not: Switch…, Read Again…
   var accessory: AnyView?
   let content: AnyView
@@ -374,7 +375,9 @@ struct InspectorSectionHeader: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .help(Self.help(isCollapsed: isCollapsed, summary: section.summaryText))
+      .help(
+        Self.help(isCollapsed: isCollapsed, summary: isCollapsed ? section.summaryText?() : nil)
+      )
       .accessibilityLabel(Text(section.title))
       .accessibilityValue(
         isCollapsed

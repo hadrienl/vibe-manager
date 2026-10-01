@@ -72,6 +72,7 @@ struct ActivityPresentationTests {
     #expect(ActivityPresentation.reference(resource) == "hadrienl/vibe-manager#62")
     #expect(ActivityPresentation.copyText(resource) == url.absoluteString)
   }
+
   @Test("A long name may go to the line after its separators, and only where it is shown")
   func breakable() {
     let shown = ActivityPresentation.breakable("feat/279-a_b.c")

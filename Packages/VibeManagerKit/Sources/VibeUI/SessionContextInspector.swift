@@ -105,7 +105,9 @@ extension SessionContextInspector {
       systemImage: "waveform.path.ecg",
       sizing: .fill(minimum: 90),
       summary: AnyView(ActivitySummary(session: session.id, journal: journal)),
-      summaryText: activitySummaryText(journal),
+      summaryText: { [session] in
+        ActivityPresentation.resourceSummary(journal.journal(for: session.id))
+      },
       content: AnyView(
         ActivityPane(
           session: session,
@@ -114,11 +116,6 @@ extension SessionContextInspector {
           journal: journal)),
       accessibilityIdentifier: "inspector-activity-section"
     )
-  }
-
-  fileprivate func activitySummaryText(_ journal: SessionJournalModel) -> String? {
-    let count = journal.journal(for: session.id)?.resources.count ?? 0
-    return count > 0 ? ActivityPresentation.resourceCount(count) : nil
   }
 
   fileprivate var gitSection: InspectorSectionDescriptor {
@@ -279,9 +276,8 @@ private struct ActivitySummary: View {
   let journal: SessionJournalModel
 
   var body: some View {
-    let count = journal.journal(for: session)?.resources.count ?? 0
-    if count > 0 {
-      Text(verbatim: ActivityPresentation.resourceCount(count))
+    if let summary = ActivityPresentation.resourceSummary(journal.journal(for: session)) {
+      Text(verbatim: summary)
     }
   }
 }

@@ -269,9 +269,11 @@ enum ActivityPresentation {
     }
   }
 
-  /// "12 resources": what the Activity section says once folded.
-  static func resourceCount(_ count: Int) -> String {
-    String(
+  /// "12 resources": what the Activity section says once folded, nothing while it holds none.
+  static func resourceSummary(_ journal: SessionJournal?) -> String? {
+    let count = journal?.resources.count ?? 0
+    guard count > 0 else { return nil }
+    return String(
       localized: "\(count) resources", bundle: .module,
       comment: "How many links a session's activity holds.")
   }
