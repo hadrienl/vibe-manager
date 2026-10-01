@@ -146,4 +146,34 @@ extension AppModel {
     guard let id, id != creation.sessionID else { return }
     sessionInCreation?.isFollowed = false
   }
+
+  /// How long a first message waits for its agent before it is left in the composer, for the
+  /// user to send.
+  static let firstMessagePatience: Duration = .seconds(300)
+
+  /// The first message of a session whose draft had files joined (#291): put in its
+  /// conversation's composer, then sent from there once the agent is ready, as the user would
+  /// send it — the paths pasted, so that Claude Code takes an image as one. An agent that is not
+  /// ready in time, or a composer the user changed meanwhile, leaves it where it is.
+  func sendFirstMessage(_ message: PromptSubmission, to session: WorkSession) {
+    let conversation = conversations.show(session)
+    conversation.draft = message.text
+    conversation.attach(message.attachments)
+    let id = session.id
+    let deadline = ContinuousClock.now + Self.firstMessagePatience
+    Task { [weak self, weak conversation] in
+      while ContinuousClock.now < deadline {
+        guard let self, let conversation else { return }
+        // A process the activity has not seen start yet is not known to be ready.
+        if self.activity(for: id) != nil, conversation.composerState == .ready {
+          guard conversation.draft == message.text,
+            conversation.attachments == message.attachments
+          else { return }
+          await conversation.send()
+          return
+        }
+        try? await Task.sleep(for: .milliseconds(100))
+      }
+    }
+  }
 }

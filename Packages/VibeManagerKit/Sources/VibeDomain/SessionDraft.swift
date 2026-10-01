@@ -84,11 +84,17 @@ public struct SessionDraft: Hashable, Sendable {
   public var effectivePrompt: String {
     if let templateFill { return templateFill.render().prompt }
     let text = PromptText.normalizingLineBreaks(initialPrompt)
-    let paths = attachments.map(\.path).filter(ShellPath.isWritable).map(ShellPath.escaped)
+    let paths = sentAttachments.map { ShellPath.escaped($0.path) }
     guard !paths.isEmpty else { return text }
     let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
     let files = paths.joined(separator: " ")
     return body.isEmpty ? files : body + " " + files
+  }
+
+  /// The files the agent is handed with the prompt: none with a template's.
+  public var sentAttachments: [URL] {
+    guard templateFill == nil else { return [] }
+    return attachments.filter { ShellPath.isWritable($0.path) }
   }
 
   public var trimmedPrompt: String {

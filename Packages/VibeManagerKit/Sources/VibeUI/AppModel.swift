@@ -2714,6 +2714,9 @@ public final class AppModel {
     if launching, let launcher {
       await launcher.launch(session: creation.session, plan: creation.plan)
       await reload()
+      if let message = creation.firstMessage {
+        sendFirstMessage(message, to: creation.session)
+      }
     }
     // Shown in To Do when it was only planned; otherwise it is In Progress by now, and the column
     // follows it rather than hiding what the user made.

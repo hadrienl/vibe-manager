@@ -61,8 +61,13 @@ SwiftUI drop destination on the draft was never reached: SwiftUI lays the view i
 every other view, and AppKit found nothing on the draft but its prompt's field, which typed the path
 where it was let go. A transparent view laid over the whole draft is registered for files only, and
 wins their drags from end to end, the field included: the files become chips of the draft, as in a
-conversation's composer, and Attach Files… makes the same chips. Their paths, escaped, follow the
-prompt's text only in the prompt the agent is launched with; the session is not named after them.
+conversation's composer, and Attach Files… makes the same chips. The session is not named after
+them. Given as an argument, an image is only a path, which Claude Code reads with a tool: with files
+joined, the agent is launched without a prompt, and the text and the files are put in its
+conversation's composer and sent from there once the agent is known to run — pasted, so that Claude
+Code takes an image as one. A composer the user changed meanwhile, or an agent not ready within five
+minutes, leaves them there. The session keeps the text followed by the escaped paths as its initial
+prompt, which a later launch — from To Do — gives as an argument.
 Over a template's prompt, which takes no file, it refuses them with
 the red veil. A text, a web address or an image with no file of its own meets none of its types and
 goes where it went before; an image with no file has no session folder yet to be written in.
