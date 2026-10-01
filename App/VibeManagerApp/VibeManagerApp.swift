@@ -196,8 +196,8 @@ struct VibeManagerApp: App {
         .disabled(!environment.appModel.canToggleDrawer)
 
         // ⌘T follows the keyboard, like ⌘W (#165): in the web view a new tab, as in a browser
-        // (#247); anywhere else a new side terminal.
-        if environment.appModel.closesWebTab {
+        // (#247); anywhere else a new side terminal. Over another window, never a web tab.
+        if windowFocus.front == .workspace, environment.appModel.closesWebTab {
           Button("New Tab") {
             environment.appModel.newWebTab()
           }

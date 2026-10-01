@@ -391,6 +391,8 @@ private struct BrowserAddressBar: View {
     }
     .onChange(of: isFocused) { _, focused in
       model.isAddressBarFocused = focused
+      // Left empty — a new tab's field, Return on it — or half typed: it shows the page again.
+      if !focused { text = tab?.url.absoluteString ?? "" }
     }
     .onDisappear { model.isAddressBarFocused = false }
     .alert(Text("Ticket", bundle: .module), isPresented: $isEditingTicket) {

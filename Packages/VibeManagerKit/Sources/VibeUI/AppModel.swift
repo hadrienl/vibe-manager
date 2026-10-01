@@ -2389,18 +2389,18 @@ public final class AppModel {
     await resume(shutdown)
   }
 
-  /// Detection never fails the application: an unavailable agent is data, not an error.
-  ///
-  /// Each agent is published as its own detection lands, in registration order. Waiting for the
-  /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
-  /// probes now costs three budgets and their retries: there is no reason for the agents that
-  /// answered straight away to stay hidden for that long.
   private func name(_ descriptors: [AgentDescriptor]) {
     let names = Dictionary(
       descriptors.map { ($0.id.rawValue, $0.displayName) }, uniquingKeysWith: { first, _ in first })
     if names != agentNames { agentNames = names }
   }
 
+  /// Detection never fails the application: an unavailable agent is data, not an error.
+  ///
+  /// Each agent is published as its own detection lands, in registration order. Waiting for the
+  /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
+  /// probes now costs three budgets and their retries: there is no reason for the agents that
+  /// answered straight away to stay hidden for that long.
   public func refreshAgents(forceRefresh: Bool = false) async {
     guard let agents, !isRefreshingAgents else { return }
 

@@ -43,6 +43,15 @@ struct CloseCommandRoutingTests {
         .subviews.compactMap { $0 as? WKWebView }.first
     }
 
+    /// The web view's address bar, on screen.
+    var addressField: NSTextField? {
+      all(NSTextField.self, in: window.contentView).first {
+        $0.isEditable
+          && ($0.placeholderString ?? $0.placeholderAttributedString?.string)
+            == "Enter an address or #ticket"
+      }
+    }
+
     /// The agent's terminal, on screen.
     var agentTerminal: AccessibleTerminalView? {
       all(AccessibleTerminalView.self, in: window.contentView)
@@ -217,9 +226,20 @@ struct CloseCommandRoutingTests {
 
     // Return on the empty field of another new tab opens nothing.
     model.newWebTab()
+    try await waitUntil("the empty field of a new tab", in: workspace) {
+      model.isAddressBarFocused && workspace.addressField?.stringValue == ""
+    }
     model.navigateWebTab(to: "")
     #expect(workspace.tabs.count == 4, "\(workspace.state)")
     #expect(model.opensNewWebTab, "what is typed next still opens a tab of its own")
+
+    // Leaving the empty field gives the page's address back to the address bar.
+    let page = try #require(workspace.page)
+    workspace.window.makeFirstResponder(page)
+    let shown = try #require(model.activeWebTab).url.absoluteString
+    try await waitUntil("the page's address back in the field", in: workspace) {
+      !model.isAddressBarFocused && workspace.addressField?.stringValue == shown
+    }
 
     // Open Location, ⌘L, is unchanged: what is typed replaces the page in front, in place.
     model.focusAddressBar()
