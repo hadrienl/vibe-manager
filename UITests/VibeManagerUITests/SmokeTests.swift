@@ -105,8 +105,13 @@ final class SmokeTests: XCTestCase {
       let proposed = expectation(for: filled, evaluatedWith: folder)
       wait(for: [proposed], timeout: 10)
     }
-    // ⌘↩ creates from anywhere in the form.
-    app.typeKey(.return, modifierFlags: .command)
+    if isFirst {
+      // ⌘↩ creates from anywhere in the form.
+      app.typeKey(.return, modifierFlags: .command)
+    } else {
+      // Return creates from the name too, as from the prompt: it only selected the name.
+      nameField.typeKey(.return, modifierFlags: [])
+    }
     XCTAssertTrue(
       nameField.waitForNonExistence(timeout: 20), "The sheet did not close for \(name)")
     // The sheet closes at Create, before the session is stored (#117): its placeholder stands for
