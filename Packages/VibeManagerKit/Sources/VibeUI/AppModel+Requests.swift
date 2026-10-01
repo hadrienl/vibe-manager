@@ -19,11 +19,17 @@ public struct RequestNotification: Equatable, Sendable {
 @MainActor
 public protocol RequestNotifying: AnyObject {
   func post(_ notification: RequestNotification)
+  /// A session out of sight replied, failed or stopped (#236).
+  func postOutcome(_ notification: SessionOutcomeNotification)
   func remove(_ ids: [AgentRequestID])
   /// The number on the Dock icon; `nil` shows none.
   func setBadge(_ count: Int?)
   /// Whether the system lets the application notify; `nil` when it has not been asked yet.
   func isAuthorized() async -> Bool?
+}
+
+extension RequestNotifying {
+  public func postOutcome(_ notification: SessionOutcomeNotification) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.
@@ -158,14 +164,8 @@ extension AppModel {
   /// its composer:
   /// the one gesture of the palette that changes the session on screen.
   public func openSession(for id: AgentRequestID) {
-    guard let session = sessions.first(where: { $0.id == id.sessionID }) else { return }
     // From the floating panel, another application is in front (#41).
-    if !isApplicationActive { activateApplication() }
-    if session.taskStatus != .archived, filter.column != session.taskStatus {
-      setColumn(session.taskStatus)
-    }
-    select(session.id)
-    focusSession()
+    openSession(id.sessionID)
   }
 
   /// ⌥⌘P: unfolds the palette and gives it the keyboard.

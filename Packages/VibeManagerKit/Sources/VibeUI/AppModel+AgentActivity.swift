@@ -24,7 +24,9 @@ extension AppModel {
         guard let self else { return }
         // What one transition costs the main thread, the views it wakes aside (#254).
         let signpost = Signposts.begin("ui.activityApplied")
+        let previous = self.activityCells.value(for: update.sessionID)
         self.activityCells.set(update.state, for: update.sessionID)
+        self.activityDidChange(update.sessionID, from: previous, to: update.state)
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {
           $0.key.sessionID != update.sessionID

@@ -10271,6 +10271,17 @@
         }
       }
     },
+    "Replied · %@" : {
+      "comment" : "Said when the agent of a session out of sight finished its answer.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A répondu · %@"
+          }
+        }
+      }
+    },
     "Repositories, Git metadata, notes and the initial prompt are kept, and are listed in the context column. An archived session stays in Closed, but cannot be reopened: unarchive it first, then restarting its agent is a separate, deliberate step." : {
       "comment" : "Closed is the tab of the sidebar that lists closed sessions.",
       "localizations" : {
@@ -11971,6 +11982,17 @@
         }
       }
     },
+    "Stopped · %@" : {
+      "comment" : "Said when the agent of a session out of sight ended on its own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêté · %@"
+          }
+        }
+      }
+    },
     "Summarize sessions automatically" : {
       "localizations" : {
         "fr" : {
@@ -12387,6 +12409,28 @@
         }
       }
     },
+    "The agent ended on an error." : {
+      "comment" : "A notification: the agent of a session in the background ended on an error.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent s’est arrêté sur une erreur."
+          }
+        }
+      }
+    },
+    "The agent finished its answer." : {
+      "comment" : "A notification: the agent of a session in the background finished its turn.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent a fini sa réponse."
+          }
+        }
+      }
+    },
     "The agent finished without producing an image. Try again, or describe the avatar differently." : {
       "comment" : "A generation gave no image.",
       "localizations" : {
@@ -12445,6 +12489,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’agent a ouvert une page dans la vue web"
+          }
+        }
+      }
+    },
+    "The agent stopped." : {
+      "comment" : "A notification: the agent of a session in the background ended on its own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent s’est arrêté."
           }
         }
       }
@@ -15261,12 +15316,12 @@
         }
       }
     },
-    "When an agent in the background asks for something while Vibe Manager is not in front." : {
+    "When an agent in the background asks for something, replies or stops, while Vibe Manager is not in front." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quand un agent en arrière-plan demande quelque chose alors que Vibe Manager n’est pas au premier plan."
+            "value" : "Quand un agent en arrière-plan demande quelque chose, répond ou s’arrête, alors que Vibe Manager n’est pas au premier plan."
           }
         }
       }
