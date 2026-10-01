@@ -258,7 +258,7 @@ struct SessionStatusFrenchTests {
   /// case, accents or the feminine “e”, so that “Terminé” and “Terminée” count as one.
   @Test("No state of the agent reads like the name of a column")
   func statesAreNotColumns() {
-    let columns = SessionTaskStatus.allCases.filter { $0 != .archived }.map {
+    let columns = SessionTaskStatus.columns.map {
       Self.folded(Localization.string($0.label, in: "fr"))
     }
     let session = WorkSession(name: "S", status: .active)
@@ -290,16 +290,21 @@ struct SessionStatusFrenchTests {
       let french = Localization.string(state.label, in: "fr")
       #expect(!columns.contains(Self.folded(french)), "« \(french) » is a column's name")
     }
+    // A group's header counts its working agents in the same words (“2 au travail”).
+    let working = Localization.string("\(2) working", module: "VibeUI", in: "fr")
+      .replacingOccurrences(of: "2 ", with: "")
+    #expect(!columns.contains(Self.folded(working)), "« \(working) » is a column's name")
   }
 
+  /// The feminine “e” goes first, accents after: “Terminée” and “Terminé” both read “termine”.
   private static func folded(_ text: String) -> String {
-    text.folding(
-      options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "fr")
-    )
-    .split(separator: " ")
-    .map { $0.hasSuffix("e") ? String($0.dropLast()) : String($0) }
-    .joined(separator: " ")
+    text.split(separator: " ")
+      .map { $0.hasSuffix("e") ? String($0.dropLast()) : String($0) }
+      .joined(separator: " ")
+      .folding(
+        options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "fr"))
   }
+
 }
 
 private func english(_ label: LocalizedStringResource) -> String {

@@ -3865,19 +3865,19 @@
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld en cours"
+                  "value" : "%lld au travail"
                 }
               }
             }
