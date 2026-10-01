@@ -520,6 +520,12 @@ struct NewSessionDraftTests {
 
     #expect(model.newSessionModel === discarded)
     #expect(model.setAsideDrafts.first === current)
+
+    // Another draft brought on screen since: ⇧⌘Z leaves it alone.
+    model.showNewSessionDraft(current)
+    undo.redo()
+    #expect(model.newSessionModel === current)
+    #expect(model.isPresentingNewSession)
   }
 
   @Test("Escape does nothing to a draft on its way to becoming a session")

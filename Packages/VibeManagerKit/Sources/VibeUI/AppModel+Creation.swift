@@ -153,11 +153,15 @@ extension AppModel {
   }
 
   /// ⌘Z after a discard: the draft is the current one again, on screen, as it was left. One begun
-  /// meanwhile is put aside, or dropped if nothing was changed in it. ⇧⌘Z discards it again.
+  /// meanwhile is put aside, or dropped if nothing was changed in it. ⇧⌘Z discards it again —
+  /// that draft only, never another one brought on screen since.
   func restoreDiscardedDraft(_ draft: NewSessionModel, undoManager: UndoManager) {
     showNewSessionDraft(draft)
     undoManager.registerUndo(withTarget: self) { model in
-      MainActor.assumeIsolated { model.discardNewSessionDraft(undoManager: undoManager) }
+      MainActor.assumeIsolated {
+        guard model.newSessionModel === draft else { return }
+        model.discardNewSessionDraft(undoManager: undoManager)
+      }
     }
     undoManager.setActionName(
       String(
