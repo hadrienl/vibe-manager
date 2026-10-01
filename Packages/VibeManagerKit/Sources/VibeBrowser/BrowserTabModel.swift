@@ -107,9 +107,10 @@ public final class BrowserTabModel: NSObject, Identifiable {
   /// The tab was closed: a download it started and nobody decided on yet is refused.
   @ObservationIgnored var isClosed = false
   /// Opens another application's address: macOS does, the tests only note it.
+  // Opens outside: only called from the navigation policy below, whose every call says why it may
+  // open there (#241).
   @ObservationIgnored var openApplicationAddress: @MainActor (URL) -> Void = { url in
-    // Opens outside: only reached from the navigation policy below, whose every call says why it
-    // may open there (#241).
+    // Opens outside: see above — this is the one way the policy hands an address to macOS.
     NSWorkspace.shared.open(url)
   }
 
