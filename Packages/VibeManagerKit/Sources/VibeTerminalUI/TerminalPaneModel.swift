@@ -34,6 +34,9 @@ public final class TerminalPaneModel {
   /// 143 for a `SIGTERM`. Read as a bare exit code that is an alarming red row about a session
   /// the user closed themselves on purpose.
   public private(set) var wasStoppedOnPurpose = false
+  /// Whether this process was stopped because the terminal host stopped (#237): one cause shared
+  /// by every session it ran, said once for all of them rather than once per row.
+  public private(set) var stoppedWithHost = false
   /// Whether anything was ever typed into this process.
   ///
   /// An agent that refused the conversation it was handed exits before a key is pressed. One the
@@ -408,6 +411,11 @@ public final class TerminalPaneModel {
   }
 
   private func apply(_ state: TerminalProcessState) {
+    if case .failed(.hostStopped) = state {
+      stoppedWithHost = true
+    } else {
+      stoppedWithHost = false
+    }
     switch state {
     case .starting:
       status = .starting

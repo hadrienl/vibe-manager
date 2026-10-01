@@ -269,6 +269,12 @@ public struct RootView: View {
           )
           Divider()
         }
+        if !model.sessionsStoppedWithHost.isEmpty {
+          HostStoppedBanner(count: model.sessionsStoppedWithHost.count) {
+            Task { await model.restartSessionsStoppedWithHost() }
+          }
+          Divider()
+        }
         if let warning = model.detachWarning {
           DetachWarningBanner(warning: warning) { model.dismissDetachWarning() }
           Divider()
@@ -1289,6 +1295,37 @@ private struct RefreshFailureBanner: View {
     .background(.quaternary)
     // Said as it appears: VoiceOver does not read what shows up away from its cursor.
     .announcedOnAppear(failure.message)
+  }
+}
+
+/// The terminal host stopped, and took these sessions' agents with it (#237): the cause, once,
+/// and the one thing to do about it. It goes away as they are restarted or closed.
+private struct HostStoppedBanner: View {
+  let count: Int
+  let restartAll: () -> Void
+
+  private var message: String {
+    String(
+      localized: "The terminal host stopped: \(count) sessions were interrupted.",
+      bundle: .module, comment: "How many sessions lost their agent.")
+  }
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+        .accessibilityHidden(true)
+      Text(message)
+        .font(.callout)
+        .lineLimit(2)
+      Spacer(minLength: 8)
+      Button(LocalizedStringResource("Restart All", bundle: .module), action: restartAll)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+    .announcedOnAppear(message)
   }
 }
 
