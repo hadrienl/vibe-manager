@@ -535,6 +535,8 @@ struct ThemeCard: View {
   let theme: ConversationTheme
   let isCurrent: Bool
   let isOther: Bool
+  /// Said under the picture in place of the theme's name: what choosing the card means (#274).
+  var title: Text? = nil
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -556,7 +558,10 @@ struct ThemeCard: View {
       .background(ThemeBackdropView(theme: theme).clipShape(RoundedRectangle(cornerRadius: 6)))
       .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.border.color))
       HStack(spacing: 4) {
-        if let name = theme.personalName {
+        if let title {
+          title
+            .lineLimit(1)
+        } else if let name = theme.personalName {
           Text(verbatim: name)
             .lineLimit(1)
           Text("Mine", bundle: .module, comment: "A mark on the card of a theme the user made.")
