@@ -37,6 +37,12 @@ public final class TerminalPaneModel {
   /// Whether this process was stopped because the terminal host stopped (#237): one cause shared
   /// by every session it ran, said once for all of them rather than once per row.
   public private(set) var stoppedWithHost = false
+
+  /// The user read the message about the host and set it aside: this pane no longer counts
+  /// among the sessions it lists, until the host stops it again.
+  public func setAsideHostStop() {
+    stoppedWithHost = false
+  }
   /// Whether anything was ever typed into this process.
   ///
   /// An agent that refused the conversation it was handed exits before a key is pressed. One the
