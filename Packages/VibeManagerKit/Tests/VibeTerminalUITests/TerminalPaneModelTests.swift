@@ -130,6 +130,12 @@ func paneSaysItStoppedWithTheHost() async throws {
   #expect(await settles { model.stoppedWithHost })
   await supervisor.emit(.running(processIdentifier: 5_678), for: id)
   #expect(await settles { !model.stoppedWithHost })
+
+  // A new process starts clear of it, whatever ended the previous one.
+  await supervisor.emit(.failed(.hostStopped), for: id)
+  #expect(await settles { model.stoppedWithHost })
+  await model.start()
+  #expect(!model.stoppedWithHost)
 }
 
 @MainActor

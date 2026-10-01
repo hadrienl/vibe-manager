@@ -34,8 +34,8 @@ public final class TerminalPaneModel {
   /// 143 for a `SIGTERM`. Read as a bare exit code that is an alarming red row about a session
   /// the user closed themselves on purpose.
   public private(set) var wasStoppedOnPurpose = false
-  /// Whether this process was stopped because the terminal host stopped (#237): one cause shared
-  /// by every session it ran, said once for all of them rather than once per row.
+  /// Whether this process was stopped, or lost, because the terminal host stopped (#237): one
+  /// cause shared by every session it ran, said once for all of them rather than once per row.
   public private(set) var stoppedWithHost = false
 
   /// The user read the message about the host and set it aside: this pane no longer counts
@@ -153,6 +153,7 @@ public final class TerminalPaneModel {
     launchError = nil
     // A new process: whatever ended the previous one says nothing about how this one will end.
     wasStoppedOnPurpose = false
+    stoppedWithHost = false
     hasReceivedInput = false
 
     if viewportSize == nil {
@@ -196,6 +197,7 @@ public final class TerminalPaneModel {
     self.session = session
     failure = nil
     wasStoppedOnPurpose = false
+    stoppedWithHost = false
     hasReceivedInput = false
     apply(await session.state())
     observe(session)
@@ -417,9 +419,14 @@ public final class TerminalPaneModel {
   }
 
   private func apply(_ state: TerminalProcessState) {
-    if case .failed(.hostStopped) = state {
+    switch state {
+    case .failed(.hostStopped):
       stoppedWithHost = true
-    } else {
+    case .failed(.processOutcomeUnknown):
+      // In the host, an outcome nobody can tell is the host's connection lost under it: the
+      // same interruption, with an agent that may still be running.
+      stoppedWithHost = session?.runsInTerminalHost == true
+    default:
       stoppedWithHost = false
     }
     switch state {
