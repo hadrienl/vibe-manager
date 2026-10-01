@@ -509,10 +509,10 @@ public struct RootView: View {
               Divider()
               inspector(for: session)
             }
-            // ⌘Z undoes a rename or a change of icon here too (#183); the notes and the name
-            // being typed undo their own typing.
-            .onCommand(Selector(("undo:")), perform: model.identityUndoAction(redo: false))
-            .onCommand(Selector(("redo:")), perform: model.identityUndoAction(redo: true))
+            // ⌘Z undoes a rename, a change of icon (#183) or an archive (#242) here too; the notes
+            // and the name being typed undo their own typing.
+            .onCommand(Selector(("undo:")), perform: model.sidebarUndoAction(redo: false))
+            .onCommand(Selector(("redo:")), perform: model.sidebarUndoAction(redo: true))
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
             // under it: the column stays rather than snapping shut mid-refresh.

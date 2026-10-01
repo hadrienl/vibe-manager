@@ -255,6 +255,71 @@ struct SessionHistoryTests {
     #expect(!launcher.isRunning(second.id))
   }
 
+  @Test(
+    "An agent in the middle of a turn is asked about before it is archived, “Don't ask again” or not",
+    arguments: [AgentActivity.working, .awaitingUser(.approval)])
+  func archivingMidTurnAlwaysAsks(activity: AgentActivity) async {
+    let busy = session(name: "Busy", status: .active)
+    let idle = session(name: "Idle", status: .active)
+    let preferences = InMemorySessionClosePreferences(confirmsStoppingRunningAgent: false)
+    let (model, launcher, _, _) = await running([busy, idle], preferences: preferences)
+    model.activityCells.set(
+      AgentActivityState(activity: activity, source: .structured), for: busy.id)
+    model.activityCells.set(AgentActivityState(source: .structured), for: idle.id)
+
+    #expect(model.archiveAsks(busy))
+    await model.requestArchive(busy.id)
+    #expect(model.pendingArchive?.id == busy.id)
+    #expect(launcher.isRunning(busy.id))
+
+    // An agent waiting for nothing is archived at once, as the setting says.
+    model.cancelArchive()
+    #expect(!model.archiveAsks(idle))
+    await model.requestArchive(idle.id)
+    #expect(model.pendingArchive == nil)
+    #expect(!launcher.isRunning(idle.id))
+  }
+
+  @Test("⌘Z puts an archived session back in the column it left, selected if it was")
+  func undoingAnArchive() async {
+    let waiting = WorkSession(name: "Waiting on a review", status: .closed, taskStatus: .waiting)
+    let other = WorkSession(name: "Other", status: .closed, taskStatus: .waiting)
+    let repository = MutableRepository(sessions: [waiting, other])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+    model.setColumn(.waiting)
+    model.select(waiting.id)
+
+    await model.requestArchive(waiting.id)
+    #expect(await repository.session(id: waiting.id)?.status == .archived)
+    #expect(model.selectedSessionID != waiting.id)
+    #expect(model.canUndoSidebarChange)
+
+    await model.undoSidebarChange()
+
+    let restored = await repository.session(id: waiting.id)
+    #expect(restored?.status == .closed)
+    #expect(restored?.taskStatus == .waiting)
+    #expect(model.selectedSessionID == waiting.id)
+    #expect(!model.canUndoSidebarChange)
+    #expect(!model.canRedoSidebarChange)
+  }
+
+  @Test("⌘Z on an archive already undone another way beeps and changes nothing")
+  func undoingAnArchiveAlreadyRestored() async {
+    let done = WorkSession(name: "Done", status: .closed, taskStatus: .done)
+    let repository = MutableRepository(sessions: [done])
+    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    await model.load()
+
+    await model.requestArchive(done.id)
+    await model.restore(done.id)
+    await model.setTaskStatus(.todo, for: done.id)
+    await model.undoSidebarChange()
+
+    #expect(await repository.session(id: done.id)?.taskStatus == .todo)
+  }
+
   @Test("A confirmed archive takes the session out of the columns, and back to Done on request")
   func archiveAndUnarchiveFromTheWorkspace() async {
     let kept = session(name: "Still working")
