@@ -63,7 +63,7 @@ extension AppModel {
       return
     }
     let agent = session.agent.map { agentNames[$0.providerID] ?? $0.providerID }
-    notifier.post(
+    notifier.postOutcome(
       SessionOutcomeNotification(
         sessionID: id,
         outcome: outcome,

@@ -26,7 +26,9 @@ extension AppModel {
         let signpost = Signposts.begin("ui.activityApplied")
         let previous = self.activityCells.value(for: update.sessionID)
         self.activityCells.set(update.state, for: update.sessionID)
-        self.activityDidChange(update.sessionID, from: previous, to: update.state)
+        if let state = update.state {
+          self.activityDidChange(update.sessionID, from: previous, to: state)
+        }
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {
           $0.key.sessionID != update.sessionID

@@ -15316,12 +15316,12 @@
         }
       }
     },
-    "When an agent in the background asks for something, replies or stops, while Vibe Manager is not in front." : {
+    "When an agent in the background asks for something, replies or stops." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quand un agent en arrière-plan demande quelque chose, répond ou s’arrête, alors que Vibe Manager n’est pas au premier plan."
+            "value" : "Quand un agent en arrière-plan demande quelque chose, répond ou s’arrête."
           }
         }
       }
