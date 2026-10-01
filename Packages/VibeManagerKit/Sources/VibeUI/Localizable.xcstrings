@@ -4392,6 +4392,17 @@
         }
       }
     },
+    "Also interrupts the agent's turn: it waits for your next message." : {
+      "comment" : "What refusing a request from the palette does besides refusing.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
     "Also looked in: %@" : {
       "comment" : "A list of folders the agent visited that are not repositories.",
       "localizations" : {
@@ -4399,17 +4410,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autres dossiers consultés : %@"
-          }
-        }
-      }
-    },
-    "Also stops the agent's turn: it waits for your next message." : {
-      "comment" : "What refusing a request from the palette does besides refusing.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }
@@ -5834,6 +5834,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copier"
+          }
+        }
+      }
+    },
+    "Copy %@" : {
+      "comment" : "A command line to paste in a terminal: claude auth login.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier %@"
           }
         }
       }
@@ -7932,6 +7943,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Insérer le titre des tickets dans les notes"
+          }
+        }
+      }
+    },
+    "Install %@…" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer %@…"
           }
         }
       }
@@ -10130,6 +10152,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Palette"
+          }
+        }
+      }
+    },
+    "Paste it in a terminal to sign in, then detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez-la dans un terminal pour vous connecter, puis relancez la détection."
           }
         }
       }
@@ -15692,6 +15724,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les dossiers non suivis ne peuvent pas être lus ici."
+          }
+        }
+      }
+    },
+    "Update %@…" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à jour %@…"
           }
         }
       }

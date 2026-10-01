@@ -1398,16 +1398,6 @@
         }
       }
     },
-    "Set the path to its executable, then detect again." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Indiquez le chemin de son exécutable, puis relancez la détection."
-          }
-        }
-      }
-    },
     "Shorten it, or create the session without a prompt and paste it in the terminal." : {
       "localizations" : {
         "fr" : {

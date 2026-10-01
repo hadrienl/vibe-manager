@@ -957,11 +957,9 @@ public struct RootView: View {
       // An archived session has no pane by construction — archiving released it — so its own
       // card is what the column shows, rather than the "no terminal" message of a session
       // that simply has not been started.
-      let cover = SessionDetailCover.of(
-        presentation: presentation, isArchived: session.status == .archived,
-        hasPane: model.pane(for: session.id) != nil,
-        hasLaunchFailure: model.launchFailure(for: session.id) != nil)
-      if cover == .archived {
+      if presentation == .conversation {
+        EmptyView()
+      } else if session.status == .archived {
         let appearance = model.displayedAppearance(of: session)
         ArchivedSessionDetail(
           session: session, appearance: appearance,
@@ -969,7 +967,7 @@ public struct RootView: View {
         ) {
           Task { await model.restore(session.id) }
         }
-      } else if cover == .unavailable {
+      } else if model.pane(for: session.id) == nil {
         ContentUnavailableView {
           Label(session.name, systemImage: session.appearance.symbolName)
         } description: {
@@ -2382,24 +2380,11 @@ private func sessionRestart(for id: SessionID, in model: AppModel) -> () -> Void
   { Task { await model.restart(id) } }
 }
 
-/// What covers the session's column, above its terminal or its conversation.
-enum SessionDetailCover: Equatable {
-  case none
-  /// The archived session's card: it has no pane by construction.
-  case archived
-  /// Why the session has no terminal: in conversation too when its agent could not be launched,
-  /// whose reason would otherwise be shown nowhere (#235).
-  case unavailable
-
-  static func of(
-    presentation: SessionPresentation, isArchived: Bool, hasPane: Bool, hasLaunchFailure: Bool
-  ) -> SessionDetailCover {
-    if presentation == .conversation {
-      return !hasPane && hasLaunchFailure ? .unavailable : .none
-    }
-    if isArchived { return .archived }
-    return hasPane ? .none : .unavailable
-  }
+/// The status bar's button for a session's agent: Close Session, which asks first when the agent
+/// is at work, as ⇧⌘W does (#238).
+@MainActor
+private func sessionClose(for id: SessionID, in model: AppModel) -> () -> Void {
+  { Task { await model.requestClose(id) } }
 }
 
 /// One session's terminal in the window's stack, shown or kept behind the one shown (#254).
@@ -2426,7 +2411,8 @@ private struct SessionTerminalSlot: View {
         statusAccessory: model.terminals == nil
           ? nil : DrawerStatusButton(model: model, session: session),
         claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
-        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session)
+        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session),
+        close: sessionClose(for: id, in: model)
       )
       .id(id)
       .opacity(isActive ? 1 : 0)
@@ -2476,7 +2462,8 @@ private struct SessionConversationSlot: View {
             pane: pane,
             accessory: model.terminals == nil
               ? nil : DrawerStatusButton(model: model, session: listed),
-            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed))
+            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed),
+            close: sessionClose(for: id, in: model))
         }
       }
       .opacity(isActive ? 1 : 0)

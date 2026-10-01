@@ -867,13 +867,13 @@
         }
       }
     },
-    "Also stops the agent's turn: it waits for your next message." : {
+    "Also interrupts the agent's turn: it waits for your next message." : {
       "comment" : "What refusing a request does besides refusing.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arrête aussi le tour de l’agent : il attend votre prochain message."
+            "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
           }
         }
       }
@@ -1567,6 +1567,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installez Claude Code ou Codex et connectez-vous depuis un terminal, puis vérifiez à nouveau."
+          }
+        }
+      }
+    },
+    "Interrupt" : {
+      "comment" : "Interrupts the agent's turn.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompre"
+          }
+        }
+      }
+    },
+    "Interrupt the agent" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompre l’agent"
           }
         }
       }
@@ -2570,26 +2591,6 @@
         }
       }
     },
-    "Stop" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêter"
-          }
-        }
-      }
-    },
-    "Stop the agent" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêter l’agent"
-          }
-        }
-      }
-    },
     "Sub-agent" : {
       "localizations" : {
         "fr" : {
@@ -3174,6 +3175,16 @@
         }
       }
     },
+    "interrupted without an answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "interrompu sans résultat"
+          }
+        }
+      }
+    },
     "its name cannot be used" : {
       "localizations" : {
         "fr" : {
@@ -3261,26 +3272,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "certaines de ses couleurs ne se lisent pas l’une sur l’autre"
-          }
-        }
-      }
-    },
-    "stopped" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "arrêté"
-          }
-        }
-      }
-    },
-    "stopped without an answer" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "arrêté sans résultat"
           }
         }
       }
