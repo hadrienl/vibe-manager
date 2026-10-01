@@ -57,12 +57,39 @@ struct SessionIdentityHeader: View {
             .lineLimit(1)
             .help(Text(verbatim: agent.providerID))
         }
+        themeButton
       }
       Spacer(minLength: 0)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
     .onHover { isHovering = $0 }
+  }
+
+  /// The theme of the session's conversation (#274), and where to change it.
+  private var themeButton: some View {
+    let themes = model.conversations.themes
+    let theme = model.displayedConversationTheme(of: session)
+    let isMissing = theme.map { themes.theme($0) == nil } ?? false
+    let name = SessionThemeText.name(of: theme, themes: themes)
+    return Button {
+      model.beginThemeEditing(session.id, in: .inspector)
+    } label: {
+      Label {
+        name
+      } icon: {
+        Image(systemName: isMissing ? "exclamationmark.triangle" : "paintpalette")
+      }
+      .font(.callout)
+      .foregroundStyle(isMissing ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+      .lineLimit(1)
+    }
+    .buttonStyle(.plain)
+    .disabled(!model.canEditIdentity(of: session.id))
+    .help(Text("Change Conversation Theme", bundle: .module))
+    .accessibilityLabel(Text("Conversation Theme: \(name)", bundle: .module))
+    .accessibilityIdentifier("inspector-session-theme")
+    .sessionThemePopover(model: model, sessionID: session.id, place: .inspector)
   }
 
   private func rename() {

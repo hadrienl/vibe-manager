@@ -773,6 +773,9 @@ private struct ArchivedSessionsList: View {
               Button(LocalizedStringResource("Change Icon…", bundle: .module)) {
                 editArchived(id) { model.beginAppearanceEditing(id, in: .inspector) }
               }
+              Button(LocalizedStringResource("Change Conversation Theme…", bundle: .module)) {
+                editArchived(id) { model.beginThemeEditing(id, in: .inspector) }
+              }
               Divider()
               Button(LocalizedStringResource("Unarchive", bundle: .module)) {
                 Task { await model.restore(id) }

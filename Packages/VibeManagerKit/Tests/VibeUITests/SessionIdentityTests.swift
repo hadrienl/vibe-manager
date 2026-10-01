@@ -244,6 +244,49 @@ struct SessionIdentityTests {
     #expect(model.canRedoSidebarChange)
   }
 
+  @Test("A theme is previewed in the conversation while it is chosen; Escape writes nothing (#274)")
+  func themePreviewAndCancel() async throws {
+    let workspace = try await workspace()
+    let model = workspace.model
+    let session = workspace.running
+
+    model.beginThemeEditing(session.id, in: .inspector)
+    model.previewTheme("night")
+    #expect(model.displayedConversationTheme(of: session) == "night")
+    #expect(model.displayedConversationTheme(of: workspace.other) == nil)
+    #expect(model.sessions.first { $0.id == session.id }?.conversationTheme == nil)
+
+    model.cancelThemeEditing()
+    #expect(model.themeEditing == nil)
+    #expect(model.displayedConversationTheme(of: session) == nil)
+    #expect(await workspace.repository.session(id: session.id)?.conversationTheme == nil)
+    #expect(!model.canUndoIdentityChange)
+  }
+
+  @Test("Closing the theme popover keeps the theme chosen, as one change for ⌘Z")
+  func commitTheme() async throws {
+    let workspace = try await workspace()
+    let model = workspace.model
+    let id = workspace.running.id
+    let updatedAt = await workspace.repository.session(id: id)?.updatedAt
+
+    model.beginThemeEditing(id, in: .sidebar)
+    model.previewTheme("paper")
+    model.previewTheme("night")
+    model.endThemeEditing()
+
+    #expect(model.sessions.first { $0.id == id }?.conversationTheme == "night")
+    await waitUntil("the theme is written") {
+      await workspace.repository.session(id: id)?.conversationTheme == "night"
+    }
+    await waitUntil("the change can be undone") { model.canUndoIdentityChange }
+    #expect(await workspace.repository.session(id: id)?.updatedAt == updatedAt)
+
+    await model.undoIdentityChange()
+    #expect(await workspace.repository.session(id: id)?.conversationTheme == nil)
+    #expect(!model.canUndoIdentityChange)
+  }
+
   @Test("Revert to Default Icon gives what a creation would: the folder's icon, kept on disk")
   func revertToDefault() async throws {
     let icon = ProjectIcon(id: iconID, pngData: Data([0x89, 0x50]))
