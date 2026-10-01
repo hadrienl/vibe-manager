@@ -268,4 +268,42 @@ enum ActivityPresentation {
     case .folder(let path): return path
     }
   }
+
+  /// "12 resources": what the Activity section says once folded.
+  static func resourceCount(_ count: Int) -> String {
+    String(
+      localized: "\(count) resources", bundle: .module,
+      comment: "How many links a session's activity holds.")
+  }
+
+  /// Where it belongs, then what the session did with it: "vibe-manager · created" (#279). Under
+  /// the name, so that the name has the whole width.
+  static func caption(_ resource: SessionResource) -> String {
+    [resource.context, involvement(resource)].compactMap { $0 }.joined(separator: " · ")
+  }
+
+  /// A name as it is shown, never as it is copied: a zero-width space after each `/`, `-`, `_`
+  /// and `.` lets a branch or a path go to the line there rather than in the middle of a word
+  /// (#279). Unicode only allows a break after some of them.
+  static func breakable(_ name: String) -> String {
+    var shown = ""
+    for index in name.indices {
+      shown.append(name[index])
+      if "/-_.".contains(name[index]), name.index(after: index) != name.endIndex {
+        shown.append("\u{200B}")
+      }
+    }
+    return shown
+  }
+
+  /// The resource in full, then where it leads: its name is never cut there (#279).
+  static func help(_ resource: SessionResource) -> String {
+    let address: String
+    switch resource.target {
+    case .web(let url): address = url.absoluteString
+    case .branch(let path, let url): address = url?.absoluteString ?? path
+    case .folder(let path): address = path
+    }
+    return [resource.label, resource.context, address].compactMap { $0 }.joined(separator: "\n")
+  }
 }
