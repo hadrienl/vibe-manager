@@ -660,8 +660,8 @@ public final class AppModel {
   public internal(set) var renaming: SessionIdentityEditing?
   /// The badge being chosen in its popover, previewed until it is kept.
   public internal(set) var appearanceEditor: SessionAppearanceEditor?
-  /// The renames and badge changes ⌘Z undoes, for this run.
-  var identityHistory = SessionIdentityHistory()
+  /// The renames, badge changes and archives ⌘Z undoes, for this run.
+  var sidebarHistory = SessionSidebarHistory()
   /// A name or a badge that could not be written, until the user has read why.
   public internal(set) var identityFailure: String?
 
@@ -1139,6 +1139,17 @@ public final class AppModel {
       && (launcher?.isRunning(session.id) == true || !runningDrawerCommands(of: session.id).isEmpty)
   }
 
+  /// Whether the session's agent is in the middle of a turn: working, or waiting on an answer it
+  /// asked for. Archiving it is always asked about, "Don't ask again" or not (#242): the setting
+  /// spares the question for an agent that waits for nothing, not for one cut off mid-task.
+  public func interruptsTurn(_ session: WorkSession) -> Bool {
+    guard launcher?.isRunning(session.id) == true else { return false }
+    switch activity(for: session.id)?.activity {
+    case .working, .awaitingUser: return true
+    case .idle, nil: return false
+    }
+  }
+
   /// What ⇧⌘W and every other Close Session run: closes at once, or asks first when work would
   /// be interrupted. Does nothing for a session there is nothing left to close.
   public func requestClose(_ id: SessionID) async {
@@ -1304,16 +1315,22 @@ public final class AppModel {
   /// rule and the setting of Close Session. One key, repeated, empties a column.
   public func requestArchive(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canArchive(session) else { return }
-    guard !interruptsWork(session) else {
+    guard !archiveAsks(session) else {
       pendingArchive = session
       return
     }
     await archive(id)
   }
 
+  /// Whether the question before archiving offers "Don't ask again": only when the setting is
+  /// what asks it. Asked because the agent is in the middle of a turn (#242), it always will be.
+  public func archiveOffersDontAskAgain(_ session: WorkSession) -> Bool {
+    interruptsWork(session)
+  }
+
   /// Whether Archive will ask before archiving: the menus end its name with an ellipsis then.
   public func archiveAsks(_ session: WorkSession) -> Bool {
-    canArchive(session) && interruptsWork(session)
+    canArchive(session) && (interruptsWork(session) || interruptsTurn(session))
   }
 
   public func cancelArchive() {
@@ -1337,11 +1354,16 @@ public final class AppModel {
     defer { archivingSessionIDs.remove(id) }
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
-    let name = sessions.first { $0.id == id }?.name
+    let session = sessions.first { $0.id == id }
+    let name = session?.name
     var archived = false
     do {
       let archival = try await archiveProcess(id)
       archived = true
+      if let session {
+        sidebarHistory.record(
+          [SessionArchiveUndo(id: id, taskStatus: session.taskStatus, wasSelected: wasSelected)])
+      }
       report(archival.detachment, for: archival.session, action: .archived)
       prepareHandOff(from: id, listedBefore: visible)
       // Set before the reload that puts the neighbour on screen: its terminal must not take the
@@ -1394,6 +1416,31 @@ public final class AppModel {
       reportAction(error, .restore, on: id) { [weak self] in await self?.restore(id) }
     }
     await reload()
+    reconcileSelection()
+  }
+
+  /// ⌘Z after an archive (#242): the sessions come back to the columns they left — all of a
+  /// batch at once — and the one on screen selected again. Their agents stay stopped: they come
+  /// back closed, as any unarchived session, and Restart picks them up. One no longer archived
+  /// — unarchived since by another way — is left alone; with none left to bring back, it beeps.
+  func undoArchive(_ archives: [SessionArchiveUndo]) async {
+    let archived = Set(sessions.filter { $0.status == .archived }.map(\.id))
+    let back = archives.filter { archived.contains($0.id) }
+    guard !back.isEmpty else { return NSSound.beep() }
+    for archive in back {
+      do {
+        _ = try await restoreSession(id: archive.id)
+        if archive.taskStatus != .done, archive.taskStatus != .archived {
+          try await changeTaskStatus(id: archive.id, to: archive.taskStatus)
+        }
+        diagnostics.record(
+          .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(archive.id)])
+      } catch {
+        await report(error)
+      }
+    }
+    await reload()
+    if let selected = back.first(where: \.wasSelected) { select(selected.id) }
     reconcileSelection()
   }
 

@@ -74,9 +74,10 @@ The window's undo manager is shared by every text field, and the composer emptie
 sends a prompt (a replaced text would otherwise leave undo records that crash). A rename registered
 there would be lost at the next prompt, and would answer a ⌘Z typed in a terminal.
 
-`SessionIdentityHistory` keeps the last 50 changes for the run. Undoing applies the reverse only if
-the session still has the identity the change gave it; otherwise the change is dropped and the Mac
-beeps. The sidebar's list and the inspector take `undo:` and `redo:` with `onCommand`: the hosting
+`SessionSidebarHistory` keeps the last 50 changes for the run — renames and icons, and archives
+since #242, a batch archive as one entry. Undoing applies the reverse only if the session still has
+the identity the change gave it (still archived, for an archive); otherwise the change is dropped
+and the Mac beeps. The sidebar's list and the inspector take `undo:` and `redo:` with `onCommand`: the hosting
 view answers them only while the keyboard is inside the view that declares them, so a ⌘Z in the
 terminal, the composer or the notes goes on to what holds it. With nothing to undo, the action is
 `nil` and ⌘Z reaches the window as before. A text being edited inside those views — the name field,

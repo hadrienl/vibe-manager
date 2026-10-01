@@ -71,7 +71,7 @@ extension AppModel {
     showIdentity(SessionIdentity(name: name, appearance: session.appearance), of: id)
     do {
       if let change = try await identityEdits.rename(id, to: name) {
-        identityHistory.record(change)
+        sidebarHistory.record(change)
         Announcer.announce(
           LocalizedStringResource(
             "Session renamed: \(name)", bundle: .module,
@@ -142,7 +142,7 @@ extension AppModel {
         if let change = try await self.identityEdits.setAppearance(
           appearance, keeping: icon, for: id)
         {
-          self.identityHistory.record(change)
+          self.sidebarHistory.record(change)
         }
       } catch {
         self.identityFailure = Self.describe(error)
@@ -153,17 +153,19 @@ extension AppModel {
 
   // MARK: - Undo
 
-  public var canUndoIdentityChange: Bool { identityHistory.canUndo }
-  public var canRedoIdentityChange: Bool { identityHistory.canRedo }
+  public var canUndoSidebarChange: Bool { sidebarHistory.canUndo }
+  public var canRedoSidebarChange: Bool { sidebarHistory.canRedo }
 
-  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard.
-  /// `nil` with nothing to undo: it then goes on to the window, as it did before.
+  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard:
+  /// the last rename, change of icon (#183) or archive (#242). `nil` with nothing to undo, or
+  /// with the keyboard elsewhere (`keyboardHere` false): ⌘Z then goes on to the window, whose
+  /// own undo — the draft of a new session given back, for one — is never hidden by this one.
   ///
   /// A text being edited there — the name field, the notes — undoes its own typing: the command
   /// is taken above it, by the view that declares it, before the window would have handed it
   /// down to the text's undo manager.
-  public func identityUndoAction(redo: Bool) -> (() -> Void)? {
-    guard redo ? canRedoIdentityChange : canUndoIdentityChange else { return nil }
+  public func sidebarUndoAction(redo: Bool, keyboardHere: Bool = true) -> (() -> Void)? {
+    guard keyboardHere, redo ? canRedoSidebarChange : canUndoSidebarChange else { return nil }
     return { [weak self] in
       let responder = (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder
       if Self.isEditingText(responder) {
@@ -173,9 +175,9 @@ extension AppModel {
       }
       Task { [weak self] in
         if redo {
-          await self?.redoIdentityChange()
+          await self?.redoSidebarChange()
         } else {
-          await self?.undoIdentityChange()
+          await self?.undoSidebarChange()
         }
       }
     }
@@ -186,22 +188,28 @@ extension AppModel {
     responder is NSText
   }
 
-  /// ⌘Z in the sidebar or the inspector: the last rename or badge change, unless the session has
-  /// changed since — then nothing is undone, and the Mac beeps.
-  public func undoIdentityChange() async {
-    identityHistory.keep(only: Set(sessions.map(\.id)))
-    guard let change = identityHistory.popUndo() else { return NSSound.beep() }
-    if let applied = await apply(change) {
-      identityHistory.didUndo(applied)
+  /// ⌘Z in the sidebar or the inspector: the last rename, badge change or archive, unless the
+  /// session has changed since — then nothing is undone, and the Mac beeps.
+  public func undoSidebarChange() async {
+    sidebarHistory.keep(only: Set(sessions.map(\.id)))
+    switch sidebarHistory.popUndo() {
+    case nil:
+      NSSound.beep()
+    case .identity(let change):
+      if let applied = await apply(change) {
+        sidebarHistory.didUndo(applied)
+      }
+    case .archive(let archives):
+      await undoArchive(archives)
     }
   }
 
-  /// ⇧⌘Z: the change undone last, again.
-  public func redoIdentityChange() async {
-    identityHistory.keep(only: Set(sessions.map(\.id)))
-    guard let change = identityHistory.popRedo() else { return NSSound.beep() }
+  /// ⇧⌘Z: the rename or badge change undone last, again.
+  public func redoSidebarChange() async {
+    sidebarHistory.keep(only: Set(sessions.map(\.id)))
+    guard let change = sidebarHistory.popRedo() else { return NSSound.beep() }
     if let applied = await apply(change) {
-      identityHistory.didRedo(applied)
+      sidebarHistory.didRedo(applied)
     }
   }
 
