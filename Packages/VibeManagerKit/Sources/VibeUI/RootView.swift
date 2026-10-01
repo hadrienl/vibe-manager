@@ -21,6 +21,8 @@ public struct RootView: View {
   @State private var titleRoom = WindowTitleRoom()
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
+  /// The window's: where ⌘Z finds a discarded draft (#293).
+  @Environment(\.undoManager) private var undoManager
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
@@ -369,11 +371,7 @@ public struct RootView: View {
                 model: draft,
                 focusRequest: model.newSessionFocusRequest,
                 submitted: { launching in model.submitNewSession(launching: launching) },
-                dismissed: { model.dismissNewSessionDraft() },
-                discarded: {
-                  model.cancelNewSession()
-                  model.focusSession()
-                },
+                discarded: { model.discardNewSessionDraft(undoManager: undoManager) },
                 chooseFiles: { model.beginAttachingFiles() },
                 manageTemplates: {
                   model.settingsTab = .templates

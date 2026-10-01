@@ -6017,6 +6017,17 @@
         }
       }
     },
+    "Discard Draft" : {
+      "comment" : "The undo action that brings back a new session's discarded draft.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandonner le brouillon"
+          }
+        }
+      }
+    },
     "Discard This Template" : {
       "localizations" : {
         "fr" : {
@@ -10733,12 +10744,12 @@
         }
       }
     },
-    "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape sets the draft aside" : {
+    "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape discards the draft" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Retour crée et lance · Maj-Retour va à la ligne · Option-Retour ajoute à À faire · Échap met le brouillon de côté"
+            "value" : "Retour crée et lance · Maj-Retour va à la ligne · Option-Retour ajoute à À faire · Échap abandonne le brouillon"
           }
         }
       }
