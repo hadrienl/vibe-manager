@@ -102,9 +102,9 @@ in a row, does not spawn a process each time.
 `invalidate()`, a new user defined path and an explicit detection still look again in every case,
 `available` included.
 
-`AgentProbeFailure.isTransient` carries that distinction into the presentation: a silent agent
-reads as "did not answer in time" and offers to detect again first, while a failing one keeps
-"could not be inspected" and the remediations that ask the user to go and fix something.
+The distinction reaches the presentation through the summary: a silent agent reads as "did not
+answer in time", a failing one as "could not be inspected". Both offer only to detect again: the
+manual path to the executable they once offered pointed at a setting that does not exist (#234).
 
 Serialising the startup probes was considered and refused: it turns one budget into one budget
 per provider on a Mac where no agent is installed, to remove a contention that is not the cause.

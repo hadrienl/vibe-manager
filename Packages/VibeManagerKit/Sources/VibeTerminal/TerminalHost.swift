@@ -296,7 +296,32 @@ public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
 
   public func launch(at location: TerminalHostLocation) throws {
     try location.prepare()
+    var arguments = [TerminalHost.argument, location.directory.path]
+    if let logDirectory {
+      arguments += [TerminalHost.logDirectoryArgument, logDirectory.path]
+    }
+    let processIdentifier = try DetachedProcess.spawn(
+      executableURL: executableURL, arguments: arguments,
+      environment: Self.environment(), disclaimsResponsibility: disclaimsResponsibility)
+    HostReaper.reap(processIdentifier)
+  }
 
+  /// The host needs almost nothing of the application's environment: every agent it starts is
+  /// given the one the application computed for it (`TerminalSpec.environment`).
+  private static func environment() -> [String] {
+    DetachedProcess.minimalEnvironment()
+  }
+}
+
+/// Starts one of the application's own programs, detached from it: its own session and no
+/// controlling terminal, so that nothing the application's death sends to its group reaches it,
+/// standard streams on `/dev/null`, and — unless a test's sandbox refuses it — answering for itself
+/// to TCC. The terminal host and the endpoint gateway (#107) are started this way.
+public enum DetachedProcess {
+  public static func spawn(
+    executableURL: URL, arguments: [String], environment: [String],
+    disclaimsResponsibility: Bool = true
+  ) throws -> pid_t {
     var fileActions: posix_spawn_file_actions_t?
     posix_spawn_file_actions_init(&fileActions)
     defer { posix_spawn_file_actions_destroy(&fileActions) }
@@ -315,7 +340,7 @@ public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
     sigemptyset(&unblockedSignals)
     posix_spawnattr_setsigmask(&attributes, &unblockedSignals)
     // A session of its own and no controlling terminal: nothing the application's death sends to
-    // its group or its terminal reaches the host.
+    // its group or its terminal reaches the child.
     let flags =
       POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
       | POSIX_SPAWN_SETSIGMASK
@@ -325,27 +350,27 @@ public struct ExecutableTerminalHostLauncher: TerminalHostLaunching {
     }
 
     let path = executableURL.path
-    var arguments = [path, TerminalHost.argument, location.directory.path]
-    if let logDirectory {
-      arguments += [TerminalHost.logDirectoryArgument, logDirectory.path]
-    }
-    let environment = Self.environment()
     var processIdentifier: pid_t = 0
-    let result = withCStrings(arguments) { argv in
+    let result = withCStrings([path] + arguments) { argv in
       withCStrings(environment) { envp in
         posix_spawn(&processIdentifier, path, &fileActions, &attributes, argv, envp)
       }
     }
     guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: result) ?? .EIO) }
-    HostReaper.reap(processIdentifier)
+    return processIdentifier
   }
 
-  /// The host needs almost nothing of the application's environment: every agent it starts is
-  /// given the one the application computed for it (`TerminalSpec.environment`).
-  private static func environment() -> [String] {
+  /// What a detached program of the application needs of its environment, and nothing more.
+  public static func minimalEnvironment() -> [String] {
     let kept = ["HOME", "USER", "LOGNAME", "TMPDIR", "PATH", "LANG", "SHELL"]
     let current = ProcessInfo.processInfo.environment
     return kept.compactMap { key in current[key].map { "\(key)=\($0)" } }
+  }
+
+  /// Collects the exit status of a detached child while the application is alive, so that it
+  /// never lingers as a zombie under it.
+  public static func reap(_ processIdentifier: pid_t) {
+    HostReaper.reap(processIdentifier)
   }
 }
 

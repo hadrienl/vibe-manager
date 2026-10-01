@@ -37,6 +37,7 @@ public struct RecordAgentResumeIdentifier: Sendable {
   private let repository: any SessionRepository
   private let providerID: String?
   private let launchedAt: Date?
+  private let harnessID: String?
 
   /// - Parameters:
   ///   - providerID: the agent whose launch revealed the identifier. When given, nothing is written
@@ -44,14 +45,18 @@ public struct RecordAgentResumeIdentifier: Sendable {
   ///   - launchedAt: when that launch started. When given, nothing is written on a session that was
   ///     switched since — to another agent, or to another model of the same one, whose conversation
   ///     this identifier does not name either.
+  ///   - harnessID: the command line agent that ran the conversation, when the agent is an endpoint
+  ///     (#107): written with the identifier, since it says where the conversation's transcript is.
   public init(
     repository: any SessionRepository,
     providerID: String? = nil,
-    launchedAt: Date? = nil
+    launchedAt: Date? = nil,
+    harnessID: String? = nil
   ) {
     self.repository = repository
     self.providerID = providerID
     self.launchedAt = launchedAt
+    self.harnessID = harnessID
   }
 
   /// Whether the session's agent is still the one this launch started.
@@ -76,13 +81,18 @@ public struct RecordAgentResumeIdentifier: Sendable {
     guard let current = try await repository.session(id: sessionID) else { return .sessionMissing }
     guard let agent = current.agent else { return .agentMissing }
     guard isStillLaunched(on: current) else { return .agentChanged }
-    guard agent.resumeIdentifier != identifier else { return .unchanged }
+    guard agent.resumeIdentifier != identifier || agent.harnessID != harnessID else {
+      return .unchanged
+    }
 
     let updated = try await repository.mutate(id: sessionID) { [self] session in
-      guard var agent = session.agent, agent.resumeIdentifier != identifier else { return }
+      guard var agent = session.agent,
+        agent.resumeIdentifier != identifier || agent.harnessID != harnessID
+      else { return }
       // Decided again on the copy the write is made on: a switch may have landed in between.
       guard isStillLaunched(on: session) else { return }
       agent.resumeIdentifier = identifier
+      agent.harnessID = harnessID
       session.agent = agent
     }
     guard let updated else { return .sessionMissing }

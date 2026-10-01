@@ -9,11 +9,12 @@ import VibeTerminal
 import VibeUI
 import VibeUpdates
 
-/// The one binary is six programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
+/// The one binary is seven programs. Given `--terminal-host`, it is the terminal host (ADR 0017);
 /// given `--browser-bridge` or `--browser-cli`, the web view's bridge an agent starts or the `vibe`
 /// command (ADR 0023); given `--probe-full-disk-access`, it says whether a process born now has Full
 /// Disk Access, and exits (#76); given `--terminal-exec`, it takes its terminal as its controlling
-/// one and becomes a side terminal's shell (#43). Those never return: no `NSApplication` is created,
+/// one and becomes a side terminal's shell (#43); given `--endpoint-gateway`, it is the gateway
+/// between an agent and a model endpoint (#107). Those never return: no `NSApplication` is created,
 /// so they have no Dock icon, no menu bar and no window. Being the same signed binary is the point:
 /// TCC and the peer checks all see Vibe Manager.
 @main
@@ -31,6 +32,8 @@ enum Entry {
       },
       // What every agent it runs inherits, and what the application asks it.
       fullDiskAccess: TCCFullDiskAccessProbe())
+    // The gateway between Claude Code or Codex and a model endpoint (#107).
+    EndpointGatewayCommand.runIfRequested()
     VibeManagerApp.main()
   }
 }

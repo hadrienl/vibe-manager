@@ -1978,6 +1978,53 @@
         }
       }
     },
+    "%lld models" : {
+      "comment" : "How many models an endpoint offers.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld model"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld models"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèles"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèle"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld modèles"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld more resources were not kept." : {
       "comment" : "Resources past the journal's bound; a count.",
       "localizations" : {
@@ -3838,6 +3885,26 @@
         }
       }
     },
+    "A JSON object merged into every request, such as {\"provider\": {\"sort\": \"throughput\"}}." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un objet JSON fusionné dans chaque requête, par exemple {\"provider\": {\"sort\": \"throughput\"}}."
+          }
+        }
+      }
+    },
+    "A custom endpoint needs its document: start from the example." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un endpoint personnalisé a besoin de son document : partez de l’exemple."
+          }
+        }
+      }
+    },
     "A development server often signs its own certificate. Continue only if it is yours." : {
       "localizations" : {
         "fr" : {
@@ -4023,6 +4090,16 @@
         }
       }
     },
+    "Add a Header" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un en-tête"
+          }
+        }
+      }
+    },
     "Add a Rule" : {
       "localizations" : {
         "fr" : {
@@ -4043,12 +4120,32 @@
         }
       }
     },
+    "Add a model that can call tools: read them from the endpoint, or type one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez un modèle qui sait appeler des outils : lisez-les depuis l’endpoint, ou saisissez-en un."
+          }
+        }
+      }
+    },
     "Add a resolver" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajouter un résolveur"
+          }
+        }
+      }
+    },
+    "Add an endpoint" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un endpoint"
           }
         }
       }
@@ -4080,6 +4177,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Motif d’adresse"
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avancé"
           }
         }
       }
@@ -4382,6 +4489,16 @@
         }
       }
     },
+    "An endpoint is a model server reachable over HTTP, on this Mac or in the cloud. Its models then appear beside Claude Code and Codex when you create a session, driven by one of them." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un endpoint est un serveur de modèles joignable en HTTP, sur ce Mac ou dans le cloud. Ses modèles apparaissent ensuite à côté de Claude Code et Codex quand vous créez une session, pilotés par l’un d’eux."
+          }
+        }
+      }
+    },
     "Animated preview of the avatar" : {
       "localizations" : {
         "fr" : {
@@ -4423,6 +4540,16 @@
         }
       }
     },
+    "Answer after the tool" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse après l’outil"
+          }
+        }
+      }
+    },
     "Answer this question in the session." : {
       "comment" : "Why a request is answered in its terminal: its CLI never says when its dialog is shown.",
       "localizations" : {
@@ -4434,6 +4561,16 @@
         }
       }
     },
+    "Answered in %lld ms." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A répondu en %lld ms."
+          }
+        }
+      }
+    },
     "Answered · %@" : {
       "comment" : "Said once an agent's question was answered from the palette.",
       "localizations" : {
@@ -4441,6 +4578,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Répondu · %@"
+          }
+        }
+      }
+    },
+    "Anthropic-compatible" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible Anthropic"
           }
         }
       }
@@ -4687,6 +4834,16 @@
         }
       }
     },
+    "Ask before closing a session whose agent is running" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demander avant de fermer une session dont l’agent est en cours d’exécution"
+          }
+        }
+      }
+    },
     "Ask before closing or archiving a session where work is running" : {
       "localizations" : {
         "fr" : {
@@ -4741,6 +4898,16 @@
         }
       }
     },
+    "Authentication" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentification"
+          }
+        }
+      }
+    },
     "Auto" : {
       "comment" : "An agent action that needed no approval.",
       "localizations" : {
@@ -4748,6 +4915,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Auto"
+          }
+        }
+      }
+    },
+    "Automatic (%@)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique (%@)"
           }
         }
       }
@@ -4837,6 +5014,26 @@
         }
       }
     },
+    "Base URL" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL de base"
+          }
+        }
+      }
+    },
+    "Bearer token" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeton porteur"
+          }
+        }
+      }
+    },
     "Bisect in progress" : {
       "localizations" : {
         "fr" : {
@@ -4918,6 +5115,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler"
+          }
+        }
+      }
+    },
+    "Cannot call tools: not offered for sessions." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne sait pas appeler d’outils : pas proposé pour les sessions."
           }
         }
       }
@@ -5419,6 +5626,16 @@
         }
       }
     },
+    "Cloud, an API key" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloud, clé d’API"
+          }
+        }
+      }
+    },
     "Collapse" : {
       "comment" : "Folds a group of the sidebar.\nHides a section of the inspector.",
       "localizations" : {
@@ -5557,6 +5774,16 @@
         }
       }
     },
+    "Connection" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion"
+          }
+        }
+      }
+    },
     "Contains the selected session" : {
       "comment" : "Read out by VoiceOver on a folded group.",
       "localizations" : {
@@ -5564,6 +5791,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contient la session sélectionnée"
+          }
+        }
+      }
+    },
+    "Context" : {
+      "comment" : "A model's context window, in tokens.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contexte"
           }
         }
       }
@@ -5596,6 +5834,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copier"
+          }
+        }
+      }
+    },
+    "Copy %@" : {
+      "comment" : "A command line to paste in a terminal: claude auth login.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier %@"
           }
         }
       }
@@ -5771,6 +6020,17 @@
         }
       }
     },
+    "Custom" : {
+      "comment" : "An endpoint's protocol.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisé"
+          }
+        }
+      }
+    },
     "Daily" : {
       "comment" : "How often to check for updates.",
       "localizations" : {
@@ -5834,6 +6094,16 @@
         }
       }
     },
+    "Default parameters" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres par défaut"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "fr" : {
@@ -5850,6 +6120,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le modèle"
+          }
+        }
+      }
+    },
+    "Delete the endpoint and its key" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer l’endpoint et sa clé"
           }
         }
       }
@@ -6238,6 +6518,16 @@
         }
       }
     },
+    "Driven by" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piloté par"
+          }
+        }
+      }
+    },
     "Drop to attach to your message" : {
       "localizations" : {
         "fr" : {
@@ -6313,6 +6603,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dupliquer"
+          }
+        }
+      }
+    },
+    "Duplicate the endpoint" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dupliquer l’endpoint"
           }
         }
       }
@@ -6395,6 +6695,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vides"
+          }
+        }
+      }
+    },
+    "Endpoints" : {
+      "comment" : "A tab of the Settings window: model servers.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endpoints"
           }
         }
       }
@@ -6746,6 +7057,36 @@
         }
       }
     },
+    "First byte" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier octet"
+          }
+        }
+      }
+    },
+    "First words after %lld ms." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premiers mots après %lld ms."
+          }
+        }
+      }
+    },
+    "First words after %lld ms. Speed: %lld tokens/s." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premiers mots après %1$lld ms. Débit : %2$lld jetons/s."
+          }
+        }
+      }
+    },
     "Flask" : {
       "comment" : "A session's symbol.",
       "localizations" : {
@@ -7055,6 +7396,16 @@
         }
       }
     },
+    "Give the endpoint a name." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donnez un nom à l’endpoint."
+          }
+        }
+      }
+    },
     "Give the resolver a name." : {
       "localizations" : {
         "fr" : {
@@ -7155,6 +7506,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Question posée"
+          }
+        }
+      }
+    },
+    "Header" : {
+      "comment" : "A key sent in a header of its own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En-tête"
+          }
+        }
+      }
+    },
+    "Header name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom de l’en-tête"
+          }
+        }
+      }
+    },
+    "Header value" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valeur de l’en-tête"
+          }
+        }
+      }
+    },
+    "Headers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En-têtes"
           }
         }
       }
@@ -7314,6 +7706,16 @@
         }
       }
     },
+    "How to build a request from the conversation and read the answer: paths into the JSON the endpoint sends, and named values such as {{model}}, {{messages:openai}} or {{lastUserText}}. See docs/endpoints.md." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment construire une requête à partir de la conversation et lire la réponse : des chemins dans le JSON que l’endpoint envoie, et des valeurs nommées comme {{model}}, {{messages:openai}} ou {{lastUserText}}. Voir docs/endpoints.md."
+          }
+        }
+      }
+    },
     "Identical — skipped" : {
       "comment" : "An imported template the library already has as it is.",
       "localizations" : {
@@ -7462,6 +7864,16 @@
         }
       }
     },
+    "In the keychain" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans le trousseau"
+          }
+        }
+      }
+    },
     "In the web view" : {
       "localizations" : {
         "fr" : {
@@ -7504,12 +7916,33 @@
         }
       }
     },
+    "Insert the Example" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insérer l’exemple"
+          }
+        }
+      }
+    },
     "Insert ticket titles in the notes" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Insérer le titre des tickets dans les notes"
+          }
+        }
+      }
+    },
+    "Install %@…" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer %@…"
           }
         }
       }
@@ -7649,6 +8082,26 @@
         }
       }
     },
+    "Kept in the keychain, never shown again. Type a new one to replace it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardée dans le trousseau, jamais réaffichée. Saisissez-en une nouvelle pour la remplacer."
+          }
+        }
+      }
+    },
+    "Key" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé"
+          }
+        }
+      }
+    },
     "LOCAL" : {
       "comment" : "A badge in the address bar for a page of this Mac.",
       "localizations" : {
@@ -7709,6 +8162,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernière recherche : %@"
+          }
+        }
+      }
+    },
+    "Last tested %@: everything worked." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier test le %@ : tout a fonctionné."
+          }
+        }
+      }
+    },
+    "Last tested %@: it failed. Test it again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier test le %@ : échec. Testez à nouveau."
+          }
+        }
+      }
+    },
+    "Last tested %@: it works, with reservations." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier test le %@ : fonctionne, avec des réserves."
           }
         }
       }
@@ -7875,6 +8358,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changement de modèle"
+          }
+        }
+      }
+    },
+    "Model identifier" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiant du modèle"
+          }
+        }
+      }
+    },
+    "Models" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèles"
           }
         }
       }
@@ -8237,6 +8740,16 @@
         }
       }
     },
+    "Name the header or the parameter that carries the key." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nommez l’en-tête ou le paramètre qui porte la clé."
+          }
+        }
+      }
+    },
     "Needs approval" : {
       "comment" : "A session's state: its agent waits for the user to allow a tool or a plan.",
       "localizations" : {
@@ -8532,6 +9045,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun agent de code n’a été détecté sur ce Mac."
+          }
+        }
+      }
+    },
+    "No endpoint selected" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun endpoint sélectionné"
           }
         }
       }
@@ -9374,6 +9897,16 @@
         }
       }
     },
+    "On this Mac, no key" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur ce Mac, sans clé"
+          }
+        }
+      }
+    },
     "Only the first %lld changes are listed; the counts are exact." : {
       "localizations" : {
         "fr" : {
@@ -9518,6 +10051,16 @@
         }
       }
     },
+    "OpenAI-compatible" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible OpenAI"
+          }
+        }
+      }
+    },
     "Optional — names the sessions made from it, with the same {{fields}}." : {
       "localizations" : {
         "fr" : {
@@ -9602,6 +10145,16 @@
         }
       }
     },
+    "Paste it in a terminal to sign in, then detect again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez-la dans un terminal pour vous connecter, puis relancez la détection."
+          }
+        }
+      }
+    },
     "Pending Requests" : {
       "comment" : "The title of the palette of requests.",
       "localizations" : {
@@ -9673,6 +10226,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisissez un symbole, ou tapez son nom exact."
+          }
+        }
+      }
+    },
+    "Plain HTTP is only accepted on this Mac and on the local network: the key would travel in clear." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le HTTP simple n’est accepté que sur ce Mac et le réseau local : la clé circulerait en clair."
           }
         }
       }
@@ -9828,6 +10391,26 @@
         }
       }
     },
+    "Protocol" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protocole"
+          }
+        }
+      }
+    },
+    "Protocol document" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Document du protocole"
+          }
+        }
+      }
+    },
     "Pull & Merge Requests" : {
       "comment" : "A group of resources.",
       "localizations" : {
@@ -9860,6 +10443,16 @@
         }
       }
     },
+    "Query parameter" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètre d’URL"
+          }
+        }
+      }
+    },
     "Question" : {
       "comment" : "The title of a request of an agent.",
       "localizations" : {
@@ -9871,12 +10464,32 @@
         }
       }
     },
+    "Reachable" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joignable"
+          }
+        }
+      }
+    },
     "Reaches the bubble from any application." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atteint la bulle depuis n’importe quelle application."
+          }
+        }
+      }
+    },
+    "Read from the Endpoint" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire depuis l’endpoint"
           }
         }
       }
@@ -10000,6 +10613,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prête à reprendre."
+          }
+        }
+      }
+    },
+    "Reasoning" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raisonnement"
           }
         }
       }
@@ -10175,6 +10798,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer le dossier"
+          }
+        }
+      }
+    },
+    "Remove the header" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer l’en-tête"
+          }
+        }
+      }
+    },
+    "Remove the key from the keychain" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la clé du trousseau"
+          }
+        }
+      }
+    },
+    "Remove the model" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer le modèle"
           }
         }
       }
@@ -10879,6 +11532,16 @@
         }
       }
     },
+    "Running sessions keep what they started with until they are restarted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions en cours gardent leur configuration jusqu’à leur relance."
+          }
+        }
+      }
+    },
     "Running time" : {
       "comment" : "A session's usage: how long its agent ran.",
       "localizations" : {
@@ -11107,6 +11770,16 @@
         }
       }
     },
+    "Sends a short request asking the model to call a tool, then gives it the result: what a session does on every turn. A local model may take a while to load the first time." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoie une courte requête qui demande au modèle d’appeler un outil, puis lui rend le résultat : ce que fait une session à chaque tour. Un modèle local peut mettre du temps à se charger la première fois."
+          }
+        }
+      }
+    },
     "Session" : {
       "comment" : "What the Usage window groups its figures by.",
       "localizations" : {
@@ -11302,6 +11975,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fourni avec l’application"
+          }
+        }
+      }
+    },
+    "Short for an agent: the harness's prompt and tools already take much of it. Give the model at least %lld tokens on its server." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Court pour un agent : le prompt et les outils du harnais en prennent déjà une bonne part. Donnez au modèle au moins %lld jetons sur son serveur."
           }
         }
       }
@@ -11790,6 +12473,16 @@
         }
       }
     },
+    "Silence in an answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Silence dans une réponse"
+          }
+        }
+      }
+    },
     "Skipped: %@" : {
       "comment" : "Why an imported template is left out.",
       "localizations" : {
@@ -11940,6 +12633,16 @@
         }
       }
     },
+    "Steps the agent ran on the server: %lld." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étapes lancées par l’agent sur le serveur : %lld."
+          }
+        }
+      }
+    },
     "Stop" : {
       "localizations" : {
         "fr" : {
@@ -11989,6 +12692,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arrêté · %@"
+          }
+        }
+      }
+    },
+    "Streamed answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse en flux"
           }
         }
       }
@@ -12384,6 +13097,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’agent peut aussi ouvrir une page, avec son outil tab_open ou `vibe browser open <url>`."
+          }
+        }
+      }
+    },
+    "The agent could not be prepared to start." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent n’a pas pu être préparé à démarrer."
           }
         }
       }
@@ -12970,6 +13693,16 @@
         }
       }
     },
+    "The base URL must be a full address, such as https://host/v1." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’URL de base doit être une adresse complète, par exemple https://hote/v1."
+          }
+        }
+      }
+    },
     "The certificate of %@ is not trusted" : {
       "localizations" : {
         "fr" : {
@@ -12991,12 +13724,32 @@
         }
       }
     },
+    "The coding agent that runs the sessions: its tools, its prompts and its permissions. The gateway translates between its protocol and the endpoint's." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent de code qui fait tourner les sessions : ses outils, ses prompts et ses autorisations. La passerelle traduit entre son protocole et celui de l’endpoint."
+          }
+        }
+      }
+    },
     "The command or the question" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "La commande ou la question"
+          }
+        }
+      }
+    },
+    "The context window, in tokens." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La fenêtre de contexte, en jetons."
           }
         }
       }
@@ -13028,6 +13781,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le dessin actuel sera remplacé."
+          }
+        }
+      }
+    },
+    "The default parameters must be a JSON object." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les paramètres par défaut doivent être un objet JSON."
           }
         }
       }
@@ -13079,6 +13842,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’éditeur choisi dans les Réglages n’est plus installé. Le fichier a été affiché dans le Finder à la place."
+          }
+        }
+      }
+    },
+    "The endpoint answered %lld: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint a répondu %1$lld : %2$@"
+          }
+        }
+      }
+    },
+    "The endpoint cannot be reached. Check the address, and that the server runs." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint est injoignable. Vérifiez l’adresse, et que le serveur tourne."
+          }
+        }
+      }
+    },
+    "The endpoint did not answer in time. A local model may still be loading." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint n’a pas répondu à temps. Un modèle local est peut-être encore en chargement."
+          }
+        }
+      }
+    },
+    "The endpoint does not say how many tokens it used: the session's usage will stay empty." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint ne dit pas combien de jetons il a consommés : l’usage de la session restera vide."
+          }
+        }
+      }
+    },
+    "The endpoint gave no list of models Vibe Manager can read. Type them below." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint n’a donné aucune liste de modèles lisible par Vibe Manager. Saisissez-les ci-dessous."
+          }
+        }
+      }
+    },
+    "The endpoint said: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’endpoint a répondu : %@"
           }
         }
       }
@@ -13274,6 +14097,16 @@
         }
       }
     },
+    "The key is refused. Type a new one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La clé est refusée. Saisissez-en une nouvelle."
+          }
+        }
+      }
+    },
     "The kind of request" : {
       "localizations" : {
         "fr" : {
@@ -13291,6 +14124,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le dernier résumé n’a pas pu être écrit, à %@."
+          }
+        }
+      }
+    },
+    "The model answered without calling the tool: it will not be able to read or edit files." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle a répondu sans appeler l’outil : il ne pourra ni lire ni modifier de fichiers."
+          }
+        }
+      }
+    },
+    "The model called the tool with arguments that are not valid JSON." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle a appelé l’outil avec des arguments qui ne sont pas du JSON valide."
+          }
+        }
+      }
+    },
+    "The model said nothing after the tool's result." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle n’a rien dit après le résultat de l’outil."
+          }
+        }
+      }
+    },
+    "The models could not be read." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les modèles n’ont pas pu être lus."
           }
         }
       }
@@ -14293,6 +15166,16 @@
         }
       }
     },
+    "Timeouts, in seconds" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Délais, en secondes"
+          }
+        }
+      }
+    },
     "Title" : {
       "comment" : "Why a session is listed in Open Quickly: its title matches.",
       "localizations" : {
@@ -14463,6 +15346,16 @@
         }
       }
     },
+    "Tokens used" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jetons consommés"
+          }
+        }
+      }
+    },
     "Too long to be shown in full: allow it in the session." : {
       "comment" : "Why a permission cannot be granted from the palette: it was cut short.",
       "localizations" : {
@@ -14481,6 +15374,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Outil"
+          }
+        }
+      }
+    },
+    "Tool call" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel d’outil"
           }
         }
       }
@@ -14847,6 +15750,17 @@
         }
       }
     },
+    "Update %@…" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à jour %@…"
+          }
+        }
+      }
+    },
     "Updates" : {
       "comment" : "A section of the Settings window.\nA tab of the Settings window.",
       "localizations" : {
@@ -15119,6 +16033,16 @@
         }
       }
     },
+    "Vision" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vision"
+          }
+        }
+      }
+    },
     "Waiting" : {
       "comment" : "A task status: the session waits on something else, a review or a build.",
       "localizations" : {
@@ -15336,6 +16260,16 @@
         }
       }
     },
+    "Whole answer" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse entière"
+          }
+        }
+      }
+    },
     "With no pending request" : {
       "localizations" : {
         "fr" : {
@@ -15362,6 +16296,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sans lui, macOS demande l’autorisation chaque fois qu’un agent lit votre Bureau, vos Documents, vos Téléchargements, un disque externe ou iCloud Drive."
+          }
+        }
+      }
+    },
+    "Work with any model" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Travaillez avec n’importe quel modèle"
           }
         }
       }
@@ -16408,6 +17352,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "rien pour l’instant"
+          }
+        }
+      }
+    },
+    "read %lld s ago" : {
+      "comment" : "When the Git list was read: a number of seconds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lu il y a %lld s"
+          }
+        }
+      }
+    },
+    "read at %@" : {
+      "comment" : "When the Git list was read: a time of day.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lu à %@"
+          }
+        }
+      }
+    },
+    "read just now" : {
+      "comment" : "When the Git list was read.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lu à l’instant"
           }
         }
       }

@@ -23,6 +23,7 @@ xcrun swift-format lint --recursive \
   UITests \
   Packages/VibeManagerKit/Sources \
   Packages/VibeManagerKit/Tests \
+  Packages/VibeManagerKit/Tools \
   Packages/VibeManagerKit/Package.swift \
   Packages/ReleaseTools/Sources \
   Packages/ReleaseTools/Tests \
