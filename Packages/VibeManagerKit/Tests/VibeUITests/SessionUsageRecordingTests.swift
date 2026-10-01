@@ -67,6 +67,27 @@ struct SessionUsageRecordingTests {
     #expect(recorded.first?.exit == .exited)
   }
 
+  @Test("A session's initial command is never typed before its agent's hooks say it is ready")
+  func initialCommandWaitsForHooks() async throws {
+    let subject = session()
+    let (launcher, _, _) = makeLauncher(subject)
+    var typed: [String] = []
+    launcher.commandTyped = { _, command in typed.append(command) }
+    let commandPlan = AgentLaunchPlan(
+      providerID: AgentProviderID("stub"), executablePath: "/usr/bin/true", arguments: [],
+      environment: [:], workingDirectoryPath: "/workspace",
+      promptDelivery: .typedOnceReady("/mcp"))
+
+    await launcher.launch(session: subject, plan: commandPlan)
+    let terminal = try #require(launcher.pane(for: subject.id)?.session as? WorkspaceTerminal)
+    // No hook will speak: a screen of the CLI's own — a folder to trust — may be up, and a
+    // Return typed now would answer it.
+    try await Task.sleep(for: SessionLauncher.commandSettleDelay * 2)
+    #expect(await terminal.written.isEmpty)
+    #expect(typed.isEmpty)
+    _ = await launcher.detach(subject.id)
+  }
+
   @Test("An agent that exits at once still has its run closed")
   func immediateExit() async {
     let subject = session()

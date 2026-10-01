@@ -303,23 +303,42 @@ struct ComposerCommandsTests {
     #expect(stopped.terminalPanel?.command == "/model")
   }
 
-  @Test("A session started on a command finds its panel even if the agent seemed to work first")
+  @Test("An initial command the agent works on opens no panel, even once the turn ends")
   func initialPromptAfterStart() async {
     let (model, _) = await readyModel()
-    model.activity = .working
+    model.activity = .awaitingUser(.question)
     model.expectTerminalPanel(forInitialPrompt: "/mcp")
-    #expect(model.terminalPanel == nil)
-    model.activity = nil
+    // Not working: looked for at once.
     #expect(model.terminalPanel?.command == "/mcp")
+    // A command the agent works on — a skill — opened no panel: looked for no more.
     model.activity = .working
     #expect(model.terminalPanel == nil)
     model.activity = nil
-    #expect(model.terminalPanel?.command == "/mcp")
-    // Seen: looked for no more.
+    #expect(model.terminalPanel == nil)
+  }
+
+  @Test(
+    "Escape goes on to the panel; the block follows the screen, or closes if it saw none",
+    .timeLimit(.minutes(1)))
+  func escapeInPanel() async {
+    let (model, terminal) = await readyModel()
+    model.draft = "/mcp"
+    #expect(await model.send())
+    await until { model.terminalPanel != nil }
     model.terminalScreenChanged("Manage MCP servers\nEsc to cancel")
-    model.activity = .working
-    model.activity = nil
-    #expect(model.terminalPanel == nil)
+    terminal.written = []
+    model.escapeInTerminalPanel()
+    try? await Task.sleep(for: ConversationModel.panelGoneDelay * 2)
+    // Back a level: still a panel on screen.
+    #expect(model.terminalPanel != nil)
+    #expect(terminal.written.isEmpty)
+
+    let (unrecognised, _) = await readyModel()
+    unrecognised.draft = "/model"
+    #expect(await unrecognised.send())
+    await until { unrecognised.terminalPanel != nil }
+    unrecognised.escapeInTerminalPanel()
+    await until { unrecognised.terminalPanel == nil }
   }
 
   @Test("Another agent's list is not kept: a reading for the one before is dropped")

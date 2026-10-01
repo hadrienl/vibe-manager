@@ -79,7 +79,7 @@ public struct ConversationView: View {
           model: model, panel: panel,
           terminal: liveTerminal(
             model.terminalPanelFocusRequest,
-            { Task { await model.closeTerminalPanel() } },
+            { model.escapeInTerminalPanel() },
             { model.terminalScreenChanged($0) })
         )
         .frame(maxWidth: layout.contentWidth)

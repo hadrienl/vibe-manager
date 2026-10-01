@@ -91,10 +91,13 @@ terminal itself, as a second view of it (`TerminalSurface(isMirror:)`), in a blo
   in Claude Code 2.1.285, "esc back" in Codex 0.159.2), which neither prompt shows at rest or at work
   ("esc to interrupt"). The block closes when one of these happens:
   - the panel was seen, then gone for 0.8 s;
-  - no panel was seen after 4 s (10 s for an agent starting);
+  - no panel was seen after 4 s;
   - the agent starts working;
-  - the user presses Escape in the block, or clicks Close. Both type Escape into the panel. Escape is
-    caught by a local event monitor, as SwiftTerm's key handling cannot be overridden.
+  - the user clicks Close, which types Escape into the panel.
+
+  Escape pressed in the block goes on to the panel, which goes back a level or closes, and the screen
+  says which. A panel never recognised on screen closes the block on Escape all the same. Escape is
+  seen by a local event monitor, as SwiftTerm's key handling cannot be overridden.
 - **Sizes.** The mirror sizes the process to itself while it is shown. A view coming back on screen
   gives the process its own size again, and only if another view changed it, since each new size makes
   the program redraw. A hidden mirror does not read its screen, which is then the other view's redraw.
@@ -104,9 +107,12 @@ terminal itself, as a second view of it (`TerminalSurface(isMirror:)`), in a blo
 
 Given as an argument, Claude Code runs a command before it has read its MCP servers: `/mcp` then says
 there are none. A one-line `/` prompt is therefore delivered as `PromptDelivery.typedOnceReady`. The CLI
-is started without it, and `SessionLauncher` types it as the composer would. It does so once the
-agent's hooks have spoken (6 s at most), then 1.5 s later. This holds for every first launch: a new
-session, a planned one started later, or an agent switch.
+is started without it, and `SessionLauncher` types it as the composer would, 1.5 s after the agent's
+hooks have spoken. It never types sooner: until then the CLI may show a screen of its own — a folder to
+trust, an update offer — whose default the Return would choose. An agent whose hooks never speak does
+not get the command, and the diagnostics say so. The conversation looks for the command's panel from
+the moment it is typed. This holds for every first launch: a new session, a planned one started later,
+or an agent switch.
 
 ### Sending is unchanged
 

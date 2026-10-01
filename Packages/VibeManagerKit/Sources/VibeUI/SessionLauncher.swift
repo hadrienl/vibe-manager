@@ -101,6 +101,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// host — so that what it is can be read before its number could be given to another (#69).
   public var processDidStart: (@MainActor (SessionID, Int32) -> Void)?
 
+  /// Told once a session's initial command is typed into its agent (#219): its panel, if it opens
+  /// one, is looked for from then on.
+  public var commandTyped: (@MainActor (SessionID, String) -> Void)?
+
   /// The side terminals of each session's drawer (#43), which follow what happens to its agent.
   public weak var sideTerminals: (any SessionSideTerminals)?
   /// Sessions whose next stop must leave their side terminals running: an agent switch stops the
@@ -326,24 +330,36 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     return .started
   }
 
-  /// How long an agent's hooks are waited for before its initial command is typed all the same.
-  static let commandReadinessLimit = Duration.seconds(6)
+  /// How long an agent's hooks are waited for before its initial command is given up.
+  static let commandReadinessLimit = Duration.seconds(600)
   /// Once the agent is ready, before its command is typed: Claude Code connects its MCP servers
   /// after it started.
   static let commandSettleDelay = Duration.milliseconds(1_500)
 
-  /// Types a session's initial command once its agent is ready — its hooks have spoken, or a
-  /// few seconds went by — as the composer sends one (#219). The process replaced meanwhile
-  /// gets nothing.
+  /// Types a session's initial command once its agent is ready — its hooks have spoken — as the
+  /// composer sends one (#219). Never before: until then the CLI may show a screen of its own — a
+  /// folder to trust, an update offer — whose default the Return would choose. An agent whose
+  /// hooks never speak, or a process replaced meanwhile, gets nothing; it is said in the
+  /// diagnostics.
   private func type(
     _ command: String, into id: SessionID, once terminal: any TerminalSession,
     isReadyFor providerID: AgentProviderID
   ) async {
     let clock = ContinuousClock()
     let deadline = clock.now + Self.commandReadinessLimit
-    while clock.now < deadline {
-      if case .structured = await activity?.state(for: id)?.source { break }
+    var isReady = false
+    while clock.now < deadline, !Task.isCancelled, pane(for: id)?.session === terminal {
+      if case .structured = await activity?.state(for: id)?.source {
+        isReady = true
+        break
+      }
       try? await Task.sleep(for: .milliseconds(200))
+    }
+    guard isReady else {
+      diagnostics.record(
+        .session, .notice, "session.initialCommandDropped",
+        ["session": diagnostics.pseudonym(id), "provider": .token(providerID.diagnosticToken)])
+      return
     }
     try? await Task.sleep(for: Self.commandSettleDelay)
     guard let pane = pane(for: id), let current = pane.session, current === terminal else {
@@ -360,6 +376,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     }
     try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
     await pane.write(keystrokes.submit)
+    commandTyped?(id, command)
   }
 
   /// From the launch to the first byte the agent writes, for Instruments.

@@ -34,6 +34,8 @@ public final class ConversationWorkspace {
   @ObservationIgnored let commands: AgentCommandCatalog
   /// Which list each model reads: another agent or folder starts from an empty one.
   @ObservationIgnored private var commandKeys: [SessionID: AgentCommandCatalog.Key] = [:]
+  /// Initial commands typed before their conversation was first shown.
+  @ObservationIgnored private var typedCommands: [SessionID: (command: String, at: Date)] = [:]
   /// The user's own themes, and the one on trial (#118).
   public let themes: ConversationThemesModel
 
@@ -137,9 +139,11 @@ public final class ConversationWorkspace {
       }
       models[session.id] = model
       connect?(model, session)
-      // Started a moment ago on a command of its CLI, the session may show one of its panels.
-      if Date().timeIntervalSince(session.createdAt) < 60 {
-        model.expectTerminalPanel(forInitialPrompt: session.initialPrompt)
+      // Its initial command typed a moment before the conversation was first shown.
+      if let typed = typedCommands.removeValue(forKey: session.id),
+        Date().timeIntervalSince(typed.at) < 5
+      {
+        model.expectTerminalPanel(forInitialPrompt: typed.command)
       }
       if pendingComposerFocus == session.id {
         pendingComposerFocus = nil
@@ -199,6 +203,16 @@ public final class ConversationWorkspace {
     mountedSessionIDs.append(session.id)
     evict()
     return model
+  }
+
+  /// A session's initial command was typed into its agent (#219): its conversation looks for the
+  /// panel the command may open — now, or if it is first shown in the next few seconds.
+  public func commandTyped(_ command: String, in id: SessionID) {
+    if let model = models[id] {
+      model.expectTerminalPanel(forInitialPrompt: command)
+    } else {
+      typedCommands[id] = (command, Date())
+    }
   }
 
   /// Hands the model what its agent accepts under `/`, read where the agent runs (#219): read

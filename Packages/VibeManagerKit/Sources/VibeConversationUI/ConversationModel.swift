@@ -224,8 +224,15 @@ public final class ConversationModel {
     didSet {
       guard activity != oldValue else { return }
       rebuild(changedFrom: nil)
-      // A skill or a prompt the agent took up: nothing waits in a panel of its terminal.
-      if activity == .working { terminalPanel = nil }
+      // A skill or a prompt the agent took up: nothing waits in a panel of its terminal, and the
+      // composer gets the keyboard back from the block.
+      if activity == .working {
+        initialCommand = nil
+        if terminalPanel != nil {
+          terminalPanel = nil
+          requestComposerFocus()
+        }
+      }
       openInitialPanelIfRunning()
     }
   }
@@ -1276,17 +1283,15 @@ public final class ConversationModel {
   @ObservationIgnored private var panelSeen = false
   @ObservationIgnored private var panelGone: Task<Void, Never>?
   @ObservationIgnored private var panelFirstSight: Task<Void, Never>?
-  /// A session started on a command (#219): its panel is looked for while the agent runs and does
-  /// not work — starting, an agent may seem to work or stop for a moment — until it is seen, or
-  /// until `initialCommandDeadline`.
+  /// A session's initial command, typed into its agent once ready (#219): its panel is looked for
+  /// while the agent runs and does not work, until it is seen, the agent works on it, or
+  /// `initialCommandDeadline`.
   @ObservationIgnored private var initialCommand: String?
   @ObservationIgnored private var initialCommandDeadline = Date.distantPast
-  /// How long a session started on a command looks for its panel.
-  static let initialCommandWindow: TimeInterval = 30
+  /// How long a session's initial command, once typed, has its panel looked for.
+  static let initialCommandWindow: TimeInterval = 10
   /// How long a block waits to see a panel before it takes the command for one that opened none.
   static let panelFirstSightLimit = Duration.seconds(4)
-  /// An agent starting takes longer to draw its first screen.
-  static let initialPanelFirstSightLimit = Duration.seconds(10)
   /// A panel's hint gone this long is the panel closed, not a screen being redrawn — a new size
   /// makes the program draw it again.
   static let panelGoneDelay = Duration.milliseconds(800)
@@ -1327,8 +1332,8 @@ public final class ConversationModel {
     }
   }
 
-  /// A session started on a command of its CLI — its initial prompt — may open a panel as well:
-  /// looked for once the agent runs.
+  /// A session's initial command — a command of its CLI, typed once the agent was ready — may open
+  /// a panel as well.
   public func expectTerminalPanel(forInitialPrompt prompt: String) {
     let command = String(prompt.prefix { !$0.isWhitespace })
     guard command.hasPrefix("/"), command.count > 1 else { return }
@@ -1344,8 +1349,7 @@ public final class ConversationModel {
       return
     }
     guard isProcessRunning, !isAgentWorking, terminalPanel == nil else { return }
-    openTerminalPanel(
-      TerminalPanel(echoID: nil, command: command), firstSight: Self.initialPanelFirstSightLimit)
+    openTerminalPanel(TerminalPanel(echoID: nil, command: command))
   }
 
   /// What the block's terminal shows, as it changes: the panel seen, then gone, closes the block
@@ -1374,6 +1378,17 @@ public final class ConversationModel {
     terminalPanel = nil
     if let echo = panel.echoID { dismissEcho(echo) }
     requestComposerFocus()
+  }
+
+  /// Escape typed in the block: it goes on to the panel, which goes back a level or closes, and the
+  /// screen says which. A panel never recognised on screen closes the block all the same.
+  public func escapeInTerminalPanel() {
+    guard let panel = terminalPanel, !panelSeen else { return }
+    Task { [weak self] in
+      try? await Task.sleep(for: Self.panelGoneDelay)
+      guard let self, self.terminalPanel == panel, !self.panelSeen else { return }
+      self.endTerminalPanel()
+    }
   }
 
   /// Closes the panel from the conversation: Escape, as in the terminal, then the block goes. The

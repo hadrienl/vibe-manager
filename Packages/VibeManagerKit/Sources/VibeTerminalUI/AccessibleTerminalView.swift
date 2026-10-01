@@ -24,9 +24,9 @@ public final class AccessibleTerminalView: TerminalView {
 
   public override func accessibilityLabel() -> String? { accessibilityTitle }
 
-  /// Escape without a modifier, taken by the view's owner rather than sent to the program: the
-  /// block a panel opens in the conversation closes with it (#219). SwiftTerm's handling of keys
-  /// cannot be overridden: Escape is caught before it, while this view has the keyboard.
+  /// Told of Escape without a modifier, on its way to the program: the block a panel opens in the
+  /// conversation follows what it does there (#219). SwiftTerm's handling of keys cannot be
+  /// overridden: Escape is seen before it, while this view has the keyboard, and passed on.
   var onEscape: (() -> Void)? {
     didSet {
       guard (onEscape == nil) != (escapeMonitor == nil) else { return }
@@ -39,15 +39,14 @@ public final class AccessibleTerminalView: TerminalView {
             event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift])
           else { return event }
           let window = event.window.map(ObjectIdentifier.init)
-          let taken = MainActor.assumeIsolated { () -> Bool in
+          MainActor.assumeIsolated {
             guard let self, let onEscape = self.onEscape,
               window == self.window.map(ObjectIdentifier.init),
               self.window?.firstResponder === self
-            else { return false }
+            else { return }
             onEscape()
-            return true
           }
-          return taken ? nil : event
+          return event
         }
       }
     }

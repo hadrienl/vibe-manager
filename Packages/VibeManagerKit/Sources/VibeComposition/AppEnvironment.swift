@@ -352,6 +352,10 @@ public final class AppEnvironment {
       // The skills an agent could not read, and the listings that failed, go to the diagnostics:
       // a list that never opens is otherwise left unexplained (#219).
       commands: AgentCommandCatalog(diagnostics: diagnostics.log))
+    // A session's initial command typed: its conversation looks for the panel it may open (#219).
+    launcher.commandTyped = { [weak conversations] id, command in
+      conversations?.commandTyped(command, in: id)
+    }
     appModel = AppModel(
       repository: repository,
       recovery: repository,
