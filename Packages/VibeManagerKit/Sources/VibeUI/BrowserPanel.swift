@@ -45,7 +45,7 @@ struct BrowserPanel: View {
           isAddressBarFocused: { model.isAddressBarFocused },
           closeTab: { model.closeWebTab() })
         if let failure = tab.failure {
-          BrowserFailureView(tab: tab, failure: failure)
+          BrowserFailureView(model: model, tab: tab, failure: failure)
         } else if tab.hasCrashed {
           BrowserStateView(
             symbol: "exclamationmark.octagon", tint: .red,
@@ -247,10 +247,11 @@ private struct BrowserTabButton: View {
       Text("Reload", bundle: .module)
     }
     Button {
-      NSWorkspace.shared.open(tab.url)
+      model.openOutside(tab.url)
     } label: {
       Text("Open in Browser", bundle: .module)
     }
+    .disabled(!model.opensOutside(tab.url))
     Button {
       NSPasteboard.general.clearContents()
       NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
@@ -343,11 +344,11 @@ private struct BrowserAddressBar: View {
       .padding(.horizontal, 4)
 
       Button {
-        if let url = tab?.url { NSWorkspace.shared.open(url) }
+        if let url = tab?.url { model.openOutside(url) }
       } label: {
         Image(systemName: "arrow.up.forward.app").frame(width: 26, height: 24)
       }
-      .disabled(tab == nil)
+      .disabled(tab.map { !model.opensOutside($0.url) } ?? true)
       .help(Text("Open in Browser", bundle: .module))
       .accessibilityLabel(Text("Open in Browser", bundle: .module))
 
@@ -732,6 +733,7 @@ private struct BrowserEmptyView: View {
 }
 
 private struct BrowserFailureView: View {
+  let model: AppModel
   let tab: BrowserTabModel
   let failure: BrowserLoadFailure
 
@@ -806,10 +808,12 @@ private struct BrowserFailureView: View {
           Text("Try Again", bundle: .module)
         }
         .buttonStyle(.borderedProminent)
-        Button {
-          NSWorkspace.shared.open(tab.url)
-        } label: {
-          Text("Open in Browser", bundle: .module)
+        if model.opensOutside(tab.url) {
+          Button {
+            model.openOutside(tab.url)
+          } label: {
+            Text("Open in Browser", bundle: .module)
+          }
         }
       }
     }

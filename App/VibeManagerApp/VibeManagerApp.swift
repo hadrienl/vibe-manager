@@ -880,9 +880,9 @@ private struct WebCommands: Commands {
       Divider()
 
       Button("Open Page in Browser") {
-        if let url = model.activeWebTab?.url { NSWorkspace.shared.open(url) }
+        if let url = model.activeWebTab?.url { model.openOutside(url) }
       }
-      .disabled(model.activeWebTab == nil)
+      .disabled(model.activeWebTab.map { !model.opensOutside($0.url) } ?? true)
     }
   }
 }

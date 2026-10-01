@@ -32,6 +32,8 @@ final class WorkspaceFileOpener: FileOpening {
   func open(_ url: URL, with editor: EditorChoice) async -> Bool {
     switch editor {
     case .defaultApplication:
+      // Opens outside: a file the user chose to open (the Git inspector's « Open With »), or an
+      // address the caller checked first (notes: `NotesLinks`, journal: a web address).
       return workspace.open(url)
     case .application(let identifier):
       guard let application = workspace.urlForApplication(withBundleIdentifier: identifier) else {
@@ -40,6 +42,7 @@ final class WorkspaceFileOpener: FileOpening {
       // The completion handler, not the async variant: that one sends `NSWorkspace`, which is not
       // Sendable, off the main actor, and Swift 6.1 refuses it.
       return await withCheckedContinuation { continuation in
+        // Opens outside: a file of the session, in the editor the user chose for it.
         workspace.open(
           [url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration()
         ) { _, error in

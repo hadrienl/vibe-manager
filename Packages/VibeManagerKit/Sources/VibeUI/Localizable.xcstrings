@@ -6366,6 +6366,16 @@
         }
       }
     },
+    "Everything a session runs gets this access too: the agents and the commands they start, a project's scripts included." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout ce qu’une session exécute en profite aussi : les agents et les commandes qu’ils lancent, scripts des projets compris."
+          }
+        }
+      }
+    },
     "Example: %@" : {
       "comment" : "A line as it would be written in the notes.",
       "localizations" : {

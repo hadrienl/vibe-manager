@@ -219,7 +219,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     }
     webView.openExternally = { url in
       guard LinkRouting.isPage(url) else { return }
-      NSWorkspace.shared.open(url)
+      ExternalOpening.open(url)
     }
   }
 

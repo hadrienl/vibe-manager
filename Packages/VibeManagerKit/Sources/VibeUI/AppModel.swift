@@ -132,6 +132,10 @@ public final class AppModel {
   @ObservationIgnored public var activateApplication: @MainActor () -> Void = {
     NSApp.activate()
   }
+  /// Hands an address to macOS, once `LinkRouting` has let it out (`openOutside`, `openLink`).
+  @ObservationIgnored var openOutsideHandler: @MainActor (URL) -> Void = {
+    ExternalOpening.open($0)
+  }
   /// The requests already accounted for: notified, or seen arriving while the application was in
   /// front. Only one arriving in the background is notified.
   @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
