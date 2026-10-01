@@ -127,8 +127,8 @@ public struct NewSessionDraftView: View {
       placeCaret()
     }
     // What a template gives is seen, the theme as the rest (#274).
-    .onChange(of: model.themeComesFromTemplate) { _, fromTemplate in
-      if fromTemplate { showsMoreOptions = true }
+    .onChange(of: model.draft.conversationTheme) {
+      if model.themeComesFromTemplate { showsMoreOptions = true }
     }
     .task {
       showsMoreOptions = !model.draft.ticketText.isEmpty || model.draft.conversationTheme != nil

@@ -31,6 +31,11 @@ public struct ConversationThemePicker: View {
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var contrast
   @FocusState private var isFocused: Bool
+  /// The selection when the picker appeared: what Escape gives back.
+  @State private var initial: String??
+  /// A theme chosen before that is no longer there: its card stays while the picker is open, so
+  /// that the arrows can come back to it.
+  @State private var missingID: String?
 
   private static let columns = 3
 
@@ -51,7 +56,9 @@ public struct ConversationThemePicker: View {
 
   private var options: [Option] {
     var options: [Option] = []
-    if let selection, themes.theme(selection) == nil { options.append(.missing(selection)) }
+    if let missing = missingID ?? selection.flatMap({ themes.theme($0) == nil ? $0 : nil }) {
+      options.append(.missing(missing))
+    }
     options.append(.settings)
     options += themes.offered.map { .theme($0.id) }
     return options
@@ -74,7 +81,11 @@ public struct ConversationThemePicker: View {
     .focusable()
     .focusEffectDisabled()
     .focused($isFocused)
-    .onAppear { isFocused = true }
+    .onAppear {
+      isFocused = true
+      initial = .some(selection)
+      missingID = selection.flatMap { themes.theme($0) == nil ? $0 : nil }
+    }
     .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
       move(by: Self.step(for: press.key))
       return .handled
@@ -84,7 +95,10 @@ public struct ConversationThemePicker: View {
       commit()
       return .handled
     }
-    .onExitCommand(perform: cancel)
+    .onExitCommand {
+      if let initial { selection = initial }
+      cancel?()
+    }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Conversation Theme", bundle: .module))
   }
