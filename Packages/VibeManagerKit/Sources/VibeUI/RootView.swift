@@ -449,7 +449,9 @@ public struct RootView: View {
                     if !showsBrowser { model.focusSession() }
                   })
               ) {
-                Text("Terminal", bundle: .module).tag(false)
+                // “Session”, not “Terminal”: beside it the session's own picker already says
+                // Conversation or Terminal, and one word must not name two things (#247).
+                Text("Session", bundle: .module).tag(false)
                 Text("Web", bundle: .module).tag(true)
               } label: {
                 Text("Main View", bundle: .module)
@@ -962,7 +964,7 @@ public struct RootView: View {
       } else if session.status == .archived {
         let appearance = model.displayedAppearance(of: session)
         ArchivedSessionDetail(
-          session: session, appearance: appearance,
+          session: session, agentNames: model.agentNames, appearance: appearance,
           icon: model.icons.image(for: appearance.iconID)
         ) {
           Task { await model.restore(session.id) }
@@ -1716,6 +1718,7 @@ private struct DetachWarningBanner: View {
 /// column states the facts, says plainly that nothing was deleted, and offers the way back.
 private struct ArchivedSessionDetail: View {
   let session: WorkSession
+  let agentNames: [String: String]
   /// Its badge as drawn: the one previewed while its icon is being changed (#183).
   let appearance: SessionAppearance
   let icon: NSImage?
@@ -1750,9 +1753,10 @@ private struct ArchivedSessionDetail: View {
                 .font(.title3)
                 .fontWeight(.semibold)
               if let agent = session.agent {
-                Text([agent.providerID, agent.modelID].compactMap { $0 }.joined(separator: " · "))
+                Text(AgentNaming.label(agent, names: agentNames))
                   .font(.callout)
                   .foregroundStyle(.secondary)
+                  .help(Text(verbatim: agent.providerID))
               }
             }
           }
@@ -1855,7 +1859,7 @@ struct SidebarFooter: View {
           Section(LocalizedStringResource("Agent", bundle: .module)) {
             ForEach(model.availableProviderIDs, id: \.self) { providerID in
               Toggle(
-                providerID,
+                AgentNaming.name(of: providerID, names: model.agentNames),
                 isOn: Binding(
                   get: { model.filter.agentProviderIDs.contains(providerID) },
                   set: { _ in model.toggleProviderFacet(providerID) }
@@ -2084,9 +2088,10 @@ struct SessionRow: View {
             .lineLimit(1)
         }
         if let agent = session.agent {
-          Text(agent.providerID)
+          Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
             .font(.caption)
             .foregroundStyle(.secondary)
+            .help(Text(verbatim: agent.providerID))
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
@@ -2132,7 +2137,10 @@ struct SessionRow: View {
     // Its name field, while it is renamed, is reached on its own.
     .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
     .accessibilityIdentifier("session-row")
-    .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
+    .accessibilityLabel(
+      SessionStatusPresentation.accessibilityLabel(
+        for: session, status: status, agentNames: commands.model.agentNames)
+    )
     .accessibilityValue(accessibilityValue)
     // The same commands, reachable without a pointer and without the menu bar.
     .accessibilityAction(named: Text(commands.restartAnnouncement)) {
