@@ -42,8 +42,8 @@ struct SessionStatusPresentationTests {
   func agentStates() {
     let expected:
       [(SessionStatusPresentation, String, String, String, SessionStatusSeverity, Bool)] = [
-        (agent(.idle), "Idle", "En attente", "moon.zzz", .normal, false),
-        (agent(.working), "Working", "En cours", "arrow.triangle.2.circlepath", .active, false),
+        (agent(.idle), "Idle", "Prête", "moon.zzz", .normal, false),
+        (agent(.working), "Working", "Travaille…", "arrow.triangle.2.circlepath", .active, false),
         (
           agent(.awaitingUser(.approval)), "Needs approval", "Autorisation requise",
           "hand.raised.fill", .attention, true
@@ -229,8 +229,8 @@ struct SessionStatusFrenchTests {
   func states() {
     let expected: [(TerminalPaneModel.Status, String)] = [
       (.starting, "Démarrage"),
-      (.running, "En attente"),
-      (.exited(code: 0), "Terminée"),
+      (.running, "Prête"),
+      (.exited(code: 0), "Processus terminé"),
       (.exited(code: 127), "Terminée avec le code 127"),
       (.terminated(signal: 9), "Interrompue par le signal 9"),
       (.failed(message: "x"), "Échec"),
@@ -251,6 +251,54 @@ struct SessionStatusFrenchTests {
         in: "fr")
     }
     #expect(labels == ["Arrêtée", "Fermée", "Archivée"])
+  }
+
+  /// A session's row shows its column's name nowhere but in the column: in French, “En cours”
+  /// for Working read as if a session of To Do were In Progress (#246). Words are compared without
+  /// case, accents or the feminine “e”, so that “Terminé” and “Terminée” count as one.
+  @Test("No state of the agent reads like the name of a column")
+  func statesAreNotColumns() {
+    let columns = SessionTaskStatus.allCases.filter { $0 != .archived }.map {
+      Self.folded(Localization.string($0.label, in: "fr"))
+    }
+    let session = WorkSession(name: "S", status: .active)
+    let panes: [TerminalPaneModel.Status] = [
+      .starting, .running, .exited(code: 0), .exited(code: 1), .terminated(signal: 9),
+      .failed(message: "x"),
+    ]
+    let activities: [AgentActivityState] = [
+      AgentActivityState(activity: .idle, source: .structured),
+      AgentActivityState(activity: .idle, unreadSince: Date(), source: .structured),
+      AgentActivityState(activity: .working, source: .structured),
+      AgentActivityState(activity: .awaitingUser(.approval), source: .structured),
+      AgentActivityState(activity: .awaitingUser(.question), source: .structured),
+    ]
+    let states =
+      panes.map { SessionStatusPresentation.make(session: session, paneStatus: $0) }
+      + activities.map {
+        SessionStatusPresentation.make(session: session, paneStatus: .running, activity: $0)
+      }
+      + [SessionStatus.active, .closed].map {
+        SessionStatusPresentation.make(session: WorkSession(name: "S", status: $0), paneStatus: nil)
+      }
+      + [
+        .restoring,
+        SessionStatusPresentation.make(
+          session: session, paneStatus: nil, resolution: .unknownProvider("gone")),
+      ]
+    for state in states {
+      let french = Localization.string(state.label, in: "fr")
+      #expect(!columns.contains(Self.folded(french)), "« \(french) » is a column's name")
+    }
+  }
+
+  private static func folded(_ text: String) -> String {
+    text.folding(
+      options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "fr")
+    )
+    .split(separator: " ")
+    .map { $0.hasSuffix("e") ? String($0.dropLast()) : String($0) }
+    .joined(separator: " ")
   }
 }
 

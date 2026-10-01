@@ -6741,7 +6741,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminée"
+            "value" : "Processus terminé"
           }
         }
       }
@@ -7341,7 +7341,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En attente"
+            "value" : "Prête"
           }
         }
       }
@@ -15317,7 +15317,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Travaille…"
           }
         }
       }
