@@ -50,6 +50,7 @@ private actor FakeSupervisor: TerminalSupervisor {
   private var sessions: [TerminalID: FakeTerminalSession] = [:]
   private(set) var startCount = 0
   private(set) var startedSpecs: [TerminalSpec] = []
+  private(set) var stopCount = 0
 
   init(failure: TerminalError? = nil) {
     self.failure = failure
@@ -67,6 +68,7 @@ private actor FakeSupervisor: TerminalSupervisor {
   func session(for id: TerminalID) -> (any TerminalSession)? { sessions[id] }
 
   func stop(id: TerminalID, gracePeriod: Duration) async {
+    stopCount += 1
     await sessions[id]?.stop(gracePeriod: gracePeriod)
   }
 
@@ -308,4 +310,24 @@ func viewBackOnScreen() async throws {
   await model.reclaimProcessSize(block, isMirror: true)
   #expect(await session.resizes.last == block)
   #expect(model.viewportSize == own)
+}
+
+@MainActor
+@Test("A session's status bar closes the session through its Close, never its process (#238)")
+func statusBarCloseGoesThroughTheSession() async throws {
+  let id = TerminalID()
+  let supervisor = FakeSupervisor()
+  let model = TerminalPaneModel(
+    terminalID: id, supervisor: supervisor, spec: makeSpec(), viewportTimeout: .zero)
+  await model.start()
+  await supervisor.emit(.running(processIdentifier: 1_234), for: id)
+  #expect(await settles { model.status == .running })
+  var closes = 0
+  let bar = TerminalStatusBar(pane: model, close: { closes += 1 })
+
+  bar.stop()
+
+  #expect(closes == 1)
+  #expect(await supervisor.stopCount == 0)
+  #expect(model.status == .running)
 }

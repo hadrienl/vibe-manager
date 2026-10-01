@@ -248,7 +248,8 @@ struct SubagentModelTests {
     let label = SubagentPresentation.accessibilityLabel(for: call)
     #expect(label.contains("Explore") && label.contains("Review the diff"))
     call.state = .interrupted
-    #expect(SubagentPresentation.outcome(of: call) != nil)
+    // Interrupted, as the turn it belonged to: never "stopped", which a session's Close says.
+    #expect(SubagentPresentation.outcome(of: call) == "interrupted without an answer")
     #expect(SubagentPresentation.groupTitle([call, call]).contains("2"))
   }
 }
