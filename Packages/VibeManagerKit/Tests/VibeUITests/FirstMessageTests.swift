@@ -88,4 +88,37 @@ struct FirstMessageTests {
     #expect(fixture.conversation.draft == "yeah, and more")
     #expect(fixture.conversation.attachments == [file])
   }
+
+  @Test("A first message opening on `!` goes as a message, with its files")
+  func bangIsAMessage() async throws {
+    let fixture = try await running()
+    defer { try? FileManager.default.removeItem(at: fixture.folder) }
+    fixture.conversation.promptFormat = AgentPromptFormat(
+      shellEntry: ShellEntry(switchDelay: .zero, chunkDelay: .zero, messageGuard: " "))
+    let file = fixture.folder.appendingPathComponent("a.png")
+
+    fixture.model.sendFirstMessage(
+      PromptSubmission(text: "!important: look", attachments: [file]), to: fixture.session)
+
+    #expect(fixture.conversation.composerMode == .message)
+    fixture.model.activities[fixture.session.id] = AgentActivityState(source: .structured)
+    await waitUntil { !fixture.conversation.echoes.isEmpty }
+    #expect(fixture.conversation.echoes.first?.kind == .message)
+    #expect(fixture.conversation.echoes.first?.attachmentCount == 1)
+  }
+
+  @Test("Over a launch that ended, nothing is put in the composer: a restart gives the prompt")
+  func endedLaunch() async throws {
+    let fixture = try await running()
+    defer { try? FileManager.default.removeItem(at: fixture.folder) }
+    let pane = try #require(fixture.model.pane(for: fixture.session.id))
+    await pane.stop(gracePeriod: .zero)
+    await waitUntil { pane.status != .running }
+
+    fixture.model.sendFirstMessage(
+      PromptSubmission(text: "yeah", attachments: [fixture.folder]), to: fixture.session)
+
+    #expect(fixture.conversation.draft.isEmpty)
+    #expect(fixture.conversation.attachments.isEmpty)
+  }
 }

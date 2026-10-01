@@ -1,11 +1,16 @@
 import AppKit
 import SwiftUI
 
-/// What a drag of files over the new session's draft shows while it hovers.
+/// What a drag of files over the new session's draft does where it hovers.
 enum NewSessionDropHover: Equatable {
-  case accepting
+  /// The files join the prompt.
+  case attaching
+  /// One folder over the working folder: the session works in it.
+  case choosingFolder
   /// A template's prompt is its own: no file joins it.
   case refusingTemplate
+
+  var isAccepting: Bool { self != .refusingTemplate }
 }
 
 /// The new session's draft, as one place to drop files on: they join its prompt, as Attach
@@ -16,14 +21,15 @@ enum NewSessionDropHover: Equatable {
 /// types, and the draft — drawn over the session selected — had none but the prompt's text view,
 /// which typed the path where it was let go. Laid in front, this view wins every drag that
 /// carries a file, the prompt's field included, so a file joins the prompt the same way wherever
-/// it is let go. A text, a web address or an image with no file meets none of its types and goes
-/// where it went before. AppKit finds a drag's destination without asking `hitTest(_:)`: the
+/// it is let go — but a folder over the working folder, which becomes the session's. A text, a web
+/// address or an image with no file meets none of its types and goes where it went before. AppKit finds a drag's destination without asking `hitTest(_:)`: the
 /// view answers no click, and VoiceOver does not see it.
 struct NewSessionDropCatcher: NSViewRepresentable {
-  /// The hover a drag of files would get now: `nil` while nothing may be dropped at all.
-  let hover: @MainActor () -> NewSessionDropHover?
+  /// What the files of a drag would do at a point of the draft, its origin at the top left:
+  /// `nil` while nothing may be dropped at all.
+  let hover: @MainActor (_ files: [URL], _ location: CGPoint) -> NewSessionDropHover?
   let hovering: @MainActor (NewSessionDropHover?) -> Void
-  let dropped: @MainActor ([URL]) -> Void
+  let dropped: @MainActor ([URL], NewSessionDropHover) -> Void
 
   static let fileTypes: [NSPasteboard.PasteboardType] = [
     .fileURL, .init("NSFilenamesPboardType"),
@@ -48,6 +54,8 @@ struct NewSessionDropCatcher: NSViewRepresentable {
 
   final class CatcherView: NSView {
     var catcher: NewSessionDropCatcher?
+    /// The files of the drag going on, read once when it enters rather than at every move.
+    private var files: [URL] = []
 
     override init(frame: NSRect) {
       super.init(frame: frame)
@@ -57,19 +65,26 @@ struct NewSessionDropCatcher: NSViewRepresentable {
 
     required init?(coder _: NSCoder) { nil }
 
+    /// As SwiftUI measures the draft: from the top left.
+    override var isFlipped: Bool { true }
+
     override func hitTest(_: NSPoint) -> NSView? { nil }
 
+    private func hover(_ drag: any NSDraggingInfo) -> NewSessionDropHover? {
+      guard !files.isEmpty else { return nil }
+      return catcher?.hover(files, convert(drag.draggingLocation, from: nil))
+    }
+
     private func propose(_ drag: any NSDraggingInfo) -> NSDragOperation {
-      let hover =
-        NewSessionDropCatcher.files(on: drag.draggingPasteboard).isEmpty
-        ? nil : catcher?.hover()
+      let hover = hover(drag)
       catcher?.hovering(hover)
       // No "+" on the pointer: the refusal is seen before letting go.
-      return hover == .accepting ? .copy : []
+      return hover?.isAccepting == true ? .copy : []
     }
 
     override func draggingEntered(_ drag: any NSDraggingInfo) -> NSDragOperation {
-      propose(drag)
+      files = NewSessionDropCatcher.files(on: drag.draggingPasteboard)
+      return propose(drag)
     }
 
     override func draggingUpdated(_ drag: any NSDraggingInfo) -> NSDragOperation {
@@ -80,20 +95,20 @@ struct NewSessionDropCatcher: NSViewRepresentable {
       catcher?.hovering(nil)
     }
 
-    override func prepareForDragOperation(_: any NSDraggingInfo) -> Bool {
-      catcher?.hover() == .accepting
+    override func prepareForDragOperation(_ drag: any NSDraggingInfo) -> Bool {
+      hover(drag)?.isAccepting == true
     }
 
     override func performDragOperation(_ drag: any NSDraggingInfo) -> Bool {
       catcher?.hovering(nil)
-      let files = NewSessionDropCatcher.files(on: drag.draggingPasteboard)
-      guard catcher?.hover() == .accepting, !files.isEmpty else { return false }
-      catcher?.dropped(files)
+      guard let hover = hover(drag), hover.isAccepting else { return false }
+      catcher?.dropped(files, hover)
       return true
     }
 
     override func draggingEnded(_: any NSDraggingInfo) {
       catcher?.hovering(nil)
+      files = []
     }
   }
 }

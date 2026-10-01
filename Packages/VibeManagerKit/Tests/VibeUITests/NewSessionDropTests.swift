@@ -38,6 +38,13 @@ struct NewSessionDropTests {
       Self.all(NewSessionDropCatcher.CatcherView.self, in: window.contentView).first
     }
 
+    /// The working folder's field.
+    var folderField: NSTextField? {
+      Self.all(NSTextField.self, in: window.contentView).first {
+        $0.placeholderString == String(localized: "Choose a folder", bundle: .module)
+      }
+    }
+
     /// The prompt's field: the draft's only text view, drawn in front of the session's.
     var promptField: NSTextView? {
       Self.all(NSTextView.self, in: window.contentView).first {
@@ -247,5 +254,28 @@ struct NewSessionDropTests {
       ["npm run dev" as NSString], at: field, on: workspace, sourceMask: [.copy, .generic])
 
     #expect(outcome.destination === workspace.promptField)
+  }
+
+  @Test("A folder let go on the working folder becomes the session's, and joins nothing")
+  func folderOnTheWorkingFolder() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let draft = try #require(workspace.draft)
+    let field = try #require(workspace.folderField)
+    let folder = workspace.folder.appendingPathComponent("project", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let location = field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil)
+
+    let outcome = try drop([folder as NSURL], at: location, on: workspace)
+    await waitUntil { draft.draft.workingDirectoryPath == folder.path }
+
+    #expect(outcome.taken)
+    #expect(draft.draft.workingDirectoryPath == folder.path)
+    #expect(draft.draft.attachments.isEmpty)
+
+    // Elsewhere, the same folder is a file joined to the prompt.
+    let card = try #require(try points(of: workspace)["card"])
+    _ = try drop([folder as NSURL], at: card, on: workspace)
+    #expect(draft.draft.attachments == [folder])
   }
 }

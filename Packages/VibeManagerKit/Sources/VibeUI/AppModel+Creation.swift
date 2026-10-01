@@ -147,33 +147,44 @@ extension AppModel {
     sessionInCreation?.isFollowed = false
   }
 
-  /// How long a first message waits for its agent before it is left in the composer, for the
-  /// user to send.
-  static let firstMessagePatience: Duration = .seconds(300)
-
   /// The first message of a session whose draft had files joined (#291): put in its
   /// conversation's composer, then sent from there once the agent is ready, as the user would
-  /// send it — the paths pasted, so that Claude Code takes an image as one. An agent that is not
-  /// ready in time, or a composer the user changed meanwhile, leaves it where it is.
+  /// send it — the paths pasted, so that Claude Code takes an image as one.
+  ///
+  /// Only over a launch that started: one that failed is started again with the session's
+  /// initial prompt, which holds the message already. An agent that stops before it is ready, or
+  /// a composer the user changed meanwhile, leaves the message to the user.
   func sendFirstMessage(_ message: PromptSubmission, to session: WorkSession) {
-    let conversation = conversations.show(session)
-    conversation.draft = message.text
-    conversation.attach(message.attachments)
     let id = session.id
-    let deadline = ContinuousClock.now + Self.firstMessagePatience
+    guard !hasEnded(id) else { return }
+    let conversation = conversations.show(session)
+    // Sent as a message even when it opens on `!`, as it would have been as an argument: a
+    // command would run it in the shell and leave the files out.
+    let text =
+      message.text.hasPrefix("!") && conversation.promptFormat.shellEntry != nil
+      ? PromptKind.literalBang + message.text.dropFirst() : message.text
+    conversation.draft = text
+    conversation.attach(message.attachments, focusing: false)
     Task { [weak self, weak conversation] in
-      while ContinuousClock.now < deadline {
-        guard let self, let conversation else { return }
+      while true {
+        guard let self, let conversation, !self.hasEnded(id) else { return }
         // A process the activity has not seen start yet is not known to be ready.
         if self.activity(for: id) != nil, conversation.composerState == .ready {
-          guard conversation.draft == message.text,
-            conversation.attachments == message.attachments
+          guard conversation.draft == text, conversation.attachments == message.attachments
           else { return }
           await conversation.send()
           return
         }
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(250))
       }
+    }
+  }
+
+  /// Whether the session's process ended, or never started: still starting is not ended.
+  private func hasEnded(_ id: SessionID) -> Bool {
+    switch pane(for: id)?.status {
+    case .exited, .terminated, .failed: true
+    case .starting, .running, nil: false
     }
   }
 }

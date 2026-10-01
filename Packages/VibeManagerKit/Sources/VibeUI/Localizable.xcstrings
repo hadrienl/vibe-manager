@@ -6257,6 +6257,17 @@
         }
       }
     },
+    "Drop to work in this folder" : {
+      "comment" : "Over the new session's draft, while a folder is dragged over its working folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez pour travailler dans ce dossier"
+          }
+        }
+      }
+    },
     "Dropped into the side terminal %@ of %@." : {
       "comment" : "VoiceOver, after a drop on a side terminal. The arguments are its title, then its session's name.",
       "localizations" : {

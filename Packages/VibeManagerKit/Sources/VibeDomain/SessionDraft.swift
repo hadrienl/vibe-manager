@@ -93,8 +93,7 @@ public struct SessionDraft: Hashable, Sendable {
 
   /// The files the agent is handed with the prompt: none with a template's.
   public var sentAttachments: [URL] {
-    guard templateFill == nil else { return [] }
-    return attachments.filter { ShellPath.isWritable($0.path) }
+    templateFill == nil ? attachments : []
   }
 
   public var trimmedPrompt: String {

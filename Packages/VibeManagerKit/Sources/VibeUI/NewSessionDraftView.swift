@@ -24,6 +24,25 @@ public struct NewSessionDraftView: View {
   /// The symbol and the colour, in a popover from the badge next to the name.
   @State private var showsAppearancePicker = false
   @State private var dropHover: NewSessionDropHover?
+  /// Where the working folder lies in the draft, for a folder dropped on it.
+  @State private var folderZone = CGRect.null
+
+  private static let dropSpace = "new-session-draft"
+
+  private static func message(for hover: NewSessionDropHover) -> String {
+    switch hover {
+    case .attaching:
+      String(localized: "Drop to attach to your prompt", bundle: .module)
+    case .choosingFolder:
+      String(
+        localized: "Drop to work in this folder", bundle: .module,
+        comment: "Over the new session's draft, while a folder is dragged over its working folder.")
+    case .refusingTemplate:
+      String(
+        localized: "A template’s prompt takes no files", bundle: .module,
+        comment: "Over the new session's draft, while files are dragged over it.")
+    }
+  }
 
   /// What can hold the keyboard: the draft's own fields, and the ones a template adds.
   enum FocusTarget: Hashable {
@@ -112,33 +131,35 @@ public struct NewSessionDraftView: View {
       placeCaret()
     }
     // A file dropped anywhere on the draft joins its prompt, as the composer of a conversation
-    // takes one.
+    // takes one; a folder dropped on the working folder becomes the session's.
+    .coordinateSpace(.named(Self.dropSpace))
     .overlay {
       if let dropHover {
-        DropVeil(
-          isRefusing: dropHover == .refusingTemplate,
-          message: dropHover == .accepting
-            ? String(localized: "Drop to attach to your prompt", bundle: .module)
-            : String(
-              localized: "A template’s prompt takes no files", bundle: .module,
-              comment: "Over the new session's draft, while files are dragged over it."))
+        DropVeil(isRefusing: !dropHover.isAccepting, message: Self.message(for: dropHover))
       }
     }
     // Over the veil: the catcher is the frontmost view under the drag, the prompt's field
     // included.
     .overlay {
       NewSessionDropCatcher(
-        hover: {
+        hover: { files, location in
           guard !model.isSubmitting else { return nil }
-          return model.draft.templateFill == nil ? .accepting : .refusingTemplate
+          if files.count == 1, files[0].hasDirectoryPath, folderZone.contains(location) {
+            return .choosingFolder
+          }
+          return model.draft.templateFill == nil ? .attaching : .refusingTemplate
         },
         hovering: { hover in
           if dropHover != hover { dropHover = hover }
         },
-        dropped: { files in
-          model.attach(files)
-          // Let go from the Finder: the draft comes forward, its caret in the prompt.
+        dropped: { files, hover in
+          // Let go from the Finder: the draft comes forward.
           NSApp?.activate()
+          if hover == .choosingFolder, let folder = files.first {
+            Task { await model.folderChosen(folder.path) }
+            return
+          }
+          model.attach(files)
           moveFocus(to: .draft(.initialPrompt))
         })
     }
@@ -476,6 +497,11 @@ public struct NewSessionDraftView: View {
         recentFolderCards
         folderPathField
       }
+    }
+    .onGeometryChange(for: CGRect.self) {
+      $0.frame(in: .named(Self.dropSpace))
+    } action: {
+      folderZone = $0
     }
   }
 

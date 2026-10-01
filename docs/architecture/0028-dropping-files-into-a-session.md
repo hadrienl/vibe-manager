@@ -65,8 +65,10 @@ conversation's composer, and Attach Files… makes the same chips. The session i
 them. Given as an argument, an image is only a path, which Claude Code reads with a tool: with files
 joined, the agent is launched without a prompt, and the text and the files are put in its
 conversation's composer and sent from there once the agent is known to run — pasted, so that Claude
-Code takes an image as one. A composer the user changed meanwhile, or an agent not ready within five
-minutes, leaves them there. The session keeps the text followed by the escaped paths as its initial
+Code takes an image as one, and as a message even when it opens on `!`. A composer the user changed
+meanwhile, or an agent that stops before it is ready, leaves them there; over a launch that failed,
+nothing is put there, since the restart gives the initial prompt. The prompt is still checked as an
+argument at creation. One folder let go on the working folder becomes the session's instead. The session keeps the text followed by the escaped paths as its initial
 prompt, which a later launch — from To Do — gives as an argument.
 Over a template's prompt, which takes no file, it refuses them with
 the red veil. A text, a web address or an image with no file of its own meets none of its types and

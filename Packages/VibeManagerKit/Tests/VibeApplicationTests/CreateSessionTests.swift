@@ -267,6 +267,18 @@ struct CreateSessionTests {
     #expect(creation.session.initialPrompt == "Look at " + ShellPath.escaped(image.path))
   }
 
+  @Test("With files joined, a prompt the agent would refuse is still reported")
+  func attachmentsKeepThePromptChecked() async {
+    var provider = StubProvider()
+    provider.promptFailure = .promptTooLarge(byteCount: 10, limit: 5)
+    let (create, repository) = makeSubject(provider: provider)
+    var withFiles = draft()
+    withFiles.attachments = [FileManager.default.temporaryDirectory.appendingPathComponent("a.png")]
+
+    await #expect(throws: SessionCreationRejected.self) { try await create(withFiles) }
+    #expect(await repository.savedSessions.isEmpty)
+  }
+
   @Test("Without files, the prompt is the agent's argument and there is no first message")
   func noAttachmentsNoFirstMessage() async throws {
     let (create, _) = makeSubject()
@@ -367,6 +379,8 @@ private struct StubProvider: AgentProvider {
   var state: AgentAvailabilityState = .available
   var models: [AgentModel] = []
   var launchFailure: AgentLaunchError?
+  /// Refused only for a launch that carries a prompt.
+  var promptFailure: AgentLaunchError?
 
   init(
     state: AgentAvailabilityState = .available,
@@ -397,6 +411,7 @@ private struct StubProvider: AgentProvider {
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
     if let launchFailure { throw launchFailure }
+    if let promptFailure, request.initialPrompt != nil { throw promptFailure }
     return AgentLaunchPlan(
       providerID: descriptor.id,
       executablePath: "/usr/bin/true",
