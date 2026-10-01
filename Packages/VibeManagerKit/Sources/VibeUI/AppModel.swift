@@ -51,12 +51,10 @@ public final class AppModel {
   @ObservationIgnored private var sessionIndexes: [SessionID: Int] = [:]
   public private(set) var refreshFailure: RefreshFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
-  /// The name of each detected agent, by provider identifier, for the places that name one.
-  public var agentNames: [String: String] {
-    Dictionary(
-      agentDiagnostics.map { ($0.providerID.rawValue, $0.providerName) },
-      uniquingKeysWith: { first, _ in first })
-  }
+  /// The name of each agent of this build, by provider identifier, for the places that name one
+  /// (#247). Read from what the providers say of themselves, not from their detection: a session
+  /// is named “Claude Code” from the first frame, and through every refresh.
+  public private(set) var agentNames: [String: String] = [:]
   public private(set) var isRefreshingAgents = false
   public private(set) var selectedSessionID: SessionID?
   /// Whether the new session's draft is what the main area shows (#177), over the session
@@ -2325,6 +2323,7 @@ public final class AppModel {
     // The stored selection is read before the sessions, so the first list that arrives can be
     // asked whether that session still exists instead of selecting its first row and losing it.
     preferredSelection = await layout.restore()
+    if let agents { name(await agents.descriptors()) }
     await loadFolderLabels()
     // Beside the load rather than before it: the notes only serve the search, and the list must
     // not wait on reading them.
@@ -2396,6 +2395,12 @@ public final class AppModel {
   /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
   /// probes now costs three budgets and their retries: there is no reason for the agents that
   /// answered straight away to stay hidden for that long.
+  private func name(_ descriptors: [AgentDescriptor]) {
+    let names = Dictionary(
+      descriptors.map { ($0.id.rawValue, $0.displayName) }, uniquingKeysWith: { first, _ in first })
+    if names != agentNames { agentNames = names }
+  }
+
   public func refreshAgents(forceRefresh: Bool = false) async {
     guard let agents, !isRefreshingAgents else { return }
 
@@ -2403,6 +2408,7 @@ public final class AppModel {
     defer { isRefreshingAgents = false }
 
     let descriptors = await agents.descriptors()
+    name(descriptors)
     usage?.reportingProviderIDs = Set(
       descriptors.filter(\.capabilities.reportsUsage).map(\.id.rawValue))
     var diagnostics: [AgentProviderID: AgentDiagnostic] = [:]

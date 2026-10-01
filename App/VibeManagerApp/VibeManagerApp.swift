@@ -50,12 +50,12 @@ struct VibeManagerApp: App {
   @State private var windowFocus = WindowFocus()
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-  /// How long a help tag waits before showing, in milliseconds. The system's own delay is long
-  /// enough that the small buttons of the sidebar's foot read as unlabelled. Registered as a
-  /// default, so a value the user set with `defaults write` still wins.
   /// The workspace's window, opened again by ⌘N once closed (#247).
   static let workspaceWindowID = "workspace"
 
+  /// How long a help tag waits before showing, in milliseconds. The system's own delay is long
+  /// enough that the small buttons of the sidebar's foot read as unlabelled. Registered as a
+  /// default, so a value the user set with `defaults write` still wins.
   private static let toolTipDelay = 400
 
   init() {

@@ -3,14 +3,20 @@ import Testing
 
 @testable import VibeUI
 
-@Suite("⌘W in the web view")
+@Suite("⌘W and ⌘T in the web view")
 @MainActor
 struct BrowserKeyEquivalentTests {
   private func commandW(_ modifiers: NSEvent.ModifierFlags = .command) -> NSEvent {
+    key("w", keyCode: 13, modifiers)
+  }
+
+  private func key(
+    _ character: String, keyCode: UInt16, _ modifiers: NSEvent.ModifierFlags = .command
+  ) -> NSEvent {
     NSEvent.keyEvent(
       with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: 0,
-      context: nil, characters: "w", charactersIgnoringModifiers: "w", isARepeat: false,
-      keyCode: 13)!
+      context: nil, characters: character, charactersIgnoringModifiers: character,
+      isARepeat: false, keyCode: keyCode)!
   }
 
   private func setUp() -> (NSWindow, BrowserWebViewContainer, page: NSView, other: NSView) {
@@ -50,6 +56,27 @@ struct BrowserKeyEquivalentTests {
     container.isAddressBarFocused = { true }
     #expect(container.performKeyEquivalent(with: commandW()))
     #expect(closed == 2)
+  }
+
+  @Test("⌘T opens a tab when the page or its address bar holds the keyboard, and nothing else")
+  func opensTab() {
+    let (window, container, page, other) = setUp()
+    var opened = 0
+    container.newTab = { opened += 1 }
+    container.isAddressBarFocused = { false }
+
+    window.makeFirstResponder(page)
+    #expect(container.performKeyEquivalent(with: key("t", keyCode: 17)))
+    #expect(opened == 1)
+
+    #expect(!container.performKeyEquivalent(with: key("t", keyCode: 17, [.command, .option])))
+    window.makeFirstResponder(other)
+    #expect(!container.performKeyEquivalent(with: key("t", keyCode: 17)))
+    #expect(opened == 1)
+
+    container.isAddressBarFocused = { true }
+    #expect(container.performKeyEquivalent(with: key("t", keyCode: 17)))
+    #expect(opened == 2)
   }
 }
 

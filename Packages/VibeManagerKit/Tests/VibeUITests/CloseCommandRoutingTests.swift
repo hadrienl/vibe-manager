@@ -215,12 +215,21 @@ struct CloseCommandRoutingTests {
     try await waitUntil("a fourth tab", in: workspace) { workspace.tabs.count == 4 }
     #expect(front.url == address, "\(workspace.state)")
 
-    // Open Location, ⌘L, is unchanged: what is typed replaces the page in front.
+    // Return on the empty field of another new tab opens nothing.
+    model.newWebTab()
+    model.navigateWebTab(to: "")
+    #expect(workspace.tabs.count == 4, "\(workspace.state)")
+    #expect(model.opensNewWebTab, "what is typed next still opens a tab of its own")
+
+    // Open Location, ⌘L, is unchanged: what is typed replaces the page in front, in place.
     model.focusAddressBar()
     try await waitUntil("the address bar holding the keyboard", in: workspace) {
       model.isAddressBarFocused
     }
-    model.navigateWebTab(to: "about:blank")
+    model.navigateWebTab(to: "about:blank#located")
+    try await waitUntil("the page in front sent away", in: workspace) {
+      model.activeWebTab?.url.absoluteString == "about:blank#located"
+    }
     #expect(workspace.tabs.count == 4, "\(workspace.state)")
   }
 

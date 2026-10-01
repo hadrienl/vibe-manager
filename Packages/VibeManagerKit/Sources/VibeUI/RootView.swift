@@ -451,7 +451,11 @@ public struct RootView: View {
               ) {
                 // “Session”, not “Terminal”: beside it the session's own picker already says
                 // Conversation or Terminal, and one word must not name two things (#247).
-                Text("Session", bundle: .module).tag(false)
+                Text(
+                  "Session", bundle: .module,
+                  comment: "Of the two views taking turns in a narrow window: the session's own."
+                )
+                .tag(false)
                 Text("Web", bundle: .module).tag(true)
               } label: {
                 Text("Main View", bundle: .module)

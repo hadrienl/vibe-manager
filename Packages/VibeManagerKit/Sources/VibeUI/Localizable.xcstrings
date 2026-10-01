@@ -11770,7 +11770,7 @@
       }
     },
     "Session" : {
-      "comment" : "What the Usage window groups its figures by.",
+      "comment" : "What the Usage window groups its figures by.\nOf the two views taking turns in a narrow window: the session's own.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

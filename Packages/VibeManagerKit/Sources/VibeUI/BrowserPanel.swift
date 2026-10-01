@@ -43,7 +43,8 @@ struct BrowserPanel: View {
           workspace: workspace, tab: tab, focusRequest: model.webViewFocusRequest,
           isPageFocused: { model.isWebPageFocused = $0 },
           isAddressBarFocused: { model.isAddressBarFocused },
-          closeTab: { model.closeWebTab() })
+          closeTab: { model.closeWebTab() },
+          newTab: { model.newWebTab() })
         if let failure = tab.failure {
           BrowserFailureView(model: model, tab: tab, failure: failure)
         } else if tab.hasCrashed {
@@ -384,6 +385,8 @@ private struct BrowserAddressBar: View {
       text = tab?.url.absoluteString ?? ""
     }
     .onChange(of: model.addressBarFocusRequest) { _, _ in
+      // A new tab starts from an empty field; Open Location edits the page's address.
+      if model.opensNewWebTab { text = "" }
       isFocused = true
     }
     .onChange(of: isFocused) { _, focused in
@@ -495,6 +498,7 @@ private struct BrowserWebViewHost: NSViewRepresentable {
   let isPageFocused: (Bool) -> Void
   let isAddressBarFocused: () -> Bool
   let closeTab: () -> Void
+  let newTab: () -> Void
 
   func makeCoordinator() -> Coordinator {
     Coordinator(workspace: workspace)
@@ -506,6 +510,7 @@ private struct BrowserWebViewHost: NSViewRepresentable {
     container.focusChanged = isPageFocused
     container.isAddressBarFocused = isAddressBarFocused
     container.closeTab = closeTab
+    container.newTab = newTab
     return container
   }
 
@@ -514,6 +519,7 @@ private struct BrowserWebViewHost: NSViewRepresentable {
     container.focusChanged = isPageFocused
     container.isAddressBarFocused = isAddressBarFocused
     container.closeTab = closeTab
+    container.newTab = newTab
     // The web view moved between beside the terminal and taking turns with it: SwiftUI makes the
     // new view, which takes the page, and then updates the old one a last time before letting
     // it go. Taking the page back then left the new view empty — the page parked with the old
@@ -566,28 +572,35 @@ private struct BrowserWebViewHost: NSViewRepresentable {
 }
 
 /// The view pages are shown in. It tells the workspace when the keyboard enters or leaves a page,
-/// so that ⌘W closes the tab while a page has it.
+/// so that ⌘W closes the tab while a page has it, and ⌘T opens another (#247).
 final class BrowserWebViewContainer: NSView {
   var focusChanged: ((Bool) -> Void)?
   var isAddressBarFocused: (() -> Bool)?
   var closeTab: (() -> Void)?
+  var newTab: (() -> Void)?
 
-  /// ⌘W with the keyboard in the page or its address bar closes the tab, here rather than through
-  /// the menu. A `WKWebView` keeps ⌘ keys for its page and hands back the ones the page ignores
-  /// later, when the menu no longer takes them; AppKit asks the views of the key window before
-  /// the menu, and this view holds the page, so it is asked first.
+  /// ⌘W and ⌘T with the keyboard in the page or its address bar close the tab and open another,
+  /// here rather than through the menu. A `WKWebView` keeps ⌘ keys for its page and hands back the
+  /// ones the page ignores later, when the menu no longer takes them; AppKit asks the views of the
+  /// key window before the menu, and this view holds the page, so it is asked first.
   override func performKeyEquivalent(with event: NSEvent) -> Bool {
     let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
       .subtracting([.capsLock, .numericPad, .function])
-    guard modifiers == .command, event.charactersIgnoringModifiers?.lowercased() == "w",
-      let closeTab
-    else { return super.performKeyEquivalent(with: event) }
+    let action: (() -> Void)? =
+      switch event.charactersIgnoringModifiers?.lowercased() {
+      case "w": closeTab
+      case "t": newTab
+      default: nil
+      }
+    guard modifiers == .command, let action else {
+      return super.performKeyEquivalent(with: event)
+    }
     let responder = window?.firstResponder as? NSView
     let inPage = responder.map { $0.isDescendant(of: self) } ?? false
     guard inPage || isAddressBarFocused?() == true else {
       return super.performKeyEquivalent(with: event)
     }
-    closeTab()
+    action()
     return true
   }
   private var observation: NSKeyValueObservation?
