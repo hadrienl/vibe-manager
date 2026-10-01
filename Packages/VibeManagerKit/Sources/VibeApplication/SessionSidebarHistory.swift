@@ -1,6 +1,7 @@
 import VibeDomain
 
-/// A session that was archived, and where it stood: what ⌘Z puts back (#242).
+/// A session that was archived, and where it stood: what ⌘Z puts back (#242). A batch archive is
+/// one entry of several: one ⌘Z brings it all back.
 public struct SessionArchiveUndo: Hashable, Sendable {
   public let id: SessionID
   /// The column it left for the archive.
@@ -20,12 +21,16 @@ public struct SessionArchiveUndo: Hashable, Sendable {
 public struct SessionSidebarHistory: Hashable, Sendable {
   public enum Entry: Hashable, Sendable {
     case identity(SessionIdentityChange)
-    case archive(SessionArchiveUndo)
+    case archive([SessionArchiveUndo])
 
-    var sessionID: SessionID {
+    /// What is left of the entry once the sessions no longer stored are taken out of it.
+    func keeping(only ids: Set<SessionID>) -> Entry? {
       switch self {
-      case .identity(let change): change.id
-      case .archive(let archive): archive.id
+      case .identity(let change):
+        return ids.contains(change.id) ? self : nil
+      case .archive(let archives):
+        let kept = archives.filter { ids.contains($0.id) }
+        return kept.isEmpty ? nil : .archive(kept)
       }
     }
   }
@@ -46,8 +51,9 @@ public struct SessionSidebarHistory: Hashable, Sendable {
     redoStack.removeAll()
   }
 
-  public mutating func record(_ archive: SessionArchiveUndo) {
-    push(.archive(archive))
+  public mutating func record(_ archives: [SessionArchiveUndo]) {
+    guard !archives.isEmpty else { return }
+    push(.archive(archives))
     redoStack.removeAll()
   }
 
@@ -73,7 +79,7 @@ public struct SessionSidebarHistory: Hashable, Sendable {
   }
 
   public mutating func keep(only ids: Set<SessionID>) {
-    undoStack.removeAll { !ids.contains($0.sessionID) }
+    undoStack = undoStack.compactMap { $0.keeping(only: ids) }
     redoStack.removeAll { !ids.contains($0.id) }
   }
 

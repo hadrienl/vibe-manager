@@ -157,14 +157,15 @@ extension AppModel {
   public var canRedoSidebarChange: Bool { sidebarHistory.canRedo }
 
   /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard:
-  /// the last rename, change of icon (#183) or archive (#242). `nil` with nothing to undo: it
-  /// then goes on to the window, as it did before.
+  /// the last rename, change of icon (#183) or archive (#242). `nil` with nothing to undo, or
+  /// with the keyboard elsewhere (`keyboardHere` false): ⌘Z then goes on to the window, whose
+  /// own undo — the draft of a new session given back, for one — is never hidden by this one.
   ///
   /// A text being edited there — the name field, the notes — undoes its own typing: the command
   /// is taken above it, by the view that declares it, before the window would have handed it
   /// down to the text's undo manager.
-  public func sidebarUndoAction(redo: Bool) -> (() -> Void)? {
-    guard redo ? canRedoSidebarChange : canUndoSidebarChange else { return nil }
+  public func sidebarUndoAction(redo: Bool, keyboardHere: Bool = true) -> (() -> Void)? {
+    guard keyboardHere, redo ? canRedoSidebarChange : canUndoSidebarChange else { return nil }
     return { [weak self] in
       let responder = (NSApp.keyWindow ?? NSApp.mainWindow)?.firstResponder
       if Self.isEditingText(responder) {
@@ -198,8 +199,8 @@ extension AppModel {
       if let applied = await apply(change) {
         sidebarHistory.didUndo(applied)
       }
-    case .archive(let archive):
-      await undoArchive(archive)
+    case .archive(let archives):
+      await undoArchive(archives)
     }
   }
 
