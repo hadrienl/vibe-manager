@@ -114,8 +114,8 @@ the bundle: build a second time before testing a translation.
 | folded, unfolded | replié, déplié |
 | generate, generate again | générer, régénérer |
 | allow, always, refuse | autoriser, toujours, refuser |
-| prompt template, template | modèle de prompt, modèle |
-| model (of an agent) | modèle — where both are on screen, the template is « Modèle de prompt » |
+| prompt template, template | gabarit de session, gabarit — never « modèle » |
+| model (of an agent) | modèle — kept for the model alone |
 | working folder | dossier de travail |
 | repository, branch, commit | dépôt, branche, commit |
 | staged, unstaged, untracked, conflicted | indexé, non indexé, non suivi, en conflit |
@@ -146,6 +146,9 @@ the bundle: build a second time before testing a translation.
 | System Settings | Réglages Système |
 | Reveal in Finder | Afficher dans le Finder |
 
+A word that names a model of an agent never names a template, in any language, not even qualified:
+« modèle de prompt » next to « Modèle » made one word mean two things in the same sheet (#221).
+
 ## Guards
 
 - `Scripts/check-localizations.sh`, run by `Scripts/ci.sh`, fails when a string of a catalog has no
@@ -159,6 +162,10 @@ the bundle: build a second time before testing a translation.
   modules, and every `.xcstrings` of `App` — and fails on a French value, plural variants included,
   with an ordinary space before `:` `;` `?` `!` or inside « » (after « or before »). A no-break
   space (U+00A0) or a narrow one (U+202F) passes; there is no list of exceptions.
+- `TemplateWordingTests` reads every catalog too, and fails on a translation of a key that says
+  `template` with the word of a model (« modèle » in French), or on that word in a translation whose
+  key does not say `model`. A language added to the catalogs adds its word for a model to the
+  test's `modelWords`.
 - `AvatarLocalizationTests` resolves every label and every problem of Settings › Requests ›
   Avatars in French, and fails on an English text left as it is.
 - The interface smoke test launches the application in English (`-AppleLanguages (en)`), and one

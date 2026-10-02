@@ -591,7 +591,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gérer les modèles de prompt…"
+            "value" : "Gérer les gabarits de session…"
           }
         }
       }
@@ -681,7 +681,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nouvelle session à partir d’un modèle"
+            "value" : "Nouvelle session à partir d’un gabarit"
           }
         }
       }
@@ -862,7 +862,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistrer les modifications du modèle « %@ » avant de quitter ?"
+            "value" : "Enregistrer les modifications du gabarit « %@ » avant de quitter ?"
           }
         }
       }
@@ -1143,7 +1143,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle « %@ » contient des modifications qui ne peuvent pas être enregistrées."
+            "value" : "Le gabarit « %@ » contient des modifications qui ne peuvent pas être enregistrées."
           }
         }
       }
@@ -1194,7 +1194,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle sans titre"
+            "value" : "Gabarit sans titre"
           }
         }
       }

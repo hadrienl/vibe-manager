@@ -106,7 +106,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un autre modèle s’appelle déjà « %@ »."
+            "value" : "Un autre gabarit s’appelle déjà « %@ »."
           }
         }
       }
@@ -198,7 +198,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remplissez-le, ou choisissez un autre modèle."
+            "value" : "Remplissez-le, ou choisissez un autre gabarit."
           }
         }
       }
@@ -302,7 +302,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nommez la tâche à laquelle sert ce modèle : c’est ainsi que vous le choisirez."
+            "value" : "Nommez la tâche à laquelle sert ce gabarit : c’est ainsi que vous le choisirez."
           }
         }
       }
@@ -648,7 +648,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce modèle compte %1$lld champs ; un modèle peut en avoir %2$lld au plus."
+            "value" : "Ce gabarit compte %1$lld champs ; un gabarit peut en avoir %2$lld au plus."
           }
         }
       }

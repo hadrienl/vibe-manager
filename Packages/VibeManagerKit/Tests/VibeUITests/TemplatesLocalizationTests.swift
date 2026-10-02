@@ -17,16 +17,16 @@ struct TemplatesLocalizationTests {
     // The test runner declares no localization of its own, so its strings are English.
     #expect(model.editing?.name == "Untitled Template")
     #expect(
-      Localization.string("Untitled Template", module: "VibeUI", in: "fr") == "Modèle sans titre")
+      Localization.string("Untitled Template", module: "VibeUI", in: "fr") == "Gabarit sans titre")
   }
 
   @Test(
     "The count of imported templates agrees with its number",
     arguments: [
-      (0, "0 templates imported.", "0 modèle importé."),
-      (1, "1 template imported.", "1 modèle importé."),
-      (2, "2 templates imported.", "2 modèles importés."),
-      (1_000_000, "1,000,000 templates imported.", "1\u{202F}000\u{202F}000 modèles importés."),
+      (0, "0 templates imported.", "0 gabarit importé."),
+      (1, "1 template imported.", "1 gabarit importé."),
+      (2, "2 templates imported.", "2 gabarits importés."),
+      (1_000_000, "1,000,000 templates imported.", "1\u{202F}000\u{202F}000 gabarits importés."),
     ])
   func importedCount(count: Int, english: String, french: String) {
     #expect(

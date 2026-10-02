@@ -40,7 +40,7 @@
   "card.reply.text": "Une session en arrière-plan pose une question ? Répondez depuis une palette, sans quitter ce que vous faites.",
   "card.switch.title": "Changez d'agent en cours de route",
   "card.switch.text": "Passez de Claude Code à Codex, ou d'un modèle à l'autre. Le nouvel agent reçoit un résumé du travail, que vous relisez avant l'envoi.",
-  "card.templates.title": "Templates de prompt",
+  "card.templates.title": "Gabarits de session",
   "card.templates.text": "« Revue de {{url}} » : un formulaire, un aperçu exact, et la session démarre nommée d'après la MR.",
   "card.web.title": "Terminaux et vue web par session",
   "card.web.text": "Un tiroir de terminaux pour le serveur et les logs, et une vue web que l'agent sait piloter : ouvrir, lire la console, capturer.",

@@ -29,6 +29,11 @@ struct FrenchTypographyTests {
 
   /// Every French value of a catalog, plural and device variants included, with its key.
   static func frenchValues(of catalog: URL) throws -> [(key: String, value: String)] {
+    try values(of: catalog, language: "fr")
+  }
+
+  /// Every value of a catalog in `language`, plural and device variants included, with its key.
+  static func values(of catalog: URL, language: String) throws -> [(key: String, value: String)] {
     let data = try Data(contentsOf: catalog)
     let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
     let strings = object?["strings"] as? [String: Any] ?? [:]
@@ -46,8 +51,8 @@ struct FrenchTypographyTests {
       }
     }
     for (key, entry) in strings {
-      let french = ((entry as? [String: Any])?["localizations"] as? [String: Any])?["fr"]
-      if let french { walk(french, key: key) }
+      let translation = ((entry as? [String: Any])?["localizations"] as? [String: Any])?[language]
+      if let translation { walk(translation, key: key) }
     }
     return values
   }
