@@ -581,7 +581,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gérer les gabarits de prompt…"
+            "value" : "Gérer les gabarits de session…"
           }
         }
       }

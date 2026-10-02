@@ -97,7 +97,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce fichier ne contient pas de gabarits de prompt Vibe Manager."
+            "value" : "Ce fichier ne contient pas de gabarits de session Vibe Manager."
           }
         }
       }

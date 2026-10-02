@@ -114,7 +114,7 @@ the bundle: build a second time before testing a translation.
 | folded, unfolded | replié, déplié |
 | generate, generate again | générer, régénérer |
 | allow, always, refuse | autoriser, toujours, refuser |
-| prompt template, template | gabarit de prompt, gabarit — never « modèle » |
+| prompt template, template | gabarit de session, gabarit — never « modèle » |
 | model (of an agent) | modèle — kept for the model alone |
 | working folder | dossier de travail |
 | repository, branch, commit | dépôt, branche, commit |

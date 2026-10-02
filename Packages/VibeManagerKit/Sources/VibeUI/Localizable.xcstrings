@@ -3924,7 +3924,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un gabarit est un prompt avec des champs à remplir — « Revue {{url}} » — prêt à lancer une session."
+            "value" : "Un gabarit prépare une session : son prompt, avec des champs à remplir — « Revue {{url}} » —, et au besoin son dossier, son nom et son apparence."
           }
         }
       }
@@ -9791,7 +9791,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gabarit de prompt"
+            "value" : "Gabarit de session"
           }
         }
       }
@@ -9802,7 +9802,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gabarits de prompt"
+            "value" : "Gabarits de session"
           }
         }
       }
@@ -9813,7 +9813,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gabarit de prompt"
+            "value" : "Gabarit de session"
           }
         }
       }
