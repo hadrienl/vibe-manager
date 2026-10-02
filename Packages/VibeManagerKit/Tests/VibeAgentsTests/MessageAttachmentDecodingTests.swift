@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VibeApplication
+import VibeDomain
 
 @testable import VibeAgents
 
@@ -132,19 +133,40 @@ struct MessageAttachmentDecodingTests {
 
   @Test("Files joined by their paths become attachments; the text the agent read keeps them")
   func filesJoinedByPath() async throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("joined-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    func file(_ name: String) throws -> String {
+      let url = folder.appendingPathComponent(name)
+      try Data("x".utf8).write(to: url)
+      return url.path
+    }
+    let notes = try file("My Notes (1).txt")
+    let report = try file("report.pdf")
+    let sound = try file("only.mp3")
+    func prompt(_ id: String, _ text: String) throws -> String {
+      let object: [String: Any] = ["type": "user", "uuid": id, "message": ["content": text]]
+      return String(decoding: try JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+    }
+    let joined = "Read these " + ShellPath.escaped(notes) + " " + ShellPath.escaped(report)
     let (entries, _) = try await decode([
-      #"{"type":"user","uuid":"u","message":{"content":"Read these /Users/a/My\\ Notes\\ \\(1\\).txt /tmp/report.pdf"}}"#,
-      #"{"type":"user","uuid":"v","message":{"content":"open /tmp/a.log and tell me"}}"#,
-      #"{"type":"user","uuid":"w","message":{"content":"/tmp/only.mp3"}}"#,
+      try prompt("u", joined),
+      try prompt("v", "open \(ShellPath.escaped(notes)) and tell me"),
+      try prompt("w", ShellPath.escaped(sound)),
+      try prompt("x", "add the endpoint POST /api/v1/users"),
+      try prompt("y", "compare " + ShellPath.escaped(notes) + " /nowhere/gone.txt"),
     ])
-    #expect(entries[0].promptText == #"Read these /Users/a/My\ Notes\ \(1\).txt /tmp/report.pdf"#)
-    #expect(
-      entries[0].attachments.map(\.file?.path) == ["/Users/a/My Notes (1).txt", "/tmp/report.pdf"])
+    #expect(entries[0].promptText == joined)
+    #expect(entries[0].attachments.map(\.file?.path) == [notes, report])
     #expect(entries[0].attachments.map(\.kind) == [.text, .pdf])
-    #expect(AttachedPaths.displayText(entries[0].promptText ?? "") == "Read these")
+    #expect(entries[0].attachments.allSatisfy { $0.isWrittenInText })
+    #expect(AttachedPaths.displayText(joined, joinedCount: 2) == "Read these")
     #expect(entries[1].attachments.isEmpty)
     #expect(entries[2].attachments.map(\.kind) == [.audio])
-    #expect(AttachedPaths.displayText(entries[2].promptText ?? "") == "")
+    #expect(AttachedPaths.displayText(entries[2].promptText ?? "", joinedCount: 1) == "")
+    // A path naming no file is the user's words, and so is every path before it.
+    #expect(entries[3].attachments.isEmpty)
+    #expect(entries[4].attachments.isEmpty)
   }
 
   @Test(

@@ -28,12 +28,17 @@ public struct MessageAttachment: Hashable, Sendable, Identifiable {
   public var source: Source
   /// The file's name; nil for an image pasted without one, which the view names by its rank.
   public var name: String?
+  /// Joined by its path written at the end of the prompt's text, which the view leaves out.
+  public var isWrittenInText: Bool
 
-  public init(id: String, kind: Kind, source: Source, name: String?) {
+  public init(
+    id: String, kind: Kind, source: Source, name: String?, isWrittenInText: Bool = false
+  ) {
     self.id = id
     self.kind = kind
     self.source = source
     self.name = name
+    self.isWrittenInText = isWrittenInText
   }
 
   public var file: URL? {
@@ -50,11 +55,13 @@ public struct MessageAttachment: Hashable, Sendable, Identifiable {
     }
   }
 
-  /// A file joined by its path.
-  public static func file(_ url: URL, id: String) -> MessageAttachment {
+  /// A file joined by its path — written at the end of the prompt's text, or not.
+  public static func file(_ url: URL, id: String, isWrittenInText: Bool = false)
+    -> MessageAttachment
+  {
     MessageAttachment(
       id: id, kind: kind(forExtension: url.pathExtension), source: .file(url),
-      name: url.lastPathComponent)
+      name: url.lastPathComponent, isWrittenInText: isWrittenInText)
   }
 
   /// What a file is, from its extension.
@@ -162,18 +169,31 @@ public struct TranscriptLineLocation: Hashable, Sendable {
 /// The composer writes them at the end of the message, escaped as Terminal.app writes a dropped
 /// file, separated by spaces (`PromptEncoding`). The agent reads them as text: the message keeps
 /// them, and only its display shows them as attachments. A path in the middle of a sentence stays
-/// text.
+/// text, and so does one at its end that names no file — `POST /api/v1/users` — with every path
+/// before it: only the paths at the very end that name files are attachments.
 public enum AttachedPaths {
-  /// The text shown, without the paths at its end, and the files they name.
-  public static func split(_ text: String) -> (text: String, files: [URL]) {
-    guard let found = ShellPath.trailingPaths(in: text) else { return (text, []) }
+  /// The text without the paths at its end that name files, and those files. Looks at the disk:
+  /// called once, when the prompt is decoded.
+  public static func split(
+    _ text: String,
+    exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+  ) -> (text: String, files: [URL]) {
+    guard let found = ShellPath.trailingPaths(in: text, while: exists) else { return (text, []) }
     let body = found.body.trimmingCharacters(in: .whitespacesAndNewlines)
     return (body, found.paths.map { URL(fileURLWithPath: $0) })
   }
 
-  /// The text shown for a prompt: what `split` leaves.
-  public static func displayText(_ text: String) -> String {
-    split(text).text
+  /// The text shown for a prompt whose last `count` paths became attachments: without them. Never
+  /// looks at the disk.
+  public static func displayText(_ text: String, joinedCount count: Int) -> String {
+    guard count > 0 else { return text }
+    var accepted = 0
+    let found = ShellPath.trailingPaths(in: text) { _ in
+      accepted += 1
+      return accepted <= count
+    }
+    guard let found else { return text }
+    return found.body.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }
 

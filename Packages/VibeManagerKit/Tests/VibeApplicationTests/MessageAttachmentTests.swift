@@ -83,11 +83,26 @@ struct MessageAttachmentTests {
     #expect(!AttachmentOpening.canShowInWebView(text))
   }
 
-  @Test("The text shown keeps what is not a joined path")
-  func displayText() {
-    #expect(AttachedPaths.displayText(#"see /tmp/a\ b.png"#) == "see")
+  @Test("Only the paths at the end that name files are joined; the text shown loses only them")
+  func joinedPaths() {
+    let exists: (String) -> Bool = { $0 != "/api/v1/users" && !$0.hasPrefix("/gone") }
     #expect(
-      AttachedPaths.split(#"see /tmp/a\ b.png"#).files == [URL(fileURLWithPath: "/tmp/a b.png")])
-    #expect(AttachedPaths.displayText("no paths here") == "no paths here")
+      AttachedPaths.split(#"see /tmp/a\ b.png"#, exists: exists).files == [
+        URL(fileURLWithPath: "/tmp/a b.png")
+      ])
+    #expect(AttachedPaths.split("POST /api/v1/users", exists: exists).files.isEmpty)
+    #expect(AttachedPaths.split("POST /api/v1/users", exists: exists).text == "POST /api/v1/users")
+    #expect(AttachedPaths.split("/tmp/a.txt /gone.txt", exists: exists).files.isEmpty)
+    #expect(
+      AttachedPaths.split("/gone.txt /tmp/a.txt", exists: exists).files.map(\.path) == [
+        "/tmp/a.txt"
+      ])
+    #expect(AttachedPaths.split("/gone.txt /tmp/a.txt", exists: exists).text == "/gone.txt")
+    #expect(
+      AttachedPaths.displayText(#"see /tmp/a\ b.png /tmp/c.pdf"#, joinedCount: 1)
+        == #"see /tmp/a\ b.png"#)
+    #expect(AttachedPaths.displayText(#"see /tmp/a\ b.png /tmp/c.pdf"#, joinedCount: 2) == "see")
+    #expect(AttachedPaths.displayText("ends /tmp/x.txt", joinedCount: 0) == "ends /tmp/x.txt")
+    #expect(AttachedPaths.displayText("no paths here", joinedCount: 1) == "no paths here")
   }
 }

@@ -20,10 +20,17 @@ public enum ShellPath {
   /// (#209): the files the composer joined to a prompt. Only absolute paths count, separated by
   /// spaces; a backslash takes the character after it as it is. Nil when `text` does not end with
   /// such a path.
-  public static func trailingPaths(in text: String) -> (body: Substring, paths: [String])? {
+  ///
+  /// - Parameter accept: asked of each path from the last; the first refused, and all before it,
+  ///   stay in the body.
+  public static func trailingPaths(
+    in text: String, while accept: (String) -> Bool = { _ in true }
+  ) -> (body: Substring, paths: [String])? {
     var paths: [String] = []
     var end = text.endIndex
-    while let (start, path) = lastWord(in: text[..<end]), path.hasPrefix("/"), path.count > 1 {
+    while let (start, path) = lastWord(in: text[..<end]), path.hasPrefix("/"), path.count > 1,
+      accept(path)
+    {
       paths.insert(path, at: 0)
       end = start
       // The words are separated by one space; whatever else stands before the first is the body.

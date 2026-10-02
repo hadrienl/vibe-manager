@@ -390,7 +390,7 @@ public final class CodexConversationDecoder: ConversationDecoding {
   /// The files the composer joined by their paths, at the end of the text (#209).
   static func joinedFiles(in text: String, id: String) -> [MessageAttachment] {
     AttachedPaths.split(text).files.enumerated().map { rank, file in
-      MessageAttachment.file(file, id: "\(id)/file-\(rank)")
+      MessageAttachment.file(file, id: "\(id)/file-\(rank)", isWrittenInText: true)
     }
   }
 

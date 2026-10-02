@@ -324,7 +324,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     if Self.isPlumbing(trimmed) { return }
     // The files the composer joined by their paths, at the end of the text (#209).
     let joined = AttachedPaths.split(text).files.enumerated().map { rank, file in
-      MessageAttachment.file(file, id: "\(uuid)/file-\(rank)")
+      MessageAttachment.file(file, id: "\(uuid)/file-\(rank)", isWrittenInText: true)
     }
     let all = attachments + joined
     guard !trimmed.isEmpty || !all.isEmpty else { return }

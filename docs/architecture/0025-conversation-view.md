@@ -74,7 +74,8 @@ thumbnail of 120 points at most (`CGImageSourceCreateThumbnailAtIndex`), off the
 a cache bounded in bytes. A line no longer holding the same base64 — the transcript rewritten —
 shows the image as unavailable. The files the composer joined by their paths stay in the prompt's
 text, which is what the agent read; only the paths written at its end, escaped as the composer
-writes them, are shown as attachments.
+writes them, and naming files when the prompt is read, are shown as attachments — `POST
+/api/v1/users` stays the user's words.
 
 A click opens Quick Look; an image the transcript alone holds is written to a temporary copy for
 it, removed when Quick Look closes. Opening a file with its default application is offered for a
