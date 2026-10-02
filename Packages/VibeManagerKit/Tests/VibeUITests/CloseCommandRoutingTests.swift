@@ -270,11 +270,12 @@ struct CloseCommandRoutingTests {
       workspace.tabs.count == 4 && model.activeWebTab?.isBlank == true
         && model.isAddressBarFocused && workspace.addressField?.stringValue == ""
     }
-    // Still there once the new page is on screen: it did not take the keyboard back.
-    try await waitUntil("the new page on screen", in: workspace) {
+    // Still there once the new page is on screen and no longer owed the keyboard the old one had:
+    // it did not take it back.
+    try await waitUntil("the new page on screen, owed nothing", in: workspace) {
       workspace.page.map { $0 !== page } == true
+        && model.browser?.pageLeftWithKeyboard == false
     }
-    try await Task.sleep(for: .milliseconds(300))
     #expect(model.isAddressBarFocused, "\(workspace.state)")
   }
 

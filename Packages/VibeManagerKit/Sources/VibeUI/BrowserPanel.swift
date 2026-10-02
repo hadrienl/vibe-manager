@@ -167,16 +167,10 @@ private struct BrowserTabButton: View {
         Text(verbatim: browser.ticket?.label ?? tab.displayTitle)
           .lineLimit(1)
       } else {
-        Group {
-          if tab.isBlank && tab.title.isEmpty {
-            Text("New Tab", bundle: .module)
-          } else {
-            Text(verbatim: tab.displayTitle)
-          }
-        }
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .frame(maxWidth: 150, alignment: .leading)
+        title
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .frame(maxWidth: 150, alignment: .leading)
         if isActive || isHovering {
           Button(action: close) {
             Image(systemName: "xmark")
@@ -232,8 +226,13 @@ private struct BrowserTabButton: View {
     }
   }
 
+  /// An empty tab is a New Tab, never `about:blank`.
+  private var title: Text {
+    tab.isBlank && tab.title.isEmpty
+      ? Text("New Tab", bundle: .module) : Text(verbatim: tab.displayTitle)
+  }
+
   private var accessibilityLabel: Text {
-    let title = Text(verbatim: tab.displayTitle)
     if tab.isPinnedTicket {
       return Text("Ticket tab, \(browser.ticket?.label ?? tab.displayTitle)", bundle: .module)
     }
