@@ -12,17 +12,6 @@
         }
       }
     },
-    "Exited with code %@" : {
-      "comment" : "A terminal's state: its process ended with this exit status.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Terminé avec le code %@"
-          }
-        }
-      }
-    },
     "Finished" : {
       "comment" : "A terminal's state.",
       "localizations" : {
@@ -30,6 +19,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Processus terminé"
+          }
+        }
+      }
+    },
+    "Process failed (code %@)" : {
+      "comment" : "A terminal's state: its process ended with this exit status, other than 0.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus en erreur (code %@)"
+          }
+        }
+      }
+    },
+    "Process interrupted (signal %@)" : {
+      "comment" : "A terminal's state: its process was killed by this signal number.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus interrompu (signal %@)"
           }
         }
       }
@@ -104,17 +115,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminal indisponible"
-          }
-        }
-      }
-    },
-    "Terminated by signal %@" : {
-      "comment" : "A terminal's state: its process was killed by this signal number.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrompu par le signal %@"
           }
         }
       }

@@ -5969,6 +5969,17 @@
         }
       }
     },
+    "Couldn't start" : {
+      "comment" : "A session's state: its agent could not be launched.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage impossible"
+          }
+        }
+      }
+    },
     "Couldn’t archive this session." : {
       "localizations" : {
         "fr" : {
@@ -6877,13 +6888,13 @@
         }
       }
     },
-    "Exited with code %@" : {
-      "comment" : "A session's state: its agent ended with this exit status.",
+    "Exit code %@" : {
+      "comment" : "Beside a session's state: the exit status its agent ended with.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminée avec le code %@"
+            "value" : "Code de sortie %@"
           }
         }
       }
@@ -7024,7 +7035,7 @@
       }
     },
     "Failed" : {
-      "comment" : "A session's state, in the sidebar.\nAn agent action in the web view that failed.\nAn avatar that could not be drawn.",
+      "comment" : "An avatar, or an agent action in the web view, that failed.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -10473,6 +10484,28 @@
         }
       }
     },
+    "Process failed" : {
+      "comment" : "A session's state: its agent's process ended on an error.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus en erreur"
+          }
+        }
+      }
+    },
+    "Process interrupted" : {
+      "comment" : "A session's state: its agent's process was killed by a signal.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus interrompu"
+          }
+        }
+      }
+    },
     "Project icon" : {
       "comment" : "The icon found in the working folder.",
       "localizations" : {
@@ -12641,6 +12674,17 @@
         }
       }
     },
+    "Signal %@" : {
+      "comment" : "Beside a session's state: the signal number its agent was killed by.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal %@"
+          }
+        }
+      }
+    },
     "Silence in an answer" : {
       "localizations" : {
         "fr" : {
@@ -13166,17 +13210,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminaux"
-          }
-        }
-      }
-    },
-    "Terminated by signal %@" : {
-      "comment" : "A session's state: its agent was killed by this signal number.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrompue par le signal %@"
           }
         }
       }

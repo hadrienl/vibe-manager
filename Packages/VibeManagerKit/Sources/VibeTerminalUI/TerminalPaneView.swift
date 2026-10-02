@@ -209,11 +209,11 @@ extension TerminalPaneModel.Status {
       return code == 0
         ? String(localized: "Finished", bundle: .module, comment: "A terminal's state.")
         : String(
-          localized: "Exited with code \(String(code))", bundle: .module,
-          comment: "A terminal's state: its process ended with this exit status.")
+          localized: "Process failed (code \(String(code)))", bundle: .module,
+          comment: "A terminal's state: its process ended with this exit status, other than 0.")
     case .terminated(let signal):
       return String(
-        localized: "Terminated by signal \(String(signal))", bundle: .module,
+        localized: "Process interrupted (signal \(String(signal)))", bundle: .module,
         comment: "A terminal's state: its process was killed by this signal number.")
     case .failed(let message):
       return message

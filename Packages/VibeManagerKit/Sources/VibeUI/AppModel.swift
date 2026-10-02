@@ -978,7 +978,8 @@ public final class AppModel {
       paneStatus: pane?.status,
       resolution: resolution(forID: session.id),
       wasStoppedOnPurpose: pane?.wasStoppedOnPurpose == true,
-      activity: activity(for: session.id)
+      activity: activity(for: session.id),
+      launchFailed: pane?.failure != nil
     )
   }
 

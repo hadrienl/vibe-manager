@@ -260,7 +260,37 @@ public struct ConversationView: View {
       if model.isAgentWorking {
         ActivityLine(model: model)
       }
-      if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
+      if model.composerState == .stopped, let failure = model.shownLaunchFailure {
+        HStack(alignment: .firstTextBaseline) {
+          Label {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(failure.message)
+              if let suggestion = failure.suggestion {
+                Text(suggestion).foregroundStyle(theme.secondaryText.color)
+              }
+            }
+          } icon: {
+            Image(systemName: "exclamationmark.triangle")
+          }
+          .font(theme.interfaceFont(size: 12.5))
+          Spacer()
+          stoppedActions
+        }
+      } else if model.composerState == .stopped, model.hasStoppedOnError {
+        HStack {
+          Label {
+            Text(
+              "The agent stopped on an error. Its terminal says why.", bundle: .module,
+              comment: "Under a conversation whose agent ended on its own, not closed by the user.")
+          } icon: {
+            Image(systemName: "exclamationmark.triangle")
+          }
+          .font(theme.interfaceFont(size: 12.5))
+          .foregroundStyle(theme.secondaryText.color)
+          Spacer()
+          stoppedActions
+        }
+      } else if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
         HStack {
           Label {
             Text("The session is stopped. Its history stays readable.", bundle: .module)
@@ -283,6 +313,21 @@ public struct ConversationView: View {
     .frame(maxWidth: .infinity)
     // Behind the messages only: the composer keeps the plain background.
     .background(theme.backdrop.area == .messages ? theme.background.color : .clear)
+  }
+
+  /// The way to the terminal, which says why, and Restart, for an agent that stopped on an error.
+  @ViewBuilder
+  private var stoppedActions: some View {
+    if let showTerminal = model.showTerminal {
+      Button(action: showTerminal) {
+        Text("Show the Terminal", bundle: .module)
+      }
+    }
+    if model.canRestart(), let restart = model.restart {
+      Button(action: restart) {
+        Text("Restart", bundle: .module)
+      }
+    }
   }
 
   @ViewBuilder

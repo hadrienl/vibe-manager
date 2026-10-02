@@ -2,6 +2,7 @@ import Foundation
 import VibeApplication
 import VibeConversationUI
 import VibeDomain
+import VibeTerminalUI
 
 extension AppModel {
   /// How the session is shown: what the user chose for it, or the default of the settings —
@@ -96,6 +97,14 @@ extension AppModel {
         guard let status = self?.pane(for: id)?.status else { return false }
         return status == .running || status == .starting
       }
+      model.endedOnError = { [weak self] in
+        guard let pane = self?.pane(for: id) else { return false }
+        return ConversationStopReport.endedOnError(
+          pane.status, wasStoppedOnPurpose: pane.wasStoppedOnPurpose)
+      }
+      model.launchFailure = { [weak self] in
+        ConversationStopReport.launchFailure(of: self?.pane(for: id))
+      }
       // As the kernel says: the same whether the application was open when it started or not.
       model.processStartDate = { [weak self] in
         guard let terminal = self?.pane(for: id)?.session,
@@ -145,5 +154,25 @@ extension AppModel {
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))
     }
+  }
+}
+
+/// What the foot of a conversation says of an agent that is no longer running (#235).
+enum ConversationStopReport {
+  /// Ended on an error nobody asked for: an exit status other than 0, a signal, a terminal that
+  /// failed. Never a session closed or quit on purpose, whatever its process reported.
+  static func endedOnError(_ status: TerminalPaneModel.Status, wasStoppedOnPurpose: Bool) -> Bool {
+    guard !wasStoppedOnPurpose else { return false }
+    switch status {
+    case .exited(let code): return code != 0
+    case .terminated, .failed: return true
+    case .starting, .running: return false
+    }
+  }
+
+  /// Why the agent could not be launched, as its terminal says it.
+  @MainActor
+  static func launchFailure(of pane: TerminalPaneModel?) -> ConversationLaunchFailure? {
+    pane?.failure.map { ConversationLaunchFailure(message: $0.message, suggestion: $0.suggestion) }
   }
 }

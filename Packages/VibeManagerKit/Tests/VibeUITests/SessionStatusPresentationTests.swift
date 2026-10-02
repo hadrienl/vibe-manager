@@ -145,9 +145,23 @@ struct SessionStatusPresentationTests {
 
     #expect(failed.severity == .error)
     #expect(exited.severity == .error)
-    #expect(english(exited.label).contains("127"))
     #expect(terminated.severity == .error)
-    #expect(english(terminated.label).contains("9"))
+    // Words first, the code after them, for whoever wants it (#235).
+    #expect(english(exited.label) == "Process failed")
+    #expect(exited.detail == "Exit code 127")
+    #expect(english(terminated.label) == "Process interrupted")
+    #expect(terminated.detail == "Signal 9")
+    #expect(Localization.string(exited.label, in: "fr") == "Processus en erreur")
+    let spoken = SessionStatusPresentation.accessibilityLabel(for: session(), status: exited)
+    #expect(spoken.hasSuffix("Process failed (Exit code 127)"))
+    // Said "could not start" only of a process that never did: a terminal lost on the way failed
+    // after running, and keeps its reason beside the words.
+    #expect(english(failed.label) == "Process failed")
+    #expect(failed.detail == "No such file")
+    let neverStarted = SessionStatusPresentation.make(
+      session: session(), paneStatus: .failed(message: "No such file"), launchFailed: true)
+    #expect(english(neverStarted.label) == "Couldn't start")
+    #expect(neverStarted.detail == "No such file")
   }
 
   @Test("A clean exit is not a failure")
@@ -209,7 +223,8 @@ struct SessionStatusPresentationTests {
     )
 
     #expect(english(finished.label) == "Agent unavailable")
-    #expect(english(failed.label).contains("127"))
+    #expect(english(failed.label) == "Process failed")
+    #expect(failed.detail == "Exit code 127")
   }
 
   @Test("VoiceOver hears the name, the agent and the state")
@@ -231,9 +246,9 @@ struct SessionStatusFrenchTests {
       (.starting, "Démarrage"),
       (.running, "Prête"),
       (.exited(code: 0), "Processus terminé"),
-      (.exited(code: 127), "Terminée avec le code 127"),
-      (.terminated(signal: 9), "Interrompue par le signal 9"),
-      (.failed(message: "x"), "Échec"),
+      (.exited(code: 127), "Processus en erreur"),
+      (.terminated(signal: 9), "Processus interrompu"),
+      (.failed(message: "x"), "Processus en erreur"),
     ]
     for (pane, french) in expected {
       let status = SessionStatusPresentation.make(

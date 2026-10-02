@@ -2180,6 +2180,8 @@ struct SessionRow: View {
         // What waits for the user is the one state set apart from the others by more than its
         // colour and its symbol.
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
+        // The exit code or the signal, for whoever wants it, behind words that say what happened.
+        .help(status.detail ?? "")
         .foregroundStyle(isRestoring ? Color.secondary : tint)
         .lineLimit(1)
       }
@@ -2443,7 +2445,8 @@ private func terminalTitle(
     paneStatus: pane.status,
     resolution: model.resolution(forID: session.id),
     wasStoppedOnPurpose: pane.wasStoppedOnPurpose,
-    activity: model.activity(for: session.id)
+    activity: model.activity(for: session.id),
+    launchFailed: pane.failure != nil
   )
   return String(
     localized: "Terminal — \(session.name) — \(String(localized: status.label))",
