@@ -8495,6 +8495,17 @@
         }
       }
     },
+    "Location" : {
+      "comment" : "Where an agent's command-line tool is.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emplacement"
+          }
+        }
+      }
+    },
     "Looking for coding agents…" : {
       "localizations" : {
         "fr" : {
@@ -16332,6 +16343,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les valeurs à essayer apparaissent ici pour chaque champ du gabarit."
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
           }
         }
       }

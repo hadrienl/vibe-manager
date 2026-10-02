@@ -65,6 +65,8 @@ public final class AppModel {
   /// about the store, and kept through the reload that follows the action.
   public private(set) var actionFailure: ActionFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
+  /// The agents of this build, as their providers describe themselves, in their order.
+  public private(set) var agentDescriptors: [AgentDescriptor] = []
   /// The name of each agent of this build, by provider identifier, for the places that name one
   /// (#247). Read from what the providers say of themselves, not from their detection: a session
   /// is named “Claude Code” from the first frame, and through every refresh.
@@ -2525,6 +2527,7 @@ public final class AppModel {
     defer { isRefreshingAgents = false }
 
     let descriptors = await agents.descriptors()
+    agentDescriptors = descriptors
     name(descriptors)
     usage?.reportingProviderIDs = Set(
       descriptors.filter(\.capabilities.reportsUsage).map(\.id.rawValue))

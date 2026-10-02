@@ -184,18 +184,19 @@ struct SettingsSidebarContent {
         id: "application", title: nil,
         entries: [.general, .conversation, .sessionAppearance, .requests].map(entry))
     ]
-    if !model.hookTrustingAgents.isEmpty {
+    let agents = model.settingsAgents
+    if !agents.isEmpty {
       groups.append(
         Group(
           id: "agents",
           title: LocalizedStringResource(
             "Agents", bundle: .module, comment: "A group of the Settings window's sidebar."),
-          entries: model.hookTrustingAgents.map { agent in
+          entries: agents.map { agent in
             Entry(
               page: .agent(agent.id), name: agent.displayName, symbolName: agent.symbolName,
               tint: SettingsPage.agent(agent.id).tint,
-              status: model.reportsActivity[agent.id] ?? true
-                ? .green : Color(nsColor: .tertiaryLabelColor))
+              status: AgentSettingsPage.color(
+                of: model.agentDiagnostics.first { $0.providerID == agent.id }?.state))
           }))
     }
     if let endpoints = model.endpoints {
@@ -353,7 +354,7 @@ struct SettingsPageView: View {
           .task { await avatars.refresh() }
       }
     case .agent(let id):
-      if let agent = model.hookTrustingAgents.first(where: { $0.id == id }) {
+      if let agent = model.settingsAgents.first(where: { $0.id == id }) {
         AgentSettingsPage(model: model, agent: agent)
       }
     case .endpoint(let id):
@@ -442,10 +443,25 @@ private struct OpenSessionsInRow: View {
   }
 }
 
-/// Settings › an agent: whether its activity is tracked (#45).
+extension AppModel {
+  /// The agents the settings have a page for: those of this build, but the endpoints', which
+  /// have pages of their own, and the mock agent of the tests.
+  var settingsAgents: [AgentDescriptor] {
+    agentDescriptors.filter {
+      !$0.id.rawValue.hasPrefix(EndpointID.providerPrefix) && $0.id.rawValue != "mock"
+    }
+  }
+}
+
+/// Settings › an agent: where it was found and in what version, and whether its activity is
+/// tracked (#45) when its command-line tool asks to approve the hooks that track it.
 struct AgentSettingsPage: View {
   let model: AppModel
   let agent: AgentDescriptor
+
+  private var diagnostic: AgentDiagnostic? {
+    model.agentDiagnostics.first { $0.providerID == agent.id }
+  }
 
   var body: some View {
     Form {
@@ -460,18 +476,70 @@ struct AgentSettingsPage: View {
                 .fill(SettingsPage.agent(agent.id).tint.gradient)
             )
             .accessibilityHidden(true)
-          Text(verbatim: agent.displayName)
-            .font(.title3.weight(.semibold))
+          VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: agent.displayName)
+              .font(.title3.weight(.semibold))
+            if let diagnostic {
+              Label {
+                Text(diagnostic.summary)
+              } icon: {
+                Circle()
+                  .fill(Self.color(of: diagnostic.state))
+                  .frame(width: 8, height: 8)
+              }
+              .font(.callout)
+              .foregroundStyle(.secondary)
+            }
+          }
+          Spacer()
+          Button {
+            Task { await model.refreshAgents(forceRefresh: true) }
+          } label: {
+            Text("Detect Again", bundle: .module)
+          }
+          .disabled(model.isRefreshingAgents)
         }
         .padding(.vertical, 4)
+        if let installation = diagnostic?.installation {
+          LabeledContent {
+            Text(verbatim: installation.executablePath)
+              .font(.body.monospaced())
+              .textSelection(.enabled)
+              .lineLimit(1)
+              .truncationMode(.middle)
+          } label: {
+            Text("Location", bundle: .module, comment: "Where an agent's command-line tool is.")
+          }
+          if let version = installation.version {
+            LabeledContent {
+              Text(verbatim: String(describing: version))
+                .monospacedDigit()
+            } label: {
+              Text("Version", bundle: .module)
+            }
+          }
+        }
       }
-      Section {
-        AgentActivityRow(model: model, agent: agent)
-      } header: {
-        Text("Activity", bundle: .module, comment: "A section of an agent's page of the Settings.")
+      if model.hookTrustingAgents.contains(where: { $0.id == agent.id }) {
+        Section {
+          AgentActivityRow(model: model, agent: agent)
+        } header: {
+          Text(
+            "Activity", bundle: .module, comment: "A section of an agent's page of the Settings.")
+        }
       }
     }
     .formStyle(.grouped)
+  }
+
+  /// The dot of an agent's state: ready, usable with something to fix, or not usable.
+  static func color(of state: AgentAvailabilityState?) -> Color {
+    switch state {
+    case .available?: .green
+    case .outdated?, .unauthenticated?: .orange
+    case .notFound?, .notExecutable?, .probeFailed?: .red
+    case nil: Color(nsColor: .tertiaryLabelColor)
+    }
   }
 }
 
