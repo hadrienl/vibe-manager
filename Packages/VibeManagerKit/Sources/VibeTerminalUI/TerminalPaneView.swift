@@ -28,6 +28,7 @@ public struct TerminalPaneView<Accessory: View>: View {
   private let canRestart: Bool
   /// See `TerminalStatusBar.close`. Left out, the pane has no status bar.
   private let close: (() -> Void)?
+  @Environment(\.paneWidthHold) private var widthHold
 
   public init(
     model: TerminalPaneModel, autoStart: Bool = true, isActive: Bool = true,
@@ -56,7 +57,14 @@ public struct TerminalPaneView<Accessory: View>: View {
         accessibilityTitle: accessibilityTitle,
         claimsKeyboardOnActivation: claimsKeyboardOnActivation
       )
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      // A terminal keeps its size while its column changes for a moment, and takes the last one
+      // in a single reflow: what it leaves bare meanwhile is the colour of its own background.
+      .frame(width: widthHold?.width, alignment: .leading)
+      .frame(
+        minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .leading
+      )
+      .background(Color(nsColor: .textBackgroundColor))
+      .clipped()
       .overlay {
         if let failure = model.failure {
           ContentUnavailableView {

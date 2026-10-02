@@ -170,4 +170,36 @@ struct ObservationGranularityTests {
       })
     #expect(journal.isSummarizing(first))
   }
+
+  @Test("A drag of the web view's divider wakes neither the sidebar nor the requests' palette")
+  func browserWidth() async {
+    let first = session("First")
+    let model = await makeModel([first])
+    let width = model.layout.browserWidth
+
+    #expect(
+      !notifies(reading: { _ = model.sidebarContent }) {
+        model.layout.browserWidthChanged(to: width + 50)
+      })
+    #expect(
+      !notifies(reading: { _ = model.displayedSessions }) {
+        model.layout.browserWidthChanged(to: width + 100)
+      })
+    #expect(
+      !notifies(reading: { _ = model.isRequestPaletteCollapsed }) {
+        model.layout.browserWidthChanged(to: width + 150)
+      })
+    #expect(model.layout.browserWidth == width + 150)
+
+    // What they do show still wakes them.
+    #expect(
+      notifies(reading: { _ = model.sidebarContent }) {
+        model.layout.setFilter(SessionFilter(searchText: "First"))
+      })
+    #expect(
+      notifies(reading: { _ = model.isRequestPaletteCollapsed }) {
+        model.setRequestPaletteCollapsed(true)
+      })
+    #expect(model.isRequestPaletteCollapsed)
+  }
 }

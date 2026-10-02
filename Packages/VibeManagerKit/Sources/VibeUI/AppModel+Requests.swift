@@ -87,7 +87,7 @@ extension AppModel {
   }
 
   public var isRequestPaletteCollapsed: Bool {
-    layout.intent.isRequestPaletteCollapsed
+    layout.isRequestPaletteCollapsed
   }
 
   public func setRequestPaletteCollapsed(_ isCollapsed: Bool) {
