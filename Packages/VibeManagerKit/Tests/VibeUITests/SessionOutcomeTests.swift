@@ -49,11 +49,11 @@ struct SessionOutcomeTests {
   /// What the sidebar shows for the session in this state: the one wording said.
   private func shown(
     _ session: WorkSession, _ status: TerminalPaneModel.Status,
-    activity: AgentActivityState? = nil
+    activity: AgentActivityState? = nil, launchFailed: Bool = false
   ) -> String {
     String(
       localized: SessionStatusPresentation.make(
-        session: session, paneStatus: status, activity: activity
+        session: session, paneStatus: status, activity: activity, launchFailed: launchFailed
       ).label)
   }
 
@@ -139,8 +139,13 @@ struct SessionOutcomeTests {
     #expect(Announcer.lastAnnouncement == "\(shown(first, .exited(code: 0))) · First")
     model.processDidEnd(first.id, state: .failed(.executableNotFound(path: "/nowhere/claude")))
     #expect(Announcer.lastAnnouncement == "\(shown(first, .failed(message: ""))) · First")
+    model.processDidEnd(
+      first.id, state: .failed(.executableNotFound(path: "/nowhere/claude")), launchFailed: true)
+    let couldNotStart = shown(first, .failed(message: ""), launchFailed: true)
+    #expect(couldNotStart != shown(first, .failed(message: "")))
+    #expect(Announcer.lastAnnouncement == "\(couldNotStart) · First")
     #expect(
-      recorder.outcomes.map(\.body) == [
+      recorder.outcomes.dropLast().map(\.body) == [
         shown(first, .exited(code: 1)), shown(first, .terminated(signal: 9)),
         shown(first, .exited(code: 0)), shown(first, .failed(message: "")),
       ])

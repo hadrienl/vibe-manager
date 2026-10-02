@@ -38,7 +38,9 @@ extension AppModel {
 
   /// The process of a session ended on its own. One the application stops — Close, Archive, a
   /// switch, quitting — has its watch taken away first, and never comes here.
-  func processDidEnd(_ id: SessionID, state: TerminalProcessState) {
+  /// - Parameter launchFailed: what the sidebar is told too — the pane's launch failed — so that
+  ///   both say "Couldn't start" (#235).
+  func processDidEnd(_ id: SessionID, state: TerminalProcessState, launchFailed: Bool = false) {
     let status: TerminalPaneModel.Status
     switch state {
     case .exited(let code): status = .exited(code: code)
@@ -46,18 +48,19 @@ extension AppModel {
     case .failed(let error): status = .failed(message: error.errorDescription ?? "")
     case .starting, .running: return
     }
-    sessionDidEnd(id, as: status, activity: nil)
+    sessionDidEnd(id, as: status, activity: nil, launchFailed: launchFailed)
   }
 
   /// Says the state the sidebar now shows for the session — one wording for both — to VoiceOver
   /// and, with the application in the background, in the Notification Center.
   private func sessionDidEnd(
-    _ id: SessionID, as status: TerminalPaneModel.Status, activity: AgentActivityState?
+    _ id: SessionID, as status: TerminalPaneModel.Status, activity: AgentActivityState?,
+    launchFailed: Bool = false
   ) {
     guard !isOnScreen(id), let session = sessions.first(where: { $0.id == id }) else { return }
     let state = String(
       localized: SessionStatusPresentation.make(
-        session: session, paneStatus: status, activity: activity
+        session: session, paneStatus: status, activity: activity, launchFailed: launchFailed
       ).label)
     // Waits its turn: several sessions may end together, and a request said just before is not
     // cut.
