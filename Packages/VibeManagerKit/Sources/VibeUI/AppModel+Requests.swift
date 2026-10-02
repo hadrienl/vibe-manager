@@ -19,11 +19,17 @@ public struct RequestNotification: Equatable, Sendable {
 @MainActor
 public protocol RequestNotifying: AnyObject {
   func post(_ notification: RequestNotification)
+  /// A session out of sight replied, failed or stopped (#236).
+  func postOutcome(_ notification: SessionOutcomeNotification)
   func remove(_ ids: [AgentRequestID])
   /// The number on the Dock icon; `nil` shows none.
   func setBadge(_ count: Int?)
   /// Whether the system lets the application notify; `nil` when it has not been asked yet.
   func isAuthorized() async -> Bool?
+}
+
+extension RequestNotifying {
+  public func postOutcome(_ notification: SessionOutcomeNotification) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.

@@ -870,6 +870,8 @@ public final class AppModel {
       guard let self else { return }
       self.noteProcessDidFinish(id, state: state)
       self.noteSwitchedAgentDidFinish(id, state: state)
+      self.processDidEnd(
+        id, state: state, launchFailed: self.launcher?.pane(for: id)?.failure != nil)
       // The store already says the session is closed; the list on screen is what has to catch up.
       Task { await self.reload() }
       // An agent that stops has often just committed: its repositories are read once more.

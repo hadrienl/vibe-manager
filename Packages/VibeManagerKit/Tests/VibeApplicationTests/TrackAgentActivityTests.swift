@@ -266,6 +266,32 @@ struct TrackAgentActivityTests {
     #expect(await eventually(tracker, id) { $0?.unreadSince == t0 })
   }
 
+  @Test("What an adopted agent wrote while the application was closed is published as replayed")
+  func adoptionReplayIsMarked() async {
+    let id = SessionID()
+    let store = MemoryActivityStore([
+      id: PersistedAgentActivity(
+        activity: .working, log: AgentActivityLogPosition(fileIdentifier: 7, offset: 40),
+        isConfirmed: true)
+    ])
+    let logs = ScriptedActivityLogs()
+    let clock = TestClock(t0.addingTimeInterval(600))
+    let tracker = makeTracker(logs: logs, store: store, clock: clock)
+    await tracker.processAdopted(id, decoder: NamedDecoder())
+    #expect(await following(logs, id))
+    let updates = await tracker.updates()
+
+    // Written ten minutes ago, while the application was closed; then now.
+    await logs.write("stop", at: t0, for: id)
+    await logs.write("prompt", at: t0.addingTimeInterval(601), for: id)
+    var replayed: [Bool] = []
+    for await update in updates where update.sessionID == id {
+      replayed.append(update.isReplayed)
+      if update.state?.activity == .working { break }
+    }
+    #expect(replayed == [true, false])
+  }
+
   @Test("An adopted session in front of the user reads what it replays")
   func adoptionWhileShown() async {
     let id = SessionID()
