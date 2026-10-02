@@ -6,8 +6,9 @@ import VibeBrowser
 import VibeConversationUI
 import VibeDomain
 
-/// The application's settings, in tabs: General, Privacy, the prompt templates, the web view, the
-/// activity, the conversation view, the requests and the updates.
+/// The application's settings (#313): a sidebar of pages, as System Settings has, and the page
+/// chosen beside it, in a window that keeps its size from one page to the next and widens only
+/// for a page that needs the room.
 ///
 /// Several lines are ways back to a question asked once. The Full Disk Access step at launch is
 /// not asked again by the same identity, and neither is the close confirmation once "Don't ask
@@ -17,14 +18,6 @@ public struct SettingsView: View {
   private let permissions: PermissionsModel?
   private let model: AppModel?
 
-  /// The width of the tabs that are a single form, and the least any tab is given (#129).
-  ///
-  /// The window takes each tab's size, and its toolbar holds the tabs. Too narrow, the last ones
-  /// fall into an overflow menu where SwiftUI greys them out: at 500 points, Conversation,
-  /// Requests and Avatar could not be reached. 780 points held the nine tabs of #154 and one more;
-  /// with Badges (#199) and Endpoints (#107), the twelve need 820 in French.
-  nonisolated static let formWidth: CGFloat = 820
-
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
     self.permissions = permissions
     self.model = model
@@ -32,323 +25,592 @@ public struct SettingsView: View {
 
   public var body: some View {
     if let model {
-      TabView(selection: Bindable(model).settingsTab) {
-        general
-          .settingsPage(.general)
-        if let permissions {
-          PrivacySettingsView(permissions: permissions, sessionName: model.sessionName(for:))
-            .settingsPage(.privacy)
-        }
-        PromptTemplatesView(
-          model: model.templates, themes: model.conversations.themes,
-          conversationAppearance: model.conversations.appearance
-        )
-        .settingsPage(.templates)
-        if let browser = model.browser {
-          WebViewSettings(browser: browser)
-            .settingsPage(.webView)
-        }
-        if let terminals = model.terminals {
-          TerminalSettings(terminals: terminals)
-            .settingsPage(.terminals)
-        }
-        if model.ticketTitles.canReadPages {
-          TicketSettingsView(model: model.ticketTitles)
-            .settingsPage(.tickets)
-        }
-        if let endpoints = model.endpoints {
-          EndpointsSettingsView(model: endpoints)
-            .settingsPage(.endpoints)
-        }
-        if let journal = model.journal {
-          ActivitySettings(journal: journal)
-            .settingsPage(.activity)
-        }
-        ConversationSettingsView(
-          appearance: Bindable(model.conversations).appearance,
-          themes: model.conversations.themes
-        )
-        .settingsPage(.conversation)
-        RequestsSettingsView(model: model)
-          .settingsPage(.requests)
-        SessionAppearanceSettingsView(model: model.appearancePalette)
-          .settingsPage(.sessionAppearance)
-        if let updates = model.updates {
-          UpdatesSettingsView(updates: updates)
-            .settingsPage(.updates)
-        }
-      }
-      .environment(\.sessionAppearancePalette, model.appearancePalette.offered)
+      SettingsSplitView(model: model, permissions: permissions)
+        .environment(\.sessionAppearancePalette, model.appearancePalette.offered)
     } else {
-      general
+      privacyOnly
     }
   }
 
-  private var general: some View {
+  /// Without the workspace, the window is this one form.
+  private var privacyOnly: some View {
     Form {
-      if let model {
-        Section {
-          SessionCloseRow(model: model)
-          QuitBehaviorRow(model: model)
-        } header: {
-          Text("Sessions", bundle: .module, comment: "A section of the Settings window.")
+      Section {
+        if let permissions {
+          FullDiskAccessRow(permissions: permissions)
+        } else {
+          Text("File access cannot be read in this window.", bundle: .module)
+            .foregroundStyle(.secondary)
         }
-        Section {
-          EditorRow(model: model)
-        } header: {
-          Text("Git", bundle: .module, comment: "A section of the Settings window.")
-        }
-        if !model.hookTrustingAgents.isEmpty {
-          Section {
-            ForEach(model.hookTrustingAgents, id: \.id) { agent in
-              AgentActivityRow(model: model, agent: agent)
-            }
-          } header: {
-            Text("Agent Activity", bundle: .module, comment: "A section of the Settings window.")
-          }
-        }
-        if let usage = model.usage {
-          Section {
-            UsageSettingsRow(usage: usage)
-          } header: {
-            Text("Usage", bundle: .module, comment: "A section of the Settings window.")
-          }
-        }
-      }
-      // In a tab of its own when the window has tabs (#76): it grew past what a line of General
-      // can hold. Without the workspace, the window is this one form, and keeps it here.
-      if model == nil {
-        Section {
-          if let permissions {
-            FullDiskAccessRow(permissions: permissions)
-          } else {
-            Text("File access cannot be read in this window.", bundle: .module)
-              .foregroundStyle(.secondary)
-          }
-        } header: {
-          Text("Privacy", bundle: .module, comment: "A section of the Settings window.")
-        }
-      }
-      if let model, model.canExportDiagnostics {
-        Section {
-          LabeledContent {
-            Button {
-              model.beginDiagnosticsExport()
-            } label: {
-              Text("Export Diagnostics…", bundle: .module)
-            }
-          } label: {
-            Text("Diagnostics", bundle: .module)
-            Text(
-              """
-              A local log of what the application did, never of what you typed, kept for two \
-              weeks. Exported only when you save it yourself.
-              """,
-              bundle: .module
-            )
-          }
-        } header: {
-          Text("Diagnostics", bundle: .module)
-        }
+      } header: {
+        Text("Privacy", bundle: .module, comment: "A section of the Settings window.")
       }
     }
     .formStyle(.grouped)
-    // As tall as what it holds: the settings window takes each tab's size, and a form that
-    // scrolls gives none, which left General in a window as tall as Templates.
     .scrollDisabled(true)
     .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
-    .task {
-      guard model == nil else { return }
-      await permissions?.recheck()
+    .frame(width: SettingsPage.standardDetailWidth)
+    .task { await permissions?.recheck() }
+  }
+}
+
+/// The sidebar and the page, with the search of the sidebar and the way back from a page reached
+/// from another.
+struct SettingsSplitView: View {
+  @Bindable var model: AppModel
+  let permissions: PermissionsModel?
+  @State private var query = ""
+
+  nonisolated static let sidebarWidth: CGFloat = 215
+  nonisolated static let minimumHeight: CGFloat = 460
+  nonisolated static let idealHeight: CGFloat = 700
+
+  /// The window's width with a page that is a single form.
+  nonisolated static var standardWidth: CGFloat {
+    sidebarWidth + SettingsPage.standardDetailWidth
+  }
+
+  var body: some View {
+    let sidebar = SettingsSidebarContent(model: model, permissions: permissions)
+    let page = sidebar.shown(model.settingsPage)
+    NavigationSplitView(columnVisibility: .constant(.all)) {
+      SettingsSidebar(model: model, content: sidebar, query: query)
+        .navigationSplitViewColumnWidth(Self.sidebarWidth)
+        .toolbar(removing: .sidebarToggle)
+    } detail: {
+      SettingsPageView(model: model, permissions: permissions, page: page)
+        // Squeezed for the time the window takes to widen, rather than widening it at once.
+        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
+        .navigationTitle(Text(sidebar.name(of: page)))
+        .toolbar {
+          if let parent = page.parent {
+            ToolbarItem(placement: .navigation) {
+              Button {
+                model.settingsPage = parent
+              } label: {
+                Image(systemName: "chevron.left")
+              }
+              .help(Text("Back", bundle: .module))
+              .accessibilityLabel(Text("Back", bundle: .module))
+            }
+          }
+        }
+    }
+    .searchable(text: $query, placement: .sidebar, prompt: Text("Search", bundle: .module))
+    .frame(
+      minWidth: Self.standardWidth, idealWidth: Self.standardWidth,
+      minHeight: Self.minimumHeight, idealHeight: Self.idealHeight)
+    .background(SettingsWindowSizer(width: Self.sidebarWidth + page.detailWidth))
+  }
+}
+
+/// What the sidebar lists, in its groups: the pages this workspace has, each agent that can be
+/// tracked and each endpoint.
+@MainActor
+struct SettingsSidebarContent {
+  struct Entry: Identifiable {
+    var page: SettingsPage
+    /// The name shown: the page's, or the agent's or endpoint's own.
+    var name: String
+    var symbolName: String
+    var tint: Color
+    /// The dot after the name: an agent tracked or not, an endpoint's last test.
+    var status: Color?
+    var id: SettingsPage { page }
+  }
+
+  struct Group: Identifiable {
+    var id: String
+    var title: LocalizedStringResource?
+    var entries: [Entry]
+  }
+
+  let groups: [Group]
+
+  init(model: AppModel, permissions: PermissionsModel?) {
+    func entry(_ page: SettingsPage) -> Entry {
+      Entry(
+        page: page, name: String(localized: page.title), symbolName: page.symbolName,
+        tint: page.tint)
+    }
+    var groups = [
+      Group(
+        id: "application", title: nil,
+        entries: [.general, .conversation, .sessionAppearance, .requests].map(entry))
+    ]
+    if !model.hookTrustingAgents.isEmpty {
+      groups.append(
+        Group(
+          id: "agents",
+          title: LocalizedStringResource(
+            "Agents", bundle: .module, comment: "A group of the Settings window's sidebar."),
+          entries: model.hookTrustingAgents.map { agent in
+            Entry(
+              page: .agent(agent.id), name: agent.displayName, symbolName: agent.symbolName,
+              tint: SettingsPage.agent(agent.id).tint,
+              status: model.reportsActivity[agent.id] ?? true
+                ? .green : Color(nsColor: .tertiaryLabelColor))
+          }))
+    }
+    if let endpoints = model.endpoints {
+      let page = SettingsPage.newEndpoint
+      groups.append(
+        Group(
+          id: "endpoints",
+          title: LocalizedStringResource(
+            "Endpoints", bundle: .module, comment: "A group of the Settings window's sidebar."),
+          entries: endpoints.endpoints.map { endpoint in
+            Entry(
+              page: .endpoint(endpoint.id),
+              name: endpoint.name.isEmpty ? " " : endpoint.name,
+              symbolName: SettingsPage.endpoint(endpoint.id).symbolName,
+              tint: SettingsPage.endpoint(endpoint.id).tint,
+              status: EndpointsSettingsView.color(of: endpoint.lastTest?.verdict))
+          } + [
+            Entry(
+              page: page,
+              name: String(
+                localized: "Add an Endpoint…", bundle: .module,
+                comment: "The last line of the endpoints in the Settings window's sidebar."),
+              symbolName: page.symbolName, tint: page.tint)
+          ]))
+    }
+    var tools: [SettingsPage] = []
+    if model.browser != nil { tools.append(.webView) }
+    tools.append(.templates)
+    if model.ticketTitles.canReadPages { tools.append(.tickets) }
+    groups.append(
+      Group(
+        id: "tools",
+        title: LocalizedStringResource(
+          "Tools", bundle: .module, comment: "A group of the Settings window's sidebar."),
+        entries: tools.map(entry)))
+    var system: [SettingsPage] = []
+    if permissions != nil || model.usage != nil || model.canExportDiagnostics {
+      system.append(.privacy)
+    }
+    if model.updates != nil { system.append(.updates) }
+    if !system.isEmpty {
+      groups.append(Group(id: "system", title: nil, entries: system.map(entry)))
+    }
+    self.groups = groups
+  }
+
+  /// The page to show for `page`: itself when this workspace has it, General otherwise — an
+  /// endpoint deleted, an agent gone.
+  func shown(_ page: SettingsPage) -> SettingsPage {
+    groups.contains { $0.entries.contains { $0.page == page.sidebarPage } } ? page : .general
+  }
+
+  /// The name of `page` in the window's title: the agent's or endpoint's for theirs.
+  func name(of page: SettingsPage) -> String {
+    if page.parent == nil,
+      let entry = groups.lazy.flatMap(\.entries).first(where: { $0.page == page })
+    {
+      return entry.name
+    }
+    return String(localized: page.title)
+  }
+
+  /// The groups with only the entries that answer `query`; a group left empty is left out.
+  func filtered(by query: String, locale: Locale) -> [Group] {
+    groups.compactMap { group in
+      var group = group
+      group.entries = group.entries.filter {
+        $0.page.matches(query, name: $0.name, locale: locale)
+      }
+      return group.entries.isEmpty ? nil : group
     }
   }
 }
 
-/// The tabs of the settings window, in the order of its toolbar.
-public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
-  case general
-  /// Full Disk Access, and the processes it has to reach (#76).
-  case privacy
-  /// The prompt templates: a list, an editor and a preview, which need the room of a tab of their
-  /// own rather than a section of a form.
-  case templates
-  /// The session's web view (#69): what agents may do there, and where links go.
-  case webView
-  /// Each session's drawer of side terminals (#43): whether their history is kept.
-  case terminals
-  /// The titles of the tickets a new session names, and the resolvers that recognise them (#89).
-  case tickets
-  /// The model servers a session can run on, driven by Claude Code or Codex (#107).
-  case endpoints
-  /// What each session's journal does: the summary its agent writes (#36).
-  case activity
-  /// The conversation view of #38: its theme, its fonts, what it unfolds.
-  case conversation
-  /// How the requests of background sessions are signalled (#40), the floating panel (#41), and
-  /// its avatars (#154), in two pages.
-  case requests
-  /// The symbols and colours a session may be given (#199).
-  case sessionAppearance
-  /// Whether and how the application updates itself, and on which channel (#92).
-  case updates
+/// The list of the pages, grouped, filtered by the search.
+private struct SettingsSidebar: View {
+  @Bindable var model: AppModel
+  let content: SettingsSidebarContent
+  let query: String
+  @Environment(\.locale) private var locale
 
-  /// The label of the tab in the toolbar.
-  var title: LocalizedStringResource {
-    switch self {
-    case .general:
-      LocalizedStringResource("General", bundle: .module, comment: "A tab of the Settings window.")
-    case .privacy:
-      LocalizedStringResource("Privacy", bundle: .module, comment: "A tab of the Settings window.")
-    case .templates:
-      LocalizedStringResource(
-        "Templates", bundle: .module, comment: "A tab of the Settings window.")
-    case .webView:
-      LocalizedStringResource(
-        "Web View", bundle: .module, comment: "A tab of the Settings window.")
-    case .terminals:
-      LocalizedStringResource(
-        "Terminals", bundle: .module, comment: "A tab of the Settings window.")
-    case .tickets:
-      LocalizedStringResource("Tickets", bundle: .module, comment: "A tab of the Settings window.")
-    case .endpoints:
-      LocalizedStringResource(
-        "Endpoints", bundle: .module, comment: "A tab of the Settings window: model servers.")
-    case .activity:
-      LocalizedStringResource(
-        "Activity", bundle: .module, comment: "A tab of the Settings window.")
-    case .conversation:
-      LocalizedStringResource(
-        "Conversation", bundle: .module, comment: "A tab of the Settings window.")
-    case .requests:
-      LocalizedStringResource(
-        "Requests", bundle: .module, comment: "A tab of the Settings window.")
-    case .sessionAppearance:
-      LocalizedStringResource(
-        "Badges", bundle: .module,
-        comment: "A tab of the Settings window: the symbols and colours sessions may be given.")
-    case .updates:
-      LocalizedStringResource("Updates", bundle: .module, comment: "A tab of the Settings window.")
-    }
-  }
-
-  /// The symbol of the tab in the toolbar.
-  var symbolName: String {
-    switch self {
-    case .general: "gearshape"
-    case .privacy: "hand.raised"
-    case .templates: "text.badge.plus"
-    case .webView: "globe"
-    case .terminals: "apple.terminal"
-    case .tickets: "ticket"
-    case .endpoints: "point.3.connected.trianglepath.dotted"
-    case .activity: "list.bullet.rectangle"
-    case .conversation: "bubble.left.and.text.bubble.right"
-    // Not Privacy's hand: a person speaking in a bubble, as the avatar of the panel does.
-    case .requests: "person.bubble"
-    case .sessionAppearance: "paintpalette"
-    case .updates: "arrow.down.circle"
-    }
-  }
-}
-
-extension View {
-  /// Makes this view the page of a tab of the settings window: its label, its tag, and at least
-  /// the width of `SettingsView.formWidth`.
-  ///
-  /// The window takes the size of the tab shown, and its toolbar holds every tab: a page narrower
-  /// than the toolbar needs sends the last tabs into an overflow menu where they cannot be
-  /// clicked (#129). Given here rather than by each page, a tab added later cannot forget it.
-  func settingsPage(_ tab: SettingsTab) -> some View {
-    SettingsPageLayout {
-      self
-    }
-    .tabItem {
-      Label {
-        Text(tab.title)
-      } icon: {
-        Image(systemName: tab.symbolName)
+  var body: some View {
+    let groups = content.filtered(by: query, locale: locale)
+    List(
+      selection: Binding(
+        get: { Optional(model.settingsPage.sidebarPage) },
+        set: { page in
+          if let page, page != model.settingsPage.sidebarPage { model.settingsPage = page }
+        })
+    ) {
+      ForEach(groups) { group in
+        Section {
+          if group.id == "endpoints", query.isEmpty {
+            ForEach(group.entries.filter { $0.page != .newEndpoint }) { entry in
+              row(entry)
+            }
+            .onMove { source, destination in
+              guard let endpoints = model.endpoints else { return }
+              var list = endpoints.endpoints
+              list.move(fromOffsets: source, toOffset: destination)
+              Task { await endpoints.save(list) }
+            }
+            ForEach(group.entries.filter { $0.page == .newEndpoint }) { entry in
+              row(entry)
+            }
+          } else {
+            ForEach(group.entries) { entry in
+              row(entry)
+            }
+          }
+        } header: {
+          if let title = group.title {
+            Text(title)
+          }
+        }
       }
     }
-    .tag(tab)
+    .listStyle(.sidebar)
+    .overlay {
+      if groups.isEmpty {
+        ContentUnavailableView.search(text: query)
+      }
+    }
+    // The endpoints are read from their file the first time the window shows them.
+    .task { await model.endpoints?.load() }
+  }
+
+  private func row(_ entry: SettingsSidebarContent.Entry) -> some View {
+    Label {
+      HStack(spacing: 6) {
+        Text(verbatim: entry.name)
+        Spacer(minLength: 0)
+        if let status = entry.status {
+          Circle()
+            .fill(status)
+            .frame(width: 7, height: 7)
+            .accessibilityHidden(true)
+        }
+      }
+    } icon: {
+      SettingsPageIcon(symbolName: entry.symbolName, tint: entry.tint)
+    }
+    .tag(Optional(entry.page))
   }
 }
 
-/// A page at least `SettingsView.formWidth` wide, and never narrower than what it holds needs.
-///
-/// Not `frame(minWidth:)`: offered less than its least width, that frame answers its least width
-/// whatever the page inside needs. The settings window, which reads a tab's least size, then
-/// stayed 780 points wide around Templates (1,008) and Conversation (921), which overflowed it on
-/// both sides and lost their list, their buttons and their preview (#152).
-///
-/// A page made of several views lays them one over the other, centred, as a `ZStack` would: none
-/// is left out, and the page is as large as the largest.
-struct SettingsPageLayout: Layout {
-  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    let offered = ProposedViewSize(
-      width: proposal.width.map { max($0, SettingsView.formWidth) }, height: proposal.height)
-    return subviews.reduce(CGSize(width: SettingsView.formWidth, height: 0)) { size, page in
-      let needed = page.sizeThatFits(offered)
-      return CGSize(width: max(size.width, needed.width), height: max(size.height, needed.height))
-    }
-  }
+/// The page shown beside the sidebar.
+struct SettingsPageView: View {
+  @Bindable var model: AppModel
+  let permissions: PermissionsModel?
+  let page: SettingsPage
 
-  func placeSubviews(
-    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
-  ) {
-    for page in subviews {
-      page.place(
-        at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
-        proposal: ProposedViewSize(bounds.size))
+  var body: some View {
+    switch page {
+    case .general:
+      GeneralSettingsPage(model: model)
+    case .conversation:
+      ConversationSettingsView(
+        appearance: Bindable(model.conversations).appearance,
+        themes: model.conversations.themes)
+    case .sessionAppearance:
+      SessionAppearanceSettingsView(model: model.appearancePalette)
+    case .requests:
+      SignallingSettings(model: model)
+        // Each time the page appears: the avatars made or deleted meanwhile.
+        .task { await model.avatars?.refresh() }
+    case .avatars:
+      if let avatars = model.avatars {
+        AvatarLibraryView(avatars: avatars)
+          .task { await avatars.refresh() }
+      }
+    case .agent(let id):
+      if let agent = model.hookTrustingAgents.first(where: { $0.id == id }) {
+        AgentSettingsPage(model: model, agent: agent)
+      }
+    case .endpoint(let id):
+      if let endpoints = model.endpoints {
+        EndpointsSettingsView(model: endpoints, endpointID: id) { model.settingsPage = $0 }
+          .id(page)
+      }
+    case .newEndpoint:
+      if let endpoints = model.endpoints {
+        EndpointsSettingsView(model: endpoints, endpointID: nil) { model.settingsPage = $0 }
+          .id(page)
+      }
+    case .webView:
+      if let browser = model.browser {
+        WebViewSettings(browser: browser)
+      }
+    case .templates:
+      PromptTemplatesView(
+        model: model.templates, themes: model.conversations.themes,
+        conversationAppearance: model.conversations.appearance)
+    case .tickets:
+      TicketSettingsView(model: model.ticketTitles, pane: .general) { model.settingsPage = $0 }
+    case .ticketResolvers:
+      TicketSettingsView(model: model.ticketTitles, pane: .resolvers) { model.settingsPage = $0 }
+    case .privacy:
+      PrivacySettingsView(permissions: permissions, model: model)
+    case .updates:
+      if let updates = model.updates {
+        UpdatesSettingsView(updates: updates)
+      }
     }
   }
 }
 
-/// Full Disk Access, and whether it has reached the agents yet.
-///
-/// Asks a process born now each time the tab is opened: whoever opens it has usually just been to
-/// System Settings, and this window — launched before — could only repeat what it got then.
-struct PrivacySettingsView: View {
-  let permissions: PermissionsModel
-  let sessionName: (SessionID) -> String
+/// Settings › General: the sessions, their summary, their side terminals, and where a changed
+/// file opens.
+struct GeneralSettingsPage: View {
+  @Bindable var model: AppModel
 
   var body: some View {
     Form {
       Section {
-        FullDiskAccessRow(permissions: permissions)
+        OpenSessionsInRow(appearance: Bindable(model.conversations).appearance)
+        SessionCloseRow(model: model)
+        QuitBehaviorRow(model: model)
       } header: {
-        Text("Full Disk Access", bundle: .module, comment: "A section of the Settings window.")
-      } footer: {
-        FullDiskAccessSheet.reach
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
+        Text("Sessions", bundle: .module, comment: "A section of the Settings window.")
       }
-      if let report = permissions.report, !report.isConsistent {
+      if let journal = model.journal {
         Section {
-          ProcessAccessRows(report: report)
+          SummaryRow(journal: journal)
         } header: {
-          Text("Process by Process", bundle: .module, comment: "A section of the Settings window.")
+          Text("Summary", bundle: .module, comment: "The heading of a session's summary.")
+        }
+      }
+      if let terminals = model.terminals {
+        Section {
+          SideTerminalsRow(terminals: terminals)
+        } header: {
+          Text("Side Terminals", bundle: .module, comment: "A section of the Settings window.")
+        }
+      }
+      Section {
+        EditorRow(model: model)
+      } header: {
+        Text("Changed Files", bundle: .module, comment: "A section of the Settings window.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+/// Whether a new session shows its conversation or its terminal (#38).
+private struct OpenSessionsInRow: View {
+  @Binding var appearance: ConversationAppearance
+
+  var body: some View {
+    Picker(selection: $appearance.defaultPresentation) {
+      Text("Conversation", bundle: .module).tag(SessionPresentation.conversation)
+      Text("Terminal", bundle: .module).tag(SessionPresentation.terminal)
+    } label: {
+      Text("Open sessions in", bundle: .module)
+      Text("Each session can then be switched with ⌥⌘T, and keeps its choice.", bundle: .module)
+    }
+    .pickerStyle(.segmented)
+  }
+}
+
+/// Settings › an agent: whether its activity is tracked (#45).
+struct AgentSettingsPage: View {
+  let model: AppModel
+  let agent: AgentDescriptor
+
+  var body: some View {
+    Form {
+      Section {
+        HStack(spacing: 12) {
+          Image(systemName: agent.symbolName)
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .background(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(SettingsPage.agent(agent.id).tint.gradient)
+            )
+            .accessibilityHidden(true)
+          Text(verbatim: agent.displayName)
+            .font(.title3.weight(.semibold))
+        }
+        .padding(.vertical, 4)
+      }
+      Section {
+        AgentActivityRow(model: model, agent: agent)
+      } header: {
+        Text("Activity", bundle: .module, comment: "A section of an agent's page of the Settings.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+/// Full Disk Access, and whether it has reached the agents yet; then what the application keeps
+/// on this Mac: the usage it records, and the diagnostics it can export.
+///
+/// Asks a process born now each time the page is opened: whoever opens it has usually just been
+/// to System Settings, and this window — launched before — could only repeat what it got then.
+struct PrivacySettingsView: View {
+  let permissions: PermissionsModel?
+  let model: AppModel
+
+  var body: some View {
+    Form {
+      if let permissions {
+        Section {
+          FullDiskAccessRow(permissions: permissions)
+        } header: {
+          Text("Full Disk Access", bundle: .module, comment: "A section of the Settings window.")
         } footer: {
+          FullDiskAccessSheet.reach
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        if let report = permissions.report, !report.isConsistent {
+          Section {
+            ProcessAccessRows(report: report)
+          } header: {
+            Text(
+              "Process by Process", bundle: .module, comment: "A section of the Settings window.")
+          } footer: {
+            Text(
+              """
+              macOS gives each process the access it had when it started. Agents run in a \
+              background process of Vibe Manager, which keeps running while they work.
+              """,
+              bundle: .module
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+      }
+      if model.usage != nil || model.canExportDiagnostics {
+        Section {
+          if let usage = model.usage {
+            UsageSettingsRow(usage: usage)
+          }
+          if model.canExportDiagnostics {
+            LabeledContent {
+              Button {
+                model.beginDiagnosticsExport()
+              } label: {
+                Text("Export Diagnostics…", bundle: .module)
+              }
+            } label: {
+              Text("Diagnostics", bundle: .module)
+              Text(
+                """
+                A local log of what the application did, never of what you typed, kept for two \
+                weeks. Exported only when you save it yourself.
+                """,
+                bundle: .module
+              )
+            }
+          }
+        } header: {
           Text(
-            """
-            macOS gives each process the access it had when it started. Agents run in a \
-            background process of Vibe Manager, which keeps running while they work.
-            """,
-            bundle: .module
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
+            "Data on This Mac", bundle: .module,
+            comment: "A section of Settings › Privacy: the usage and the diagnostics.")
         }
       }
     }
     .formStyle(.grouped)
-    .scrollDisabled(true)
-    .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
-    .restartNowConfirmation(permissions: permissions, origin: .settings, sessionName: sessionName)
-    .task { await permissions.recheck() }
+    .restartNowConfirmation(
+      permissions: permissions, origin: .settings, sessionName: model.sessionName(for:))
+    .task { await permissions?.recheck() }
+  }
+}
+
+/// Widens the settings window to what the page shown needs, and brings it back to its width once
+/// the page is left (#313).
+///
+/// The window is the user's to size otherwise: it is only widened, never narrowed below what the
+/// user gave it, and it moves left rather than leave the screen.
+struct SettingsWindowSizer: NSViewRepresentable {
+  /// The width the window needs for the page shown.
+  let width: CGFloat
+
+  func makeNSView(context: Context) -> SizerView { SizerView() }
+
+  func updateNSView(_ view: SizerView, context: Context) {
+    view.neededWidth = width
+  }
+
+  final class SizerView: NSView {
+    /// The width the window had before a page widened it, given back when the page is left.
+    private var restoredWidth: CGFloat?
+
+    var neededWidth: CGFloat = 0 {
+      didSet {
+        guard neededWidth != oldValue else { return }
+        resize(animated: window?.isVisible == true)
+      }
+    }
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      resize(animated: false)
+    }
+
+    private func resize(animated: Bool) {
+      guard let window, neededWidth > 0, !window.styleMask.contains(.fullScreen),
+        let plan = SettingsWindowWidth.plan(
+          frame: window.frame, needed: neededWidth, restoredWidth: restoredWidth,
+          screen: window.screen?.visibleFrame)
+      else { return }
+      restoredWidth = plan.restoredWidth
+      if animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        NSAnimationContext.runAnimationGroup { context in
+          context.duration = 0.25
+          context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+          window.animator().setFrame(plan.frame, display: true)
+        }
+      } else {
+        window.setFrame(plan.frame, display: true)
+      }
+    }
+  }
+}
+
+/// The frame the settings window takes for a page, and the width to give back after it.
+enum SettingsWindowWidth {
+  struct Plan: Equatable {
+    var frame: NSRect
+    var restoredWidth: CGFloat?
+  }
+
+  /// `nil` when the window keeps its frame.
+  ///
+  /// Wider than the window, the page widens it, and the width it had is kept to be given back.
+  /// Narrower, the window goes back to that width, or to what the page needs if it is between.
+  static func plan(frame: NSRect, needed: CGFloat, restoredWidth: CGFloat?, screen: NSRect?)
+    -> Plan?
+  {
+    var restored = restoredWidth
+    var width = frame.width
+    if needed > frame.width {
+      restored = restored ?? frame.width
+      width = needed
+    } else if let previous = restoredWidth {
+      width = max(previous, needed)
+      if width <= previous { restored = nil }
+    }
+    var target = frame
+    target.size.width = width
+    if let screen {
+      target.size.width = min(target.width, screen.width)
+      // Grown to the right, as System Settings does, unless the screen ends first.
+      if target.maxX > screen.maxX {
+        target.origin.x = max(screen.minX, screen.maxX - target.width)
+      }
+    }
+    guard target != frame else {
+      return restored == restoredWidth ? nil : Plan(frame: frame, restoredWidth: restored)
+    }
+    return Plan(frame: target, restoredWidth: restored)
   }
 }
 
@@ -662,54 +924,25 @@ private struct AgentActivityRow: View {
   }
 }
 
-/// The settings of the sessions' journal (#36), in a tab of their own.
-/// Each session's drawer of side terminals (#43).
-private struct TerminalSettings: View {
+/// Whether each session's drawer of side terminals (#43) keeps what it showed.
+private struct SideTerminalsRow: View {
   let terminals: SessionTerminals
 
   var body: some View {
-    Form {
-      Section {
-        Toggle(
-          isOn: Binding(
-            get: { terminals.keepsScrollback },
-            set: { keeps in Task { await terminals.setKeepsScrollback(keeps) } })
-        ) {
-          Text("Keep the history of side terminals", bundle: .module)
-          Text(
-            """
-            What each side terminal showed is written to disk, so that it is still there when its \
-            session is reopened or Vibe Manager relaunched. It stays on this Mac, readable by you \
-            alone and out of backups. Turned off, the histories already kept are erased.
-            """,
-            bundle: .module)
-        }
-      } header: {
-        Text("Side Terminals", bundle: .module, comment: "A section of the Settings window.")
-      }
+    Toggle(
+      isOn: Binding(
+        get: { terminals.keepsScrollback },
+        set: { keeps in Task { await terminals.setKeepsScrollback(keeps) } })
+    ) {
+      Text("Keep the history of side terminals", bundle: .module)
+      Text(
+        """
+        What each side terminal showed is written to disk, so that it is still there when its \
+        session is reopened or Vibe Manager relaunched. It stays on this Mac, readable by you \
+        alone and out of backups. Turned off, the histories already kept are erased.
+        """,
+        bundle: .module)
     }
-    .formStyle(.grouped)
-    .scrollDisabled(true)
-    .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
-  }
-}
-
-private struct ActivitySettings: View {
-  let journal: SessionJournalModel
-
-  var body: some View {
-    Form {
-      Section {
-        SummaryRow(journal: journal)
-      } header: {
-        Text("Summary", bundle: .module, comment: "The heading of a session's summary.")
-      }
-    }
-    .formStyle(.grouped)
-    .scrollDisabled(true)
-    .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
   }
 }
 
@@ -937,7 +1170,7 @@ private struct UsageSettingsRow: View {
   }
 }
 
-/// Settings › Web View (#69), a tab of its own. The preferences are read once and written as they
+/// Settings › Web View (#69). The preferences are read once and written as they
 /// change: they live in the user defaults, which the view does not observe.
 private struct WebViewSettings: View {
   let browser: BrowserWorkspace
@@ -1013,9 +1246,6 @@ private struct WebViewSettings: View {
       }
     }
     .formStyle(.grouped)
-    .scrollDisabled(true)
-    .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
     .onAppear {
       givesAgents = browser.preferences.givesAgentsWebView
       showsOnAgentPage = browser.preferences.showsWebViewWhenAgentOpensPage

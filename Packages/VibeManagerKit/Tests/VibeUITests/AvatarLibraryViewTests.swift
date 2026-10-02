@@ -190,11 +190,12 @@ struct AvatarLibraryViewTests {
     }
   }
 
-  /// The page alone, at the size of the pages of Settings › Requests.
+  /// The page alone, at the size the settings window gives it.
   private func window(
     _ avatars: AvatarLibraryModel, isCreating: Bool, language: String, dark: Bool
   ) -> (NSWindow, NSHostingController<AnyView>) {
-    let size = RequestsSettingsView.pageSize
+    let size = CGSize(
+      width: SettingsPage.avatars.detailWidth, height: SettingsSplitView.idealHeight)
     let host = NSHostingController(
       rootView: AnyView(
         AvatarLibraryView(avatars: avatars, isCreating: isCreating)

@@ -3,12 +3,20 @@ import SwiftUI
 import VibeApplication
 import VibeDomain
 
-/// The Endpoints tab of the settings (#107): the model servers a session can run on, each driven by
-/// Claude Code or Codex through the gateway.
+/// An endpoint's page of the settings (#107, #313): a model server a session can run on, driven
+/// by Claude Code or Codex through the gateway. Without an endpoint, the page of a new one: the
+/// server it starts from, then the same form.
 struct EndpointsSettingsView: View {
   @Bindable var model: EndpointsSettingsModel
-  @State private var selectedID: EndpointID?
+  /// The endpoint shown; `nil` for a new one.
+  let endpointID: EndpointID?
+  /// Turns the settings to another page: the endpoint just added, duplicated, or the one after
+  /// the endpoint deleted.
+  let show: (SettingsPage) -> Void
   @State private var draft: Endpoint?
+  /// The server a new endpoint starts from. Its protocol is then the server's, and only "Other
+  /// Server" asks for one.
+  @State private var preset: EndpointsSettingsModel.Preset?
   /// The key typed in the form. Written to the keychain on Save, never kept elsewhere.
   @State private var typedSecret = ""
   @State private var secretError: String?
@@ -19,158 +27,131 @@ struct EndpointsSettingsView: View {
   @State private var isTesting = false
   @State private var report: EndpointTestReport?
   @State private var showsAdvanced = false
+  @State private var isConfirmingDelete = false
+
+  init(
+    model: EndpointsSettingsModel, endpointID: EndpointID?,
+    show: @escaping (SettingsPage) -> Void
+  ) {
+    self.model = model
+    self.endpointID = endpointID
+    self.show = show
+  }
+
+  private var isNew: Bool { endpointID == nil }
 
   var body: some View {
-    HStack(alignment: .top, spacing: 16) {
-      sidebar
-        .frame(width: 220)
-      Group {
-        if model.endpoints.isEmpty, draft == nil {
-          starts
-        } else {
-          editor
+    VStack(spacing: 0) {
+      Form {
+        if let error = model.storeError {
+          storeProblem(error)
         }
+        if isNew {
+          starts
+        }
+        editor
       }
-      .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      .formStyle(.grouped)
+      if let draft {
+        footer(
+          Binding(get: { self.draft ?? draft }, set: { self.draft = $0 }),
+          issues: (self.draft ?? draft).validationIssues)
+      }
     }
-    .padding(16)
-    .frame(idealWidth: 900, minHeight: 640, idealHeight: 720)
     .task {
       await model.load()
-      if selectedID == nil { select(model.endpoints.first?.id) }
-    }
-  }
-
-  // MARK: - The list
-
-  private var sidebar: some View {
-    VStack(spacing: 0) {
-      List(selection: Binding(get: { selectedID }, set: { select($0) })) {
-        ForEach(model.endpoints) { endpoint in
-          HStack(spacing: 8) {
-            Circle()
-              .fill(Self.color(of: endpoint.lastTest?.verdict))
-              .frame(width: 8, height: 8)
-              .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-              Text(verbatim: endpoint.name.isEmpty ? " " : endpoint.name)
-              // One number per sentence: its plural is the catalog's to choose.
-              (Text(verbatim: Self.protocolName(endpoint.wireProtocol) + " · ")
-                + Text(
-                  "\(endpoint.agentModels.count) models", bundle: .module,
-                  comment: "How many models an endpoint offers."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-          .tag(Optional(endpoint.id))
-          .accessibilityElement(children: .combine)
-        }
-        .onMove { source, destination in
-          var list = model.endpoints
-          list.move(fromOffsets: source, toOffset: destination)
-          Task { await model.save(list) }
-        }
-      }
-      .listStyle(.bordered(alternatesRowBackgrounds: false))
-      HStack(spacing: 4) {
-        Menu {
-          ForEach(EndpointsSettingsModel.presets) { preset in
-            Button {
-              start(from: preset)
-            } label: {
-              Text(Self.presetName(preset))
-            }
-          }
-        } label: {
-          Image(systemName: "plus")
-        }
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help(Text("Add an endpoint", bundle: .module))
-        Button {
-          duplicate()
-        } label: {
-          Image(systemName: "plus.square.on.square")
-        }
-        .disabled(selectedID == nil)
-        .help(Text("Duplicate the endpoint", bundle: .module))
-        Button {
-          remove()
-        } label: {
-          Image(systemName: "minus")
-        }
-        .disabled(selectedID == nil)
-        .help(Text("Delete the endpoint and its key", bundle: .module))
-        Spacer()
-      }
-      .buttonStyle(.borderless)
-      .padding(.top, 6)
-      if let error = model.storeError {
-        VStack(alignment: .leading, spacing: 4) {
-          Text(error)
-            .font(.caption)
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
-          if let url = model.fileURL {
-            Button {
-              NSWorkspace.shared.activateFileViewerSelecting([url])
-            } label: {
-              Text("Reveal in Finder", bundle: .module)
-            }
-            .buttonStyle(.link)
-            .font(.caption)
-          }
-        }
-        .padding(.top, 8)
+      if !isNew, draft == nil {
+        draft = model.endpoints.first { $0.id == endpointID }
       }
     }
-  }
-
-  /// The empty tab: what an endpoint is, and where to start from.
-  private var starts: some View {
-    VStack(spacing: 14) {
-      Image(systemName: "point.3.connected.trianglepath.dotted")
-        .font(.system(size: 36))
-        .foregroundStyle(.secondary)
-        .accessibilityHidden(true)
-      Text("Work with any model", bundle: .module)
-        .font(.title3.weight(.semibold))
+    // Leaving the page keeps what was typed, as leaving a row of the list did.
+    .onDisappear { saveOnLeaving() }
+    .confirmationDialog(
       Text(
-        """
-        An endpoint is a model server reachable over HTTP, on this Mac or in the cloud. Its models \
-        then appear beside Claude Code and Codex when you create a session, driven by one of them.
-        """,
-        bundle: .module
-      )
-      .multilineTextAlignment(.center)
-      .foregroundStyle(.secondary)
-      .frame(maxWidth: 440)
-      .fixedSize(horizontal: false, vertical: true)
-      LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
-        ForEach(EndpointsSettingsModel.presets) { preset in
+        "Delete “\(draft?.name ?? "")” and its key?", bundle: .module,
+        comment: "The name of an endpoint."),
+      isPresented: $isConfirmingDelete
+    ) {
+      Button(role: .destructive) {
+        remove()
+      } label: {
+        Text("Delete", bundle: .module)
+      }
+    } message: {
+      Text("Sessions that run on it keep it until they are restarted.", bundle: .module)
+    }
+  }
+
+  private func storeProblem(_ error: String) -> some View {
+    Section {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(error)
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+        if let url = model.fileURL {
           Button {
-            start(from: preset)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
           } label: {
-            VStack(alignment: .leading, spacing: 2) {
-              Text(Self.presetName(preset))
-                .fontWeight(.medium)
-              Text(Self.presetDetail(preset))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            Text("Reveal in Finder", bundle: .module)
           }
-          .buttonStyle(.plain)
+          .buttonStyle(.link)
+          .font(.caption)
         }
       }
-      .frame(maxWidth: 520)
     }
-    .frame(maxWidth: .infinity)
-    .padding(.top, 60)
+  }
+
+  /// What an endpoint is, and the servers a new one starts from.
+  private var starts: some View {
+    Section {
+      VStack(alignment: .leading, spacing: 12) {
+        Text(
+          """
+          An endpoint is a model server reachable over HTTP, on this Mac or in the cloud. Its models \
+          then appear beside Claude Code and Codex when you create a session, driven by one of them.
+          """,
+          bundle: .module
+        )
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
+          ForEach(EndpointsSettingsModel.presets) { preset in
+            presetCard(preset)
+          }
+        }
+      }
+      .padding(.vertical, 4)
+    } header: {
+      Text("Work with any model", bundle: .module)
+    }
+  }
+
+  private func presetCard(_ preset: EndpointsSettingsModel.Preset) -> some View {
+    let isChosen = self.preset?.id == preset.id
+    return Button {
+      start(from: preset)
+    } label: {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(Self.presetName(preset))
+          .fontWeight(.medium)
+        Text(Self.presetDetail(preset))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(10)
+      .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+      .overlay {
+        if isChosen {
+          RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2)
+        }
+      }
+      .contentShape(RoundedRectangle(cornerRadius: 8))
+    }
+    .buttonStyle(.plain)
+    .accessibilityAddTraits(isChosen ? .isSelected : [])
   }
 
   // MARK: - The editor
@@ -179,26 +160,11 @@ struct EndpointsSettingsView: View {
   private var editor: some View {
     if let draft {
       let binding = Binding(get: { self.draft ?? draft }, set: { self.draft = $0 })
-      let issues = binding.wrappedValue.validationIssues
-      VStack(spacing: 0) {
-        Form {
-          connection(binding)
-          harness(binding)
-          models(binding)
-          advanced(binding)
-          test(binding)
-        }
-        .formStyle(.grouped)
-        footer(binding, issues: issues)
-      }
-    } else {
-      ContentUnavailableView {
-        Label {
-          Text("No endpoint selected", bundle: .module)
-        } icon: {
-          Image(systemName: "point.3.connected.trianglepath.dotted")
-        }
-      }
+      connection(binding)
+      harness(binding)
+      models(binding)
+      advanced(binding)
+      test(binding)
     }
   }
 
@@ -217,12 +183,29 @@ struct EndpointsSettingsView: View {
       } label: {
         Text("Base URL", bundle: .module)
       }
-      Picker(selection: binding.wireProtocol) {
-        ForEach(EndpointWireKind.allCases, id: \.self) { wire in
-          Text(Self.protocolName(wire)).tag(wire)
+      if isNew, let preset, preset.id != EndpointsSettingsModel.otherPresetID {
+        // The server's own: asked only of another server, and changed once the endpoint is added.
+        LabeledContent {
+          Text(verbatim: Self.protocolName(binding.wrappedValue.wireProtocol))
+        } label: {
+          Text("Protocol", bundle: .module)
+          Text(
+            "The one \(Self.presetName(preset)) speaks. It can be changed once the endpoint is added.",
+            bundle: .module, comment: "The name of a model server, such as Ollama.")
         }
-      } label: {
-        Text("Protocol", bundle: .module)
+      } else {
+        Picker(selection: binding.wireProtocol) {
+          ForEach(EndpointWireKind.allCases, id: \.self) { wire in
+            Text(Self.protocolName(wire)).tag(wire)
+          }
+        } label: {
+          Text("Protocol", bundle: .module)
+          if isNew {
+            Text(
+              "What the server speaks. Its documentation often says “OpenAI-compatible” or “Anthropic-compatible”.",
+              bundle: .module)
+          }
+        }
       }
       Picker(selection: authenticationKind(binding)) {
         Text("None", bundle: .module, comment: "No authentication.").tag(AuthenticationKind.none)
@@ -598,23 +581,43 @@ struct EndpointsSettingsView: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         Spacer()
-        Button {
-          revert()
-        } label: {
-          Text("Revert", bundle: .module)
+        if isNew {
+          Button {
+            Task { await add() }
+          } label: {
+            Text("Add", bundle: .module)
+          }
+          .keyboardShortcut(.defaultAction)
+          .disabled(!Self.savable(issues) || hasDocumentProblem(binding.wrappedValue))
+        } else {
+          Button {
+            duplicate()
+          } label: {
+            Text("Duplicate", bundle: .module)
+          }
+          Button {
+            isConfirmingDelete = true
+          } label: {
+            Text("Delete…", bundle: .module)
+          }
+          Button {
+            revert()
+          } label: {
+            Text("Revert", bundle: .module)
+          }
+          .disabled(!isDirty)
+          Button {
+            Task { await saveDraft() }
+          } label: {
+            Text("Save", bundle: .module)
+          }
+          .keyboardShortcut("s", modifiers: .command)
+          .disabled(!isDirty || !Self.savable(issues) || hasDocumentProblem(binding.wrappedValue))
         }
-        .disabled(!isDirty)
-        Button {
-          Task { await saveDraft() }
-        } label: {
-          Text("Save", bundle: .module)
-        }
-        .keyboardShortcut("s", modifiers: .command)
-        .disabled(!isDirty || !Self.savable(issues) || hasDocumentProblem(binding.wrappedValue))
       }
     }
     .padding(.horizontal, 20)
-    .padding(.bottom, 4)
+    .padding(.vertical, 10)
   }
 
   /// A custom endpoint whose document does not read would fail at its first session.
@@ -635,17 +638,13 @@ struct EndpointsSettingsView: View {
     return typed || model.endpoints.first { $0.id == draft.id } != draft
   }
 
-  private func select(_ id: EndpointID?) {
-    if isDirty, let draft, Self.savable(draft.validationIssues) {
-      Task { await saveDraft(draft) }
-    }
-    selectedID = id
-    draft = id.flatMap { id in model.endpoints.first { $0.id == id } }
-    typedSecret = ""
-    secretError = nil
-    discoveryError = nil
-    report = nil
-    testedModel = nil
+  /// Saved on the way out when it can be: what was typed is not lost by turning the page. A new
+  /// endpoint is only added by Add.
+  private func saveOnLeaving() {
+    guard !isNew, isDirty, let draft, Self.savable(draft.validationIssues),
+      !hasDocumentProblem(draft)
+    else { return }
+    Task { await saveDraft(draft) }
   }
 
   private func revert() {
@@ -678,8 +677,10 @@ struct EndpointsSettingsView: View {
 
   private func start(from preset: EndpointsSettingsModel.Preset) {
     var endpoint = preset.endpoint
-    endpoint.name = Self.uniqueName(Self.presetName(preset), among: model.endpoints.map(\.name))
-    selectedID = endpoint.id
+    if preset.id != EndpointsSettingsModel.otherPresetID {
+      endpoint.name = Self.uniqueName(Self.presetName(preset), among: model.endpoints.map(\.name))
+    }
+    self.preset = preset
     draft = endpoint
     typedSecret = ""
     report = nil
@@ -690,28 +691,36 @@ struct EndpointsSettingsView: View {
     }
   }
 
-  private func duplicate() {
-    guard let source = draft ?? model.endpoints.first(where: { $0.id == selectedID }) else {
-      return
+  /// Adds the new endpoint, then shows its own page.
+  private func add() async {
+    guard let endpoint = draft else { return }
+    await saveDraft(endpoint)
+    if secretError == nil, model.endpoints.contains(where: { $0.id == endpoint.id }) {
+      show(.endpoint(endpoint.id))
     }
+  }
+
+  private func duplicate() {
+    guard let source = draft else { return }
     var copy = source
     copy.id = EndpointID()
     copy.lastTest = nil
     copy.name = Self.uniqueName(source.name, among: model.endpoints.map(\.name))
     Task {
       await saveDraft(copy)
-      select(copy.id)
+      show(.endpoint(copy.id))
     }
   }
 
   private func remove() {
-    guard let selectedID else { return }
-    let list = model.endpoints.filter { $0.id != selectedID }
+    guard let endpointID else { return }
+    let list = model.endpoints.filter { $0.id != endpointID }
+    let index = model.endpoints.firstIndex { $0.id == endpointID } ?? 0
     draft = nil
-    self.selectedID = nil
     Task {
       await model.save(list)
-      select(model.endpoints.first?.id)
+      let next = list.indices.contains(index) ? list[index] : list.last
+      show(next.map { .endpoint($0.id) } ?? .newEndpoint)
     }
   }
 
@@ -837,10 +846,10 @@ struct EndpointsSettingsView: View {
 
   static func presetName(_ preset: EndpointsSettingsModel.Preset) -> String {
     switch preset.id {
-    case "openai":
-      return String(localized: "OpenAI-compatible", bundle: .module)
-    case "anthropic":
-      return String(localized: "Anthropic-compatible", bundle: .module)
+    case EndpointsSettingsModel.otherPresetID:
+      return String(
+        localized: "Other Server", bundle: .module,
+        comment: "A new endpoint that starts from no known server.")
     default:
       return preset.name
     }
@@ -853,7 +862,9 @@ struct EndpointsSettingsView: View {
     case "openrouter":
       return String(localized: "Cloud, an API key", bundle: .module)
     default:
-      return protocolName(preset.wireProtocol)
+      return String(
+        localized: "An address and its protocol", bundle: .module,
+        comment: "Under Other Server, among the servers a new endpoint starts from.")
     }
   }
 

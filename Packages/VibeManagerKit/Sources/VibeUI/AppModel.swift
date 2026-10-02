@@ -265,12 +265,9 @@ public final class AppModel {
   public let templates: PromptTemplateLibraryModel
   /// The usage figures (#18). Absent in a workspace assembled without them.
   public let usage: UsageModel?
-  /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
-  /// menu — can open them on the right one.
-  public var settingsTab: SettingsTab = .general
-  /// The page Settings › Requests shows (#154). Kept here rather than by the window, so that
-  /// the settings reopen on it, and that "Manage Avatars…" can turn it.
-  public var requestsPane: RequestsPane = .signalling
+  /// The page the settings show (#313), so that a way into them — Manage… in the New Session
+  /// sheet, the menu — can open them on the right one, and that they reopen where they were.
+  public var settingsPage: SettingsPage = .general
   /// Where a drop writes what has no file of its own (#42).
   let dropStore: (any SessionDropStore)?
   /// What the last drop on a session has to say: a file left out, a folder the agent may not
@@ -853,7 +850,7 @@ public final class AppModel {
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
 
-    journal?.showSettingsTab = { [weak self] in self?.settingsTab = .activity }
+    journal?.showSettingsTab = { [weak self] in self?.settingsPage = .general }
     quickOpen.opened = { [weak self] result in self?.goToSession(result.sessionID) }
     journal?.journalDidChange = { [quickOpen] id, journal in
       quickOpen.journalChanged(journal, for: id)

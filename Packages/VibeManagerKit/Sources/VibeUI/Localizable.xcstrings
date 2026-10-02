@@ -1989,53 +1989,6 @@
         }
       }
     },
-    "%lld models" : {
-      "comment" : "How many models an endpoint offers.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld model"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld models"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld modèles"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld modèle"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld modèles"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld more resources were not kept." : {
       "comment" : "Resources past the journal's bound; a count.",
       "localizations" : {
@@ -4151,12 +4104,13 @@
         }
       }
     },
-    "Add an endpoint" : {
+    "Add an Endpoint…" : {
+      "comment" : "The last line of the endpoints in the Settings window's sidebar.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter un endpoint"
+            "value" : "Ajouter un endpoint…"
           }
         }
       }
@@ -4244,17 +4198,6 @@
         }
       }
     },
-    "Agent Activity" : {
-      "comment" : "A section of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activité des agents"
-          }
-        }
-      }
-    },
     "Agent switched" : {
       "comment" : "The title of the line a terminal shows above an agent that replaced another.",
       "localizations" : {
@@ -4273,6 +4216,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agent indisponible"
+          }
+        }
+      }
+    },
+    "Agents" : {
+      "comment" : "A group of the Settings window's sidebar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agents"
           }
         }
       }
@@ -4303,17 +4257,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les agents en cours au moment d’installer une mise à jour continuent de tourner si vous le choisissez : la question vous est posée d’abord, comme en quittant, et vous les retrouvez à l’écran après la relance."
-          }
-        }
-      }
-    },
-    "Alerts" : {
-      "comment" : "A page of Settings › Requests: how requests are signalled.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signalement"
           }
         }
       }
@@ -4499,6 +4442,17 @@
         }
       }
     },
+    "An address and its protocol" : {
+      "comment" : "Under Other Server, among the servers a new endpoint starts from.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une adresse et son protocole"
+          }
+        }
+      }
+    },
     "An agent is asking for something" : {
       "comment" : "A notification whose details are hidden, on the lock screen.",
       "localizations" : {
@@ -4599,16 +4553,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Répondu · %@"
-          }
-        }
-      }
-    },
-    "Anthropic-compatible" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compatible Anthropic"
           }
         }
       }
@@ -5232,6 +5176,17 @@
         }
       }
     },
+    "Changed Files" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichiers modifiés"
+          }
+        }
+      }
+    },
     "Channel" : {
       "comment" : "Which versions are offered as updates.",
       "localizations" : {
@@ -5684,6 +5639,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cloud, clé d’API"
+          }
+        }
+      }
+    },
+    "Code font" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Police du code"
           }
         }
       }
@@ -6261,6 +6226,17 @@
         }
       }
     },
+    "Data on This Mac" : {
+      "comment" : "A section of Settings › Privacy: the usage and the diagnostics.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Données de ce Mac"
+          }
+        }
+      }
+    },
     "Day" : {
       "localizations" : {
         "fr" : {
@@ -6343,22 +6319,23 @@
         }
       }
     },
-    "Delete the endpoint and its key" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprimer l’endpoint et sa clé"
-          }
-        }
-      }
-    },
     "Delete the resolver" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le résolveur"
+          }
+        }
+      }
+    },
+    "Delete “%@” and its key?" : {
+      "comment" : "The name of an endpoint.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer « %@ » et sa clé ?"
           }
         }
       }
@@ -6847,16 +6824,6 @@
         }
       }
     },
-    "Duplicate the endpoint" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dupliquer l’endpoint"
-          }
-        }
-      }
-    },
     "Duplicate the resolver" : {
       "localizations" : {
         "fr" : {
@@ -6873,6 +6840,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaque agent reprend sa conversation quand c’est possible. Une session dont le résumé doit d’abord être relu vous est laissée, pour la redémarrer seule."
+          }
+        }
+      }
+    },
+    "Each session can then be switched with ⌥⌘T, and keeps its choice." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque session peut ensuite basculer avec ⌥⌘T, et garde son choix."
           }
         }
       }
@@ -6935,6 +6912,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vides"
+          }
+        }
+      }
+    },
+    "Endpoint" : {
+      "comment" : "A page of the Settings window: a model server.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endpoint"
           }
         }
       }
@@ -7622,17 +7610,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Génération en cours, %@"
-          }
-        }
-      }
-    },
-    "Git" : {
-      "comment" : "A section of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Git"
           }
         }
       }
@@ -8498,6 +8475,16 @@
         }
       }
     },
+    "Line numbers in diffs" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numéros de ligne dans les diffs"
+          }
+        }
+      }
+    },
     "Loading notes" : {
       "localizations" : {
         "fr" : {
@@ -8597,6 +8584,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Merge request %@"
+          }
+        }
+      }
+    },
+    "Message font" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Police des messages"
           }
         }
       }
@@ -9118,6 +9115,17 @@
         }
       }
     },
+    "New Endpoint" : {
+      "comment" : "A page of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel endpoint"
+          }
+        }
+      }
+    },
     "New Resolver" : {
       "localizations" : {
         "fr" : {
@@ -9317,16 +9325,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun agent de code n’a été détecté sur ce Mac."
-          }
-        }
-      }
-    },
-    "No endpoint selected" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun endpoint sélectionné"
           }
         }
       }
@@ -10179,6 +10177,17 @@
         }
       }
     },
+    "On: %lld" : {
+      "comment" : "How many ticket resolvers are turned on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activés : %lld"
+          }
+        }
+      }
+    },
     "Only the first %lld changes are listed; the counts are exact." : {
       "localizations" : {
         "fr" : {
@@ -10313,22 +10322,22 @@
         }
       }
     },
+    "Open sessions in" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les sessions en"
+          }
+        }
+      }
+    },
     "Open with Default Application" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir avec l’application par défaut"
-          }
-        }
-      }
-    },
-    "OpenAI-compatible" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compatible OpenAI"
           }
         }
       }
@@ -10390,6 +10399,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autre réponse…"
+          }
+        }
+      }
+    },
+    "Other Server" : {
+      "comment" : "A new endpoint that starts from no known server.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre serveur"
           }
         }
       }
@@ -11272,17 +11292,6 @@
         }
       }
     },
-    "Requests Section" : {
-      "comment" : "The pages of Settings › Requests.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Section des demandes"
-          }
-        }
-      }
-    },
     "Required" : {
       "comment" : "An option of a new session to fill.\nVoiceOver: a field that must be filled.",
       "localizations" : {
@@ -11300,6 +11309,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rétablir la disposition de la colonne"
+          }
+        }
+      }
+    },
+    "Resolvers" : {
+      "comment" : "A page of Settings › Tickets: what recognises a ticket's address.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résolveurs"
           }
         }
       }
@@ -12025,6 +12045,16 @@
         }
       }
     },
+    "Search" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher"
+          }
+        }
+      }
+    },
     "Search sessions" : {
       "localizations" : {
         "fr" : {
@@ -12207,6 +12237,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les sessions créées à partir de lui gardent leurs propres symbole et couleur."
+          }
+        }
+      }
+    },
+    "Sessions that run on it keep it until they are restarted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions qui l’utilisent le gardent jusqu’à leur redémarrage."
           }
         }
       }
@@ -12590,6 +12630,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher dans le Finder"
+          }
+        }
+      }
+    },
+    "Show reasoning rows" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les rangées de raisonnement"
           }
         }
       }
@@ -13327,17 +13377,6 @@
         }
       }
     },
-    "Terminals" : {
-      "comment" : "A tab of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Terminaux"
-          }
-        }
-      }
-    },
     "Test" : {
       "localizations" : {
         "fr" : {
@@ -13354,6 +13393,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tester avec une adresse"
+          }
+        }
+      }
+    },
+    "Text size" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taille du texte"
           }
         }
       }
@@ -14470,6 +14519,17 @@
         }
       }
     },
+    "The one %@ speaks. It can be changed once the endpoint is added." : {
+      "comment" : "The name of a model server, such as Ollama.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celui que parle %@. Il pourra être changé une fois l’endpoint ajouté."
+          }
+        }
+      }
+    },
     "The one that presents the requests. Others are made in Avatars." : {
       "localizations" : {
         "fr" : {
@@ -14994,6 +15054,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les agents démarrent l’un après l’autre, ce qui peut prendre plusieurs minutes et ralentir ce Mac."
+          }
+        }
+      }
+    },
+    "Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème"
           }
         }
       }
@@ -16568,6 +16638,16 @@
         }
       }
     },
+    "What recognises a ticket's address, and reads its title." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui reconnaît l’adresse d’un ticket, et lit son titre."
+          }
+        }
+      }
+    },
     "What runs in its side terminals will be stopped: %@." : {
       "comment" : "The argument lists the commands running in the session's side terminals.",
       "localizations" : {
@@ -16585,6 +16665,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui tourne dans leurs terminaux annexes sera arrêté."
+          }
+        }
+      }
+    },
+    "What the server speaks. Its documentation often says “OpenAI-compatible” or “Anthropic-compatible”." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que parle le serveur. Sa documentation dit souvent « compatible OpenAI » ou « compatible Anthropic »."
           }
         }
       }
@@ -16619,12 +16709,12 @@
         }
       }
     },
-    "When a new session names a ticket's address, its page opens in the session's web view, where you are signed in, and its title goes to the top of the notes. Only addresses a resolver below recognises are opened." : {
+    "When a new session names a ticket's address, its page opens in the session's web view, where you are signed in, and its title goes to the top of the notes. Only addresses a resolver recognises are opened." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quand une nouvelle session cite l’adresse d’un ticket, sa page s’ouvre dans la vue web de la session, là où vous êtes connecté, et son titre s’ajoute en tête des notes. Seules les adresses reconnues par un résolveur ci-dessous sont ouvertes."
+            "value" : "Quand une nouvelle session cite l’adresse d’un ticket, sa page s’ouvre dans la vue web de la session, là où vous êtes connecté, et son titre s’ajoute en tête des notes. Seules les adresses reconnues par un résolveur sont ouvertes."
           }
         }
       }
