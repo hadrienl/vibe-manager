@@ -5171,6 +5171,26 @@
         }
       }
     },
+    "Change Conversation Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer le thème de la conversation"
+          }
+        }
+      }
+    },
+    "Change Conversation Theme…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer le thème de la conversation…"
+          }
+        }
+      }
+    },
     "Change Icon" : {
       "localizations" : {
         "fr" : {
@@ -5855,6 +5875,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conversation"
+          }
+        }
+      }
+    },
+    "Conversation Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème de la conversation"
+          }
+        }
+      }
+    },
+    "Conversation Theme: %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème de la conversation : %@"
           }
         }
       }
@@ -7378,6 +7418,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dossier introuvable : %@"
+          }
+        }
+      }
+    },
+    "Follow Settings" : {
+      "comment" : "A session's conversation theme: none of its own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selon les Réglages"
+          }
+        }
+      }
+    },
+    "Follows Settings › Conversation, in light and dark mode." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit Réglages › Conversation, en mode clair comme en mode sombre."
           }
         }
       }
@@ -10288,6 +10349,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Facultatif — proposé comme dossier de travail quand ce modèle est choisi."
+          }
+        }
+      }
+    },
+    "Optional — the conversation theme of the sessions made from it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Facultatif — le thème de conversation des sessions créées avec ce modèle."
           }
         }
       }
@@ -14927,6 +14998,26 @@
         }
       }
     },
+    "Theme Not Found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème introuvable"
+          }
+        }
+      }
+    },
+    "Theme not found — ignored when a session is created." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème introuvable — ignoré à la création d’une session."
+          }
+        }
+      }
+    },
     "These notes could not be read" : {
       "localizations" : {
         "fr" : {
@@ -15343,6 +15434,36 @@
         }
       }
     },
+    "This theme applies as it is, in light and dark mode." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce thème s’applique tel quel, en mode clair comme en mode sombre."
+          }
+        }
+      }
+    },
+    "This theme cannot be stored." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce thème ne peut pas être enregistré."
+          }
+        }
+      }
+    },
+    "This theme was deleted or can no longer be read: the conversation follows the settings." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce thème a été supprimé ou ne se lit plus : la conversation suit les Réglages."
+          }
+        }
+      }
+    },
     "This window" : {
       "localizations" : {
         "fr" : {
@@ -15397,6 +15518,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Onglet du ticket, %@"
+          }
+        }
+      }
+    },
+    "Ticket, Theme" : {
+      "comment" : "What More Options unfolds: the ticket and the conversation theme.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ticket, thème"
           }
         }
       }

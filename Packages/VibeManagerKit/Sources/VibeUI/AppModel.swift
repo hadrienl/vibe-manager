@@ -668,6 +668,8 @@ public final class AppModel {
   public internal(set) var appearanceEditor: SessionAppearanceEditor?
   /// The renames, badge changes and archives ⌘Z undoes, for this run.
   var sidebarHistory = SessionSidebarHistory()
+  /// The conversation theme being chosen in its popover (#274), previewed until it is kept.
+  public internal(set) var themeEditing: SessionThemeEditing?
   /// A name or a badge that could not be written, until the user has read why.
   public internal(set) var identityFailure: String?
 
@@ -2773,7 +2775,8 @@ public final class AppModel {
       recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) },
       palette: appearancePalette.offered,
-      commandCatalog: conversations.commands
+      commandCatalog: conversations.commands,
+      isThemeAvailable: { [conversations] in conversations.themes.theme($0) != nil }
     )
     if let template {
       model.selectTemplate(template)
@@ -2887,6 +2890,7 @@ public final class AppModel {
     else { return }
     current[index].name = identity.name
     current[index].appearance = identity.appearance
+    current[index].conversationTheme = identity.conversationTheme
     state = .loaded(current)
   }
 

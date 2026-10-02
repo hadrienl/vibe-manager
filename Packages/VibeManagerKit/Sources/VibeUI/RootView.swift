@@ -397,7 +397,9 @@ public struct RootView: View {
                 manageTemplates: {
                   model.settingsTab = .templates
                   openSettings()
-                }
+                },
+                themes: model.conversations.themes,
+                conversationAppearance: model.conversations.appearance
               )
               // One view per draft: another draft brought on screen starts with its own folds,
               // popover and caret, not the ones left by the previous.
@@ -970,8 +972,9 @@ public struct RootView: View {
     }
   }
 
-  /// The theme of the conversation views, for the system's appearance of the moment — or the one
-  /// on trial in the settings (#118).
+  /// The settings' theme for the system's appearance of the moment — or the one on trial in the
+  /// settings (#118): what a new session's draft is drawn with. Each conversation resolves its
+  /// own (#274).
   private var conversationTheme: ConversationTheme {
     model.conversations.themes.displayed(
       ConversationFonts.installedOnly(model.conversations.appearance),
@@ -994,10 +997,12 @@ public struct RootView: View {
 
       // Mounted like the terminals, so that going back and forth keeps each one's place. Only
       // the few sessions last shown in conversation keep one.
-      let theme = conversationTheme
+      // Each with its own theme (#274), resolved for the window's appearance: the conversation
+      // forces its own scheme on what it draws, not on this.
       ForEach(model.conversations.mountedSessionIDs, id: \.self) { id in
         SessionConversationSlot(
-          model: model, id: id, shownID: session.id, isCovered: isCovered, theme: theme)
+          model: model, id: id, shownID: session.id, isCovered: isCovered,
+          isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
       }
 
       // An archived session has no pane by construction — archiving released it — so its own
@@ -2065,6 +2070,7 @@ struct SessionCommands {
   func switchAgent() { model.beginAgentSwitch(session.id) }
   func rename() { model.beginRename(session.id, in: .sidebar) }
   func changeIcon() { model.beginAppearanceEditing(session.id, in: .sidebar) }
+  func changeTheme() { model.beginThemeEditing(session.id, in: .sidebar) }
   func moveUp() { Task { await model.move(session.id, by: -1) } }
   func moveDown() { Task { await model.move(session.id, by: 1) } }
   func setTaskStatus(_ status: SessionTaskStatus) {
@@ -2081,6 +2087,9 @@ struct SessionCommandButtons: View {
         commands.rename()
       }
       Button(LocalizedStringResource("Change Icon…", bundle: .module)) { commands.changeIcon() }
+      Button(LocalizedStringResource("Change Conversation Theme…", bundle: .module)) {
+        commands.changeTheme()
+      }
       Divider()
     }
     if !commands.movableStatuses.isEmpty {
@@ -2194,6 +2203,7 @@ struct SessionRow: View {
         .foregroundStyle(isRestoring ? Color.secondary : tint)
         .lineLimit(1)
       }
+      .sessionThemePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       Spacer(minLength: 4)
       switch webView {
       case .waitingForApproval:
@@ -2241,6 +2251,10 @@ struct SessionRow: View {
     .accessibilityAction(named: Text("Change Icon", bundle: .module)) {
       guard commands.canEditIdentity else { return }
       commands.changeIcon()
+    }
+    .accessibilityAction(named: Text("Change Conversation Theme", bundle: .module)) {
+      guard commands.canEditIdentity else { return }
+      commands.changeTheme()
     }
     .accessibilityAction(named: Text("Close Session", bundle: .module)) {
       guard commands.canClose else { return }
@@ -2518,12 +2532,19 @@ private struct SessionConversationSlot: View {
   let id: SessionID
   let shownID: SessionID
   let isCovered: Bool
-  let theme: ConversationTheme
+  let isDark: Bool
+  let increasedContrast: Bool
 
   var body: some View {
     if let conversation = model.conversations.existingModel(for: id),
       let listed = model.session(withID: id)
     {
+      // The theme of the session's own (#274), or the settings' — or the one on trial in them
+      // (#118).
+      let theme = model.conversations.themes.displayed(
+        ConversationFonts.installedOnly(model.conversations.appearance),
+        session: model.displayedConversationTheme(of: listed), isDark: isDark,
+        increasedContrast: increasedContrast)
       let isActive =
         !isCovered && id == shownID && model.presentation(of: listed) == .conversation
       VStack(spacing: 0) {

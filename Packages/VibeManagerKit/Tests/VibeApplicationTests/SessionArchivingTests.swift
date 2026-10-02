@@ -134,7 +134,8 @@ private func runningSession(name: String = "Refactor the webhook") -> WorkSessio
       )
     ],
     legacyNotes: "The webhook retries three times, then gives up.",
-    template: PromptTemplateReference(id: "tpl-1", name: "Bug fix", revision: "3")
+    template: PromptTemplateReference(id: "tpl-1", name: "Bug fix", revision: "3"),
+    conversationTheme: "night"
   )
 }
 
@@ -328,6 +329,7 @@ struct ArchiveSessionTests {
     #expect(restored.repositories == session.repositories)
     #expect(restored.repositories.first?.git == session.repositories.first?.git)
     #expect(restored.template == session.template)
+    #expect(restored.conversationTheme == "night")
     #expect(restored.createdAt == session.createdAt)
   }
 }

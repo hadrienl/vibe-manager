@@ -173,14 +173,18 @@ public final class ConversationThemesModel {
 
   public var canSave: Bool { !versions.isEmpty && !isGenerating && !isSaving }
 
-  /// The theme the conversations are drawn with: the one on trial — with its own accent, which
-  /// is what is being made — or the one the settings resolve to.
+  /// The theme the conversations are drawn with: a session's own (#274), whatever the mode;
+  /// otherwise the one on trial — with its own accent, which is what is being made — or the one
+  /// the settings resolve to. A session's theme that is no longer there follows the settings.
   public func displayed(
-    _ appearance: ConversationAppearance, isDark: Bool, increasedContrast: Bool
+    _ appearance: ConversationAppearance, session sessionTheme: String? = nil, isDark: Bool,
+    increasedContrast: Bool
   ) -> ConversationTheme {
     _ = fontsGeneration
     var theme: ConversationTheme
-    if let trial {
+    if let own = sessionTheme.flatMap({ self.theme($0) }) {
+      theme = own.applying(appearance)
+    } else if let trial {
       var own = appearance
       own.accent = .theme
       theme = trial.applying(own)
@@ -203,6 +207,9 @@ public final class ConversationThemesModel {
   public func theme(_ id: String) -> ConversationTheme? {
     ConversationTheme.named(id, personal: personal)
   }
+
+  /// The themes a session can be given (#274), in the order the settings show them.
+  public var offered: [ConversationTheme] { ConversationTheme.builtIn + personal }
 
   /// Reads the library again: when the tab appears, and after each change.
   public func load() async {

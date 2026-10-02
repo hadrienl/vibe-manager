@@ -45,6 +45,7 @@ extension AppModel {
   public func beginRename(_ id: SessionID, in place: SessionIdentityEditing.Place? = nil) {
     guard canEditIdentity(of: id) else { return }
     endAppearanceEditing()
+    endThemeEditing()
     let place = place ?? editingPlace(for: id)
     prepare(place, for: id)
     renaming = SessionIdentityEditing(sessionID: id, place: place)
@@ -68,7 +69,9 @@ extension AppModel {
     guard let session = sessions.first(where: { $0.id == id }), session.name != name else {
       return nil
     }
-    showIdentity(SessionIdentity(name: name, appearance: session.appearance), of: id)
+    var identity = SessionIdentity(of: session)
+    identity.name = name
+    showIdentity(identity, of: id)
     do {
       if let change = try await identityEdits.rename(id, to: name) {
         sidebarHistory.record(change)
@@ -97,6 +100,7 @@ extension AppModel {
       return
     }
     endAppearanceEditing()
+    endThemeEditing()
     renaming = nil
     let place = place ?? editingPlace(for: id)
     prepare(place, for: id)
@@ -135,13 +139,74 @@ extension AppModel {
     let id = editor.sessionID
     let appearance = editor.current
     let icon = editor.iconToKeep
-    showIdentity(SessionIdentity(name: session.name, appearance: appearance), of: id)
+    var identity = SessionIdentity(of: session)
+    identity.appearance = appearance
+    showIdentity(identity, of: id)
     Task { [weak self] in
       guard let self else { return }
       do {
         if let change = try await self.identityEdits.setAppearance(
           appearance, keeping: icon, for: id)
         {
+          self.sidebarHistory.record(change)
+        }
+      } catch {
+        self.identityFailure = Self.describe(error)
+      }
+      await self.identityDidChange(of: id, renamed: false)
+    }
+  }
+
+  // MARK: - Conversation theme (#274)
+
+  /// Opens the Change Theme popover on the session's row, or on the inspector's header.
+  public func beginThemeEditing(_ id: SessionID, in place: SessionIdentityEditing.Place? = nil) {
+    guard canEditIdentity(of: id), let session = sessions.first(where: { $0.id == id }) else {
+      return
+    }
+    endAppearanceEditing()
+    endThemeEditing()
+    renaming = nil
+    let place = place ?? editingPlace(for: id)
+    prepare(place, for: id)
+    themeEditing = SessionThemeEditing(
+      editing: SessionIdentityEditing(sessionID: id, place: place),
+      original: session.conversationTheme)
+  }
+
+  /// A card chosen in the popover: the conversation shows it at once, nothing is written yet.
+  public func previewTheme(_ theme: String?) {
+    themeEditing?.current = theme
+  }
+
+  /// The theme a session's conversation is drawn with: the one previewed while its popover is
+  /// open, `nil` following the settings.
+  public func displayedConversationTheme(of session: WorkSession) -> String? {
+    if let themeEditing, themeEditing.editing.sessionID == session.id {
+      return themeEditing.current
+    }
+    return session.conversationTheme
+  }
+
+  /// Escape: the preview goes, and nothing is written.
+  public func cancelThemeEditing() {
+    themeEditing = nil
+  }
+
+  /// The popover closed any other way: the theme chosen is kept, as one change for ⌘Z.
+  public func endThemeEditing() {
+    guard let editing = themeEditing else { return }
+    themeEditing = nil
+    let id = editing.editing.sessionID
+    guard editing.hasChanges, let session = sessions.first(where: { $0.id == id }) else { return }
+    let theme = editing.current
+    var identity = SessionIdentity(of: session)
+    identity.conversationTheme = theme
+    showIdentity(identity, of: id)
+    Task { [weak self] in
+      guard let self else { return }
+      do {
+        if let change = try await self.identityEdits.setConversationTheme(theme, for: id) {
           self.sidebarHistory.record(change)
         }
       } catch {
@@ -219,6 +284,7 @@ extension AppModel {
   private func apply(_ change: SessionIdentityChange) async -> SessionIdentityChange? {
     renaming = nil
     appearanceEditor = nil
+    themeEditing = nil
     showIdentity(change.after, of: change.id)
     var applied: SessionIdentityChange?
     do {
@@ -261,6 +327,8 @@ extension AppModel {
         bundle: .module)
     case .invalidAppearance:
       return String(localized: "This icon cannot be stored.", bundle: .module)
+    case .invalidConversationTheme:
+      return String(localized: "This theme cannot be stored.", bundle: .module)
     case .sessionNotFound:
       return String(localized: "This session no longer exists.", bundle: .module)
     case nil:

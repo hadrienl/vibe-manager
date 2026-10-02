@@ -148,6 +148,45 @@ struct EditSessionIdentityTests {
     #expect(change?.before.appearance == original.appearance)
   }
 
+  @Test(
+    "A conversation theme writes the theme and nothing else, and ⌘Z gives the previous one back (#274)",
+    arguments: [SessionStatus.active, .closed, .archived])
+  func conversationThemeWritesOnlyTheTheme(status: SessionStatus) async throws {
+    let original = session(status)
+    let repository = IdentityRepository([original])
+    let edit = EditSessionIdentity(repository: repository)
+
+    let change = try #require(try await edit.setConversationTheme("night", for: original.id))
+
+    var stored = try #require(await repository.session(id: original.id))
+    #expect(stored.conversationTheme == "night")
+    var expected = original
+    expected.conversationTheme = "night"
+    #expect(stored == expected)
+    #expect(change.before.conversationTheme == nil)
+    #expect(change.after.conversationTheme == "night")
+
+    #expect(try await edit.apply(change.reversed) == change.reversed)
+    stored = try #require(await repository.session(id: original.id))
+    #expect(stored == original)
+  }
+
+  @Test("The same theme again writes nothing; an empty one is refused")
+  func conversationThemeNoChange() async throws {
+    var original = session()
+    original.conversationTheme = "paper"
+    let repository = IdentityRepository([original])
+    let edit = EditSessionIdentity(repository: repository)
+
+    #expect(try await edit.setConversationTheme("paper", for: original.id) == nil)
+    await #expect(throws: SessionIdentityError.invalidConversationTheme) {
+      try await edit.setConversationTheme("", for: original.id)
+    }
+    #expect(await repository.writes == 0)
+    #expect(try await edit.setConversationTheme(nil, for: original.id) != nil)
+    #expect(await repository.session(id: original.id)?.conversationTheme == nil)
+  }
+
   @Test("A badge that cannot be stored is refused")
   func invalidAppearance() async {
     let original = session()

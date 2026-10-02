@@ -51,6 +51,8 @@ private struct StoredTemplateV1: Codable {
   /// Absent from the files written before templates proposed a folder.
   let folder: String?
   let appearance: TemplateAppearanceV1?
+  /// Absent from the files written before templates gave a conversation theme (#274).
+  let conversationTheme: String?
   let fields: [StoredFieldSettingsV1]
   let revision: Int
   let createdAt: Date
@@ -63,6 +65,7 @@ private struct StoredTemplateV1: Codable {
     body = template.body
     folder = template.folder
     appearance = template.appearance.map(TemplateAppearanceV1.init)
+    conversationTheme = template.conversationTheme
     fields = template.fieldSettings.map(StoredFieldSettingsV1.init)
     revision = template.revision
     createdAt = template.createdAt
@@ -77,6 +80,7 @@ private struct StoredTemplateV1: Codable {
       body: body,
       workingDirectoryPath: folder,
       appearance: appearance?.domainValue,
+      conversationTheme: conversationTheme.flatMap { $0.isEmpty ? nil : $0 },
       fieldSettings: fields.map(\.domainValue),
       revision: revision,
       createdAt: createdAt,
@@ -207,6 +211,7 @@ private struct ExchangeTemplateV1: Codable {
   let body: String
   let folder: String?
   let appearance: TemplateAppearanceV1?
+  let conversationTheme: String?
   let fields: [ExchangeFieldV1]?
 
   init(_ template: PromptTemplate) {
@@ -216,6 +221,7 @@ private struct ExchangeTemplateV1: Codable {
     body = template.body
     folder = template.folder
     appearance = template.appearance.map(TemplateAppearanceV1.init)
+    conversationTheme = template.conversationTheme
     fields = template.trimmedFieldSettings.map(ExchangeFieldV1.init)
   }
 
@@ -227,6 +233,7 @@ private struct ExchangeTemplateV1: Codable {
       body: body,
       workingDirectoryPath: folder,
       appearance: appearance?.domainValue,
+      conversationTheme: conversationTheme.flatMap { $0.isEmpty ? nil : $0 },
       fieldSettings: (fields ?? []).map(\.domainValue),
       revision: 1,
       createdAt: date

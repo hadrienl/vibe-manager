@@ -219,6 +219,16 @@
         }
       }
     },
+    "Change Conversation Theme…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer le thème de la conversation…"
+          }
+        }
+      }
+    },
     "Change Icon…" : {
       "localizations" : {
         "fr" : {

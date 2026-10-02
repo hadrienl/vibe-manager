@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The Prompt Templates window: the list on the left, in the user's order, and the template being
@@ -12,11 +13,20 @@ public struct PromptTemplatesView: View {
   @State private var isImporting = false
   @State private var export: ExportRequest?
   @FocusState private var isNameFocused: Bool
+  @State private var showsThemePicker = false
   /// What the pickers offer (#199), handed down by the Settings.
   @Environment(\.sessionAppearancePalette) private var palette
+  /// The conversation themes a template can give (#274). `nil`: it offers none.
+  private let themes: ConversationThemesModel?
+  private let conversationAppearance: ConversationAppearance
 
-  public init(model: PromptTemplateLibraryModel) {
+  public init(
+    model: PromptTemplateLibraryModel, themes: ConversationThemesModel? = nil,
+    conversationAppearance: ConversationAppearance = ConversationAppearance()
+  ) {
     _model = Bindable(model)
+    self.themes = themes
+    self.conversationAppearance = conversationAppearance
   }
 
   /// Laid out inside the settings window, under its tabs: nothing here draws in the title bar.
@@ -374,6 +384,15 @@ public struct PromptTemplatesView: View {
             ) {
               appearancePicker(editing)
             }
+            if let themes {
+              EditorRow(
+                LocalizedStringResource("Conversation Theme", bundle: .module),
+                help: themeHelp(editing, themes: themes),
+                issues: []
+              ) {
+                themePicker(editing, themes: themes)
+              }
+            }
             EditorRow(
               LocalizedStringResource("Prompt", bundle: .module),
               help: LocalizedStringResource(
@@ -657,6 +676,51 @@ public struct PromptTemplatesView: View {
 
   /// The symbols and colours the New Session sheet offers, and None to leave the sessions their
   /// own. Picking one of the two when there is none yet starts from the template's name.
+  /// The theme the sessions made from it are given (#274). One this Mac does not have — deleted,
+  /// or from another Mac's export — is said, and ignored at creation.
+  private func themeHelp(_ editing: PromptTemplate, themes: ConversationThemesModel)
+    -> LocalizedStringResource?
+  {
+    guard let theme = editing.conversationTheme else {
+      return LocalizedStringResource(
+        "Optional — the conversation theme of the sessions made from it.", bundle: .module)
+    }
+    guard themes.theme(theme) == nil else { return nil }
+    return LocalizedStringResource(
+      "Theme not found — ignored when a session is created.", bundle: .module)
+  }
+
+  private func themePicker(_ editing: PromptTemplate, themes: ConversationThemesModel)
+    -> some View
+  {
+    let name: Text =
+      editing.conversationTheme == nil
+      ? Text("None", bundle: .module, comment: "A template that gives no conversation theme.")
+      : SessionThemeText.name(of: editing.conversationTheme, themes: themes)
+    return Button {
+      showsThemePicker = true
+    } label: {
+      Label {
+        name
+      } icon: {
+        Image(systemName: "paintpalette")
+      }
+    }
+    .popover(isPresented: $showsThemePicker, arrowEdge: .bottom) {
+      ConversationThemePicker(
+        selection: Binding(
+          get: { model.editing?.conversationTheme },
+          set: { model.editing?.conversationTheme = $0 }),
+        themes: themes, appearance: conversationAppearance,
+        nilTitle: Text(
+          "None", bundle: .module, comment: "A template that gives no conversation theme."),
+        commit: { showsThemePicker = false }, cancel: { showsThemePicker = false }
+      )
+      .padding(16)
+    }
+    .accessibilityLabel(Text("Conversation Theme: \(name)", bundle: .module))
+  }
+
   private func appearancePicker(_ editing: PromptTemplate) -> some View {
     let current = editing.appearance
     let base = current ?? palette.derived(forName: editing.trimmedName)

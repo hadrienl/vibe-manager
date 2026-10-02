@@ -279,6 +279,23 @@
         }
       }
     },
+    "%@, %@ now" : {
+      "comment" : "VoiceOver: the card that follows the settings, and the theme they give now.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@ en ce moment"
+          }
+        }
+      }
+    },
     "%@, a theme of yours" : {
       "localizations" : {
         "fr" : {
@@ -1129,6 +1146,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conversation"
+          }
+        }
+      }
+    },
+    "Conversation Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème de la conversation"
           }
         }
       }
@@ -2878,6 +2905,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thème"
+          }
+        }
+      }
+    },
+    "Theme Not Found" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème introuvable"
           }
         }
       }

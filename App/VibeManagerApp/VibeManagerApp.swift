@@ -638,6 +638,12 @@ private struct SessionHistoryCommands: Commands {
     }
     .keyboardShortcut("i", modifiers: [.command, .control])
     .disabled(!canEditIdentity)
+
+    Button("Change Conversation Theme…") {
+      guard let id = model.selectedSessionID else { return }
+      model.beginThemeEditing(id)
+    }
+    .disabled(!canEditIdentity)
   }
 
   /// One session on screen, in the workspace: never several at once (#77), never under a sheet.

@@ -186,3 +186,18 @@ func agentConfigurationWithoutHarness() throws {
   #expect(roundTrip == endpoint)
   #expect(roundTrip.transcriptProviderID == "claude-code")
 }
+
+@Test("A conversation theme may name a theme that is gone, never nothing (#274)")
+func conversationThemeValidation() throws {
+  var session = WorkSession(name: "Prod", conversationTheme: "deleted-personal-theme")
+  try session.validate()
+  session.conversationTheme = ""
+  #expect(throws: WorkSessionValidationError.emptyConversationTheme) { try session.validate() }
+}
+
+@Test("A draft gives its conversation theme to the session it becomes (#274)")
+func draftCarriesConversationTheme() {
+  let draft = SessionDraft(name: "Prod", conversationTheme: "night")
+  #expect(draft.session().conversationTheme == "night")
+  #expect(SessionDraft(name: "Free").session().conversationTheme == nil)
+}
