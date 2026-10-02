@@ -121,8 +121,11 @@ public final class WorkspaceLayoutController {
     scheduleSave()
   }
 
+  // Read from the settings, never through `intent`: `intent` reads the web view's width, and
+  // every view that reads the filter — the sidebar, the menus of the session — would be evaluated
+  // again at each step of a drag of its divider.
   public var filter: SessionFilter {
-    intent.sessionFilter
+    settings.sessionFilter
   }
 
   /// The scope, the sort and the facets are kept. The search text never reaches here — the
@@ -324,6 +327,10 @@ public final class WorkspaceLayoutController {
   }
 
   /// Folds the palette of pending requests into its count, or unfolds it (#40).
+  public var isRequestPaletteCollapsed: Bool {
+    settings.isRequestPaletteCollapsed
+  }
+
   public func setRequestPaletteCollapsed(_ isCollapsed: Bool) {
     updateIntent { $0.isRequestPaletteCollapsed = isCollapsed }
   }

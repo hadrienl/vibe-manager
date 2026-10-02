@@ -25,7 +25,6 @@ public struct RootView: View {
   @Environment(\.undoManager) private var undoManager
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   public init(model: AppModel) {
     self.model = model
@@ -930,44 +929,22 @@ public struct RootView: View {
   /// replaying its whole history on the main thread, at each click of the toolbar's button.
   private func sessionContent(for session: WorkSession) -> some View {
     let workspace = session.status == .archived ? nil : model.browser
-    let arrangement = workspace == nil ? .hidden : model.layout.columns.browser
-    return GeometryReader { proxy in
-      // The terminal keeps its eighty columns: the web view gives way first.
-      let upper = WorkspaceLayout.browserWidthUpperBound(
-        in: Double(proxy.size.width), handle: Double(SplitHandle.thickness),
-        terminalMinimum: Self.terminalMinimumWidth)
-      let width = min(model.layout.browserWidth, upper)
-      HStack(spacing: 0) {
-        terminalStack(for: session)
-          .overlay {
-            if let workspace, arrangement == .alternating,
-              model.layout.showsBrowserWhenAlternating
-            {
-              BrowserPanel(
-                model: model, workspace: workspace, browser: workspace.browser(for: session.id))
-            }
+    let placement: BrowserPlacement = workspace == nil ? .hidden : model.layout.columns.browser
+    return BrowserSplit(
+      layout: model.layout, sessionID: session.id, placement: placement,
+      terminalMinimum: Self.terminalMinimumWidth
+    ) {
+      terminalStack(for: session)
+        .overlay {
+          if let workspace, placement == .alternating, model.layout.showsBrowserWhenAlternating {
+            BrowserPanel(
+              model: model, workspace: workspace, browser: workspace.browser(for: session.id))
           }
-        if let workspace, arrangement == .beside {
-          SplitHandle(
-            length: width,
-            range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
-            label: Text("Divider between the terminal and the web view", bundle: .module),
-            onChange: { model.layout.browserWidthChanged(to: $0) },
-            onDoubleClick: {
-              let centered = WorkspaceLayout.centeredBrowserWidth(
-                in: Double(proxy.size.width), handle: Double(SplitHandle.thickness),
-                terminalMinimum: Self.terminalMinimumWidth)
-              withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                model.layout.browserWidthChanged(to: centered)
-              }
-            },
-            help: Text(
-              "Drag to resize. Double-click to give both sides the same width.", bundle: .module))
-          BrowserPanel(
-            model: model, workspace: workspace, browser: workspace.browser(for: session.id)
-          )
-          .frame(width: width)
         }
+    } trailing: {
+      if let workspace {
+        BrowserPanel(
+          model: model, workspace: workspace, browser: workspace.browser(for: session.id))
       }
     }
   }
@@ -2534,6 +2511,7 @@ private struct SessionConversationSlot: View {
   let isCovered: Bool
   let isDark: Bool
   let increasedContrast: Bool
+  @Environment(\.paneWidthHold) private var widthHold
 
   var body: some View {
     if let conversation = model.conversations.existingModel(for: id),
@@ -2577,6 +2555,11 @@ private struct SessionConversationSlot: View {
             close: sessionClose(for: id, in: model))
         }
       }
+      // Hidden, it keeps its width while the column changes for a moment, as a terminal does.
+      // On screen too when the web view slides over it; not under a drag of the divider, where
+      // it would leave a bare strip.
+      .frame(width: widthHold.flatMap { !isActive || $0.isCovered ? $0.width : nil })
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
       .opacity(isActive ? 1 : 0)
       .allowsHitTesting(isActive)
       .accessibilityHidden(!isActive)
