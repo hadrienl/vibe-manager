@@ -572,12 +572,7 @@ public final class AppModel {
   public internal(set) var webViewFocusRequest = 0
   public internal(set) var addressBarFocusRequest = 0
   /// Whether the web view's address bar holds the keyboard: ⌘W then closes its tab.
-  public var isAddressBarFocused = false {
-    didSet { if !isAddressBarFocused { opensNewWebTab = false } }
-  }
-  /// The address bar was given the keyboard for a new tab (#247): what is typed opens beside the
-  /// tab in front instead of replacing it.
-  public internal(set) var opensNewWebTab = false
+  public var isAddressBarFocused = false
   var webPageFocus = false
   /// Absent in a workspace assembled without the system around it — tests and previews. The
   /// application always has one.
