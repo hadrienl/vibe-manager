@@ -21,6 +21,8 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   static let refuseAction = "vibe.request.refuse"
   nonisolated static let sessionKey = "session"
   nonisolated static let requestKey = "request"
+  /// Marks a notification about a session's outcome (#236), which names no request.
+  nonisolated static let outcomeKey = "outcome"
 
   private let center: UNUserNotificationCenter
   private weak var model: AppModel?
@@ -88,6 +90,36 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       ]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
+  }
+
+  /// One per session: a later outcome replaces the one still shown.
+  public func postOutcome(_ notification: SessionOutcomeNotification) {
+    let session = notification.sessionID.rawValue.uuidString
+    let identifier = "\(session)|\(Self.outcomeKey)"
+    // Kept, as a request's is, by `withdrawIfUnwanted`.
+    wanted.insert(identifier)
+    Task {
+      guard await authorized() else { return }
+      let content = UNMutableNotificationContent()
+      content.title = notification.title
+      content.body = notification.body
+      content.sound = .default
+      content.threadIdentifier = session
+      content.userInfo = [Self.sessionKey: session, Self.outcomeKey: true]
+      deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  nonisolated static func outcomeSessionID(from userInfo: [AnyHashable: Any]) -> SessionID? {
+    guard userInfo[outcomeKey] as? Bool == true,
+      let session = (userInfo[sessionKey] as? String).flatMap(UUID.init(uuidString:))
+    else { return nil }
+    return SessionID(rawValue: session)
+  }
+
+  fileprivate func open(_ id: SessionID) {
+    NSApp.activate()
+    model?.openFromNotification(id)
   }
 
   private func isStillShown(_ identifier: String) async -> Bool {
@@ -200,7 +232,12 @@ extension SystemRequestNotifier: UNUserNotificationCenterDelegate {
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
     let action = response.actionIdentifier
-    guard let id = Self.requestID(from: response.notification.request.content.userInfo) else {
+    let userInfo = response.notification.request.content.userInfo
+    if let session = Self.outcomeSessionID(from: userInfo) {
+      await open(session)
+      return
+    }
+    guard let id = Self.requestID(from: userInfo) else {
       return
     }
     await respond(to: action, for: id)

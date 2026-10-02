@@ -34,6 +34,27 @@ struct WorkspaceLayoutTests {
     )
   }
 
+  @Test(
+    "Centring the web view gives both panes the same width, as far as the bounds allow",
+    arguments: [
+      // Room for both halves.
+      (1_409.0, 700.0),
+      // The middle would narrow the terminal under its minimum: the web view gives way.
+      (1_100.0, 531.0),
+      // The middle is wider than the web view may be.
+      (3_000.0, 1_200.0),
+      // Too narrow for both: the web view keeps its own minimum.
+      (800.0, 380.0),
+      (.nan, 380.0),
+      (0.0, 380.0),
+    ])
+  func centredBrowserWidth(container: Double, expected: Double) {
+    let width = WorkspaceLayout.centeredBrowserWidth(
+      in: container, handle: 9, terminalMinimum: 560)
+
+    #expect(width == expected)
+  }
+
   @Test("A stored layout survives a round trip")
   func roundTrip() throws {
     let layout = WorkspaceLayout(

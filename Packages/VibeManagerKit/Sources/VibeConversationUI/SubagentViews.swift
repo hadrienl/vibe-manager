@@ -601,8 +601,8 @@ enum SubagentPresentation {
       return String(localized: "waiting for your permission", bundle: .module)
     case .interrupted:
       return call.subagent?.result == nil
-        ? String(localized: "stopped without an answer", bundle: .module)
-        : String(localized: "stopped", bundle: .module)
+        ? String(localized: "interrupted without an answer", bundle: .module)
+        : String(localized: "interrupted", bundle: .module)
     case .refused: return String(localized: "not allowed", bundle: .module)
     default: return nil
     }

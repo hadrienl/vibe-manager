@@ -219,6 +219,16 @@
         }
       }
     },
+    "Change Conversation Theme…" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer le thème de la conversation…"
+          }
+        }
+      }
+    },
     "Change Icon…" : {
       "localizations" : {
         "fr" : {
@@ -392,12 +402,12 @@
         }
       }
     },
-    "Focus Inspector" : {
+    "Focus Context" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aller à l’inspecteur"
+            "value" : "Aller au contexte"
           }
         }
       }
@@ -672,6 +682,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle session à partir d’un gabarit"
+          }
+        }
+      }
+    },
+    "New Tab" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel onglet"
           }
         }
       }

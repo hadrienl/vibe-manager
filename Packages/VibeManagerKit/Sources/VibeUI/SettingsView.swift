@@ -21,9 +21,9 @@ public struct SettingsView: View {
   ///
   /// The window takes each tab's size, and its toolbar holds the tabs. Too narrow, the last ones
   /// fall into an overflow menu where SwiftUI greys them out: at 500 points, Conversation,
-  /// Requests and Avatar could not be reached. At this width the nine tabs of #154 leave room
-  /// for a longer translation, or one more tab.
-  nonisolated static let formWidth: CGFloat = 780
+  /// Requests and Avatar could not be reached. 780 points held the nine tabs of #154 and one more;
+  /// with Badges (#199) and Endpoints (#107), the twelve need 820 in French.
+  nonisolated static let formWidth: CGFloat = 820
 
   public init(permissions: PermissionsModel? = nil, model: AppModel? = nil) {
     self.permissions = permissions
@@ -39,8 +39,11 @@ public struct SettingsView: View {
           PrivacySettingsView(permissions: permissions, sessionName: model.sessionName(for:))
             .settingsPage(.privacy)
         }
-        PromptTemplatesView(model: model.templates)
-          .settingsPage(.templates)
+        PromptTemplatesView(
+          model: model.templates, themes: model.conversations.themes,
+          conversationAppearance: model.conversations.appearance
+        )
+        .settingsPage(.templates)
         if let browser = model.browser {
           WebViewSettings(browser: browser)
             .settingsPage(.webView)
@@ -52,6 +55,10 @@ public struct SettingsView: View {
         if model.ticketTitles.canReadPages {
           TicketSettingsView(model: model.ticketTitles)
             .settingsPage(.tickets)
+        }
+        if let endpoints = model.endpoints {
+          EndpointsSettingsView(model: endpoints)
+            .settingsPage(.endpoints)
         }
         if let journal = model.journal {
           ActivitySettings(journal: journal)
@@ -172,6 +179,8 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
   case terminals
   /// The titles of the tickets a new session names, and the resolvers that recognise them (#89).
   case tickets
+  /// The model servers a session can run on, driven by Claude Code or Codex (#107).
+  case endpoints
   /// What each session's journal does: the summary its agent writes (#36).
   case activity
   /// The conversation view of #38: its theme, its fonts, what it unfolds.
@@ -202,6 +211,9 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
         "Terminals", bundle: .module, comment: "A tab of the Settings window.")
     case .tickets:
       LocalizedStringResource("Tickets", bundle: .module, comment: "A tab of the Settings window.")
+    case .endpoints:
+      LocalizedStringResource(
+        "Endpoints", bundle: .module, comment: "A tab of the Settings window: model servers.")
     case .activity:
       LocalizedStringResource(
         "Activity", bundle: .module, comment: "A tab of the Settings window.")
@@ -229,6 +241,7 @@ public enum SettingsTab: String, Hashable, Sendable, CaseIterable {
     case .webView: "globe"
     case .terminals: "apple.terminal"
     case .tickets: "ticket"
+    case .endpoints: "point.3.connected.trianglepath.dotted"
     case .activity: "list.bullet.rectangle"
     case .conversation: "bubble.left.and.text.bubble.right"
     // Not Privacy's hand: a person speaking in a bubble, as the avatar of the panel does.

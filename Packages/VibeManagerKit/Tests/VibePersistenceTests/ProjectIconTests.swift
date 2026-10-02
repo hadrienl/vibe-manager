@@ -366,7 +366,7 @@ struct SessionStoreIconTests {
     let session = WorkSession(name: "Waiting", taskStatus: .waiting)
     let codec = SessionStoreCodec()
     let v6 = String(decoding: try codec.encode(sessions: [session]), as: UTF8.self)
-      .replacingOccurrences(of: #""schemaVersion" : 8"#, with: #""schemaVersion" : 6"#)
+      .replacingOccurrences(of: #""schemaVersion" : 9"#, with: #""schemaVersion" : 6"#)
 
     let decoded = try codec.decode(Data(v6.utf8))
 

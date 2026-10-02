@@ -108,13 +108,40 @@ extension AppModel {
     }
   }
 
-  /// ⌥⌘→ and ⌥⌘← on a selection of several: the column next to the one on screen.
+  /// ⌃⌘→ and ⌃⌘← on a selection of several: the column next to the one on screen.
   public func batchMovePlan(forward: Bool) -> SessionBatchPlan? {
     guard let session = selectedSession else { return nil }
     let candidates = forward ? nextTaskStatuses(of: session) : previousTaskStatuses(of: session)
     guard let target = candidates.first, target != .archived else { return nil }
     let plan = batchPlan(.move(to: target), for: commandTargets)
     return plan.isEmpty ? nil : plan
+  }
+
+  // MARK: - Stopped with the terminal host
+
+  /// The sessions the terminal host took down with it when it stopped (#237): one banner says
+  /// why for all of them, rather than a row of "Failed" each. Restarting one, or archiving it,
+  /// takes it off the list; the banner's ✕ sets them all aside.
+  public var sessionsStoppedWithHost: [SessionID] {
+    guard let launcher else { return [] }
+    return sessions.compactMap { session in
+      session.status != .archived && launcher.pane(for: session.id)?.stoppedWithHost == true
+        ? session.id : nil
+    }
+  }
+
+  /// The banner dismissed: the sessions stay as they are, closed, and Restart still works on
+  /// each of them.
+  public func setAsideSessionsStoppedWithHost() {
+    for id in sessionsStoppedWithHost {
+      launcher?.pane(for: id)?.setAsideHostStop()
+    }
+  }
+
+  /// Restarts them together, as Restart on the same selection would — asking first, as it does
+  /// for several agents at once. Nothing restarts without this.
+  public func restartSessionsStoppedWithHost() async {
+    await requestBatch(batchPlan(.restart, for: sessionsStoppedWithHost))
   }
 
   // MARK: - Asking
@@ -267,7 +294,15 @@ extension AppModel {
       // the other would hold the last one for half a minute.
       results.merge(await concurrently(current.eligible) { await $0.closeInBatch($1) }) { $1 }
     case .archive:
+      let columns = Dictionary(
+        uniqueKeysWithValues: sessions.map { ($0.id, $0.taskStatus) })
       results.merge(await concurrently(current.eligible) { await $0.archiveInBatch($1) }) { $1 }
+      // One ⌘Z brings the whole batch back, the session on screen selected again (#242).
+      sidebarHistory.record(
+        current.eligible.compactMap { id in
+          guard results[id]?.isDone == true, let column = columns[id] else { return nil }
+          return SessionArchiveUndo(id: id, taskStatus: column, wasSelected: id == shown)
+        })
     case .unarchive:
       for id in current.eligible { results[id] = await restoreInBatch(id) }
     case .restart:

@@ -1,22 +1,27 @@
 import Foundation
 import VibeDomain
 
-/// What a session is shown as: its name and its badge (#183).
+/// What a session is shown as: its name and its badge (#183), and the theme of its conversation
+/// (#274).
 public struct SessionIdentity: Hashable, Sendable {
   public var name: String
   public var appearance: SessionAppearance
+  public var conversationTheme: String?
 
-  public init(name: String, appearance: SessionAppearance) {
+  public init(name: String, appearance: SessionAppearance, conversationTheme: String? = nil) {
     self.name = name
     self.appearance = appearance
+    self.conversationTheme = conversationTheme
   }
 
   public init(of session: WorkSession) {
-    self.init(name: session.name, appearance: session.appearance)
+    self.init(
+      name: session.name, appearance: session.appearance,
+      conversationTheme: session.conversationTheme)
   }
 }
 
-/// One rename or one change of badge, as ⌘Z undoes it.
+/// One rename, one change of badge or of theme, as ⌘Z undoes it.
 public struct SessionIdentityChange: Hashable, Sendable {
   public let id: SessionID
   public let before: SessionIdentity
@@ -40,6 +45,8 @@ public enum SessionIdentityError: Error, Equatable, Sendable {
   case invalidAppearance
   /// The project's icon could not be copied into the data folder, and nothing was changed.
   case iconNotKept
+  /// A theme named by nothing: `nil` is how a session follows the settings.
+  case invalidConversationTheme
 }
 
 /// Renames a session, or changes its badge, after it was created (#183).
@@ -96,6 +103,19 @@ public struct EditSessionIdentity: Sendable {
     return try await write(id) { $0.appearance = appearance }
   }
 
+  /// Gives the session's conversation this theme (#274), or the settings' with `nil`. `nil` when
+  /// it already had it. A theme that is not there is written all the same: it is drawn as the
+  /// settings' until it is back.
+  @discardableResult
+  public func setConversationTheme(_ theme: String?, for id: SessionID) async throws
+    -> SessionIdentityChange?
+  {
+    guard theme.map({ !$0.isEmpty }) ?? true else {
+      throw SessionIdentityError.invalidConversationTheme
+    }
+    return try await write(id) { $0.conversationTheme = theme }
+  }
+
   /// Puts back a name and a badge as they were, for ⌘Z — only if the session still has the ones
   /// the change gave it. Anything else means it was changed since, and the change is not undone
   /// over that: `nil`.
@@ -106,6 +126,7 @@ public struct EditSessionIdentity: Sendable {
         guard SessionIdentity(of: session) == change.before else { throw ChangedSince() }
         session.name = change.after.name
         session.appearance = change.after.appearance
+        session.conversationTheme = change.after.conversationTheme
       }
       guard updated != nil else { throw SessionIdentityError.sessionNotFound }
       return change

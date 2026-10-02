@@ -9,11 +9,17 @@ public enum Announcer {
   /// active one, and has no window in front.
   static weak var floatingElement: NSWindow?
 
-  public static func announce(_ text: LocalizedStringResource) {
-    announce(String(localized: text))
+  public static func announce(
+    _ text: LocalizedStringResource, priority: NSAccessibilityPriorityLevel = .high
+  ) {
+    announce(String(localized: text), priority: priority)
   }
 
-  public static func announce(_ text: String) {
+  /// `priority`: high interrupts what VoiceOver is saying; medium waits its turn, for news that
+  /// may come in bursts (#236).
+  public static func announce(
+    _ text: String, priority: NSAccessibilityPriorityLevel = .high
+  ) {
     lastAnnouncement = text
     let floating = NSApp?.isActive == false ? floatingElement : nil
     let element: Any = floating ?? NSApp?.keyWindow ?? NSApp?.mainWindow ?? NSApp as Any
@@ -22,7 +28,7 @@ public enum Announcer {
       notification: .announcementRequested,
       userInfo: [
         .announcement: text,
-        .priority: NSAccessibilityPriorityLevel.high.rawValue,
+        .priority: priority.rawValue,
       ]
     )
   }

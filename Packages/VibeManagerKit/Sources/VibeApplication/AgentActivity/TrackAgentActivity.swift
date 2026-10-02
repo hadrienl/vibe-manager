@@ -8,15 +8,20 @@ public struct AgentActivityUpdate: Hashable, Sendable {
   public let state: AgentActivityState?
   /// How each of its requests can be answered now (#40).
   public let answering: [AgentRequestID: AgentRequestAnswering]
+  /// The change comes from a log line written while the application was closed, read again once
+  /// its process is adopted: it happened, but not now, and is not to be said as news (#236).
+  public let isReplayed: Bool
 
   public init(
     sessionID: SessionID,
     state: AgentActivityState?,
-    answering: [AgentRequestID: AgentRequestAnswering] = [:]
+    answering: [AgentRequestID: AgentRequestAnswering] = [:],
+    isReplayed: Bool = false
   ) {
     self.sessionID = sessionID
     self.state = state
     self.answering = answering
+    self.isReplayed = isReplayed
   }
 }
 
@@ -46,6 +51,9 @@ public actor TrackAgentActivity {
     /// Which process the tasks belong to. A log line still on its way from the previous one must
     /// not move the new one.
     var generation = 0
+    /// When the process was adopted: a log line dated before it was written while the
+    /// application was closed.
+    var adoptedAt: Date?
   }
 
   private let logs: any AgentActivityLogStore
@@ -170,6 +178,7 @@ public actor TrackAgentActivity {
     tracked.restoredUncertainty = false
     tracked.sourceEvent = nil
     tracked.conversationIdentifier = nil
+    tracked.adoptedAt = nil
     tracked.state = reduce(tracked.state, .processStarted(structured: decoder != nil), for: id)
     sessions[id] = tracked
     if decoder != nil { follow(id, from: nil) }
@@ -200,6 +209,7 @@ public actor TrackAgentActivity {
     tracked.restoredRequests = []
     tracked.restoredUncertainty = false
     tracked.conversationIdentifier = nil
+    tracked.adoptedAt = now()
     if isVisible(id) { tracked.state.unreadSince = nil }
     sessions[id] = tracked
     if hasLog {
@@ -383,7 +393,8 @@ public actor TrackAgentActivity {
     }
     openSource(after: event, for: id)
     // The position moved: written down even when the state did not.
-    changed(id, from: previous, force: true)
+    let isReplayed = tracked.adoptedAt.map { event.date < $0 } ?? false
+    changed(id, from: previous, force: true, isReplayed: isReplayed)
   }
 
   /// Opens what an event names beyond the hooks, in place of what an earlier one had opened.
@@ -447,7 +458,10 @@ public actor TrackAgentActivity {
   /// Said to the interface, and written down, only when what is shown changes: a keystroke, or a
   /// line of output, moves the instants the fallback counts from and nothing a row displays.
   /// `force` is for what must be written even so — a log position, a new process.
-  private func changed(_ id: SessionID, from previous: AgentActivityState, force: Bool = false) {
+  private func changed(
+    _ id: SessionID, from previous: AgentActivityState, force: Bool = false,
+    isReplayed: Bool = false
+  ) {
     guard let current = sessions[id]?.state else { return }
     if AgentActivityMachine.nextDeadline(of: current)
       != AgentActivityMachine.nextDeadline(of: previous)
@@ -455,7 +469,9 @@ public actor TrackAgentActivity {
       scheduleTick()
     }
     guard force || !current.showsTheSame(as: previous) else { return }
-    if !current.showsTheSame(as: previous) { publish(id) }
+    if !current.showsTheSame(as: previous) {
+      publish(id, state: current, isReplayed: isReplayed)
+    }
     schedulePersistence()
   }
 
@@ -463,9 +479,10 @@ public actor TrackAgentActivity {
     publish(id, state: sessions[id]?.state)
   }
 
-  private func publish(_ id: SessionID, state: AgentActivityState?) {
+  private func publish(_ id: SessionID, state: AgentActivityState?, isReplayed: Bool = false) {
     let update = AgentActivityUpdate(
-      sessionID: id, state: state, answering: state.map { answering(of: $0, for: id) } ?? [:])
+      sessionID: id, state: state, answering: state.map { answering(of: $0, for: id) } ?? [:],
+      isReplayed: isReplayed)
     for continuation in continuations.values { continuation.yield(update) }
   }
 

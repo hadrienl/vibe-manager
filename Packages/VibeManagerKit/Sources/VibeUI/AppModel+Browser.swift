@@ -111,6 +111,15 @@ extension AppModel {
   /// ⌘L: the address bar takes the keyboard, the view shown first if it was not.
   public func focusAddressBar() {
     showWebView()
+    opensNewWebTab = false
+    addressBarFocusRequest += 1
+  }
+
+  /// New Tab — the “+” of the tab bar, and ⌘T while the web view holds the keyboard (#247): the
+  /// address bar takes it, empty, and what is typed there opens in a tab of its own.
+  public func newWebTab() {
+    showWebView()
+    opensNewWebTab = true
     addressBarFocusRequest += 1
   }
 
@@ -179,6 +188,13 @@ extension AppModel {
 
   /// Sends the tab in front to an address typed in the address bar.
   public func navigateWebTab(to text: String) {
+    if opensNewWebTab {
+      // Return on the empty field of a new tab opens nothing — not a copy of the page in front.
+      guard Self.address(from: text) != nil else { return }
+      opensNewWebTab = false
+      openInWebView(text)
+      return
+    }
     guard let tab = activeWebTab else {
       openInWebView(text)
       return

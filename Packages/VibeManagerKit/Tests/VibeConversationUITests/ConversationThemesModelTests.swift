@@ -250,6 +250,54 @@ struct ConversationThemesModelTests {
     #expect(trial.accent == fixture.model.trial?.accent)
   }
 
+  @Test("A session's own theme is drawn in either mode, with the settings' accent (#274)")
+  func sessionTheme() async {
+    let fixture = Fixture()
+    let appearance = ConversationAppearance(accent: .blue)
+    for isDark in [false, true] {
+      let theme = fixture.model.displayed(
+        appearance, session: ConversationTheme.night.id, isDark: isDark, increasedContrast: false)
+      #expect(theme.id == ConversationTheme.night.id)
+      #expect(theme.accent == ConversationTheme.accentColors[.blue]?.dark)
+    }
+    let following = fixture.model.displayed(
+      appearance, session: nil, isDark: true, increasedContrast: false)
+    #expect(following.id == ConversationAppearance.defaultDarkTheme)
+  }
+
+  @Test("Contrast High replaces the settings' system theme, never one chosen for the session")
+  func sessionThemeAndContrast() async {
+    let fixture = Fixture()
+    let appearance = ConversationAppearance()
+    let chosen = fixture.model.displayed(
+      appearance, session: ConversationTheme.systemLight.id, isDark: false,
+      increasedContrast: true)
+    #expect(chosen.id == ConversationTheme.systemLight.id)
+    let following = fixture.model.displayed(
+      appearance, session: nil, isDark: false, increasedContrast: true)
+    #expect(following.id == ConversationTheme.highContrast.id)
+  }
+
+  @Test("A session's theme that is gone follows the settings, and the trial with them")
+  func missingSessionTheme() async throws {
+    let fixture = Fixture()
+    let appearance = ConversationAppearance()
+    let missing = fixture.model.displayed(
+      appearance, session: "deleted", isDark: true, increasedContrast: false)
+    #expect(missing.id == ConversationAppearance.defaultDarkTheme)
+    try await fixture.generate("une forêt la nuit")
+    let trial = try #require(fixture.model.trial)
+    #expect(
+      fixture.model.displayed(
+        appearance, session: "deleted", isDark: true, increasedContrast: false
+      )
+      .id == trial.id)
+    #expect(
+      fixture.model.displayed(
+        appearance, session: ConversationTheme.paper.id, isDark: true, increasedContrast: false
+      ).id == ConversationTheme.paper.id)
+  }
+
   @Test("A family the theme asks for is drawn when it is there, and gives way when it is not")
   func fonts() async {
     var present = ConversationThemeLibraryRules.kept(.night, name: "Menlo")

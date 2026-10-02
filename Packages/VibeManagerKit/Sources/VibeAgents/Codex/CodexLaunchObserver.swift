@@ -15,16 +15,20 @@ public actor CodexLaunchObserver: AgentLaunchObserver {
   private let sessionID: SessionID
   private let repository: any SessionRepository
   private let provider: CodexAgentProvider
+  private let recording: AgentResumeRecording
   private var capture: CodexSessionIdentifierCapture?
 
   public init(
     sessionID: SessionID,
     repository: any SessionRepository,
-    provider: CodexAgentProvider
+    provider: CodexAgentProvider,
+    recording: AgentResumeRecording = AgentResumeRecording(
+      providerID: CodexAgentProvider.id.rawValue)
   ) {
     self.sessionID = sessionID
     self.repository = repository
     self.provider = provider
+    self.recording = recording
   }
 
   /// A launch nobody said had approved hooks: the rollout is its only sure source.
@@ -41,6 +45,7 @@ public actor CodexLaunchObserver: AgentLaunchObserver {
       for: sessionID,
       workingDirectoryPath: plan.workingDirectoryPath,
       repository: repository,
+      recording: recording,
       timeout: reportsThroughHooks
         ? CodexSessionIdentifierCapture.defaultTimeout
         : CodexSessionIdentifierCapture.defaultWatchLimit
@@ -79,7 +84,7 @@ public actor CodexLaunchObserver: AgentLaunchObserver {
   private func namingCapture() -> CodexSessionIdentifierCapture {
     if let capture { return capture }
     let capture = provider.identifierCapture(
-      for: sessionID, workingDirectoryPath: "", repository: repository)
+      for: sessionID, workingDirectoryPath: "", repository: repository, recording: recording)
     self.capture = capture
     return capture
   }

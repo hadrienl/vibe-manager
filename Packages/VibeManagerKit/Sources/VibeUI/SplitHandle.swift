@@ -33,7 +33,11 @@ struct SplitHandle: View {
   var onEnded: () -> Void = {
     // Nothing by default: the web view's width is written as it changes.
   }
+  /// Gives both panes the same length: a double click, VoiceOver's “Center”, or Return or = once
+  /// the handle has the keyboard.
   var onDoubleClick: (() -> Void)?
+  /// What the handle's help tag says, if anything.
+  var help: Text?
 
   @State private var dragged: Double?
   /// The length when the drag began: the drag's translation is counted from it, however often the
@@ -69,7 +73,9 @@ struct SplitHandle: View {
       cursorPushed = false
     }
     .gesture(
-      DragGesture(minimumDistance: 1, coordinateSpace: .global)
+      // A few points before a drag begins: the mouse trembling between the two clicks of a
+      // double click must not move the handle before it is centred (#218).
+      DragGesture(minimumDistance: 3, coordinateSpace: .global)
         .onChanged { value in
           let start = startLength ?? length
           startLength = start
@@ -88,8 +94,9 @@ struct SplitHandle: View {
         }
     )
     .simultaneousGesture(TapGesture(count: 2).onEnded { onDoubleClick?() })
-    // Reached with Tab when Full Keyboard Access is on; the arrows then move it.
-    .focusable(axis == .vertical)
+    // Reached with Tab when Full Keyboard Access is on; the arrows then move it. Beside the
+    // terminal, only by Tab: a click on the handle must leave the keyboard to the terminal.
+    .focusable(interactions: axis == .vertical ? .automatic : .activate)
     .focused($isFocused)
     .focusEffectDisabled()
     .onKeyPress(keys: [.upArrow, .downArrow]) { press in
@@ -97,6 +104,12 @@ struct SplitHandle: View {
       adjust((press.key == .downArrow ? step : -step) * verticalDirection)
       return .handled
     }
+    .onKeyPress(keys: [.return, KeyEquivalent("=")]) { press in
+      guard let onDoubleClick, press.modifiers.isEmpty else { return .ignored }
+      onDoubleClick()
+      return .handled
+    }
+    .help(help ?? Text(verbatim: ""))
     .accessibilityElement()
     .accessibilityLabel(label)
     .accessibilityValue(
@@ -107,6 +120,15 @@ struct SplitHandle: View {
     )
     .accessibilityAdjustableAction { direction in
       adjust(direction == .increment ? step : -step)
+    }
+    .accessibilityActions {
+      if let onDoubleClick {
+        Button(
+          String(
+            localized: "Center", bundle: .module,
+            comment: "VoiceOver's action on a divider: both panes take the same length."),
+          action: onDoubleClick)
+      }
     }
   }
 

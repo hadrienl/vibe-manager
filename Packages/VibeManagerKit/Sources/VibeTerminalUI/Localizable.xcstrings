@@ -1,13 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Exited with code %@" : {
-      "comment" : "A terminal's state: its process ended with this exit status.",
+    "Close Session…" : {
+      "comment" : "Stops a session's agent, asking first when it is at work.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminé avec le code %@"
+            "value" : "Fermer la session…"
           }
         }
       }
@@ -18,7 +18,29 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terminé"
+            "value" : "Processus terminé"
+          }
+        }
+      }
+    },
+    "Process failed (code %@)" : {
+      "comment" : "A terminal's state: its process ended with this exit status, other than 0.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus en erreur (code %@)"
+          }
+        }
+      }
+    },
+    "Process interrupted (signal %@)" : {
+      "comment" : "A terminal's state: its process was killed by this signal number.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processus interrompu (signal %@)"
           }
         }
       }
@@ -51,7 +73,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En cours"
+            "value" : "Processus en cours"
           }
         }
       }
@@ -77,17 +99,6 @@
         }
       }
     },
-    "Stop" : {
-      "comment" : "Stops the terminal's process.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrêter"
-          }
-        }
-      }
-    },
     "Terminal" : {
       "localizations" : {
         "fr" : {
@@ -104,17 +115,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminal indisponible"
-          }
-        }
-      }
-    },
-    "Terminated by signal %@" : {
-      "comment" : "A terminal's state: its process was killed by this signal number.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrompu par le signal %@"
           }
         }
       }

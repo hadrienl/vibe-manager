@@ -58,6 +58,21 @@ struct SessionLauncherRuntimeTests {
     await launcher.stopAll(gracePeriod: .zero)
     #expect(launcher.trackedSessionIDs.isEmpty)
   }
+
+  @Test("Stopping every agent, to quit or to update, is a stop asked for: no error is read (#235)")
+  func stopAllIsOnPurpose() async {
+    let session = session("Quitting")
+    let supervisor = OutputSupervisor()
+    let launcher = launcher([session], supervisor: supervisor)
+    await launcher.launch(session: session, plan: plan())
+    let pane = launcher.pane(for: session.id)
+    #expect(pane != nil)
+    #expect(pane?.wasStoppedOnPurpose == false)
+
+    await launcher.stopAll(gracePeriod: .zero)
+
+    #expect(pane?.wasStoppedOnPurpose == true)
+  }
 }
 
 private actor StoredSessions: SessionRepository {

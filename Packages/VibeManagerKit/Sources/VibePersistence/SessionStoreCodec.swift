@@ -19,9 +19,11 @@ struct SessionStoreCodec {
   /// v5 adds the ticket a session works on (#69), and v6 each session's task status (#80), for
   /// the same reason: an older build would erase them. v7 adds the project icon of a session's
   /// appearance (#27), again for that reason. v8 adds each session's place in the order arranged
-  /// by hand (#44). Each shape is the one before with one more optional field, so all five are
-  /// read by the same structure.
-  static let currentSchemaVersion = 8
+  /// by hand (#44), and v9 the conversation theme chosen for a session (#274). Each shape is the
+  /// one before with one more optional field, so all six are read by the same structure.
+  static let currentSchemaVersion = 9
+  /// v8 is v9 without the themes: every session follows the settings.
+  static let themelessSchemaVersion = 8
   /// v7 is v8 without the ranks: the sessions are ranked in the order the store lists them.
   static let ranklessSchemaVersion = 7
   /// v6 is v7 without the project icon: the session wears the symbol and the colour it had.
@@ -36,10 +38,10 @@ struct SessionStoreCodec {
 
   func encode(sessions: [WorkSession], savedAt: Date = Date()) throws -> Data {
     try validate(sessions)
-    let envelope = StoreEnvelopeV8(
+    let envelope = StoreEnvelopeV9(
       schemaVersion: Self.currentSchemaVersion,
       savedAt: savedAt,
-      sessions: sessions.map(StoredSessionV8.init)
+      sessions: sessions.map(StoredSessionV9.init)
     )
     return try Self.makeEncoder().encode(envelope)
   }
@@ -69,15 +71,15 @@ struct SessionStoreCodec {
         sessions = previous.sessions.map(\.workSession)
         requiresRewrite = true
       case Self.ticketlessSchemaVersion, Self.statuslessSchemaVersion:
-        let previous = try Self.makeDecoder().decode(StoreEnvelopeV8.self, from: data)
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV9.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: false) }
         requiresRewrite = true
-      case Self.iconlessSchemaVersion, Self.ranklessSchemaVersion:
-        let previous = try Self.makeDecoder().decode(StoreEnvelopeV8.self, from: data)
+      case Self.iconlessSchemaVersion, Self.ranklessSchemaVersion, Self.themelessSchemaVersion:
+        let previous = try Self.makeDecoder().decode(StoreEnvelopeV9.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = true
       case Self.currentSchemaVersion:
-        let current = try Self.makeDecoder().decode(StoreEnvelopeV8.self, from: data)
+        let current = try Self.makeDecoder().decode(StoreEnvelopeV9.self, from: data)
         sessions = current.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = false
       case Self.abandonedSchemaVersion:
@@ -87,7 +89,7 @@ struct SessionStoreCodec {
       default:
         throw SessionStoreCodecError.unsupportedSchemaVersion(probe.schemaVersion)
       }
-      if probe.schemaVersion < Self.currentSchemaVersion {
+      if probe.schemaVersion < Self.themelessSchemaVersion {
         sessions = Self.rankedByActivity(sessions)
       }
       try validate(sessions)
@@ -238,17 +240,17 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-/// Reads v4 to v7 as well: a v7 session is a v8 one without a rank, a v6 one has no icon either,
-/// a v5 one no `taskStatus`, and a v4 one no `ticket`.
-private struct StoreEnvelopeV8: Codable {
+/// Reads v4 to v8 as well: a v8 session is a v9 one without a theme, a v7 one has no rank either,
+/// a v6 one no icon, a v5 one no `taskStatus`, and a v4 one no `ticket`.
+private struct StoreEnvelopeV9: Codable {
   let schemaVersion: Int
   let savedAt: Date
-  let sessions: [StoredSessionV8]
+  let sessions: [StoredSessionV9]
 }
 
 /// A v2 session, the history of its agent switches (v4), its ticket (v5), its task status (v6) and
-/// its project icon (v7) and its rank (v8).
-private struct StoredSessionV8: Codable {
+/// its project icon (v7), its rank (v8) and its conversation theme (v9).
+private struct StoredSessionV9: Codable {
   let id: UUID
   let name: String
   let initialPrompt: String
@@ -265,6 +267,8 @@ private struct StoredSessionV8: Codable {
   let taskStatus: String?
   /// Absent before v8, where the codec ranks the sessions itself.
   let rank: Int?
+  /// Absent before v9, and for a session that follows the settings.
+  let conversationTheme: String?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
@@ -280,6 +284,7 @@ private struct StoredSessionV8: Codable {
     ticket = session.ticket.map(StoredTicketV5.init)
     taskStatus = session.taskStatus.rawValue
     rank = session.rank
+    conversationTheme = session.conversationTheme
   }
 
   /// - Parameter recordsStart: the document was written by a build that records the start of
@@ -306,6 +311,8 @@ private struct StoredSessionV8: Codable {
       ticket: ticket?.domainValue,
       taskStatus: storedTaskStatus,
       rank: rank ?? 0,
+      // An empty one, which no build writes, follows the settings rather than failing the store.
+      conversationTheme: conversationTheme.flatMap { $0.isEmpty ? nil : $0 },
       infersStartedAt: !recordsStart
     )
   }
@@ -472,18 +479,23 @@ private struct StoredAgentV2: Codable {
   let providerID: String
   let modelID: String?
   let resumeIdentifier: String?
+  /// The CLI that ran an endpoint's conversation (#107). Absent from every document written
+  /// before, and from every conversation that is not an endpoint's.
+  let harnessID: String?
 
   init(_ agent: SessionAgentConfiguration) {
     providerID = agent.providerID
     modelID = agent.modelID
     resumeIdentifier = agent.resumeIdentifier
+    harnessID = agent.harnessID
   }
 
   var domainValue: SessionAgentConfiguration {
     SessionAgentConfiguration(
       providerID: providerID,
       modelID: modelID,
-      resumeIdentifier: resumeIdentifier
+      resumeIdentifier: resumeIdentifier,
+      harnessID: harnessID
     )
   }
 }

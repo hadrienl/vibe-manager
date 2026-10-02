@@ -74,4 +74,13 @@ struct AgentDiagnosticTests {
       ).isUsable
     )
   }
+
+  @Test("Every endpoint is logged under one token, never under its identifier")
+  func endpointToken() {
+    let endpoint = AgentProviderID("endpoint.7C1E6A55-0D5B-4E43-9E47-4A3C2B1D0E9F")
+    #expect(endpoint.isEndpoint)
+    #expect(endpoint.diagnosticToken == DiagnosticToken("endpoint"))
+    #expect(!AgentProviderID("claude-code").isEndpoint)
+    #expect(AgentProviderID("endpoints").diagnosticToken == DiagnosticToken("other"))
+  }
 }

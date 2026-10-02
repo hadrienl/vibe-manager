@@ -23,6 +23,7 @@ public struct NewSessionDraftView: View {
   @State private var showsMoreOptions = false
   /// The symbol and the colour, in a popover from the badge next to the name.
   @State private var showsAppearancePicker = false
+  @State private var showsThemePicker = false
   @State private var dropHover: NewSessionDropHover?
   /// Where the working folder lies in the draft, for a folder dropped on it.
   @State private var folderZone = CGRect.null
@@ -56,28 +57,31 @@ public struct NewSessionDraftView: View {
   /// or leave it in To Do (#80). The rest — the folder, the agent, the store — is checked with the
   /// draft gone, and a refusal brings it back.
   private let submitted: (Bool) -> Void
-  /// Escape: the draft is set aside, or dropped when nothing of the user's is in it.
-  private let dismissed: () -> Void
-  /// Discard: the draft goes, whatever is in it.
+  /// Discard, or Escape (#293): the draft goes, whatever is in it.
   private let discarded: () -> Void
   /// Opens the panel to choose files to join to the prompt.
   private let chooseFiles: () -> Void
   /// Opens the templates in the settings. `nil`: the draft offers no way there.
   private let manageTemplates: (() -> Void)?
+  /// The themes the session's conversation can be given (#274). `nil`: the draft offers none.
+  private let themes: ConversationThemesModel?
+  private let conversationAppearance: ConversationAppearance
 
   public init(
     model: NewSessionModel,
     focusRequest: Int = 0,
     submitted: @escaping (Bool) -> Void,
-    dismissed: @escaping () -> Void,
     discarded: @escaping () -> Void,
     chooseFiles: @escaping () -> Void,
-    manageTemplates: (() -> Void)? = nil
+    manageTemplates: (() -> Void)? = nil,
+    themes: ConversationThemesModel? = nil,
+    conversationAppearance: ConversationAppearance = ConversationAppearance()
   ) {
+    self.themes = themes
+    self.conversationAppearance = conversationAppearance
     _model = Bindable(model)
     self.focusRequest = focusRequest
     self.submitted = submitted
-    self.dismissed = dismissed
     self.discarded = discarded
     self.chooseFiles = chooseFiles
     self.manageTemplates = manageTemplates
@@ -122,8 +126,12 @@ public struct NewSessionDraftView: View {
     .onChange(of: focusRequest) {
       placeCaret()
     }
+    // What a template gives is seen, the theme as the rest (#274).
+    .onChange(of: model.draft.conversationTheme) {
+      if model.themeComesFromTemplate { showsMoreOptions = true }
+    }
     .task {
-      showsMoreOptions = !model.draft.ticketText.isEmpty
+      showsMoreOptions = !model.draft.ticketText.isEmpty || model.draft.conversationTheme != nil
       // At once, so that nothing typed meanwhile goes elsewhere; again once the agents and the
       // folders are there, for a draft that came back refused — only then: the folders can take
       // seconds, and the caret would leave the name being typed meanwhile.
@@ -164,10 +172,10 @@ public struct NewSessionDraftView: View {
           moveFocus(to: .draft(.initialPrompt))
         })
     }
-    // Escape sets the draft aside — only from inside it: a key equivalent would take Escape from
-    // the whole window, Open Quickly and the sidebar included. The prompt, an AppKit text view,
-    // hands it over itself.
-    .onExitCommand(perform: dismissed)
+    // Escape discards the draft, as its button does — only from inside it: a key equivalent would
+    // take Escape from the whole window, Open Quickly and the sidebar included. The prompt, an
+    // AppKit text view, hands it over itself.
+    .onExitCommand(perform: discarded)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New Session", bundle: .module, comment: "An unnamed new session."))
     .accessibilityIdentifier("new-session-draft")
@@ -245,13 +253,26 @@ public struct NewSessionDraftView: View {
 
   private var moreOptions: some View {
     DisclosureGroup(isExpanded: $showsMoreOptions) {
-      ticketField
-        .padding(.top, 10)
+      VStack(alignment: .leading, spacing: 12) {
+        ticketField
+        if let themes {
+          themeField(themes)
+        }
+      }
+      .padding(.top, 10)
     } label: {
       HStack(spacing: 6) {
         Text("More Options", bundle: .module, comment: "Unfolds the ticket.")
-        Text("Ticket", bundle: .module, comment: "The ticket the new session works on.")
+        if themes != nil {
+          Text(
+            "Ticket, Theme", bundle: .module,
+            comment: "What More Options unfolds: the ticket and the conversation theme."
+          )
           .foregroundStyle(.secondary)
+        } else {
+          Text("Ticket", bundle: .module, comment: "The ticket the new session works on.")
+            .foregroundStyle(.secondary)
+        }
       }
       .font(.callout)
     }
@@ -595,6 +616,45 @@ public struct NewSessionDraftView: View {
     }
   }
 
+  /// The theme of the session's conversation (#274): the settings', or one of its own.
+  private func themeField(_ themes: ConversationThemesModel) -> some View {
+    let theme = model.draft.conversationTheme
+    return LabeledField(
+      Text("Conversation Theme", bundle: .module),
+      help: model.themeComesFromTemplate
+        ? Text("Given by the template — pick another if needed.", bundle: .module)
+        : SessionThemeText.caption(for: theme, themes: themes),
+      issues: []
+    ) {
+      Button {
+        showsThemePicker = true
+      } label: {
+        Label {
+          SessionThemeText.name(of: theme, themes: themes)
+        } icon: {
+          Image(systemName: "paintpalette")
+        }
+      }
+      .popover(isPresented: $showsThemePicker, arrowEdge: .bottom) {
+        ConversationThemePicker(
+          selection: Binding(
+            get: { model.draft.conversationTheme },
+            set: { model.chooseConversationTheme($0) }),
+          themes: themes, appearance: conversationAppearance,
+          nilTitle: SessionThemeText.followsSettings,
+          commit: { showsThemePicker = false }, cancel: { showsThemePicker = false }
+        )
+        .padding(16)
+      }
+      .accessibilityLabel(
+        Text(
+          "Conversation Theme: \(SessionThemeText.name(of: theme, themes: themes))",
+          bundle: .module)
+      )
+      .accessibilityIdentifier("new-session-theme")
+    }
+  }
+
   // MARK: - Composer
 
   /// The initial prompt, where a conversation is written to: the free text, or the template's
@@ -628,7 +688,7 @@ public struct NewSessionDraftView: View {
             focusRequested: editorRequest == .draft(.initialPrompt),
             isBordered: false,
             onSubmit: submit,
-            onCancel: dismissed,
+            onCancel: discarded,
             commands: model.commands
           )
           .focused($focus, equals: .draft(.initialPrompt))
@@ -658,7 +718,7 @@ public struct NewSessionDraftView: View {
       }
 
       Text(
-        "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape sets the draft aside",
+        "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape discards the draft",
         bundle: .module
       )
       .font(.caption2)
@@ -992,10 +1052,53 @@ struct AgentChoiceRow: View {
   let select: () -> Void
 
   var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      card
+      remedyActions
+    }
+  }
+
+  /// What the remedy asks for, done from here: the install page, the sign-in command (#234).
+  /// Beside the card rather than in it: the card is itself a button.
+  @ViewBuilder
+  private var remedyActions: some View {
+    if agent.installationPage != nil || agent.signInCommand != nil {
+      HStack(spacing: 8) {
+        if let page = agent.installationPage {
+          Button {
+            ExternalOpening.open(page)
+          } label: {
+            agent.installationPageUpdates
+              ? Text("Update \(agent.name)…", bundle: .module, comment: "An agent's name.")
+              : Text("Install \(agent.name)…", bundle: .module, comment: "An agent's name.")
+          }
+        }
+        if let command = agent.signInCommand {
+          Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+          } label: {
+            Text(
+              "Copy \(command)", bundle: .module,
+              comment: "A command line to paste in a terminal: claude auth login.")
+          }
+          .help(
+            Text("Paste it in a terminal to sign in, then detect again.", bundle: .module))
+        }
+      }
+      .controlSize(.small)
+      // Under the card's text: past its inset, its icon and the space after it.
+      .padding(.leading, ChoiceCardMetrics.inset + Self.iconWidth + ChoiceCardMetrics.spacing)
+    }
+  }
+
+  private static let iconWidth: CGFloat = 18
+
+  private var card: some View {
     // Unusable agents stay visible and readable, but cannot be chosen.
     ChoiceCard(isSelected: isSelected, isEnabled: agent.isUsable, select: select) {
       Image(systemName: agent.descriptor.symbolName)
-        .frame(width: 18)
+        .frame(width: Self.iconWidth)
       VStack(alignment: .leading, spacing: 2) {
         Text(agent.name)
           .fontWeight(.medium)
@@ -1027,6 +1130,12 @@ struct AgentChoiceRow: View {
   }
 }
 
+/// The measures of a `ChoiceCard`, for what lines up with its content outside it.
+enum ChoiceCardMetrics {
+  static let inset: CGFloat = 11
+  static let spacing: CGFloat = 10
+}
+
 /// One choice in a list the user picks one item from — an agent, a recent folder: tinted and
 /// outlined once chosen, dimmed when it cannot be. One component, so every such list looks alike.
 struct ChoiceCard<Content: View>: View {
@@ -1037,14 +1146,14 @@ struct ChoiceCard<Content: View>: View {
 
   var body: some View {
     Button(action: select) {
-      HStack(spacing: 10) {
+      HStack(spacing: ChoiceCardMetrics.spacing) {
         content
         if isSelected {
           Image(systemName: "checkmark")
             .foregroundStyle(.tint)
         }
       }
-      .padding(.horizontal, 11)
+      .padding(.horizontal, ChoiceCardMetrics.inset)
       .padding(.vertical, 8)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(

@@ -21,8 +21,11 @@ public struct RootView: View {
   @State private var titleRoom = WindowTitleRoom()
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
+  /// The window's: where ⌘Z finds a discarded draft (#293).
+  @Environment(\.undoManager) private var undoManager
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   public init(model: AppModel) {
     self.model = model
@@ -269,6 +272,26 @@ public struct RootView: View {
           )
           Divider()
         }
+        if let failure = model.actionFailure {
+          // The store's banner, without what belongs to the store: there is no backup to offer
+          // over an archive that failed, and Try Again runs the action, not a reload.
+          RefreshFailureBanner(
+            failure: AppModel.RefreshFailure(message: failure.message, canRestoreBackup: false),
+            retry: { Task { await model.retryActionFailure() } },
+            restore: {},
+            export: nil,
+            dismiss: { model.dismissActionFailure() }
+          )
+          Divider()
+        }
+        if !model.sessionsStoppedWithHost.isEmpty {
+          HostStoppedBanner(
+            count: model.sessionsStoppedWithHost.count,
+            restartAll: { Task { await model.restartSessionsStoppedWithHost() } },
+            dismiss: { model.setAsideSessionsStoppedWithHost() }
+          )
+          Divider()
+        }
         if let warning = model.detachWarning {
           DetachWarningBanner(warning: warning) { model.dismissDetachWarning() }
           Divider()
@@ -369,16 +392,14 @@ public struct RootView: View {
                 model: draft,
                 focusRequest: model.newSessionFocusRequest,
                 submitted: { launching in model.submitNewSession(launching: launching) },
-                dismissed: { model.dismissNewSessionDraft() },
-                discarded: {
-                  model.cancelNewSession()
-                  model.focusSession()
-                },
+                discarded: { model.discardNewSessionDraft(undoManager: undoManager) },
                 chooseFiles: { model.beginAttachingFiles() },
                 manageTemplates: {
                   model.settingsTab = .templates
                   openSettings()
-                }
+                },
+                themes: model.conversations.themes,
+                conversationAppearance: model.conversations.appearance
               )
               // One view per draft: another draft brought on screen starts with its own folds,
               // popover and caret, not the ones left by the previous.
@@ -449,7 +470,13 @@ public struct RootView: View {
                     if !showsBrowser { model.focusSession() }
                   })
               ) {
-                Text("Terminal", bundle: .module).tag(false)
+                // “Session”, not “Terminal”: beside it the session's own picker already says
+                // Conversation or Terminal, and one word must not name two things (#247).
+                Text(
+                  "Session", bundle: .module,
+                  comment: "Of the two views taking turns in a narrow window: the session's own."
+                )
+                .tag(false)
                 Text("Web", bundle: .module).tag(true)
               } label: {
                 Text("Main View", bundle: .module)
@@ -509,10 +536,10 @@ public struct RootView: View {
               Divider()
               inspector(for: session)
             }
-            // ⌘Z undoes a rename or a change of icon here too (#183); the notes and the name
-            // being typed undo their own typing.
-            .onCommand(Selector(("undo:")), perform: model.identityUndoAction(redo: false))
-            .onCommand(Selector(("redo:")), perform: model.identityUndoAction(redo: true))
+            // ⌘Z undoes a rename, a change of icon (#183) or an archive (#242) here too; the notes
+            // and the name being typed undo their own typing.
+            .onCommand(Selector(("undo:")), perform: model.sidebarUndoAction(redo: false))
+            .onCommand(Selector(("redo:")), perform: model.sidebarUndoAction(redo: true))
           } else {
             // The inspector is only reachable with a selection, but a session can disappear
             // under it: the column stays rather than snapping shut mid-refresh.
@@ -596,33 +623,11 @@ public struct RootView: View {
     // Asked only when archiving stops work in progress (#115), with the close question's "Don't
     // ask again": the two share one setting. Cancel is the default button: the key that opened
     // this must not also answer it.
-    // `presenting:` hands the session to the buttons, rather than having them read it back from
-    // the model. SwiftUI dismisses the dialog before running a button's action, and the dismissal
-    // clears the pending session — read there, Archive found nothing and did nothing.
-    .confirmationDialog(
-      model.pendingArchive.map {
-        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
-      } ?? Text("Archive this session?", bundle: .module),
-      isPresented: Binding(
-        get: { model.pendingArchive != nil },
-        set: { isPresented in
-          guard !isPresented else { return }
-          model.cancelArchive()
-        }
-      ),
-      titleVisibility: .visible,
-      presenting: model.pendingArchive
-    ) { session in
-      Button(LocalizedStringResource("Archive", bundle: .module)) {
-        let askAgain = !suppressesCloseConfirmation
-        Task { await model.archive(session.id, askAgain: askAgain) }
-      }
-      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
-        model.cancelArchive()
-      }
-    } message: { session in
-      Text(archiveConfirmationMessage(for: session))
-    }
+    .archiveConfirmation(
+      model: model, isOffered: model.pendingArchive.map(model.archiveOffersDontAskAgain) == true,
+      suppressesConfirmation: $suppressesCloseConfirmation,
+      message: archiveConfirmationMessage(for:)
+    )
     // Before the side terminal's dialog and the other batch one in the chain: the toggle reaches
     // every dialog it wraps, and a question has a "Don't ask again" only when it is #51's.
     .dialogSuppressionToggle(
@@ -636,6 +641,39 @@ public struct RootView: View {
     }
     .onChange(of: model.pendingArchive?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
+    }
+    // The same question when only an agent in the middle of a turn asks it (#242): after the
+    // suppression toggle, since "Don't ask again" would change nothing — it is always asked.
+    .archiveConfirmation(
+      model: model, isOffered: model.pendingArchive.map(model.archiveOffersDontAskAgain) == false,
+      suppressesConfirmation: .constant(false), message: archiveConfirmationMessage(for:)
+    )
+    // ⌃⌘→ or ⌃⌘← that would restart a closed session's agent (#240): a key pressed by mistake
+    // must not start one. After the suppression toggle: this question has no "Don't ask again".
+    .confirmationDialog(
+      model.pendingStatusRestart.map {
+        Text("Restart “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Restart this session?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingStatusRestart != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelStatusRestart()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingStatusRestart
+    ) { restart in
+      Button(LocalizedStringResource("Move and Restart", bundle: .module)) {
+        Task { await model.confirmStatusRestart(restart) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelStatusRestart()
+      }
+    } message: { restart in
+      Text(
+        "Moving it to \(String(localized: restart.status.label)) starts its agent again.",
+        bundle: .module, comment: "A task status.")
     }
     // A side terminal is closed at once, unless a command runs in its foreground (#43). After
     // the suppression toggle: this question has no "Don't ask again" (#115).
@@ -895,9 +933,9 @@ public struct RootView: View {
     let arrangement = workspace == nil ? .hidden : model.layout.columns.browser
     return GeometryReader { proxy in
       // The terminal keeps its eighty columns: the web view gives way first.
-      let available =
-        Double(proxy.size.width) - Self.terminalMinimumWidth - Double(SplitHandle.thickness)
-      let upper = max(WorkspaceLayout.browserWidthRange.lowerBound, available)
+      let upper = WorkspaceLayout.browserWidthUpperBound(
+        in: Double(proxy.size.width), handle: Double(SplitHandle.thickness),
+        terminalMinimum: Self.terminalMinimumWidth)
       let width = min(model.layout.browserWidth, upper)
       HStack(spacing: 0) {
         terminalStack(for: session)
@@ -914,7 +952,17 @@ public struct RootView: View {
             length: width,
             range: WorkspaceLayout.browserWidthRange.lowerBound...upper,
             label: Text("Divider between the terminal and the web view", bundle: .module),
-            onChange: { model.layout.browserWidthChanged(to: $0) })
+            onChange: { model.layout.browserWidthChanged(to: $0) },
+            onDoubleClick: {
+              let centered = WorkspaceLayout.centeredBrowserWidth(
+                in: Double(proxy.size.width), handle: Double(SplitHandle.thickness),
+                terminalMinimum: Self.terminalMinimumWidth)
+              withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                model.layout.browserWidthChanged(to: centered)
+              }
+            },
+            help: Text(
+              "Drag to resize. Double-click to give both sides the same width.", bundle: .module))
           BrowserPanel(
             model: model, workspace: workspace, browser: workspace.browser(for: session.id)
           )
@@ -924,8 +972,9 @@ public struct RootView: View {
     }
   }
 
-  /// The theme of the conversation views, for the system's appearance of the moment — or the one
-  /// on trial in the settings (#118).
+  /// The settings' theme for the system's appearance of the moment — or the one on trial in the
+  /// settings (#118): what a new session's draft is drawn with. Each conversation resolves its
+  /// own (#274).
   private var conversationTheme: ConversationTheme {
     model.conversations.themes.displayed(
       ConversationFonts.installedOnly(model.conversations.appearance),
@@ -948,10 +997,12 @@ public struct RootView: View {
 
       // Mounted like the terminals, so that going back and forth keeps each one's place. Only
       // the few sessions last shown in conversation keep one.
-      let theme = conversationTheme
+      // Each with its own theme (#274), resolved for the window's appearance: the conversation
+      // forces its own scheme on what it draws, not on this.
       ForEach(model.conversations.mountedSessionIDs, id: \.self) { id in
         SessionConversationSlot(
-          model: model, id: id, shownID: session.id, isCovered: isCovered, theme: theme)
+          model: model, id: id, shownID: session.id, isCovered: isCovered,
+          isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
       }
 
       // An archived session has no pane by construction — archiving released it — so its own
@@ -962,7 +1013,7 @@ public struct RootView: View {
       } else if session.status == .archived {
         let appearance = model.displayedAppearance(of: session)
         ArchivedSessionDetail(
-          session: session, appearance: appearance,
+          session: session, agentNames: model.agentNames, appearance: appearance,
           icon: model.icons.image(for: appearance.iconID)
         ) {
           Task { await model.restore(session.id) }
@@ -1289,6 +1340,43 @@ private struct RefreshFailureBanner: View {
     .background(.quaternary)
     // Said as it appears: VoiceOver does not read what shows up away from its cursor.
     .announcedOnAppear(failure.message)
+  }
+}
+
+/// The terminal host stopped, and took these sessions' agents with it (#237): the cause, once,
+/// and the one thing to do about it. It goes away as they are restarted, or when dismissed.
+private struct HostStoppedBanner: View {
+  let count: Int
+  let restartAll: () -> Void
+  let dismiss: () -> Void
+
+  private var message: String {
+    String(
+      localized: "The terminal host stopped: \(count) sessions were interrupted.",
+      bundle: .module, comment: "How many sessions lost their agent.")
+  }
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+        .accessibilityHidden(true)
+      Text(message)
+        .font(.callout)
+        .lineLimit(2)
+      Spacer(minLength: 8)
+      Button(LocalizedStringResource("Restart All", bundle: .module), action: restartAll)
+        .controlSize(.small)
+      Button(action: dismiss) {
+        Image(systemName: "xmark")
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.quaternary)
+    .announcedOnAppear(message)
   }
 }
 
@@ -1716,6 +1804,7 @@ private struct DetachWarningBanner: View {
 /// column states the facts, says plainly that nothing was deleted, and offers the way back.
 private struct ArchivedSessionDetail: View {
   let session: WorkSession
+  let agentNames: [String: String]
   /// Its badge as drawn: the one previewed while its icon is being changed (#183).
   let appearance: SessionAppearance
   let icon: NSImage?
@@ -1750,9 +1839,10 @@ private struct ArchivedSessionDetail: View {
                 .font(.title3)
                 .fontWeight(.semibold)
               if let agent = session.agent {
-                Text([agent.providerID, agent.modelID].compactMap { $0 }.joined(separator: " · "))
+                Text(AgentNaming.label(agent, names: agentNames))
                   .font(.callout)
                   .foregroundStyle(.secondary)
+                  .help(Text(verbatim: agent.providerID))
               }
             }
           }
@@ -1855,7 +1945,7 @@ struct SidebarFooter: View {
           Section(LocalizedStringResource("Agent", bundle: .module)) {
             ForEach(model.availableProviderIDs, id: \.self) { providerID in
               Toggle(
-                providerID,
+                AgentNaming.name(of: providerID, names: model.agentNames),
                 isOn: Binding(
                   get: { model.filter.agentProviderIDs.contains(providerID) },
                   set: { _ in model.toggleProviderFacet(providerID) }
@@ -1980,6 +2070,7 @@ struct SessionCommands {
   func switchAgent() { model.beginAgentSwitch(session.id) }
   func rename() { model.beginRename(session.id, in: .sidebar) }
   func changeIcon() { model.beginAppearanceEditing(session.id, in: .sidebar) }
+  func changeTheme() { model.beginThemeEditing(session.id, in: .sidebar) }
   func moveUp() { Task { await model.move(session.id, by: -1) } }
   func moveDown() { Task { await model.move(session.id, by: 1) } }
   func setTaskStatus(_ status: SessionTaskStatus) {
@@ -1996,6 +2087,9 @@ struct SessionCommandButtons: View {
         commands.rename()
       }
       Button(LocalizedStringResource("Change Icon…", bundle: .module)) { commands.changeIcon() }
+      Button(LocalizedStringResource("Change Conversation Theme…", bundle: .module)) {
+        commands.changeTheme()
+      }
       Divider()
     }
     if !commands.movableStatuses.isEmpty {
@@ -2084,9 +2178,10 @@ struct SessionRow: View {
             .lineLimit(1)
         }
         if let agent = session.agent {
-          Text(agent.providerID)
+          Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
             .font(.caption)
             .foregroundStyle(.secondary)
+            .help(Text(verbatim: agent.providerID))
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
@@ -2103,9 +2198,12 @@ struct SessionRow: View {
         // What waits for the user is the one state set apart from the others by more than its
         // colour and its symbol.
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
+        // The exit code or the signal, for whoever wants it, behind words that say what happened.
+        .help(status.detail ?? "")
         .foregroundStyle(isRestoring ? Color.secondary : tint)
         .lineLimit(1)
       }
+      .sessionThemePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       Spacer(minLength: 4)
       switch webView {
       case .waitingForApproval:
@@ -2132,7 +2230,10 @@ struct SessionRow: View {
     // Its name field, while it is renamed, is reached on its own.
     .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
     .accessibilityIdentifier("session-row")
-    .accessibilityLabel(SessionStatusPresentation.accessibilityLabel(for: session, status: status))
+    .accessibilityLabel(
+      SessionStatusPresentation.accessibilityLabel(
+        for: session, status: status, agentNames: commands.model.agentNames)
+    )
     .accessibilityValue(accessibilityValue)
     // The same commands, reachable without a pointer and without the menu bar.
     .accessibilityAction(named: Text(commands.restartAnnouncement)) {
@@ -2150,6 +2251,10 @@ struct SessionRow: View {
     .accessibilityAction(named: Text("Change Icon", bundle: .module)) {
       guard commands.canEditIdentity else { return }
       commands.changeIcon()
+    }
+    .accessibilityAction(named: Text("Change Conversation Theme", bundle: .module)) {
+      guard commands.canEditIdentity else { return }
+      commands.changeTheme()
     }
     .accessibilityAction(named: Text("Close Session", bundle: .module)) {
       guard commands.canClose else { return }
@@ -2363,7 +2468,8 @@ private func terminalTitle(
     paneStatus: pane.status,
     resolution: model.resolution(forID: session.id),
     wasStoppedOnPurpose: pane.wasStoppedOnPurpose,
-    activity: model.activity(for: session.id)
+    activity: model.activity(for: session.id),
+    launchFailed: pane.failure != nil
   )
   return String(
     localized: "Terminal — \(session.name) — \(String(localized: status.label))",
@@ -2376,6 +2482,13 @@ private func terminalTitle(
 @MainActor
 private func sessionRestart(for id: SessionID, in model: AppModel) -> () -> Void {
   { Task { await model.restart(id) } }
+}
+
+/// The status bar's button for a session's agent: Close Session, which asks first when the agent
+/// is at work, as ⇧⌘W does (#238).
+@MainActor
+private func sessionClose(for id: SessionID, in model: AppModel) -> () -> Void {
+  { Task { await model.requestClose(id) } }
 }
 
 /// One session's terminal in the window's stack, shown or kept behind the one shown (#254).
@@ -2402,7 +2515,8 @@ private struct SessionTerminalSlot: View {
         statusAccessory: model.terminals == nil
           ? nil : DrawerStatusButton(model: model, session: session),
         claimsKeyboardOnActivation: model.terminalClaimsKeyboardOnActivation,
-        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session)
+        restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(session),
+        close: sessionClose(for: id, in: model)
       )
       .id(id)
       .opacity(isActive ? 1 : 0)
@@ -2418,12 +2532,19 @@ private struct SessionConversationSlot: View {
   let id: SessionID
   let shownID: SessionID
   let isCovered: Bool
-  let theme: ConversationTheme
+  let isDark: Bool
+  let increasedContrast: Bool
 
   var body: some View {
     if let conversation = model.conversations.existingModel(for: id),
       let listed = model.session(withID: id)
     {
+      // The theme of the session's own (#274), or the settings' — or the one on trial in them
+      // (#118).
+      let theme = model.conversations.themes.displayed(
+        ConversationFonts.installedOnly(model.conversations.appearance),
+        session: model.displayedConversationTheme(of: listed), isDark: isDark,
+        increasedContrast: increasedContrast)
       let isActive =
         !isCovered && id == shownID && model.presentation(of: listed) == .conversation
       VStack(spacing: 0) {
@@ -2452,7 +2573,8 @@ private struct SessionConversationSlot: View {
             pane: pane,
             accessory: model.terminals == nil
               ? nil : DrawerStatusButton(model: model, session: listed),
-            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed))
+            restart: sessionRestart(for: id, in: model), canRestart: model.canRestart(listed),
+            close: sessionClose(for: id, in: model))
         }
       }
       .opacity(isActive ? 1 : 0)
@@ -2461,6 +2583,42 @@ private struct SessionConversationSlot: View {
       // A hidden composer must lose the keyboard: typed into, it would send to a session
       // nobody is looking at.
       .disabled(!isActive)
+    }
+  }
+}
+
+extension View {
+  /// The question before archiving a session (#115). `presenting:` hands the session to the
+  /// buttons, rather than having them read it back from the model: SwiftUI dismisses the dialog
+  /// before running a button's action, and the dismissal clears the pending session — read there,
+  /// Archive found nothing and did nothing.
+  fileprivate func archiveConfirmation(
+    model: AppModel, isOffered: Bool, suppressesConfirmation: Binding<Bool>,
+    message: @escaping (WorkSession) -> String
+  ) -> some View {
+    confirmationDialog(
+      model.pendingArchive.map {
+        Text("Archive “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Archive this session?", bundle: .module),
+      isPresented: Binding(
+        get: { isOffered },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelArchive()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingArchive
+    ) { session in
+      Button(LocalizedStringResource("Archive", bundle: .module)) {
+        let askAgain = !suppressesConfirmation.wrappedValue
+        Task { await model.archive(session.id, askAgain: askAgain) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelArchive()
+      }
+    } message: { session in
+      Text(message(session))
     }
   }
 }

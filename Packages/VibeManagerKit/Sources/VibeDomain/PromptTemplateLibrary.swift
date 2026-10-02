@@ -54,6 +54,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
       body: original.body,
       workingDirectoryPath: original.workingDirectoryPath,
       appearance: original.appearance,
+      conversationTheme: original.conversationTheme,
       fieldSettings: original.fieldSettings,
       revision: 1,
       createdAt: date
@@ -181,6 +182,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           body: template.body,
           workingDirectoryPath: template.workingDirectoryPath,
           appearance: template.appearance,
+          conversationTheme: template.conversationTheme,
           fieldSettings: template.fieldSettings,
           createdAt: date
         )
@@ -193,6 +195,7 @@ public struct PromptTemplateLibrary: Hashable, Sendable {
           body: template.body,
           workingDirectoryPath: template.workingDirectoryPath,
           appearance: template.appearance,
+          conversationTheme: template.conversationTheme,
           fieldSettings: template.fieldSettings,
           createdAt: date
         )

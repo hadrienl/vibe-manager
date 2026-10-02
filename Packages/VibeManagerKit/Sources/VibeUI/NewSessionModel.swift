@@ -55,6 +55,11 @@ public final class NewSessionModel {
   /// The same for the symbol and colour: `nil` in the draft means "derived from the name".
   private var presetAppearance: SessionAppearance?
   private var appearanceBeforePreset: SessionAppearance??
+  /// The same for the conversation theme (#274): `nil` in the draft follows the settings.
+  private var presetTheme: String?
+  private var themeBeforePreset: String??
+  /// Whether a theme names one this Mac has: a template's that does not is ignored.
+  private let isThemeAvailable: @MainActor (String) -> Bool
 
   /// The folders sessions were created in, the most recent first, as the sheet offers them (#39).
   public private(set) var recentFolders: [RecentFolderOption]
@@ -103,8 +108,11 @@ public final class NewSessionModel {
     /// The symbols and colours the Settings offer (#199), and what a name is given among them.
     palette: SessionAppearancePalette = .default,
     /// The skills and commands read from the agents, shared with the conversations (#219).
-    commandCatalog: AgentCommandCatalog = AgentCommandCatalog()
+    commandCatalog: AgentCommandCatalog = AgentCommandCatalog(),
+    /// Whether a conversation theme is there to be given (#274).
+    isThemeAvailable: @escaping @MainActor (String) -> Bool = { _ in true }
   ) {
+    self.isThemeAvailable = isThemeAvailable
     self.commandCatalog = commandCatalog
     self.projectIcons = projectIcons
     self.icons = icons
@@ -226,7 +234,7 @@ public final class NewSessionModel {
     return draft.trimmedName.isEmpty
       && (folder.isEmpty || draft.workingDirectoryPath == preselectedFolder)
       && (draft.providerID == nil || draft.providerID == defaultProviderID)
-      && draft.modelID == nil && draft.appearance == nil
+      && draft.modelID == nil && draft.appearance == nil && draft.conversationTheme == nil
       && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && draft.attachments.isEmpty
       && draft.templateFill == nil
@@ -303,6 +311,35 @@ public final class NewSessionModel {
     refreshName()
     applyFolderPreset(of: template)
     applyAppearancePreset(of: template)
+    applyThemePreset(of: template)
+  }
+
+  /// Whether the conversation theme is the one the template gave.
+  public var themeComesFromTemplate: Bool {
+    presetTheme != nil && draft.conversationTheme == presetTheme
+  }
+
+  /// The theme chosen by the user for the session's conversation; `nil` follows the settings.
+  public func chooseConversationTheme(_ theme: String?) {
+    draft.conversationTheme = theme
+  }
+
+  /// Gives the session the template's conversation theme — one this Mac has —, unless the user
+  /// picked their own; a template without any gives back what a previous one replaced.
+  private func applyThemePreset(of template: PromptTemplate) {
+    let isFree = draft.conversationTheme == nil
+    guard isFree || themeComesFromTemplate else { return }
+    if let theme = template.conversationTheme, isThemeAvailable(theme) {
+      if themeBeforePreset == nil {
+        themeBeforePreset = .some(draft.conversationTheme)
+      }
+      draft.conversationTheme = theme
+      presetTheme = theme
+    } else if themeComesFromTemplate, let before = themeBeforePreset {
+      draft.conversationTheme = before
+      presetTheme = nil
+      themeBeforePreset = nil
+    }
   }
 
   /// Whether the symbol and colour are the ones the template gave.
@@ -634,6 +671,10 @@ public final class NewSessionModel {
     // at, and the checks that follow may keep looking at it.
     checkedFolderPath = draft.workingDirectoryPath
     await settleIcon()
+    // A theme deleted since it was chosen is not written: the session follows the settings.
+    if let theme = draft.conversationTheme, !isThemeAvailable(theme) {
+      draft.conversationTheme = nil
+    }
 
     do {
       let creation = try await create(draft)

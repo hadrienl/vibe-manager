@@ -50,6 +50,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   private let reportActivity: ReportAgentActivity?
   /// Sets each launch up with the tools of its session's web view (#69).
   private let provideTools: ProvideAgentTools?
+  /// Does what a provider can only do when its process is about to start: an endpoint starts its
+  /// gateway and gives the session its token (#107).
+  private let prepareLaunch: PrepareAgentLaunch?
   /// Asked when a CLI needs its hooks approved before the first launch that carries them. Until
   /// the workspace sets it, the answer is no: the agent then simply runs without hooks.
   public var askHookConsent: AgentHookConsentRequest = { _, _ in .undecided }
@@ -124,6 +127,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     activity: TrackAgentActivity? = nil,
     reportActivity: ReportAgentActivity? = nil,
     provideTools: ProvideAgentTools? = nil,
+    prepareLaunch: PrepareAgentLaunch? = nil,
     clock: any SessionClock = SystemSessionClock(),
     viewportTimeout: Duration = .milliseconds(500),
     diagnostics: Diagnostics = .disabled
@@ -137,6 +141,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     self.activity = activity
     self.reportActivity = reportActivity
     self.provideTools = provideTools
+    self.prepareLaunch = prepareLaunch
     self.viewportTimeout = viewportTimeout
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
     changeTaskStatus = ChangeTaskStatus(repository: repository, clock: clock)
@@ -226,7 +231,17 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       ?? ReportedLaunch(plan: plan, decoder: nil)
     // After the hooks: Codex's approval of them is keyed on the plan they were read from, and the
     // tool server is not theirs to approve.
-    let plan = await provideTools?(reported.plan) ?? reported.plan
+    let toolsPlan = await provideTools?(reported.plan) ?? reported.plan
+    // Last, and only now: an endpoint's gateway is started for a launch that is really happening,
+    // never for a plan built to check a form.
+    let plan: AgentLaunchPlan
+    do {
+      plan = try await prepareLaunch?(toolsPlan, session: session.id) ?? toolsPlan
+    } catch {
+      refused(session.id, DiagnosticToken("preparation"))
+      return .failed(
+        reason: (error as? LocalizedError)?.errorDescription ?? Self.preparationFailedReason)
+    }
 
     // The pane a session already has is reused rather than replaced. The view that renders it
     // is keyed on the session id, so SwiftUI would keep its coordinator — and its keyboard and
@@ -417,6 +432,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
 
   static var archivedReason: String {
     String(localized: "This session is archived.", bundle: .module)
+  }
+  static var preparationFailedReason: String {
+    String(localized: "The agent could not be prepared to start.", bundle: .module)
   }
   static var storeRefusedReason: String {
     String(
@@ -742,6 +760,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   }
 
   public func stopAll(gracePeriod: Duration = .seconds(3)) async {
+    // Asked for by the user — Quit and stop the agents, a relaunch to update: no session reads
+    // as stopped on an error while the agents end (#235).
+    for pane in panes.values { pane.markStoppingOnPurpose() }
     // Retired as well as cancelled, exactly as `detach` does: a watch already on its way to the
     // main actor would otherwise still write to the store and ask for a reload, during teardown.
     for (id, task) in exitTasks {
