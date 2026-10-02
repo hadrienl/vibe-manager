@@ -141,6 +141,17 @@ struct RequestsSettingsTests {
     #expect(Localization.string(SettingsPage.avatars.title, in: "fr") == "Avatars")
   }
 
+  @Test("The sidebar is as wide as said")
+  func sidebarWidth() async {
+    let model = await workspace()
+    let (window, host) = window(model, page: .requests)
+    defer { window.close() }
+    await settle(window, "the page of the alerts") { Self.switches(in: host.view).count == 4 }
+    let sidebar = Self.descendants(of: host.view).compactMap { $0 as? NSOutlineView }
+      .compactMap(\.enclosingScrollView).map(\.frame.width)
+    #expect(sidebar.first.map { $0 >= SettingsSplitView.sidebarWidth - 1 } == true, "\(sidebar)")
+  }
+
   @Test("Manage Avatars… turns to the page of the avatars")
   func manageAvatars() async {
     let model = await workspace()

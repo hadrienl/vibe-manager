@@ -76,9 +76,11 @@ struct SettingsSplitView: View {
     let page = sidebar.shown(model.settingsPage)
     NavigationSplitView(columnVisibility: .constant(.all)) {
       SettingsSidebar(model: model, content: sidebar, query: query)
-        .navigationSplitViewColumnWidth(
-          min: Self.sidebarWidth, ideal: Self.sidebarWidth, max: Self.sidebarWidth)
         .toolbar(removing: .sidebarToggle)
+        // Both: the column's width alone is not kept by the split view of the settings window,
+        // which gave the sidebar 144 points and cut the names of its pages.
+        .frame(width: Self.sidebarWidth)
+        .navigationSplitViewColumnWidth(Self.sidebarWidth)
     } detail: {
       SettingsPageView(model: model, permissions: permissions, page: page)
         // Squeezed for the time the window takes to widen, rather than widening it at once.

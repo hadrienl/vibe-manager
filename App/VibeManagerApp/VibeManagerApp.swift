@@ -352,6 +352,7 @@ struct VibeManagerApp: App {
     }
     // The user's to size, down to what a page needs: a page that needs more widens it (#313).
     .windowResizability(.contentMinSize)
+    .defaultSize(width: 835, height: 700)
 
     // One window, reopened rather than duplicated. SwiftUI lists it in the Window menu itself,
     // so the shortcut goes on the scene rather than on a second menu item.
