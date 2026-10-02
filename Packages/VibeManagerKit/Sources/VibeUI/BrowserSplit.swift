@@ -20,6 +20,11 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
 
   /// Whether the web view is sliding in or out: beside the terminal, still, while it slides out.
   @State private var isSliding = false
+  /// Whether it was beside the terminal when the placement last changed: until the change is
+  /// followed — a pass later, from `onChange` — what is drawn stays as it was. Read from the new
+  /// placement straight away, a web view being closed was torn down for that pass and built
+  /// again to slide out.
+  @State private var wasBeside: Bool
   /// How much of it shows while it slides, from 0 to 1, as the sidebars do.
   @State private var reveal: Double = 0
   @State private var hold: PaneWidthHold?
@@ -47,6 +52,7 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
     self.terminalMinimum = terminalMinimum
     self.leading = leading()
     self.trailing = trailing()
+    _wasBeside = State(initialValue: placement == .beside)
   }
 
   var body: some View {
@@ -58,9 +64,9 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
         in: container, handle: handle, terminalMinimum: terminalMinimum)
       let width = min(layout.browserWidth, upper)
       let isBeside = placement == .beside
-      // Read from the placement itself, not from what the last change of it left: never mounted
-      // here and in turns with the terminal at once, nor missing for a pass.
-      let mountsTrailing = isBeside || (isSliding && placement != .alternating)
+      // Never here and in turns with the terminal at once: in turns, the web view is over it.
+      let showsTrailing = placement != .alternating && wasBeside
+      let mountsTrailing = placement != .alternating && (wasBeside || isSliding)
       HStack(spacing: 0) {
         leading
           .environment(\.paneWidthHold, hold)
@@ -88,7 +94,8 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
           }
         }
         .frame(
-          width: (isSliding ? reveal : isBeside ? 1 : 0) * (width + handle), alignment: .leading
+          width: (isSliding ? reveal : showsTrailing ? 1 : 0) * (width + handle),
+          alignment: .leading
         )
         .clipped()
       }
@@ -117,6 +124,7 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
     guard slides else {
       hold = nil
       isSliding = false
+      wasBeside = opens
       return
     }
     let current = slide
@@ -126,6 +134,7 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
     // From where it shows now, a slide overtaken included.
     if !isSliding { reveal = opens ? 0 : 1 }
     isSliding = true
+    wasBeside = opens
     withAnimation(Self.slideAnimation) {
       reveal = opens ? 1 : 0
     } completion: {
