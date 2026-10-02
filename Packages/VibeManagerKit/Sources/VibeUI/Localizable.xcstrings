@@ -5160,6 +5160,17 @@
         }
       }
     },
+    "Center" : {
+      "comment" : "VoiceOver's action on a divider: both panes take the same length.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centrer"
+          }
+        }
+      }
+    },
     "Change Icon" : {
       "localizations" : {
         "fr" : {
@@ -6652,6 +6663,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Brouillon"
+          }
+        }
+      }
+    },
+    "Drag to resize. Double-click to give both sides the same width." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faites glisser pour redimensionner. Double-cliquez pour donner la même largeur aux deux côtés."
           }
         }
       }
