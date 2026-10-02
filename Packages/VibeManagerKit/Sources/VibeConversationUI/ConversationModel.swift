@@ -113,7 +113,8 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   /// The message, or the command without its `!`.
   public let text: String
   public let kind: PromptKind
-  public let attachmentCount: Int
+  /// The files joined to it, shown as the transcript will show them (#209).
+  public let attachments: [URL]
   public let sentAt: Date
   /// What ↑ brings back of it into the composer.
   let recallText: String
@@ -129,6 +130,15 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
 
   var confirmationDeadline: Date {
     sentAt.addingTimeInterval(waitsForEnd ? 600 : 10)
+  }
+
+  public var attachmentCount: Int { attachments.count }
+
+  /// The files as attachments of the message.
+  var messageAttachments: [MessageAttachment] {
+    attachments.enumerated().map { rank, file in
+      MessageAttachment.file(file, id: "\(id.uuidString)/file-\(rank)")
+    }
   }
 }
 
@@ -1242,7 +1252,7 @@ public final class ConversationModel {
     let opensPanel = kind == .message && text.hasPrefix("/") && !isAgentWorking
     echoes.append(
       PendingEcho(
-        id: echoID, text: text, kind: kind, attachmentCount: attachments.count,
+        id: echoID, text: text, kind: kind, attachments: attachments,
         sentAt: Date(), recallText: recallText, countAtSend: count,
         // Queued, a command is written once the turn ended, then run.
         waitsForEnd: opensPanel

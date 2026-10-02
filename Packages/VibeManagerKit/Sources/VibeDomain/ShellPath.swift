@@ -8,14 +8,78 @@ public enum ShellPath {
   /// image named that way. Accents and emoji are written as they are, like Terminal.app does, and
   /// the name is never normalized: the path stays exactly the one on disk.
   public static func escaped(_ path: String) -> String {
-    let special = Set(" \t'\"\\$`!&*()[]{}|;<>?~#")
     var escaped = ""
     for character in path {
-      if special.contains(character) { escaped.append("\\") }
+      if specialCharacters.contains(character) { escaped.append("\\") }
       escaped.append(character)
     }
     return escaped
   }
+
+  /// The paths `escaped` wrote at the end of `text`, one after the other, and the text before them
+  /// (#209): the files the composer joined to a prompt. Only absolute paths count, separated by
+  /// spaces; a backslash takes the character after it as it is. Nil when `text` does not end with
+  /// such a path.
+  ///
+  /// - Parameter accept: asked of each path from the last; the first refused, and all before it,
+  ///   stay in the body.
+  public static func trailingPaths(
+    in text: String, while accept: (String) -> Bool = { _ in true }
+  ) -> (body: Substring, paths: [String])? {
+    var paths: [String] = []
+    var end = text.endIndex
+    while let (start, path) = lastWord(in: text[..<end]), path.hasPrefix("/"), path.count > 1,
+      accept(path)
+    {
+      paths.insert(path, at: 0)
+      end = start
+      // The words are separated by one space; whatever else stands before the first is the body.
+      guard end > text.startIndex, text[text.index(before: end)] == " " else { break }
+      end = text.index(before: end)
+    }
+    guard !paths.isEmpty else { return nil }
+    return (text[..<end], paths)
+  }
+
+  /// The last word of `text`, unescaped, and where it starts: up to the space before it that no
+  /// backslash escapes. Nil when it holds a character `escaped` would have escaped bare, or when
+  /// it ends on a lone backslash. Read backwards from the end: a long text is never copied.
+  private static func lastWord(in text: Substring) -> (String.Index, String)? {
+    guard let last = text.last, !last.isWhitespace else { return nil }
+    var start = text.endIndex
+    while start > text.startIndex {
+      let before = text.index(before: start)
+      if text[before] == " " || text[before] == "\n" || text[before] == "\t" {
+        // A separator unless an odd number of backslashes escapes it.
+        var backslashes = 0
+        var index = before
+        while index > text.startIndex, text[text.index(before: index)] == "\\" {
+          backslashes += 1
+          index = text.index(before: index)
+        }
+        if backslashes % 2 == 0 { break }
+      }
+      start = before
+    }
+    var word = ""
+    var index = start
+    while index < text.endIndex {
+      let character = text[index]
+      if character == "\\" {
+        let next = text.index(after: index)
+        guard next < text.endIndex else { return nil }
+        word.append(text[next])
+        index = text.index(after: next)
+      } else {
+        if specialCharacters.contains(character) || character == "\n" { return nil }
+        word.append(character)
+        index = text.index(after: index)
+      }
+    }
+    return (start, word)
+  }
+
+  private static let specialCharacters = Set(" \t'\"\\$`!&*()[]{}|;<>?~#")
 
   /// Whether a path can be written into the terminal: no control character anywhere in it. One
   /// could close a bracketed paste and type on its own.

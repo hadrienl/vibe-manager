@@ -64,6 +64,24 @@ runs; images already in the history are not. The web view comes forward or not b
 preference for pages an agent opens. Only a file of an image type that exists is opened: a page
 written by the agent would run its scripts with access to its folder.
 
+### The files that came with a prompt
+
+A prompt's attachments (#209) are described, never read, when the transcript is decoded: their
+kind, their file, and for an image the transcript holds — a screenshot pasted, 65 to 670 KB of
+base64 each — where it is: the line's offset and length, the array of blocks and the block's
+index. Its bytes are read again from that line only when it is shown, and decoded straight to a
+thumbnail of 120 points at most (`CGImageSourceCreateThumbnailAtIndex`), off the main actor, into
+a cache bounded in bytes. A line no longer holding the same base64 — the transcript rewritten —
+shows the image as unavailable. The files the composer joined by their paths stay in the prompt's
+text, which is what the agent read; only the paths written at its end, escaped as the composer
+writes them, and naming files when the prompt is read, are shown as attachments — `POST
+/api/v1/users` stays the user's words.
+
+A click opens Quick Look; an image the transcript alone holds is written to a temporary copy for
+it, removed when Quick Look closes. Opening a file with its default application is offered for a
+document only — never an application, a script or a `.command`, links and aliases followed — and
+the web view for a page or an image. Nothing plays on its own.
+
 ### Lines in the order they were written
 
 The `parentUuid` tree of a Claude Code transcript is not followed: parallel tool calls branch it on

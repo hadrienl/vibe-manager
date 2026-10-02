@@ -1,4 +1,5 @@
 import AppKit
+import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
@@ -26,7 +27,9 @@ struct PromptComposer: View {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 8) {
             ForEach(model.attachments, id: \.self) { file in
-              AttachmentChip(file: file) { model.removeAttachment(file) }
+              AttachmentChip(file: file, siblings: model.attachments) {
+                model.removeAttachment(file)
+              }
             }
           }
         }
@@ -340,37 +343,58 @@ struct PromptComposer: View {
 }
 
 /// A file joined to the message: its icon or thumbnail, its name, its size, and a way to remove it.
+/// A click opens it in Quick Look, ← and → going through the other files joined (#209).
 ///
 /// In the conversation's theme, or in the system's colours where no theme applies — the new
 /// session's draft (#291).
 public struct AttachmentChip: View {
   let file: URL
+  let siblings: [URL]
   let usesSystemColors: Bool
   let remove: () -> Void
+  @State private var preview: AttachmentPreview?
+  @State private var quickLook: URL?
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.displayScale) private var displayScale
 
-  public init(file: URL, usesSystemColors: Bool = false, remove: @escaping () -> Void) {
+  /// - Parameter siblings: the files joined with it, which Quick Look goes through; itself alone
+  ///   when empty.
+  public init(
+    file: URL, siblings: [URL] = [], usesSystemColors: Bool = false,
+    remove: @escaping () -> Void
+  ) {
     self.file = file
+    self.siblings = siblings.contains(file) ? siblings : [file]
     self.usesSystemColors = usesSystemColors
     self.remove = remove
   }
 
   public var body: some View {
     HStack(spacing: 8) {
-      thumbnail
-        .frame(width: 28, height: 28)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
-      VStack(alignment: .leading, spacing: 1) {
-        Text(verbatim: file.lastPathComponent)
-          .font(font(size: 12, weight: .semibold))
-          .foregroundStyle(usesSystemColors ? Color.primary : theme.text.color)
-          .lineLimit(1)
-        if let size = fileSize {
-          Text(verbatim: size)
-            .font(font(size: 11))
-            .foregroundStyle(secondary)
+      Button {
+        quickLook = file
+      } label: {
+        HStack(spacing: 8) {
+          thumbnail
+            .frame(width: 28, height: 28)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+          VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: file.lastPathComponent)
+              .font(font(size: 12, weight: .semibold))
+              .foregroundStyle(usesSystemColors ? Color.primary : theme.text.color)
+              .lineLimit(1)
+            if let size = fileSize {
+              Text(verbatim: size)
+                .font(font(size: 11))
+                .foregroundStyle(secondary)
+            }
+          }
         }
+        .contentShape(Rectangle())
       }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text(verbatim: file.lastPathComponent))
+      .accessibilityHint(Text("Opens a preview", bundle: .module))
       Button(action: remove) {
         Image(systemName: "xmark")
           .font(.system(size: 10, weight: .bold))
@@ -391,6 +415,12 @@ public struct AttachmentChip: View {
         usesSystemColors ? Color(nsColor: .separatorColor) : theme.border.color)
     )
     .help(file.path)
+    .quickLookPreview($quickLook, in: siblings)
+    .task(id: file) {
+      let preview = await AttachmentPreviews.shared.preview(
+        for: .file(file, id: file.path), maxPixel: Int(28 * displayScale))
+      if !Task.isCancelled { self.preview = preview }
+    }
   }
 
   private var secondary: Color {
@@ -404,19 +434,17 @@ public struct AttachmentChip: View {
 
   @ViewBuilder
   private var thumbnail: some View {
-    if let type = UTType(filenameExtension: file.pathExtension), type.conforms(to: .image),
-      let image = NSImage(contentsOf: file)
-    {
-      Image(nsImage: image).resizable().scaledToFill()
+    if let image = preview?.thumbnail {
+      Image(decorative: image, scale: displayScale).resizable().scaledToFill()
+    } else if let icon = preview?.icon {
+      Image(nsImage: icon).resizable()
     } else {
-      Image(nsImage: NSWorkspace.shared.icon(forFile: file.path)).resizable()
+      Image(systemName: "doc").resizable().scaledToFit().foregroundStyle(secondary).padding(5)
     }
   }
 
   private var fileSize: String? {
-    guard let bytes = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
-      return nil
-    }
+    guard let bytes = preview?.byteCount else { return nil }
     return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
   }
 }

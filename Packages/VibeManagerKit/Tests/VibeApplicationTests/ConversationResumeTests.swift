@@ -13,7 +13,7 @@ private final class TextDecoder: ConversationDecoding {
     let id = "#\(entries.count)"
     if text.hasPrefix("user:") {
       entries.append(
-        ConversationEntry(id: id, content: .userPrompt(String(text.dropFirst(5)), attachments: 0)))
+        ConversationEntry(id: id, content: .userPrompt(String(text.dropFirst(5)), attachments: [])))
     } else if text.hasPrefix("agent:") {
       entries.append(ConversationEntry(id: id, content: .agentText(String(text.dropFirst(6)))))
     }
@@ -176,7 +176,7 @@ struct ConversationResumeTests {
     #expect(snapshots.allSatisfy { $0.entries.count >= 2 })
     #expect(
       snapshots.last?.entries.map(\.content) == [
-        .userPrompt("hi", attachments: 0), .agentText("hello"), .agentText("later"),
+        .userPrompt("hi", attachments: []), .agentText("hello"), .agentText("later"),
       ])
     #expect(await tail.starts[file("one")] == [2])
     #expect(await tail.delivered == 1)
@@ -194,7 +194,7 @@ struct ConversationResumeTests {
 
     let snapshots = await self.follow(one, with: follow) { $0.entries.count == 1 }
     #expect(snapshots.allSatisfy { !$0.entries.isEmpty })
-    #expect(snapshots.last?.entries.map(\.content) == [.userPrompt("again", attachments: 0)])
+    #expect(snapshots.last?.entries.map(\.content) == [.userPrompt("again", attachments: [])])
   }
 
   @Test("Once forgotten, a session is read from the start again")

@@ -86,14 +86,24 @@ public struct FileTranscriptTail: TranscriptTailing {
   {
     autoreleasepool {
       let reading = reader.readChunk()
-      return (reading, parse(reading.lines))
+      let file = reader.file
+      let locations = zip(reading.lines, reading.lineOffsets).map { line, offset in
+        TranscriptLineLocation(file: file, offset: offset, length: line.count)
+      }
+      return (reading, parse(reading.lines, locations: locations))
     }
   }
 
   /// Lines parsed on every core, in the order they came; those that are not JSON objects are
   /// left out. The few lines a followed transcript gains at a time are parsed right here.
-  static func parse(_ lines: [Data]) -> [TranscriptRecord] {
-    guard lines.count > 64 else { return lines.compactMap(TranscriptRecord.init(line:)) }
+  static func parse(_ lines: [Data], locations: [TranscriptLineLocation] = [])
+    -> [TranscriptRecord]
+  {
+    @Sendable func record(_ index: Int) -> TranscriptRecord? {
+      TranscriptRecord(
+        line: lines[index], location: index < locations.count ? locations[index] : nil)
+    }
+    guard lines.count > 64 else { return lines.indices.compactMap(record) }
     let stripes = min(lines.count, ProcessInfo.processInfo.activeProcessorCount * 4)
     var parsed = [TranscriptRecord?](repeating: nil, count: lines.count)
     parsed.withUnsafeMutableBufferPointer { buffer in
@@ -102,7 +112,7 @@ public struct FileTranscriptTail: TranscriptTailing {
       DispatchQueue.concurrentPerform(iterations: stripes) { stripe in
         let range = (lines.count * stripe / stripes)..<(lines.count * (stripe + 1) / stripes)
         autoreleasepool {
-          for index in range { output[index] = TranscriptRecord(line: lines[index]) }
+          for index in range { output[index] = record(index) }
         }
       }
     }
@@ -297,6 +307,8 @@ struct TranscriptLineReader {
 
   struct Reading {
     var lines: [Data] = []
+    /// Where each line starts in the file.
+    var lineOffsets: [UInt64] = []
     var wasReset = false
     /// Nothing is at the file's path.
     var isMissing = false
@@ -338,8 +350,15 @@ struct TranscriptLineReader {
       let data = try? handle.read(upToCount: chunkSize), !data.isEmpty
     else { return reading }
     var lines: [Data] = []
-    splitter.append(data) { lines.append($0) }
+    var lineOffsets: [UInt64] = []
+    // The incomplete line carried starts at `offset`; the lines are located from there.
+    let bufferStart = offset
+    splitter.appendLocated(data) { line, start in
+      lines.append(line)
+      lineOffsets.append(bufferStart + UInt64(start))
+    }
     reading.lines = lines
+    reading.lineOffsets = lineOffsets
     // Nothing carried after a chunk that does not end a line: the splitter gave the line up.
     let skips = data.last != 0x0A && splitter.pendingCount == 0
     if skips, !isSkipping { reading.skippedLines += 1 }

@@ -60,13 +60,13 @@ struct ShellModeTests {
     // A prompt written meanwhile is not the command.
     model.apply(
       ConversationSnapshot(
-        entries: [ConversationEntry(id: "u", content: .userPrompt("hi", attachments: 0))],
+        entries: [ConversationEntry(id: "u", content: .userPrompt("hi", attachments: []))],
         availability: .available))
     #expect(model.echoes.count == 1)
     model.apply(
       ConversationSnapshot(
         entries: [
-          ConversationEntry(id: "u", content: .userPrompt("hi", attachments: 0)),
+          ConversationEntry(id: "u", content: .userPrompt("hi", attachments: [])),
           shellEntry("s", "git status"),
         ], availability: .available))
     #expect(model.echoes.isEmpty)

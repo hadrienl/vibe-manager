@@ -25,7 +25,7 @@ struct ConversationModelIncrementalTests {
 
   private static func entry(_ id: String, using generator: inout Seeded) -> ConversationEntry {
     switch Int.random(in: 0..<9, using: &generator) {
-    case 0: return ConversationEntry(id: id, content: .userPrompt("prompt \(id)", attachments: 0))
+    case 0: return ConversationEntry(id: id, content: .userPrompt("prompt \(id)", attachments: []))
     case 1: return ConversationEntry(id: id, content: .agentText("text \(id)"))
     case 2: return ConversationEntry(id: id, content: .reasoning(nil))
     case 3: return ConversationEntry(id: id, content: .reasoning("thought \(id)"))
@@ -144,7 +144,7 @@ struct ConversationModelIncrementalTests {
     model.processRunning = { true }
     var entries = (0..<10_000).map { index in
       index.isMultiple(of: 2)
-        ? ConversationEntry(id: "p\(index)", content: .userPrompt("prompt", attachments: 0))
+        ? ConversationEntry(id: "p\(index)", content: .userPrompt("prompt", attachments: []))
         : ConversationEntry(id: "a\(index)", content: .agentText("answer"))
     }
     model.apply(Self.snapshot(entries, revision: 1, unchangedPrefix: 0))
@@ -168,7 +168,7 @@ struct ConversationModelIncrementalTests {
     model.apply(Self.snapshot(first, revision: 1, unchangedPrefix: 0))
     // Revision 2 never came: what 3 says it kept is kept from 2, not from here.
     let third = [
-      ConversationEntry(id: "x", content: .userPrompt("other", attachments: 0)),
+      ConversationEntry(id: "x", content: .userPrompt("other", attachments: [])),
       ConversationEntry(id: "b", content: .agentText("two")),
     ]
     model.apply(Self.snapshot(third, revision: 3, unchangedPrefix: 2))
@@ -199,7 +199,7 @@ struct ConversationModelIncrementalTests {
       let previous = entries.count
       entries.append(
         step == 2
-          ? ConversationEntry(id: "p", content: .userPrompt("hello", attachments: 0))
+          ? ConversationEntry(id: "p", content: .userPrompt("hello", attachments: []))
           : ConversationEntry(id: "a\(step)", content: .agentText("answer \(step)")))
       for model in [hidden, shown] {
         model.apply(Self.snapshot(entries, revision: step, unchangedPrefix: previous))
@@ -226,7 +226,7 @@ struct ConversationModelIncrementalTests {
     let model = ConversationModel(sessionID: SessionID())
     model.processRunning = { true }
     let entries = [
-      ConversationEntry(id: "p", content: .userPrompt("go", attachments: 0)),
+      ConversationEntry(id: "p", content: .userPrompt("go", attachments: [])),
       ConversationEntry(
         id: "f", content: .tool(ToolCall(callID: "f", kind: .read, state: .failed(exitCode: 1)))),
       ConversationEntry(id: "t", content: .agentText("…")),

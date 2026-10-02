@@ -164,7 +164,7 @@ public struct ConversationView: View {
                 if echo.state == .unconfirmed { echoStatus(echo) }
               } else {
                 UserPromptView(
-                  text: echo.text, attachments: echo.attachmentCount, date: echo.sentAt,
+                  text: echo.text, attachments: echo.messageAttachments, date: echo.sentAt,
                   isEcho: true)
                 echoStatus(echo)
               }

@@ -6,7 +6,10 @@ import Testing
 @Suite("The messages ↑ and ↓ recall in the composer (#123)")
 struct PromptHistoryTests {
   private func prompt(_ text: String, attachments: Int = 0) -> ConversationEntry {
-    ConversationEntry(id: UUID().uuidString, content: .userPrompt(text, attachments: attachments))
+    let files = (0..<attachments).map {
+      MessageAttachment.file(URL(fileURLWithPath: "/tmp/\($0).png"), id: "\($0)")
+    }
+    return ConversationEntry(id: UUID().uuidString, content: .userPrompt(text, attachments: files))
   }
 
   @Test("The transcript's prompts in order, then those sent and not written yet")

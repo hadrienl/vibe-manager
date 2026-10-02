@@ -641,7 +641,7 @@ struct ConversationPreview: View {
       ConversationEntry(
         id: "prompt",
         content: .userPrompt(
-          String(localized: "Run the tail's tests.", bundle: .module), attachments: 0)),
+          String(localized: "Run the tail's tests.", bundle: .module), attachments: [])),
       ConversationEntry(id: "tests", content: .tool(tests)),
       ConversationEntry(
         id: "answer",

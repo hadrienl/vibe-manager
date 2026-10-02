@@ -2,10 +2,12 @@ import AppKit
 import SwiftUI
 import VibeApplication
 
-/// What the user sent: a bubble on the right, or a line with a mark, as the settings say.
+/// What the user sent: a bubble on the right, or a line with a mark, as the settings say. The
+/// files that came with it under it (#209).
 struct UserPromptView: View {
+  /// As the agent read it: the paths the composer joined are shown as attachments instead.
   let text: String
-  let attachments: Int
+  let attachments: [MessageAttachment]
   let date: Date?
   var isEcho = false
   @State private var selection = MessageSelection()
@@ -16,38 +18,55 @@ struct UserPromptView: View {
 
   var body: some View {
     let size = appearance.textSize.pointSize
+    // Without the paths that became attachments; an echo's text never holds them.
+    let shown = AttachedPaths.displayText(
+      text, joinedCount: attachments.filter(\.isWrittenInText).count)
     Group {
       if appearance.userMessageStyle == .bubbles {
         HStack {
           Spacer(minLength: 80)
           VStack(alignment: .trailing, spacing: 6) {
-            content(size: size)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 10)
-              .background(theme.bubble.color)
-              .clipShape(
-                UnevenRoundedRectangle(
-                  topLeadingRadius: bubbleRadius, bottomLeadingRadius: bubbleRadius,
-                  bottomTrailingRadius: min(4, bubbleRadius), topTrailingRadius: bubbleRadius)
-              )
-              .overlay {
-                if let border = theme.bubbleBorder {
+            if !shown.isEmpty {
+              content(shown, size: size)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(theme.bubble.color)
+                .clipShape(
                   UnevenRoundedRectangle(
                     topLeadingRadius: bubbleRadius, bottomLeadingRadius: bubbleRadius,
-                    bottomTrailingRadius: min(4, bubbleRadius), topTrailingRadius: bubbleRadius
-                  ).stroke(border.color, lineWidth: 1.5)
+                    bottomTrailingRadius: min(4, bubbleRadius), topTrailingRadius: bubbleRadius)
+                )
+                .overlay {
+                  if let border = theme.bubbleBorder {
+                    UnevenRoundedRectangle(
+                      topLeadingRadius: bubbleRadius, bottomLeadingRadius: bubbleRadius,
+                      bottomTrailingRadius: min(4, bubbleRadius), topTrailingRadius: bubbleRadius
+                    ).stroke(border.color, lineWidth: 1.5)
+                  }
                 }
-              }
+                .modifier(SpokenPrompt(text: shown))
+            }
+            if !attachments.isEmpty {
+              AttachmentStrip(attachments: attachments, alignment: .trailing)
+            }
           }
+          // Files without text: the heading VoiceOver goes to is the group of them.
+          .modifier(EmptyPromptHeading(isEmpty: shown.isEmpty))
         }
       } else {
         HStack(alignment: .top, spacing: 12) {
           RoundedRectangle(cornerRadius: 1.5).fill(theme.accent.color).frame(width: 3)
           VStack(alignment: .leading, spacing: 4) {
-            Text("You", bundle: .module)
-              .font(theme.interfaceFont(size: size * 0.78, weight: .semibold))
-              .foregroundStyle(theme.secondaryText.color)
-            content(size: size)
+            VStack(alignment: .leading, spacing: 4) {
+              Text("You", bundle: .module)
+                .font(theme.interfaceFont(size: size * 0.78, weight: .semibold))
+                .foregroundStyle(theme.secondaryText.color)
+              if !shown.isEmpty { content(shown, size: size) }
+            }
+            .modifier(SpokenPrompt(text: shown))
+            if !attachments.isEmpty {
+              AttachmentStrip(attachments: attachments).padding(.top, 4)
+            }
           }
           Spacer(minLength: 0)
         }
@@ -62,34 +81,47 @@ struct UserPromptView: View {
         Text("Copy Message", bundle: .module)
       }
     }
-    .accessibilityElement(children: .combine)
-    .accessibilityAddTraits(.isHeader)
-    .accessibilityLabel(Text("You said: \(text)", bundle: .module))
   }
 
-  @ViewBuilder
-  private func content(size: Double) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      if !text.isEmpty {
-        // A segment of its own: selecting in it clears the selection of an answer (#189).
-        SegmentView(
-          content: .plain(
-            text,
-            color: appearance.userMessageStyle == .bubbles ? theme.bubbleText : theme.text),
-          markdown: text, hugsText: true
-        )
-        .environment(\.messageSelection, selection)
-      }
-      if attachments > 0 {
-        Label {
-          Text("\(attachments) attachments", bundle: .module)
-        } icon: {
-          Image(systemName: "paperclip")
-        }
-        .font(theme.interfaceFont(size: size * 0.8))
-        .foregroundStyle(theme.secondaryText.color)
-      }
+  private func content(_ shown: String, size: Double) -> some View {
+    // A segment of its own: selecting in it clears the selection of an answer (#189).
+    SegmentView(
+      content: .plain(
+        shown,
+        color: appearance.userMessageStyle == .bubbles ? theme.bubbleText : theme.text),
+      markdown: shown, hugsText: true
+    )
+    .environment(\.messageSelection, selection)
+  }
+}
+
+/// A prompt of files alone, as VoiceOver reads it: a heading, « You », holding them.
+private struct EmptyPromptHeading: ViewModifier {
+  let isEmpty: Bool
+
+  func body(content: Content) -> some View {
+    if isEmpty {
+      content
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("You", bundle: .module))
+        .accessibilityAddTraits(.isHeader)
+    } else {
+      content
     }
+  }
+}
+
+/// The text of a prompt as VoiceOver reads it: one element, a heading. Its attachments are
+/// elements of their own.
+private struct SpokenPrompt: ViewModifier {
+  let text: String
+
+  func body(content: Content) -> some View {
+    content
+      .accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityLabel(
+        text.isEmpty ? Text("You", bundle: .module) : Text("You said: \(text)", bundle: .module))
   }
 }
 

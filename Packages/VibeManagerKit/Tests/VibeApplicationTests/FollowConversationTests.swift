@@ -18,7 +18,7 @@ private final class LineDecoder: ConversationDecoding {
     let id = "\(file)#\(entries.count)"
     if text.hasPrefix("user:") {
       entries.append(
-        ConversationEntry(id: id, content: .userPrompt(String(text.dropFirst(5)), attachments: 0)))
+        ConversationEntry(id: id, content: .userPrompt(String(text.dropFirst(5)), attachments: [])))
     } else if text.hasPrefix("agent:") {
       entries.append(ConversationEntry(id: id, content: .agentText(String(text.dropFirst(6)))))
     }
@@ -236,13 +236,13 @@ struct FollowConversationTests {
     var iterator = await follow.follow(session).makeAsyncIterator()
     let first = await next(&iterator) { $0.availability == .available }
     #expect(
-      first?.entries.map(\.content) == [.userPrompt("hi", attachments: 0), .agentText("hello")])
+      first?.entries.map(\.content) == [.userPrompt("hi", attachments: []), .agentText("hello")])
     await tail.write(["agent:more"], to: file)
     let second = await next(&iterator) { $0.entries.count == 3 }
     #expect(second?.entries.last?.content == .agentText("more"))
     await tail.replace(file, with: ["user:again"])
     let third = await next(&iterator) { $0.entries.count == 1 }
-    #expect(third?.entries.first?.content == .userPrompt("again", attachments: 0))
+    #expect(third?.entries.first?.content == .userPrompt("again", attachments: []))
   }
 
   @Test("A file emptied: its conversation is emptied, not left as it was (#249)")
@@ -301,7 +301,7 @@ struct FollowConversationTests {
     var iterator = await follow.follow(session, live: false).makeAsyncIterator()
     let snapshot = await next(&iterator) { $0.availability == .available }
     #expect(snapshot?.entries.count == 3)
-    #expect(snapshot?.entries.first?.content == .userPrompt("first", attachments: 0))
+    #expect(snapshot?.entries.first?.content == .userPrompt("first", attachments: []))
     guard case .notice(.chapter(let name, _)) = snapshot?.entries[1].content else {
       Issue.record("no chapter")
       return
@@ -464,7 +464,7 @@ struct FollowConversationTests {
     // The `/clear` named its file, written only at the next exchange, well after any wake.
     files.value = [old, cleared]
     let both = await next(&iterator) { $0.entries.count == 2 }
-    #expect(both?.entries.last?.content == .userPrompt("after", attachments: 0))
+    #expect(both?.entries.last?.content == .userPrompt("after", attachments: []))
   }
 
   @Test(
@@ -503,8 +503,8 @@ struct FollowConversationTests {
     let all = await next(&iterator) { $0.entries.count == 4 }
     #expect(
       all?.entries.map(\.content).filter { if case .notice = $0 { false } else { true } } == [
-        .userPrompt("first", attachments: 0), .agentText("later"),
-        .userPrompt("second", attachments: 0),
+        .userPrompt("first", attachments: []), .agentText("later"),
+        .userPrompt("second", attachments: []),
       ])
     // Each file opened once: no reading was dropped, left running, and opened again.
     #expect(tail.opened.count("one.jsonl") == 1)
@@ -531,7 +531,7 @@ struct FollowConversationTests {
       handover: .initialPrompt, at: Date())
     await follow.sessionChanged(session)
     let both = await next(&iterator) { $0.entries.count == 3 }
-    #expect(both?.entries.last?.content == .userPrompt("second", attachments: 0))
+    #expect(both?.entries.last?.content == .userPrompt("second", attachments: []))
     #expect(tail.opened.count("one.jsonl") == 1)
     #expect(tail.opened.count("two.jsonl") == 1)
   }

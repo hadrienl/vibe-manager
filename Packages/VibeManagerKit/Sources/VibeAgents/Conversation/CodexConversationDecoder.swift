@@ -26,6 +26,10 @@ public final class CodexConversationDecoder: ConversationDecoding {
   /// the rollout itself did.
   private var isInCopiedHistory: Bool
   private var forkedAt: Date?
+  /// Where the line being decoded is, for the images it holds (#209).
+  private var location: TranscriptLineLocation?
+  /// The session's folder, which the path of an image joined on the command line is relative to.
+  private var workingDirectory: String?
 
   public init(isFork: Bool = false) {
     isInCopiedHistory = isFork
@@ -39,8 +43,12 @@ public final class CodexConversationDecoder: ConversationDecoding {
 
   public func consume(_ record: TranscriptRecord) {
     let object = record.object
+    location = record.location
     guard let payload = object["payload"] as? [String: Any]
     else { return }
+    if object["type"] as? String == "session_meta", let cwd = payload["cwd"] as? String {
+      workingDirectory = cwd
+    }
     let date = (object["timestamp"] as? String).flatMap(TranscriptDates.parse)
     if isInCopiedHistory {
       skipCopiedHistory(object, payload: payload)
@@ -76,14 +84,12 @@ public final class CodexConversationDecoder: ConversationDecoding {
       let texts = Self.texts(item["content"]).filter { !Self.isContext($0) }.map {
         $0.hasPrefix(Self.messageGuard + "!") ? String($0.dropFirst()) : $0
       }
-      let images = (item["content"] as? [[String: Any]] ?? []).filter {
-        ($0["type"] as? String)?.lowercased().contains("image") == true
-      }.count
-      guard !texts.isEmpty || images > 0 else { return }
+      let text = texts.joined(separator: "\n\n")
+      let attachments = images(in: item["content"], id: id) + Self.joinedFiles(in: text, id: id)
+      guard !texts.isEmpty || !attachments.isEmpty else { return }
       append(
         ConversationEntry(
-          id: id, date: date,
-          content: .userPrompt(texts.joined(separator: "\n\n"), attachments: images)))
+          id: id, date: date, content: .userPrompt(text, attachments: attachments)))
     case "AgentMessage":
       let text = Self.texts(item["content"]).joined(separator: "\n\n")
       guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -346,7 +352,46 @@ public final class CodexConversationDecoder: ConversationDecoding {
     legacy.append(
       ConversationEntry(
         id: id, date: date,
-        content: role == "user" ? .userPrompt(text, attachments: 0) : .agentText(text)))
+        content: role == "user"
+          ? .userPrompt(text, attachments: Self.joinedFiles(in: text, id: id)) : .agentText(text)))
+  }
+
+  /// The images of a `UserMessage` (#209): a file Codex names by its `path` — 0.159 writes
+  /// `{"type": "local_image", "path": "shot.png"}`, relative to the session's folder when it was
+  /// given so — or one held in the rollout as a `data:` URL, of which only where it is is kept.
+  private func images(in content: Any?, id: String) -> [MessageAttachment] {
+    let blocks = content as? [[String: Any]] ?? []
+    var images: [MessageAttachment] = []
+    for (index, block) in blocks.enumerated()
+    where (block["type"] as? String)?.lowercased().contains("image") == true {
+      let path = (block["path"] as? String).flatMap(absolute)
+      let encoded = EmbeddedImage.encodedImage(in: block)
+      var embedded: EmbeddedImage?
+      if let location, let encoded {
+        embedded = EmbeddedImage(
+          line: location, container: ["payload", "item", "content"], index: index,
+          mediaType: encoded.mediaType, encodedLength: (encoded.base64 as NSString).length)
+      }
+      images.append(
+        ClaudeCodeConversationDecoder.image(
+          id: "\(id)/attachment-\(images.count)", path: path, embedded: embedded,
+          mediaType: encoded?.mediaType))
+    }
+    return images
+  }
+
+  private func absolute(_ path: String) -> String? {
+    if path.hasPrefix("/") { return path }
+    guard !path.isEmpty, let workingDirectory else { return nil }
+    return URL(fileURLWithPath: workingDirectory).appendingPathComponent(path).standardizedFileURL
+      .path
+  }
+
+  /// The files the composer joined by their paths, at the end of the text (#209).
+  static func joinedFiles(in text: String, id: String) -> [MessageAttachment] {
+    AttachedPaths.split(text).files.enumerated().map { rank, file in
+      MessageAttachment.file(file, id: "\(id)/file-\(rank)", isWrittenInText: true)
+    }
   }
 
   // MARK: - Helpers

@@ -26,6 +26,13 @@ struct LineSplitter {
 
   /// Appends `block` and hands out, in order, each whole line it completes.
   mutating func append(_ block: Data, _ body: (Data) throws -> Void) rethrows {
+    try appendLocated(block) { line, _ in try body(line) }
+  }
+
+  /// Appends `block` and hands out, in order, each whole line it completes with where it starts:
+  /// in bytes from the start of the incomplete line held before `block` — of `block` when none
+  /// was.
+  mutating func appendLocated(_ block: Data, _ body: (Data, Int) throws -> Void) rethrows {
     guard !block.isEmpty else { return }
     let buffer: Data
     if rest.isEmpty {
@@ -47,7 +54,7 @@ struct LineSplitter {
         if skipsToNewline {
           skipsToNewline = false
         } else {
-          try body(line)
+          try body(line, offset)
         }
         offset = newline + 1
       }
