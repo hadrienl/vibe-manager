@@ -462,11 +462,12 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   }
 
   /// A sub-agent's end, notified to the agent: `completed`, `failed`, `killed` or `stopped`. The
-  /// same sub-agent notifies again when it is given more work: the last word stands.
+  /// same sub-agent notifies again when it is given more work: the last word stands. It is known by
+  /// its identifier first: once resumed, the notification names the message that resumed it.
   private func readNotification(_ text: String) {
     guard
-      let index = Self.tag("tool-use-id", in: text).flatMap({ indexByCallID[$0] })
-        ?? Self.tag("task-id", in: text).flatMap({ indexByAgentID[$0] }),
+      let index = Self.tag("task-id", in: text).flatMap({ indexByAgentID[$0] })
+        ?? Self.tag("tool-use-id", in: text).flatMap({ indexByCallID[$0] }),
       case .tool(var call) = entries[index].content, call.kind == .subagent
     else { return }
     var run = call.subagent ?? SubagentRun()
