@@ -102,21 +102,7 @@ struct SettingsSplitView: View {
         .clipped()
       }
       .navigationTitle(Text(sidebar.name(of: page)))
-      .toolbar {
-        // Only where it leads somewhere. The title keeps its line of the unified toolbar either
-        // way, so the page does not move when it comes and goes.
-        if let parent = page.parent {
-          ToolbarItem(placement: .navigation) {
-            Button {
-              model.settingsPage = parent
-            } label: {
-              Image(systemName: "chevron.left")
-            }
-            .help(Text("Back", bundle: .module))
-            .accessibilityLabel(Text("Back", bundle: .module))
-          }
-        }
-      }
+      .toolbar { backItem(page) }
     }
     .onChange(of: target) { old, new in
       let isGoingIn = new.parent == old
@@ -132,6 +118,37 @@ struct SettingsSplitView: View {
       minWidth: Self.standardWidth, idealWidth: Self.standardWidth,
       minHeight: Self.minimumHeight, idealHeight: Self.idealHeight)
     .background(SettingsWindowSizer(width: Self.sidebarWidth + target.detailWidth))
+  }
+
+  /// The back button, only where it leads somewhere. Elsewhere an empty item holds its place: a
+  /// window without one loses its toolbar, whose title bar is 20 points shorter, and the window's
+  /// buttons and title jumped from a page to the next.
+  @ToolbarContentBuilder
+  private func backItem(_ page: SettingsPage) -> some ToolbarContent {
+    if #available(macOS 26, *) {
+      // No capsule of glass around the empty item.
+      backItemContent(page).sharedBackgroundVisibility(page.parent == nil ? .hidden : .automatic)
+    } else {
+      backItemContent(page)
+    }
+  }
+
+  private func backItemContent(_ page: SettingsPage) -> some ToolbarContent {
+    ToolbarItem(placement: .navigation) {
+      if let parent = page.parent {
+        Button {
+          model.settingsPage = parent
+        } label: {
+          Image(systemName: "chevron.left")
+        }
+        .help(Text("Back", bundle: .module))
+        .accessibilityLabel(Text("Back", bundle: .module))
+      } else {
+        Color.clear
+          .frame(width: 1, height: 1)
+          .accessibilityHidden(true)
+      }
+    }
   }
 }
 

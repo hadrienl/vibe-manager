@@ -173,6 +173,26 @@ struct RequestsSettingsTests {
     }
   }
 
+  @Test("The title bar keeps its height, the back button or not")
+  func titleBarKeepsItsHeight() async {
+    let model = await workspace()
+    let host = NSHostingController(rootView: SettingsView(model: model))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 1_200, height: 700),
+      styleMask: [.titled, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentViewController = host
+    defer { window.close() }
+    await settle(window, "the alerts") { Self.switches(in: host.view).count == 4 }
+    let bar = { window.frame.height - window.contentLayoutRect.height }
+    let alerts = bar()
+    model.settingsPage = .avatars
+    await settle(window, "the avatars") { Self.switches(in: host.view).isEmpty }
+    for _ in 0..<50 { window.contentView?.layoutSubtreeIfNeeded(); await Task.yield() }
+    #expect(abs(bar() - alerts) < 0.5, "\(alerts) then \(bar())")
+    #expect(window.toolbar != nil)
+  }
+
   @Test("Manage Avatars… turns to the page of the avatars")
   func manageAvatars() async {
     let model = await workspace()
