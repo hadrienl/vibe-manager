@@ -582,6 +582,10 @@ struct SettingsWindowSizer: NSViewRepresentable {
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
+      // The title and the way back on one line, as System Settings. The settings scene gives
+      // its window the preferences style, made for tabs, which centred the back button on a row
+      // of its own, and ignores the scene's toolbar style.
+      window?.toolbarStyle = .unified
       resize(animated: false)
     }
 
