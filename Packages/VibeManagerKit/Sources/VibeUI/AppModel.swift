@@ -66,7 +66,7 @@ public final class AppModel {
   public private(set) var actionFailure: ActionFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
   /// The agents of this build, as their providers describe themselves, in their order.
-  public private(set) var agentDescriptors: [AgentDescriptor] = []
+  public internal(set) var agentDescriptors: [AgentDescriptor] = []
   /// The name of each agent of this build, by provider identifier, for the places that name one
   /// (#247). Read from what the providers say of themselves, not from their detection: a session
   /// is named “Claude Code” from the first frame, and through every refresh.
