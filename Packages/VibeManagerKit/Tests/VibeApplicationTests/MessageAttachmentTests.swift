@@ -86,7 +86,8 @@ struct MessageAttachmentTests {
   @Test("The text shown keeps what is not a joined path")
   func displayText() {
     #expect(AttachedPaths.displayText(#"see /tmp/a\ b.png"#) == "see")
-    #expect(AttachedPaths.split(#"see /tmp/a\ b.png"#).files == [URL(fileURLWithPath: "/tmp/a b.png")])
+    #expect(
+      AttachedPaths.split(#"see /tmp/a\ b.png"#).files == [URL(fileURLWithPath: "/tmp/a b.png")])
     #expect(AttachedPaths.displayText("no paths here") == "no paths here")
   }
 }

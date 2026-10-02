@@ -36,7 +36,9 @@ struct MessageAttachmentDecodingTests {
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let file = folder.appendingPathComponent("transcript.jsonl")
     try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: file)
-    for record in await FileTranscriptTail(pollInterval: .seconds(1), chunkSize: chunkSize).read(file) {
+    for record in await FileTranscriptTail(pollInterval: .seconds(1), chunkSize: chunkSize).read(
+      file)
+    {
       decoder.consume(record)
     }
     return (decoder.entries, file)
@@ -145,7 +147,8 @@ struct MessageAttachmentDecodingTests {
     #expect(AttachedPaths.displayText(entries[2].promptText ?? "") == "")
   }
 
-  @Test("Codex: an image joined by its path, relative to the session's folder, and one in the rollout")
+  @Test(
+    "Codex: an image joined by its path, relative to the session's folder, and one in the rollout")
   func codex() async throws {
     let item =
       #"{"type":"UserMessage","id":"m","content":[{"type":"local_image","path":"shots/dot.png"},{"type":"image","url":"data:image/png;base64,\#(Self.png)"},{"type":"text","text":"Reply","text_elements":[]}]}"#
@@ -157,7 +160,8 @@ struct MessageAttachmentDecodingTests {
     let prompt = try #require(entries.first)
     #expect(prompt.promptText == "Reply")
     #expect(prompt.attachments.count == 2)
-    #expect(prompt.attachments[0].source == .file(URL(fileURLWithPath: "/tmp/project/shots/dot.png")))
+    #expect(
+      prompt.attachments[0].source == .file(URL(fileURLWithPath: "/tmp/project/shots/dot.png")))
     let embedded = try #require(prompt.attachments[1].embeddedImage)
     #expect(embedded.container == ["payload", "item", "content"])
     #expect(embedded.mediaType == "image/png")

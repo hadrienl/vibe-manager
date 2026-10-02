@@ -19,7 +19,9 @@ struct ShellPathTrailingTests {
 
   @Test("Several, in order, the text before them kept")
   func several() throws {
-    let text = "Compare\nthese " + ["/a/b c.png", "/d/e.pdf"].map(ShellPath.escaped)
+    let text =
+      "Compare\nthese "
+      + ["/a/b c.png", "/d/e.pdf"].map(ShellPath.escaped)
       .joined(separator: " ")
     let found = try #require(ShellPath.trailingPaths(in: text))
     #expect(found.paths == ["/a/b c.png", "/d/e.pdf"])

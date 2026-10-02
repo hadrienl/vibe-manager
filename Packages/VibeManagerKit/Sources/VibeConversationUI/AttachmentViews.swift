@@ -76,16 +76,16 @@ struct AttachmentTile: View {
 
   let attachment: MessageAttachment
   let name: String
-  let open: () -> Void
+  let showPreview: () -> Void
   @State private var preview: AttachmentPreview?
 
   /// The thumbnails' size in pixels: one for every screen, so that the cache answers at once.
   static let maxPixel = Int(imageHeight * 2 * 2)
 
-  init(attachment: MessageAttachment, name: String, open: @escaping () -> Void) {
+  init(attachment: MessageAttachment, name: String, showPreview: @escaping () -> Void) {
     self.attachment = attachment
     self.name = name
-    self.open = open
+    self.showPreview = showPreview
     // What the cache already holds is drawn at once: a row built again while scrolling keeps
     // its height.
     _preview = State(
@@ -162,7 +162,7 @@ struct AttachmentTile: View {
       tileButton { textExcerpt }
     case .audio:
       AttachmentAudioPlayer(
-        file: attachment.file, name: name, duration: preview?.duration, open: open)
+        file: attachment.file, name: name, duration: preview?.duration, showPreview: showPreview)
     case .chip:
       tileButton { chip(missing: false) }
     case .missing:
@@ -172,7 +172,7 @@ struct AttachmentTile: View {
 
   /// The tile as one button: a click, or Space once it has the focus, opens Quick Look.
   private func tileButton(@ViewBuilder _ label: () -> some View) -> some View {
-    Button(action: open, label: label)
+    Button(action: showPreview, label: label)
       .buttonStyle(.plain)
       .accessibilityLabel(accessibilityLabel)
   }
@@ -234,7 +234,8 @@ struct AttachmentTile: View {
           if missing {
             Text("File not found", bundle: .module)
           } else if let bytes = preview?.byteCount {
-            Text(verbatim: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
+            Text(
+              verbatim: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
           }
         }
         .font(theme.interfaceFont(size: 11))
@@ -271,6 +272,8 @@ struct AttachmentTile: View {
     let file = preview?.existingFile
     Button {
       // Checked again: the file may have changed since the tile was drawn.
+      // Opens outside: a document a transcript names, which `AttachmentOpening.canOpen` lets out
+      // only when it is read by its application — never a program, a script or a link (ADR 0025).
       if let file, AttachmentOpening.canOpen(file) { NSWorkspace.shared.open(file) }
     } label: {
       Text("Open", bundle: .module)
@@ -290,6 +293,7 @@ struct AttachmentTile: View {
     .disabled(file == nil && attachment.embeddedImage == nil)
     if let links, links.hasWebView(), let file, preview?.canShowInWebView == true {
       Button {
+        // Opens outside: the session's own link rule, into its web view, for a page or an image.
         links.open(file, .webView)
       } label: {
         Text("Open in Web View", bundle: .module)
@@ -340,7 +344,7 @@ struct AttachmentAudioPlayer: View {
   let file: URL?
   let name: String
   let duration: Double?
-  let open: () -> Void
+  let showPreview: () -> Void
   @State private var playback = AudioPlayback()
   @Environment(\.conversationTheme) private var theme
 
@@ -360,7 +364,7 @@ struct AttachmentAudioPlayer: View {
       .accessibilityLabel(
         playback.isPlaying
           ? Text("Pause \(name)", bundle: .module) : Text("Play \(name)", bundle: .module))
-      Button(action: open) {
+      Button(action: showPreview) {
         VStack(alignment: .leading, spacing: 4) {
           Text(verbatim: name)
             .accessibilityLabel(Text("Audio", bundle: .module) + Text(verbatim: ", \(name)"))

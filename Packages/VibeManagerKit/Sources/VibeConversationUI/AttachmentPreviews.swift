@@ -71,9 +71,10 @@ actor AttachmentPreviews {
     var size: Int?
   }
 
-  init(temporaryFolder: URL = FileManager.default.temporaryDirectory
-    .appendingPathComponent("VibeAttachments", isDirectory: true))
-  {
+  init(
+    temporaryFolder: URL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("VibeAttachments", isDirectory: true)
+  ) {
     cache.totalCostLimit = 64 << 20
     self.temporaryFolder = temporaryFolder
     // Copies left by a run that ended without removing them.
@@ -89,32 +90,36 @@ actor AttachmentPreviews {
   }
 
   /// The preview of `attachment` with a thumbnail of `maxPixel` pixels at most on its longer side.
-  /// Read again when its file changed; a file missing is never kept as such. When the caller is
-  /// cancelled, so is the load it alone waited for, and what it gets is not to be shown.
+  /// Read again when its file changed — or came back. When the caller is cancelled, so is the
+  /// load it alone waited for, and what it gets is not to be shown.
   func preview(for attachment: MessageAttachment, maxPixel: Int) async -> AttachmentPreview {
     let key = Self.key(attachment.source, maxPixel: maxPixel)
-    let signature = Self.signature(of: attachment.file)
-    if let entry = cache.object(forKey: key as NSString), entry.signature == signature {
+    if let entry = cache.object(forKey: key as NSString),
+      entry.signature == Self.signature(of: attachment.file)
+    {
       return entry.preview
     }
     while !Task.isCancelled {
-      let task = loading[key] ?? startLoading(attachment, maxPixel: maxPixel, key: key)
+      // A load cancelled by the one who started it is not waited for: another starts.
+      let task: Task<AttachmentPreview?, Never>
+      if let current = loading[key], !current.isCancelled {
+        task = current
+      } else {
+        task = startLoading(attachment, maxPixel: maxPixel, key: key)
+      }
       let preview = await withTaskCancellationHandler {
         await task.value
       } onCancel: {
         task.cancel()
       }
       if loading[key] == task { loading[key] = nil }
-      guard let preview else { continue }
-      if !preview.isMissing {
-        cache.setObject(
-          Entry(preview, signature: signature), forKey: key as NSString, cost: preview.cost)
-      }
-      return preview
+      if let preview { return preview }
     }
     return AttachmentPreview()
   }
 
+  /// A load, its turn waited for, kept in the cache with the signature its file had when it was
+  /// read; nil when it was cancelled, before or during.
   private func startLoading(_ attachment: MessageAttachment, maxPixel: Int, key: String)
     -> Task<AttachmentPreview?, Never>
   {
@@ -122,7 +127,13 @@ actor AttachmentPreviews {
       await acquire()
       defer { release() }
       guard !Task.isCancelled else { return nil }
-      return await Self.load(attachment, maxPixel: maxPixel)
+      let signature = Self.signature(of: attachment.file)
+      let preview = await Self.load(attachment, maxPixel: maxPixel)
+      guard !Task.isCancelled else { return nil }
+      // A file missing is kept as such too: its signature is nil, and it is read again once back.
+      cache.setObject(
+        Entry(preview, signature: signature), forKey: key as NSString, cost: preview.cost)
+      return preview
     }
     loading[key] = task
     loadCount += 1
@@ -173,7 +184,8 @@ actor AttachmentPreviews {
     // Named after its media type, never after the transcript: a name it gives could make the copy
     // something Quick Look offers to run.
     let fileName =
-      (name as NSString).deletingPathExtension.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+      (name as NSString).deletingPathExtension.replacingOccurrences(of: "/", with: "-")
+      .replacingOccurrences(of: ":", with: "-")
       + "."
       + (UTType(mimeType: image.mediaType)?.conforms(to: .image) == true
         ? UTType(mimeType: image.mediaType)?.preferredFilenameExtension ?? "png" : "png")
@@ -250,7 +262,9 @@ actor AttachmentPreviews {
     switch kind {
     case .image:
       preview.thumbnail = autoreleasepool {
-        CGImageSourceCreateWithURL(file as CFURL, nil).flatMap { thumbnail(of: $0, maxPixel: maxPixel) }
+        CGImageSourceCreateWithURL(file as CFURL, nil).flatMap {
+          thumbnail(of: $0, maxPixel: maxPixel)
+        }
       }
       if preview.thumbnail == nil { preview.thumbnail = await quickLookThumbnail(file, maxPixel) }
     case .pdf:

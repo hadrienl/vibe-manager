@@ -417,8 +417,9 @@ public struct AttachmentChip: View {
     .help(file.path)
     .quickLookPreview($quickLook, in: siblings)
     .task(id: file) {
-      preview = await AttachmentPreviews.shared.preview(
+      let preview = await AttachmentPreviews.shared.preview(
         for: .file(file, id: file.path), maxPixel: Int(28 * displayScale))
+      if !Task.isCancelled { self.preview = preview }
     }
   }
 

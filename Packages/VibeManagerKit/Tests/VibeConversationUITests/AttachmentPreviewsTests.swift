@@ -45,7 +45,8 @@ struct AttachmentPreviewsTests {
   @Test("An image held by the transcript only: read again from its line, to its thumbnail")
   func embeddedImage() async throws {
     let base64 = try png(width: 300, height: 300).base64EncodedString()
-    let line = #"{"message":{"content":[{"type":"text","text":"[Image #1]"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"\#(base64)"}}]}}"#
+    let line =
+      #"{"message":{"content":[{"type":"text","text":"[Image #1]"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"\#(base64)"}}]}}"#
     let transcript = folder.appendingPathComponent("t.jsonl")
     let prefix = #"{"first":true}"# + "\n"
     try Data((prefix + line + "\n").utf8).write(to: transcript)
@@ -87,7 +88,8 @@ struct AttachmentPreviewsTests {
       encodedLength: base64.utf8.count)
     let attachment = MessageAttachment(
       id: "g", kind: .image,
-      source: .fileWithEmbedded(folder.appendingPathComponent("moved.png"), image), name: "moved.png")
+      source: .fileWithEmbedded(folder.appendingPathComponent("moved.png"), image),
+      name: "moved.png")
     let preview = await previews().preview(for: attachment, maxPixel: 64)
     #expect(preview.thumbnail != nil)
     #expect(!preview.isMissing)
