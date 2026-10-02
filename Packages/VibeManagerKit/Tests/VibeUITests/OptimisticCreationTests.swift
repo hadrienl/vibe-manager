@@ -451,6 +451,135 @@ struct NewSessionDraftTests {
     await waitUntil("the session is stored") { model.sessionInCreation == nil }
     #expect(model.sessions.contains { $0.name == "Fix the blank conversation" })
   }
+
+  // MARK: - Escape (#293)
+
+  @Test("Escape on an empty draft discards it, and leaves nothing to undo")
+  func escapeDiscardsAnEmptyDraft() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+    model.beginNewSession()
+    let undo = UndoManager()
+
+    model.discardNewSessionDraft(undoManager: undo)
+
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionModel == nil)
+    #expect(model.newSessionDrafts.isEmpty)
+    #expect(model.selectedSessionID == previous.id)
+    #expect(!undo.canUndo)
+  }
+
+  @Test("Escape on a draft written in discards it, and ⌘Z brings it back as it was")
+  func escapeDiscardsAWrittenDraftUndoably() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.select(previous.id)
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+    draft.draft.name = "Parser"
+    draft.draft.initialPrompt = "Rewrite the parser"
+    let undo = UndoManager()
+
+    model.discardNewSessionDraft(undoManager: undo)
+
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionDrafts.isEmpty)
+    #expect(model.selectedSessionID == previous.id)
+    #expect(undo.undoActionName == String(localized: "Discard Draft", bundle: .module))
+
+    let request = model.newSessionFocusRequest
+    undo.undo()
+
+    #expect(model.isPresentingNewSession)
+    #expect(model.newSessionModel === draft)
+    #expect(draft.draft.name == "Parser")
+    #expect(draft.draft.initialPrompt == "Rewrite the parser")
+    #expect(model.newSessionFocusRequest == request + 1)
+
+    // ⇧⌘Z discards it again.
+    undo.redo()
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionModel == nil)
+  }
+
+  @Test("⌘Z over a draft begun since puts that one aside, and brings the discarded one back")
+  func undoPutsTheCurrentDraftAside() async throws {
+    let model = await makeModel(sessions: [])
+    model.beginNewSession()
+    let discarded = try #require(model.newSessionModel)
+    discarded.draft.initialPrompt = "First"
+    let undo = UndoManager()
+    model.discardNewSessionDraft(undoManager: undo)
+    model.beginNewSession()
+    let current = try #require(model.newSessionModel)
+    current.draft.initialPrompt = "Second"
+
+    undo.undo()
+
+    #expect(model.newSessionModel === discarded)
+    #expect(model.setAsideDrafts.first === current)
+
+    // Another draft brought on screen since: ⇧⌘Z leaves it alone.
+    model.showNewSessionDraft(current)
+    undo.redo()
+    #expect(model.newSessionModel === current)
+    #expect(model.isPresentingNewSession)
+  }
+
+  @Test("Escape does nothing to a draft on its way to becoming a session")
+  func escapeLeavesASubmittingDraft() async throws {
+    // Held at the store: the first creation is on its way, and the second waits in its draft.
+    let repository = GatedRepository(sessions: [])
+    let launcher = SessionLauncher(
+      supervisor: FakeSupervisor(), repository: repository, agents: OneAgent(),
+      viewportTimeout: .zero)
+    let model = AppModel(repository: repository, agents: OneAgent(), launcher: launcher)
+    await model.load()
+    model.beginNewSession()
+    try #require(model.newSessionModel).draft = SessionDraft(
+      name: "First", providerID: "stub", workingDirectoryPath: folder)
+    model.submitNewSession(launching: true)
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+    draft.draft = SessionDraft(name: "Second", providerID: "stub", workingDirectoryPath: folder)
+    model.submitNewSession(launching: true)
+    await waitUntil("the second draft is on its way") { draft.isSubmitting }
+    let undo = UndoManager()
+
+    model.discardNewSessionDraft(undoManager: undo)
+
+    #expect(model.isPresentingNewSession)
+    #expect(model.newSessionModel === draft)
+    #expect(!undo.canUndo)
+    await repository.open()
+    await waitUntil("both sessions are made") { model.sessions.count == 2 }
+  }
+
+  @Test("Going to another session, or Open Quickly, still sets a written draft aside")
+  func goingElsewhereStillSetsTheDraftAside() async throws {
+    let previous = existing()
+    let model = await makeModel(sessions: [previous])
+    model.beginNewSession()
+    let draft = try #require(model.newSessionModel)
+    draft.draft.initialPrompt = "Kept"
+
+    model.select(previous.id)
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionModel === draft)
+
+    model.showNewSessionDraft()
+    model.goToSession(previous.id)
+    #expect(!model.isPresentingNewSession)
+    #expect(model.newSessionModel === draft)
+
+    // ⌘N on a folder over it: put aside, not discarded.
+    model.showNewSessionDraft()
+    model.beginNewSession(folder: folder)
+    #expect(model.setAsideDrafts.first === draft)
+  }
+
 }
 
 /// Holds every write until it is opened, so what the window shows meanwhile can be looked at.

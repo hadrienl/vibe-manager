@@ -133,11 +133,40 @@ extension AppModel {
     }
   }
 
-  /// Escape in the draft: an empty draft is discarded, one with something in it is put aside, and
-  /// the session underneath comes back.
-  public func dismissNewSessionDraft() {
-    leaveNewSessionDraft()
+  /// Escape in the draft, or its Discard button (#293): the draft goes, and the session underneath
+  /// comes back with the keyboard. One with something of the user's in it can be brought back with
+  /// ⌘Z, as it was. A draft on its way to becoming a session stays where it is.
+  ///
+  /// - Parameter undoManager: the window's, where ⌘Z finds the discarded draft.
+  public func discardNewSessionDraft(undoManager: UndoManager?) {
+    guard isPresentingNewSession, let draft = newSessionModel, !draft.isSubmitting else { return }
+    cancelNewSession()
     focusSession()
+    guard !draft.isPristine, let undoManager else { return }
+    undoManager.registerUndo(withTarget: self) { model in
+      MainActor.assumeIsolated { model.restoreDiscardedDraft(draft, undoManager: undoManager) }
+    }
+    undoManager.setActionName(
+      String(
+        localized: "Discard Draft", bundle: .module,
+        comment: "The undo action that brings back a new session's discarded draft."))
+  }
+
+  /// ⌘Z after a discard: the draft is the current one again, on screen, as it was left. One begun
+  /// meanwhile is put aside, or dropped if nothing was changed in it. ⇧⌘Z discards it again —
+  /// that draft only, never another one brought on screen since.
+  func restoreDiscardedDraft(_ draft: NewSessionModel, undoManager: UndoManager) {
+    showNewSessionDraft(draft)
+    undoManager.registerUndo(withTarget: self) { model in
+      MainActor.assumeIsolated {
+        guard model.newSessionModel === draft else { return }
+        model.discardNewSessionDraft(undoManager: undoManager)
+      }
+    }
+    undoManager.setActionName(
+      String(
+        localized: "Discard Draft", bundle: .module,
+        comment: "The undo action that brings back a new session's discarded draft."))
   }
 
   func creationWasLeft(for id: SessionID?) {

@@ -56,9 +56,7 @@ public struct NewSessionDraftView: View {
   /// or leave it in To Do (#80). The rest — the folder, the agent, the store — is checked with the
   /// draft gone, and a refusal brings it back.
   private let submitted: (Bool) -> Void
-  /// Escape: the draft is set aside, or dropped when nothing of the user's is in it.
-  private let dismissed: () -> Void
-  /// Discard: the draft goes, whatever is in it.
+  /// Discard, or Escape (#293): the draft goes, whatever is in it.
   private let discarded: () -> Void
   /// Opens the panel to choose files to join to the prompt.
   private let chooseFiles: () -> Void
@@ -69,7 +67,6 @@ public struct NewSessionDraftView: View {
     model: NewSessionModel,
     focusRequest: Int = 0,
     submitted: @escaping (Bool) -> Void,
-    dismissed: @escaping () -> Void,
     discarded: @escaping () -> Void,
     chooseFiles: @escaping () -> Void,
     manageTemplates: (() -> Void)? = nil
@@ -77,7 +74,6 @@ public struct NewSessionDraftView: View {
     _model = Bindable(model)
     self.focusRequest = focusRequest
     self.submitted = submitted
-    self.dismissed = dismissed
     self.discarded = discarded
     self.chooseFiles = chooseFiles
     self.manageTemplates = manageTemplates
@@ -164,10 +160,10 @@ public struct NewSessionDraftView: View {
           moveFocus(to: .draft(.initialPrompt))
         })
     }
-    // Escape sets the draft aside — only from inside it: a key equivalent would take Escape from
-    // the whole window, Open Quickly and the sidebar included. The prompt, an AppKit text view,
-    // hands it over itself.
-    .onExitCommand(perform: dismissed)
+    // Escape discards the draft, as its button does — only from inside it: a key equivalent would
+    // take Escape from the whole window, Open Quickly and the sidebar included. The prompt, an
+    // AppKit text view, hands it over itself.
+    .onExitCommand(perform: discarded)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New Session", bundle: .module, comment: "An unnamed new session."))
     .accessibilityIdentifier("new-session-draft")
@@ -628,7 +624,7 @@ public struct NewSessionDraftView: View {
             focusRequested: editorRequest == .draft(.initialPrompt),
             isBordered: false,
             onSubmit: submit,
-            onCancel: dismissed,
+            onCancel: discarded,
             commands: model.commands
           )
           .focused($focus, equals: .draft(.initialPrompt))
@@ -658,7 +654,7 @@ public struct NewSessionDraftView: View {
       }
 
       Text(
-        "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape sets the draft aside",
+        "Return creates and launches · Shift-Return starts a new line · Option-Return adds to To Do · Escape discards the draft",
         bundle: .module
       )
       .font(.caption2)
