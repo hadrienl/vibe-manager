@@ -932,7 +932,7 @@ public struct RootView: View {
     let placement: BrowserPlacement = workspace == nil ? .hidden : model.layout.columns.browser
     return BrowserSplit(
       layout: model.layout, sessionID: session.id, placement: placement,
-      terminalMinimum: Self.terminalMinimumWidth
+      canSlide: workspace != nil, terminalMinimum: Self.terminalMinimumWidth
     ) {
       terminalStack(for: session)
         .overlay {

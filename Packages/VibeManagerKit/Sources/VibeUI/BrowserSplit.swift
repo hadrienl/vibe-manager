@@ -12,17 +12,20 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
   let layout: WorkspaceLayoutController
   let sessionID: SessionID
   let placement: BrowserPlacement
+  /// False when there is no web view to slide: an archived session has none.
+  let canSlide: Bool
   let terminalMinimum: Double
   let leading: Leading
   let trailing: Trailing
 
-  /// Whether the web view is beside the terminal — still, while it slides out.
-  @State private var mountsTrailing: Bool
-  /// How much of it shows, from 0 to 1: what slides it in and out, as the sidebars are.
-  @State private var reveal: Double
+  /// Whether the web view is sliding in or out: beside the terminal, still, while it slides out.
+  @State private var isSliding = false
+  /// How much of it shows while it slides, from 0 to 1, as the sidebars do.
+  @State private var reveal: Double = 0
   @State private var hold: PaneWidthHold?
-  /// Counts the slides: the end of one overtaken by the next must not release the next's hold.
+  /// Count the slides and the centrings: the end of one overtaken by the next must not undo it.
   @State private var slide = 0
+  @State private var centring = 0
   @State private var dragPause: Task<Void, Never>?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -34,18 +37,16 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
 
   init(
     layout: WorkspaceLayoutController, sessionID: SessionID, placement: BrowserPlacement,
-    terminalMinimum: Double, @ViewBuilder leading: () -> Leading,
+    canSlide: Bool, terminalMinimum: Double, @ViewBuilder leading: () -> Leading,
     @ViewBuilder trailing: () -> Trailing
   ) {
     self.layout = layout
     self.sessionID = sessionID
     self.placement = placement
+    self.canSlide = canSlide
     self.terminalMinimum = terminalMinimum
     self.leading = leading()
     self.trailing = trailing()
-    let isBeside = placement == .beside
-    _mountsTrailing = State(initialValue: isBeside)
-    _reveal = State(initialValue: isBeside ? 1 : 0)
   }
 
   var body: some View {
@@ -56,6 +57,10 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
       let upper = WorkspaceLayout.browserWidthUpperBound(
         in: container, handle: handle, terminalMinimum: terminalMinimum)
       let width = min(layout.browserWidth, upper)
+      let isBeside = placement == .beside
+      // Read from the placement itself, not from what the last change of it left: never mounted
+      // here and in turns with the terminal at once, nor missing for a pass.
+      let mountsTrailing = isBeside || (isSliding && placement != .alternating)
       HStack(spacing: 0) {
         leading
           .environment(\.paneWidthHold, hold)
@@ -77,9 +82,14 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
               trailing
                 .frame(width: width)
             }
+            // Sliding out, it is already closed: neither clicked, nor focused, nor read.
+            .allowsHitTesting(isBeside)
+            .accessibilityHidden(!isBeside)
           }
         }
-        .frame(width: reveal * (width + handle), alignment: .leading)
+        .frame(
+          width: (isSliding ? reveal : isBeside ? 1 : 0) * (width + handle), alignment: .leading
+        )
         .clipped()
       }
       .onChange(of: Arrangement(session: sessionID, placement: placement)) { old, new in
@@ -99,26 +109,29 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
   private func follow(from old: Arrangement, to new: Arrangement, container: Double) {
     let opens = new.placement == .beside
     slide += 1
+    dragPause?.cancel()
+    dragPause = nil
     let slides =
-      !reduceMotion && old.session == new.session
+      !reduceMotion && canSlide && old.session == new.session
       && old.placement != .alternating && new.placement != .alternating
     guard slides else {
       hold = nil
-      mountsTrailing = opens
-      reveal = opens ? 1 : 0
+      isSliding = false
       return
     }
     let current = slide
     // The whole column is the widest the panes are, before the slide or after it: laid out at
     // it, they are only covered and uncovered by the web view.
     hold = PaneWidthHold(width: container, isCovered: true)
-    mountsTrailing = true
+    // From where it shows now, a slide overtaken included.
+    if !isSliding { reveal = opens ? 0 : 1 }
+    isSliding = true
     withAnimation(Self.slideAnimation) {
       reveal = opens ? 1 : 0
     } completion: {
       guard current == slide else { return }
       hold = nil
-      if !opens { mountsTrailing = false }
+      isSliding = false
     }
   }
 
@@ -151,13 +164,14 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
       layout.browserWidthChanged(to: centered)
       return
     }
-    slide += 1
-    let current = slide
+    centring += 1
+    let current = (centring, slide)
     hold = PaneWidthHold(width: container - handle - min(width, centered), isCovered: true)
     withAnimation(.easeOut(duration: 0.2)) {
       layout.browserWidthChanged(to: centered)
     } completion: {
-      guard current == slide else { return }
+      // A slide started meanwhile releases the hold itself, at its own end.
+      guard current == (centring, slide) else { return }
       hold = nil
     }
   }
