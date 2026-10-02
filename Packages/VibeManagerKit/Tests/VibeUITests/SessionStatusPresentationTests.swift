@@ -42,8 +42,8 @@ struct SessionStatusPresentationTests {
   func agentStates() {
     let expected:
       [(SessionStatusPresentation, String, String, String, SessionStatusSeverity, Bool)] = [
-        (agent(.idle), "Idle", "En attente", "moon.zzz", .normal, false),
-        (agent(.working), "Working", "En cours", "arrow.triangle.2.circlepath", .active, false),
+        (agent(.idle), "Idle", "Prête", "moon.zzz", .normal, false),
+        (agent(.working), "Working", "Travaille…", "arrow.triangle.2.circlepath", .active, false),
         (
           agent(.awaitingUser(.approval)), "Needs approval", "Autorisation requise",
           "hand.raised.fill", .attention, true
@@ -145,9 +145,23 @@ struct SessionStatusPresentationTests {
 
     #expect(failed.severity == .error)
     #expect(exited.severity == .error)
-    #expect(english(exited.label).contains("127"))
     #expect(terminated.severity == .error)
-    #expect(english(terminated.label).contains("9"))
+    // Words first, the code after them, for whoever wants it (#235).
+    #expect(english(exited.label) == "Process failed")
+    #expect(exited.detail == "Exit code 127")
+    #expect(english(terminated.label) == "Process interrupted")
+    #expect(terminated.detail == "Signal 9")
+    #expect(Localization.string(exited.label, in: "fr") == "Processus en erreur")
+    let spoken = SessionStatusPresentation.accessibilityLabel(for: session(), status: exited)
+    #expect(spoken.hasSuffix("Process failed (Exit code 127)"))
+    // Said "could not start" only of a process that never did: a terminal lost on the way failed
+    // after running, and keeps its reason beside the words.
+    #expect(english(failed.label) == "Process failed")
+    #expect(failed.detail == "No such file")
+    let neverStarted = SessionStatusPresentation.make(
+      session: session(), paneStatus: .failed(message: "No such file"), launchFailed: true)
+    #expect(english(neverStarted.label) == "Couldn't start")
+    #expect(neverStarted.detail == "No such file")
   }
 
   @Test("A clean exit is not a failure")
@@ -209,7 +223,8 @@ struct SessionStatusPresentationTests {
     )
 
     #expect(english(finished.label) == "Agent unavailable")
-    #expect(english(failed.label).contains("127"))
+    #expect(english(failed.label) == "Process failed")
+    #expect(failed.detail == "Exit code 127")
   }
 
   @Test("VoiceOver hears the name, the agent and the state")
@@ -229,11 +244,11 @@ struct SessionStatusFrenchTests {
   func states() {
     let expected: [(TerminalPaneModel.Status, String)] = [
       (.starting, "Démarrage"),
-      (.running, "En attente"),
-      (.exited(code: 0), "Terminée"),
-      (.exited(code: 127), "Terminée avec le code 127"),
-      (.terminated(signal: 9), "Interrompue par le signal 9"),
-      (.failed(message: "x"), "Échec"),
+      (.running, "Prête"),
+      (.exited(code: 0), "Processus terminé"),
+      (.exited(code: 127), "Processus en erreur"),
+      (.terminated(signal: 9), "Processus interrompu"),
+      (.failed(message: "x"), "Processus en erreur"),
     ]
     for (pane, french) in expected {
       let status = SessionStatusPresentation.make(
@@ -252,6 +267,59 @@ struct SessionStatusFrenchTests {
     }
     #expect(labels == ["Arrêtée", "Fermée", "Archivée"])
   }
+
+  /// A session's row shows its column's name nowhere but in the column: in French, “En cours”
+  /// for Working read as if a session of To Do were In Progress (#246). Words are compared without
+  /// case, accents or the feminine “e”, so that “Terminé” and “Terminée” count as one.
+  @Test("No state of the agent reads like the name of a column")
+  func statesAreNotColumns() {
+    let columns = SessionTaskStatus.columns.map {
+      Self.folded(Localization.string($0.label, in: "fr"))
+    }
+    let session = WorkSession(name: "S", status: .active)
+    let panes: [TerminalPaneModel.Status] = [
+      .starting, .running, .exited(code: 0), .exited(code: 1), .terminated(signal: 9),
+      .failed(message: "x"),
+    ]
+    let activities: [AgentActivityState] = [
+      AgentActivityState(activity: .idle, source: .structured),
+      AgentActivityState(activity: .idle, unreadSince: Date(), source: .structured),
+      AgentActivityState(activity: .working, source: .structured),
+      AgentActivityState(activity: .awaitingUser(.approval), source: .structured),
+      AgentActivityState(activity: .awaitingUser(.question), source: .structured),
+    ]
+    let states =
+      panes.map { SessionStatusPresentation.make(session: session, paneStatus: $0) }
+      + activities.map {
+        SessionStatusPresentation.make(session: session, paneStatus: .running, activity: $0)
+      }
+      + [SessionStatus.active, .closed].map {
+        SessionStatusPresentation.make(session: WorkSession(name: "S", status: $0), paneStatus: nil)
+      }
+      + [
+        .restoring,
+        SessionStatusPresentation.make(
+          session: session, paneStatus: nil, resolution: .unknownProvider("gone")),
+      ]
+    for state in states {
+      let french = Localization.string(state.label, in: "fr")
+      #expect(!columns.contains(Self.folded(french)), "« \(french) » is a column's name")
+    }
+    // A group's header counts its working agents in the same words (“2 au travail”).
+    let working = Localization.string("\(2) working", module: "VibeUI", in: "fr")
+      .replacingOccurrences(of: "2 ", with: "")
+    #expect(!columns.contains(Self.folded(working)), "« \(working) » is a column's name")
+  }
+
+  /// The feminine “e” goes first, accents after: “Terminée” and “Terminé” both read “termine”.
+  private static func folded(_ text: String) -> String {
+    text.split(separator: " ")
+      .map { $0.hasSuffix("e") ? String($0.dropLast()) : String($0) }
+      .joined(separator: " ")
+      .folding(
+        options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "fr"))
+  }
+
 }
 
 private func english(_ label: LocalizedStringResource) -> String {

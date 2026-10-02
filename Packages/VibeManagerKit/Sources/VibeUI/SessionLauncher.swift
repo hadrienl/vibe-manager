@@ -760,6 +760,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   }
 
   public func stopAll(gracePeriod: Duration = .seconds(3)) async {
+    // Asked for by the user — Quit and stop the agents, a relaunch to update: no session reads
+    // as stopped on an error while the agents end (#235).
+    for pane in panes.values { pane.markStoppingOnPurpose() }
     // Retired as well as cancelled, exactly as `detach` does: a watch already on its way to the
     // main actor would otherwise still write to the store and ask for a reload, during teardown.
     for (id, task) in exitTasks {

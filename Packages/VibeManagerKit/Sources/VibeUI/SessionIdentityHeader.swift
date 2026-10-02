@@ -51,10 +51,11 @@ struct SessionIdentityHeader: View {
           }
         }
         if let agent = session.agent {
-          Text([agent.providerID, agent.modelID].compactMap { $0 }.joined(separator: " · "))
+          Text(AgentNaming.label(agent, names: model.agentNames))
             .font(.callout)
             .foregroundStyle(.secondary)
             .lineLimit(1)
+            .help(Text(verbatim: agent.providerID))
         }
       }
       Spacer(minLength: 0)

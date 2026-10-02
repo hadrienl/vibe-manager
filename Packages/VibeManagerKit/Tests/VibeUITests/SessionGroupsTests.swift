@@ -78,7 +78,7 @@ struct SessionGroupStatusTests {
     #expect(label == "vibe-manager, 3 sessions, 1 needs attention, 1 working, Collapsed")
     #expect(
       Localization.string("\(1) need attention", module: "VibeUI", in: "fr") == "1 action requise")
-    #expect(Localization.string("\(2) working", module: "VibeUI", in: "fr") == "2 en cours")
+    #expect(Localization.string("\(2) working", module: "VibeUI", in: "fr") == "2 au travail")
   }
 }
 

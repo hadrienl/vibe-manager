@@ -162,3 +162,30 @@ func appModelWorksWithoutRegistry() async {
   #expect(model.state == .loaded([]))
   #expect(model.agentDiagnostics.isEmpty)
 }
+
+@MainActor
+@Test(
+  "An agent is named by its provider before its detection answers, and through it (#247)",
+  .timeLimit(.minutes(1))
+)
+func agentNamesComeBeforeDetection() async {
+  let slow = ProbeGate()
+  let model = AppModel(
+    repository: EmptyRepository(),
+    agents: StubAgentRegistry(providers: [
+      StubAgentProvider(id: "claude", state: .available, gate: slow)
+    ])
+  )
+
+  let refresh = Task { await model.refreshAgents() }
+  // The detection is held: what names the agent cannot come from it.
+  while model.agentNames.isEmpty {
+    try? await Task.sleep(for: .milliseconds(10))
+  }
+  #expect(model.agentDiagnostics.isEmpty)
+  #expect(model.agentNames == ["claude": "Claude"])
+
+  await slow.open()
+  await refresh.value
+  #expect(model.agentNames == ["claude": "Claude"])
+}
