@@ -23,6 +23,7 @@ struct ActivityPane: View {
           Label(notice, systemImage: "info.circle")
             .font(.caption)
             .foregroundStyle(.secondary)
+            .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
         }
         entries(current, resources: resources)
@@ -32,6 +33,7 @@ struct ActivityPane: View {
       }
       resourceSections(current)
     }
+    // A sidebar list keeps each text to one line: every text of the pane lifts it (#279).
     .listStyle(.sidebar)
     .focused($isListFocused)
     .onChange(of: journal.focusRequest) { takeFocus() }
@@ -95,6 +97,7 @@ struct ActivityPane: View {
         Text(date.formatted(date: .abbreviated, time: .omitted))
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
       case .entry(let entry):
@@ -116,6 +119,7 @@ struct ActivityPane: View {
         Text(sentence)
           .font(.caption)
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
         switch status {
         case .failed, .unavailable:
@@ -151,9 +155,11 @@ struct ActivityPane: View {
         Text("No ticket, request, branch or worktree yet.", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
       } header: {
         Text("Resources", bundle: .module, comment: "The heading of the resources a session used.")
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
@@ -167,6 +173,7 @@ struct ActivityPane: View {
           }
         } header: {
           Text(ActivityPresentation.groupTitle(kind))
+            .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
         }
       }
@@ -178,6 +185,7 @@ struct ActivityPane: View {
       )
       .font(.caption)
       .foregroundStyle(.tertiary)
+      .lineLimit(nil)
       .fixedSize(horizontal: false, vertical: true)
     }
   }
@@ -223,6 +231,7 @@ private struct EntryRow: View {
       Text(ActivityPresentation.attributedText(entry, resources: resources))
         .font(.callout)
         .foregroundStyle(entry.foldedCount == nil ? .primary : .secondary)
+        .lineLimit(nil)
         .fixedSize(horizontal: false, vertical: true)
     }
     .help(links.map(\.absoluteString).joined(separator: "\n"))
@@ -254,10 +263,12 @@ struct ResourceRow: View {
         .frame(width: 16)
       VStack(alignment: .leading, spacing: 1) {
         Text(verbatim: ActivityPresentation.breakable(resource.label))
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
         Text(verbatim: ActivityPresentation.breakable(ActivityPresentation.caption(resource)))
           .font(.caption)
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
