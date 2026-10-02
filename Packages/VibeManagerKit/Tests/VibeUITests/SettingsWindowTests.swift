@@ -92,6 +92,9 @@ struct SettingsWindowTests {
     #expect(sidebar.shown(.agent(AgentProviderID("gone"))) == .general)
     #expect(sidebar.shown(.templates) == .templates)
     #expect(sidebar.name(of: .templates) == String(localized: SettingsPage.templates.title))
+    let french = SettingsSidebarContent(model: model, permissions: nil, locale: Locale(identifier: "fr"))
+    #expect(french.name(of: .templates) == "Gabarits")
+    #expect(french.groups.first?.entries.first?.name == "Général")
   }
 
   @Test("The search finds a page by the settings it holds, in the window's language")

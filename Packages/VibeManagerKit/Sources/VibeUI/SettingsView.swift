@@ -60,6 +60,7 @@ struct SettingsSplitView: View {
   @Bindable var model: AppModel
   let permissions: PermissionsModel?
   @State private var query = ""
+  @Environment(\.locale) private var locale
 
   nonisolated static let sidebarWidth: CGFloat = 215
   nonisolated static let minimumHeight: CGFloat = 460
@@ -71,11 +72,12 @@ struct SettingsSplitView: View {
   }
 
   var body: some View {
-    let sidebar = SettingsSidebarContent(model: model, permissions: permissions)
+    let sidebar = SettingsSidebarContent(model: model, permissions: permissions, locale: locale)
     let page = sidebar.shown(model.settingsPage)
     NavigationSplitView(columnVisibility: .constant(.all)) {
       SettingsSidebar(model: model, content: sidebar, query: query)
-        .navigationSplitViewColumnWidth(Self.sidebarWidth)
+        .navigationSplitViewColumnWidth(
+          min: Self.sidebarWidth, ideal: Self.sidebarWidth, max: Self.sidebarWidth)
         .toolbar(removing: .sidebarToggle)
     } detail: {
       SettingsPageView(model: model, permissions: permissions, page: page)
@@ -127,12 +129,15 @@ struct SettingsSidebarContent {
   }
 
   let groups: [Group]
+  /// The language of the window, which names the pages.
+  let locale: Locale
 
-  init(model: AppModel, permissions: PermissionsModel?) {
+  init(model: AppModel, permissions: PermissionsModel?, locale: Locale = .current) {
+    self.locale = locale
     func entry(_ page: SettingsPage) -> Entry {
       Entry(
-        page: page, name: String(localized: page.title), symbolName: page.symbolName,
-        tint: page.tint)
+        page: page, name: SettingsPage.string(page.title, locale: locale),
+        symbolName: page.symbolName, tint: page.tint)
     }
     var groups = [
       Group(
@@ -170,9 +175,11 @@ struct SettingsSidebarContent {
           } + [
             Entry(
               page: page,
-              name: String(
-                localized: "Add an Endpoint…", bundle: .module,
-                comment: "The last line of the endpoints in the Settings window's sidebar."),
+              name: SettingsPage.string(
+                LocalizedStringResource(
+                  "Add an Endpoint…", bundle: .module,
+                  comment: "The last line of the endpoints in the Settings window's sidebar."),
+                locale: locale),
               symbolName: page.symbolName, tint: page.tint)
           ]))
     }
@@ -210,7 +217,7 @@ struct SettingsSidebarContent {
     {
       return entry.name
     }
-    return String(localized: page.title)
+    return SettingsPage.string(page.title, locale: locale)
   }
 
   /// The groups with only the entries that answer `query`; a group left empty is left out.
@@ -542,6 +549,8 @@ struct SettingsWindowSizer: NSViewRepresentable {
   final class SizerView: NSView {
     /// The width the window had before a page widened it, given back when the page is left.
     private var restoredWidth: CGFloat?
+    /// The width this view gave the window last. Another width is the user's, which is kept.
+    private var givenWidth: CGFloat?
 
     var neededWidth: CGFloat = 0 {
       didSet {
@@ -556,12 +565,18 @@ struct SettingsWindowSizer: NSViewRepresentable {
     }
 
     private func resize(animated: Bool) {
-      guard let window, neededWidth > 0, !window.styleMask.contains(.fullScreen),
+      guard let window, neededWidth > 0, !window.styleMask.contains(.fullScreen) else { return }
+      // Resized by hand since: the user's width is the one to come back to no more.
+      if let givenWidth, abs(window.frame.width - givenWidth) > 0.5 { restoredWidth = nil }
+      let screen = window.screen?.visibleFrame
+      // Never narrower than the page shown: a page squeezed below its width is cut (#152).
+      window.minSize.width = min(neededWidth, screen?.width ?? neededWidth)
+      guard
         let plan = SettingsWindowWidth.plan(
-          frame: window.frame, needed: neededWidth, restoredWidth: restoredWidth,
-          screen: window.screen?.visibleFrame)
+          frame: window.frame, needed: neededWidth, restoredWidth: restoredWidth, screen: screen)
       else { return }
       restoredWidth = plan.restoredWidth
+      givenWidth = plan.frame.width
       if animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
         NSAnimationContext.runAnimationGroup { context in
           context.duration = 0.25

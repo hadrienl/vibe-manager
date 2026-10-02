@@ -194,7 +194,7 @@ struct EndpointsSettingsView: View {
             bundle: .module, comment: "The name of a model server, such as Ollama.")
         }
       } else {
-        Picker(selection: binding.wireProtocol) {
+        Picker(selection: wireProtocol(binding)) {
           ForEach(EndpointWireKind.allCases, id: \.self) { wire in
             Text(Self.protocolName(wire)).tag(wire)
           }
@@ -587,7 +587,8 @@ struct EndpointsSettingsView: View {
           } label: {
             Text("Add", bundle: .module)
           }
-          .keyboardShortcut(.defaultAction)
+          // Not Return: it ends what is typed in a field, such as a model's identifier.
+          .keyboardShortcut("s", modifiers: .command)
           .disabled(!Self.savable(issues) || hasDocumentProblem(binding.wrappedValue))
         } else {
           Button {
@@ -700,14 +701,17 @@ struct EndpointsSettingsView: View {
     }
   }
 
+  /// Duplicates the endpoint as it is saved: what is being edited stays with it.
   private func duplicate() {
-    guard let source = draft else { return }
+    guard let source = model.endpoints.first(where: { $0.id == endpointID }) ?? draft else {
+      return
+    }
     var copy = source
     copy.id = EndpointID()
     copy.lastTest = nil
     copy.name = Self.uniqueName(source.name, among: model.endpoints.map(\.name))
     Task {
-      await saveDraft(copy)
+      guard await model.save(model.endpoints + [copy]) else { return }
       show(.endpoint(copy.id))
     }
   }
@@ -764,6 +768,26 @@ struct EndpointsSettingsView: View {
       draft?.lastTest = EndpointTestOutcome(
         verdict: result.verdict, date: result.date, model: result.model)
     }
+  }
+
+  /// The protocol, and with it the kind of key a new server most likely takes: Anthropic's
+  /// Messages sends it in `x-api-key`, the others as a bearer token.
+  private func wireProtocol(_ binding: Binding<Endpoint>) -> Binding<EndpointWireKind> {
+    Binding(
+      get: { binding.wrappedValue.wireProtocol },
+      set: { wire in
+        binding.wrappedValue.wireProtocol = wire
+        guard isNew else { return }
+        switch (wire, binding.wrappedValue.authentication) {
+        case (.messages, .bearer):
+          binding.wrappedValue.authentication = .header(name: "x-api-key")
+        case (.chatCompletions, .header(name: "x-api-key")),
+          (.responses, .header(name: "x-api-key")):
+          binding.wrappedValue.authentication = .bearer
+        default:
+          break
+        }
+      })
   }
 
   // MARK: - Authentication

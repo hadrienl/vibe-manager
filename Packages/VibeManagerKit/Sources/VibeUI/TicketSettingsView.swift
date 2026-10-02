@@ -46,6 +46,7 @@ struct TicketSettingsView: View {
         .padding(16)
       }
     }
+    .onDisappear { saveIfKept() }
     .task {
       await model.load()
       formatText = model.lineFormat.template
@@ -373,12 +374,16 @@ struct TicketSettingsView: View {
   }
 
   private func select(_ id: UUID?) {
-    // A change that can be kept is kept: the list is not a place where edits are lost.
+    saveIfKept()
+    selectedID = id
+    draft = id.flatMap { id in model.resolvers.first { $0.id == id } }
+  }
+
+  /// A change that can be kept is kept: neither the list nor leaving the page loses an edit.
+  private func saveIfKept() {
     if isDirty, let draft, draft.validate().isEmpty {
       Task { await saveDraft(draft) }
     }
-    selectedID = id
-    draft = id.flatMap { id in model.resolvers.first { $0.id == id } }
   }
 
   private func saveDraft(_ resolver: TicketResolver? = nil) async {
