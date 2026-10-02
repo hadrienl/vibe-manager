@@ -260,7 +260,7 @@ struct SessionIdentityTests {
     #expect(model.themeEditing == nil)
     #expect(model.displayedConversationTheme(of: session) == nil)
     #expect(await workspace.repository.session(id: session.id)?.conversationTheme == nil)
-    #expect(!model.canUndoIdentityChange)
+    #expect(!model.canUndoSidebarChange)
   }
 
   @Test("Closing the theme popover keeps the theme chosen, as one change for ⌘Z")
@@ -279,12 +279,12 @@ struct SessionIdentityTests {
     await waitUntil("the theme is written") {
       await workspace.repository.session(id: id)?.conversationTheme == "night"
     }
-    await waitUntil("the change can be undone") { model.canUndoIdentityChange }
+    await waitUntil("the change can be undone") { model.canUndoSidebarChange }
     #expect(await workspace.repository.session(id: id)?.updatedAt == updatedAt)
 
-    await model.undoIdentityChange()
+    await model.undoSidebarChange()
     #expect(await workspace.repository.session(id: id)?.conversationTheme == nil)
-    #expect(!model.canUndoIdentityChange)
+    #expect(!model.canUndoSidebarChange)
   }
 
   @Test("Revert to Default Icon gives what a creation would: the folder's icon, kept on disk")
