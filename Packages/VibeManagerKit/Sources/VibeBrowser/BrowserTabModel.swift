@@ -157,6 +157,11 @@ public final class BrowserTabModel: NSObject, Identifiable {
     webView != nil
   }
 
+  /// The page of a new tab, before anything is typed in its address bar.
+  public static let blankPage = URL(string: "about:blank")!
+
+  public var isBlank: Bool { url == Self.blankPage }
+
   /// What the tab strip shows: the title once there is one, else the host.
   public var displayTitle: String {
     if !title.isEmpty { return title }

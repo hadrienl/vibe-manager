@@ -167,7 +167,7 @@ private struct BrowserTabButton: View {
         Text(verbatim: browser.ticket?.label ?? tab.displayTitle)
           .lineLimit(1)
       } else {
-        Text(verbatim: tab.displayTitle)
+        title
           .lineLimit(1)
           .truncationMode(.tail)
           .frame(maxWidth: 150, alignment: .leading)
@@ -226,8 +226,13 @@ private struct BrowserTabButton: View {
     }
   }
 
+  /// An empty tab is a New Tab, never `about:blank`.
+  private var title: Text {
+    tab.isBlank && tab.title.isEmpty
+      ? Text("New Tab", bundle: .module) : Text(verbatim: tab.displayTitle)
+  }
+
   private var accessibilityLabel: Text {
-    let title = Text(verbatim: tab.displayTitle)
     if tab.isPinnedTicket {
       return Text("Ticket tab, \(browser.ticket?.label ?? tab.displayTitle)", bundle: .module)
     }
@@ -330,7 +335,7 @@ private struct BrowserAddressBar: View {
           isFocused = false
         }
         .onExitCommand {
-          text = tab?.url.absoluteString ?? ""
+          text = address
           isFocused = false
         }
       }
@@ -377,22 +382,20 @@ private struct BrowserAddressBar: View {
         .frame(height: 2)
       }
     }
-    .onAppear { text = tab?.url.absoluteString ?? "" }
-    .onChange(of: tab?.url) { _, url in
-      if !isFocused { text = url?.absoluteString ?? "" }
+    .onAppear { text = address }
+    .onChange(of: tab?.url) { _, _ in
+      if !isFocused { text = address }
     }
     .onChange(of: tab?.id) { _, _ in
-      text = tab?.url.absoluteString ?? ""
+      text = address
     }
     .onChange(of: model.addressBarFocusRequest) { _, _ in
-      // A new tab starts from an empty field; Open Location edits the page's address.
-      if model.opensNewWebTab { text = "" }
       isFocused = true
     }
     .onChange(of: isFocused) { _, focused in
       model.isAddressBarFocused = focused
-      // Left empty — a new tab's field, Return on it — or half typed: it shows the page again.
-      if !focused { text = tab?.url.absoluteString ?? "" }
+      // Left half typed: it shows the page again.
+      if !focused { text = address }
     }
     .onDisappear { model.isAddressBarFocused = false }
     .alert(Text("Ticket", bundle: .module), isPresented: $isEditingTicket) {
@@ -416,6 +419,12 @@ private struct BrowserAddressBar: View {
         "The ticket's page stays pinned first among this session's tabs. Leave the field empty to remove it.",
         bundle: .module)
     }
+  }
+
+  /// A new tab's field stays empty rather than show `about:blank`.
+  private var address: String {
+    guard let tab, !tab.isBlank else { return "" }
+    return tab.url.absoluteString
   }
 
   @ViewBuilder

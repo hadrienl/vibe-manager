@@ -172,6 +172,13 @@ struct CloseCommandRoutingTests {
       isARepeat: false, keyCode: 13)!
   }
 
+  private func commandT() -> NSEvent {
+    NSEvent.keyEvent(
+      with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+      windowNumber: 0, context: nil, characters: "t", charactersIgnoringModifiers: "t",
+      isARepeat: false, keyCode: 17)!
+  }
+
   @Test(
     "With the keyboard in the page or its address bar, ⌘W closes the tab, then the next one",
     arguments: [1600, 800] as [CGFloat], [false, true])
@@ -207,7 +214,7 @@ struct CloseCommandRoutingTests {
     #expect(model.sessions.first?.status == .active, "\(workspace.state)")
   }
 
-  @Test("New Tab opens what is typed beside the page in front; ⌘L still sends that page away")
+  @Test("New Tab opens an empty tab beside the page in front; ⌘L still sends that page away")
   func newTabOpensBeside() async throws {
     let workspace = try await workspace()
     defer { workspace.close() }
@@ -215,31 +222,27 @@ struct CloseCommandRoutingTests {
     let front = try #require(model.activeWebTab)
     let address = front.url
 
-    // The “+” of the tab bar, the Web menu's New Tab and ⌘T in the web view (#247).
+    // The “+” of the tab bar, the Web menu's New Tab and ⌘T in the web view (#247): a tab shows at
+    // once, empty, its address bar holding the keyboard.
     model.newWebTab()
-    try await waitUntil("the address bar holding the keyboard", in: workspace) {
-      model.isAddressBarFocused
+    try await waitUntil("an empty tab, its field holding the keyboard", in: workspace) {
+      workspace.tabs.count == 4 && model.isAddressBarFocused
+        && workspace.addressField?.stringValue == ""
     }
-    model.navigateWebTab(to: "about:blank")
-    try await waitUntil("a fourth tab", in: workspace) { workspace.tabs.count == 4 }
-    #expect(front.url == address, "\(workspace.state)")
+    let blank = try #require(model.activeWebTab)
+    #expect(blank.isBlank, "\(workspace.state)")
 
-    // Return on the empty field of another new tab opens nothing.
-    model.newWebTab()
-    try await waitUntil("the empty field of a new tab", in: workspace) {
-      model.isAddressBarFocused && workspace.addressField?.stringValue == ""
-    }
+    // Return on the empty field opens nothing more.
     model.navigateWebTab(to: "")
     #expect(workspace.tabs.count == 4, "\(workspace.state)")
-    #expect(model.opensNewWebTab, "what is typed next still opens a tab of its own")
 
-    // Leaving the empty field gives the page's address back to the address bar.
-    let page = try #require(workspace.page)
-    workspace.window.makeFirstResponder(page)
-    let shown = try #require(model.activeWebTab).url.absoluteString
-    try await waitUntil("the page's address back in the field", in: workspace) {
-      !model.isAddressBarFocused && workspace.addressField?.stringValue == shown
+    // What is typed goes to the new tab; the page that was in front stays where it was.
+    model.navigateWebTab(to: "about:blank#typed")
+    try await waitUntil("the new tab sent to what was typed", in: workspace) {
+      blank.url.absoluteString == "about:blank#typed"
     }
+    #expect(workspace.tabs.count == 4, "\(workspace.state)")
+    #expect(front.url == address, "\(workspace.state)")
 
     // Open Location, ⌘L, is unchanged: what is typed replaces the page in front, in place.
     model.focusAddressBar()
@@ -251,6 +254,29 @@ struct CloseCommandRoutingTests {
       model.activeWebTab?.url.absoluteString == "about:blank#located"
     }
     #expect(workspace.tabs.count == 4, "\(workspace.state)")
+  }
+
+  @Test("⌘T in the page opens an empty tab whose address bar, not its page, takes the keyboard")
+  func commandTInPageOpensEmptyTab() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let model = workspace.model
+    let page = try #require(workspace.page)
+    #expect(workspace.window.makeFirstResponder(page), "\(workspace.state)")
+    try await waitUntil("the page holding the keyboard", in: workspace) { model.isWebPageFocused }
+
+    #expect(workspace.window.performKeyEquivalent(with: commandT()), "\(workspace.state)")
+    try await waitUntil("an empty tab, its field holding the keyboard", in: workspace) {
+      workspace.tabs.count == 4 && model.activeWebTab?.isBlank == true
+        && model.isAddressBarFocused && workspace.addressField?.stringValue == ""
+    }
+    // Still there once the new page is on screen and no longer owed the keyboard the old one had:
+    // it did not take it back.
+    try await waitUntil("the new page on screen, owed nothing", in: workspace) {
+      workspace.page.map { $0 !== page } == true
+        && model.browser?.pageLeftWithKeyboard == false
+    }
+    #expect(model.isAddressBarFocused, "\(workspace.state)")
   }
 
   @Test("Another tab brought forward takes the keyboard the page had")
