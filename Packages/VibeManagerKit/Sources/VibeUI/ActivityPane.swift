@@ -23,6 +23,7 @@ struct ActivityPane: View {
           Label(notice, systemImage: "info.circle")
             .font(.caption)
             .foregroundStyle(.secondary)
+            .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
         }
         entries(current, resources: resources)
@@ -32,6 +33,7 @@ struct ActivityPane: View {
       }
       resourceSections(current)
     }
+    // A sidebar list keeps each text to one line: every text of the pane lifts it (#279).
     .listStyle(.sidebar)
     .focused($isListFocused)
     .onChange(of: journal.focusRequest) { takeFocus() }
@@ -95,6 +97,8 @@ struct ActivityPane: View {
         Text(date.formatted(date: .abbreviated, time: .omitted))
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
       case .entry(let entry):
         EntryRow(entry: entry, resources: resources) { journal.openLink($0, from: session.id) }
@@ -115,6 +119,7 @@ struct ActivityPane: View {
         Text(sentence)
           .font(.caption)
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
           .fixedSize(horizontal: false, vertical: true)
         switch status {
         case .failed, .unavailable:
@@ -150,8 +155,12 @@ struct ActivityPane: View {
         Text("No ticket, request, branch or worktree yet.", bundle: .module)
           .font(.caption)
           .foregroundStyle(.secondary)
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
       } header: {
         Text("Resources", bundle: .module, comment: "The heading of the resources a session used.")
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
       }
     }
     ForEach(ActivityPresentation.groups, id: \.self) { kind in
@@ -164,6 +173,8 @@ struct ActivityPane: View {
           }
         } header: {
           Text(ActivityPresentation.groupTitle(kind))
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
     }
@@ -174,6 +185,8 @@ struct ActivityPane: View {
       )
       .font(.caption)
       .foregroundStyle(.tertiary)
+      .lineLimit(nil)
+      .fixedSize(horizontal: false, vertical: true)
     }
   }
 
@@ -218,6 +231,7 @@ private struct EntryRow: View {
       Text(ActivityPresentation.attributedText(entry, resources: resources))
         .font(.callout)
         .foregroundStyle(entry.foldedCount == nil ? .primary : .secondary)
+        .lineLimit(nil)
         .fixedSize(horizontal: false, vertical: true)
     }
     .help(links.map(\.absoluteString).joined(separator: "\n"))
@@ -238,44 +252,31 @@ private struct EntryRow: View {
 }
 
 /// A resource: its kind, its short name, where it belongs, and what the session did with it — in
-/// words, never by a colour alone.
-private struct ResourceRow: View {
+/// words, never by a colour alone. Every word of it is shown, on as many lines as it takes (#279).
+struct ResourceRow: View {
   let resource: SessionResource
 
   var body: some View {
-    HStack(spacing: 6) {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
       Image(systemName: ActivityPresentation.symbol(resource.kind))
         .foregroundStyle(.secondary)
         .frame(width: 16)
       VStack(alignment: .leading, spacing: 1) {
-        Text(verbatim: resource.label)
-          .lineLimit(1)
-          .truncationMode(.middle)
-        if let context = resource.context {
-          Text(verbatim: context)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-        }
+        Text(verbatim: ActivityPresentation.breakable(resource.label))
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
+        Text(verbatim: ActivityPresentation.breakable(ActivityPresentation.caption(resource)))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      Spacer(minLength: 4)
-      Text(verbatim: ActivityPresentation.involvement(resource))
-        .font(.caption)
-        .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .help(help)
+    .help(ActivityPresentation.help(resource))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(verbatim: ActivityPresentation.spokenLabel(resource)))
     .accessibilityAddTraits(.isButton)
-  }
-
-  private var help: String {
-    switch resource.target {
-    case .web(let url): return url.absoluteString
-    case .branch(let path, let url): return url?.absoluteString ?? path
-    case .folder(let path): return path
-    }
   }
 }
 

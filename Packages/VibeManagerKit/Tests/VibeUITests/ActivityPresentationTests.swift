@@ -72,4 +72,57 @@ struct ActivityPresentationTests {
     #expect(ActivityPresentation.reference(resource) == "hadrienl/vibe-manager#62")
     #expect(ActivityPresentation.copyText(resource) == url.absoluteString)
   }
+
+  @Test("A long name may go to the line after its separators, and only where it is shown")
+  func breakable() {
+    let shown = ActivityPresentation.breakable("feat/279-a_b.c")
+    #expect(shown == "feat/\u{200B}279-\u{200B}a_\u{200B}b.\u{200B}c")
+    #expect(shown.replacingOccurrences(of: "\u{200B}", with: "") == "feat/279-a_b.c")
+    #expect(ActivityPresentation.breakable("#36") == "#36")
+    #expect(ActivityPresentation.breakable("v1.") == "v1.")
+  }
+
+  @Test("Under the name: where it belongs, then what was done with it")
+  func caption() {
+    #expect(ActivityPresentation.caption(branch(webURL: nil)) == "vibe-manager · created")
+    let worktree = SessionResource(
+      key: "worktree:/w/agent-3", kind: .worktree, label: "agent-3", context: nil,
+      target: .folder("/w/agent-3"), involvement: .created, firstSeenAt: Date())
+    #expect(ActivityPresentation.caption(worktree) == "created")
+  }
+
+  @Test("The help gives the whole name, where it belongs, then where it leads")
+  func help() throws {
+    let url = try #require(URL(string: "https://github.com/hadrienl/vibe-manager/tree/feat/x"))
+    #expect(
+      ActivityPresentation.help(branch(webURL: url))
+        == "\(longBranch)\nvibe-manager\n\(url.absoluteString)")
+    #expect(
+      ActivityPresentation.help(branch(webURL: nil))
+        == "\(longBranch)\nvibe-manager\n/r/vibe-manager")
+    let folder = SessionResource(
+      key: "worktree:/w/agent-3", kind: .worktree, label: "agent-3", context: nil,
+      target: .folder("/w/agent-3"), involvement: .created, firstSeenAt: Date())
+    #expect(ActivityPresentation.help(folder) == "agent-3\n/w/agent-3")
+  }
+
+  @Test("Folded, the header's help gives its summary in full before what a click does")
+  func headerHelp() {
+    let folded = InspectorSectionHeader.help(isCollapsed: true, summary: "12 resources")
+    #expect(folded.hasPrefix("12 resources\n"))
+    #expect(
+      InspectorSectionHeader.help(isCollapsed: true, summary: nil)
+        == folded.replacingOccurrences(of: "12 resources\n", with: ""))
+    #expect(
+      !InspectorSectionHeader.help(isCollapsed: false, summary: "12 resources").contains("12"))
+  }
+
+  private let longBranch = "feat/279-activite-sans-troncature-des-ressources-longues"
+
+  private func branch(webURL: URL?) -> SessionResource {
+    SessionResource(
+      key: "branch:/r/vibe-manager:\(longBranch)", kind: .branch, label: longBranch,
+      context: "vibe-manager", target: .branch(repositoryPath: "/r/vibe-manager", webURL: webURL),
+      involvement: .created, firstSeenAt: Date())
+  }
 }

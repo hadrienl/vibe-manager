@@ -30,6 +30,9 @@ struct InspectorSectionDescriptor: Identifiable {
   let sizing: Sizing
   /// Shown beside the title once folded: what the section holds, in a few words.
   var summary: AnyView?
+  /// The summary in words, for the header's help: folded, it keeps to one line (#279). Read by
+  /// the header alone, so that what it observes never redraws the whole column.
+  var summaryText: (@MainActor () -> String?)?
   /// On the right of the header, folded or not: Switch…, Read Again…
   var accessory: AnyView?
   let content: AnyView
@@ -323,6 +326,18 @@ struct InspectorSectionHeader: View {
   let dragEnded: (CGPoint) -> Void
   let space: String
 
+  /// What folding does, after the summary in full when the section is folded: its line may be
+  /// cut short (#279).
+  static func help(isCollapsed: Bool, summary: String?) -> String {
+    guard isCollapsed else {
+      return String(localized: "Hide this section. Option-click hides them all.", bundle: .module)
+    }
+    let action = String(
+      localized: "Show this section. Option-click shows them all.", bundle: .module)
+    guard let summary, !summary.isEmpty else { return action }
+    return summary + "\n" + action
+  }
+
   /// A drag ends with the button released under the pointer: that release is not a click.
   @State private var isDragging = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -361,9 +376,7 @@ struct InspectorSectionHeader: View {
       }
       .buttonStyle(.plain)
       .help(
-        isCollapsed
-          ? Text("Show this section. Option-click shows them all.", bundle: .module)
-          : Text("Hide this section. Option-click hides them all.", bundle: .module)
+        Self.help(isCollapsed: isCollapsed, summary: isCollapsed ? section.summaryText?() : nil)
       )
       .accessibilityLabel(Text(section.title))
       .accessibilityValue(
