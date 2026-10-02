@@ -10358,7 +10358,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Facultatif — le thème de conversation des sessions créées avec ce modèle."
+            "value" : "Facultatif — le thème de conversation des sessions créées avec ce gabarit."
           }
         }
       }
