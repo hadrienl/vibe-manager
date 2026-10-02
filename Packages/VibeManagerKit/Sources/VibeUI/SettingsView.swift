@@ -54,13 +54,17 @@ public struct SettingsView: View {
   }
 }
 
-/// The sidebar and the page, with the search of the sidebar and the way back from a page reached
-/// from another.
+/// The sidebar and the page, with the way back from a page reached from another.
 struct SettingsSplitView: View {
   @Bindable var model: AppModel
   let permissions: PermissionsModel?
-  @State private var query = ""
+  /// The page on screen. It follows the model's, through a slide when one page is reached from
+  /// the other, as System Settings does.
+  @State private var shown: SettingsPage?
+  /// Where the page coming in slides from: the trailing edge going in, the leading edge back.
+  @State private var arrival: Edge = .trailing
   @Environment(\.locale) private var locale
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   nonisolated static let sidebarWidth: CGFloat = 215
   nonisolated static let minimumHeight: CGFloat = 460
@@ -73,39 +77,71 @@ struct SettingsSplitView: View {
 
   var body: some View {
     let sidebar = SettingsSidebarContent(model: model, permissions: permissions, locale: locale)
-    let page = sidebar.shown(model.settingsPage)
+    let target = sidebar.shown(model.settingsPage)
+    let page = shown.map(sidebar.shown) ?? target
     NavigationSplitView(columnVisibility: .constant(.all)) {
-      SettingsSidebar(model: model, content: sidebar, query: query)
+      SettingsSidebar(model: model, content: sidebar)
         .toolbar(removing: .sidebarToggle)
         // Both: the column's width alone is not kept by the split view of the settings window,
         // which gave the sidebar 144 points and cut the names of its pages.
         .frame(width: Self.sidebarWidth)
         .navigationSplitViewColumnWidth(Self.sidebarWidth)
     } detail: {
-      SettingsPageView(model: model, permissions: permissions, page: page)
-        // Squeezed for the time the window takes to widen, rather than widening it at once.
-        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .clipped()
-        .navigationTitle(Text(sidebar.name(of: page)))
-        .toolbar {
-          if let parent = page.parent {
-            ToolbarItem(placement: .navigation) {
-              Button {
-                model.settingsPage = parent
-              } label: {
-                Image(systemName: "chevron.left")
-              }
-              .help(Text("Back", bundle: .module))
-              .accessibilityLabel(Text("Back", bundle: .module))
-            }
-          }
+      GeometryReader { proxy in
+        ZStack(alignment: .topLeading) {
+          SettingsPageView(model: model, permissions: permissions, page: page)
+            // Laid out at its own width at once: the window widening uncovers it, rather than
+            // squeezing it the time it takes. Its least size stays out of the window's.
+            .frame(
+              width: max(proxy.size.width, page.detailWidth), height: proxy.size.height,
+              alignment: .topLeading)
+            .id(page)
+            .transition(.push(from: arrival))
         }
+        .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+        .clipped()
+      }
+      .navigationTitle(Text(sidebar.name(of: page)))
+      .toolbar {
+        // Always there, as in System Settings: the toolbar keeps its height from page to page.
+        ToolbarItem(placement: .navigation) {
+          Button {
+            if let parent = page.parent { model.settingsPage = parent }
+          } label: {
+            Image(systemName: "chevron.left")
+          }
+          .disabled(page.parent == nil)
+          .help(Text("Back", bundle: .module))
+          .accessibilityLabel(Text("Back", bundle: .module))
+        }
+      }
     }
-    .searchable(text: $query, placement: .sidebar, prompt: Text("Search", bundle: .module))
+    .onChange(of: target) { old, new in
+      let isGoingIn = new.parent == old
+      guard isGoingIn || old.parent == new, !reduceMotion else {
+        shown = new
+        return
+      }
+      arrival = isGoingIn ? .trailing : .leading
+      withAnimation(.smooth(duration: 0.3)) { shown = new }
+    }
+    .modifier(SettingsToolbarVeil())
     .frame(
       minWidth: Self.standardWidth, idealWidth: Self.standardWidth,
       minHeight: Self.minimumHeight, idealHeight: Self.idealHeight)
-    .background(SettingsWindowSizer(width: Self.sidebarWidth + page.detailWidth))
+    .background(SettingsWindowSizer(width: Self.sidebarWidth + target.detailWidth))
+  }
+}
+
+/// What scrolls under the toolbar is veiled the whole height of it: with the soft edge of
+/// macOS 26, the words of a form stayed legible under the title.
+private struct SettingsToolbarVeil: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content.scrollEdgeEffectStyle(.hard, for: .top)
+    } else {
+      content
+    }
   }
 }
 
@@ -214,35 +250,23 @@ struct SettingsSidebarContent {
 
   /// The name of `page` in the window's title: the agent's or endpoint's for theirs.
   func name(of page: SettingsPage) -> String {
-    if page.parent == nil,
+    // The new endpoint's line says what it does, "Add an Endpoint…"; its page is named.
+    if page.parent == nil, page != .newEndpoint,
       let entry = groups.lazy.flatMap(\.entries).first(where: { $0.page == page })
     {
       return entry.name
     }
     return SettingsPage.string(page.title, locale: locale)
   }
-
-  /// The groups with only the entries that answer `query`; a group left empty is left out.
-  func filtered(by query: String, locale: Locale) -> [Group] {
-    groups.compactMap { group in
-      var group = group
-      group.entries = group.entries.filter {
-        $0.page.matches(query, name: $0.name, locale: locale)
-      }
-      return group.entries.isEmpty ? nil : group
-    }
-  }
 }
 
-/// The list of the pages, grouped, filtered by the search.
+/// The list of the pages, grouped.
 private struct SettingsSidebar: View {
   @Bindable var model: AppModel
   let content: SettingsSidebarContent
-  let query: String
-  @Environment(\.locale) private var locale
 
   var body: some View {
-    let groups = content.filtered(by: query, locale: locale)
+    let groups = content.groups
     List(
       selection: Binding(
         get: { Optional(model.settingsPage.sidebarPage) },
@@ -252,7 +276,7 @@ private struct SettingsSidebar: View {
     ) {
       ForEach(groups) { group in
         Section {
-          if group.id == "endpoints", query.isEmpty {
+          if group.id == "endpoints" {
             ForEach(group.entries.filter { $0.page != .newEndpoint }) { entry in
               row(entry)
             }
@@ -278,11 +302,6 @@ private struct SettingsSidebar: View {
       }
     }
     .listStyle(.sidebar)
-    .overlay {
-      if groups.isEmpty {
-        ContentUnavailableView.search(text: query)
-      }
-    }
     // The endpoints are read from their file the first time the window shows them.
     .task { await model.endpoints?.load() }
   }
@@ -571,23 +590,22 @@ struct SettingsWindowSizer: NSViewRepresentable {
       // Resized by hand since: the user's width is the one to come back to no more.
       if let givenWidth, abs(window.frame.width - givenWidth) > 0.5 { restoredWidth = nil }
       let screen = window.screen?.visibleFrame
-      // Never narrower than the page shown: a page squeezed below its width is cut (#152).
-      window.minSize.width = min(neededWidth, screen?.width ?? neededWidth)
+      // Never narrower than the page shown: a page squeezed below its width is cut (#152). The
+      // content's least size, which the least height SwiftUI gave stays part of.
+      window.contentMinSize = NSSize(
+        width: min(neededWidth, screen?.width ?? neededWidth),
+        height: max(window.contentMinSize.height, SettingsSplitView.minimumHeight))
       guard
         let plan = SettingsWindowWidth.plan(
           frame: window.frame, needed: neededWidth, restoredWidth: restoredWidth, screen: screen)
       else { return }
       restoredWidth = plan.restoredWidth
       givenWidth = plan.frame.width
-      if animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-        NSAnimationContext.runAnimationGroup { context in
-          context.duration = 0.25
-          context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-          window.animator().setFrame(plan.frame, display: true)
-        }
-      } else {
-        window.setFrame(plan.frame, display: true)
-      }
+      // AppKit's own resizing, as the tabs of a preferences window had: SwiftUI, which sizes
+      // the settings window too, let the animator's frame go.
+      window.setFrame(
+        plan.frame, display: true,
+        animate: animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     }
   }
 }

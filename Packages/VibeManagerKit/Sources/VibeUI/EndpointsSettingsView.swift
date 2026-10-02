@@ -41,23 +41,24 @@ struct EndpointsSettingsView: View {
   private var isNew: Bool { endpointID == nil }
 
   var body: some View {
-    VStack(spacing: 0) {
-      Form {
-        if let error = model.storeError {
-          storeProblem(error)
-        }
-        if isNew {
-          starts
-        }
-        editor
+    Form {
+      if let error = model.storeError {
+        storeProblem(error)
       }
-      .formStyle(.grouped)
+      if isNew {
+        starts
+      }
+      editor
+      // In the form, at its end: under it, the buttons left the window when it was short.
       if let draft {
-        footer(
-          Binding(get: { self.draft ?? draft }, set: { self.draft = $0 }),
-          issues: (self.draft ?? draft).validationIssues)
+        Section {
+          footer(
+            Binding(get: { self.draft ?? draft }, set: { self.draft = $0 }),
+            issues: (self.draft ?? draft).validationIssues)
+        }
       }
     }
+    .formStyle(.grouped)
     .task {
       await model.load()
       if !isNew, draft == nil {
@@ -617,8 +618,6 @@ struct EndpointsSettingsView: View {
         }
       }
     }
-    .padding(.horizontal, 20)
-    .padding(.vertical, 10)
   }
 
   /// A custom endpoint whose document does not read would fail at its first session.

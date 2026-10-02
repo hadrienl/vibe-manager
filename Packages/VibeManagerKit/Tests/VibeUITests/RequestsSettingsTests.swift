@@ -152,6 +152,27 @@ struct RequestsSettingsTests {
     #expect(sidebar.first.map { $0 >= SettingsSplitView.sidebarWidth - 1 } == true, "\(sidebar)")
   }
 
+  @Test("The window widens for the avatars, and comes back for the alerts")
+  func windowWidens() async {
+    let model = await workspace()
+    let host = NSHostingController(rootView: SettingsView(model: model))
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: SettingsSplitView.standardWidth, height: 700),
+      styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentViewController = host
+    window.setContentSize(NSSize(width: SettingsSplitView.standardWidth, height: 700))
+    defer { window.close() }
+    await settle(window, "the alerts") { Self.switches(in: host.view).count == 4 }
+    model.settingsPage = .avatars
+    let wide = SettingsSplitView.sidebarWidth + SettingsPage.avatars.detailWidth
+    await settle(window, "the window widened") { window.frame.width >= wide - 0.5 }
+    model.settingsPage = .requests
+    await settle(window, "the window back") {
+      abs(window.frame.width - SettingsSplitView.standardWidth) < 0.5
+    }
+  }
+
   @Test("Manage Avatars… turns to the page of the avatars")
   func manageAvatars() async {
     let model = await workspace()

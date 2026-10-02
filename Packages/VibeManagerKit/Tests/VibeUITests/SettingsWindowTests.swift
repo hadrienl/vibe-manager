@@ -97,23 +97,6 @@ struct SettingsWindowTests {
     #expect(french.groups.first?.entries.first?.name == "Général")
   }
 
-  @Test("The search finds a page by the settings it holds, in the window's language")
-  func search() {
-    let model = Self.workspace()
-    let sidebar = SettingsSidebarContent(model: model, permissions: nil)
-    let french = Locale(identifier: "fr")
-    let found = sidebar.filtered(by: "historique", locale: french).flatMap(\.entries).map(\.page)
-    #expect(found == [.general])
-    // Accents and case are ignored.
-    #expect(
-      sidebar.filtered(by: "GENERAL", locale: french).flatMap(\.entries).map(\.page) == [.general])
-    #expect(
-      sidebar.filtered(by: "dock", locale: Locale(identifier: "en")).flatMap(\.entries)
-        .map(\.page) == [.requests])
-    #expect(sidebar.filtered(by: "zzzz", locale: french).isEmpty)
-    #expect(sidebar.filtered(by: " ", locale: french).count == sidebar.groups.count)
-  }
-
   /// What each page needs at least fits the width the window gives it: below it, the window
   /// would cut it, as the toolbar of tabs did (#129, #152).
   @Test(

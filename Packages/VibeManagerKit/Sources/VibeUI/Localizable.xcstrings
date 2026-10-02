@@ -5643,16 +5643,6 @@
         }
       }
     },
-    "Code font" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Police du code"
-          }
-        }
-      }
-    },
     "Collapse" : {
       "comment" : "Folds a group of the sidebar.\nHides a section of the inspector.",
       "localizations" : {
@@ -8475,16 +8465,6 @@
         }
       }
     },
-    "Line numbers in diffs" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Numéros de ligne dans les diffs"
-          }
-        }
-      }
-    },
     "Loading notes" : {
       "localizations" : {
         "fr" : {
@@ -8584,16 +8564,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Merge request %@"
-          }
-        }
-      }
-    },
-    "Message font" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Police des messages"
           }
         }
       }
@@ -12045,16 +12015,6 @@
         }
       }
     },
-    "Search" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rechercher"
-          }
-        }
-      }
-    },
     "Search sessions" : {
       "localizations" : {
         "fr" : {
@@ -12630,16 +12590,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher dans le Finder"
-          }
-        }
-      }
-    },
-    "Show reasoning rows" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher les rangées de raisonnement"
           }
         }
       }
@@ -13393,16 +13343,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tester avec une adresse"
-          }
-        }
-      }
-    },
-    "Text size" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taille du texte"
           }
         }
       }
@@ -15054,16 +14994,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les agents démarrent l’un après l’autre, ce qui peut prendre plusieurs minutes et ralentir ce Mac."
-          }
-        }
-      }
-    },
-    "Theme" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thème"
           }
         }
       }
