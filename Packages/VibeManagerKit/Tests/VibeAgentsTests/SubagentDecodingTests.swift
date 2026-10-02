@@ -125,6 +125,13 @@ struct ClaudeCodeSubagentTests {
     ])
     #expect(call(second)?.state == .succeeded)
     #expect(call(second)?.subagent?.result == "Second.")
+    // The CLI names the message that resumed it, not the call that started it.
+    let resumed = decode([
+      launch, launched, line, sendMessage,
+      notification("completed", result: "Second.", call: "t2"),
+    ])
+    #expect(call(resumed)?.state == .succeeded)
+    #expect(call(resumed)?.subagent?.result == "Second.")
   }
 
   @Test("Stopping the turn leaves a sub-agent in the background running")
