@@ -103,16 +103,18 @@ struct SettingsSplitView: View {
       }
       .navigationTitle(Text(sidebar.name(of: page)))
       .toolbar {
-        // Always there, as in System Settings: the toolbar keeps its height from page to page.
-        ToolbarItem(placement: .navigation) {
-          Button {
-            if let parent = page.parent { model.settingsPage = parent }
-          } label: {
-            Image(systemName: "chevron.left")
+        // Only where it leads somewhere. The title keeps its line of the unified toolbar either
+        // way, so the page does not move when it comes and goes.
+        if let parent = page.parent {
+          ToolbarItem(placement: .navigation) {
+            Button {
+              model.settingsPage = parent
+            } label: {
+              Image(systemName: "chevron.left")
+            }
+            .help(Text("Back", bundle: .module))
+            .accessibilityLabel(Text("Back", bundle: .module))
           }
-          .disabled(page.parent == nil)
-          .help(Text("Back", bundle: .module))
-          .accessibilityLabel(Text("Back", bundle: .module))
         }
       }
     }
