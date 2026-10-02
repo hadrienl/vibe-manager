@@ -38,11 +38,20 @@ struct ActivityResourceRowLayoutTests {
       window.contentView = nil
       window.close()
     }
-    host.layoutSubtreeIfNeeded()
-    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-    host.layoutSubtreeIfNeeded()
-    guard let table = tableView(in: host) else { return [] }
-    return (0..<table.numberOfRows).map { Double(table.rect(ofRow: $0).height) }
+    // Until every row is there and two passes agree on their heights, never for a set time: a
+    // busy runner lays the list out late.
+    var heights: [Double] = []
+    let limit = Date().addingTimeInterval(10)
+    while Date() < limit {
+      host.layoutSubtreeIfNeeded()
+      let current = tableView(in: host).map { table in
+        (0..<table.numberOfRows).map { Double(table.rect(ofRow: $0).height) }
+      }
+      if let current, current.count == resources.count, current == heights { return heights }
+      heights = current ?? []
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+    return heights
   }
 
   private func tableView(in view: NSView) -> NSTableView? {
