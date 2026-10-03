@@ -452,6 +452,11 @@ final class SmokeTests: XCTestCase {
         #328.
         """),
     AuditException(
+      type: .sufficientElementDescription, elements: [.outline], element: "avatar-library-list",
+      reason:
+        "The list of the avatars' library has no label: found by this audit, given one by #328."
+    ),
+    AuditException(
       type: .sufficientElementDescription, elements: [.popUpButton], element: "emoji & symbols",
       reason: "The Emoji & Symbols button macOS puts in a text field: the system's, not ours."),
     AuditException(
