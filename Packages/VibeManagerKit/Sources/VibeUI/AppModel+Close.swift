@@ -26,7 +26,7 @@ extension AppModel {
     switch innerCloseTarget {
     case .drawerTerminal: requestCloseDrawerTerminal()
     case .webTab: closeWebTab()
-    case nil: NSSound.beep()
+    case nil: beep()
     }
   }
 }

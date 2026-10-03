@@ -163,11 +163,11 @@ extension AppModel {
 
   public func closeWebTab() {
     guard let browser, let id = selectedSessionID, let tab = activeWebTab else {
-      NSSound.beep()
+      beep()
       return
     }
     guard !tab.isPinnedTicket else {
-      NSSound.beep()
+      beep()
       return
     }
     browser.close(tab.id, in: id)
@@ -239,7 +239,7 @@ extension AppModel {
     case .browser, .system:
       openOutsideHandler(url)
     case .refused:
-      NSSound.beep()
+      beep()
     }
   }
 
@@ -249,7 +249,7 @@ extension AppModel {
   public func openOutside(_ url: URL) {
     switch LinkRouting.externalRoute(for: url) {
     case .browser, .system: openOutsideHandler(url)
-    case .refused, .webView, .newTab: NSSound.beep()
+    case .refused, .webView, .newTab: beep()
     }
   }
 

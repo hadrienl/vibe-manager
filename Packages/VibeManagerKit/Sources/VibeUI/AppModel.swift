@@ -272,6 +272,8 @@ public final class AppModel {
   public var settingsPage: SettingsPage = .general
   /// Where a drop writes what has no file of its own (#42).
   let dropStore: (any SessionDropStore)?
+  /// Says that a gesture did nothing: the system alert sound in the application.
+  let beep: @MainActor () -> Void
   /// What the last drop on a session has to say: a file left out, a folder the agent may not
   /// read, a fallback to the terminal (#42).
   public internal(set) var dropNotice: SessionDropNotice?
@@ -744,8 +746,12 @@ public final class AppModel {
     /// Where a drop writes what has no file of its own (#42). Absent, such a drop is refused.
     dropStore: (any SessionDropStore)? = nil,
     /// Where the symbols and colours the pickers offer are kept (#199).
-    appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore()
+    appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore(),
+    /// Says that a gesture did nothing. Silent in a workspace assembled without it: the tests run
+    /// while the user works, and are not to be heard.
+    beep: @escaping @MainActor () -> Void = {}
   ) {
+    self.beep = beep
     self.appearancePalette = SessionAppearancePaletteModel(store: appearancePalette)
     self.dropStore = dropStore
     self.journal = journal
@@ -1431,7 +1437,7 @@ public final class AppModel {
   func undoArchive(_ archives: [SessionArchiveUndo]) async {
     let archived = Set(sessions.filter { $0.status == .archived }.map(\.id))
     let back = archives.filter { archived.contains($0.id) }
-    guard !back.isEmpty else { return NSSound.beep() }
+    guard !back.isEmpty else { return beep() }
     for archive in back {
       do {
         _ = try await restoreSession(id: archive.id)
@@ -1613,7 +1619,7 @@ public final class AppModel {
   /// beeps.
   func undoStatusChange(_ undo: SessionStatusUndo) async {
     guard sessions.first(where: { $0.id == undo.id })?.taskStatus == undo.to else {
-      return NSSound.beep()
+      return beep()
     }
     await setTaskStatus(undo.from, for: undo.id, restarting: false)
     if undo.wasSelected { select(undo.id) }
