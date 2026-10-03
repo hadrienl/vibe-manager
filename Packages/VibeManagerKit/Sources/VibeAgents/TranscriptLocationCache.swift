@@ -4,7 +4,13 @@ import VibeApplication
 /// Where each conversation's transcripts were found, so that a later look only checks what can
 /// have changed (#255). One instance, made by the composition and given to the conversation view
 /// and to the branch report alike (#276).
+///
+/// A Claude Code transcript never moves to another folder: once found, one `stat` says it is still
+/// there. A Codex conversation resumed another day starts a new rollout in that day's folder, and
+/// the folders of the days before never get one: only the last day listed and today are listed
+/// again. Bounded: an entry evicted is rebuilt by the full look, which it only spares.
 public final class TranscriptLocationCache: @unchecked Sendable {
+  /// How many conversations are remembered.
   static let capacity = 256
 
   let locator: AgentTranscriptLocator
@@ -16,10 +22,12 @@ public final class TranscriptLocationCache: @unchecked Sendable {
   private var claude: [String: URL] = [:]
   private var claudeMissed: [String: Date] = [:]
   private var codex: [String: CodexRollouts] = [:]
+  /// Oldest first, both kinds together.
   private var order: [String] = []
 
   private struct CodexRollouts {
     var found: Set<URL>
+    /// The last day listed, at its start: from the day before it, the next look lists again.
     var listedThrough: Date
   }
 
@@ -33,6 +41,10 @@ public final class TranscriptLocationCache: @unchecked Sendable {
     self.now = now
   }
 
+  /// The main transcript of a Claude Code conversation: where it was found last time, else where
+  /// Claude Code names the folder after the working directory, else wherever a look through every
+  /// project finds it. Its sub-agents' files are not looked for. The look through every project is
+  /// not made again for `missRetry` after it found nothing; the working directory's folder is.
   public func claudeTranscript(for identifier: String, workingDirectory: String?) -> URL? {
     let manager = FileManager.default
     let moment = now()
@@ -60,6 +72,7 @@ public final class TranscriptLocationCache: @unchecked Sendable {
       lock.withLock {
         claude[identifier] = nil
         claudeMissed[identifier] = moment
+        touch("claude:\(identifier)")
       }
       return nil
     }
@@ -67,14 +80,15 @@ public final class TranscriptLocationCache: @unchecked Sendable {
     return found
   }
 
-  /// Every rollout of the conversation: the days already listed are not listed again, only the
-  /// day before the last listing and the days since. A rollout deleted since is not given back.
+  /// Every rollout of a Codex conversation: the days listed before are not listed again, but for
+  /// the last one, and the days since. A rollout deleted since is not given back.
   public func codexRollouts(for identifier: String, since created: Date) -> [URL] {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = .current
     let moment = now()
     let known = lock.withLock { codex[identifier] }
     var first = created.addingTimeInterval(-86_400)
+    // The day before the last one listed, in case the clock or the time zone went back.
     if let known, let resumed = calendar.date(byAdding: .day, value: -1, to: known.listedThrough),
       resumed > calendar.startOfDay(for: first)
     {
@@ -94,6 +108,8 @@ public final class TranscriptLocationCache: @unchecked Sendable {
     return Array(found)
   }
 
+  /// The folder Claude Code keeps a working directory's conversations in: its path, every
+  /// character but a letter or a digit made a dash.
   static func claudeFolderName(for workingDirectory: String) -> String {
     String(
       workingDirectory.unicodeScalars.map {
@@ -109,7 +125,8 @@ public final class TranscriptLocationCache: @unchecked Sendable {
     }
   }
 
-  /// Least recently used out first: a hit counts as a use.
+  /// Moves an entry to the most recent end — a hit counts as a use — and lets the oldest go past
+  /// the capacity. Under the lock.
   private func touch(_ key: String) {
     order.removeAll { $0 == key }
     order.append(key)

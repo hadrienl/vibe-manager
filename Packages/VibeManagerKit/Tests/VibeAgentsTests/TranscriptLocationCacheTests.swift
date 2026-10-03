@@ -151,6 +151,22 @@ struct TranscriptLocationCacheTests {
     #expect(listings.count == 2)
   }
 
+  @Test("Claude Code: the working directory's folder is checked even during the pause")
+  func directPathSkipsThePause() throws {
+    let root = try scratch()
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(
+      at: root.appendingPathComponent("projects"), withIntermediateDirectories: true)
+    let listings = Listings()
+    let cache = cache(root, listings, now: { Date(timeIntervalSince1970: 1_000) })
+    #expect(cache.claudeTranscript(for: "abc", workingDirectory: "/Users/me/app") == nil)
+    let file = root.appendingPathComponent("projects/-Users-me-app/abc.jsonl")
+    try write(file)
+    // Still within the pause: no look through the projects, but its own folder is found.
+    #expect(cache.claudeTranscript(for: "abc", workingDirectory: "/Users/me/app") == file)
+    #expect(listings.count == 1)
+  }
+
   @Test("A conversation looked at again is kept: the least recently used one is let go of")
   func leastRecentlyUsed() throws {
     let root = try scratch()

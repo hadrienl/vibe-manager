@@ -56,7 +56,8 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       let isCodex: Bool
       switch conversation.transcriptProviderID {
       case ClaudeCodeAgentProvider.id.rawValue:
-        files = claudeTranscripts(for: identifier)
+        files = claudeTranscripts(
+          for: identifier, workingDirectory: RestartSession.workingDirectoryPath(of: session))
         isCodex = false
       case CodexAgentProvider.id.rawValue:
         files = codexRollouts(for: identifier, since: session.createdAt)
@@ -102,9 +103,14 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
   // MARK: - Finding them
 
   /// Once its file is found, only the folder of its sub-agents is listed again, where new ones
-  /// appear; every project folder only if the file went away, or once a minute.
-  private func claudeTranscripts(for identifier: String) -> [URL] {
-    guard let main = locations.claudeTranscript(for: identifier, workingDirectory: nil) else {
+  /// appear; every project folder only if the file went away and is not where the working
+  /// directory names it, and not again for two seconds after a look found nothing. A second
+  /// transcript the conversation got when resumed from another folder outside the application is
+  /// not looked for (#276).
+  private func claudeTranscripts(for identifier: String, workingDirectory: String?) -> [URL] {
+    guard
+      let main = locations.claudeTranscript(for: identifier, workingDirectory: workingDirectory)
+    else {
       return []
     }
     return [main] + locator.claudeSubagents(of: main, identifier: identifier)
