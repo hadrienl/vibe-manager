@@ -980,7 +980,8 @@ struct ThemeBackdropAccessibilityTests {
     let id = own.id
     try #require(id != ConversationTheme.night.id)
     let shown = themes.displayed(
-      ConversationAppearance(), session: id, isDark: true, increasedContrast: false)
+      ConversationAppearance(), session: id, isDark: true, increasedContrast: false,
+      reducedTransparency: false)
     try #require(shown.backdrop.localImage != nil)
     let honouring = themes.displayed(
       ConversationAppearance(), session: id, isDark: true, increasedContrast: false,
@@ -988,7 +989,7 @@ struct ThemeBackdropAccessibilityTests {
     #expect(honouring.backdrop.localImage == nil)
   }
 
-  @Test("A veil thinner than the least one is refused: the picture never shows through bare")
+  @Test("A veil thinner than the least one is raised: the picture never shows through bare")
   func leastVeil() {
     var theme = pictured
     theme.backdrop.veil = 0

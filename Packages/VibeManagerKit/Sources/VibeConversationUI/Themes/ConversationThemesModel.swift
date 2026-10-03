@@ -178,7 +178,7 @@ public final class ConversationThemesModel {
   /// the settings resolve to. A session's theme that is no longer there follows the settings.
   public func displayed(
     _ appearance: ConversationAppearance, session sessionTheme: String? = nil, isDark: Bool,
-    increasedContrast: Bool, reducedTransparency: Bool = false
+    increasedContrast: Bool, reducedTransparency: Bool
   ) -> ConversationTheme {
     _ = fontsGeneration
     var theme: ConversationTheme

@@ -176,7 +176,7 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
 
     public static let veilRange: ClosedRange<Double> = 0...1
     /// The least veil a picture is ever shown under: the text is read on `background`, and a
-    /// thinner veil leaves it on the photograph itself (#231). A lower one is refused, not obeyed.
+    /// thinner veil leaves it on the photograph itself (#231). A lower one is raised to it.
     public static let minimumVeil = 0.6
 
     /// The veil the picture is shown under: never thinner than `minimumVeil`.

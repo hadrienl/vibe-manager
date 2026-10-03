@@ -2169,7 +2169,8 @@ struct SessionRow: View {
         Label {
           Text(status.label)
             .foregroundStyle(
-              !isRestoring && status.severity.wordsInLabelColour ? Color.primary : Color.secondary)
+              !isRestoring && status.severity.wordsInLabelColour
+                ? HierarchicalShapeStyle.primary : HierarchicalShapeStyle.secondary)
         } icon: {
           Image(systemName: status.symbolName)
             .opacity(isWorkingAnimated ? 0 : 1)
