@@ -110,7 +110,9 @@ every sixty seconds as a safety net (#255). Only the look changes what is follow
 changed is kept until the next one adopts it, so that nothing a look adds meanwhile is lost. Where
 each transcript was found is remembered (`TranscriptLocationCache`): a Claude Code transcript is
 checked by one `stat`, and only the last day listed and today are listed again for a Codex
-rollout. A clock in a hidden conversation stops. Only the five sessions last shown in conversation
+rollout. One memory, made by the composition and shared with the branch report's transcript reader
+(#276); a transcript not found is not looked for again for two seconds, a rollout deleted since is
+not given back. A clock in a hidden conversation stops. Only the five sessions last shown in conversation
 keep a mounted view and a reader; a hidden conversation view is disabled, so that its composer
 never keeps the keyboard. The twenty shown before them keep their model — what was read, in memory
 only — without a reader: coming back to one shows its conversation at once, and its readers resume

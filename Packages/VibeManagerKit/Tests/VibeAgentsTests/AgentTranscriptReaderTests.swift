@@ -185,7 +185,7 @@ struct AgentTranscriptReaderTests {
     let main = folder.appendingPathComponent("\(identifier).jsonl")
     try append([#"{"cwd":"/Users/a/api","message":{"content":[]}}"#], to: main)
     let listings = ListingCounter()
-    // A still clock: a runner that stalls past `relistInterval` must not list the folders again.
+    // A still clock: a runner that stalls must not make the folders listed again.
     let moment = Date()
     let reader = AgentTranscriptReader(
       claudeProjects: projects, codexSessions: root.appendingPathComponent("sessions"),
