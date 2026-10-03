@@ -373,8 +373,10 @@ final class SmokeTests: XCTestCase {
     try audit(app, "Settings")
     // A page of the settings, by the row of their sidebar that carries its title.
     for page in ["Badges", "Updates", "Notifications", "Avatars"] {
-      let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", page))
-        .firstMatch
+      // A static text's words are its value on macOS, not its label.
+      let item = app.outlines.staticTexts.matching(
+        NSPredicate(format: "value == %@ OR label == %@", page, page)
+      ).firstMatch
       guard item.waitForExistence(timeout: 5) else {
         XCTFail("No \(page) page in the settings")
         continue
