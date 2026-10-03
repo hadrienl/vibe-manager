@@ -64,6 +64,12 @@ struct SettingsWindowTests {
         screen: small))
     #expect(clamped.frame.width == small.width)
     #expect(clamped.frame.minX == small.minX)
+
+    // Already wider than the screen: left as it is, never narrowed to it.
+    let wide = NSRect(x: 0, y: 0, width: 1_115, height: 700)
+    #expect(
+      SettingsWindowWidth.plan(frame: wide, needed: 1_115, restoredWidth: nil, screen: small)
+        == nil)
   }
 
   @Test("The sidebar lists the pages of the workspace, in their groups")

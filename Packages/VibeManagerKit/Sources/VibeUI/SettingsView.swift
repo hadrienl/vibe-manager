@@ -727,7 +727,9 @@ enum SettingsWindowWidth {
     var target = frame
     target.size.width = width
     if let screen {
-      target.size.width = min(target.width, screen.width)
+      // The screen only bounds what the window grows: a window already wider than the screen,
+      // which the user gave it, is not narrowed for that.
+      target.size.width = min(target.width, max(frame.width, screen.width))
       // Grown to the right, as System Settings does, unless the screen ends first.
       if target.maxX > screen.maxX {
         target.origin.x = max(screen.minX, screen.maxX - target.width)

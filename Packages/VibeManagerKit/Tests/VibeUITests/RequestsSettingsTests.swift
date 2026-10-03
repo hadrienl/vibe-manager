@@ -165,7 +165,10 @@ struct RequestsSettingsTests {
     defer { window.close() }
     await settle(window, "the alerts") { Self.switches(in: host.view).count == 4 }
     model.settingsPage = .avatars
-    let wide = SettingsSplitView.sidebarWidth + SettingsPage.avatars.detailWidth
+    // As wide as the page needs, or as the screen allows: the screen of CI is narrower.
+    let wide = min(
+      SettingsSplitView.sidebarWidth + SettingsPage.avatars.detailWidth,
+      max(window.frame.width, window.screen?.visibleFrame.width ?? .infinity))
     await settle(window, "the window widened") { window.frame.width >= wide - 0.5 }
     model.settingsPage = .requests
     await settle(window, "the window back") {
