@@ -127,6 +127,9 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
           event.requestNotice(isShown: false, alwaysAllow: CodexAnswerKeymap.alwaysAllow)))
     case "PostToolUse":
       let reference = AgentRequestReading.reference(of: event)
+      // An asynchronous question's tool ends at once, its question still waiting: the rollout
+      // says when Codex takes it away (#273).
+      guard reference.tool != CodexQuestionWatch.asyncTool else { return nil }
       guard let tool = reference.tool else { return .questionResolved }
       return .toolFinished(tool, agentID: reference.agentID, subject: reference.subject)
     case "Stop": return .turnEnded

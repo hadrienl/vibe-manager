@@ -255,17 +255,20 @@ public enum AgentActivityMachine {
       // nothing of it.
       if notice?.reference.agentID == nil { next.dropAnnouncedRequests() }
       next.pendingTool = tool
-      let count = next.requests.count
+      let known = Set(next.requests.map(\.id))
       next.enqueue(notice, kind: kind, tool: tool, context: context)
-      if next.requests.count > count, let last = next.requests.indices.last {
-        next.reportFollows(drawnDialogAt: last)
+      // Not always the last: an asynchronous question waits behind it.
+      if let added = next.requests.firstIndex(where: { !known.contains($0.id) }) {
+        next.reportFollows(drawnDialogAt: added)
       }
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
     case .questionResolved:
       // Nothing says which request was answered. Alone, it was; behind others, the first is taken
       // as the one, and the dialog on screen is no longer known for sure.
-      if next.requests.count > 1 {
+      if next.heldRequestCount > 1 {
         next.settleFirstRequest(isKnownAnswered: false)
+      } else if next.requests.count > 1 {
+        next.settleFirstRequest(isKnownAnswered: true)
       } else {
         next.clearRequests()
         next.activity = .working
@@ -328,7 +331,7 @@ public enum AgentActivityMachine {
         next.activity = .working
       } else if wasFirst {
         // Which of the others is on screen is not known from this.
-        next.isFirstRequestUncertain = next.requests.count > 1 || next.isTrackLost
+        next.isFirstRequestUncertain = next.heldRequestCount > 1 || next.isTrackLost
         next.activity = .awaitingUser(next.requests[0].kind)
       }
     case .turnFailed(let prompt):
@@ -412,7 +415,7 @@ extension AgentActivityState {
   /// dialog on screen whatever doubt came before: Codex settles its requests with no word of which.
   mutating func arm(at index: Int) {
     markDrawn(at: index)
-    if requests.count == 1 {
+    if heldRequestCount == 1 {
       isFirstRequestUncertain = false
       isTrackLost = false
     }
@@ -432,7 +435,7 @@ extension AgentActivityState {
     if let first = requests.first, first.id != id, !first.content.isAnnouncedOnly {
       // Another request drawn before it still waits: which dialog is on screen is not known.
       isFirstRequestUncertain = true
-    } else if !settled.isEmpty, requests.count == 1, !isTrackLost {
+    } else if !settled.isEmpty, heldRequestCount == 1, !isTrackLost {
       // Alone once the settled ones are gone, it is the dialog on screen.
       isFirstRequestUncertain = false
     }
@@ -516,6 +519,12 @@ extension AgentActivityState {
     }
   }
 
+  /// The requests that hold the agent: an asynchronous question waits behind them, and says
+  /// nothing of which dialog is on screen (#273).
+  var heldRequestCount: Int {
+    requests.count { !$0.isAsynchronous }
+  }
+
   /// The first request was taken as answered: the next one's dialog takes its place.
   /// `isKnownAnswered` says it was the one answered; otherwise it was a guess.
   mutating func settleFirstRequest(isKnownAnswered: Bool) {
@@ -526,7 +535,7 @@ extension AgentActivityState {
     } else if !isKnownAnswered {
       isFirstRequestUncertain = true
       isTrackLost = true
-    } else if requests.count == 1, !isTrackLost {
+    } else if heldRequestCount == 1, !isTrackLost {
       // Alone, the one left is the dialog on screen.
       isFirstRequestUncertain = false
     }
@@ -549,7 +558,7 @@ extension AgentActivityState {
         clearRequests()
       } else {
         // Alone, the one left is the dialog on screen — unless a guess already lost track.
-        isFirstRequestUncertain = requests.count > 1 || isTrackLost
+        isFirstRequestUncertain = heldRequestCount > 1 || isTrackLost
       }
     } else if let first = requests.first, first.reference.match(reference) == .likely {
       settleFirstRequest(isKnownAnswered: false)

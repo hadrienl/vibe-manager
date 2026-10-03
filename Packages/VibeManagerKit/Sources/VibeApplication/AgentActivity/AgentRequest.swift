@@ -50,6 +50,42 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
     self.isShown = isShown
     self.isAsynchronous = isAsynchronous
   }
+
+  enum CodingKeys: String, CodingKey {
+    case id, receivedAt, kind, content, reference, isShown, isAsynchronous
+  }
+
+  /// Read as the version before #273 P3 wrote it too: no `isAsynchronous`, and a form with nothing
+  /// of its server's words. A request kept across an update is not asked again.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(AgentRequestID.self, forKey: .id)
+    receivedAt = try container.decode(Date.self, forKey: .receivedAt)
+    kind = try container.decode(AgentQuestionKind.self, forKey: .kind)
+    if let content = try? container.decode(AgentRequestContent.self, forKey: .content) {
+      self.content = content
+    } else {
+      _ = try container.decode(FormlessElicitation.self, forKey: .content)
+      content = .elicitation(AgentElicitation())
+    }
+    reference = try container.decode(AgentToolReference.self, forKey: .reference)
+    isShown = try container.decode(Bool.self, forKey: .isShown)
+    isAsynchronous = try container.decodeIfPresent(Bool.self, forKey: .isAsynchronous) ?? false
+  }
+
+  /// `{"elicitation":{}}`: a form, as written before it carried its server's words.
+  private struct FormlessElicitation: Decodable {
+    enum CodingKeys: CodingKey { case elicitation }
+
+    init(from decoder: any Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      guard container.contains(.elicitation) else {
+        throw DecodingError.keyNotFound(
+          CodingKeys.elicitation,
+          .init(codingPath: decoder.codingPath, debugDescription: "not a form"))
+      }
+    }
+  }
 }
 
 /// What a request asks.

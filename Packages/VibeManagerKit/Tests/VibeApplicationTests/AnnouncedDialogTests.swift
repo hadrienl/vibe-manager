@@ -519,6 +519,22 @@ struct AsynchronousQuestionTests {
     #expect(!state.isFirstRequestUncertain)
   }
 
+  @Test("Behind it, a permission alone is the dialog on screen: settled, drawn, or drawn first")
+  func aloneBehind() {
+    // Two in the same second: in doubt until one is settled, then the other is alone.
+    let two = play(
+      (0, asked), (60, permission(shown: true, command: "a")),
+      (60.5, permission(shown: true, command: "b")), (120, .toolFinished("Bash", subject: "a")))
+    #expect(two.requests.map(\.reference.subject) == ["b", "call_a"])
+    #expect(!two.isFirstRequestUncertain)
+    // Its dialog drawn before its report: the report finds it, not the question.
+    let early = play(
+      (0, asked), (60, .dialogDrawn(AgentDrawnDialog(.command("ls")))),
+      (61, permission(shown: false, command: "ls")))
+    #expect(early.requests.map(\.isShown) == [true, false])
+    #expect(early.drawnBeforeReport == nil)
+  }
+
   @Test("Codex's word of it adds nothing; a form it announces still waits")
   func announcements() {
     let question = AgentSignal.dialogAnnounced(

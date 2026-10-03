@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VibeApplication
+import VibeDomain
 
 @testable import VibeAgents
 
@@ -391,5 +392,33 @@ struct CodexStoppingTimeoutTests {
       #expect(option.contains(isStopping ? "timeout=3," : "timeout=5,"), "\(option.prefix(40))")
     }
     #expect(options.count == CodexActivityHooks.hooks.count)
+  }
+}
+
+@Suite("Requests kept across an update (#273, P3)")
+struct KeptRequestsTests {
+  @Test("What the version before wrote is read again: no asynchrony, a form without words")
+  func previousVersion() throws {
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: SessionID(), key: "k"),
+      receivedAt: Date(timeIntervalSince1970: 0),
+      kind: .question, content: .elicitation(AgentElicitation(message: "m")),
+      reference: AgentToolReference(tool: nil), isShown: true)
+    var object = try #require(
+      try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+    object["isAsynchronous"] = nil
+    object["content"] = ["elicitation": [String: Any]()]
+    let read = try JSONDecoder().decode(
+      AgentRequest.self, from: JSONSerialization.data(withJSONObject: object))
+    #expect(read.content == .elicitation(AgentElicitation()))
+    #expect(!read.isAsynchronous)
+    #expect(
+      try JSONDecoder().decode(AgentRequest.self, from: JSONEncoder().encode(request)) == request)
+  }
+
+  @Test("The end of an asynchronous question's tool settles nothing")
+  func asyncToolEnd() {
+    let event = event("PostToolUse", #"{"tool_name":"request_user_input_async"}"#)
+    #expect(CodexSignalDecoder().signal(for: event) == nil)
   }
 }
