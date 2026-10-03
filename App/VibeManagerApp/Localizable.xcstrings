@@ -57,6 +57,16 @@
         }
       }
     },
+    "Actual Size" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taille réelle"
+          }
+        }
+      }
+    },
     "Agents are running in %lld sessions." : {
       "localizations" : {
         "en" : {
@@ -1287,6 +1297,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vos modifications seront perdues si vous ne les enregistrez pas."
+          }
+        }
+      }
+    },
+    "Zoom In" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrandir"
+          }
+        }
+      }
+    },
+    "Zoom Out" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réduire"
           }
         }
       }

@@ -311,20 +311,29 @@ struct AnswerKeymapTests {
 
   @Test("Claude Code: a digit per question, a free answer pasted, a review submitted")
   func claudeQuestions() {
+    // The dialog of the first question, as Claude Code draws it (#273): its options, then
+    // "Type something." when an answer of one's own is offered.
+    func keys(_ answer: AgentAnswer, _ questions: [AgentQuestion]) -> [[UInt8]]? {
+      let first = questions[0]
+      let labels = first.options.map(\.label) + (first.allowsFreeText ? ["Type something."] : [])
+      let screen = AgentDialogScreen(
+        options: labels.enumerated().map { .init(number: $0 + 1, label: $1) })
+      return claude.keystrokes(for: answer, to: .questions(questions), screen: screen)
+    }
     let tea = AgentQuestion(
       header: nil, text: "Tea?", options: [.init(label: "Tea"), .init(label: "Coffee")])
     let sugar = AgentQuestion(
       header: nil, text: "Sugar?", options: [.init(label: "Yes"), .init(label: "No")])
     #expect(
-      claude.keystrokes(for: .answers([.option(1)]), to: .questions([tea])) == [[0x32]])
+      keys(.answers([.option(1)]), [tea]) == [[0x32]])
     #expect(
-      claude.keystrokes(for: .answers([.text("Hot\u{1B}[201~ chocolate")]), to: .questions([tea]))
+      keys(.answers([.text("Hot\u{1B}[201~ chocolate")]), [tea])
         == [[0x33], TerminalKeys.bracketedPaste("Hot[201~ chocolate"), [0x0D]])
     #expect(
-      claude.keystrokes(for: .answers([.option(1), .option(0)]), to: .questions([tea, sugar]))
+      keys(.answers([.option(1), .option(0)]), [tea, sugar])
         == [[0x32], [0x31], [0x31]])
-    #expect(claude.keystrokes(for: .answers([.option(5)]), to: .questions([tea])) == nil)
-    #expect(claude.keystrokes(for: .answers([.text("  ")]), to: .questions([tea])) == nil)
+    #expect(keys(.answers([.option(5)]), [tea]) == nil)
+    #expect(keys(.answers([.text("  ")]), [tea]) == nil)
     // Boxes, as drawn by 2.1.283: each digit ticks one, the right arrow moves on, and the review
     // that follows is submitted with 1.
     let toppings = AgentQuestion(
@@ -332,29 +341,27 @@ struct AnswerKeymapTests {
       allowsMultipleChoices: true)
     #expect(claude.answers(for: .questions([toppings])).contains(.chooseOptions))
     #expect(
-      claude.keystrokes(for: .answers([.options([1, 0])]), to: .questions([toppings]))
+      keys(.answers([.options([1, 0])]), [toppings])
         == [[0x31], [0x32], TerminalKeys.rightArrow, [0x31]])
     #expect(
-      claude.keystrokes(
-        for: .answers([.option(1), .options([0])]), to: .questions([tea, toppings]))
+      keys(.answers([.option(1), .options([0])]), [tea, toppings])
         == [[0x32], [0x31], TerminalKeys.rightArrow, [0x31]])
     #expect(
-      claude.keystrokes(
-        for: .answers([.options([1]), .option(0)]), to: .questions([toppings, tea]))
+      keys(.answers([.options([1]), .option(0)]), [toppings, tea])
         == [[0x32], TerminalKeys.rightArrow, [0x31], [0x31]])
-    #expect(claude.keystrokes(for: .answers([.options([])]), to: .questions([toppings])) == nil)
-    #expect(claude.keystrokes(for: .answers([.text("Cheese")]), to: .questions([toppings])) == nil)
+    #expect(keys(.answers([.options([])]), [toppings]) == nil)
+    #expect(keys(.answers([.text("Cheese")]), [toppings]) == nil)
     // Beside previews, as drawn by 2.1.285, a digit only moves the highlight: Return takes it.
     let layout = AgentQuestion(
       header: nil, text: "Layout?",
       options: [.init(label: "Grid", preview: "▦"), .init(label: "List")],
       allowsFreeText: false)
     #expect(
-      claude.keystrokes(for: .answers([.option(1)]), to: .questions([layout])) == [[0x32], [0x0D]])
+      keys(.answers([.option(1)]), [layout]) == [[0x32], [0x0D]])
     #expect(
-      claude.keystrokes(for: .answers([.option(0), .option(1)]), to: .questions([layout, tea]))
+      keys(.answers([.option(0), .option(1)]), [layout, tea])
         == [[0x31], [0x0D], [0x32], [0x31]])
-    #expect(claude.keystrokes(for: .answers([.text("Cards")]), to: .questions([layout])) == nil)
+    #expect(keys(.answers([.text("Cards")]), [layout]) == nil)
   }
 
   @Test("Claude Code: a plan is accepted with the digit of its option, rejected with Escape")
@@ -366,7 +373,7 @@ struct AnswerKeymapTests {
     #expect(
       claude.keystrokes(for: .approvePlan(.reviewEdits), to: plan, screen: screen) == [[0x32]])
     #expect(claude.keystrokes(for: .rejectPlan, to: plan) == [[0x1B]])
-    #expect(claude.answers(for: .elicitation).isEmpty)
+    #expect(claude.answers(for: .elicitation(AgentElicitation())).isEmpty)
   }
 
   @Test("Codex: y, p for a command, a for a patch, Escape; its questions stay in the terminal")

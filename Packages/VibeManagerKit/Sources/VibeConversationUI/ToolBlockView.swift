@@ -27,7 +27,7 @@ struct ToolBlockView: View {
       }
       .buttonStyle(.plain)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel(accessibilityTitle(state: state))
+      .accessibilityLabel(Self.accessibilityTitle(of: block))
       .accessibilityValue(
         isExpanded ? Text("expanded", bundle: .module) : Text("collapsed", bundle: .module)
       )
@@ -45,7 +45,9 @@ struct ToolBlockView: View {
         .stroke(borderColor(state).color, lineWidth: state.severity >= 4 ? 1.5 : 1))
   }
 
-  private var title: ToolCallTitle {
+  private var title: ToolCallTitle { Self.title(of: block) }
+
+  static func title(of block: ConversationBlock) -> ToolCallTitle {
     switch block {
     case .entry(let entry):
       return entry.toolCall.map { ToolCallSummary.title(for: $0) }
@@ -162,9 +164,34 @@ struct ToolBlockView: View {
     }
   }
 
-  private func accessibilityTitle(state: ToolCallState) -> String {
-    let title = title
-    let words = [title.title, title.outcome, StateSymbol.label(for: state)].compactMap { $0 }
+  /// What the block did, to whom, and how it ended: its header as VoiceOver reads it, and its
+  /// name in the rotors (#232). A group says its targets — the commands, the files — and a group
+  /// of sub-agents what they were asked; the state is said once, not again after an outcome
+  /// that already says it.
+  static func accessibilityTitle(of block: ConversationBlock) -> String {
+    var words: [String]
+    var outcome: String?
+    if case .subagentGroup(_, let runs) = block {
+      let calls = runs.compactMap(\.toolCall)
+      let failed = calls.filter {
+        if case .failed = $0.state { return true }
+        return false
+      }
+      words = [
+        ListFormatter.localizedString(
+          byJoining: (failed.isEmpty ? calls : failed).map(SubagentPresentation.description(of:)))
+      ]
+    } else {
+      let title = title(of: block)
+      outcome = title.outcome
+      words = [title.title, title.detail, title.outcome].compactMap { $0 }
+    }
+    words.removeAll(where: \.isEmpty)
+    // Said once: not again after an outcome that already says it — « 2 failed », « failed ».
+    let state = StateSymbol.label(for: block.toolState ?? .succeeded)
+    if outcome?.localizedCaseInsensitiveContains(state) != true {
+      words.append(state)
+    }
     return words.joined(separator: ", ")
   }
 }
@@ -493,6 +520,7 @@ struct ProducedImageView: View {
   let call: ToolCall
   let model: ConversationModel?
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -523,11 +551,11 @@ struct ProducedImageView: View {
           }
         }
         .buttonStyle(.plain)
-        .font(theme.interfaceFont(size: 12))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
         .foregroundStyle(theme.accent.color)
       } else {
         Text("The image is no longer where the agent saved it.", bundle: .module)
-          .font(theme.interfaceFont(size: 12))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
           .foregroundStyle(theme.secondaryText.color)
       }
     }
@@ -774,6 +802,7 @@ struct RequestActions: View {
   let request: ConversationRequest
   let call: ToolCall
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -783,7 +812,7 @@ struct RequestActions: View {
         !ConversationModel.isAbout(call, subject)
       {
         Text(verbatim: DisplaySafeText.visible(subject))
-          .font(theme.codeFont(size: 12))
+          .font(theme.codeFont(size: appearance.textSize.scaled(12)))
           .foregroundStyle(theme.text.color)
           .textSelection(.enabled)
           .lineLimit(6)
@@ -794,7 +823,7 @@ struct RequestActions: View {
       // A dialog the agent only announced (#273): its own words are all there is to show.
       if case .inTerminal(let prompt) = request.request.content, let message = prompt.message {
         Text(verbatim: DisplaySafeText.visible(message))
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.text.color)
           .textSelection(.enabled)
       }
@@ -866,7 +895,7 @@ struct RequestActions: View {
       }
       if answers.isEmpty {
         Text("This request can only be answered in the terminal.", bundle: .module)
-          .font(theme.interfaceFont(size: 11.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
           .foregroundStyle(theme.secondaryText.color)
       }
     }

@@ -25,6 +25,9 @@ public struct RootView: View {
   @Environment(\.undoManager) private var undoManager
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  /// The zoom's keys, taken before any view of the window (#229).
+  @State private var zoomKeys = ZoomKeyMonitor()
 
   public init(model: AppModel) {
     self.model = model
@@ -66,6 +69,10 @@ public struct RootView: View {
         }
       }
     }
+    // The application's zoom (#229), for every terminal of the window: the session's, the drawer's
+    // and the copies shown in the conversation.
+    .environment(\.terminalFontSize, model.conversations.appearance.textSize.terminalPointSize)
+    .onAppear { zoomKeys.install { model.zoom($0) } }
     // The window's title (#159), in every state: the Window menu, Mission Control and ⌘` read it.
     // From macOS 26 the toolbar draws it itself, the application's name and the session's in two
     // styles (#256).
@@ -395,7 +402,7 @@ public struct RootView: View {
                 discarded: { model.discardNewSessionDraft(undoManager: undoManager) },
                 chooseFiles: { model.beginAttachingFiles() },
                 manageTemplates: {
-                  model.settingsTab = .templates
+                  model.settingsPage = .templates
                   openSettings()
                 },
                 themes: model.conversations.themes,
@@ -956,7 +963,8 @@ public struct RootView: View {
   private var conversationTheme: ConversationTheme {
     model.conversations.themes.displayed(
       ConversationFonts.installedOnly(model.conversations.appearance),
-      isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
+      isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased,
+      reducedTransparency: reduceTransparency)
   }
 
   @ViewBuilder
@@ -980,7 +988,8 @@ public struct RootView: View {
       ForEach(model.conversations.mountedSessionIDs, id: \.self) { id in
         SessionConversationSlot(
           model: model, id: id, shownID: session.id, isCovered: isCovered,
-          isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
+          isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased,
+          reducedTransparency: reduceTransparency)
       }
 
       // An archived session has no pane by construction — archiving released it — so its own
@@ -1026,7 +1035,7 @@ public struct RootView: View {
           notice: notice,
           allowFullDiskAccess: {
             model.dismissDropNotice()
-            model.settingsTab = .privacy
+            model.settingsPage = .privacy
             openSettings()
           },
           dismiss: { model.dismissDropNotice() }
@@ -2008,6 +2017,11 @@ struct SidebarFooter: View {
   }
 }
 
+/// A command of a session's row, as VoiceOver offers it.
+enum SessionRowAction: Hashable {
+  case restart, switchAgent, rename, changeIcon, changeTheme, close, archive, restore
+}
+
 /// The three history commands for one session, in the single place that decides whether each of
 /// them applies. The menu, the context menu and the accessibility actions all read this.
 @MainActor
@@ -2037,6 +2051,45 @@ struct SessionCommands {
   /// commands, which say what they do to the process.
   var movableStatuses: [SessionTaskStatus] {
     session.taskStatus == .archived ? [] : SessionTaskStatus.columns
+  }
+
+  /// The commands VoiceOver offers on the row: only those that would do something (#232).
+  var rowActions: [SessionRowAction] {
+    var actions: [SessionRowAction] = []
+    if canRestart { actions.append(.restart) }
+    if canSwitchAgent { actions.append(.switchAgent) }
+    if canEditIdentity { actions += [.rename, .changeIcon, .changeTheme] }
+    if canClose { actions.append(.close) }
+    if canArchive { actions.append(.archive) }
+    if canRestore { actions.append(.restore) }
+    return actions
+  }
+
+  func perform(_ action: SessionRowAction) {
+    switch action {
+    case .restart: restart()
+    case .switchAgent: switchAgent()
+    case .rename: rename()
+    case .changeIcon: changeIcon()
+    case .changeTheme: changeTheme()
+    case .close: close()
+    case .archive: requestArchive()
+    case .restore: restore()
+    }
+  }
+
+  /// What VoiceOver calls the action.
+  func name(of action: SessionRowAction) -> Text {
+    switch action {
+    case .restart: Text(restartAnnouncement)
+    case .switchAgent: Text("Switch Agent", bundle: .module)
+    case .rename: Text("Rename", bundle: .module, comment: "Renames a session.")
+    case .changeIcon: Text("Change Icon", bundle: .module)
+    case .changeTheme: Text("Change Conversation Theme", bundle: .module)
+    case .close: Text("Close Session", bundle: .module)
+    case .archive: Text("Archive", bundle: .module)
+    case .restore: Text("Unarchive", bundle: .module)
+    }
   }
 
   func close() { Task { await model.requestClose(session.id) } }
@@ -2165,12 +2218,16 @@ struct SessionRow: View {
         // tell apart, and the identity colour of the session stays free to mean identity.
         Label {
           Text(status.label)
+            .foregroundStyle(
+              !isRestoring && status.severity.wordsInLabelColour
+                ? HierarchicalShapeStyle.primary : HierarchicalShapeStyle.secondary)
         } icon: {
           Image(systemName: status.symbolName)
             .opacity(isWorkingAnimated ? 0 : 1)
             .overlay {
               if isWorkingAnimated { WorkingSpinner() }
             }
+            .foregroundStyle(isRestoring ? Color.secondary : tint)
         }
         .font(.caption)
         // What waits for the user is the one state set apart from the others by more than its
@@ -2178,7 +2235,6 @@ struct SessionRow: View {
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
         // The exit code or the signal, for whoever wants it, behind words that say what happened.
         .help(status.detail ?? "")
-        .foregroundStyle(isRestoring ? Color.secondary : tint)
         .lineLimit(1)
       }
       .sessionThemePopover(model: commands.model, sessionID: session.id, place: .sidebar)
@@ -2213,38 +2269,16 @@ struct SessionRow: View {
         for: session, status: status, agentNames: commands.model.agentNames)
     )
     .accessibilityValue(accessibilityValue)
-    // The same commands, reachable without a pointer and without the menu bar.
-    .accessibilityAction(named: Text(commands.restartAnnouncement)) {
-      guard commands.canRestart else { return }
-      commands.restart()
-    }
-    .accessibilityAction(named: Text("Switch Agent", bundle: .module)) {
-      guard commands.canSwitchAgent else { return }
-      commands.switchAgent()
-    }
-    .accessibilityAction(named: Text("Rename", bundle: .module, comment: "Renames a session.")) {
-      guard commands.canEditIdentity else { return }
-      commands.rename()
-    }
-    .accessibilityAction(named: Text("Change Icon", bundle: .module)) {
-      guard commands.canEditIdentity else { return }
-      commands.changeIcon()
-    }
-    .accessibilityAction(named: Text("Change Conversation Theme", bundle: .module)) {
-      guard commands.canEditIdentity else { return }
-      commands.changeTheme()
-    }
-    .accessibilityAction(named: Text("Close Session", bundle: .module)) {
-      guard commands.canClose else { return }
-      commands.close()
-    }
-    .accessibilityAction(named: Text("Archive", bundle: .module)) {
-      guard commands.canArchive else { return }
-      commands.requestArchive()
-    }
-    .accessibilityAction(named: Text("Unarchive", bundle: .module)) {
-      guard commands.canRestore else { return }
-      commands.restore()
+    // The same commands, reachable without a pointer and without the menu bar: only those that
+    // apply, so that VoiceOver never lists one that does nothing (#232).
+    .accessibilityActions {
+      ForEach(commands.rowActions, id: \.self) { action in
+        Button {
+          commands.perform(action)
+        } label: {
+          commands.name(of: action)
+        }
+      }
     }
     // The drag that reorders, reachable without it (#44).
     .accessibilityActions {
@@ -2512,6 +2546,7 @@ private struct SessionConversationSlot: View {
   let isCovered: Bool
   let isDark: Bool
   let increasedContrast: Bool
+  let reducedTransparency: Bool
   @Environment(\.paneWidthHold) private var widthHold
 
   var body: some View {
@@ -2523,7 +2558,7 @@ private struct SessionConversationSlot: View {
       let theme = model.conversations.themes.displayed(
         ConversationFonts.installedOnly(model.conversations.appearance),
         session: model.displayedConversationTheme(of: listed), isDark: isDark,
-        increasedContrast: increasedContrast)
+        increasedContrast: increasedContrast, reducedTransparency: reducedTransparency)
       let isActive =
         !isCovered && id == shownID && model.presentation(of: listed) == .conversation
       VStack(spacing: 0) {

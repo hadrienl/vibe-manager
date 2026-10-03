@@ -145,7 +145,7 @@ struct PromptComposer: View {
           RequestHint(model: model)
         } else {
           hint(state)
-            .font(theme.interfaceFont(size: 11.5))
+            .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
             .foregroundStyle(theme.secondaryText.color)
             .lineLimit(1)
         }
@@ -376,6 +376,7 @@ public struct AttachmentChip: View {
   @State private var preview: AttachmentPreview?
   @State private var quickLook: URL?
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
   @Environment(\.displayScale) private var displayScale
 
   /// - Parameter siblings: the files joined with it, which Quick Look goes through; itself alone
@@ -449,7 +450,8 @@ public struct AttachmentChip: View {
   }
 
   private func font(size: Double, weight: Font.Weight = .regular) -> Font {
-    usesSystemColors
+    let size = appearance.textSize.scaled(size)
+    return usesSystemColors
       ? .system(size: size, weight: weight) : theme.interfaceFont(size: size, weight: weight)
   }
 
@@ -474,6 +476,7 @@ public struct AttachmentChip: View {
 struct ActivityLine: View {
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     HStack(spacing: 8) {
@@ -506,7 +509,7 @@ struct ActivityLine: View {
       .buttonStyle(.plain)
       .accessibilityLabel(Text("Interrupt the agent", bundle: .module))
     }
-    .font(theme.interfaceFont(size: 12.5))
+    .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
     .foregroundStyle(theme.secondaryText.color)
     .accessibilityElement(children: .contain)
   }
@@ -518,6 +521,7 @@ struct ActivityLine: View {
 struct RequestHint: View {
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     HStack(spacing: 6) {
@@ -542,7 +546,7 @@ struct RequestHint: View {
           Text("\(model.agentName) asks for your permission", bundle: .module)
         }
       }
-      .font(theme.interfaceFont(size: 11.5))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
       .foregroundStyle(theme.secondaryText.color)
       .lineLimit(1)
     }

@@ -92,9 +92,6 @@ struct UpdatesSettingsView: View {
     }
     .formStyle(.grouped)
     .disabled(!updates.isAvailable)
-    .scrollDisabled(true)
-    .fixedSize(horizontal: false, vertical: true)
-    .frame(width: SettingsView.formWidth)
   }
 
   private func binding<Value>(_ keyPath: WritableKeyPath<UpdateSettings, Value>) -> Binding<Value> {

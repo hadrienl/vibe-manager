@@ -1989,53 +1989,6 @@
         }
       }
     },
-    "%lld models" : {
-      "comment" : "How many models an endpoint offers.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld model"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld models"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld modèles"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld modèle"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld modèles"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld more resources were not kept." : {
       "comment" : "Resources past the journal's bound; a count.",
       "localizations" : {
@@ -4049,13 +4002,13 @@
         }
       }
     },
-    "Accent %@" : {
-      "comment" : "VoiceOver: a colour, by its hex code.",
+    "Account to check" : {
+      "comment" : "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couleur %@"
+            "value" : "Compte à vérifier"
           }
         }
       }
@@ -4151,12 +4104,13 @@
         }
       }
     },
-    "Add an endpoint" : {
+    "Add an Endpoint…" : {
+      "comment" : "The last line of the endpoints in the Settings window's sidebar.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter un endpoint"
+            "value" : "Ajouter un endpoint…"
           }
         }
       }
@@ -4244,17 +4198,6 @@
         }
       }
     },
-    "Agent Activity" : {
-      "comment" : "A section of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activité des agents"
-          }
-        }
-      }
-    },
     "Agent switched" : {
       "comment" : "The title of the line a terminal shows above an agent that replaced another.",
       "localizations" : {
@@ -4273,6 +4216,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agent indisponible"
+          }
+        }
+      }
+    },
+    "Agents" : {
+      "comment" : "A group of the Settings window's sidebar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agents"
           }
         }
       }
@@ -4303,17 +4257,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les agents en cours au moment d’installer une mise à jour continuent de tourner si vous le choisissez : la question vous est posée d’abord, comme en quittant, et vous les retrouvez à l’écran après la relance."
-          }
-        }
-      }
-    },
-    "Alerts" : {
-      "comment" : "A page of Settings › Requests: how requests are signalled.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signalement"
           }
         }
       }
@@ -4499,6 +4442,17 @@
         }
       }
     },
+    "An address and its protocol" : {
+      "comment" : "Under Other Server, among the servers a new endpoint starts from.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une adresse et son protocole"
+          }
+        }
+      }
+    },
     "An agent is asking for something" : {
       "comment" : "A notification whose details are hidden, on the lock screen.",
       "localizations" : {
@@ -4599,16 +4553,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Répondu · %@"
-          }
-        }
-      }
-    },
-    "Anthropic-compatible" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compatible Anthropic"
           }
         }
       }
@@ -4882,6 +4826,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demandé par un sous-agent"
+          }
+        }
+      }
+    },
+    "Asked by the MCP server “%@”" : {
+      "comment" : "On a request's card: the MCP server that asks the user for a form or a page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandé par le serveur MCP « %@ »"
           }
         }
       }
@@ -5228,6 +5183,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modifié"
+          }
+        }
+      }
+    },
+    "Changed Files" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichiers modifiés"
           }
         }
       }
@@ -6261,6 +6227,17 @@
         }
       }
     },
+    "Data on This Mac" : {
+      "comment" : "A section of Settings › Privacy: the usage and the diagnostics.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Données de ce Mac"
+          }
+        }
+      }
+    },
     "Day" : {
       "localizations" : {
         "fr" : {
@@ -6343,22 +6320,23 @@
         }
       }
     },
-    "Delete the endpoint and its key" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprimer l’endpoint et sa clé"
-          }
-        }
-      }
-    },
     "Delete the resolver" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le résolveur"
+          }
+        }
+      }
+    },
+    "Delete “%@” and its key?" : {
+      "comment" : "The name of an endpoint.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer « %@ » et sa clé ?"
           }
         }
       }
@@ -6676,16 +6654,6 @@
         }
       }
     },
-    "Double-click to rename" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Double-cliquez pour renommer"
-          }
-        }
-      }
-    },
     "Download and install updates automatically" : {
       "localizations" : {
         "fr" : {
@@ -6707,12 +6675,12 @@
         }
       }
     },
-    "Drag to resize. Double-click to give both sides the same width." : {
+    "Drag to resize, or use the arrow keys. Double-click or press Return to give both sides the same width." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faites glisser pour redimensionner. Double-cliquez pour donner la même largeur aux deux côtés."
+            "value" : "Faites glisser pour redimensionner, ou utilisez les flèches. Double-cliquez ou appuyez sur Retour pour donner la même largeur aux deux côtés."
           }
         }
       }
@@ -6847,16 +6815,6 @@
         }
       }
     },
-    "Duplicate the endpoint" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dupliquer l’endpoint"
-          }
-        }
-      }
-    },
     "Duplicate the resolver" : {
       "localizations" : {
         "fr" : {
@@ -6873,6 +6831,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaque agent reprend sa conversation quand c’est possible. Une session dont le résumé doit d’abord être relu vous est laissée, pour la redémarrer seule."
+          }
+        }
+      }
+    },
+    "Each session can then be switched with ⌥⌘T, and keeps its choice." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque session peut ensuite basculer avec ⌥⌘T, et garde son choix."
           }
         }
       }
@@ -6935,6 +6903,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vides"
+          }
+        }
+      }
+    },
+    "Endpoint" : {
+      "comment" : "A page of the Settings window: a model server.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endpoint"
           }
         }
       }
@@ -7622,17 +7601,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Génération en cours, %@"
-          }
-        }
-      }
-    },
-    "Git" : {
-      "comment" : "A section of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Git"
           }
         }
       }
@@ -8528,6 +8496,17 @@
         }
       }
     },
+    "Location" : {
+      "comment" : "Where an agent's command-line tool is.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emplacement"
+          }
+        }
+      }
+    },
     "Looking for coding agents…" : {
       "localizations" : {
         "fr" : {
@@ -8691,6 +8670,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus d’actions"
+          }
+        }
+      }
+    },
+    "More permissions" : {
+      "comment" : "A permission an agent asks for: more than its sandbox allows, the network or folders.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permissions supplémentaires"
           }
         }
       }
@@ -9118,6 +9108,17 @@
         }
       }
     },
+    "New Endpoint" : {
+      "comment" : "A page of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel endpoint"
+          }
+        }
+      }
+    },
     "New Resolver" : {
       "localizations" : {
         "fr" : {
@@ -9317,16 +9318,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun agent de code n’a été détecté sur ce Mac."
-          }
-        }
-      }
-    },
-    "No endpoint selected" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun endpoint sélectionné"
           }
         }
       }
@@ -10179,6 +10170,17 @@
         }
       }
     },
+    "On: %lld" : {
+      "comment" : "How many ticket resolvers are turned on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activés : %lld"
+          }
+        }
+      }
+    },
     "Only the first %lld changes are listed; the counts are exact." : {
       "localizations" : {
         "fr" : {
@@ -10196,6 +10198,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir %@"
+          }
+        }
+      }
+    },
+    "Open Link" : {
+      "comment" : "Opens the page an MCP server asks for.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir le lien"
           }
         }
       }
@@ -10313,22 +10326,22 @@
         }
       }
     },
+    "Open sessions in" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les sessions en"
+          }
+        }
+      }
+    },
     "Open with Default Application" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir avec l’application par défaut"
-          }
-        }
-      }
-    },
-    "OpenAI-compatible" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compatible OpenAI"
           }
         }
       }
@@ -10394,6 +10407,17 @@
         }
       }
     },
+    "Other Server" : {
+      "comment" : "A new endpoint that starts from no known server.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre serveur"
+          }
+        }
+      }
+    },
     "Other…" : {
       "comment" : "Picks another application to open files with.",
       "localizations" : {
@@ -10412,6 +10436,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paquet"
+          }
+        }
+      }
+    },
+    "Page to open" : {
+      "comment" : "The title of a request of an agent: an MCP server asks the user to open a page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page à ouvrir"
           }
         }
       }
@@ -11272,17 +11307,6 @@
         }
       }
     },
-    "Requests Section" : {
-      "comment" : "The pages of Settings › Requests.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Section des demandes"
-          }
-        }
-      }
-    },
     "Required" : {
       "comment" : "An option of a new session to fill.\nVoiceOver: a field that must be filled.",
       "localizations" : {
@@ -11300,6 +11324,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rétablir la disposition de la colonne"
+          }
+        }
+      }
+    },
+    "Resolvers" : {
+      "comment" : "A page of Settings › Tickets: what recognises a ticket's address.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résolveurs"
           }
         }
       }
@@ -12211,6 +12246,16 @@
         }
       }
     },
+    "Sessions that run on it keep it until they are restarted." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sessions qui l’utilisent le gardent jusqu’à leur redémarrage."
+          }
+        }
+      }
+    },
     "Sessions unavailable" : {
       "localizations" : {
         "fr" : {
@@ -12947,6 +12992,17 @@
         }
       }
     },
+    "Startup dialog" : {
+      "comment" : "The title of a request of an agent: a dialog of the CLI's start — trusting the folder, approving servers, signing in — is most likely waiting.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dialogue de démarrage"
+          }
+        }
+      }
+    },
     "Status" : {
       "comment" : "The submenu that moves a session between columns.",
       "localizations" : {
@@ -13300,6 +13356,17 @@
         }
       }
     },
+    "Terminal input" : {
+      "comment" : "A permission an agent asks for: to type into a terminal it left running.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisie dans un terminal"
+          }
+        }
+      }
+    },
     "Terminal tabs" : {
       "localizations" : {
         "fr" : {
@@ -13323,17 +13390,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminal — %1$@ — %2$@"
-          }
-        }
-      }
-    },
-    "Terminals" : {
-      "comment" : "A tab of the Settings window.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Terminaux"
           }
         }
       }
@@ -13687,6 +13743,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’action de l’agent ouvre %@ dans une autre application."
+          }
+        }
+      }
+    },
+    "The agent’s page on %@ wants to use the microphone." : {
+      "comment" : "A page the agent drives asks for the microphone (#315). %@ is the page's site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page de l’agent sur %@ veut utiliser le micro."
           }
         }
       }
@@ -14477,6 +14544,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les notes n’ont pas pu être enregistrées : %@"
+          }
+        }
+      }
+    },
+    "The one %@ speaks. It can be changed once the endpoint is added." : {
+      "comment" : "The name of a model server, such as Ollama.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celui que parle %@. Il pourra être changé une fois l’endpoint ajouté."
           }
         }
       }
@@ -16347,6 +16425,16 @@
         }
       }
     },
+    "Version" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        }
+      }
+    },
     "Version %@ is available." : {
       "localizations" : {
         "fr" : {
@@ -16579,6 +16667,16 @@
         }
       }
     },
+    "What recognises a ticket's address, and reads its title." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui reconnaît l’adresse d’un ticket, et lit son titre."
+          }
+        }
+      }
+    },
     "What runs in its side terminals will be stopped: %@." : {
       "comment" : "The argument lists the commands running in the session's side terminals.",
       "localizations" : {
@@ -16596,6 +16694,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui tourne dans leurs terminaux annexes sera arrêté."
+          }
+        }
+      }
+    },
+    "What the server speaks. Its documentation often says “OpenAI-compatible” or “Anthropic-compatible”." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que parle le serveur. Sa documentation dit souvent « compatible OpenAI » ou « compatible Anthropic »."
           }
         }
       }
@@ -16630,12 +16738,12 @@
         }
       }
     },
-    "When a new session names a ticket's address, its page opens in the session's web view, where you are signed in, and its title goes to the top of the notes. Only addresses a resolver below recognises are opened." : {
+    "When a new session names a ticket's address, its page opens in the session's web view, where you are signed in, and its title goes to the top of the notes. Only addresses a resolver recognises are opened." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quand une nouvelle session cite l’adresse d’un ticket, sa page s’ouvre dans la vue web de la session, là où vous êtes connecté, et son titre s’ajoute en tête des notes. Seules les adresses reconnues par un résolveur ci-dessous sont ouvertes."
+            "value" : "Quand une nouvelle session cite l’adresse d’un ticket, sa page s’ouvre dans la vue web de la session, là où vous êtes connecté, et son titre s’ajoute en tête des notes. Seules les adresses reconnues par un résolveur sont ouvertes."
           }
         }
       }
@@ -16998,6 +17106,28 @@
         }
       }
     },
+    "black" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "noir"
+          }
+        }
+      }
+    },
+    "blue" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bleu"
+          }
+        }
+      }
+    },
     "branch %@" : {
       "comment" : "Said by VoiceOver on a request's card.\nWhat VoiceOver says of a repository's branch: its name.",
       "localizations" : {
@@ -17005,6 +17135,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "branche %@"
+          }
+        }
+      }
+    },
+    "brown" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "marron"
           }
         }
       }
@@ -17167,6 +17308,17 @@
         }
       }
     },
+    "dark %@" : {
+      "comment" : "A colour, darker: “dark blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ foncé"
+          }
+        }
+      }
+    },
     "default model" : {
       "comment" : "Stands for the model an agent uses when none is chosen.",
       "localizations" : {
@@ -17249,6 +17401,17 @@
         }
       }
     },
+    "emerald" : {
+      "comment" : "A colour, said by VoiceOver: a green leaning to blue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "émeraude"
+          }
+        }
+      }
+    },
     "file edits" : {
       "comment" : "What always allowing grants: the agent's file edits, accepted as they come.",
       "localizations" : {
@@ -17293,6 +17456,28 @@
         }
       }
     },
+    "gray" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gris"
+          }
+        }
+      }
+    },
+    "green" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vert"
+          }
+        }
+      }
+    },
     "imported on %@" : {
       "comment" : "Read by VoiceOver after an avatar's name: made from an archive, and when.",
       "localizations" : {
@@ -17311,6 +17496,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "dans %@"
+          }
+        }
+      }
+    },
+    "indigo" : {
+      "comment" : "A colour, said by VoiceOver: between blue and violet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "indigo"
           }
         }
       }
@@ -17546,6 +17742,17 @@
         }
       }
     },
+    "light %@" : {
+      "comment" : "A colour, paler: “light blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ clair"
+          }
+        }
+      }
+    },
     "live" : {
       "comment" : "Said of a Git list that follows the disk as it changes.",
       "localizations" : {
@@ -17746,6 +17953,39 @@
         }
       }
     },
+    "orange" : {
+      "comment" : "A colour, said by VoiceOver: the fruit's.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "orange"
+          }
+        }
+      }
+    },
+    "pink" : {
+      "comment" : "A colour, said by VoiceOver: the flower's, not the wine's.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rose"
+          }
+        }
+      }
+    },
+    "purple" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "violet"
+          }
+        }
+      }
+    },
     "read %lld s ago" : {
       "comment" : "When the Git list was read: a number of seconds.",
       "localizations" : {
@@ -17775,6 +18015,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "lu à l’instant"
+          }
+        }
+      }
+    },
+    "red" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rouge"
           }
         }
       }
@@ -17907,6 +18158,17 @@
         }
       }
     },
+    "teal" : {
+      "comment" : "A colour, said by VoiceOver: between green and blue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "turquoise"
+          }
+        }
+      }
+    },
     "the default application" : {
       "comment" : "The application a file opens with, named inside a sentence: “could not be opened in …”.",
       "localizations" : {
@@ -18012,6 +18274,17 @@
         }
       }
     },
+    "very dark %@" : {
+      "comment" : "A colour, much darker: “very dark blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ très foncé"
+          }
+        }
+      }
+    },
     "waiting at its prompt" : {
       "comment" : "A side terminal's state.",
       "localizations" : {
@@ -18019,6 +18292,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente à l’invite"
+          }
+        }
+      }
+    },
+    "white" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blanc"
+          }
+        }
+      }
+    },
+    "yellow" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jaune"
+          }
+        }
+      }
+    },
+    "yellow-green" : {
+      "comment" : "A colour, said by VoiceOver: between yellow and green.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vert-jaune"
           }
         }
       }
@@ -18127,6 +18433,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "↻ pour en redessiner une"
+          }
+        }
+      }
+    },
+    "⌃⌥⌘P answers the requests from any application." : {
+      "comment" : "VoiceOver's hint on the palette of requests: its global shortcut.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃⌥⌘P permet de répondre aux demandes depuis n’importe quelle application."
           }
         }
       }

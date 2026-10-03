@@ -345,8 +345,46 @@ struct RequestCard: View {
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
-    case .elicitation, .unreadable:
+    case .elicitation(let elicitation):
+      elicitationContent(elicitation)
+    case .unreadable:
       EmptyView()
+    }
+  }
+
+  /// The server's words, and the page it asks to open — opened in the session's web view.
+  @ViewBuilder
+  private func elicitationContent(_ elicitation: AgentElicitation) -> some View {
+    if let message = elicitation.message {
+      Text(verbatim: DisplaySafeText.visible(message))
+        .font(.callout)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    if let server = elicitation.server {
+      Text(RequestPresentation.serverLine(DisplaySafeText.visible(server)))
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+    if let url = elicitation.url {
+      HStack(spacing: 8) {
+        Button {
+          model.openRequestLink(url, for: pending.id)
+        } label: {
+          Label {
+            Text("Open Link", bundle: .module, comment: "Opens the page an MCP server asks for.")
+          } icon: {
+            Image(systemName: "safari")
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .help(Text(verbatim: url.absoluteString))
+        Text(verbatim: url.host() ?? url.absoluteString)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
     }
   }
 

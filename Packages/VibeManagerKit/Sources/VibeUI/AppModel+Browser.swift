@@ -163,11 +163,11 @@ extension AppModel {
 
   public func closeWebTab() {
     guard let browser, let id = selectedSessionID, let tab = activeWebTab else {
-      NSSound.beep()
+      beep()
       return
     }
     guard !tab.isPinnedTicket else {
-      NSSound.beep()
+      beep()
       return
     }
     browser.close(tab.id, in: id)
@@ -239,7 +239,7 @@ extension AppModel {
     case .browser, .system:
       openOutsideHandler(url)
     case .refused:
-      NSSound.beep()
+      beep()
     }
   }
 
@@ -249,7 +249,7 @@ extension AppModel {
   public func openOutside(_ url: URL) {
     switch LinkRouting.externalRoute(for: url) {
     case .browser, .system: openOutsideHandler(url)
-    case .refused, .webView, .newTab: NSSound.beep()
+    case .refused, .webView, .newTab: beep()
     }
   }
 
@@ -277,6 +277,13 @@ extension AppModel {
     browser.openLink(url, in: id)
     if id == selectedSessionID { layout.setShowsBrowserWhenAlternating(true) }
     return true
+  }
+
+  /// The page an MCP server asks to open (#273): in the session's web view, the session on
+  /// screen, or in the default browser when the session has no web view.
+  public func openRequestLink(_ url: URL, for id: AgentRequestID) {
+    openSession(for: id)
+    if !openInWebView(url, from: id.sessionID) { ExternalOpening.open(url) }
   }
 
   // MARK: - Ticket

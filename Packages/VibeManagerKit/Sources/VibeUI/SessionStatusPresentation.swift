@@ -11,6 +11,11 @@ public enum SessionStatusSeverity: Equatable, Sendable {
   case active
   case attention
   case error
+
+  /// Whether the words of the state are drawn in the label colour rather than in the state's own:
+  /// a small orange or red caption reads at about 2:1 on the sidebar, under the 4.5:1 a reader
+  /// needs (#231). The colour stays on the symbol beside them.
+  var wordsInLabelColour: Bool { self != .normal }
 }
 
 /// What a session looks like in the sidebar, resolved from three sources that disagree.

@@ -136,7 +136,7 @@ struct CodeBlockView: View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
         Text(verbatim: language ?? "")
-          .font(theme.interfaceFont(size: 11))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
           .foregroundStyle(theme.secondaryText.color)
         Spacer()
         Button {
@@ -149,7 +149,7 @@ struct CodeBlockView: View {
           } icon: {
             Image(systemName: copied ? "checkmark" : "doc.on.doc")
           }
-          .font(theme.interfaceFont(size: 11))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
         }
         .buttonStyle(.plain)
         .foregroundStyle(theme.secondaryText.color)

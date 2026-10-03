@@ -260,7 +260,7 @@ extension AppModel {
     sidebarHistory.keep(only: Set(sessions.map(\.id)))
     switch sidebarHistory.popUndo() {
     case nil:
-      NSSound.beep()
+      beep()
     case .identity(let change):
       if let applied = await apply(change) {
         sidebarHistory.didUndo(applied)
@@ -275,7 +275,7 @@ extension AppModel {
   /// ⇧⌘Z: the rename or badge change undone last, again.
   public func redoSidebarChange() async {
     sidebarHistory.keep(only: Set(sessions.map(\.id)))
-    guard let change = sidebarHistory.popRedo() else { return NSSound.beep() }
+    guard let change = sidebarHistory.popRedo() else { return beep() }
     if let applied = await apply(change) {
       sidebarHistory.didRedo(applied)
     }
@@ -292,7 +292,7 @@ extension AppModel {
     } catch {
       applied = nil
     }
-    if applied == nil { NSSound.beep() }
+    if applied == nil { beep() }
     await identityDidChange(of: change.id, renamed: change.before.name != change.after.name)
     return applied
   }

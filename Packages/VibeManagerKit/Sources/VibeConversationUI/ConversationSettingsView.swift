@@ -62,14 +62,15 @@ public enum ConversationFonts {
   }
 }
 
-/// Settings › Conversation (#38): every preference of the conversation view, in a tab of its own,
-/// with a preview that follows each change. The user's own themes (#118) sit in the grid beside
+/// Settings › Conversation (#38): every preference of the conversation view, with a preview that
+/// follows each change. Whether sessions open on it is in General (#313). The user's own themes (#118) sit in the grid beside
 /// the built-in ones, and the card at its end unfolds the panel that makes one.
 public struct ConversationSettingsView: View {
   @Binding var appearance: ConversationAppearance
   @Bindable var themes: ConversationThemesModel
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var contrast
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @State private var deleting: ConversationTheme?
   @State private var exportDocument: ThemeArchiveDocument?
   @State private var exportName = ""
@@ -82,20 +83,6 @@ public struct ConversationSettingsView: View {
   public var body: some View {
     HStack(alignment: .top, spacing: 0) {
       Form {
-        Section {
-          Picker(selection: $appearance.defaultPresentation) {
-            Text("Conversation", bundle: .module).tag(SessionPresentation.conversation)
-            Text("Terminal", bundle: .module).tag(SessionPresentation.terminal)
-          } label: {
-            Text("Open sessions in", bundle: .module)
-          }
-          .pickerStyle(.segmented)
-          Text(
-            "Each session can then be switched with ⌥⌘T, and keeps its choice.", bundle: .module
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        }
         Section {
           Toggle(isOn: $appearance.followsSystemAppearance) {
             Text("Follow light and dark mode", bundle: .module)
@@ -154,6 +141,11 @@ public struct ConversationSettingsView: View {
             Text("Extra Large", bundle: .module).tag(ConversationAppearance.TextSize.extraLarge)
           } label: {
             Text("Text size", bundle: .module)
+            Text(
+              "Also sizes the terminals. ⌘+ and ⌘− in the View menu.", bundle: .module,
+              comment:
+                "Under the text size setting: it also sizes the terminals, and the View menu's zoom changes it."
+            )
           }
           Picker(selection: $appearance.density) {
             Text("Compact", bundle: .module).tag(ConversationAppearance.Density.compact)
@@ -249,7 +241,8 @@ public struct ConversationSettingsView: View {
 
   private var currentTheme: ConversationTheme {
     themes.displayed(
-      installedAppearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased)
+      installedAppearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased,
+      reducedTransparency: reduceTransparency)
   }
 
   /// A theme no longer there is named as the one drawn in its place: the mode's default.
@@ -408,7 +401,11 @@ public struct ConversationSettingsView: View {
               .frame(width: 18, height: 18)
               .overlay(
                 Circle().stroke(Color.accentColor, lineWidth: appearance.accent == accent ? 2 : 0)
-                  .padding(-3))
+                  .padding(-3)
+              )
+              // At least 20 points to click (#229), the disc drawn at its own size.
+              .frame(width: 20, height: 20)
+              .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
           .help(Text(Self.accentName(accent)))

@@ -115,6 +115,11 @@ pid, so a `git` that started a helper or a login shell whose profile started one
   keychain item of the sites always allowed to make one that names the application alone, which the
   keychain cannot tell from the application's own (ADR 0023). The data protection keychain would
   need an entitlement, and so a provisioning profile, this application does not have.
+- **The microphone is the terminals' too** (#315). Once the user has given Vibe Manager the
+  microphone for a page of the web view, a process of a session's terminal — an agent, a script it
+  runs — can record without a question, since macOS holds the application responsible for it, as
+  with any terminal application. A page the agent drives gets it only once the user allowed it
+  (ADR 0023); macOS's indicator shows whenever it is on.
 - **The history of side terminals is on disk** (#43, ADR 0030). What a side terminal showed —
   possibly a token a command printed — is written to `Terminals/<session>/*.scrollback`, `0600` in
   `0700` folders excluded from backups, bounded to 4 MiB per terminal, never read by the

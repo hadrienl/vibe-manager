@@ -35,8 +35,8 @@ GitHub.
   - the archive, built with `MARKETING_VERSION=<version>` and `CURRENT_PROJECT_VERSION` the
     number of commits — followed by `.1` for a final version, so that it comes after the release
     candidate of the same commit — nothing written to the repository;
-  - `codesign --verify --deep --strict`, no entitlement at all, the hardened runtime, a designated
-    requirement naming the team (security review A6) and equal to
+  - `codesign --verify --deep --strict`, the microphone's entitlement alone (#315), the hardened
+    runtime, a designated requirement naming the team (security review A6) and equal to
     `Configuration/DesignatedRequirement.txt`, the bundle identifier and version, an
     `SUPublicEDKey`;
   - `mock-agent.sh` sealed in the bundle, no `Local.xcconfig`;

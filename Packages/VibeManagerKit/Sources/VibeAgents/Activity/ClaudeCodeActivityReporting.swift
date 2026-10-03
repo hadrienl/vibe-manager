@@ -25,7 +25,11 @@ public enum ClaudeCodeActivityHooks {
     Hook(event: "PreToolUse", matcher: questionTools, payload: .keep),
     Hook(event: "PermissionRequest", matcher: nil, payload: .keep),
     Hook(event: "Notification", matcher: nil, payload: .keep),
-    Hook(event: "Elicitation", matcher: nil, payload: .drop),
+    // What the server asks, and the page it asks to open — never what its form is filled with —
+    // and which agent waits on it.
+    Hook(
+      event: "Elicitation", matcher: nil,
+      payload: .fields(["agent_id", "mcp_server_name", "message", "mode", "url"])),
     Hook(event: "ElicitationResult", matcher: nil, payload: .drop),
     // Which agent ran which tool on what: the request of #40 it settles, among several waiting.
     Hook(
@@ -37,8 +41,13 @@ public enum ClaudeCodeActivityHooks {
     Hook(
       event: "PermissionDenied", matcher: nil,
       payload: .fields(AgentRequestReading.resolutionFields)),
+    // Every call of a batch resolved, refused ones included (#273): only which agent's batch.
+    Hook(event: "PostToolBatch", matcher: nil, payload: .fields(["agent_id"])),
     Hook(event: "Stop", matcher: nil, payload: .drop),
-    Hook(event: "StopFailure", matcher: nil, payload: .drop),
+    // Which error ended the turn, and the API's words for it (#273).
+    Hook(
+      event: "StopFailure", matcher: nil,
+      payload: .fields(["error", "last_assistant_message"])),
     Hook(event: "SessionEnd", matcher: nil, payload: .drop),
   ]
 
@@ -74,6 +83,12 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
   public var answerKeymap: (any AgentAnswerKeymap)? {
     ClaudeCodeAnswerKeymap()
   }
+
+  /// The errors of `StopFailure` only the user can end: signing in again, an account to sort out.
+  static let accountErrors: Set<String> = [
+    "authentication_failed", "oauth_org_not_allowed", "account_on_hold", "billing_error",
+    "cloud_credential_error",
+  ]
 
   /// The notifications that say a dialog is up, checked against 2.1.285 and its documentation.
   /// `elicitation_dialog` is left out: the `Elicitation` hook reports the same dialog, and ends it.
@@ -137,20 +152,39 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       return .questionAsked(
         .question,
         notice: AgentRequestNotice(
-          content: .elicitation, reference: AgentToolReference(tool: nil), isShown: true))
+          content: .elicitation(Self.elicitation(in: event)),
+          // A sub-agent's: the end of the main agent's batch does not settle it.
+          reference: AgentToolReference(tool: nil, agentID: event.string("agent_id")),
+          isShown: true))
     case "ElicitationResult":
       return .questionResolved
     case "PostToolUse", "PostToolUseFailure", "PermissionDenied":
       let reference = AgentRequestReading.reference(of: event)
       guard let tool = reference.tool else { return .questionResolved }
       return .toolFinished(tool, agentID: reference.agentID, subject: reference.subject)
-    case "Stop", "StopFailure":
+    case "PostToolBatch":
+      return .batchResolved(agentID: event.string("agent_id"))
+    case "Stop":
       return .turnEnded
+    case "StopFailure":
+      guard let error = event.string("error"), Self.accountErrors.contains(error) else {
+        return .turnEnded
+      }
+      return .turnFailed(
+        AgentTerminalPrompt(kind: .account, message: event.string("last_assistant_message")))
     case "SessionEnd":
       return .agentEnded
     default:
       return nil
     }
+  }
+
+  /// The server's words, and the page it asks to open in URL mode — only then.
+  static func elicitation(in event: AgentActivityEvent) -> AgentElicitation {
+    AgentElicitation(
+      server: event.string("mcp_server_name"),
+      message: event.string("message"),
+      url: event.string("mode") == "url" ? event.string("url").flatMap(URL.init(string:)) : nil)
   }
 
   /// Claude Code reports no interruption through its hooks — neither Escape during a turn nor a

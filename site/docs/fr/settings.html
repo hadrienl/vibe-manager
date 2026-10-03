@@ -1,78 +1,86 @@
 <h1>Réglages</h1>
-<p class="lede">Chaque onglet de <strong>Vibe Manager › Réglages…</strong> (<kbd>⌘,</kbd>), et le rôle de chaque réglage.</p>
+<p class="lede">Chaque page de <strong>Vibe Manager › Réglages…</strong> (<kbd>⌘,</kbd>), et le rôle de chaque réglage. La barre latérale les regroupe comme Réglages Système ; la fenêtre s’élargit d’elle-même pour les pages qui demandent de la place, comme les gabarits.</p>
 
-<vm-shot name="settings-general" alt="Réglages, onglet Général : les sessions, la fermeture de l’app avec des agents en cours, l’éditeur des fichiers modifiés, l’activité des agents, l’utilisation et les diagnostics.">L’onglet Général.</vm-shot>
+<vm-shot name="settings-general" alt="Réglages, page Général : la barre latérale des pages, à côté les sessions, le résumé, les terminaux annexes et l’éditeur des fichiers modifiés.">La page Général, et la barre latérale de toutes les pages.</vm-shot>
 
 <h2 id="general">Général</h2>
 <dl>
+  <dt>Ouvrir les sessions en</dt>
+  <dd><strong>Conversation</strong> ou <strong>Terminal</strong>, pour les sessions dont vous n’avez pas changé la vue vous-même (<kbd>⌥⌘T</kbd>).</dd>
   <dt>Demander avant de fermer ou d’archiver une session où un travail est en cours</dt>
   <dd>Activé par défaut. Désactivé, fermer et archiver ne demandent jamais confirmation.</dd>
   <dt>En quittant avec des agents en cours d’exécution</dt>
-  <dd><strong>Demander</strong>, <strong>Les laisser tourner</strong> ou <strong>Les arrêter</strong> : voir <a href="agents.html#quit">Quitter sans arrêter les agents</a>.</dd>
+  <dd><strong>Demander</strong>, <strong>Les laisser tourner</strong> ou <strong>Les arrêter</strong> : voir <a href="agents.html#quit">Quitter sans arrêter les agents</a>.</dd>
+  <dt id="activity">Résumer automatiquement les sessions</dt>
+  <dd>Après chaque tour, l’agent écrit un court résumé de la session avec son modèle le plus léger, au plus une fois toutes les cinq minutes ; il s’affiche dans l’<a href="inspector.html#activity">inspecteur</a> et Ouvrir rapidement y cherche. Il utilise le compte de votre agent.</dd>
+  <dt id="terminals">Conserver l’historique des terminaux annexes</dt>
+  <dd>Ce qu’affichait chaque terminal annexe est écrit sur le disque pour revenir après une relance. Le désactiver efface les historiques enregistrés.</dd>
   <dt>Ouvrir les fichiers modifiés avec</dt>
-  <dd>Ce que font <kbd>Return</kbd> ou un double-clic sur un fichier de l’inspecteur : <strong>Finder (afficher seulement)</strong>, <strong>Application par défaut</strong>, l’un des éditeurs trouvés sur ce Mac, ou <strong>Autre…</strong>.</dd>
-  <dt>Activité des agents › Suivre l’activité de …</dt>
-  <dd>Un interrupteur par agent. Activé, les hooks de l’agent signalent quand il travaille, demande ou termine, ce dont la barre latérale et les demandes ont besoin. La première fois, une feuille montre les commandes qu’exécutent les hooks, et vous les approuvez une fois pour toutes.</dd>
-  <dt>Utilisation › Suivre l’utilisation des agents</dt>
-  <dd>Enregistre le temps d’exécution et lit les compteurs de jetons pour la <a href="inspector.html#usage-window">fenêtre Utilisation</a>. <strong>Effacer les données d’utilisation…</strong> efface ce qui a été enregistré, pas les transcripts des agents.</dd>
-  <dt>Diagnostics</dt>
-  <dd><strong>Exporter les diagnostics…</strong> : voir <a href="troubleshooting.html#diagnostics">Dépannage</a>.</dd>
+  <dd>Ce que font <kbd>Return</kbd> ou un double-clic sur un fichier de l’inspecteur : <strong>Finder (afficher seulement)</strong>, <strong>Application par défaut</strong>, l’un des éditeurs trouvés sur ce Mac, ou <strong>Autre…</strong>.</dd>
 </dl>
 
-<h2 id="privacy">Confidentialité</h2>
-<p>Indique si Vibe Manager dispose de l’<strong>Accès complet au disque</strong> — Accordé, Non accordé, ou Accordé, pas encore effectif —, avec <strong>Ouvrir Réglages Système</strong>. Les agents héritent de l’accès du processus qui les fait tourner, lequel a pu démarrer avant que vous l’accordiez : <strong>Redémarrer à la fin des agents</strong> le laisse partir une fois son dernier agent terminé, <strong>Redémarrer maintenant…</strong> arrête les agents qu’il cite et les reprend. La section <strong>Processus par processus</strong> apparaît quand ils ne sont pas d’accord.</p>
+<h2 id="conversation">Conversation</h2>
+<dl>
+  <dt>Thème</dt><dd>Voir <a href="personalize.html#themes">Thèmes et avatars</a>.</dd>
+  <dt>Affichage</dt><dd>Couleur d’accent, police des messages, police du code, taille du texte (de Petit à Très grand), densité (Compacte ou Confortable), vos messages en Bulles ou en Lignes.</dd>
+  <dt>Détails techniques</dt><dd>Regrouper les appels consécutifs de même nature ; déplier un appel en échec ; déplier les modifications de fichiers ; afficher les rangées de raisonnement ; retour à la ligne dans les blocs de code ; numéros de ligne dans les diffs.</dd>
+</dl>
 
-<h2 id="templates">Gabarits</h2>
-<p>L’éditeur de gabarits de session : voir <a href="templates.html">Gabarits de session</a>.</p>
+<h2 id="badges">Badges</h2>
+<p>Les symboles et les couleurs proposés pour les badges des sessions : voir <a href="personalize.html#badges">Badges</a>.</p>
+
+<h2 id="requests">Notifications</h2>
+<dl>
+  <dt>Panneau flottant</dt>
+  <dd><strong>Afficher les demandes au-dessus des autres applications</strong> active le <a href="requests.html#background">panneau flottant</a>. Choisissez son avatar, s’il masque ou garde l’avatar à l’écran <strong>Sans demande en attente</strong>, et <strong>Remettre à sa place</strong> s’il s’est perdu. Son raccourci est <kbd>⌃⌥⌘P</kbd>.</dd>
+  <dt>Notifications</dt>
+  <dd><strong>Me notifier des demandes</strong>, en montrant <strong>Le type de demande</strong> ou <strong>La commande ou la question</strong>. Indisponible tant que le panneau flottant est actif, puisqu’il les signale déjà.</dd>
+  <dt>Palette</dt>
+  <dd>Afficher le nombre de demandes sur l’icône du Dock ; déplier la palette à l’arrivée d’une demande.</dd>
+  <dt>Gérer les avatars…</dt>
+  <dd>Ouvre la page <strong>Avatars</strong>, votre bibliothèque d’avatars : voir <a href="personalize.html#avatars">Avatars</a>. Le bouton ‹ ramène aux notifications.</dd>
+</dl>
+
+<h2 id="agents">Agents</h2>
+<p>Une page par agent : Claude Code, Codex. Le point de la barre latérale dit s’il est prêt (vert), utilisable avec quelque chose à régler, trop ancien ou pas connecté (orange), ou introuvable (rouge). La page montre où son outil en ligne de commande a été trouvé et sa version ; <strong>Relancer la détection</strong> le cherche à nouveau, après une installation ou une mise à jour.</p>
+<dl>
+  <dt>Suivre l’activité de …</dt>
+  <dd>Pour un agent qui fait approuver ses hooks, comme Codex. Activé, les hooks signalent quand il travaille, demande ou termine, ce dont la barre latérale et les demandes ont besoin. La première fois, une feuille montre les commandes qu’exécutent les hooks, et vous les approuvez une fois pour toutes. Claude Code n’a pas ce réglage : ses hooks n’ont pas à être approuvés.</dd>
+</dl>
+
+<h2 id="endpoints">Endpoints</h2>
+<p>Chaque serveur de modèles déclaré a sa page, et le point de la barre latérale dit le résultat de son dernier test. <strong>Ajouter un endpoint…</strong> part d’Ollama, de LM Studio, d’OpenRouter ou d’un <strong>Autre serveur</strong> : un serveur connu remplit l’adresse, la clé attendue et le protocole ; seul un autre serveur demande son protocole. Voir <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/endpoints.md">docs/endpoints.md</a>.</p>
 
 <h2 id="web-view">Vue web</h2>
 <dl>
   <dt>Donner la vue web aux agents</dt><dd>Lance chaque agent avec le serveur d’outils <code>vibe-browser</code>. Prend effet au prochain démarrage de chaque agent.</dd>
   <dt>Afficher la vue web quand un agent ouvre une page</dt><dd>Fait passer la vue web au premier plan quand l’agent ouvre un onglet.</dd>
-  <dt>Ouvrir les liens</dt><dd><strong>Dans la vue web</strong> ou <strong>Dans le navigateur par défaut</strong>, pour les liens cliqués avec <kbd>⌘</kbd> dans un terminal ; <kbd>⌥</kbd> fait l’inverse.</dd>
-  <dt>Sites toujours autorisés</dt><dd>Les sites pour lesquels vous avez choisi <strong>Toujours autoriser</strong> ; <strong>Retirer</strong> revient sur ce choix.</dd>
+  <dt>Ouvrir les liens</dt><dd><strong>Dans la vue web</strong> ou <strong>Dans le navigateur par défaut</strong>, pour les liens cliqués avec <kbd>⌘</kbd> dans un terminal ; <kbd>⌥</kbd> fait l’inverse.</dd>
+  <dt>Sites toujours autorisés</dt><dd>Les sites pour lesquels vous avez choisi <strong>Toujours autoriser</strong> ; <strong>Retirer</strong> revient sur ce choix.</dd>
   <dt>Données de navigation › Effacer…</dt><dd>Efface les cookies et les données de la vue web, ce qui vous déconnecte de tous les sites dans toutes les sessions.</dd>
 </dl>
 
-<h2 id="terminals">Terminaux</h2>
-<p><strong>Conserver l’historique des terminaux annexes</strong> : ce qu’affichait chaque terminal annexe est écrit sur le disque pour revenir après une relance. Le désactiver efface les historiques enregistrés.</p>
+<h2 id="templates">Gabarits</h2>
+<p>L’éditeur de gabarits de session : voir <a href="templates.html">Gabarits de session</a>.</p>
 
 <h2 id="tickets">Tickets</h2>
 <p>Quand une nouvelle session désigne un ticket — dans son champ Ticket, son nom ou son prompt —, sa page s’ouvre dans la vue web et, avec <strong>Insérer le titre des tickets dans les notes</strong>, son titre est ajouté en haut des notes, dans le <strong>Format de la ligne</strong> de votre choix (<code>{title}</code>, <code>{id}</code>, <code>{url}</code>).</p>
-<p>Un <strong>résolveur</strong> indique quelles adresses sont des tickets : GitHub, GitLab, les merge requests GitLab, Jira Cloud et Linear sont fournis. Ajoutez les vôtres pour un GitLab auto-hébergé, un Jira Server ou un Redmine : un nom, un <strong>motif d’adresse</strong> avec une capture nommée comme <code>(?&lt;number&gt;[0-9]+)</code>, un <strong>identifiant</strong> comme <code>#{number}</code>, et des motifs de <strong>nettoyage du titre</strong>. <strong>Tester avec une adresse</strong> le vérifie. Les résolveurs peuvent être importés et exportés ; voir <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/ticket-resolvers.md">docs/ticket-resolvers.md</a>.</p>
+<p>La ligne <strong>Résolveurs</strong> ouvre leur page. Un résolveur indique quelles adresses sont des tickets : GitHub, GitLab, les merge requests GitLab, Jira Cloud et Linear sont fournis. Ajoutez les vôtres pour un GitLab auto-hébergé, un Jira Server ou un Redmine : un nom, un <strong>motif d’adresse</strong> avec une capture nommée comme <code>(?&lt;number&gt;[0-9]+)</code>, un <strong>identifiant</strong> comme <code>#{number}</code>, et des motifs de <strong>nettoyage du titre</strong>. <strong>Tester avec une adresse</strong> le vérifie. Les résolveurs peuvent être importés et exportés ; voir <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/ticket-resolvers.md">docs/ticket-resolvers.md</a>.</p>
 
-<h2 id="activity">Activité</h2>
-<p><strong>Résumer automatiquement les sessions</strong> : après chaque tour, l’agent écrit un court résumé de la session avec son modèle le plus léger, au plus une fois toutes les cinq minutes ; il s’affiche dans l’<a href="inspector.html#activity">inspecteur</a> et Ouvrir rapidement y cherche. Il utilise le compte de votre agent.</p>
-
-<h2 id="conversation">Conversation</h2>
+<h2 id="privacy">Confidentialité</h2>
+<p>Indique si Vibe Manager dispose de l’<strong>Accès complet au disque</strong> — Accordé, Non accordé, ou Accordé, pas encore effectif —, avec <strong>Ouvrir Réglages Système</strong>. Les agents héritent de l’accès du processus qui les fait tourner, lequel a pu démarrer avant que vous l’accordiez : <strong>Redémarrer à la fin des agents</strong> le laisse partir une fois son dernier agent terminé, <strong>Redémarrer maintenant…</strong> arrête les agents qu’il cite et les reprend. La section <strong>Processus par processus</strong> apparaît quand ils ne sont pas d’accord.</p>
 <dl>
-  <dt>Ouvrir les sessions en</dt><dd><strong>Conversation</strong> ou <strong>Terminal</strong>, pour les sessions dont vous n’avez pas changé la vue vous-même.</dd>
-  <dt>Thème</dt><dd>Voir <a href="personalize.html#themes">Thèmes et avatars</a>.</dd>
-  <dt>Affichage</dt><dd>Couleur d’accent, police des messages, police du code, taille du texte (de Petit à Très grand), densité (Compacte ou Confortable), vos messages en Bulles ou en Lignes.</dd>
-  <dt>Détails techniques</dt><dd>Regrouper les appels consécutifs de même nature ; déplier un appel en échec ; déplier les modifications de fichiers ; afficher les rangées de raisonnement ; retour à la ligne dans les blocs de code ; numéros de ligne dans les diffs.</dd>
+  <dt id="usage">Données de ce Mac › Suivre l’utilisation des agents</dt>
+  <dd>Enregistre le temps d’exécution et lit les compteurs de jetons pour la <a href="inspector.html#usage-window">fenêtre Utilisation</a>. <strong>Effacer les données d’utilisation…</strong> efface ce qui a été enregistré, pas les transcripts des agents.</dd>
+  <dt>Données de ce Mac › Diagnostics</dt>
+  <dd><strong>Exporter les diagnostics…</strong> : voir <a href="troubleshooting.html#diagnostics">Dépannage</a>.</dd>
 </dl>
-
-<h2 id="requests">Demandes</h2>
-<p>Deux pages, <strong>Signalement</strong> et <strong>Avatars</strong>.</p>
-<dl>
-  <dt>Panneau flottant</dt>
-  <dd><strong>Afficher les demandes au-dessus des autres applications</strong> active le <a href="requests.html#background">panneau flottant</a>. Choisissez son avatar (<strong>Gérer les avatars…</strong>), s’il masque ou garde l’avatar à l’écran <strong>Sans demande en attente</strong>, et <strong>Remettre à sa place</strong> s’il s’est perdu. Son raccourci est <kbd>⌃⌥⌘P</kbd>.</dd>
-  <dt>Notifications</dt>
-  <dd><strong>Me notifier des demandes</strong>, en montrant <strong>Le type de demande</strong> ou <strong>La commande ou la question</strong>. Indisponible tant que le panneau flottant est actif, puisqu’il les signale déjà.</dd>
-  <dt>Palette</dt>
-  <dd>Afficher le nombre de demandes sur l’icône du Dock ; déplier la palette à l’arrivée d’une demande.</dd>
-  <dt>Avatars</dt>
-  <dd>Votre bibliothèque d’avatars : voir <a href="personalize.html#avatars">Avatars</a>.</dd>
-</dl>
-
-<h2 id="badges">Badges</h2>
-<p>Les symboles et les couleurs proposés pour les badges des sessions : voir <a href="personalize.html#badges">Badges</a>.</p>
 
 <h2 id="updates">Mises à jour</h2>
 <dl>
   <dt>Rechercher automatiquement les mises à jour</dt><dd>Chaque jour, chaque semaine ou chaque mois.</dd>
-  <dt>Télécharger et installer automatiquement les mises à jour</dt><dd>Installe en arrière-plan ; sinon, la question vous est posée.</dd>
+  <dt>Télécharger et installer automatiquement les mises à jour</dt><dd>Installe en arrière-plan ; sinon, la question vous est posée.</dd>
   <dt>Canal</dt><dd><strong>Stable</strong>, ou <strong>Instable</strong> pour recevoir aussi les versions candidates.</dd>
   <dt>Rechercher maintenant</dt><dd>Aussi dans <strong>Vibe Manager › Rechercher les mises à jour…</strong>.</dd>
 </dl>
-<p>Les mises à jour sont signées deux fois — avec le Developer ID de l’app et avec une clé EdDSA — et vérifiées avant d’être installées. Quand des agents tournent, la mise à jour pose la même question qu’en quittant : installer en les laissant tourner, ou tout arrêter.</p>
+<p>Les mises à jour sont signées deux fois — avec le Developer ID de l’app et avec une clé EdDSA — et vérifiées avant d’être installées. Quand des agents tournent, la mise à jour pose la même question qu’en quittant : installer en les laissant tourner, ou tout arrêter.</p>

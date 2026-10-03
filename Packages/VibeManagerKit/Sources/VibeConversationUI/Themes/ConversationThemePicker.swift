@@ -30,6 +30,7 @@ public struct ConversationThemePicker: View {
   private let cancel: (() -> Void)?
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var contrast
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @FocusState private var isFocused: Bool
   /// The selection when the picker appeared: what Escape gives back.
   @State private var initial: String??
@@ -146,7 +147,8 @@ public struct ConversationThemePicker: View {
   /// What the conversation is drawn with when it follows the settings, now.
   private var settingsTheme: ConversationTheme {
     themes.displayed(
-      appearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased)
+      appearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased,
+      reducedTransparency: reduceTransparency)
   }
 
   private func label(_ option: Option) -> Text {

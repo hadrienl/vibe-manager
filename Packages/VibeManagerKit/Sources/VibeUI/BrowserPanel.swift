@@ -159,33 +159,57 @@ private struct BrowserTabButton: View {
   let model: AppModel
   let browser: SessionBrowser
   @State private var isHovering = false
+  @FocusState private var focus: TabFocus?
+
+  /// What has the keyboard in the tab, with Full Keyboard Access (#230).
+  private enum TabFocus: Hashable {
+    case tab
+    case close
+  }
 
   var body: some View {
     HStack(spacing: 5) {
-      icon
-      if tab.isPinnedTicket {
-        Text(verbatim: browser.ticket?.label ?? tab.displayTitle)
-          .lineLimit(1)
-      } else {
-        title
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .frame(maxWidth: 150, alignment: .leading)
-        if isActive || isHovering {
-          Button(action: close) {
-            Image(systemName: "xmark")
-              .font(.system(size: 9, weight: .semibold))
-              .frame(width: 14, height: 14)
+      // A button, so that the keyboard reaches every tab, not only the one in front (#230).
+      Button(action: activate) {
+        HStack(spacing: 5) {
+          icon
+          if tab.isPinnedTicket {
+            Text(verbatim: browser.ticket?.label ?? tab.displayTitle)
+              .lineLimit(1)
+          } else {
+            title
+              .lineLimit(1)
+              .truncationMode(.tail)
+              .frame(maxWidth: 150, alignment: .leading)
           }
-          .buttonStyle(.borderless)
-          .help(Text("Close Tab", bundle: .module))
-          .accessibilityLabel(Text("Close Tab", bundle: .module))
         }
+        // The whole tab answers the click, its margins included, as before it was a button.
+        .padding(.leading, 8)
+        .padding(.trailing, showsClose ? 0 : 8)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .focused($focus, equals: .tab)
+      // Shown in front, under the pointer, and when the keyboard is on the tab: a tab behind is
+      // closed without the mouse too.
+      if showsClose {
+        Button(action: close) {
+          Image(systemName: "xmark")
+            .font(.system(size: 9, weight: .semibold))
+            // At least 20 points to click (#229).
+            .frame(width: 20, height: 20)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .focused($focus, equals: .close)
+        .help(Text("Close Tab", bundle: .module))
+        .accessibilityLabel(Text("Close Tab", bundle: .module))
       }
     }
     .font(.callout.weight(isActive ? .semibold : .regular))
     .foregroundStyle(isActive ? .primary : .secondary)
-    .padding(.horizontal, 8)
+    .padding(.trailing, showsClose ? 8 : 0)
     .frame(height: 26)
     .background(
       RoundedRectangle(cornerRadius: 7)
@@ -196,15 +220,32 @@ private struct BrowserTabButton: View {
         .strokeBorder(isActive ? Color(nsColor: .separatorColor) : .clear)
     )
     .contentShape(Rectangle())
-    .onTapGesture(perform: activate)
     .onHover { isHovering = $0 }
     .help(Text(verbatim: tab.url.absoluteString))
     .contextMenu { menu }
     .accessibilityElement(children: .ignore)
     .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     .accessibilityLabel(accessibilityLabel)
-    .accessibilityAction(named: Text("Close Tab", bundle: .module)) { close() }
     .accessibilityAction { activate() }
+    .accessibilityActions {
+      if !tab.isPinnedTicket {
+        Button(String(localized: "Close Tab", bundle: .module), action: close)
+        if browser.canMoveTab(tab.id, by: -1) {
+          Button(String(localized: "Move Left", bundle: .module)) {
+            browser.moveTab(tab.id, by: -1)
+          }
+        }
+        if browser.canMoveTab(tab.id, by: 1) {
+          Button(String(localized: "Move Right", bundle: .module)) {
+            browser.moveTab(tab.id, by: 1)
+          }
+        }
+      }
+    }
+  }
+
+  private var showsClose: Bool {
+    !tab.isPinnedTicket && (isActive || isHovering || focus != nil)
   }
 
   @ViewBuilder
@@ -270,6 +311,19 @@ private struct BrowserTabButton: View {
       } label: {
         Text("Set as Ticket", bundle: .module)
       }
+      Divider()
+      Button {
+        browser.moveTab(tab.id, by: -1)
+      } label: {
+        Text("Move Left", bundle: .module)
+      }
+      .disabled(!browser.canMoveTab(tab.id, by: -1))
+      Button {
+        browser.moveTab(tab.id, by: 1)
+      } label: {
+        Text("Move Right", bundle: .module)
+      }
+      .disabled(!browser.canMoveTab(tab.id, by: 1))
       Divider()
       Button(action: close) {
         Text("Close Tab", bundle: .module)
@@ -973,6 +1027,8 @@ private struct BrowserPermissionBanner: View {
       return Text(
         "The page opens \(address) in another application, which connects to another computer.",
         bundle: .module)
+    case .effect(.microphone(let site)):
+      return Text("The agent’s page on \(site) wants to use the microphone.", bundle: .module)
     }
   }
 

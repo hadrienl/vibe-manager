@@ -133,6 +133,31 @@ struct VibeManagerApp: App {
       // In the menus rather than bound to the views: a shortcut that only works while a
       // particular view holds focus is a shortcut nobody can rely on, and the menu is also
       // where VoiceOver and the keyboard-only user find these actions at all.
+      // The size of the text of the conversations and the terminals (#229): macOS gives a
+      // third-party application no Dynamic Type. The size chosen in the Conversation settings,
+      // so it is kept between launches. ⌘+ also over the web view: it zooms no page.
+      CommandGroup(before: .toolbar) {
+        Button("Zoom In") {
+          environment.appModel.zoomIn()
+        }
+        .keyboardShortcut("+", modifiers: .command)
+        .disabled(!environment.appModel.canZoomIn)
+
+        Button("Zoom Out") {
+          environment.appModel.zoomOut()
+        }
+        .keyboardShortcut("-", modifiers: .command)
+        .disabled(!environment.appModel.canZoomOut)
+
+        Button("Actual Size") {
+          environment.appModel.resetZoom()
+        }
+        .keyboardShortcut("0", modifiers: .command)
+        .disabled(environment.appModel.isActualSize)
+
+        Divider()
+      }
+
       CommandGroup(after: .sidebar) {
         Button(
           environment.appModel.layout.columns.isInspectorVisible
@@ -350,6 +375,9 @@ struct VibeManagerApp: App {
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
+    // The user's to size, down to what a page needs: a page that needs more widens it (#313).
+    .windowResizability(.contentMinSize)
+    .defaultSize(width: 835, height: 700)
 
     // One window, reopened rather than duplicated. SwiftUI lists it in the Window menu itself,
     // so the shortcut goes on the scene rather than on a second menu item.
@@ -388,7 +416,7 @@ private struct TemplateCommands: View {
     Divider()
 
     Button("Manage Prompt Templates…") {
-      model.settingsTab = .templates
+      model.settingsPage = .templates
       openSettings()
     }
   }
@@ -447,7 +475,7 @@ private struct UpdateCommands: View {
         }
       } else if !updates.isAvailable {
         Button("Check for Updates…") {
-          model.settingsTab = .updates
+          model.settingsPage = .updates
           openSettings()
         }
       } else if let waiting = updates.waitingVersion {

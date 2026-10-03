@@ -42,7 +42,8 @@ struct AnnouncedDialogDecodingTests {
       decoder.signal(for: notification("idle_prompt", "Claude is waiting for your input"))
         == .waitingForInput)
     // Any other permission repeats its `PermissionRequest`, and may come once it is answered.
-    #expect(decoder.signal(for: notification("permission_prompt", "Claude needs your permission")) == nil)
+    #expect(
+      decoder.signal(for: notification("permission_prompt", "Claude needs your permission")) == nil)
     // Its `Elicitation` hook reports the same dialog, and says when it ends.
     #expect(decoder.signal(for: notification("elicitation_dialog", "Form")) == nil)
     // A teammate's permission, reported by its own hooks, may come once answered.
@@ -93,7 +94,8 @@ struct AnnouncedDialogDecodingTests {
         otherwise: AgentTerminalPrompt(kind: .form, message: "Approval requested by github")),
       "Plan mode prompt: Implement this plan?": announced(
         .plan, "Plan mode prompt: Implement this plan?"),
-      "Plan mode prompt: Which database?": announced(.question, "Plan mode prompt: Which database?"),
+      "Plan mode prompt: Which database?": announced(
+        .question, "Plan mode prompt: Which database?"),
       "Question: Tea or coffee?": announced(.question, "Question: Tea or coffee?"),
       "Plan mode prompt: Apply reasoning change": nil,
       "Agent turn complete": nil,
@@ -110,11 +112,46 @@ struct AnnouncedDialogDecodingTests {
       providerID: CodexAgentProvider.id, executablePath: "/bin/codex", arguments: ["codex"],
       environment: [:], workingDirectoryPath: "/tmp", promptDelivery: .none, version: nil)
     let arguments = CodexAgentProvider.make(environment: [:]).reportingActivity(
-      plan, to: URL(fileURLWithPath: "/l"))
-      .arguments
+      plan, to: URL(fileURLWithPath: "/l")
+    )
+    .arguments
     #expect(arguments.contains(#"tui.notification_method="osc9""#))
     #expect(arguments.contains(#"tui.notification_condition="always""#))
     // The hooks, and so what Codex asked the user to approve, are the same as before.
     #expect(CodexActivityHooks.hookOptions(in: arguments) == CodexActivityHooks.options())
+  }
+
+  @Test("Claude Code: a batch resolved, and a turn failed on the account (P2)")
+  func claudeP2() {
+    let decoder = ClaudeCodeSignalDecoder()
+    func event(_ name: String, _ payload: String?) -> AgentActivityEvent {
+      AgentActivityEvent(name: name, date: Date(), payload: payload.map { Data($0.utf8) })
+    }
+    #expect(decoder.signal(for: event("PostToolBatch", nil)) == .batchResolved(agentID: nil))
+    #expect(
+      decoder.signal(for: event("PostToolBatch", #"{"agent_id":"a1"}"#))
+        == .batchResolved(agentID: "a1"))
+    #expect(
+      decoder.signal(
+        for: event(
+          "StopFailure",
+          #"{"error":"authentication_failed","last_assistant_message":"API Error: 401"}"#))
+        == .turnFailed(AgentTerminalPrompt(kind: .account, message: "API Error: 401")))
+    #expect(decoder.signal(for: event("StopFailure", #"{"error":"rate_limit"}"#)) == .turnEnded)
+    #expect(decoder.signal(for: event("StopFailure", nil)) == .turnEnded)
+    #expect(ClaudeCodeActivityHooks.hooks.contains { $0.event == "PostToolBatch" })
+  }
+
+  @Test("Codex: a tool finishing says which, for which agent, on what (P2)")
+  func codexToolFinished() {
+    let event = AgentActivityEvent(
+      name: "PostToolUse", date: Date(),
+      payload: Data(#"{"agent_id":"a1","tool_name":"Bash","command":"ls"}"#.utf8))
+    #expect(
+      CodexSignalDecoder().signal(for: event) == .toolFinished("Bash", agentID: "a1", subject: "ls")
+    )
+    #expect(
+      CodexSignalDecoder().signal(for: AgentActivityEvent(name: "PostToolUse", date: Date()))
+        == .questionResolved)
   }
 }
