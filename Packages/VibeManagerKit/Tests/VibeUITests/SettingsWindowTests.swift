@@ -20,7 +20,8 @@ struct SettingsWindowTests {
   func widensThenComesBack() throws {
     let frame = NSRect(x: 100, y: 200, width: 835, height: 700)
     let wide = try #require(
-      SettingsWindowWidth.plan(frame: frame, needed: 1_225, restoredWidth: nil, screen: Self.screen))
+      SettingsWindowWidth.plan(frame: frame, needed: 1_225, restoredWidth: nil, screen: Self.screen)
+    )
     #expect(wide.frame == NSRect(x: 100, y: 200, width: 1_225, height: 700))
     #expect(wide.restoredWidth == 835)
 
@@ -53,7 +54,8 @@ struct SettingsWindowTests {
   func staysOnScreen() throws {
     let frame = NSRect(x: 1_000, y: 200, width: 835, height: 700)
     let plan = try #require(
-      SettingsWindowWidth.plan(frame: frame, needed: 1_225, restoredWidth: nil, screen: Self.screen))
+      SettingsWindowWidth.plan(frame: frame, needed: 1_225, restoredWidth: nil, screen: Self.screen)
+    )
     #expect(plan.frame.maxX == Self.screen.maxX)
     #expect(plan.frame.width == 1_225)
 
@@ -90,7 +92,9 @@ struct SettingsWindowTests {
     #expect(sidebar.groups[2].entries.map(\.page).prefix(2) == [.webView, .templates])
   }
 
-  @Test("A page the workspace does not have shows General, and a page reached from another keeps its name")
+  @Test(
+    "A page the workspace does not have shows General, and a page reached from another keeps its name"
+  )
   func shownPage() {
     let model = Self.workspace()
     let sidebar = SettingsSidebarContent(model: model, permissions: nil)
@@ -98,7 +102,8 @@ struct SettingsWindowTests {
     #expect(sidebar.shown(.agent(AgentProviderID("gone"))) == .general)
     #expect(sidebar.shown(.templates) == .templates)
     #expect(sidebar.name(of: .templates) == String(localized: SettingsPage.templates.title))
-    let french = SettingsSidebarContent(model: model, permissions: nil, locale: Locale(identifier: "fr"))
+    let french = SettingsSidebarContent(
+      model: model, permissions: nil, locale: Locale(identifier: "fr"))
     #expect(french.name(of: .templates) == "Gabarits")
     #expect(french.groups.first?.entries.first?.name == "Général")
   }

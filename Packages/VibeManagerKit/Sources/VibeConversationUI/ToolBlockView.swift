@@ -27,7 +27,7 @@ struct ToolBlockView: View {
       }
       .buttonStyle(.plain)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel(accessibilityTitle(state: state))
+      .accessibilityLabel(Self.accessibilityTitle(of: block))
       .accessibilityValue(
         isExpanded ? Text("expanded", bundle: .module) : Text("collapsed", bundle: .module)
       )
@@ -164,16 +164,31 @@ struct ToolBlockView: View {
     }
   }
 
-  private func accessibilityTitle(state: ToolCallState) -> String {
-    Self.accessibilityTitle(of: block)
-  }
-
   /// What the block did, to whom, and how it ended: its header as VoiceOver reads it, and its
-  /// name in the rotors (#232).
+  /// name in the rotors (#232). A group says its targets — the commands, the files — and a group
+  /// of sub-agents what they were asked; the state is said once, not again after an outcome
+  /// that already says it.
   static func accessibilityTitle(of block: ConversationBlock) -> String {
-    let title = title(of: block)
-    let state = block.toolState ?? .succeeded
-    let words = [title.title, title.outcome, StateSymbol.label(for: state)].compactMap { $0 }
+    var words: [String]
+    if case .subagentGroup(_, let runs) = block {
+      let calls = runs.compactMap(\.toolCall)
+      let failed = calls.filter {
+        if case .failed = $0.state { return true }
+        return false
+      }
+      words = [
+        ListFormatter.localizedString(
+          byJoining: (failed.isEmpty ? calls : failed).map(SubagentPresentation.description(of:)))
+      ]
+    } else {
+      let title = title(of: block)
+      words = [title.title, title.detail, title.outcome].compactMap { $0 }
+    }
+    words.removeAll(where: \.isEmpty)
+    let state = StateSymbol.label(for: block.toolState ?? .succeeded)
+    if !words.contains(where: { $0.localizedCaseInsensitiveContains(state) }) {
+      words.append(state)
+    }
     return words.joined(separator: ", ")
   }
 }

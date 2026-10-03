@@ -369,7 +369,7 @@ public struct ConversationView: View {
 
   private static func rotorLabel(_ block: ConversationBlock) -> String {
     guard case .entry(let entry) = block, case .userPrompt(let text, _) = entry.content else {
-      return ToolBlockView.accessibilityTitle(of: block)
+      return block.id
     }
     return String(text.prefix(80))
   }

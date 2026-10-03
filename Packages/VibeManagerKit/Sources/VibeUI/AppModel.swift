@@ -3068,7 +3068,8 @@ public final class AppModel {
     case .restart: String(localized: "Couldn’t restart this session.", bundle: .module)
     case .switchAgent:
       String(localized: "Couldn’t switch the agent of this session.", bundle: .module)
-    case .reorder: String(localized: "Couldn’t save the new order of the sessions.", bundle: .module)
+    case .reorder:
+      String(localized: "Couldn’t save the new order of the sessions.", bundle: .module)
     }
   }
 

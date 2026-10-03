@@ -17018,6 +17018,7 @@
       }
     },
     "black" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17028,6 +17029,7 @@
       }
     },
     "blue" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17049,6 +17051,7 @@
       }
     },
     "brown" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17354,6 +17357,7 @@
       }
     },
     "gray" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17364,6 +17368,7 @@
       }
     },
     "green" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17391,6 +17396,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "dans %@"
+          }
+        }
+      }
+    },
+    "indigo" : {
+      "comment" : "A colour, said by VoiceOver: between blue and violet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "indigo"
           }
         }
       }
@@ -17838,6 +17854,7 @@
       }
     },
     "orange" : {
+      "comment" : "A colour, said by VoiceOver: the fruit's.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17848,6 +17865,7 @@
       }
     },
     "pink" : {
+      "comment" : "A colour, said by VoiceOver: the flower's, not the wine's.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17858,6 +17876,7 @@
       }
     },
     "purple" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -17901,6 +17920,7 @@
       }
     },
     "red" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -18039,6 +18059,7 @@
       }
     },
     "teal" : {
+      "comment" : "A colour, said by VoiceOver: between green and blue.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -18153,6 +18174,17 @@
         }
       }
     },
+    "very dark %@" : {
+      "comment" : "A colour, much darker: “very dark blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ très foncé"
+          }
+        }
+      }
+    },
     "waiting at its prompt" : {
       "comment" : "A side terminal's state.",
       "localizations" : {
@@ -18165,6 +18197,7 @@
       }
     },
     "white" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -18175,11 +18208,23 @@
       }
     },
     "yellow" : {
+      "comment" : "A colour, said by VoiceOver.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "jaune"
+          }
+        }
+      }
+    },
+    "yellow-green" : {
+      "comment" : "A colour, said by VoiceOver: between yellow and green.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vert-jaune"
           }
         }
       }

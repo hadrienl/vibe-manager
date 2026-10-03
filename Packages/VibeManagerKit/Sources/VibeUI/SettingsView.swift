@@ -92,7 +92,8 @@ struct SettingsSplitView: View {
             // squeezing it the time it takes. Its least size stays out of the window's.
             .frame(
               width: max(proxy.size.width, page.detailWidth), height: proxy.size.height,
-              alignment: .topLeading)
+              alignment: .topLeading
+            )
             .id(page)
             // Each page by its depth: a page reached from another comes in from the trailing edge
             // and leaves to it, the page it was reached from goes to the leading edge and comes
@@ -118,7 +119,8 @@ struct SettingsSplitView: View {
     .modifier(SettingsToolbarVeil())
     .frame(
       minWidth: Self.standardWidth, idealWidth: Self.standardWidth,
-      minHeight: Self.minimumHeight, idealHeight: Self.idealHeight)
+      minHeight: Self.minimumHeight, idealHeight: Self.idealHeight
+    )
     .background(SettingsWindowSizer(width: Self.sidebarWidth + target.detailWidth))
   }
 
@@ -636,7 +638,8 @@ struct PrivacySettingsView: View {
     }
     .formStyle(.grouped)
     .restartNowConfirmation(
-      permissions: permissions, origin: .settings, sessionName: model.sessionName(for:))
+      permissions: permissions, origin: .settings, sessionName: model.sessionName(for:)
+    )
     .task { await permissions?.recheck() }
   }
 }

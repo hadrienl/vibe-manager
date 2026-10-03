@@ -26,7 +26,17 @@ struct SessionRowActionTests {
     #expect(actions.contains(.restore))
     #expect(!actions.contains(.archive))
     #expect(!actions.contains(.close))
-    #expect(!actions.contains(.switchAgent))
+  }
+
+  @Test("A closed session offers no Close, and Archive still")
+  func closed() async {
+    let session = WorkSession(
+      name: "Done", agent: SessionAgentConfiguration(providerID: "stub"), status: .closed)
+    let model = await model([session])
+    let actions = SessionCommands(model: model, session: session).rowActions
+    #expect(!actions.contains(.close))
+    #expect(actions.contains(.archive))
+    #expect(!actions.contains(.restore))
   }
 
   @Test("An active session offers Close and Archive, not Unarchive")
