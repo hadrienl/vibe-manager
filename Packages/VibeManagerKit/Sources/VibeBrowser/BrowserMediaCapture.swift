@@ -4,10 +4,12 @@ import WebKit
 ///
 /// The microphone only: the application declares no use of the camera. A page of the user's is
 /// asked by WebKit, then by macOS the first time; a page the agent drives is asked by the question
-/// of the agent's effects (#241), since nothing the agent does may reach the microphone unasked.
+/// of the agent's effects (#241), so that the agent never opens the microphone of a page unasked.
+/// WebKit keeps a grant for the document's life: what the page does with it afterwards, whoever
+/// drives it, is not asked again (ADR 0023).
 enum BrowserMediaCapture {
   enum Decision: Equatable {
-    /// WebKit asks the user, in the tab.
+    /// WebKit asks the user, in a sheet of the window.
     case prompt
     /// The question of the agent's effects asks the user.
     case askUser

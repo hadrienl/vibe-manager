@@ -252,10 +252,14 @@ declares no use of the camera. `BrowserMediaCapture` decides:
 |---|---|---|
 | The camera, or the camera and the microphone | Anyone's | Refused |
 | The microphone | The agent's (`asksBeforeEffects`) | Asked like a download the agent caused (#241); allowed, granted without WebKit asking again |
-| The microphone | The user's, its tab on screen | WebKit asks, in the tab |
+| The microphone | The user's, its tab on screen | WebKit asks, in a sheet of the window |
 | The microphone | The user's, its tab out of sight | Refused: WebKit's question would open where nobody sees it |
 
-A refusal reaches the page as a `NotAllowedError`, and a line of its console says why. macOS asks
+A refusal reaches the page as a `NotAllowedError`, and a line of its console says why. WebKit
+keeps a grant for the document's life and does not ask again: a page the user gave the microphone,
+which the agent then drives — a click on its "Dictate" button — records without a question, and
+so does a page of the agent's once allowed, until it is reloaded or left. This adds nothing to what
+the agent's terminal can already do once the application has the microphone (below). macOS asks
 once, the first time, in the application's name; the grant follows the designated requirement, so
 it survives updates (#92). There is no "Always Allow" for the microphone, nor a mark on the tab:
 the system's indicator shows it is on.
