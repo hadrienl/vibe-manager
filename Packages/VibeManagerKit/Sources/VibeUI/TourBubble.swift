@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import VibeDomain
 
@@ -24,6 +25,8 @@ struct TourBubble: View {
         .accessibilityAddTraits(.isHeader)
       Text(verbatim: bubble.message)
         .font(.callout)
+        // Whatever the list it is shown from: a sidebar's keeps its texts to one line.
+        .lineLimit(nil)
         .fixedSize(horizontal: false, vertical: true)
       HStack(spacing: 8) {
         if bubble.advance != .done {
@@ -68,16 +71,17 @@ struct TourBubble: View {
 // MARK: - Popover host
 
 /// The tour's bubble as a popover on `target`: New Session, or the session's row. Nothing is typed
-/// at these steps, so a popover taking the keyboard costs nothing, and it reaches where an anchor
-/// cannot — a toolbar item, a cell of the sidebar's list.
+/// at these steps, and a popover reaches where an anchor cannot — a toolbar item, a cell of the
+/// sidebar's list.
 ///
-/// Closed by the user — Escape, a click elsewhere — it stays closed until its target comes back on
-/// screen or the tour moves on, and the tour goes on underneath.
+/// An AppKit popover the tour opens and closes itself: SwiftUI's closes at the first click outside
+/// it and keeps that click, so the button it points at had to be clicked twice. This one lets the
+/// click through, and goes when the tour moves on. Escape, once it holds the keyboard, closes it
+/// until its target comes back on screen or the tour moves on; the tour goes on underneath.
 ///
-/// Shown only once its target has stayed where it is for a moment: presented during the window's
-/// first layout, the popover kept the frame the target had before the split view placed it, and
-/// pointed at the window's edge. A target that moves takes it down, and it comes back on the new
-/// frame.
+/// Shown once its target has stopped moving: presented during the window's first layout, it kept
+/// the frame the target had before the split view placed it, and pointed at the window's edge.
+/// After that it follows its target — the row the swipe demo slides included.
 struct TourPopover: ViewModifier {
   let model: AppModel
   let target: TourTarget
@@ -85,7 +89,7 @@ struct TourPopover: ViewModifier {
   /// Whether this target is the one the step points at: New Session lives in two places.
   var isEligible = true
   @State private var isClosed = false
-  /// Where the target is in the window, and whether it has stayed there long enough.
+  /// Where the target is in the window, and whether it stopped moving once.
   @State private var frame = CGRect.zero
   @State private var isSettled = false
   @Environment(\.controlActiveState) private var activeState
@@ -97,31 +101,34 @@ struct TourPopover: ViewModifier {
 
   func body(content: Content) -> some View {
     let step = step
+    let shown = step.flatMap { step in isClosed || !isSettled ? nil : step }
     content
-      .popover(
-        isPresented: Binding(
-          get: { step != nil && !isClosed && isSettled },
-          set: { isShown in
-            if !isShown, step != nil { isClosed = true }
-          }),
-        arrowEdge: arrowEdge
-      ) {
-        if let step {
-          TourBubble(
-            bubble: model.tourBubble(for: step),
-            advance: { model.onboarding.send(.next) },
-            skip: { model.onboarding.send(.skip) })
-        }
-      }
+      .background(
+        TourPopoverAnchor(
+          bubble: shown.map { step in
+            TourBubble(
+              bubble: model.tourBubble(for: step),
+              advance: { model.onboarding.send(.next) },
+              skip: { model.onboarding.send(.skip) }
+            )
+            .onExitCommand { isClosed = true }
+          },
+          edge: arrowEdge)
+      )
       .onGeometryChange(for: CGRect.self) {
         $0.frame(in: .global)
       } action: {
         frame = $0
       }
-      .task(id: Settling(isWanted: step != nil, frame: frame)) {
+      .task(id: step) {
         isSettled = false
-        guard step != nil, !frame.isEmpty else { return }
-        try? await Task.sleep(for: .milliseconds(300))
+        guard step != nil else { return }
+        // Still for a moment, at a place of its own.
+        var last = CGRect.null
+        while !Task.isCancelled, frame.isEmpty || frame != last {
+          last = frame
+          try? await Task.sleep(for: .milliseconds(250))
+        }
         if !Task.isCancelled { isSettled = true }
       }
       .onChange(of: step) { isClosed = false }
@@ -129,10 +136,112 @@ struct TourPopover: ViewModifier {
   }
 }
 
-/// What the popover waits on before it shows: wanted, on a target that stopped moving.
-private struct Settling: Equatable {
-  let isWanted: Bool
-  let frame: CGRect
+/// The view an AppKit popover is shown from, behind the target: it opens the popover while there
+/// is a bubble, puts the new bubble in it, and closes it when there is none.
+private struct TourPopoverAnchor<Bubble: View>: NSViewRepresentable {
+  let bubble: Bubble?
+  let edge: Edge
+
+  func makeCoordinator() -> TourPopoverController { TourPopoverController() }
+
+  func makeNSView(context: Context) -> TourPopoverAnchorView {
+    let view = TourPopoverAnchorView()
+    view.coordinator = context.coordinator
+    return view
+  }
+
+  func updateNSView(_ view: TourPopoverAnchorView, context: Context) {
+    let coordinator = context.coordinator
+    guard let bubble else {
+      coordinator.close()
+      return
+    }
+    coordinator.show(AnyView(bubble), from: view, edge: edge.rectEdge)
+  }
+
+  static func dismantleNSView(_ view: TourPopoverAnchorView, coordinator: TourPopoverController) {
+    coordinator.close()
+  }
+}
+
+/// Opens, fills and closes the popover of one target.
+@MainActor
+private final class TourPopoverController {
+  private var popover: NSPopover?
+  private var host: NSHostingController<AnyView>?
+  private var pending: (view: NSView, edge: NSRectEdge)?
+
+  func show(_ content: AnyView, from view: NSView, edge: NSRectEdge) {
+    if let host {
+      host.rootView = content
+    } else {
+      let host = NSHostingController(rootView: content)
+      host.sizingOptions = .preferredContentSize
+      self.host = host
+    }
+    let popover = popover ?? makePopover()
+    guard !popover.isShown else { return }
+    // Once the view is in a window: SwiftUI asks for the popover before it is placed.
+    guard view.window != nil else {
+      pending = (view, edge)
+      return
+    }
+    popover.show(relativeTo: view.bounds, of: view, preferredEdge: edge)
+  }
+
+  /// The view arrived in its window, or moved: the popover follows it.
+  func viewDidMove(_ view: NSView) {
+    if let pending, pending.view === view, view.window != nil, let popover, !popover.isShown {
+      self.pending = nil
+      popover.show(relativeTo: view.bounds, of: view, preferredEdge: pending.edge)
+    } else if let popover, popover.isShown {
+      popover.positioningRect = view.bounds
+    }
+  }
+
+  func close() {
+    pending = nil
+    popover?.close()
+  }
+
+  private func makePopover() -> NSPopover {
+    let popover = NSPopover()
+    // Not transient: a click outside goes where it was meant to, and the bubble stays.
+    popover.behavior = .applicationDefined
+    popover.animates = true
+    popover.contentViewController = host
+    self.popover = popover
+    return popover
+  }
+}
+
+/// Behind the target, the size of it: what the popover points at. Clicks go through it.
+private final class TourPopoverAnchorView: NSView {
+  weak var coordinator: TourPopoverController?
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    coordinator?.viewDidMove(self)
+  }
+
+  override func layout() {
+    super.layout()
+    coordinator?.viewDidMove(self)
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+extension Edge {
+  /// The side of the target the popover's arrow comes from.
+  fileprivate var rectEdge: NSRectEdge {
+    switch self {
+    case .top: .minY
+    case .bottom: .maxY
+    case .leading: .minX
+    case .trailing: .maxX
+    }
+  }
 }
 
 extension View {
@@ -182,7 +291,7 @@ struct TourBubblePlacement: Equatable {
   static let margin: CGFloat = 10
   static let arrowLength: CGFloat = 8
   /// How far the arrow stays from the bubble's corners.
-  static let arrowInset: CGFloat = 18
+  static let arrowInset: CGFloat = 22
 
   /// The bubble's top-left corner, in the container.
   let origin: CGPoint
@@ -218,22 +327,37 @@ struct TourBubbleShape: Shape {
   let arrowX: CGFloat
   var cornerRadius: CGFloat = 12
 
+  /// One outline, the arrow part of the edge it stands on: drawn as a shape of its own, it left
+  /// the rectangle's border across its base.
   func path(in rect: CGRect) -> Path {
     let length = TourBubblePlacement.arrowLength
-    var path = Path(roundedRect: rect, cornerRadius: cornerRadius)
-    let x = rect.minX + arrowX
-    var arrow = Path()
+    let radius = min(cornerRadius, rect.width / 2, rect.height / 2)
+    let x = min(max(rect.minX + arrowX, rect.minX + radius + length), rect.maxX - radius - length)
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
     if isArrowOnTop {
-      arrow.move(to: CGPoint(x: x - length, y: rect.minY + 0.5))
-      arrow.addLine(to: CGPoint(x: x, y: rect.minY - length))
-      arrow.addLine(to: CGPoint(x: x + length, y: rect.minY + 0.5))
-    } else {
-      arrow.move(to: CGPoint(x: x - length, y: rect.maxY - 0.5))
-      arrow.addLine(to: CGPoint(x: x, y: rect.maxY + length))
-      arrow.addLine(to: CGPoint(x: x + length, y: rect.maxY - 0.5))
+      path.addLine(to: CGPoint(x: x - length, y: rect.minY))
+      path.addLine(to: CGPoint(x: x, y: rect.minY - length))
+      path.addLine(to: CGPoint(x: x + length, y: rect.minY))
     }
-    arrow.closeSubpath()
-    path.addPath(arrow)
+    path.addArc(
+      tangent1End: CGPoint(x: rect.maxX, y: rect.minY),
+      tangent2End: CGPoint(x: rect.maxX, y: rect.maxY), radius: radius)
+    path.addArc(
+      tangent1End: CGPoint(x: rect.maxX, y: rect.maxY),
+      tangent2End: CGPoint(x: rect.minX, y: rect.maxY), radius: radius)
+    if !isArrowOnTop {
+      path.addLine(to: CGPoint(x: x + length, y: rect.maxY))
+      path.addLine(to: CGPoint(x: x, y: rect.maxY + length))
+      path.addLine(to: CGPoint(x: x - length, y: rect.maxY))
+    }
+    path.addArc(
+      tangent1End: CGPoint(x: rect.minX, y: rect.maxY),
+      tangent2End: CGPoint(x: rect.minX, y: rect.minY), radius: radius)
+    path.addArc(
+      tangent1End: CGPoint(x: rect.minX, y: rect.minY),
+      tangent2End: CGPoint(x: rect.maxX, y: rect.minY), radius: radius)
+    path.closeSubpath()
     return path
   }
 }
