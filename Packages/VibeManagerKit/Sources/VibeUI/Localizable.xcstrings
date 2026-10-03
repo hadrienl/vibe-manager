@@ -538,6 +538,17 @@
         }
       }
     },
+    "%@ wants to open %@ in another application." : {
+      "comment" : "A page asks to open another application's address (#289). The first %@ is the site of the frame that asks, the second the address's scheme, like zoommtg.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ veut ouvrir %2$@ dans une autre application."
+          }
+        }
+      }
+    },
     "%@ was archived, but its process (pid %@) did not answer the stop and may still be running." : {
       "comment" : "A session's name, then a process identifier.",
       "localizations" : {
@@ -3905,6 +3916,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une nouvelle version est téléchargée en arrière-plan et installée la prochaine fois que vous quittez Vibe Manager. Sinon, vous êtes prévenu d’abord."
+          }
+        }
+      }
+    },
+    "A page is asking for your approval in the web view." : {
+      "comment" : "VoiceOver announcement when a page, not the agent, asks something in the web view (#289).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une page demande votre accord dans la vue web."
           }
         }
       }
@@ -14635,17 +14657,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La page ouvre %@ dans une autre application, qui se connecte à un autre ordinateur."
-          }
-        }
-      }
-    },
-    "The page wants to open %@ in another application." : {
-      "comment" : "A page asks to open another application's address (#289). %@ is the address's scheme, like zoommtg.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La page veut ouvrir %@ dans une autre application."
           }
         }
       }

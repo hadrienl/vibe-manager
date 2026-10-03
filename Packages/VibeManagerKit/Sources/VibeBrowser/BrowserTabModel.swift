@@ -109,6 +109,9 @@ public final class BrowserTabModel: NSObject, Identifiable {
   let isOpenedByAgentPage: Bool
   /// The tab was closed: a download it started and nobody decided on yet is refused.
   @ObservationIgnored var isClosed = false
+  /// Application schemes the user refused on the page in front: not asked again until the user
+  /// loads another page (#289).
+  @ObservationIgnored private var refusedApplicationSchemes: Set<String> = []
   /// Opens another application's address: macOS does, the tests only note it.
   // Opens outside: only called from the navigation policy below, whose every call says why it may
   // open there (#241).
@@ -476,8 +479,9 @@ public enum BrowserAgentEffect: Hashable, Sendable {
   case download(filename: String)
   case externalApplication(URL)
   /// Another application's address a page of the user's sends after a click of theirs: asked
-  /// too, without speaking of the agent — the page's script may have chosen it (#289).
-  case pageApplication(URL)
+  /// too, without speaking of the agent — the page's script may have chosen it. `site` is the
+  /// frame's that sends it, which may be another site's (#289).
+  case pageApplication(URL, site: String)
   /// Another application's address that reaches another computer — a share to mount, a remote
   /// screen or shell: asked whoever's the tab is, even after a click of the user's (#241).
   case networkAddress(URL)
@@ -486,10 +490,9 @@ public enum BrowserAgentEffect: Hashable, Sendable {
 
   /// The schemes macOS hands to an application that connects to another computer: Finder mounts
   /// `smb:`, `afp:`, `nfs:`, `cifs:` and `ftp:` shares, Screen Sharing opens `vnc:`, Terminal
-  /// `ssh:` and `telnet:`; their secure forms, WebDAV mounts and remote desktops too.
+  /// `ssh:` and `telnet:`.
   static let networkSchemes: Set<String> = [
-    "smb", "smbs", "afp", "vnc", "nfs", "ftp", "ftps", "sftp", "ssh", "telnet", "cifs",
-    "webdav", "webdavs", "dav", "davs", "rdp", "ms-rd",
+    "smb", "afp", "vnc", "nfs", "ftp", "ssh", "telnet", "cifs",
   ]
 
   static func reachesAnotherComputer(_ url: URL) -> Bool {
@@ -510,6 +513,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
 
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
     committedURL = webView.url
+    refusedApplicationSchemes = []
     // A redirection the policy was not asked about still comes to the front once it commits.
     if let url = webView.url, BrowserWorkspace.isRemote(url), asksBeforeEffects {
       willLeaveThisMac?(self)
@@ -586,20 +590,35 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     if BrowserAgentEffect.reachesAnotherComputer(target) {
       let allowed = await confirmAgentEffect?(.networkAddress(target), self) ?? false
       // Opens outside: the user allowed this address in the question just answered.
-      if allowed { openApplicationAddress(target) }
+      if allowed, !isClosed { openApplicationAddress(target) }
     } else if asksBeforeEffects {
       let allowed = await confirmAgentEffect?(.externalApplication(target), self) ?? false
       // Opens outside: the user allowed this address in the question just answered.
-      if allowed { openApplicationAddress(target) }
+      if allowed, !isClosed { openApplicationAddress(target) }
     } else if navigationAction.navigationType == .linkActivated,
       let sessionView = webView as? SessionWebView,
       sessionView.followsPress(
         with: navigationAction.modifierFlags, now: ProcessInfo.processInfo.systemUptime)
     {
-      // The click may have been on something else: the page's script chose the address.
-      let allowed = await confirmAgentEffect?(.pageApplication(target), self) ?? false
+      // The click may have been on something else: the page's script chose the address. One
+      // press, one question; a refusal holds for this scheme until the user loads another page.
+      sessionView.spendPress()
+      if refusedApplicationSchemes.contains(scheme) {
+        record(
+          console: BrowserConsoleEntry(
+            level: .warn, text: "Blocked opening \(scheme): the user refused it on this page."))
+        return (.cancel, preferences)
+      }
+      let site = BrowserOrigin(
+        scheme: navigationAction.sourceFrame.securityOrigin.protocol,
+        host: navigationAction.sourceFrame.securityOrigin.host,
+        port: navigationAction.sourceFrame.securityOrigin.port == 0
+          ? nil : navigationAction.sourceFrame.securityOrigin.port
+      ).description
+      let allowed = await confirmAgentEffect?(.pageApplication(target, site: site), self) ?? false
+      if !allowed { refusedApplicationSchemes.insert(scheme) }
       // Opens outside: the user allowed this address in the question just answered.
-      if allowed { openApplicationAddress(target) }
+      if allowed, !isClosed { openApplicationAddress(target) }
     } else {
       record(
         console: BrowserConsoleEntry(

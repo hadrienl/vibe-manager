@@ -133,12 +133,15 @@ quarantine — a web download, by Vibe Manager, from its `http`, `https` or `fil
 so Gatekeeper checks it before it is opened; its name loses the characters that make it read as
 another, such as a right-to-left override.
 
-Another application's address is always asked, as browsers do, whoever's the tab is and even after
-a click of the user's: the page's script may have chosen it (#289). One that reaches another
-computer — `smb:`, `smbs:`, `afp:`, `nfs:`, `cifs:`, `ftp:`, `ftps:`, `sftp:`, WebDAV, `vnc:`,
-`rdp:`, `ssh:`, `telnet:` — says so. Outside the agent's tabs the question only comes after a press
-of the user's in the page within the second, since a scripted click is `.linkActivated` too; one
-without is refused with a line in the page's console, so a page cannot pile up questions.
+Another application's address is always asked, whoever's the tab is and even after a click of the
+user's: the page's script may have chosen it (#289). The question names the site of the frame that
+sends it, which may be another site's. One that reaches another computer — `smb:`, `afp:`, `nfs:`,
+`cifs:`, `ftp:`, `vnc:`, `ssh:`, `telnet:` — says so. Outside the agent's tabs the question only
+comes after a press of the user's in the page within the second, since a scripted click is
+`.linkActivated` too; one without is refused with a line in the page's console. A press allows one
+question only, and a scheme the user refused is not asked again until another page loads. Stricter
+than Safari and Chrome: an address a page sends otherwise than by a link — `location`,
+`window.open`, a form — is refused in the user's tabs, even from a click handler.
 A question is a banner in
 the session's web view — the session's row says so when it is not on screen — and the agent waits
 two minutes at most. "Always Allow" covers clicks, typing, JavaScript and reading on that site; the
