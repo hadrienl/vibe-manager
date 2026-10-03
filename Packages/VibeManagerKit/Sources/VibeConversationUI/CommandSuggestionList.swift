@@ -11,6 +11,7 @@ public struct CommandSuggestionList: View {
   /// Puts the command clicked in the text, and the keyboard back in it.
   let insert: (AgentCommand) -> Void
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
   @State private var contentHeight: CGFloat = 0
 
   /// About seven entries and a half: the next one shows there is more.
@@ -29,13 +30,13 @@ public struct CommandSuggestionList: View {
           ProgressView().controlSize(.small)
           Text("Reading the skills and commands…", bundle: .module)
         }
-        .font(theme.interfaceFont(size: 12.5))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
         .foregroundStyle(theme.secondaryText.color)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
       } else if matches.isEmpty {
         Text("No skill matches", bundle: .module)
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.secondaryText.color)
           .padding(.horizontal, 14)
           .padding(.vertical, 12)
@@ -54,7 +55,7 @@ public struct CommandSuggestionList: View {
       }
       Rectangle().fill(theme.border.color).frame(height: 1)
       Text("↑↓ navigate · ⇥ or ↩ insert · Esc close", bundle: .module)
-        .font(theme.interfaceFont(size: 11))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
         .foregroundStyle(theme.secondaryText.color)
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
@@ -98,7 +99,7 @@ public struct CommandSuggestionList: View {
       case .command: Text("Commands", bundle: .module)
       }
     }
-    .font(theme.interfaceFont(size: 11, weight: .semibold))
+    .font(theme.interfaceFont(size: appearance.textSize.scaled(11), weight: .semibold))
     .foregroundStyle(theme.secondaryText.color)
     .textCase(.uppercase)
     .padding(.horizontal, 14)
@@ -139,6 +140,7 @@ struct CommandSuggestionRow: View {
   let match: AgentCommandMatch
   let isSelected: Bool
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     let command = match.command
@@ -150,14 +152,14 @@ struct CommandSuggestionRow: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 8) {
           Text(name)
-            .font(theme.codeFont(size: 12.5))
+            .font(theme.codeFont(size: appearance.textSize.scaled(12.5)))
             .foregroundStyle(theme.text.color)
             .lineLimit(1)
             .truncationMode(.middle)
             .layoutPriority(1)
           if let origin = Self.originLabel(command.origin) {
             Text(origin)
-              .font(theme.interfaceFont(size: 10.5))
+              .font(theme.interfaceFont(size: appearance.textSize.scaled(10.5)))
               .foregroundStyle(theme.secondaryText.color)
               .lineLimit(1)
               .truncationMode(.middle)
@@ -169,7 +171,7 @@ struct CommandSuggestionRow: View {
         }
         if !command.description.isEmpty {
           Text(description)
-            .font(theme.interfaceFont(size: 12))
+            .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
             .foregroundStyle(theme.secondaryText.color)
             .lineLimit(2)
             .truncationMode(.tail)

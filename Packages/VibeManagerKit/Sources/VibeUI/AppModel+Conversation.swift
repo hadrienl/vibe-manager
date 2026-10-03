@@ -5,6 +5,20 @@ import VibeDomain
 import VibeTerminalUI
 
 extension AppModel {
+  // MARK: Zoom (#229)
+
+  /// The size of the text in the conversations and the terminals, from View › Zoom In, Zoom Out
+  /// and Actual Size. It is the size chosen in the Conversation settings, so it is kept there.
+  public var textSize: ConversationAppearance.TextSize { conversations.appearance.textSize }
+
+  public var canZoomIn: Bool { textSize.larger != textSize }
+  public var canZoomOut: Bool { textSize.smaller != textSize }
+  public var isActualSize: Bool { textSize == .standard }
+
+  public func zoomIn() { conversations.appearance.textSize = textSize.larger }
+  public func zoomOut() { conversations.appearance.textSize = textSize.smaller }
+  public func resetZoom() { conversations.appearance.textSize = .standard }
+
   /// How the session is shown: what the user chose for it, or the default of the settings —
   /// and the terminal, whatever was chosen, when its agent writes nothing the view can read.
   public func presentation(of session: WorkSession) -> SessionPresentation {

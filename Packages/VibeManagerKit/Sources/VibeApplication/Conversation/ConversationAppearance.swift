@@ -36,6 +36,18 @@ public struct ConversationAppearance: Codable, Hashable, Sendable {
     public var smaller: TextSize {
       Self.allCases.last { $0.pointSize < pointSize } ?? self
     }
+
+    /// The size the application opens with, and that ⌘0 comes back to.
+    public static let standard = TextSize.medium
+
+    /// A size drawn for the standard text, grown or shrunk with the chosen one (#229): macOS gives
+    /// a third-party application no Dynamic Type, so the zoom is the application's own.
+    public func scaled(_ size: Double) -> Double {
+      size * pointSize / Self.standard.pointSize
+    }
+
+    /// The terminal's text: SwiftTerm's own 13 points at the standard size.
+    public var terminalPointSize: Double { scaled(13) }
   }
 
   public enum Density: String, Codable, CaseIterable, Hashable, Sendable {
@@ -79,7 +91,7 @@ public struct ConversationAppearance: Codable, Hashable, Sendable {
     customAccent: String? = nil,
     messageFont: String? = nil,
     codeFont: String? = nil,
-    textSize: TextSize = .medium,
+    textSize: TextSize = .standard,
     density: Density = .comfortable,
     userMessageStyle: UserMessageStyle = .bubbles,
     groupsToolCalls: Bool = true,

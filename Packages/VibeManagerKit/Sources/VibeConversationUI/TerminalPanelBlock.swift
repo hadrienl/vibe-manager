@@ -11,6 +11,7 @@ struct TerminalPanelBlock: View {
   /// The session's terminal, a second view of it.
   let terminal: AnyView
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   /// About twenty-five lines of the terminal: a panel of the TUI fits, the conversation stays in
   /// sight above.
@@ -24,11 +25,11 @@ struct TerminalPanelBlock: View {
           .foregroundStyle(theme.accent.color)
           .accessibilityHidden(true)
         Text(verbatim: panel.command)
-          .font(theme.codeFont(size: 12.5))
+          .font(theme.codeFont(size: appearance.textSize.scaled(12.5)))
           .fontWeight(.semibold)
           .foregroundStyle(theme.text.color)
         Text("waits for your choice in \(model.agentName)’s terminal", bundle: .module)
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.secondaryText.color)
           .lineLimit(1)
         Spacer(minLength: 8)
@@ -68,10 +69,11 @@ struct TerminalPanelBlock: View {
 
 private struct PanelButtonStyle: ButtonStyle {
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(theme.interfaceFont(size: 12))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
       .foregroundStyle(theme.text.color)
       .padding(.horizontal, 10)
       .padding(.vertical, 4)

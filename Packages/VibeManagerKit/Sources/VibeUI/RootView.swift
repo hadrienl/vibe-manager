@@ -66,6 +66,9 @@ public struct RootView: View {
         }
       }
     }
+    // The application's zoom (#229), for every terminal of the window: the session's, the drawer's
+    // and the copies shown in the conversation.
+    .environment(\.terminalFontSize, model.conversations.appearance.textSize.terminalPointSize)
     // The window's title (#159), in every state: the Window menu, Mission Control and ⌘` read it.
     // From macOS 26 the toolbar draws it itself, the application's name and the session's in two
     // styles (#256).
