@@ -54,8 +54,9 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   case questions([AgentQuestion])
   /// A plan to accept before the agent starts. `excerpt` is its beginning.
   case plan(excerpt: String, isComplete: Bool)
-  /// A form an MCP server asks the user to fill in: only the terminal can.
-  case elicitation
+  /// A form an MCP server asks the user to fill in, or a page to open: only the terminal can
+  /// answer it.
+  case elicitation(AgentElicitation)
   /// The agent asked something its report does not let us read: cut short, or not JSON.
   case unreadable(tool: String?)
   /// A dialog the CLI only announces, in its own words, without saying what it asks for in a
@@ -71,6 +72,21 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   public var isAnnouncedOnly: Bool {
     if case .inTerminal = self { return true }
     return false
+  }
+}
+
+/// What an MCP server asks of the user, in its own words (#273): its form is filled in the
+/// terminal, its page opened by the user.
+public struct AgentElicitation: Hashable, Codable, Sendable {
+  public let server: String?
+  public let message: String?
+  /// The page the server asks to open, in URL mode: `http` or `https` only.
+  public let url: URL?
+
+  public init(server: String? = nil, message: String? = nil, url: URL? = nil) {
+    self.server = server
+    self.message = message
+    self.url = url.flatMap { ["http", "https"].contains($0.scheme?.lowercased()) ? $0 : nil }
   }
 }
 

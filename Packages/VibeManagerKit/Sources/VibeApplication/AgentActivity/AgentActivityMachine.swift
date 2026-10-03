@@ -461,7 +461,7 @@ extension AgentActivityState {
     let notice =
       notice
       ?? AgentRequestNotice(
-        content: kind == .approval ? .unreadable(tool: tool) : .elicitation,
+        content: kind == .approval ? .unreadable(tool: tool) : .elicitation(AgentElicitation()),
         reference: AgentToolReference(tool: tool), isShown: false)
     if let index = requests.firstIndex(where: {
       !$0.isShown && $0.reference.match(notice.reference) == .same

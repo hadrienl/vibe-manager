@@ -4841,6 +4841,17 @@
         }
       }
     },
+    "Asked by the MCP server “%@”" : {
+      "comment" : "On a request's card: the MCP server that asks the user for a form or a page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandé par le serveur MCP « %@ »"
+          }
+        }
+      }
+    },
     "Asked by the sub-agent “%@”" : {
       "comment" : "On a request's card: which of the agent's sub-agents asks.",
       "localizations" : {
@@ -10201,6 +10212,17 @@
         }
       }
     },
+    "Open Link" : {
+      "comment" : "Opens the page an MCP server asks for.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir le lien"
+          }
+        }
+      }
+    },
     "Open Privacy & Security → Full Disk Access." : {
       "comment" : "The names of the pane and the setting in System Settings.",
       "localizations" : {
@@ -10424,6 +10446,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paquet"
+          }
+        }
+      }
+    },
+    "Page to open" : {
+      "comment" : "The title of a request of an agent: an MCP server asks the user to open a page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page à ouvrir"
           }
         }
       }

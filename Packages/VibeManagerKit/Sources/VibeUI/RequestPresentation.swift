@@ -54,6 +54,10 @@ public enum RequestPresentation {
     case .plan:
       return LocalizedStringResource(
         "Plan to approve", bundle: .module, comment: "The title of a request of an agent.")
+    case .elicitation(let elicitation) where elicitation.url != nil:
+      return LocalizedStringResource(
+        "Page to open", bundle: .module,
+        comment: "The title of a request of an agent: an MCP server asks the user to open a page.")
     case .elicitation:
       return LocalizedStringResource(
         "Form to fill in", bundle: .module,
@@ -150,7 +154,8 @@ public enum RequestPresentation {
       }
     case .questions: return "questionmark.bubble"
     case .plan: return "list.bullet.clipboard"
-    case .elicitation: return "list.bullet.rectangle"
+    case .elicitation(let elicitation):
+      return elicitation.url != nil ? "link" : "list.bullet.rectangle"
     case .unreadable: return "hand.raised"
     case .inTerminal(let prompt):
       switch prompt.kind {
@@ -180,9 +185,18 @@ public enum RequestPresentation {
       return excerpt.split(separator: "\n").first.map { DisplaySafeText.visible(String($0)) }
     case .inTerminal(let prompt):
       return prompt.message.map(DisplaySafeText.visible)
-    case .elicitation, .unreadable:
+    case .elicitation(let elicitation):
+      return elicitation.message.map(DisplaySafeText.visible)
+    case .unreadable:
       return nil
     }
+  }
+
+  /// Which MCP server asks, on the card of its form or page.
+  public static func serverLine(_ server: String) -> LocalizedStringResource {
+    LocalizedStringResource(
+      "Asked by the MCP server “\(server)”", bundle: .module,
+      comment: "On a request's card: the MCP server that asks the user for a form or a page.")
   }
 
   /// What "always allow" allows, in words: its rules and how long they last.

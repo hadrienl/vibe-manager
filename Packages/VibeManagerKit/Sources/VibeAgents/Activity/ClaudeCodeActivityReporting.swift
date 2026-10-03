@@ -25,7 +25,10 @@ public enum ClaudeCodeActivityHooks {
     Hook(event: "PreToolUse", matcher: questionTools, payload: .keep),
     Hook(event: "PermissionRequest", matcher: nil, payload: .keep),
     Hook(event: "Notification", matcher: nil, payload: .keep),
-    Hook(event: "Elicitation", matcher: nil, payload: .drop),
+    // What the server asks, and the page it asks to open: never what its form is filled with.
+    Hook(
+      event: "Elicitation", matcher: nil,
+      payload: .fields(["mcp_server_name", "message", "mode", "url"])),
     Hook(event: "ElicitationResult", matcher: nil, payload: .drop),
     // Which agent ran which tool on what: the request of #40 it settles, among several waiting.
     Hook(
@@ -148,7 +151,8 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
       return .questionAsked(
         .question,
         notice: AgentRequestNotice(
-          content: .elicitation, reference: AgentToolReference(tool: nil), isShown: true))
+          content: .elicitation(Self.elicitation(in: event)),
+          reference: AgentToolReference(tool: nil), isShown: true))
     case "ElicitationResult":
       return .questionResolved
     case "PostToolUse", "PostToolUseFailure", "PermissionDenied":
@@ -170,6 +174,14 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
     default:
       return nil
     }
+  }
+
+  /// The server's words, and the page it asks to open in URL mode — only then.
+  static func elicitation(in event: AgentActivityEvent) -> AgentElicitation {
+    AgentElicitation(
+      server: event.string("mcp_server_name"),
+      message: event.string("message"),
+      url: event.string("mode") == "url" ? event.string("url").flatMap(URL.init(string:)) : nil)
   }
 
   /// Claude Code reports no interruption through its hooks — neither Escape during a turn nor a
