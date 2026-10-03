@@ -115,10 +115,11 @@ struct SubagentHeader: View {
 struct SubagentTypeCapsule: View {
   let type: String
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     Text(verbatim: type)
-      .font(theme.interfaceFont(size: 11, weight: .semibold))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(11), weight: .semibold))
       .foregroundStyle(theme.secondaryText.color)
       .lineLimit(1)
       .padding(.horizontal, 7)
@@ -274,14 +275,14 @@ struct SubagentSections: View {
       }
     } else if call.state == .succeeded, run.activity == .notFound {
       Text("Its answer was not found", bundle: .module)
-        .font(theme.interfaceFont(size: 12))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
         .foregroundStyle(theme.secondaryText.color)
     } else if call.state == .succeeded, run.activity == .loading {
       HStack(spacing: 8) {
         ProgressView().controlSize(.small)
         Text("Reading its answer…", bundle: .module)
       }
-      .font(theme.interfaceFont(size: 12))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
       .foregroundStyle(theme.secondaryText.color)
     }
   }
@@ -351,24 +352,25 @@ struct SubagentActivityView: View {
   let run: SubagentRun
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     switch run.activity {
     case .notFound:
       Text("Its activity was not found", bundle: .module)
-        .font(theme.interfaceFont(size: 12))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
         .foregroundStyle(theme.secondaryText.color)
     case .unread, .loading:
       HStack(spacing: 8) {
         ProgressView().controlSize(.small)
         Text("Reading its activity…", bundle: .module)
       }
-      .font(theme.interfaceFont(size: 12))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
       .foregroundStyle(theme.secondaryText.color)
     case .read(let entries):
       if entries.isEmpty {
         Text("Nothing yet", bundle: .module)
-          .font(theme.interfaceFont(size: 12))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
           .foregroundStyle(theme.secondaryText.color)
       } else {
         VStack(alignment: .leading, spacing: 8) {
@@ -463,6 +465,7 @@ struct SubagentGroupView: View {
 struct SubagentTray: View {
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   static let shownPillCount = 4
 
@@ -475,7 +478,7 @@ struct SubagentTray: View {
       } icon: {
         Image(systemName: "person.2")
       }
-      .font(theme.interfaceFont(size: 12, weight: .semibold))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12), weight: .semibold))
       .foregroundStyle(theme.secondaryText.color)
       .fixedSize()
       ScrollView(.horizontal, showsIndicators: false) {
@@ -529,6 +532,7 @@ struct SubagentPill: View {
   let item: SubagentTrayItem
   let model: ConversationModel
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
   @Environment(\.conversationIsLive) private var isLive
 
   var body: some View {
@@ -561,7 +565,7 @@ struct SubagentPill: View {
           }
         }
       }
-      .font(theme.interfaceFont(size: 12))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
       .padding(.horizontal, 10)
       .padding(.vertical, 4)
       .background(theme.surface.color, in: Capsule())

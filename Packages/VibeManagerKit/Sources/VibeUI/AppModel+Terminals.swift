@@ -93,7 +93,7 @@ extension AppModel {
     guard let drawer = selectedDrawer,
       let terminal = drawer.terminals.first(where: { $0.id == (id ?? drawer.activeTerminalID) })
     else {
-      NSSound.beep()
+      beep()
       return
     }
     Task {

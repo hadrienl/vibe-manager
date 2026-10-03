@@ -520,6 +520,7 @@ struct ProducedImageView: View {
   let call: ToolCall
   let model: ConversationModel?
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -550,11 +551,11 @@ struct ProducedImageView: View {
           }
         }
         .buttonStyle(.plain)
-        .font(theme.interfaceFont(size: 12))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
         .foregroundStyle(theme.accent.color)
       } else {
         Text("The image is no longer where the agent saved it.", bundle: .module)
-          .font(theme.interfaceFont(size: 12))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12)))
           .foregroundStyle(theme.secondaryText.color)
       }
     }
@@ -801,6 +802,7 @@ struct RequestActions: View {
   let request: ConversationRequest
   let call: ToolCall
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -810,7 +812,7 @@ struct RequestActions: View {
         !ConversationModel.isAbout(call, subject)
       {
         Text(verbatim: DisplaySafeText.visible(subject))
-          .font(theme.codeFont(size: 12))
+          .font(theme.codeFont(size: appearance.textSize.scaled(12)))
           .foregroundStyle(theme.text.color)
           .textSelection(.enabled)
           .lineLimit(6)
@@ -821,7 +823,7 @@ struct RequestActions: View {
       // A dialog the agent only announced (#273): its own words are all there is to show.
       if case .inTerminal(let prompt) = request.request.content, let message = prompt.message {
         Text(verbatim: DisplaySafeText.visible(message))
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.text.color)
           .textSelection(.enabled)
       }
@@ -893,7 +895,7 @@ struct RequestActions: View {
       }
       if answers.isEmpty {
         Text("This request can only be answered in the terminal.", bundle: .module)
-          .font(theme.interfaceFont(size: 11.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
           .foregroundStyle(theme.secondaryText.color)
       }
     }
