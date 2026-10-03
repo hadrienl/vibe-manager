@@ -313,16 +313,15 @@ struct BrowserAgentEffectsTests {
     #expect(opened.isEmpty)
   }
 
-  @Test("After a click of the user's, an application address the page's script sends is asked")
-  func pageScriptAfterClickAsked() async throws {
-    // The user clicks a button; the page's handler sends an address they never saw (#289).
-    let server = try TestPageServer(pages: [
-      "/": #"""
-      <!doctype html><title>Page</title><a id="hidden" href="vibetest://open"></a>
-      <button id="b" onclick="document.getElementById('hidden').click()">Play</button>
-      """#
-    ])
-    defer { server.stop() }
+  /// The application address the pages below send.
+  private static let application = URL(string: "vibetest://open")!
+
+  /// A press of the user's in a page of theirs, then a click on `element`; returns once the
+  /// application's address is asked, with the workspace, the session and what was opened.
+  private func pressThenClick(_ element: String, in page: String) async throws -> (
+    BrowserWorkspace, SessionID, () -> [URL], TestPageServer
+  ) {
+    let server = try TestPageServer(pages: ["/": page])
     let workspace = BrowserWorkspace()
     let session = SessionID()
     let tab = workspace.open(server.url("/"), in: session, openedBy: .user, activate: false)
@@ -331,40 +330,36 @@ struct BrowserAgentEffectsTests {
     await waitUntil("the page is loaded") { tab.committedURL != nil && !tab.isLoading }
     let view = try #require(tab.webView as? SessionWebView)
     view.notePress(at: ProcessInfo.processInfo.systemUptime, modifiers: [])
-    _ = try? await view.evaluateJavaScript("document.getElementById('b').click()")
-
+    _ = try? await view.evaluateJavaScript("document.getElementById('\(element)').click()")
     await waitUntil("the application is asked") {
-      self.effects(of: workspace, in: session)
-        == [.pageApplication(URL(string: "vibetest://open")!)]
+      self.effects(of: workspace, in: session) == [.pageApplication(Self.application)]
     }
+    return (workspace, session, { opened }, server)
+  }
+
+  @Test("After a click of the user's, an application address the page's script sends is asked")
+  func pageScriptAfterClickAsked() async throws {
+    // The user clicks a button; the page's handler sends an address they never saw (#289).
+    let (workspace, session, opened, server) = try await pressThenClick(
+      "b",
+      in: #"""
+      <!doctype html><title>Page</title><a id="hidden" href="vibetest://open"></a>
+      <button id="b" onclick="document.getElementById('hidden').click()">Play</button>
+      """#)
+    defer { server.stop() }
     workspace.answer(try #require(workspace.requests(for: session).first), with: .deny)
     await waitUntil("the question is gone") { workspace.pendingRequests.isEmpty }
-    #expect(opened.isEmpty)
+    #expect(opened().isEmpty)
   }
 
   @Test("An application address the user clicks is asked too, and opens once allowed")
   func userClickedApplicationAsked() async throws {
-    let server = try TestPageServer(pages: [
-      "/": #"<!doctype html><title>Page</title><a id="link" href="vibetest://open">Open</a>"#
-    ])
+    let (workspace, session, opened, server) = try await pressThenClick(
+      "link", in: #"<!doctype html><title>Page</title><a id="link" href="vibetest://open">x</a>"#)
     defer { server.stop() }
-    let workspace = BrowserWorkspace()
-    let session = SessionID()
-    let tab = workspace.open(server.url("/"), in: session, openedBy: .user, activate: false)
-    var opened: [URL] = []
-    tab.openApplicationAddress = { opened.append($0) }
-    await waitUntil("the page is loaded") { tab.committedURL != nil && !tab.isLoading }
-    let view = try #require(tab.webView as? SessionWebView)
-    view.notePress(at: ProcessInfo.processInfo.systemUptime, modifiers: [])
-    _ = try? await view.evaluateJavaScript("document.getElementById('link').click()")
-
-    await waitUntil("the application is asked") {
-      self.effects(of: workspace, in: session)
-        == [.pageApplication(URL(string: "vibetest://open")!)]
-    }
-    #expect(opened.isEmpty)
+    #expect(opened().isEmpty)
     workspace.answer(try #require(workspace.requests(for: session).first), with: .allowOnce)
-    await waitUntil("the address is opened") { opened == [URL(string: "vibetest://open")!] }
+    await waitUntil("the address is opened") { opened() == [Self.application] }
   }
 
   @Test("Secure shares, WebDAV and remote desktops reach another computer")
