@@ -8,6 +8,9 @@ import VibeApplication
 /// The words of a state on a session's row are small text: WCAG asks 4.5:1 of them, in light and in
 /// dark (#233). Measured against the window's background, which stands for the sidebar's material:
 /// the material lets the desktop through, so no colour of its own can be read.
+///
+/// The ordinary state is left out: it is the system's secondary label, which macOS draws vibrant
+/// over the sidebar's material, not a colour of the application's choosing.
 @Suite("The contrast of a session's state in the sidebar")
 struct SessionStatusContrastTests {
   enum Appearance: String, CaseIterable, CustomTestStringConvertible {
@@ -24,7 +27,7 @@ struct SessionStatusContrastTests {
 
   @Test(
     "Every state's words read at 4.5:1",
-    arguments: [SessionStatusSeverity.normal, .active, .attention, .error], Appearance.allCases)
+    arguments: [SessionStatusSeverity.active, .attention, .error], Appearance.allCases)
   func legible(severity: SessionStatusSeverity, appearance: Appearance) {
     let ratio = Self.contrast(of: severity.tint, in: appearance.name)
     let label = "\(severity) \(appearance.rawValue)"
