@@ -1022,6 +1022,9 @@ private struct BrowserPermissionBanner: View {
     case .effect(.externalApplication(let url)):
       return Text(
         "The agent’s action opens \(url.scheme ?? "") in another application.", bundle: .module)
+    case .effect(.pageApplication(let url)):
+      return Text(
+        "The page wants to open \(url.scheme ?? "") in another application.", bundle: .module)
     case .effect(.networkAddress(let url)):
       let address = url.host.map { "\(url.scheme ?? "")://\($0)" } ?? (url.scheme ?? "")
       return Text(

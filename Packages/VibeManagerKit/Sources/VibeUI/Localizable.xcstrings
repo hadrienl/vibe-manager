@@ -14639,6 +14639,17 @@
         }
       }
     },
+    "The page wants to open %@ in another application." : {
+      "comment" : "A page asks to open another application's address (#289). %@ is the address's scheme, like zoommtg.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page veut ouvrir %@ dans une autre application."
+          }
+        }
+      }
+    },
     "The page was not loaded." : {
       "localizations" : {
         "fr" : {

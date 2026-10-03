@@ -475,6 +475,9 @@ private final class TitleReading {
 public enum BrowserAgentEffect: Hashable, Sendable {
   case download(filename: String)
   case externalApplication(URL)
+  /// Another application's address a page of the user's sends after a click of theirs: asked
+  /// too, without speaking of the agent — the page's script may have chosen it (#289).
+  case pageApplication(URL)
   /// Another application's address that reaches another computer — a share to mount, a remote
   /// screen or shell: asked whoever's the tab is, even after a click of the user's (#241).
   case networkAddress(URL)
@@ -483,9 +486,10 @@ public enum BrowserAgentEffect: Hashable, Sendable {
 
   /// The schemes macOS hands to an application that connects to another computer: Finder mounts
   /// `smb:`, `afp:`, `nfs:`, `cifs:` and `ftp:` shares, Screen Sharing opens `vnc:`, Terminal
-  /// `ssh:` and `telnet:`.
+  /// `ssh:` and `telnet:`; their secure forms, WebDAV mounts and remote desktops too.
   static let networkSchemes: Set<String> = [
-    "smb", "afp", "vnc", "nfs", "ftp", "ssh", "telnet", "cifs",
+    "smb", "smbs", "afp", "vnc", "nfs", "ftp", "ftps", "sftp", "ssh", "telnet", "cifs",
+    "webdav", "webdavs", "dav", "davs", "rdp", "ms-rd",
   ]
 
   static func reachesAnotherComputer(_ url: URL) -> Bool {
@@ -575,10 +579,10 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       // decided with every other one.
       return (navigationAction.shouldPerformDownload ? .download : .allow, preferences)
     }
-    // Another application's address. One that reaches another computer — a share to mount, a
-    // remote screen — is always asked. Any other is asked when the tab is the agent's, and opened
-    // otherwise only after a click of the user's: a click the page's script dispatches is
-    // `.linkActivated` too, and must not open an application unasked (#241).
+    // Another application's address is always asked, as in Safari and Chrome. One that reaches
+    // another computer — a share to mount, a remote screen — says so. In the user's tab it is
+    // asked only after a click of theirs: a click the page's script dispatches is
+    // `.linkActivated` too, and is refused without a question (#241, #289).
     if BrowserAgentEffect.reachesAnotherComputer(target) {
       let allowed = await confirmAgentEffect?(.networkAddress(target), self) ?? false
       // Opens outside: the user allowed this address in the question just answered.
@@ -592,10 +596,10 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       sessionView.followsPress(
         with: navigationAction.modifierFlags, now: ProcessInfo.processInfo.systemUptime)
     {
-      // Unsafe open, to fix in #289: a click of the user's in the page opens, without a
-      // question, whatever application address the page's script sends within the second — no
-      // other computer, but any application that registered a scheme.
-      openApplicationAddress(target)
+      // The click may have been on something else: the page's script chose the address.
+      let allowed = await confirmAgentEffect?(.pageApplication(target), self) ?? false
+      // Opens outside: the user allowed this address in the question just answered.
+      if allowed { openApplicationAddress(target) }
     } else {
       record(
         console: BrowserConsoleEntry(
