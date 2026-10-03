@@ -19,6 +19,14 @@ extension AppModel {
   public func zoomOut() { conversations.appearance.textSize = textSize.smaller }
   public func resetZoom() { conversations.appearance.textSize = .standard }
 
+  public func zoom(_ command: ZoomCommand) {
+    switch command {
+    case .zoomIn: zoomIn()
+    case .zoomOut: zoomOut()
+    case .actualSize: resetZoom()
+    }
+  }
+
   /// How the session is shown: what the user chose for it, or the default of the settings —
   /// and the terminal, whatever was chosen, when its agent writes nothing the view can read.
   public func presentation(of session: WorkSession) -> SessionPresentation {

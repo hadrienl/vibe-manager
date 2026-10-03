@@ -8,34 +8,10 @@ import VibeDomain
 
 @testable import VibeTerminalUI
 
-private actor SilentSession: TerminalSession {
-  nonisolated let id: TerminalID
-
-  init(id: TerminalID) {
-    self.id = id
-  }
-
-  func attach() -> TerminalAttachment {
-    TerminalAttachment(
-      state: .running(processIdentifier: 7),
-      history: TerminalHistorySnapshot(bytes: [], droppedByteCount: 0),
-      events: AsyncStream { $0.finish() }
-    )
-  }
-
-  func state() -> TerminalProcessState { .running(processIdentifier: 7) }
-  func history() -> TerminalHistorySnapshot {
-    TerminalHistorySnapshot(bytes: [], droppedByteCount: 0)
-  }
-  func write(_ bytes: [UInt8]) {}
-  func resize(to size: TerminalSize) {}
-  func stop(gracePeriod: Duration) {}
-  func kill() {}
-}
-
 private actor SilentSupervisor: TerminalSupervisor {
+  /// Never asked: the surfaces of these tests are given no session.
   func start(_ spec: TerminalSpec, for id: TerminalID) throws -> any TerminalSession {
-    SilentSession(id: id)
+    throw CancellationError()
   }
 
   func session(for id: TerminalID) -> (any TerminalSession)? { nil }
@@ -60,9 +36,8 @@ struct TerminalZoomTests {
     #expect(view.getTerminal().cols < columns)
   }
 
-  @Test("The terminal of the window takes the size the environment gives")
-  func environmentReachesTheTerminal() throws {
-    let pane = TerminalPaneModel(
+  private func pane() -> TerminalPaneModel {
+    TerminalPaneModel(
       terminalID: TerminalID(),
       supervisor: SilentSupervisor(),
       spec: TerminalSpec(
@@ -71,19 +46,47 @@ struct TerminalZoomTests {
       ),
       viewportTimeout: .zero
     )
-    let host = NSHostingView(
-      rootView: TerminalSurface(pane: pane, session: nil, isActive: false)
-        .environment(\.terminalFontSize, 18)
-    )
-    // Never put on screen: a window is enough for the view to be made and updated.
+  }
+
+  private func surface(_ pane: TerminalPaneModel, size: Double) -> AnyView {
+    AnyView(
+      TerminalSurface(pane: pane, session: nil, isActive: false)
+        .environment(\.terminalFontSize, size))
+  }
+
+  /// A window never put on screen: enough for the view to be made and updated.
+  private func host(_ view: AnyView) -> NSHostingView<AnyView> {
+    let host = NSHostingView(rootView: view)
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled],
       backing: .buffered, defer: true)
     window.contentView = host
     host.layoutSubtreeIfNeeded()
+    return host
+  }
+
+  @Test("The terminal of the window takes the size the environment gives")
+  func environmentReachesTheTerminal() throws {
+    let host = host(surface(pane(), size: 18))
 
     let terminal = try #require(Self.terminal(in: host))
     #expect(terminal.font.pointSize == 18)
+  }
+
+  @Test("A terminal already open follows the zoom, in the same view")
+  func openTerminalFollows() throws {
+    let pane = pane()
+    let host = host(surface(pane, size: 13))
+    let terminal = try #require(Self.terminal(in: host))
+    let columns = terminal.getTerminal().cols
+    #expect(terminal.font.pointSize == 13)
+
+    host.rootView = surface(pane, size: 16)
+    host.layoutSubtreeIfNeeded()
+
+    #expect(Self.terminal(in: host) === terminal)
+    #expect(terminal.font.pointSize == 16)
+    #expect(terminal.getTerminal().cols < columns)
   }
 
   private static func terminal(in view: NSView) -> TerminalView? {

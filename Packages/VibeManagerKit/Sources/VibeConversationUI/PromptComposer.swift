@@ -355,6 +355,7 @@ public struct AttachmentChip: View {
   @State private var preview: AttachmentPreview?
   @State private var quickLook: URL?
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
   @Environment(\.displayScale) private var displayScale
 
   /// - Parameter siblings: the files joined with it, which Quick Look goes through; itself alone
@@ -428,7 +429,8 @@ public struct AttachmentChip: View {
   }
 
   private func font(size: Double, weight: Font.Weight = .regular) -> Font {
-    usesSystemColors
+    let size = appearance.textSize.scaled(size)
+    return usesSystemColors
       ? .system(size: size, weight: weight) : theme.interfaceFont(size: size, weight: weight)
   }
 

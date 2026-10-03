@@ -154,6 +154,11 @@ public struct ConversationSettingsView: View {
             Text("Extra Large", bundle: .module).tag(ConversationAppearance.TextSize.extraLarge)
           } label: {
             Text("Text size", bundle: .module)
+            Text(
+              "Also sizes the terminals. ⌘+ and ⌘− in the View menu.", bundle: .module,
+              comment:
+                "Under the text size setting: it also sizes the terminals, and the View menu's zoom changes it."
+            )
           }
           Picker(selection: $appearance.density) {
             Text("Compact", bundle: .module).tag(ConversationAppearance.Density.compact)
@@ -408,7 +413,8 @@ public struct ConversationSettingsView: View {
               .frame(width: 18, height: 18)
               .overlay(
                 Circle().stroke(Color.accentColor, lineWidth: appearance.accent == accent ? 2 : 0)
-                  .padding(-3))
+                  .padding(-3)
+              )
               // At least 20 points to click (#229), the disc drawn at its own size.
               .frame(width: 20, height: 20)
               .contentShape(Rectangle())
