@@ -191,7 +191,9 @@ public final class SessionBrowser {
     refusedSites.remove(site)
   }
 
+  /// The latest answer wins: a site is never both readable and refused.
   func refuseReading(_ site: String) {
+    readableSites.remove(site)
     refusedSites.insert(site)
   }
 

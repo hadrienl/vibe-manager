@@ -567,6 +567,49 @@ struct BrowserWorkspaceToolsTests {
     #expect(workspace.pendingRequests.isEmpty)
   }
 
+  @Test("A refusal after an allowance leaves the site refused only (#288)")
+  func latestAnswerWins() {
+    let browser = BrowserWorkspace().browser(for: SessionID())
+    browser.allowReading("example.com")
+    browser.refuseReading("example.com")
+    #expect(browser.readableSites.isEmpty)
+    #expect(browser.refusedSites == ["example.com"])
+  }
+
+  @Test("A remote load by tab_navigate or a redirection brings the web view forward (#288)")
+  func everyRouteBringsTheWebViewForward() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page, "/b": "<title>B</title>"])
+    defer { server.stop() }
+    server.setRedirect("/r", to: remoteURL(server).absoluteString)
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    workspace.selectedSessionID = { session }
+    var broughtForward = 0
+    workspace.agentDidOpenPage = { if $0 == session { broughtForward += 1 } }
+    let opened = try object(
+      await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(server.url("/b").absoluteString)],
+        session: session))
+    let id = try #require(opened["id"]?.stringValue)
+    broughtForward = 0
+
+    // tab_navigate to a site away from this Mac, in the session on screen: the web view comes
+    // in front of its terminal.
+    _ = await workspace.run(
+      tool: "tab_navigate",
+      arguments: ["tab": .string(id), "url": .string(remoteURL(server).absoluteString)],
+      session: session)
+    #expect(broughtForward > 0)
+
+    // A local address that redirects away from this Mac does too.
+    broughtForward = 0
+    _ = await workspace.run(
+      tool: "tab_navigate",
+      arguments: ["tab": .string(id), "url": .string(server.url("/r").absoluteString)],
+      session: session)
+    #expect(broughtForward > 0)
+  }
+
   @Test(
     "A site's answer, allowed or refused, is taken back and the next read asks (#288)",
     .timeLimit(.minutes(1)))
@@ -604,7 +647,6 @@ struct BrowserWorkspaceToolsTests {
         workspace.answer(request, with: .deny)
       }
       _ = await next.value
-      workspace.forgetReading(site, in: session)
     }
   }
 

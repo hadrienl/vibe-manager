@@ -2203,7 +2203,7 @@ struct SessionRow: View {
         Image(systemName: "globe")
           .font(.caption)
           .foregroundStyle(Color.accentColor)
-          .help(Text("The agent opened a page in the web view", bundle: .module))
+          .help(Text("The agent loaded a page in the web view", bundle: .module))
       case nil:
         EmptyView()
       }
@@ -2288,7 +2288,7 @@ struct SessionRow: View {
     case .waitingForApproval:
       return Text("Waiting for your approval in the web view", bundle: .module)
     case .agentOpenedPage:
-      return Text("The agent opened a page", bundle: .module)
+      return Text("The agent loaded a page", bundle: .module)
     case nil:
       return Text(verbatim: "")
     }

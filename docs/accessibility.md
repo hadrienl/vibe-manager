@@ -213,7 +213,7 @@ stays in the sidebar, so the next ⌃⌘A archives it.
 | Address bar | "Address" | the address | editable | — |
 | Web view divider | "Divider between the terminal and the web view" | "520 points wide" | adjustable (±40 points) | — |
 | Agent's request banner | the question, the value typed, the expiry | — | Deny, Always Allow for ‹site›, Allow Once; announced when it appears | — |
-| A session row whose web view waits | as above | "Waiting for your approval in the web view", "The agent opened a page" | — | `session-row` |
+| A session row whose web view waits | as above | "Waiting for your approval in the web view", "The agent loaded a page" | — | `session-row` |
 | New Session: ticket | "Ticket" | — | — | `new-session-ticket` |
 | New Session: a recent folder, one element | its name and path ("api, ~/code/api"), then "Folder not found" when it has gone | selected | activate (not when it has gone), Remove from Recents | `new-session-recent-folder-0`, `-1`… |
 | New Session: Show More | "Show 7 more recent folders", "Show fewer recent folders" | — | activate | `new-session-recent-folders-more` |

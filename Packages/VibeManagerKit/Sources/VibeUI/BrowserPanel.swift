@@ -1074,6 +1074,28 @@ private struct BrowserTracePopover: View {
       + browser.refusedSites.sorted().map { ($0, false) }
   }
 
+  /// One row per site: a site is never both readable and refused, so the site is its identity.
+  private var answeredSiteRows: some View {
+    ForEach(answeredSites, id: \.site) { entry in
+      HStack(spacing: 8) {
+        Text(verbatim: entry.site)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        Spacer()
+        Text(entry.isAllowed ? "Can read" : "Refused", bundle: .module)
+          .foregroundStyle(.secondary)
+        Button {
+          forget(entry.site)
+        } label: {
+          Text("Remove", bundle: .module)
+        }
+        .accessibilityLabel(Text("Remove \(entry.site)", bundle: .module))
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
+    }
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Agent Actions", bundle: .module)
@@ -1081,24 +1103,12 @@ private struct BrowserTracePopover: View {
         .padding(12)
       Divider()
       if !answeredSites.isEmpty {
-        ForEach(answeredSites, id: \.site) { entry in
-          HStack(spacing: 8) {
-            Text(verbatim: entry.site)
-              .lineLimit(1)
-              .truncationMode(.middle)
-            Spacer()
-            Text(entry.isAllowed ? "Can read" : "Refused", bundle: .module)
-              .foregroundStyle(.secondary)
-            Button {
-              forget(entry.site)
-            } label: {
-              Text("Remove", bundle: .module)
-            }
-            .accessibilityLabel(Text("Remove \(entry.site)", bundle: .module))
+        ScrollView {
+          VStack(alignment: .leading, spacing: 0) {
+            answeredSiteRows
           }
-          .padding(.horizontal, 12)
-          .padding(.vertical, 6)
         }
+        .frame(maxHeight: 160)
         Divider()
       }
       if browser.actionLog.records.isEmpty {

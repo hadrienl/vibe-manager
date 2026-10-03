@@ -13566,6 +13566,28 @@
         }
       }
     },
+    "The agent loaded a page" : {
+      "comment" : "VoiceOver value of a session row: the agent loaded a page in its web view while the session was not on screen — opened, navigated, redirected or scripted (#288).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent a chargé une page"
+          }
+        }
+      }
+    },
+    "The agent loaded a page in the web view" : {
+      "comment" : "Help of the globe on a session row: the agent loaded a page in its web view while the session was not on screen (#288).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent a chargé une page dans la vue web"
+          }
+        }
+      }
+    },
     "The agent may have to ask for access to %@ to read “%@”." : {
       "comment" : "After a drop. The arguments are a protected folder, then a file name.",
       "localizations" : {
@@ -13573,26 +13595,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’agent devra peut-être demander l’accès à %1$@ pour lire « %2$@ »."
-          }
-        }
-      }
-    },
-    "The agent opened a page" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’agent a ouvert une page"
-          }
-        }
-      }
-    },
-    "The agent opened a page in the web view" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’agent a ouvert une page dans la vue web"
           }
         }
       }
