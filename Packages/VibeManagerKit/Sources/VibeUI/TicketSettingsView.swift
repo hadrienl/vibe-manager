@@ -4,10 +4,19 @@ import UniformTypeIdentifiers
 import VibeApplication
 import VibeDomain
 
-/// The Tickets tab of the settings (#89): whether ticket titles go to the notes, in what line, the
-/// resolvers that recognise a ticket's address, and a test of an address.
+/// Settings › Tickets (#89): whether ticket titles go to the notes, and in what line; then, on a
+/// page of their own (#313), the resolvers that recognise a ticket's address, and a test of an
+/// address.
 struct TicketSettingsView: View {
+  enum Pane {
+    case general
+    case resolvers
+  }
+
   @Bindable var model: TicketTitlesModel
+  let pane: Pane
+  /// Turns the settings to another page: the resolvers, from the general one.
+  let show: (SettingsPage) -> Void
   @State private var selectedID: UUID?
   @State private var draft: TicketResolver?
   @State private var formatText = ""
@@ -19,22 +28,25 @@ struct TicketSettingsView: View {
   @State private var isTesting = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      general
-      Divider()
-      HStack(alignment: .top, spacing: 16) {
-        sidebar
-          .frame(width: 220)
-        editor
-          .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    Group {
+      switch pane {
+      case .general:
+        general
+      case .resolvers:
+        VStack(alignment: .leading, spacing: 12) {
+          HStack(alignment: .top, spacing: 16) {
+            sidebar
+              .frame(width: 220)
+            editor
+              .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+          }
+          Divider()
+          tester
+        }
+        .padding(16)
       }
-      Divider()
-      tester
     }
-    .padding(16)
-    // No least width: `settingsPage` gives the settings' width, and what the page holds gives more
-    // when it needs more. A `minWidth` would hide the latter from the window (#152).
-    .frame(idealWidth: 860, minHeight: 620, idealHeight: 680)
+    .onDisappear { saveIfKept() }
     .task {
       await model.load()
       formatText = model.lineFormat.template
@@ -69,63 +81,81 @@ struct TicketSettingsView: View {
   // MARK: - The switch and the format
 
   private var general: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Toggle(isOn: $model.insertsTicketTitles) {
-        Text("Insert ticket titles in the notes", bundle: .module)
-      }
-      Text(
-        """
-        When a new session names a ticket's address, its page opens in the session's web view, \
-        where you are signed in, and its title goes to the top of the notes. Only addresses a \
-        resolver below recognises are opened.
-        """,
-        bundle: .module
-      )
-      .font(.caption)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-      HStack(alignment: .firstTextBaseline) {
-        Text("Line format", bundle: .module)
-        TextField(text: $formatText, prompt: Text(verbatim: TicketLineFormat.standard.template)) {
+    Form {
+      Section {
+        Toggle(isOn: $model.insertsTicketTitles) {
+          Text("Insert ticket titles in the notes", bundle: .module)
+          Text(
+            """
+            When a new session names a ticket's address, its page opens in the session's web view, \
+            where you are signed in, and its title goes to the top of the notes. Only addresses a \
+            resolver recognises are opened.
+            """,
+            bundle: .module)
+        }
+        LabeledContent {
+          TextField(text: $formatText, prompt: Text(verbatim: TicketLineFormat.standard.template)) {
+            Text("Line format", bundle: .module)
+          }
+          .labelsHidden()
+          .font(.body.monospaced())
+          .onChange(of: formatText) { _, text in
+            let format = TicketLineFormat(text)
+            if format.isValid { model.lineFormat = format }
+          }
+        } label: {
           Text("Line format", bundle: .module)
+          if TicketLineFormat(formatText).isValid {
+            Text(
+              "Example: \(TicketLineFormat(formatText).line(id: "acme/app#42", title: String(localized: "Allow exporting as CSV", bundle: .module), url: "https://github.com/acme/app/issues/42"))",
+              bundle: .module, comment: "A line as it would be written in the notes.")
+          } else {
+            Text("The format must hold {title}, and may hold {id} and {url}.", bundle: .module)
+              .foregroundStyle(.orange)
+          }
         }
-        .font(.body.monospaced())
-        .onChange(of: formatText) { _, text in
-          let format = TicketLineFormat(text)
-          if format.isValid { model.lineFormat = format }
-        }
-      }
-      if TicketLineFormat(formatText).isValid {
-        Text(
-          "Example: \(TicketLineFormat(formatText).line(id: "acme/app#42", title: String(localized: "Allow exporting as CSV", bundle: .module), url: "https://github.com/acme/app/issues/42"))",
-          bundle: .module, comment: "A line as it would be written in the notes."
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      } else {
-        Text(
-          "The format must hold {title}, and may hold {id} and {url}.", bundle: .module
-        )
-        .font(.caption)
-        .foregroundStyle(.orange)
-      }
-      if let error = model.storeError {
-        HStack {
-          Text(error)
-            .font(.caption)
-            .foregroundStyle(.orange)
-          if let url = model.fileURL {
-            Button {
-              NSWorkspace.shared.activateFileViewerSelecting([url])
-            } label: {
-              Text("Reveal in Finder", bundle: .module)
+        if let error = model.storeError {
+          HStack {
+            Text(error)
+              .font(.caption)
+              .foregroundStyle(.orange)
+            if let url = model.fileURL {
+              Button {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+              } label: {
+                Text("Reveal in Finder", bundle: .module)
+              }
+              .buttonStyle(.link)
+              .font(.caption)
             }
-            .buttonStyle(.link)
-            .font(.caption)
           }
         }
       }
+      Section {
+        Button {
+          show(.ticketResolvers)
+        } label: {
+          LabeledContent {
+            HStack(spacing: 6) {
+              Text(
+                "On: \(model.resolvers.filter(\.isEnabled).count)", bundle: .module,
+                comment: "How many ticket resolvers are turned on.")
+              Image(systemName: "chevron.right")
+                .foregroundStyle(.tertiary)
+            }
+          } label: {
+            Text(
+              "Resolvers", bundle: .module,
+              comment: "A page of Settings › Tickets: what recognises a ticket's address.")
+            Text(
+              "What recognises a ticket's address, and reads its title.", bundle: .module)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
     }
+    .formStyle(.grouped)
     .disabled(!model.isLoaded)
   }
 
@@ -344,12 +374,16 @@ struct TicketSettingsView: View {
   }
 
   private func select(_ id: UUID?) {
-    // A change that can be kept is kept: the list is not a place where edits are lost.
+    saveIfKept()
+    selectedID = id
+    draft = id.flatMap { id in model.resolvers.first { $0.id == id } }
+  }
+
+  /// A change that can be kept is kept: neither the list nor leaving the page loses an edit.
+  private func saveIfKept() {
     if isDirty, let draft, draft.validate().isEmpty {
       Task { await saveDraft(draft) }
     }
-    selectedID = id
-    draft = id.flatMap { id in model.resolvers.first { $0.id == id } }
   }
 
   private func saveDraft(_ resolver: TicketResolver? = nil) async {

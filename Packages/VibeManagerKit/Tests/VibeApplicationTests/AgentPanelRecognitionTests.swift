@@ -28,5 +28,12 @@ struct AgentPanelRecognitionTests {
     let scrolled = "Esc to cancel\n" + (1...8).map { "line \($0)" }.joined(separator: "\n")
     #expect(!AgentPanelRecognition.showsPanel(screen: scrolled))
     #expect(!AgentPanelRecognition.showsPanel(screen: ""))
+    // The agent's own words, above the prompt at rest (#319).
+    #expect(
+      !AgentPanelRecognition.showsPanel(
+        screen: "Then press Esc to exit the editor.\n────\n❯ \n────\n  ⏵⏵ auto mode on"))
+    #expect(
+      !AgentPanelRecognition.showsPanel(
+        screen: "Esc to cancel, as the menu says.\n› Ask Codex to do anything\n← for agents"))
   }
 }

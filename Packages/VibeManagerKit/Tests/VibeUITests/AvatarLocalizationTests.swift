@@ -41,7 +41,7 @@ struct AvatarLocalizationTests {
       + AvatarLibraryPresentation.RowAction.allCases.map(AvatarLibraryPresentation.title(of:))
       + AvatarLibraryPresentation.JobAction.allCases.map(AvatarLibraryPresentation.title(of:))
       + AvatarExpression.allCases.map(AvatarPresentation.name(of:))
-      + RequestsPane.allCases.map(\.title)
+      + [SettingsPage.avatars.title]
       + [
         AvatarLibraryPresentation.newAvatarTitle, AvatarLibraryPresentation.missingCount(2),
         AvatarLibraryRules.defaultAvatarTitle,

@@ -241,11 +241,13 @@ struct ConversationThemesModelTests {
     let fixture = Fixture(themes: [personal])
     await fixture.model.load()
     let appearance = ConversationAppearance(darkTheme: personal.id, accent: .blue)
-    let resolved = fixture.model.displayed(appearance, isDark: true, increasedContrast: false)
+    let resolved = fixture.model.displayed(
+      appearance, isDark: true, increasedContrast: false, reducedTransparency: false)
     #expect(resolved.id == personal.id)
     #expect(resolved.accent == ConversationTheme.accentColors[.blue]?.dark)
     try await fixture.generate("une forêt la nuit")
-    let trial = fixture.model.displayed(appearance, isDark: false, increasedContrast: true)
+    let trial = fixture.model.displayed(
+      appearance, isDark: false, increasedContrast: true, reducedTransparency: false)
     #expect(trial.id == fixture.model.trial?.id)
     #expect(trial.accent == fixture.model.trial?.accent)
   }
@@ -256,12 +258,13 @@ struct ConversationThemesModelTests {
     let appearance = ConversationAppearance(accent: .blue)
     for isDark in [false, true] {
       let theme = fixture.model.displayed(
-        appearance, session: ConversationTheme.night.id, isDark: isDark, increasedContrast: false)
+        appearance, session: ConversationTheme.night.id, isDark: isDark, increasedContrast: false,
+        reducedTransparency: false)
       #expect(theme.id == ConversationTheme.night.id)
       #expect(theme.accent == ConversationTheme.accentColors[.blue]?.dark)
     }
     let following = fixture.model.displayed(
-      appearance, session: nil, isDark: true, increasedContrast: false)
+      appearance, session: nil, isDark: true, increasedContrast: false, reducedTransparency: false)
     #expect(following.id == ConversationAppearance.defaultDarkTheme)
   }
 
@@ -271,10 +274,10 @@ struct ConversationThemesModelTests {
     let appearance = ConversationAppearance()
     let chosen = fixture.model.displayed(
       appearance, session: ConversationTheme.systemLight.id, isDark: false,
-      increasedContrast: true)
+      increasedContrast: true, reducedTransparency: false)
     #expect(chosen.id == ConversationTheme.systemLight.id)
     let following = fixture.model.displayed(
-      appearance, session: nil, isDark: false, increasedContrast: true)
+      appearance, session: nil, isDark: false, increasedContrast: true, reducedTransparency: false)
     #expect(following.id == ConversationTheme.highContrast.id)
   }
 
@@ -283,18 +286,21 @@ struct ConversationThemesModelTests {
     let fixture = Fixture()
     let appearance = ConversationAppearance()
     let missing = fixture.model.displayed(
-      appearance, session: "deleted", isDark: true, increasedContrast: false)
+      appearance, session: "deleted", isDark: true, increasedContrast: false,
+      reducedTransparency: false)
     #expect(missing.id == ConversationAppearance.defaultDarkTheme)
     try await fixture.generate("une forêt la nuit")
     let trial = try #require(fixture.model.trial)
     #expect(
       fixture.model.displayed(
-        appearance, session: "deleted", isDark: true, increasedContrast: false
+        appearance, session: "deleted", isDark: true, increasedContrast: false,
+        reducedTransparency: false
       )
       .id == trial.id)
     #expect(
       fixture.model.displayed(
-        appearance, session: ConversationTheme.paper.id, isDark: true, increasedContrast: false
+        appearance, session: ConversationTheme.paper.id, isDark: true, increasedContrast: false,
+        reducedTransparency: false
       ).id == ConversationTheme.paper.id)
   }
 
@@ -305,7 +311,8 @@ struct ConversationThemesModelTests {
     let fixture = Fixture(themes: [present])
     await fixture.model.load()
     let theme = fixture.model.displayed(
-      ConversationAppearance(darkTheme: present.id), isDark: true, increasedContrast: false)
+      ConversationAppearance(darkTheme: present.id), isDark: true, increasedContrast: false,
+      reducedTransparency: false)
     #expect(theme.messageFontFamily == "Menlo")
     #expect(theme.codeFontFamily == nil)
   }

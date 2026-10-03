@@ -25,6 +25,9 @@ public struct RootView: View {
   @Environment(\.undoManager) private var undoManager
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  /// The zoom's keys, taken before any view of the window (#229).
+  @State private var zoomKeys = ZoomKeyMonitor()
 
   public init(model: AppModel) {
     self.model = model
@@ -66,6 +69,10 @@ public struct RootView: View {
         }
       }
     }
+    // The application's zoom (#229), for every terminal of the window: the session's, the drawer's
+    // and the copies shown in the conversation.
+    .environment(\.terminalFontSize, model.conversations.appearance.textSize.terminalPointSize)
+    .onAppear { zoomKeys.install { model.zoom($0) } }
     // The window's title (#159), in every state: the Window menu, Mission Control and ⌘` read it.
     // From macOS 26 the toolbar draws it itself, the application's name and the session's in two
     // styles (#256).
@@ -395,7 +402,7 @@ public struct RootView: View {
                 discarded: { model.discardNewSessionDraft(undoManager: undoManager) },
                 chooseFiles: { model.beginAttachingFiles() },
                 manageTemplates: {
-                  model.settingsTab = .templates
+                  model.settingsPage = .templates
                   openSettings()
                 },
                 themes: model.conversations.themes,
@@ -956,7 +963,8 @@ public struct RootView: View {
   private var conversationTheme: ConversationTheme {
     model.conversations.themes.displayed(
       ConversationFonts.installedOnly(model.conversations.appearance),
-      isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
+      isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased,
+      reducedTransparency: reduceTransparency)
   }
 
   @ViewBuilder
@@ -980,7 +988,8 @@ public struct RootView: View {
       ForEach(model.conversations.mountedSessionIDs, id: \.self) { id in
         SessionConversationSlot(
           model: model, id: id, shownID: session.id, isCovered: isCovered,
-          isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased)
+          isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased,
+          reducedTransparency: reduceTransparency)
       }
 
       // An archived session has no pane by construction — archiving released it — so its own
@@ -1026,7 +1035,7 @@ public struct RootView: View {
           notice: notice,
           allowFullDiskAccess: {
             model.dismissDropNotice()
-            model.settingsTab = .privacy
+            model.settingsPage = .privacy
             openSettings()
           },
           dismiss: { model.dismissDropNotice() }
@@ -2165,12 +2174,16 @@ struct SessionRow: View {
         // tell apart, and the identity colour of the session stays free to mean identity.
         Label {
           Text(status.label)
+            .foregroundStyle(
+              !isRestoring && status.severity.wordsInLabelColour
+                ? HierarchicalShapeStyle.primary : HierarchicalShapeStyle.secondary)
         } icon: {
           Image(systemName: status.symbolName)
             .opacity(isWorkingAnimated ? 0 : 1)
             .overlay {
               if isWorkingAnimated { WorkingSpinner() }
             }
+            .foregroundStyle(isRestoring ? Color.secondary : tint)
         }
         .font(.caption)
         // What waits for the user is the one state set apart from the others by more than its
@@ -2178,7 +2191,6 @@ struct SessionRow: View {
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
         // The exit code or the signal, for whoever wants it, behind words that say what happened.
         .help(status.detail ?? "")
-        .foregroundStyle(isRestoring ? Color.secondary : tint)
         .lineLimit(1)
       }
       .sessionThemePopover(model: commands.model, sessionID: session.id, place: .sidebar)
@@ -2512,6 +2524,7 @@ private struct SessionConversationSlot: View {
   let isCovered: Bool
   let isDark: Bool
   let increasedContrast: Bool
+  let reducedTransparency: Bool
   @Environment(\.paneWidthHold) private var widthHold
 
   var body: some View {
@@ -2523,7 +2536,7 @@ private struct SessionConversationSlot: View {
       let theme = model.conversations.themes.displayed(
         ConversationFonts.installedOnly(model.conversations.appearance),
         session: model.displayedConversationTheme(of: listed), isDark: isDark,
-        increasedContrast: increasedContrast)
+        increasedContrast: increasedContrast, reducedTransparency: reducedTransparency)
       let isActive =
         !isCovered && id == shownID && model.presentation(of: listed) == .conversation
       VStack(spacing: 0) {

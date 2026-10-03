@@ -65,6 +65,8 @@ public final class AppModel {
   /// about the store, and kept through the reload that follows the action.
   public private(set) var actionFailure: ActionFailure?
   public private(set) var agentDiagnostics: [AgentDiagnostic] = []
+  /// The agents of this build, as their providers describe themselves, in their order.
+  public internal(set) var agentDescriptors: [AgentDescriptor] = []
   /// The name of each agent of this build, by provider identifier, for the places that name one
   /// (#247). Read from what the providers say of themselves, not from their detection: a session
   /// is named “Claude Code” from the first frame, and through every refresh.
@@ -265,14 +267,13 @@ public final class AppModel {
   public let templates: PromptTemplateLibraryModel
   /// The usage figures (#18). Absent in a workspace assembled without them.
   public let usage: UsageModel?
-  /// The tab the settings show, so that a way into them — Manage… in the New Session sheet, the
-  /// menu — can open them on the right one.
-  public var settingsTab: SettingsTab = .general
-  /// The page Settings › Requests shows (#154). Kept here rather than by the window, so that
-  /// the settings reopen on it, and that "Manage Avatars…" can turn it.
-  public var requestsPane: RequestsPane = .signalling
+  /// The page the settings show (#313), so that a way into them — Manage… in the New Session
+  /// sheet, the menu — can open them on the right one, and that they reopen where they were.
+  public var settingsPage: SettingsPage = .general
   /// Where a drop writes what has no file of its own (#42).
   let dropStore: (any SessionDropStore)?
+  /// Says that a gesture did nothing: the system alert sound in the application.
+  let beep: @MainActor () -> Void
   /// What the last drop on a session has to say: a file left out, a folder the agent may not
   /// read, a fallback to the terminal (#42).
   public internal(set) var dropNotice: SessionDropNotice?
@@ -745,8 +746,12 @@ public final class AppModel {
     /// Where a drop writes what has no file of its own (#42). Absent, such a drop is refused.
     dropStore: (any SessionDropStore)? = nil,
     /// Where the symbols and colours the pickers offer are kept (#199).
-    appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore()
+    appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore(),
+    /// Says that a gesture did nothing. Silent in a workspace assembled without it: the tests run
+    /// while the user works, and are not to be heard.
+    beep: @escaping @MainActor () -> Void = {}
   ) {
+    self.beep = beep
     self.appearancePalette = SessionAppearancePaletteModel(store: appearancePalette)
     self.dropStore = dropStore
     self.journal = journal
@@ -848,7 +853,7 @@ public final class AppModel {
 
     usage?.connect { [weak self] in self?.sessions ?? [] }
 
-    journal?.showSettingsTab = { [weak self] in self?.settingsTab = .activity }
+    journal?.showSettingsTab = { [weak self] in self?.settingsPage = .general }
     quickOpen.opened = { [weak self] result in self?.goToSession(result.sessionID) }
     journal?.journalDidChange = { [quickOpen] id, journal in
       quickOpen.journalChanged(journal, for: id)
@@ -1432,7 +1437,7 @@ public final class AppModel {
   func undoArchive(_ archives: [SessionArchiveUndo]) async {
     let archived = Set(sessions.filter { $0.status == .archived }.map(\.id))
     let back = archives.filter { archived.contains($0.id) }
-    guard !back.isEmpty else { return NSSound.beep() }
+    guard !back.isEmpty else { return beep() }
     for archive in back {
       do {
         _ = try await restoreSession(id: archive.id)
@@ -1614,7 +1619,7 @@ public final class AppModel {
   /// beeps.
   func undoStatusChange(_ undo: SessionStatusUndo) async {
     guard sessions.first(where: { $0.id == undo.id })?.taskStatus == undo.to else {
-      return NSSound.beep()
+      return beep()
     }
     await setTaskStatus(undo.from, for: undo.id, restarting: false)
     if undo.wasSelected { select(undo.id) }
@@ -2523,6 +2528,7 @@ public final class AppModel {
     defer { isRefreshingAgents = false }
 
     let descriptors = await agents.descriptors()
+    agentDescriptors = descriptors
     name(descriptors)
     usage?.reportingProviderIDs = Set(
       descriptors.filter(\.capabilities.reportsUsage).map(\.id.rawValue))
