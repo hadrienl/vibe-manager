@@ -343,9 +343,9 @@ struct BrowserAgentEffectsTests {
     let (workspace, session, opened, server) = try await pressThenClick(
       "b",
       in: #"""
-      <!doctype html><title>Page</title><a id="hidden" href="vibetest://open"></a>
-      <button id="b" onclick="document.getElementById('hidden').click()">Play</button>
-      """#)
+        <!doctype html><title>Page</title><a id="hidden" href="vibetest://open"></a>
+        <button id="b" onclick="document.getElementById('hidden').click()">Play</button>
+        """#)
     defer { server.stop() }
     workspace.answer(try #require(workspace.requests(for: session).first), with: .deny)
     await waitUntil("the question is gone") { workspace.pendingRequests.isEmpty }
