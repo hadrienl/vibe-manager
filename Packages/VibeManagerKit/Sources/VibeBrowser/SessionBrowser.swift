@@ -131,6 +131,27 @@ public final class SessionBrowser {
     stateDidChange?()
   }
 
+  /// Moves a tab one place left (`-1`) or right (`1`) among the unpinned tabs: the keyboard's and
+  /// VoiceOver's way to do what dragging it does (#230).
+  public func moveTab(_ id: BrowserTabID, by offset: Int) {
+    guard let index = tabs.firstIndex(where: { $0.id == id }),
+      let destination = Self.place(of: index, movedBy: offset, among: tabs.count)
+    else { return }
+    move(id, to: destination)
+  }
+
+  /// Whether `moveTab(_:by:)` has somewhere to go.
+  public func canMoveTab(_ id: BrowserTabID, by offset: Int) -> Bool {
+    guard let index = tabs.firstIndex(where: { $0.id == id }) else { return false }
+    return Self.place(of: index, movedBy: offset, among: tabs.count) != nil
+  }
+
+  /// Where a tab at `index` goes when moved by `offset`, or `nil` past either end.
+  static func place(of index: Int, movedBy offset: Int, among count: Int) -> Int? {
+    let destination = index + offset
+    return destination != index && (0..<count).contains(destination) ? destination : nil
+  }
+
   /// The tab after, or before, the one in front, around the ends.
   public func activateNeighbour(offset: Int) {
     let all = allTabs
