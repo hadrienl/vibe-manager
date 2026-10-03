@@ -346,6 +346,161 @@ final class SmokeTests: XCTestCase {
     app.terminate()
   }
 
+  /// The main screens audited by XCTest, so that a view added later cannot lose what the
+  /// application does for accessibility unnoticed (#233): the sidebar and a conversation, a new
+  /// session's draft, and the settings. An issue the audit raises fails the test unless it is one
+  /// of the exceptions below, each with the reason it stands — most of them the ticket that fixes
+  /// it.
+  func testTheMainScreensPassTheAccessibilityAudit() throws {
+    // Every issue of every screen is reported, not only the first.
+    continueAfterFailure = true
+    let app = launch()
+    createSession(named: "Audit", isFirst: true, in: app)
+    expectSessionRows(1, in: app)
+    // The mock agent's session opens as a conversation (#38): its picker says it can.
+    XCTAssertTrue(app.radioButtons["Terminal"].waitForExistence(timeout: 10))
+    try audit(app, "Sidebar and conversation")
+
+    app.typeKey("n", modifierFlags: .command)
+    XCTAssertTrue(app.textFields["new-session-name"].waitForExistence(timeout: 10))
+    try audit(app, "New session draft")
+    app.typeKey(.escape, modifierFlags: [])
+
+    app.typeKey(",", modifierFlags: .command)
+    let settingsOpen = expectation(
+      for: NSPredicate { _, _ in app.windows.count > 1 }, evaluatedWith: nil)
+    wait(for: [settingsOpen], timeout: 10)
+    try audit(app, "Settings")
+    // A page of the settings, by the row of their sidebar that carries its title.
+    for page in ["Badges", "Updates", "Notifications"] {
+      // A static text's words are its value on macOS, not its label.
+      let item = app.outlines.staticTexts.matching(
+        NSPredicate(format: "value == %@ OR label == %@", page, page)
+      ).firstMatch
+      guard item.waitForExistence(timeout: 5) else {
+        XCTFail("No \(page) page in the settings")
+        continue
+      }
+      item.click()
+      try audit(app, "Settings, \(page)")
+    }
+    // The avatars' library, reached from the notifications' page.
+    let manageAvatars = app.buttons["manage-avatars"]
+    if manageAvatars.waitForExistence(timeout: 5) {
+      manageAvatars.click()
+      try audit(app, "Settings, Avatars")
+    } else {
+      XCTFail("No way to the avatars from the notifications' page")
+    }
+    app.terminate()
+  }
+
+  /// An issue the audit may raise without failing the test, and why.
+  private struct AuditException {
+    let type: XCUIAccessibilityAuditType
+    /// The issue's description, or a part of it; any when nil.
+    var issue: String? = nil
+    /// The kinds of element it may be raised on; any when empty.
+    var elements: [XCUIElement.ElementType] = []
+    /// A part of the element's identifier or label; any when nil, none at all when empty.
+    var element: String? = nil
+    let reason: String
+
+    func covers(_ raised: XCUIAccessibilityAuditIssue) -> Bool {
+      guard raised.auditType == type else { return false }
+      if let issue, !raised.compactDescription.contains(issue) { return false }
+      if !elements.isEmpty {
+        guard let kind = raised.element?.elementType, elements.contains(kind) else { return false }
+      }
+      if let element {
+        let names = [raised.element?.identifier ?? "", raised.element?.label ?? ""]
+        if element.isEmpty {
+          return names.allSatisfy(\.isEmpty)
+        }
+        return names.contains { $0.contains(element) }
+      }
+      return true
+    }
+  }
+
+  /// What the audit raises today and may go on raising, each with its reason. The fixes in flight
+  /// are named by their ticket: once one lands, its exception goes.
+  private static let auditExceptions: [AuditException] = [
+    AuditException(
+      type: .contrast, elements: [.staticText],
+      reason: """
+        The system's secondary styles, measured by the audit without the vibrancy macOS gives \
+        them over the sidebar's and the settings' materials. The words of a session's state are \
+        in the label colour since #231, and StatusInkTests measures them.
+        """),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.group, .other], element: "",
+      reason: "SwiftUI's containers: they gather controls, and are not controls themselves."),
+    AuditException(
+      type: .sufficientElementDescription, issue: "Unknown role", elements: [.other],
+      reason: """
+        The symbols and colours of the Badges settings are views without a button's role: #232 \
+        names them, #230 makes them reachable from the keyboard.
+        """),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.touchBar],
+      reason: "The Touch Bar macOS gives the window: none of its items is the application's."),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.textField], element: "new-session-name",
+      reason: """
+        A new session's name has a placeholder and no label: found by this audit, given one by \
+        #328.
+        """),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.outline], element: "avatar-library-list",
+      reason:
+        "The list of the avatars' library has no label: found by this audit, given one by #328."
+    ),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.popUpButton], element: "emoji & symbols",
+      reason: "The Emoji & Symbols button macOS puts in a text field: the system's, not ours."),
+    AuditException(
+      type: .action, elements: [.popUpButton, .menuButton],
+      reason: """
+        SwiftUI's pickers and menus open with AXShowMenu; the audit looks for AXPress, which a \
+        pop-up button does not need.
+        """),
+    AuditException(
+      type: .parentChild,
+      reason: """
+        Raised without an element on a new session's draft, so it cannot be pinned down here: \
+        looked into by #328.
+        """),
+  ]
+
+  private static func name(of type: XCUIAccessibilityAuditType) -> String {
+    let names: [(XCUIAccessibilityAuditType, String)] = [
+      (.contrast, "contrast"), (.elementDetection, "elementDetection"),
+      (.hitRegion, "hitRegion"), (.sufficientElementDescription, "sufficientElementDescription"),
+      (.action, "action"), (.parentChild, "parentChild"),
+    ]
+    return names.first { type.contains($0.0) }?.1 ?? "type \(type.rawValue)"
+  }
+
+  /// Audits what the application shows now. Every issue is written to the log, the ones let
+  /// through included, so that the list of exceptions can be read from a run.
+  private func audit(_ app: XCUIApplication, _ screen: String) throws {
+    var raised: [String] = []
+    try app.performAccessibilityAudit(for: .all) { issue in
+      let element =
+        issue.element.map { "\($0.elementType) '\($0.identifier)' '\($0.label)'" } ?? "-"
+      let text = "\(Self.name(of: issue.auditType)) \(issue.compactDescription) — \(element)"
+      let exception = Self.auditExceptions.first { $0.covers(issue) }
+      raised.append((exception == nil ? "FAIL " : "OK   ") + text)
+      print("[accessibility-audit] \(screen): \(raised.last ?? "")")
+      return exception != nil
+    }
+    let report = XCTAttachment(string: raised.joined(separator: "\n"))
+    report.name = "Accessibility audit: \(screen)"
+    report.lifetime = .keepAlways
+    add(report)
+  }
+
   func testExportDiagnosticsShowsTheWholeFileFirst() throws {
     let app = launch()
     app.menuBars.menuBarItems["Help"].click()
