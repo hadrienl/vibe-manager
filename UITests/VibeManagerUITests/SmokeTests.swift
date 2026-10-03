@@ -371,16 +371,16 @@ final class SmokeTests: XCTestCase {
       for: NSPredicate { _, _ in app.windows.count > 1 }, evaluatedWith: nil)
     wait(for: [settingsOpen], timeout: 10)
     try audit(app, "Settings")
-    // A tab of the toolbar, or a row of a sidebar: whatever carries the tab's title is clicked.
-    for tab in ["Badges", "Updates", "Requests"] {
-      let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", tab))
+    // A page of the settings, by the row of their sidebar that carries its title.
+    for page in ["Badges", "Updates", "Notifications", "Avatars"] {
+      let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", page))
         .firstMatch
       guard item.waitForExistence(timeout: 5) else {
-        XCTFail("No \(tab) tab in the settings")
+        XCTFail("No \(page) page in the settings")
         continue
       }
       item.click()
-      try audit(app, "Settings, \(tab)")
+      try audit(app, "Settings, \(page)")
     }
     app.terminate()
   }
