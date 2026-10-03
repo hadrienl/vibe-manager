@@ -84,7 +84,6 @@ public struct ConversationView: View {
             { model.terminalScreenChanged($0) })
         )
         .frame(maxWidth: layout.contentWidth)
-        .background(ConversationPagerProbe(pager: pager).accessibilityHidden(true))
         .padding(.horizontal, layout.sideMargin)
         .padding(.bottom, showsComposer ? 8 : 16)
         .frame(maxWidth: .infinity)
@@ -186,6 +185,8 @@ public struct ConversationView: View {
         // to the scroll view's top inset, which macOS 26 covers with the toolbar's edge effect
         // (#228).
         .frame(minHeight: viewportHeight, alignment: .bottom)
+        // Inside the scroll view of the messages: the pager finds it from here (#227).
+        .background(ConversationPagerProbe(pager: pager).accessibilityHidden(true))
         .onGeometryChange(for: CGRect.self) {
           $0.frame(in: .scrollView)
         } action: { frame in
@@ -205,7 +206,8 @@ public struct ConversationView: View {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
       }
       .onChange(of: model.pageRequest) {
-        pager.scroll(model.pageRequest.page)
+        let page = model.pageRequest.page
+        DispatchQueue.main.async { pager.scroll(page) }
       }
       .onChange(of: model.revealRequest) {
         guard let id = model.revealedBlockID else { return }

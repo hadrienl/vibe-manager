@@ -986,17 +986,17 @@ public final class ConversationModel {
 
   /// A page of the conversation to scroll, from the keyboard (#227): Page Up and Page Down in the
   /// composer, which has the keyboard while the messages are read.
-  public enum Page: Hashable, Sendable { case up, down }
+  enum Page: Hashable, Sendable { case up, down }
 
   /// The page asked for, and a counter: twice the same page in a row still moves.
-  public struct PageRequest: Hashable, Sendable {
-    public var page: Page
-    public var count: Int
+  struct PageRequest: Hashable, Sendable {
+    var page: Page
+    var count: Int
   }
 
-  public private(set) var pageRequest = PageRequest(page: .down, count: 0)
+  private(set) var pageRequest = PageRequest(page: .down, count: 0)
 
-  public func scrollPage(_ page: Page) {
+  func scrollPage(_ page: Page) {
     pageRequest = PageRequest(page: page, count: pageRequest.count + 1)
   }
 

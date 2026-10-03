@@ -185,7 +185,7 @@ public enum MarkdownDocument {
   }
 
   /// A whole message as plain text, one block a line, for VoiceOver to read aloud (#227).
-  public static func plainText(from text: String) -> String {
+  static func plainText(from text: String) -> String {
     plainText(blocks(from: text))
   }
 
@@ -194,8 +194,18 @@ public enum MarkdownDocument {
       switch block {
       case .heading(_, let runs), .paragraph(let runs):
         return plainText(runs)
-      case .list(_, _, let items):
-        return items.map { plainText($0.blocks) }.joined(separator: "\n")
+      case .list(let ordered, let start, let items):
+        // The numbers and the boxes say something: step 2, a task done.
+        return items.enumerated().map { index, item in
+          let mark: String
+          switch item.checkbox {
+          case .some(true): mark = "☑ "
+          case .some(false): mark = "☐ "
+          case .none: mark = ordered ? "\(start + index). " : ""
+          }
+          return mark + plainText(item.blocks)
+        }
+        .joined(separator: "\n")
       case .quote(let blocks):
         return plainText(blocks)
       case .code(_, let code):

@@ -100,19 +100,27 @@ struct ConversationReadingTests {
   }
 
   @Test(
-    "A page moves by the height shown less the overlap, never past either end",
+    "A page moves by the height read below the toolbar, never past either end",
     arguments: [true, false])
   func pageOrigin(isFlipped: Bool) {
+    // A 400-point view whose top 52 points lie under the toolbar.
+    let insets = isFlipped ? (top: 52.0, bottom: 0.0) : (top: 0.0, bottom: 52.0)
     func next(_ page: ConversationModel.Page, from y: Double) -> Double {
       ConversationPager.origin(
-        after: page, from: y, visibleHeight: 400, documentHeight: 2000, overlap: 40,
-        isFlipped: isFlipped)
+        after: page, from: y, viewHeight: 400, documentHeight: 2000, insets: insets,
+        overlap: 40, isFlipped: isFlipped)
     }
-    // Flipped, the end of the conversation is at the largest origin; unflipped, at zero.
-    let down = isFlipped ? 360.0 : -360.0
+    // Flipped, the end of the conversation is at the largest origin; unflipped, at the smallest.
+    let down = isFlipped ? 308.0 : -308.0
     #expect(next(.down, from: 800) == 800 + down)
     #expect(next(.up, from: 800) == 800 - down)
+    // No line skipped: what a page shows first under the toolbar was still in view before.
+    let readTop = 800 + 52.0
+    let readBottom = 800 + 400.0
+    #expect(isFlipped ? next(.down, from: 800) + 52 < readBottom : true)
+    #expect(isFlipped ? next(.up, from: 800) + 400 > readTop : true)
+    // The ends: the first message just below the toolbar, the last one at the bottom.
+    #expect(next(isFlipped ? .up : .down, from: 100) == -52)
     #expect(next(isFlipped ? .down : .up, from: 1500) == 1600)
-    #expect(next(isFlipped ? .up : .down, from: 100) == 0)
   }
 }

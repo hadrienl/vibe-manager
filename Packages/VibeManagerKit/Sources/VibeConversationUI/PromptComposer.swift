@@ -102,10 +102,12 @@ struct PromptComposer: View {
             return .handled
           }
           // Page Up and Page Down scroll the messages, End goes back to the last one: the
-          // conversation is read from the keyboard without leaving the composer (#227).
+          // conversation is read from the keyboard without leaving the composer (#227) — unless
+          // the draft itself scrolls.
           .onKeyPress(keys: [.pageUp, .pageDown, .end], phases: [.down, .repeat]) { press in
+            // A draft taller than its field scrolls with these keys, as any text does.
             guard press.modifiers.isDisjoint(with: [.shift, .command, .option, .control]),
-              !Self.isComposingText
+              !Self.isComposingText, !Self.draftScrolls(in: Self.focusedTextView())
             else { return .ignored }
             switch press.key {
             case .pageUp: model.scrollPage(.up)
@@ -230,6 +232,12 @@ struct PromptComposer: View {
   /// must not send the prompt.
   @MainActor static var isComposingText: Bool {
     focusedTextView()?.hasMarkedText() ?? false
+  }
+
+  /// Whether the draft is taller than its field, which then scrolls it (#227).
+  @MainActor static func draftScrolls(in textView: NSTextView?) -> Bool {
+    guard let textView, let scrollView = textView.enclosingScrollView else { return false }
+    return textView.frame.height > scrollView.contentView.bounds.height + 1
   }
 
   /// The text view that has the keyboard: the composer's, when it is typed into. Replaced by the
