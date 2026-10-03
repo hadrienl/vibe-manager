@@ -290,6 +290,8 @@ public final class ConversationModel {
   public private(set) var isSubmitting = false
   /// Writes into the session's terminal, as a keyboard would.
   @ObservationIgnored public var write: (([UInt8]) async -> Void)?
+  /// What the session's terminal shows now, as text; `nil` when it cannot be told (#319).
+  @ObservationIgnored public var readScreen: (() async -> String?)?
   /// Opens the file panel of Session › Attach Files…, whose choice comes back through `attach`:
   /// one panel for the whole window, since two file importers in one hierarchy do not both show.
   @ObservationIgnored public var chooseFiles: (() -> Void)?
@@ -1017,8 +1019,9 @@ public final class ConversationModel {
   public var canSend: Bool {
     switch composerState {
     case .ready:
+      // Keys typed now would go to the panel open in the conversation, not to the prompt.
       return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
-        && shellHold == nil
+        && shellHold == nil && terminalPanel == nil
     case .answeringQuestion:
       return request?.isSending == false && !freeAnswer.isEmpty
     default:
@@ -1223,6 +1226,14 @@ public final class ConversationModel {
     guard canSend, let write else { return false }
     isSubmitting = true
     defer { isSubmitting = false }
+    // A dialog of the CLI that no hook reports — a setup it offers, a panel — would take the
+    // prompt's keys as its own and Return as its answer (#319): nothing is typed, the draft stays,
+    // and the dialog is shown to be answered.
+    if let screen = await readScreen?(), AgentPanelRecognition.showsPanel(screen: screen) {
+      openTerminalPanel(TerminalPanel(echoID: nil, command: nil))
+      panelSeen = true
+      return false
+    }
     let shell = promptFormat.shellEntry
     let submission = PromptSubmission(text: draft, attachments: attachments)
     let kind = submission.kind(shell: shell)
@@ -1282,10 +1293,12 @@ public final class ConversationModel {
   /// shown in the conversation, live, until the transcript says the command ran, the agent starts
   /// working, or the user closes it.
   public struct TerminalPanel: Hashable, Sendable {
-    /// The echo of the command sent from the composer; `nil` for the initial prompt.
+    /// The echo of the command sent from the composer; `nil` for the initial prompt, and for a
+    /// dialog found on screen.
     public let echoID: UUID?
-    /// `/mcp`, without what follows it.
-    public let command: String
+    /// `/mcp`, without what follows it; `nil` for a dialog found on screen as a prompt was about to
+    /// be typed into it (#319).
+    public let command: String?
   }
 
   public private(set) var terminalPanel: TerminalPanel? {
