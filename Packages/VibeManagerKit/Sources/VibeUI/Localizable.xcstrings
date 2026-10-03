@@ -17312,6 +17312,17 @@
         }
       }
     },
+    "emerald" : {
+      "comment" : "A colour, said by VoiceOver: a green leaning to blue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "émeraude"
+          }
+        }
+      }
+    },
     "file edits" : {
       "comment" : "What always allowing grants: the agent's file edits, accepted as they come.",
       "localizations" : {

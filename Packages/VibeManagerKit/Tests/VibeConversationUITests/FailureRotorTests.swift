@@ -66,4 +66,15 @@ struct FailureRotorTests {
     let failed = StateSymbol.label(for: .failed(exitCode: nil))
     #expect(name.components(separatedBy: failed).count <= 2, "\(name)")
   }
+
+  @Test("A target whose name holds the state's word does not silence the state")
+  func stateKeptBesideItsWord() {
+    let call = ToolCall(
+      callID: "r", kind: .read, state: .failed(exitCode: nil),
+      parameters: [ToolParameter(.path, "/logs/failed.log")])
+    let name = ToolBlockView.accessibilityTitle(
+      of: .entry(ConversationEntry(id: "r", content: .tool(call))))
+    let failed = StateSymbol.label(for: .failed(exitCode: nil))
+    #expect(name.components(separatedBy: ", ").contains(failed), "\(name)")
+  }
 }

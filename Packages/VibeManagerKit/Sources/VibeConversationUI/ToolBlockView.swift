@@ -170,6 +170,7 @@ struct ToolBlockView: View {
   /// that already says it.
   static func accessibilityTitle(of block: ConversationBlock) -> String {
     var words: [String]
+    var outcome: String?
     if case .subagentGroup(_, let runs) = block {
       let calls = runs.compactMap(\.toolCall)
       let failed = calls.filter {
@@ -182,11 +183,13 @@ struct ToolBlockView: View {
       ]
     } else {
       let title = title(of: block)
+      outcome = title.outcome
       words = [title.title, title.detail, title.outcome].compactMap { $0 }
     }
     words.removeAll(where: \.isEmpty)
+    // Said once: not again after an outcome that already says it — « 2 failed », « failed ».
     let state = StateSymbol.label(for: block.toolState ?? .succeeded)
-    if !words.contains(where: { $0.localizedCaseInsensitiveContains(state) }) {
+    if outcome?.localizedCaseInsensitiveContains(state) != true {
       words.append(state)
     }
     return words.joined(separator: ", ")

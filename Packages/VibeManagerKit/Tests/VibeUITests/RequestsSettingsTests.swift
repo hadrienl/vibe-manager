@@ -132,9 +132,7 @@ struct RequestsSettingsTests {
     #expect(SettingsPage.avatars.parent == .requests)
     #expect(SettingsPage.avatars.sidebarPage == .requests)
     #expect(sidebar.shown(.avatars) == .avatars)
-    #expect(
-      NSImage(systemSymbolName: SettingsPage.requests.symbolName, accessibilityDescription: nil)
-        != nil)
+    #expect(NSImage(systemSymbolName: SettingsPage.requests.symbolName, accessibilityDescription: nil) != nil)
   }
 
   @Test("The page and the avatars are named in French")
@@ -193,10 +191,7 @@ struct RequestsSettingsTests {
     let alerts = bar()
     model.settingsPage = .avatars
     await settle(window, "the avatars") { Self.switches(in: host.view).isEmpty }
-    for _ in 0..<50 {
-      window.contentView?.layoutSubtreeIfNeeded()
-      await Task.yield()
-    }
+    for _ in 0..<50 { window.contentView?.layoutSubtreeIfNeeded(); await Task.yield() }
     #expect(abs(bar() - alerts) < 0.5, "\(alerts) then \(bar())")
     #expect(window.toolbar != nil)
   }

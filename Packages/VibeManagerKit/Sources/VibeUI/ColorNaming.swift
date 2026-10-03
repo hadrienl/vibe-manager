@@ -20,11 +20,19 @@ enum ColorNaming {
       if brightness > 0.9 {
         return String(localized: "white", bundle: .module, comment: "A colour, said by VoiceOver.")
       }
-      return shade(
-        String(localized: "gray", bundle: .module, comment: "A colour, said by VoiceOver."),
-        saturation, brightness)
+      let gray = String(localized: "gray", bundle: .module, comment: "A colour, said by VoiceOver.")
+      if brightness < 0.45 { return dark(gray) }
+      return brightness > 0.8 ? light(gray) : gray
     }
-    return shade(base(hue: hue, brightness: brightness), saturation, brightness)
+    let base = base(hue: hue, brightness: brightness)
+    // « très foncé » for the truly dark only; « foncé » below 82 % of the full brightness.
+    if brightness < 0.45 {
+      return String(
+        localized: "very dark \(base)", bundle: .module,
+        comment: "A colour, much darker: “very dark blue”.")
+    }
+    if brightness < 0.82 { return dark(base) }
+    return brightness >= 0.85 && saturation < 0.45 ? light(base) : base
   }
 
   private static func base(hue: Double, brightness: Double) -> String {
@@ -36,7 +44,8 @@ enum ColorNaming {
     case ..<40:
       String(
         localized: "orange", bundle: .module, comment: "A colour, said by VoiceOver: the fruit's.")
-    case ..<60:
+    // The pure hues — 60° yellow, 240° blue, 300° magenta — fall in their own name, not the next.
+    case ..<65:
       String(localized: "yellow", bundle: .module, comment: "A colour, said by VoiceOver.")
     case ..<90:
       String(
@@ -52,13 +61,13 @@ enum ColorNaming {
       String(
         localized: "teal", bundle: .module,
         comment: "A colour, said by VoiceOver: between green and blue.")
-    case ..<240:
+    case ..<245:
       String(localized: "blue", bundle: .module, comment: "A colour, said by VoiceOver.")
     case ..<275:
       String(
         localized: "indigo", bundle: .module,
         comment: "A colour, said by VoiceOver: between blue and violet.")
-    case ..<300:
+    case ..<305:
       String(localized: "purple", bundle: .module, comment: "A colour, said by VoiceOver.")
     default:
       String(
@@ -67,22 +76,11 @@ enum ColorNaming {
     }
   }
 
-  /// « foncé » below 85 % of the full brightness, « très foncé » below 65 % — the deeper rows
-  /// of a palette — « clair » for a pale tint.
-  private static func shade(_ base: String, _ saturation: Double, _ brightness: Double) -> String {
-    if brightness < 0.65 {
-      return String(
-        localized: "very dark \(base)", bundle: .module,
-        comment: "A colour, much darker: “very dark blue”.")
-    }
-    if brightness < 0.85 {
-      return String(
-        localized: "dark \(base)", bundle: .module, comment: "A colour, darker: “dark blue”.")
-    }
-    if saturation < 0.45 {
-      return String(
-        localized: "light \(base)", bundle: .module, comment: "A colour, paler: “light blue”.")
-    }
-    return base
+  private static func dark(_ base: String) -> String {
+    String(localized: "dark \(base)", bundle: .module, comment: "A colour, darker: “dark blue”.")
+  }
+
+  private static func light(_ base: String) -> String {
+    String(localized: "light \(base)", bundle: .module, comment: "A colour, paler: “light blue”.")
   }
 }
