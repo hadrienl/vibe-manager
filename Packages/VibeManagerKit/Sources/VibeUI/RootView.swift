@@ -2606,10 +2606,12 @@ private struct SessionConversationSlot: View {
       // enough to make the resize stutter. It is laid out at the new width when it comes back.
       .frame(width: heldWidth(isActive: isActive))
       .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-      .onGeometryChange(for: CGFloat.self) {
-        $0.size.width
+      // `nil` while hidden: coming back on screen at the width it left is a change too, and the
+      // width it is shown at is recorded even when the window was not resized since.
+      .onGeometryChange(for: CGFloat?.self) {
+        isActive ? $0.size.width : nil
       } action: { [shownWidth] width in
-        if isActive { shownWidth.value = width }
+        if let width { shownWidth.value = width }
       }
       .opacity(isActive ? 1 : 0)
       .allowsHitTesting(isActive)
