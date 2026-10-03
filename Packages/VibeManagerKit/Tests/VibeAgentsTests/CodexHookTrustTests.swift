@@ -198,7 +198,8 @@ struct CodexHookTrustIntegrationTests {
         workingDirectoryPath: home.path, promptDelivery: .none)
     }
     let before = CodexActivityHooks.options().map {
-      $0.replacingOccurrences(of: "timeout=\(CodexActivityHooks.stoppingTimeoutSeconds),", with: "timeout=5,")
+      $0.replacingOccurrences(
+        of: "timeout=\(CodexActivityHooks.stoppingTimeoutSeconds),", with: "timeout=5,")
     }
     #expect(before != CodexActivityHooks.options())
     let trust = CodexHookTrust(connection: CodexAppServerProcess(timeout: .seconds(20)))

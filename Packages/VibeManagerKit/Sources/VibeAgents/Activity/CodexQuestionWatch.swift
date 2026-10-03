@@ -115,10 +115,14 @@ public struct CodexQuestionWatch: Sendable {
     else { return [] }
     if object["type"] as? String == "event_msg" {
       // The turn is over: Codex takes its asynchronous questions away.
-      guard ["task_complete", "turn_aborted"].contains(payload["type"] as? String) else { return [] }
+      guard ["task_complete", "turn_aborted"].contains(payload["type"] as? String) else {
+        return []
+      }
       let ended = pending.filter { $0.hasPrefix(asyncMark) }
       pending.subtract(ended)
-      return ended.sorted().map { .toolFinished(asyncTool, subject: String($0.dropFirst(asyncMark.count))) }
+      return ended.sorted().map {
+        .toolFinished(asyncTool, subject: String($0.dropFirst(asyncMark.count)))
+      }
     }
     guard object["type"] as? String == "response_item",
       let callID = payload["call_id"] as? String

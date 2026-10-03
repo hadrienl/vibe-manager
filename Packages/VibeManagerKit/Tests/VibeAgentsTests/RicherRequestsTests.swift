@@ -34,15 +34,17 @@ struct ElicitationReadingTests {
   }
 
   private func elicitation(_ event: AgentActivityEvent) -> AgentElicitation? {
-    guard case .elicitation(let elicitation) = notice(of: ClaudeCodeSignalDecoder().signal(for: event))?
-      .content
+    guard
+      case .elicitation(let elicitation) = notice(of: ClaudeCodeSignalDecoder().signal(for: event))?
+        .content
     else { return nil }
     return elicitation
   }
 
   @Test("A page to open keeps the server, its words and the address")
   func url() throws {
-    let read = try #require(elicitation(try reported(mode: "url", url: "https://example.org/a?b=1")))
+    let read = try #require(
+      elicitation(try reported(mode: "url", url: "https://example.org/a?b=1")))
     #expect(read.server == "memory")
     #expect(read.message == "Please sign in")
     #expect(read.url == URL(string: "https://example.org/a?b=1"))
@@ -115,7 +117,8 @@ struct AsyncQuestionWatchTests {
     #"{"type":"response_item","payload":{"type":"function_call","name":"request_user_input_async","arguments":"{\"questions\":[{\"title\":\"Which port?\",\"options\":[\"8080\",\"3000\"]},{\"title\":\"Any name?\"}]}","call_id":"call_a"}}"#
   static let accepted =
     #"{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_a","output":"{\"accepted\":true}"}}"#
-  static let turnComplete = #"{"type":"event_msg","payload":{"type":"task_complete","turn_id":"t"}}"#
+  static let turnComplete =
+    #"{"type":"event_msg","payload":{"type":"task_complete","turn_id":"t"}}"#
 
   @Test("Asked with its titles and suggested answers; taken, not answered; gone with the turn")
   func lifecycle() throws {
@@ -123,11 +126,13 @@ struct AsyncQuestionWatchTests {
     let asked = CodexQuestionWatch.signals(in: Data(Self.call.utf8), pending: &pending)
     let notice = try #require(notice(of: asked.first))
     #expect(notice.key == "codex:call_a")
-    #expect(notice.reference == AgentToolReference(tool: "request_user_input_async", subject: "call_a"))
+    #expect(
+      notice.reference == AgentToolReference(tool: "request_user_input_async", subject: "call_a"))
     #expect(
       notice.content
         == .questions([
-          AgentQuestion(header: nil, text: "Which port?", options: [.init(label: "8080"), .init(label: "3000")]),
+          AgentQuestion(
+            header: nil, text: "Which port?", options: [.init(label: "8080"), .init(label: "3000")]),
           AgentQuestion(header: nil, text: "Any name?", options: []),
         ]))
     #expect(CodexQuestionWatch.signals(in: Data(Self.accepted.utf8), pending: &pending).isEmpty)
@@ -151,8 +156,10 @@ struct AsyncQuestionWatchTests {
     let rollout = FileManager.default.temporaryDirectory.appendingPathComponent(
       "async-\(UUID().uuidString).jsonl")
     let later = Self.call.replacingOccurrences(of: "call_a", with: "call_b")
-    try Data(([Self.call, Self.accepted, Self.turnComplete, later].joined(separator: "\n") + "\n").utf8)
-      .write(to: rollout)
+    try Data(
+      ([Self.call, Self.accepted, Self.turnComplete, later].joined(separator: "\n") + "\n").utf8
+    )
+    .write(to: rollout)
     let (pending, waiting, _) = CodexQuestionWatch.unanswered(in: rollout)
     #expect(pending == ["async:call_b"])
     #expect(waiting.compactMap { notice(of: $0)?.key } == ["codex:call_b"])
@@ -212,7 +219,8 @@ struct CodexPermissionsReadingTests {
   @Test("Input for a terminal shows what would be typed")
   func input() throws {
     let input = try permission(
-      #"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"confirm\n","cwd":"/tmp"}}"#)
+      #"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"confirm\n","cwd":"/tmp"}}"#
+    )
     #expect(input.tool == .terminalInput)
     #expect(input.subject == "confirm\n")
     #expect(input.alwaysAllow == nil)
@@ -223,7 +231,8 @@ struct CodexPermissionsReadingTests {
     let keymap = CodexAnswerKeymap()
     let content = AgentRequestContent.permission(
       try permission(
-        #"{"tool_name":"request_permissions","tool_input":{"permissions":{"network":{"enabled":true}}}}"#))
+        #"{"tool_name":"request_permissions","tool_input":{"permissions":{"network":{"enabled":true}}}}"#
+      ))
     let screen = AgentDialogScreen(screen: Self.grantDialog)
     #expect(keymap.answers(for: content) == [.allowOnce, .allowAlways, .deny])
     #expect(keymap.keystrokes(for: .allowOnce, to: content, screen: screen) == [Array("y".utf8)])
@@ -309,7 +318,10 @@ struct QuestionScreenKeymapTests {
   let keymap = ClaudeCodeAnswerKeymap()
 
   private func colours(_ labels: [String] = ["Red", "Green", "Blue"]) -> AgentRequestContent {
-    .questions([AgentQuestion(header: "Colour", text: "Which colour?", options: labels.map { .init(label: $0) })])
+    .questions([
+      AgentQuestion(
+        header: "Colour", text: "Which colour?", options: labels.map { .init(label: $0) })
+    ])
   }
 
   @Test("Options set apart by a rule are still one dialog")
@@ -324,7 +336,10 @@ struct QuestionScreenKeymapTests {
   @Test("The question on screen is answered by its digits, an answer of one's own included")
   func drawn() {
     let screen = AgentDialogScreen(screen: QuestionScreens.single)
-    #expect(keymap.keystrokes(for: .answers([.option(1)]), to: colours(), screen: screen) == [Array("2".utf8)])
+    #expect(
+      keymap.keystrokes(for: .answers([.option(1)]), to: colours(), screen: screen) == [
+        Array("2".utf8)
+      ])
     #expect(
       keymap.keystrokes(for: .answers([.text("Teal")]), to: colours(), screen: screen)
         == [Array("4".utf8), TerminalKeys.bracketedPaste("Teal"), TerminalKeys.enter])
@@ -333,8 +348,12 @@ struct QuestionScreenKeymapTests {
   @Test("Another question on screen, its options moved, or none read: nothing is typed")
   func notDrawn() {
     let screen = AgentDialogScreen(screen: QuestionScreens.single)
-    #expect(keymap.keystrokes(for: .answers([.option(0)]), to: colours(["Green", "Red", "Blue"]), screen: screen) == nil)
-    #expect(keymap.keystrokes(for: .answers([.option(0)]), to: colours(["Red", "Green"]), screen: screen) == nil)
+    #expect(
+      keymap.keystrokes(
+        for: .answers([.option(0)]), to: colours(["Green", "Red", "Blue"]), screen: screen) == nil)
+    #expect(
+      keymap.keystrokes(for: .answers([.option(0)]), to: colours(["Red", "Green"]), screen: screen)
+        == nil)
     #expect(keymap.keystrokes(for: .answers([.option(0)]), to: colours(), screen: nil) == nil)
   }
 
@@ -354,7 +373,9 @@ struct QuestionScreenKeymapTests {
     let layout = AgentRequestContent.questions([
       AgentQuestion(
         header: nil, text: "Which layout?",
-        options: [.init(label: "Grid", preview: "[Item]"), .init(label: "List", preview: "[Item 1]")],
+        options: [
+          .init(label: "Grid", preview: "[Item]"), .init(label: "List", preview: "[Item 1]"),
+        ],
         allowsFreeText: false)
     ])
     #expect(

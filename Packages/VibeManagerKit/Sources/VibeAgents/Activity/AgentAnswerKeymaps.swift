@@ -192,7 +192,9 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
       return Self.shortcut("y", in: screen)
     case (.allowAlways, .permission(let permission)):
       guard permission.alwaysAllow != nil, let key = Self.alwaysKey(for: permission),
-        let option = screen?.options.first(where: { $0.shortcut == String(decoding: key, as: UTF8.self) }),
+        let option = screen?.options.first(where: {
+          $0.shortcut == String(decoding: key, as: UTF8.self)
+        }),
         !option.label.localizedCaseInsensitiveContains("in the future")
       else { return nil }
       return [key]

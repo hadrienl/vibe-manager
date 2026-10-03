@@ -80,7 +80,8 @@ enum AgentRequestReading {
       let tool = reference(of: event).tool
       // A plan past the byte limit: the cut holds its beginning, more than a card shows. Its file
       // is named after it, and lost with the rest (checked against 2.1.288).
-      if tool == "ExitPlanMode", let text = event.payload.map({ String(decoding: $0, as: UTF8.self) }),
+      if tool == "ExitPlanMode",
+        let text = event.payload.map({ String(decoding: $0, as: UTF8.self) }),
         let beginning = leadingString("plan", in: text)
       {
         return plan(beginning, isCut: true)
@@ -194,7 +195,8 @@ enum AgentRequestReading {
     }
     let fileSystem = permissions["file_system"] as? [String: Any] ?? [:]
     var paths: [String: [String]] = [
-      "read": fileSystem["read"] as? [String] ?? [], "write": fileSystem["write"] as? [String] ?? [],
+      "read": fileSystem["read"] as? [String] ?? [],
+      "write": fileSystem["write"] as? [String] ?? [],
     ]
     for entry in fileSystem["entries"] as? [[String: Any]] ?? [] {
       guard let access = entry["access"] as? String, let path = entry["path"] as? [String: Any]

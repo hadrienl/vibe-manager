@@ -69,9 +69,11 @@ struct AnnouncedDialogTests {
     #expect(state.requests.count == 1)
   }
 
-  @Test("The main agent's turn or prompt takes the announced dialog away", arguments: [
-    AgentSignal.promptSubmitted(byUser: true), .turnEnded, .interrupted, .questionResolved,
-  ])
+  @Test(
+    "The main agent's turn or prompt takes the announced dialog away",
+    arguments: [
+      AgentSignal.promptSubmitted(byUser: true), .turnEnded, .interrupted, .questionResolved,
+    ])
   func settledBy(_ signal: AgentSignal) {
     let state = feed(network, signal)
     #expect(state.requests.isEmpty)

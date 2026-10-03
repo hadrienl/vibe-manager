@@ -96,12 +96,14 @@ public enum RequestPresentation {
       return LocalizedStringResource(
         "Account to check", bundle: .module,
         comment:
-          "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped.")
+          "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped."
+      )
     case .startup:
       return LocalizedStringResource(
         "Startup dialog", bundle: .module,
         comment:
-          "The title of a request of an agent: a dialog of the CLI's start — trusting the folder, approving servers, signing in — is most likely waiting.")
+          "The title of a request of an agent: a dialog of the CLI's start — trusting the folder, approving servers, signing in — is most likely waiting."
+      )
     case .other:
       return LocalizedStringResource(
         "Waiting in the terminal", bundle: .module,

@@ -169,7 +169,11 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
   static func quotedCommand(_ quoted: String) -> (text: String, isCut: Bool) {
     var text = Substring(quoted)
     let isCut = text.hasSuffix("...") || text.hasSuffix("…")
-    if text.hasSuffix("...") { text = text.dropLast(3) } else if text.hasSuffix("…") { text = text.dropLast() }
+    if text.hasSuffix("...") {
+      text = text.dropLast(3)
+    } else if text.hasSuffix("…") {
+      text = text.dropLast()
+    }
     // The shell Codex wraps the model's command in, and the quote around it.
     if let wrapper = text.range(of: #"^\S*sh -l?c ['"]?"#, options: .regularExpression) {
       let quote = text[wrapper].last.flatMap { "'\"".contains($0) ? $0 : nil }
