@@ -10,7 +10,13 @@ public enum CodexActivityHooks {
   struct Hook {
     let event: String
     let payload: AgentActivityHookCommand.Payload
+    var timeout = AgentActivityHookCommand.timeoutSeconds
   }
+
+  /// The most Codex gives the hooks of `Interrupt` and `SessionEnd`, which run as it stops: a
+  /// longer timeout is cut to it with a warning on screen (0.159.2, `hooks/src/engine/discovery.rs`).
+  /// Its approval is kept by the cut timeout, so asking for this one changes nothing to it.
+  static let stoppingTimeoutSeconds = 3
 
   /// Checked against `codex-cli 0.156.1`, which also knows `Interrupt` — the one signal Claude
   /// Code does not give.
@@ -26,8 +32,8 @@ public enum CodexActivityHooks {
     // Which agent ran which tool on what (#273): the request it settles, among several waiting.
     Hook(event: "PostToolUse", payload: .fields(AgentRequestReading.resolutionFields)),
     Hook(event: "Stop", payload: .drop),
-    Hook(event: "Interrupt", payload: .drop),
-    Hook(event: "SessionEnd", payload: .drop),
+    Hook(event: "Interrupt", payload: .drop, timeout: stoppingTimeoutSeconds),
+    Hook(event: "SessionEnd", payload: .drop, timeout: stoppingTimeoutSeconds),
   ]
 
   /// Every command the hooks run, as Codex lists them back.
@@ -52,7 +58,7 @@ public enum CodexActivityHooks {
       let command = AgentActivityHookCommand.command(event: hook.event, payload: hook.payload)
       return [
         "-c",
-        #"hooks.\#(hook.event)=[{hooks=[{type="command",timeout=\#(AgentActivityHookCommand.timeoutSeconds),command=\#(tomlString(command))}]}]"#,
+        #"hooks.\#(hook.event)=[{hooks=[{type="command",timeout=\#(hook.timeout),command=\#(tomlString(command))}]}]"#,
       ]
     }
   }

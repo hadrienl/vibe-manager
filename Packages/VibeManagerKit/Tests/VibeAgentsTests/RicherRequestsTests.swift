@@ -364,3 +364,16 @@ struct QuestionScreenKeymapTests {
         == [Array("2".utf8), TerminalKeys.enter])
   }
 }
+
+@Suite("Codex's hooks of its stopping, within its timeout (#273, P3)")
+struct CodexStoppingTimeoutTests {
+  @Test("Interrupt and SessionEnd ask for the three seconds Codex gives, the others for five")
+  func timeouts() {
+    let options = CodexActivityHooks.options().filter { $0 != "-c" }
+    for option in options {
+      let isStopping = option.hasPrefix("hooks.Interrupt=") || option.hasPrefix("hooks.SessionEnd=")
+      #expect(option.contains(isStopping ? "timeout=3," : "timeout=5,"), "\(option.prefix(40))")
+    }
+    #expect(options.count == CodexActivityHooks.hooks.count)
+  }
+}
