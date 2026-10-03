@@ -78,16 +78,16 @@ struct UpdatesSettingsTests {
     #expect(updater.offers == 1)
   }
 
-  @Test("The tab is there once the application gave the workspace an updater, wide enough")
-  func tabWidth() {
+  @Test("The page is there once the application gave the workspace an updater")
+  func page() {
     _ = NSApplication.shared
     let model = AppModel(
       repository: StubRepository(sessions: []),
       layout: WorkspaceLayoutController(store: RecordingLayoutStore()), browser: BrowserWorkspace())
     model.updates = UpdatesModel(updater: FakeUpdater(availability: .unavailable(.isolatedCopy)))
-    model.settingsTab = .updates
-    let host = NSHostingView(rootView: SettingsView(model: model))
-    #expect(host.fittingSize.width >= SettingsView.formWidth)
+    #expect(SettingsSidebarContent(model: model, permissions: nil).shown(.updates) == .updates)
+    model.updates = nil
+    #expect(SettingsSidebarContent(model: model, permissions: nil).shown(.updates) == .general)
   }
 
   @Test("Every reason a copy does not update itself is said")
