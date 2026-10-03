@@ -372,7 +372,7 @@ final class SmokeTests: XCTestCase {
     wait(for: [settingsOpen], timeout: 10)
     try audit(app, "Settings")
     // A page of the settings, by the row of their sidebar that carries its title.
-    for page in ["Badges", "Updates", "Notifications", "Avatars"] {
+    for page in ["Badges", "Updates", "Notifications"] {
       // A static text's words are its value on macOS, not its label.
       let item = app.outlines.staticTexts.matching(
         NSPredicate(format: "value == %@ OR label == %@", page, page)
@@ -383,6 +383,14 @@ final class SmokeTests: XCTestCase {
       }
       item.click()
       try audit(app, "Settings, \(page)")
+    }
+    // The avatars' library, reached from the notifications' page.
+    let manageAvatars = app.buttons["manage-avatars"]
+    if manageAvatars.waitForExistence(timeout: 5) {
+      manageAvatars.click()
+      try audit(app, "Settings, Avatars")
+    } else {
+      XCTFail("No way to the avatars from the notifications' page")
     }
     app.terminate()
   }
