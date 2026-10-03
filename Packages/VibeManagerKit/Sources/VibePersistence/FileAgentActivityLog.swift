@@ -72,6 +72,20 @@ public actor FileAgentActivityLog: AgentActivityLogStore {
     return stream
   }
 
+  /// The log's size now, or the size of the one moved aside while it is still read and no hook
+  /// has started the next.
+  public func end(for id: SessionID) -> AgentActivityLogPosition? {
+    let url = logURL(for: id)
+    for candidate in [url, Self.rotatedURL(of: url)] {
+      var status = stat()
+      if stat(candidate.path, &status) == 0 {
+        return AgentActivityLogPosition(
+          fileIdentifier: UInt64(status.st_ino), offset: UInt64(status.st_size))
+      }
+    }
+    return nil
+  }
+
   public func removeLog(for id: SessionID) {
     let url = logURL(for: id)
     try? FileManager.default.removeItem(at: url)

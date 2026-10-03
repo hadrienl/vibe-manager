@@ -463,12 +463,26 @@ public protocol AgentAnswerKeymap: Sendable {
   func keystrokes(
     for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
   ) -> [[UInt8]]?
+  /// Whether this CLI's dialog shows all of what it asks, so that the screen tells which request
+  /// it is (#283). Every answer is then typed only once the screen has named its request.
+  var readsRequestOnScreen: Bool { get }
+  /// The dialog drawn last, as the screen shows it, or `nil` when it cannot be read whole.
+  func drawnDialog(onScreen text: String) -> AgentDrawnDialog?
 }
 
 extension AgentAnswerKeymap {
   /// The keystrokes with no dialog read: enough for the dialogs whose keys never move.
   public func keystrokes(for answer: AgentAnswer, to content: AgentRequestContent) -> [[UInt8]]? {
     keystrokes(for: answer, to: content, screen: nil)
+  }
+
+  /// Most dialogs do not show all of what they ask: answered as they are known to be drawn.
+  public var readsRequestOnScreen: Bool {
+    false
+  }
+
+  public func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
+    nil
   }
 }
 
@@ -481,10 +495,15 @@ extension AgentActivityState {
   ) -> AgentRequestAnswering {
     guard let keymap else { return .inTerminalOnly(.notSupported) }
     guard requests.first?.id == request.id else { return .inTerminalOnly(.queued) }
+    // A dialog drawn that may be this one's: the screen will tell, before anything is typed
+    // (#283).
+    let mayBeOnScreen =
+      keymap.readsRequestOnScreen && drawnCandidates.contains(request.id)
+      && AgentDrawnDialog.showsWhole(request)
     // In doubt, a dialog may well be on screen — only not known to be this one's (#280): the
     // answer is given in the session, not waited for.
-    guard !isFirstRequestUncertain else { return .inTerminalOnly(.uncertain) }
-    guard request.isShown else { return .inTerminalOnly(.notYetShown) }
+    guard !isFirstRequestUncertain || mayBeOnScreen else { return .inTerminalOnly(.uncertain) }
+    guard request.isShown || mayBeOnScreen else { return .inTerminalOnly(.notYetShown) }
     var kinds = keymap.answers(for: request.content)
     if case .permission(let permission) = request.content, !permission.isComplete {
       // What would be allowed is not all on screen: it may only be refused (#40, decision 2).

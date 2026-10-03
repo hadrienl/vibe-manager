@@ -22,6 +22,9 @@ public struct AnswerAgentRequest: Sendable {
     /// The dialog drawn in the terminal does not offer this answer, or could not be read: nothing
     /// was typed (#273).
     case notOnScreen
+    /// The dialog drawn in the terminal is not known to be the request's: it shows another's, or
+    /// one more request's, or cannot be read whole. Nothing was typed (#283).
+    case otherDialog
   }
 
   /// How long a terminal must stay silent before the next keystroke, and how long it is waited for
@@ -72,8 +75,23 @@ public struct AnswerAgentRequest: Sendable {
     guard await tracker.offers(answer, to: id) else {
       return await tracker.isFirstRequest(id) ? .notAnswerable : .requestGone
     }
+    var text = await screen(id.sessionID)
+    // Whose dialog is drawn is read off the screen, against every request the agent reported
+    // before drawing it (#283). The screen is read first: every dialog on it was reported by then,
+    // and once the log is read up to its end, every report is known. Read again after, it must
+    // show the same dialog — the keys are taken from that last reading.
+    if await tracker.readsRequestsOnScreen(id.sessionID) {
+      let before = text
+      guard await tracker.catchUp(id.sessionID), let before else {
+        return await tracker.isFirstRequest(id) ? .otherDialog : .requestGone
+      }
+      text = await screen(id.sessionID)
+      guard let text, await tracker.dialogOnScreen(text, readBefore: before, isFor: id) else {
+        return await tracker.isFirstRequest(id) ? .otherDialog : .requestGone
+      }
+    }
     // Which key takes the answer is read off the dialog as drawn now (#273).
-    let drawn = await screen(id.sessionID).flatMap(AgentDialogScreen.init(screen:))
+    let drawn = text.flatMap(AgentDialogScreen.init(screen:))
     guard let steps = await tracker.keystrokes(for: answer, to: id, screen: drawn),
       !steps.isEmpty
     else {
