@@ -45,7 +45,9 @@ struct ToolBlockView: View {
         .stroke(borderColor(state).color, lineWidth: state.severity >= 4 ? 1.5 : 1))
   }
 
-  private var title: ToolCallTitle {
+  private var title: ToolCallTitle { Self.title(of: block) }
+
+  static func title(of block: ConversationBlock) -> ToolCallTitle {
     switch block {
     case .entry(let entry):
       return entry.toolCall.map { ToolCallSummary.title(for: $0) }
@@ -163,7 +165,14 @@ struct ToolBlockView: View {
   }
 
   private func accessibilityTitle(state: ToolCallState) -> String {
-    let title = title
+    Self.accessibilityTitle(of: block)
+  }
+
+  /// What the block did, to whom, and how it ended: its header as VoiceOver reads it, and its
+  /// name in the rotors (#232).
+  static func accessibilityTitle(of block: ConversationBlock) -> String {
+    let title = title(of: block)
+    let state = block.toolState ?? .succeeded
     let words = [title.title, title.outcome, StateSymbol.label(for: state)].compactMap { $0 }
     return words.joined(separator: ", ")
   }
