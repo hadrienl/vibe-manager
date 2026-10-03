@@ -388,12 +388,75 @@ final class SmokeTests: XCTestCase {
   /// An issue the audit may raise without failing the test, and why.
   private struct AuditException {
     let type: XCUIAccessibilityAuditType
-    /// A part of the issue's description or of its element's label or identifier.
-    let matching: String
+    /// The issue's description, or a part of it; any when nil.
+    var issue: String? = nil
+    /// The kinds of element it may be raised on; any when empty.
+    var elements: [XCUIElement.ElementType] = []
+    /// A part of the element's identifier or label; any when nil, none at all when empty.
+    var element: String? = nil
     let reason: String
+
+    func covers(_ raised: XCUIAccessibilityAuditIssue) -> Bool {
+      guard raised.auditType == type else { return false }
+      if let issue, !raised.compactDescription.contains(issue) { return false }
+      if !elements.isEmpty {
+        guard let kind = raised.element?.elementType, elements.contains(kind) else { return false }
+      }
+      if let element {
+        let names = [raised.element?.identifier ?? "", raised.element?.label ?? ""]
+        if element.isEmpty {
+          return names.allSatisfy(\.isEmpty)
+        }
+        return names.contains { $0.contains(element) }
+      }
+      return true
+    }
   }
 
-  private static let auditExceptions: [AuditException] = []
+  /// What the audit raises today and may go on raising, each with its reason. The fixes in flight
+  /// are named by their ticket: once one lands, its exception goes.
+  private static let auditExceptions: [AuditException] = [
+    AuditException(
+      type: .contrast, elements: [.staticText],
+      reason: """
+        Secondary text and the colours of states: #231 makes the states' colours legible. The \
+        system's secondary styles are measured by the audit without the vibrancy macOS gives \
+        them over the sidebar's and the settings' materials.
+        """),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.group, .other], element: "",
+      reason: "SwiftUI's containers: they gather controls, and are not controls themselves."),
+    AuditException(
+      type: .sufficientElementDescription, issue: "Unknown role", elements: [.other],
+      reason: """
+        The symbols and colours of the Badges settings are views without a button's role: #232 \
+        names them, #230 makes them reachable from the keyboard.
+        """),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.touchBar],
+      reason: "The Touch Bar macOS gives the window: none of its items is the application's."),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.textField], element: "new-session-name",
+      reason: """
+        A new session's name has a placeholder and no label: found by this audit, given one by \
+        #328.
+        """),
+    AuditException(
+      type: .sufficientElementDescription, elements: [.popUpButton], element: "emoji & symbols",
+      reason: "The Emoji & Symbols button macOS puts in a text field: the system's, not ours."),
+    AuditException(
+      type: .action, elements: [.popUpButton, .menuButton],
+      reason: """
+        SwiftUI's pickers and menus open with AXShowMenu; the audit looks for AXPress, which a \
+        pop-up button does not need.
+        """),
+    AuditException(
+      type: .parentChild,
+      reason: """
+        Raised without an element on a new session's draft, so it cannot be pinned down here: \
+        looked into by #328.
+        """),
+  ]
 
   private static func name(of type: XCUIAccessibilityAuditType) -> String {
     let names: [(XCUIAccessibilityAuditType, String)] = [
@@ -412,10 +475,7 @@ final class SmokeTests: XCTestCase {
       let element =
         issue.element.map { "\($0.elementType) '\($0.identifier)' '\($0.label)'" } ?? "-"
       let text = "\(Self.name(of: issue.auditType)) \(issue.compactDescription) — \(element)"
-      let exception = Self.auditExceptions.first { exception in
-        issue.auditType == exception.type
-          && (text.localizedCaseInsensitiveContains(exception.matching))
-      }
+      let exception = Self.auditExceptions.first { $0.covers(issue) }
       raised.append((exception == nil ? "FAIL " : "OK   ") + text)
       print("[accessibility-audit] \(screen): \(raised.last ?? "")")
       return exception != nil
