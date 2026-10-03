@@ -941,7 +941,7 @@ private struct BrowserPermissionBanner: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Image(systemName: "sparkle")
+        Image(systemName: isThePagesOwn ? "arrow.up.forward.app" : "sparkle")
           .foregroundStyle(Color.accentColor)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 3) {
@@ -993,10 +993,21 @@ private struct BrowserPermissionBanner: View {
       NSAccessibility.post(
         element: NSApp.mainWindow as Any, notification: .announcementRequested,
         userInfo: [
-          .announcement: String(
-            localized: "The agent is asking for your approval in the web view.", bundle: .module),
+          .announcement: isThePagesOwn
+            ? String(
+              localized: "A page is asking for your approval in the web view.", bundle: .module)
+            : String(
+              localized: "The agent is asking for your approval in the web view.", bundle: .module),
           .priority: NSAccessibilityPriorityLevel.high.rawValue,
         ])
+    }
+  }
+
+  /// A question a page asks of its own, whoever's the tab is: it does not speak of the agent.
+  private var isThePagesOwn: Bool {
+    switch request.kind {
+    case .effect(.pageApplication), .effect(.networkAddress): return true
+    default: return false
     }
   }
 
@@ -1025,6 +1036,9 @@ private struct BrowserPermissionBanner: View {
     case .effect(.externalApplication(let url)):
       return Text(
         "The agent’s action opens \(url.scheme ?? "") in another application.", bundle: .module)
+    case .effect(.pageApplication(let url, let site)):
+      return Text(
+        "\(site) wants to open \(url.scheme ?? "") in another application.", bundle: .module)
     case .effect(.networkAddress(let url)):
       let address = url.host.map { "\(url.scheme ?? "")://\($0)" } ?? (url.scheme ?? "")
       return Text(

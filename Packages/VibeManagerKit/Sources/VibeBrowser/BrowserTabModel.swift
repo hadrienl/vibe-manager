@@ -109,6 +109,9 @@ public final class BrowserTabModel: NSObject, Identifiable {
   let isOpenedByAgentPage: Bool
   /// The tab was closed: a download it started and nobody decided on yet is refused.
   @ObservationIgnored var isClosed = false
+  /// Application schemes the user refused on the page in front: not asked again until the user
+  /// loads another page (#289).
+  @ObservationIgnored private var refusedApplicationSchemes: Set<String> = []
   /// Opens another application's address: macOS does, the tests only note it.
   // Opens outside: only called from the navigation policy below, whose every call says why it may
   // open there (#241).
@@ -475,6 +478,10 @@ private final class TitleReading {
 public enum BrowserAgentEffect: Hashable, Sendable {
   case download(filename: String)
   case externalApplication(URL)
+  /// Another application's address a page of the user's sends after a click of theirs: asked
+  /// too, without speaking of the agent — the page's script may have chosen it. `site` is the
+  /// frame's that sends it, which may be another site's (#289).
+  case pageApplication(URL, site: String)
   /// Another application's address that reaches another computer — a share to mount, a remote
   /// screen or shell: asked whoever's the tab is, even after a click of the user's (#241).
   case networkAddress(URL)
@@ -506,6 +513,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
 
   public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
     committedURL = webView.url
+    refusedApplicationSchemes = []
     // A redirection the policy was not asked about still comes to the front once it commits.
     if let url = webView.url, BrowserWorkspace.isRemote(url), asksBeforeEffects {
       willLeaveThisMac?(self)
@@ -575,27 +583,42 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       // decided with every other one.
       return (navigationAction.shouldPerformDownload ? .download : .allow, preferences)
     }
-    // Another application's address. One that reaches another computer — a share to mount, a
-    // remote screen — is always asked. Any other is asked when the tab is the agent's, and opened
-    // otherwise only after a click of the user's: a click the page's script dispatches is
-    // `.linkActivated` too, and must not open an application unasked (#241).
+    // Another application's address is always asked, as in Safari and Chrome. One that reaches
+    // another computer — a share to mount, a remote screen — says so. In the user's tab it is
+    // asked only after a click of theirs: a click the page's script dispatches is
+    // `.linkActivated` too, and is refused without a question (#241, #289).
     if BrowserAgentEffect.reachesAnotherComputer(target) {
       let allowed = await confirmAgentEffect?(.networkAddress(target), self) ?? false
       // Opens outside: the user allowed this address in the question just answered.
-      if allowed { openApplicationAddress(target) }
+      if allowed, !isClosed { openApplicationAddress(target) }
     } else if asksBeforeEffects {
       let allowed = await confirmAgentEffect?(.externalApplication(target), self) ?? false
       // Opens outside: the user allowed this address in the question just answered.
-      if allowed { openApplicationAddress(target) }
+      if allowed, !isClosed { openApplicationAddress(target) }
     } else if navigationAction.navigationType == .linkActivated,
       let sessionView = webView as? SessionWebView,
       sessionView.followsPress(
         with: navigationAction.modifierFlags, now: ProcessInfo.processInfo.systemUptime)
     {
-      // Unsafe open, to fix in #289: a click of the user's in the page opens, without a
-      // question, whatever application address the page's script sends within the second — no
-      // other computer, but any application that registered a scheme.
-      openApplicationAddress(target)
+      // The click may have been on something else: the page's script chose the address. One
+      // press, one question; a refusal holds for this scheme until the user loads another page.
+      sessionView.spendPress()
+      if refusedApplicationSchemes.contains(scheme) {
+        record(
+          console: BrowserConsoleEntry(
+            level: .warn, text: "Blocked opening \(scheme): the user refused it on this page."))
+        return (.cancel, preferences)
+      }
+      let site = BrowserOrigin(
+        scheme: navigationAction.sourceFrame.securityOrigin.protocol,
+        host: navigationAction.sourceFrame.securityOrigin.host,
+        port: navigationAction.sourceFrame.securityOrigin.port == 0
+          ? nil : navigationAction.sourceFrame.securityOrigin.port
+      ).description
+      let allowed = await confirmAgentEffect?(.pageApplication(target, site: site), self) ?? false
+      if !allowed { refusedApplicationSchemes.insert(scheme) }
+      // Opens outside: the user allowed this address in the question just answered.
+      if allowed, !isClosed { openApplicationAddress(target) }
     } else {
       record(
         console: BrowserConsoleEntry(
