@@ -107,3 +107,54 @@ struct LongPlanReadingTests {
     #expect(AgentRequestReading.leadingString("plan", in: #"{"permission_mode":"plan"}"#) == nil)
   }
 }
+
+@Suite("Codex's asynchronous questions, read from its rollout (#273, P3)")
+struct AsyncQuestionWatchTests {
+  /// As `core/src/tools/handlers/request_user_input_async.rs` (0.159.2) takes them.
+  static let call =
+    #"{"type":"response_item","payload":{"type":"function_call","name":"request_user_input_async","arguments":"{\"questions\":[{\"title\":\"Which port?\",\"options\":[\"8080\",\"3000\"]},{\"title\":\"Any name?\"}]}","call_id":"call_a"}}"#
+  static let accepted =
+    #"{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_a","output":"{\"accepted\":true}"}}"#
+  static let turnComplete = #"{"type":"event_msg","payload":{"type":"task_complete","turn_id":"t"}}"#
+
+  @Test("Asked with its titles and suggested answers; taken, not answered; gone with the turn")
+  func lifecycle() throws {
+    var pending: Set<String> = []
+    let asked = CodexQuestionWatch.signals(in: Data(Self.call.utf8), pending: &pending)
+    let notice = try #require(notice(of: asked.first))
+    #expect(notice.key == "codex:call_a")
+    #expect(notice.reference == AgentToolReference(tool: "request_user_input_async", subject: "call_a"))
+    #expect(
+      notice.content
+        == .questions([
+          AgentQuestion(header: nil, text: "Which port?", options: [.init(label: "8080"), .init(label: "3000")]),
+          AgentQuestion(header: nil, text: "Any name?", options: []),
+        ]))
+    #expect(CodexQuestionWatch.signals(in: Data(Self.accepted.utf8), pending: &pending).isEmpty)
+    #expect(
+      CodexQuestionWatch.signals(in: Data(Self.turnComplete.utf8), pending: &pending)
+        == [.toolFinished("request_user_input_async", subject: "call_a")])
+    #expect(pending.isEmpty)
+  }
+
+  @Test("A turn's end leaves a waiting request_user_input alone")
+  func syncStays() {
+    var pending: Set<String> = []
+    _ = CodexQuestionWatch.signals(
+      in: Data(RequestPayloads.codexQuestionCall.utf8), pending: &pending)
+    #expect(CodexQuestionWatch.signals(in: Data(Self.turnComplete.utf8), pending: &pending).isEmpty)
+    #expect(pending == ["call_1"])
+  }
+
+  @Test("Of a rollout's history, only the question of the turn still running is said")
+  func history() throws {
+    let rollout = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "async-\(UUID().uuidString).jsonl")
+    let later = Self.call.replacingOccurrences(of: "call_a", with: "call_b")
+    try Data(([Self.call, Self.accepted, Self.turnComplete, later].joined(separator: "\n") + "\n").utf8)
+      .write(to: rollout)
+    let (pending, waiting, _) = CodexQuestionWatch.unanswered(in: rollout)
+    #expect(pending == ["async:call_b"])
+    #expect(waiting.compactMap { notice(of: $0)?.key } == ["codex:call_b"])
+  }
+}
