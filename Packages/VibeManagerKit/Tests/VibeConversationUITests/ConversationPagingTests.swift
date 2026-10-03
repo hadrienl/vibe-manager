@@ -61,19 +61,6 @@ struct ConversationPagingTests {
     }
   }
 
-  /// Waits for the origin to stop moving: the same on several readings in a row.
-  private func settledOrigin(_ origin: () -> Double) async throws {
-    var last = origin()
-    var still = 0
-    while still < 5 {
-      try Task.checkCancellation()
-      try await Task.sleep(for: .milliseconds(20))
-      let now = origin()
-      still = abs(now - last) < 0.5 ? still + 1 : 0
-      last = now
-    }
-  }
-
   @Test("Page Up scrolls the messages, page after page, up to the first one below the toolbar")
   func pagesUp() async throws {
     let (window, model) = host(messages: 120)
@@ -88,22 +75,19 @@ struct ConversationPagingTests {
     let readable = scroll.contentView.bounds.height - top - scroll.contentInsets.bottom
     var origin: Double { scroll.contentView.bounds.origin.y }
     let end = origin
-    let endHeight = scroll.documentView!.frame.height
 
     model.scrollPage(.up)
-    // Before the fix, nothing moves: the pager never found the messages' scroll view. A scroll
-    // can be eased on some systems: what is waited for is where it lands, at least half a page up.
-    try await waitUntil { origin <= end - readable / 2 && !model.scroll.isFollowing }
-    try await settledOrigin { origin }
+    // Before the fix, nothing moves: the pager never found the messages' scroll view.
+    try await waitUntil { origin < end - 1 && !model.scroll.isFollowing }
     // A page is what was read, less the overlap: no line skipped under the toolbar.
-    #expect(end - origin <= readable, "moved \(end - origin) for \(readable) read; document \(endHeight) then \(scroll.documentView!.frame.height); insets \(scroll.contentInsets.top) \(scroll.contentInsets.bottom); page scroll \(scroll.verticalPageScroll)")
+    #expect(end - origin <= readable, "moved \(end - origin) for \(readable) read")
+    #expect(end - origin >= readable / 2)
 
     // On to the start: the first message just below the toolbar, and no further.
     while origin > -top + 0.5 {
       let before = origin
       model.scrollPage(.up)
       try await waitUntil { origin < before - 0.5 }
-      try await settledOrigin { origin }
     }
     #expect(abs(origin - -top) < 1)
 

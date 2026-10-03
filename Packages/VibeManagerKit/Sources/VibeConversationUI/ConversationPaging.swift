@@ -8,25 +8,19 @@ import SwiftUI
 final class ConversationPager {
   weak var scrollView: NSScrollView?
 
-  func scroll(_ page: ConversationModel.Page) {
-    guard let scrollView, let document = scrollView.documentView else { return }
+  /// Where, in the messages, the first line read below the toolbar should be after `page`: the
+  /// view scrolls there through SwiftUI, which puts back a position set behind its back.
+  func readableTop(after page: ConversationModel.Page) -> Double? {
+    guard let scrollView, let document = scrollView.documentView, document.isFlipped else {
+      return nil
+    }
     let clip = scrollView.contentView
     let insets = scrollView.contentInsets
     let y = Self.origin(
       after: page, from: clip.bounds.origin.y, viewHeight: clip.bounds.height,
       documentHeight: document.frame.height, insets: (top: insets.top, bottom: insets.bottom),
-      overlap: scrollView.verticalPageScroll, isFlipped: document.isFlipped)
-    // As the wheel does: SwiftUI keeps the position it knows, and takes back one set behind it.
-    let distance = (y - clip.bounds.origin.y) * (document.isFlipped ? 1 : -1)
-    if let event = CGEvent(
-      scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
-      wheel1: Int32(-distance.rounded()), wheel2: 0, wheel3: 0)
-    {
-      // Continuous, as a trackpad's: the distance is taken as it is, never accelerated.
-      event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
-      guard let wheel = NSEvent(cgEvent: event) else { return }
-      scrollView.scrollWheel(with: wheel)
-    }
+      overlap: scrollView.verticalPageScroll, isFlipped: true)
+    return y + insets.top
   }
 
   /// Where the view starts after a page. The messages scroll under the toolbar, which veils them
