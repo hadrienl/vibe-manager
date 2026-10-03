@@ -13,6 +13,8 @@ private actor InterestTerminal: TerminalSession {
       [:]
   private(set) var interests: [TerminalEventInterest] = []
   private var current = TerminalProcessState.running(processIdentifier: 7)
+  /// Everything printed, which an attachment hands as its history.
+  private var backlog: [UInt8] = []
   let lastOutput = ContinuousClock.now
 
   func attach() -> TerminalAttachment { attach(.everything) }
@@ -28,7 +30,7 @@ private actor InterestTerminal: TerminalSession {
       continuation.onTermination = { _ in Task { await self.remove(subscriberID) } }
     }
     return TerminalAttachment(
-      state: current, history: TerminalHistorySnapshot(bytes: [], droppedByteCount: 0),
+      state: current, history: TerminalHistorySnapshot(bytes: backlog, droppedByteCount: 0),
       events: events)
   }
 
@@ -44,6 +46,7 @@ private actor InterestTerminal: TerminalSession {
   func lastOutputAt() -> ContinuousClock.Instant? { lastOutput }
 
   func print(_ text: String) {
+    backlog += [UInt8](text.utf8)
     for (interest, continuation) in subscribers.values {
       if let event = interest.translating(.output([UInt8](text.utf8))) {
         continuation.yield(event)
@@ -126,6 +129,24 @@ struct LaunchObserverFeedTests {
     await feed.value
 
     #expect(await !observer.read.contains("working hard"))
+  }
+
+  /// The output the agent printed before the observer looked is read from the history: on a
+  /// slow machine the agent prints its identifier before the observer is attached, and that line
+  /// was lost (the scenario « The host killed » failed on CI).
+  @Test("What the agent printed before the observer looked is read too", .timeLimit(.minutes(1)))
+  func outputPrintedBeforeIsRead() async {
+    let terminal = InterestTerminal()
+    await terminal.print("booting\r\nsession id: 42\r\n")
+    let observer = ReadingObserver(wanted: "session id: 42")
+    let feed = Task.detached { await SessionLauncher.feed(observer, from: terminal) }
+
+    // It had enough from the history alone: the stream is let go of, the end waited for.
+    while await terminal.interests.count < 2 { await Task.yield() }
+    #expect(await terminal.interests == [.everything, .state])
+    await terminal.end()
+    await feed.value
+    #expect(await observer.read.contains("session id: 42"))
   }
 
   @MainActor
