@@ -454,9 +454,14 @@ public actor TrackAgentActivity {
   /// Whether the dialog `text` shows is the request's, and no other's of the queue (#283). Named
   /// behind requests reported before it and never drawn, it is now known drawn and those settled
   /// with no dialog, as when Codex quotes a command whole.
-  public func dialogOnScreen(_ text: String, isFor id: AgentRequestID) -> Bool {
+  /// `before` is the screen read before the log was caught up with: the dialog must not have
+  /// changed since, or the one now drawn may have been reported after the log was read.
+  public func dialogOnScreen(_ text: String, readBefore before: String, isFor id: AgentRequestID)
+    -> Bool
+  {
     guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,
-      keymap.readsRequestOnScreen, let dialog = keymap.drawnDialog(onScreen: text)
+      keymap.readsRequestOnScreen, let dialog = keymap.drawnDialog(onScreen: text),
+      keymap.drawnDialog(onScreen: before) == dialog
     else { return false }
     // A request taken away on a guess may be the one drawn: only a command, shown whole, is the
     // same as another request's when it reads the same. Two patches of the same files are not.

@@ -426,7 +426,9 @@ extension AgentActivityState {
     guard requests.first?.id == request.id else { return .inTerminalOnly(.queued) }
     // A dialog drawn that may be this one's: the screen will tell, before anything is typed
     // (#283).
-    let mayBeOnScreen = keymap.readsRequestOnScreen && drawnCandidates.contains(request.id)
+    let mayBeOnScreen =
+      keymap.readsRequestOnScreen && drawnCandidates.contains(request.id)
+      && AgentDrawnDialog.showsWhole(request)
     // In doubt, a dialog may well be on screen — only not known to be this one's (#280): the
     // answer is given in the session, not waited for.
     guard !isFirstRequestUncertain || mayBeOnScreen else { return .inTerminalOnly(.uncertain) }

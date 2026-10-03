@@ -75,14 +75,18 @@ public struct AnswerAgentRequest: Sendable {
     guard await tracker.offers(answer, to: id) else {
       return await tracker.isFirstRequest(id) ? .notAnswerable : .requestGone
     }
-    let text = await screen(id.sessionID)
+    var text = await screen(id.sessionID)
     // Whose dialog is drawn is read off the screen, against every request the agent reported
     // before drawing it (#283). The screen is read first: every dialog on it was reported by then,
-    // and once the log is read up to its end, every report is known.
+    // and once the log is read up to its end, every report is known. Read again after, it must
+    // show the same dialog — the keys are taken from that last reading.
     if await tracker.readsRequestsOnScreen(id.sessionID) {
-      guard await tracker.catchUp(id.sessionID), let text,
-        await tracker.dialogOnScreen(text, isFor: id)
-      else {
+      let before = text
+      guard await tracker.catchUp(id.sessionID), let before else {
+        return await tracker.isFirstRequest(id) ? .otherDialog : .requestGone
+      }
+      text = await screen(id.sessionID)
+      guard let text, await tracker.dialogOnScreen(text, readBefore: before, isFor: id) else {
         return await tracker.isFirstRequest(id) ? .otherDialog : .requestGone
       }
     }

@@ -80,6 +80,16 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     }
   }
 
+  /// Whether a dialog read off the screen can name `request`: a command, a patch, a network
+  /// access. An MCP tool's form shows its arguments cut short, and is never read (#283).
+  public static func showsWhole(_ request: AgentRequest) -> Bool {
+    guard case .permission(let permission) = request.content else { return false }
+    switch permission.tool {
+    case .shell, .patch: return true
+    default: return false
+    }
+  }
+
   /// What a network access says it is for, in Codex's report: `network-access <target>`.
   static let networkPurpose = "network-access "
 

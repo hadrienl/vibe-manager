@@ -40,6 +40,15 @@ private struct CodexLikeDecoder: AgentSignalDecoding {
             AgentToolPermission(
               tool: .patch, toolName: "apply_patch", subject: files, workingDirectory: "/p")),
           reference: AgentToolReference(tool: "apply_patch", subject: files), isShown: false))
+    case "mcp":
+      return .questionAsked(
+        .approval, tool: "mcp__echo_box__write_note",
+        notice: AgentRequestNotice(
+          content: .permission(
+            AgentToolPermission(
+              tool: .mcp(server: "echo_box", tool: "write_note"),
+              toolName: "mcp__echo_box__write_note", subject: nil)),
+          reference: AgentToolReference(tool: "mcp__echo_box__write_note"), isShown: false))
     // A tool ran, which one is not said: Codex's `PostToolUse`.
     case "done": return .questionResolved
     default: return nil
@@ -52,6 +61,9 @@ private struct CodexLikeDecoder: AgentSignalDecoding {
     }
     if message.hasPrefix("whole:") {
       return .dialogDrawn(AgentDrawnDialog(.command(String(message.dropFirst(6)))))
+    }
+    if message.hasPrefix("server:") {
+      return .dialogDrawn(AgentDrawnDialog(.server(String(message.dropFirst(7)))))
     }
     if message.hasPrefix("file:") {
       return .dialogDrawn(AgentDrawnDialog(.file(String(message.dropFirst(5)))))
@@ -338,6 +350,32 @@ struct DialogOnScreenTests {
     await fixture.tracker.terminalNotification(fixture.id, "whole:touch alpha")
     await fixture.screen.show("$ touch alpha")
     #expect(await fixture.answer(.allowOnce, to: first) == .sent)
+  }
+
+  @Test("An MCP tool's form is never read: its request stays answered in the session")
+  func mcpTool() async {
+    let fixture = Fixture()
+    await fixture.start()
+    let tool = await fixture.ask("", event: "mcp")
+    await fixture.tracker.terminalNotification(fixture.id, "server:echo-box")
+    #expect(await fixture.answering(tool) == .inTerminalOnly(.uncertain))
+  }
+
+  @Test("A dialog that changed while the log was read gets nothing typed")
+  func changedWhileCatchingUp() async {
+    let fixture = Fixture()
+    await fixture.start()
+    let first = await fixture.ask("touch alpha")
+    await fixture.tracker.terminalNotification(fixture.id, "whole:touch alpha")
+    await fixture.screen.show("$ touch alpha")
+    await fixture.logs.writeUnread("ask", at: t1, for: fixture.id, payload: "touch beta")
+    let answer = Task { await fixture.answer(.allowOnce, to: first) }
+    await fixture.endAsked()
+    // Another dialog is drawn meanwhile, its report written after the end the answer waits for.
+    await fixture.screen.show("$ touch gamma")
+    await fixture.logs.read(fixture.id)
+    #expect(await answer.value == .otherDialog)
+    #expect(await fixture.written.bytes.isEmpty)
   }
 
   @Test("Two patches of the same files, not drawn yet, are two requests")
