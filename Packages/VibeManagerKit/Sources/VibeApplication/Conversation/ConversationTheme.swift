@@ -159,6 +159,7 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
     /// What the picture shows, when an agent draws it.
     public var imagePrompt: String?
     /// How much of `background` covers the picture, from 0 (the picture as it is) to 1 (hidden).
+    /// What a file or an agent wrote; the conversation shows `shownVeil`.
     public var veil: Double = 0.75
     /// How blurred the picture is, in points.
     public var blur: Double = 0
@@ -174,6 +175,12 @@ public struct ConversationTheme: Hashable, Sendable, Identifiable {
     public var wantsImage: Bool { imageURL != nil || imagePrompt != nil || image != nil }
 
     public static let veilRange: ClosedRange<Double> = 0...1
+    /// The least veil a picture is ever shown under: the text is read on `background`, and a
+    /// thinner veil leaves it on the photograph itself (#231). A lower one is refused, not obeyed.
+    public static let minimumVeil = 0.6
+
+    /// The veil the picture is shown under: never thinner than `minimumVeil`.
+    public var shownVeil: Double { min(max(veil, Self.minimumVeil), 1) }
     public static let blurRange: ClosedRange<Double> = 0...40
   }
 
@@ -513,6 +520,19 @@ extension ConversationTheme {
     removedText: "#8A0000", success: "#00561B", failure: "#B00000", warning: "#7A4000",
     warningBackground: "#FFE9B8")
 
+  /// Contrast High for a dark appearance: what increased contrast gives over System Dark (#231).
+  /// Not offered in the settings — the system's setting asks for it.
+  public static let highContrastDark = ConversationTheme(
+    id: "high-contrast-dark", isDark: true, fontStyle: .system,
+    background: "#000000", surface: "#000000", raised: "#000000", text: "#FFFFFF",
+    secondaryText: "#D6D6D6", border: "#FFFFFF", accent: "#7AB8FF", onAccent: "#000000",
+    bubble: "#000000", bubbleText: "#FFFFFF", bubbleBorder: "#FFFFFF",
+    codeBackground: "#141414", codeText: "#FFFFFF", keyword: "#FF9FF3", string: "#FFB3A8",
+    comment: "#C8C8C8", number: "#9EC9FF", type: "#7FE7F7", function: "#D6B3FF",
+    addedBackground: "#0B2E14", addedText: "#8EF0A6", removedBackground: "#3A0B0B",
+    removedText: "#FFA8A8", success: "#8EF0A6", failure: "#FF8C8C", warning: "#FFD27A",
+    warningBackground: "#33260A")
+
   /// The themes offered, in the order the settings show them.
   public static let builtIn: [ConversationTheme] = [
     .systemLight, .systemDark, .paper, .night, .terminal, .highContrast,
@@ -525,10 +545,10 @@ extension ConversationTheme {
     builtIn.first { $0.id == identifier } ?? personal.first { $0.id == identifier }
   }
 
-  /// The theme in force: the user's choice for the current appearance, Contrast High when macOS
-  /// asks for more contrast and the user kept the system's themes. A theme that is no longer
-  /// there — a personal one deleted, or whose file can no longer be read — gives the mode's
-  /// default one, the setting left as it is.
+  /// The theme in force: the user's choice for the current appearance, Contrast High — light or
+  /// dark — when macOS asks for more contrast and the user kept the system's themes. A theme that
+  /// is no longer there — a personal one deleted, or whose file can no longer be read — gives the
+  /// mode's default one, the setting left as it is.
   public static func resolve(
     _ appearance: ConversationAppearance, isDark: Bool, increasedContrast: Bool,
     personal: [ConversationTheme] = []
@@ -538,12 +558,22 @@ extension ConversationTheme {
       identifier == ConversationAppearance.defaultLightTheme
       || identifier == ConversationAppearance.defaultDarkTheme
     let base: ConversationTheme
-    if increasedContrast, keptSystemThemes, !isDark {
-      base = .highContrast
+    if increasedContrast, keptSystemThemes {
+      base = isDark ? .highContrastDark : .highContrast
     } else {
       base = named(identifier, personal: personal) ?? (isDark ? .systemDark : .systemLight)
     }
     return base.applying(appearance)
+  }
+
+  /// The theme as the system's display settings let it be drawn: with more contrast, or less
+  /// transparency, asked for, no picture behind the conversation, whatever theme is in force
+  /// (#231). The theme itself keeps its picture.
+  public func honoring(increasedContrast: Bool, reducedTransparency: Bool) -> ConversationTheme {
+    guard increasedContrast || reducedTransparency else { return self }
+    var theme = self
+    theme.backdrop.localImage = nil
+    return theme
   }
 }
 

@@ -23,7 +23,8 @@ struct ConversationThemeTests {
   }
 
   @Test(
-    "Every pair a reader must read passes, in every theme", arguments: ConversationTheme.builtIn)
+    "Every pair a reader must read passes, in every theme",
+    arguments: ConversationTheme.builtIn + [.highContrastDark])
   func legibility(theme: ConversationTheme) {
     for pair in theme.legibilityPairs {
       let ratio = pair.foreground.contrast(with: pair.background)
@@ -36,7 +37,7 @@ struct ConversationThemeTests {
   @Test("Every accent reads on every theme it can be given to")
   func accents() {
     for accent in ConversationAppearance.Accent.allCases where ![.theme, .custom].contains(accent) {
-      for base in ConversationTheme.builtIn {
+      for base in ConversationTheme.builtIn + [.highContrastDark] {
         let theme = base.applying(ConversationAppearance(accent: accent))
         #expect(theme.onAccent.contrast(with: theme.accent) >= 4.5, "\(accent) on \(base.id)")
         #expect(theme.accent.contrast(with: theme.background) >= 3, "\(accent) on \(base.id)")
@@ -69,6 +70,9 @@ struct ConversationThemeTests {
     let paper = ConversationAppearance(lightTheme: "paper")
     #expect(
       ConversationTheme.resolve(paper, isDark: false, increasedContrast: true).id == "paper")
+    #expect(
+      ConversationTheme.resolve(appearance, isDark: true, increasedContrast: true).id
+        == "high-contrast-dark")
     let unknown = ConversationAppearance(lightTheme: "gone")
     #expect(
       ConversationTheme.resolve(unknown, isDark: false, increasedContrast: false).id
@@ -939,5 +943,55 @@ struct ConversationModelTests {
     model.appearance.showsReasoning = false
     model.appearance.groupsToolCalls = false
     #expect(model.blocks.map(\.id) == ["a", "b"])
+  }
+}
+
+@Suite("The picture behind the conversation and the system's display settings")
+struct ThemeBackdropAccessibilityTests {
+  private var pictured: ConversationTheme {
+    var theme = ConversationTheme.night
+    theme.backdrop.image = "picture.png"
+    theme.backdrop.localImage = URL(fileURLWithPath: "/tmp/picture.png")
+    return theme
+  }
+
+  @Test("More contrast, or less transparency, asked for: no picture, whatever the theme")
+  func pictureGoes() {
+    #expect(
+      pictured.honoring(increasedContrast: false, reducedTransparency: false).backdrop.localImage
+        != nil)
+    #expect(
+      pictured.honoring(increasedContrast: true, reducedTransparency: false).backdrop.localImage
+        == nil)
+    #expect(
+      pictured.honoring(increasedContrast: false, reducedTransparency: true).backdrop.localImage
+        == nil)
+  }
+
+  @Test("A session's own theme loses its picture too, not only the settings' one")
+  @MainActor
+  func sessionThemeHonours() async throws {
+    var own = pictured
+    own.personalName = "Forêt"
+    let themes = ConversationThemesModel(
+      library: InMemoryConversationThemeLibrary(themes: [own]))
+    await themes.load()
+    let id = try #require(themes.personal.first?.id)
+    let shown = themes.displayed(
+      ConversationAppearance(), session: id, isDark: true, increasedContrast: false)
+    try #require(shown.backdrop.localImage != nil)
+    let honouring = themes.displayed(
+      ConversationAppearance(), session: id, isDark: true, increasedContrast: false,
+      reducedTransparency: true)
+    #expect(honouring.backdrop.localImage == nil)
+  }
+
+  @Test("A veil thinner than the least one is refused: the picture never shows through bare")
+  func leastVeil() {
+    var theme = pictured
+    theme.backdrop.veil = 0
+    #expect(theme.backdrop.shownVeil == ConversationTheme.Backdrop.minimumVeil)
+    theme.backdrop.veil = 0.8
+    #expect(theme.backdrop.shownVeil == 0.8)
   }
 }

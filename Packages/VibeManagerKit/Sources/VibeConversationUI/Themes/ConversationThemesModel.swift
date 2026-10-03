@@ -178,7 +178,7 @@ public final class ConversationThemesModel {
   /// the settings resolve to. A session's theme that is no longer there follows the settings.
   public func displayed(
     _ appearance: ConversationAppearance, session sessionTheme: String? = nil, isDark: Bool,
-    increasedContrast: Bool
+    increasedContrast: Bool, reducedTransparency: Bool = false
   ) -> ConversationTheme {
     _ = fontsGeneration
     var theme: ConversationTheme
@@ -200,7 +200,8 @@ public final class ConversationThemesModel {
     if let family = theme.codeFontFamily, !ConversationFonts.isInstalled(family) {
       theme.codeFontFamily = nil
     }
-    return theme
+    return theme.honoring(
+      increasedContrast: increasedContrast, reducedTransparency: reducedTransparency)
   }
 
   /// A theme by identifier, built in or the user's.
