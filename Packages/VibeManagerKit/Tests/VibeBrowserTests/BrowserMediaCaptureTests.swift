@@ -61,12 +61,31 @@ struct BrowserMediaCaptureTests {
     ] {
       let decision = Task { await tab.decideMediaCapture(.microphone, isOnScreen: false) }
       await waitUntil("the microphone is asked") {
-        workspace.requests(for: session).contains { $0.kind == .effect(.microphone) }
+        workspace.requests(for: session).contains {
+          $0.kind == .effect(.microphone(site: "example.com"))
+        }
       }
       workspace.answer(try #require(workspace.requests(for: session).first), with: answer)
       #expect(await decision.value == expected)
     }
     #expect(workspace.pendingRequests.isEmpty)
+  }
+
+  @Test("The question names the site that asks, a frame's rather than the tab's")
+  func frameSite() async throws {
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    let tab = workspace.open(
+      URL(string: "https://news.example.com")!, in: session, openedBy: .agent, activate: false)
+    let decision = Task {
+      await tab.decideMediaCapture(
+        .microphone, site: "widget.example.net", isOnScreen: true)
+    }
+    await waitUntil("the microphone is asked") { !workspace.requests(for: session).isEmpty }
+    let request = try #require(workspace.requests(for: session).first)
+    #expect(request.kind == .effect(.microphone(site: "widget.example.net")))
+    workspace.answer(request, with: .deny)
+    #expect(await decision.value == .deny)
   }
 
   @Test("A window the agent's page opened is asked, even once the user clicked in it")

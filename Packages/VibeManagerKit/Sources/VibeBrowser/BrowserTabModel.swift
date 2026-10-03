@@ -478,8 +478,8 @@ public enum BrowserAgentEffect: Hashable, Sendable {
   /// Another application's address that reaches another computer — a share to mount, a remote
   /// screen or shell: asked whoever's the tab is, even after a click of the user's (#241).
   case networkAddress(URL)
-  /// The page wants the microphone (#315).
-  case microphone
+  /// A page wants the microphone (#315): `site` is the one that asks, which may be a frame's.
+  case microphone(site: String)
 
   /// The schemes macOS hands to an application that connects to another computer: Finder mounts
   /// `smb:`, `afp:`, `nfs:`, `cifs:` and `ftp:` shares, Screen Sharing opens `vnc:`, Terminal
@@ -677,13 +677,16 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     initiatedBy frame: WKFrameInfo, type: WKMediaCaptureType
   ) async -> WKPermissionDecision {
     let window = webView.window
+    // The site that asks, not the tab's: a frame of another site may ask.
+    let site = BrowserOrigin(
+      scheme: origin.protocol, host: origin.host, port: origin.port == 0 ? nil : origin.port)
     return await decideMediaCapture(
-      type, isOnScreen: window != nil && !(window is ParkingWindow))
+      type, site: site.description, isOnScreen: window != nil && !(window is ParkingWindow))
   }
 
   /// A refusal reaches the page as a `NotAllowedError` (#315).
-  func decideMediaCapture(_ type: WKMediaCaptureType, isOnScreen: Bool) async
-    -> WKPermissionDecision
+  func decideMediaCapture(_ type: WKMediaCaptureType, site: String? = nil, isOnScreen: Bool)
+    async -> WKPermissionDecision
   {
     switch BrowserMediaCapture.decide(
       type, asksBeforeEffects: asksBeforeEffects, isOnScreen: isOnScreen)
@@ -692,8 +695,9 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
       return .prompt
     case .askUser:
       // Answered in the session, not by WebKit: granted once, never asked twice.
-      guard !isClosed, let confirmAgentEffect, await confirmAgentEffect(.microphone, self),
-        !isClosed
+      let site = site ?? (committedOrigin ?? origin)?.description ?? url.absoluteString
+      guard !isClosed, let confirmAgentEffect,
+        await confirmAgentEffect(.microphone(site: site), self), !isClosed
       else {
         record(
           console: BrowserConsoleEntry(
