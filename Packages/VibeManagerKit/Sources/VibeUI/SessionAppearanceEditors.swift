@@ -465,7 +465,7 @@ struct SwatchEditor: View {
         .buttonStyle(.plain)
         .disabled(isTaken)
         .help(Text(verbatim: color))
-        .accessibilityLabel(Text(verbatim: color))
+        .accessibilityLabel(Text(verbatim: ColorNaming.name(ofHex: color) ?? color))
         .accessibilityAddTraits(selected == color ? [.isSelected] : [])
       }
     }

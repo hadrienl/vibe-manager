@@ -254,9 +254,11 @@ private struct SwatchChip: View {
   }
 
   static func label(_ swatch: SessionAppearancePalette.Swatch) -> Text {
-    // The name first, then the hex: two colours may be given the same name.
-    if let name = swatch.displayName { return Text(verbatim: "\(name) (\(swatch.hex))") }
-    return Text(verbatim: swatch.hex)
+    // Never its hex (#232). A shipped colour by its own name; one the user named by that name,
+    // then the colour in words, since two may be given the same name; an unnamed one in words.
+    let color = ColorNaming.name(ofHex: swatch.hex) ?? swatch.hex
+    if let name = swatch.name { return Text(verbatim: "\(name), \(color)") }
+    return Text(verbatim: swatch.displayName ?? color)
   }
 }
 

@@ -4002,17 +4002,6 @@
         }
       }
     },
-    "Accent %@" : {
-      "comment" : "VoiceOver: a colour, by its hex code.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couleur %@"
-          }
-        }
-      }
-    },
     "Account to check" : {
       "comment" : "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped.",
       "localizations" : {
@@ -17116,6 +17105,28 @@
         }
       }
     },
+    "black" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "noir"
+          }
+        }
+      }
+    },
+    "blue" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bleu"
+          }
+        }
+      }
+    },
     "branch %@" : {
       "comment" : "Said by VoiceOver on a request's card.\nWhat VoiceOver says of a repository's branch: its name.",
       "localizations" : {
@@ -17123,6 +17134,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "branche %@"
+          }
+        }
+      }
+    },
+    "brown" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "marron"
           }
         }
       }
@@ -17285,6 +17307,17 @@
         }
       }
     },
+    "dark %@" : {
+      "comment" : "A colour, darker: “dark blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ foncé"
+          }
+        }
+      }
+    },
     "default model" : {
       "comment" : "Stands for the model an agent uses when none is chosen.",
       "localizations" : {
@@ -17367,6 +17400,17 @@
         }
       }
     },
+    "emerald" : {
+      "comment" : "A colour, said by VoiceOver: a green leaning to blue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "émeraude"
+          }
+        }
+      }
+    },
     "file edits" : {
       "comment" : "What always allowing grants: the agent's file edits, accepted as they come.",
       "localizations" : {
@@ -17411,6 +17455,28 @@
         }
       }
     },
+    "gray" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gris"
+          }
+        }
+      }
+    },
+    "green" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vert"
+          }
+        }
+      }
+    },
     "imported on %@" : {
       "comment" : "Read by VoiceOver after an avatar's name: made from an archive, and when.",
       "localizations" : {
@@ -17429,6 +17495,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "dans %@"
+          }
+        }
+      }
+    },
+    "indigo" : {
+      "comment" : "A colour, said by VoiceOver: between blue and violet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "indigo"
           }
         }
       }
@@ -17664,6 +17741,17 @@
         }
       }
     },
+    "light %@" : {
+      "comment" : "A colour, paler: “light blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ clair"
+          }
+        }
+      }
+    },
     "live" : {
       "comment" : "Said of a Git list that follows the disk as it changes.",
       "localizations" : {
@@ -17864,6 +17952,39 @@
         }
       }
     },
+    "orange" : {
+      "comment" : "A colour, said by VoiceOver: the fruit's.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "orange"
+          }
+        }
+      }
+    },
+    "pink" : {
+      "comment" : "A colour, said by VoiceOver: the flower's, not the wine's.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rose"
+          }
+        }
+      }
+    },
+    "purple" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "violet"
+          }
+        }
+      }
+    },
     "read %lld s ago" : {
       "comment" : "When the Git list was read: a number of seconds.",
       "localizations" : {
@@ -17893,6 +18014,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "lu à l’instant"
+          }
+        }
+      }
+    },
+    "red" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rouge"
           }
         }
       }
@@ -18025,6 +18157,17 @@
         }
       }
     },
+    "teal" : {
+      "comment" : "A colour, said by VoiceOver: between green and blue.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "turquoise"
+          }
+        }
+      }
+    },
     "the default application" : {
       "comment" : "The application a file opens with, named inside a sentence: “could not be opened in …”.",
       "localizations" : {
@@ -18130,6 +18273,17 @@
         }
       }
     },
+    "very dark %@" : {
+      "comment" : "A colour, much darker: “very dark blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ très foncé"
+          }
+        }
+      }
+    },
     "waiting at its prompt" : {
       "comment" : "A side terminal's state.",
       "localizations" : {
@@ -18137,6 +18291,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente à l’invite"
+          }
+        }
+      }
+    },
+    "white" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blanc"
+          }
+        }
+      }
+    },
+    "yellow" : {
+      "comment" : "A colour, said by VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jaune"
+          }
+        }
+      }
+    },
+    "yellow-green" : {
+      "comment" : "A colour, said by VoiceOver: between yellow and green.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vert-jaune"
           }
         }
       }
