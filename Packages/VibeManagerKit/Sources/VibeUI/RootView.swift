@@ -2008,6 +2008,11 @@ struct SidebarFooter: View {
   }
 }
 
+/// A command of a session's row, as VoiceOver offers it.
+enum SessionRowAction: Hashable {
+  case restart, switchAgent, rename, changeIcon, changeTheme, close, archive, restore
+}
+
 /// The three history commands for one session, in the single place that decides whether each of
 /// them applies. The menu, the context menu and the accessibility actions all read this.
 @MainActor
@@ -2037,6 +2042,45 @@ struct SessionCommands {
   /// commands, which say what they do to the process.
   var movableStatuses: [SessionTaskStatus] {
     session.taskStatus == .archived ? [] : SessionTaskStatus.columns
+  }
+
+  /// The commands VoiceOver offers on the row: only those that would do something (#232).
+  var rowActions: [SessionRowAction] {
+    var actions: [SessionRowAction] = []
+    if canRestart { actions.append(.restart) }
+    if canSwitchAgent { actions.append(.switchAgent) }
+    if canEditIdentity { actions += [.rename, .changeIcon, .changeTheme] }
+    if canClose { actions.append(.close) }
+    if canArchive { actions.append(.archive) }
+    if canRestore { actions.append(.restore) }
+    return actions
+  }
+
+  func perform(_ action: SessionRowAction) {
+    switch action {
+    case .restart: restart()
+    case .switchAgent: switchAgent()
+    case .rename: rename()
+    case .changeIcon: changeIcon()
+    case .changeTheme: changeTheme()
+    case .close: close()
+    case .archive: requestArchive()
+    case .restore: restore()
+    }
+  }
+
+  /// What VoiceOver calls the action.
+  func name(of action: SessionRowAction) -> Text {
+    switch action {
+    case .restart: Text(restartAnnouncement)
+    case .switchAgent: Text("Switch Agent", bundle: .module)
+    case .rename: Text("Rename", bundle: .module, comment: "Renames a session.")
+    case .changeIcon: Text("Change Icon", bundle: .module)
+    case .changeTheme: Text("Change Conversation Theme", bundle: .module)
+    case .close: Text("Close Session", bundle: .module)
+    case .archive: Text("Archive", bundle: .module)
+    case .restore: Text("Unarchive", bundle: .module)
+    }
   }
 
   func close() { Task { await model.requestClose(session.id) } }
@@ -2213,38 +2257,16 @@ struct SessionRow: View {
         for: session, status: status, agentNames: commands.model.agentNames)
     )
     .accessibilityValue(accessibilityValue)
-    // The same commands, reachable without a pointer and without the menu bar.
-    .accessibilityAction(named: Text(commands.restartAnnouncement)) {
-      guard commands.canRestart else { return }
-      commands.restart()
-    }
-    .accessibilityAction(named: Text("Switch Agent", bundle: .module)) {
-      guard commands.canSwitchAgent else { return }
-      commands.switchAgent()
-    }
-    .accessibilityAction(named: Text("Rename", bundle: .module, comment: "Renames a session.")) {
-      guard commands.canEditIdentity else { return }
-      commands.rename()
-    }
-    .accessibilityAction(named: Text("Change Icon", bundle: .module)) {
-      guard commands.canEditIdentity else { return }
-      commands.changeIcon()
-    }
-    .accessibilityAction(named: Text("Change Conversation Theme", bundle: .module)) {
-      guard commands.canEditIdentity else { return }
-      commands.changeTheme()
-    }
-    .accessibilityAction(named: Text("Close Session", bundle: .module)) {
-      guard commands.canClose else { return }
-      commands.close()
-    }
-    .accessibilityAction(named: Text("Archive", bundle: .module)) {
-      guard commands.canArchive else { return }
-      commands.requestArchive()
-    }
-    .accessibilityAction(named: Text("Unarchive", bundle: .module)) {
-      guard commands.canRestore else { return }
-      commands.restore()
+    // The same commands, reachable without a pointer and without the menu bar: only those that
+    // apply, so that VoiceOver never lists one that does nothing (#232).
+    .accessibilityActions {
+      ForEach(commands.rowActions, id: \.self) { action in
+        Button {
+          commands.perform(action)
+        } label: {
+          commands.name(of: action)
+        }
+      }
     }
     // The drag that reorders, reachable without it (#44).
     .accessibilityActions {
