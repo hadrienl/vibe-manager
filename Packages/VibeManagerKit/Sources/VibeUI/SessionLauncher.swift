@@ -1040,6 +1040,10 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // One decoder for the whole stream: a read can end in the middle of a character, and the
     // identifiers the observer looks for would be broken by a replacement character.
     var decoder = UTF8StreamDecoder()
+    // What the agent printed before this task attached comes first: on a slow machine the agent
+    // printed its identifier before the observer looked, and the line was never read.
+    let history = decoder.decode(attachment.history.bytes)
+    if !history.isEmpty, await observer.observe(output: history) == .enough { return .enough }
     for await event in attachment.events {
       guard case .output(let bytes) = event else { continue }
       let text = decoder.decode(bytes)

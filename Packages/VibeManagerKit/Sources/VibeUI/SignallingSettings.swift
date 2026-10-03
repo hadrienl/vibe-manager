@@ -2,77 +2,6 @@ import AppKit
 import SwiftUI
 import VibeApplication
 
-/// The pages of Settings › Requests (#154).
-public enum RequestsPane: String, Hashable, Sendable, CaseIterable {
-  /// How the requests are signalled: the floating panel, the notifications, the palette.
-  case signalling
-  /// The avatars of the floating panel.
-  case avatars
-
-  /// The label of the page in the segmented control.
-  var title: LocalizedStringResource {
-    switch self {
-    case .signalling:
-      LocalizedStringResource(
-        "Alerts", bundle: .module,
-        comment: "A page of Settings › Requests: how requests are signalled.")
-    case .avatars:
-      LocalizedStringResource(
-        "Avatars", bundle: .module,
-        comment: "A page of Settings › Requests: the avatars of the floating panel.")
-    }
-  }
-}
-
-/// Settings › Requests (#154): how the requests are signalled, and the avatars that present them,
-/// in two pages under a segmented control.
-///
-/// Both pages have the same size, so that the window does not jump from one to the other. Wider
-/// than the settings' form, and under the widest tabs: nothing is cut (principle 2 of #154).
-struct RequestsSettingsView: View {
-  @Bindable var model: AppModel
-
-  /// The size of each page, under the segmented control.
-  ///
-  /// 700 points high rather than the 620 of the design of #154: the alerts need 673 in French
-  /// with the panel on, 691 with the notifications refused by the system, and at 620 the palette
-  /// fell under the fold of a form whose scroller is hidden.
-  nonisolated static let pageSize = CGSize(width: 900, height: 700)
-
-  var body: some View {
-    VStack(spacing: 0) {
-      if model.avatars != nil {
-        Picker(selection: $model.requestsPane) {
-          ForEach(RequestsPane.allCases, id: \.self) { pane in
-            Text(pane.title).tag(pane)
-          }
-        } label: {
-          Text("Requests Section", bundle: .module, comment: "The pages of Settings › Requests.")
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
-        .padding(.vertical, 10)
-        .accessibilityIdentifier("requests-pane")
-        Divider()
-      }
-      page
-        .frame(width: Self.pageSize.width, height: Self.pageSize.height)
-    }
-    // Once each time the tab appears, for both pages: the avatars made or deleted meanwhile.
-    .task { await model.avatars?.refresh() }
-  }
-
-  @ViewBuilder
-  private var page: some View {
-    if model.requestsPane == .avatars, let avatars = model.avatars {
-      AvatarLibraryView(avatars: avatars)
-    } else {
-      SignallingSettings(model: model)
-    }
-  }
-}
-
 /// How the requests of background sessions are signalled (#40, #41): the floating panel first,
 /// since it is the heart of the feature, then the notifications and the palette.
 struct SignallingSettings: View {
@@ -102,14 +31,12 @@ struct SignallingSettings: View {
       }
     }
     .formStyle(.grouped)
-    // The size of the page: with the panel on and its reason shown, the form may scroll.
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .task { isAuthorized = await model.requestNotifier?.isAuthorized() }
   }
 
-  /// "Manage Avatars…": the other page of the tab.
+  /// "Manage Avatars…": the page of the avatars, reached from this one.
   func manageAvatars() {
-    model.requestsPane = .avatars
+    model.settingsPage = .avatars
   }
 
   /// While the floating panel is on, no notification is posted (ADR 0029).
@@ -189,7 +116,7 @@ struct SignallingSettings: View {
   }
 }
 
-/// The floating panel, in Settings › Requests › Alerts (#41): on or off, the avatar that presents
+/// The floating panel, in Settings › Notifications (#41): on or off, the avatar that presents
 /// the requests, what it does with none, its shortcut and its place.
 struct FloatingPanelSettingsSection: View {
   @Bindable var panel: FloatingRequestPanelModel
