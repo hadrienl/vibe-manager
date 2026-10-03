@@ -70,6 +70,7 @@ public struct ConversationSettingsView: View {
   @Bindable var themes: ConversationThemesModel
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.colorSchemeContrast) private var contrast
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @State private var deleting: ConversationTheme?
   @State private var exportDocument: ThemeArchiveDocument?
   @State private var exportName = ""
@@ -235,7 +236,8 @@ public struct ConversationSettingsView: View {
 
   private var currentTheme: ConversationTheme {
     themes.displayed(
-      installedAppearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased)
+      installedAppearance, isDark: colorScheme == .dark, increasedContrast: contrast == .increased,
+      reducedTransparency: reduceTransparency)
   }
 
   /// A theme no longer there is named as the one drawn in its place: the mode's default.

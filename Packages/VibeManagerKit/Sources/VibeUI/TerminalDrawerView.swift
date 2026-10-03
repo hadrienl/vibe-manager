@@ -130,11 +130,8 @@ private struct DrawerTab: View {
             .font(.system(.caption, design: .monospaced))
             .lineLimit(1)
             .truncationMode(.middle)
-          if let tint = newsTint {
-            Circle()
-              .fill(tint)
-              .frame(width: 6, height: 6)
-              .accessibilityHidden(true)
+          if let news {
+            DrawerNewsMark(news: news, diameter: 6)
           }
         }
         .padding(.leading, 10)
@@ -238,11 +235,11 @@ private struct DrawerTab: View {
     }
   }
 
-  /// Blue for new output, orange for a shell that ended, on a tab nobody is looking at.
-  private var newsTint: Color? {
+  /// New output, or a shell that ended, on a tab nobody is looking at.
+  private var news: DrawerAttention? {
     guard !drawer.isSeen(terminal) else { return nil }
-    if terminal.hasUnseenExit { return .orange }
-    if terminal.hasUnseenOutput { return .accentColor }
+    if terminal.hasUnseenExit { return .ended }
+    if terminal.hasUnseenOutput { return .output }
     return nil
   }
 
@@ -537,6 +534,34 @@ private struct ShellEndedBar: View {
   }
 }
 
+/// The mark of a terminal nobody is looking at: blue for new output, orange for a shell that
+/// ended. With Differentiate Without Color, an ended shell is a ring rather than a dot, so the two
+/// differ by more than their colour (#231). VoiceOver hears the state in the tab's own label.
+struct DrawerNewsMark: View {
+  let news: DrawerAttention
+  let diameter: CGFloat
+
+  @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+
+  /// Whether the mark is a ring: an ended shell, when colour must not be all that tells it apart.
+  static func isRing(_ news: DrawerAttention, differentiatingWithoutColor: Bool) -> Bool {
+    news == .ended && differentiatingWithoutColor
+  }
+
+  var body: some View {
+    let colour = news == .ended ? Color.orange : Color.accentColor
+    Group {
+      if Self.isRing(news, differentiatingWithoutColor: differentiateWithoutColor) {
+        Circle().strokeBorder(colour, lineWidth: 1.5)
+      } else {
+        Circle().fill(colour)
+      }
+    }
+    .frame(width: diameter, height: diameter)
+    .accessibilityHidden(true)
+  }
+}
+
 /// The status bar's button (#43): shows or hides the drawer, counts its tabs, and says when a
 /// terminal nobody is looking at wrote something, or ended.
 struct DrawerStatusButton: View {
@@ -561,11 +586,8 @@ struct DrawerStatusButton: View {
       }
       .overlay(alignment: .topTrailing) {
         if attention != DrawerAttention.none {
-          Circle()
-            .fill(attention == .ended ? Color.orange : Color.accentColor)
-            .frame(width: 7, height: 7)
+          DrawerNewsMark(news: attention, diameter: 7)
             .offset(x: 5, y: -3)
-            .accessibilityHidden(true)
         }
       }
     }
