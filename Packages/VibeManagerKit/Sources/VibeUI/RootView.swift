@@ -2503,6 +2503,12 @@ private struct SessionConversationSlot: View {
   let increasedContrast: Bool
   let reducedTransparency: Bool
   @Environment(\.paneWidthHold) private var widthHold
+  @State private var shownWidth = ShownWidth()
+
+  private func heldWidth(isActive: Bool) -> CGFloat? {
+    if let widthHold, !isActive || widthHold.isCovered { return widthHold.width }
+    return isActive ? nil : shownWidth.value
+  }
 
   var body: some View {
     if let conversation = model.conversations.existingModel(for: id),
@@ -2549,8 +2555,19 @@ private struct SessionConversationSlot: View {
       // Hidden, it keeps its width while the column changes for a moment, as a terminal does.
       // On screen too when the web view slides over it; not under a drag of the divider, where
       // it would leave a bare strip.
-      .frame(width: widthHold.flatMap { !isActive || $0.isCovered ? $0.width : nil })
+      //
+      // Hidden, it also keeps the width it was last shown at while the window is resized: each
+      // step of the drag laid out again every conversation kept behind, and five of them were
+      // enough to make the resize stutter. It is laid out at the new width when it comes back.
+      .frame(width: heldWidth(isActive: isActive))
       .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+      // `nil` while hidden: coming back on screen at the width it left is a change too, and the
+      // width it is shown at is recorded even when the window was not resized since.
+      .onGeometryChange(for: CGFloat?.self) {
+        isActive ? $0.size.width : nil
+      } action: { [shownWidth] width in
+        if let width { shownWidth.value = width }
+      }
       .opacity(isActive ? 1 : 0)
       .allowsHitTesting(isActive)
       .accessibilityHidden(!isActive)
@@ -2559,6 +2576,12 @@ private struct SessionConversationSlot: View {
       .disabled(!isActive)
     }
   }
+}
+
+/// The width a conversation was last shown at. Not observed: written at each step of a resize, it
+/// must not have the slot evaluated again.
+private final class ShownWidth {
+  var value: CGFloat?
 }
 
 extension View {
