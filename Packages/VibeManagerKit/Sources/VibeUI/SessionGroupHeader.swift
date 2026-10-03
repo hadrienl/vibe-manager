@@ -64,7 +64,7 @@ struct SessionGroupHeader: View {
       countOrNewSession(newSession)
       if let headline = summary.headline {
         Image(systemName: headline.symbolName)
-          .foregroundStyle(tint(headline.severity))
+          .foregroundStyle(headline.severity.tint)
           .help(Text(headline.label))
       }
     }
@@ -265,14 +265,5 @@ struct SessionGroupHeader: View {
     let name = name
     guard FolderLabel.normalized(name) != group.customName else { return }
     Task { await model.rename(group, to: name == group.folderName ? "" : name) }
-  }
-
-  private func tint(_ severity: SessionStatusSeverity) -> Color {
-    switch severity {
-    case .normal: return .secondary
-    case .active: return .accentColor
-    case .attention: return .orange
-    case .error: return .red
-    }
   }
 }

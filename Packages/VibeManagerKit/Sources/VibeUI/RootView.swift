@@ -2312,12 +2312,7 @@ struct SessionRow: View {
   }
 
   private var tint: Color {
-    switch status.severity {
-    case .normal: return .secondary
-    case .active: return .accentColor
-    case .attention: return .orange
-    case .error: return .red
-    }
+    status.severity.tint
   }
 }
 
