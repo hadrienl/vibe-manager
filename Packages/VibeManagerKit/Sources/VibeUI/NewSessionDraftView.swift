@@ -222,6 +222,9 @@ public struct NewSessionDraftView: View {
           .textFieldStyle(.plain)
           .font(.title3.weight(.semibold))
           .focused($focus, equals: .draft(.name))
+          // A plain field shows its prompt, not its label: VoiceOver is given the label itself.
+          .accessibilityLabel(
+            Text("Session name", bundle: .module, comment: "The name of the new session."))
           .accessibilityIdentifier("new-session-name")
         }
         ForEach(model.issues(for: .name) + model.issues(for: .appearance)) { issue in
