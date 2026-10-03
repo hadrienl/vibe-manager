@@ -4049,17 +4049,6 @@
         }
       }
     },
-    "Accent %@" : {
-      "comment" : "VoiceOver: a colour, by its hex code.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couleur %@"
-          }
-        }
-      }
-    },
     "Activity" : {
       "comment" : "A section of the inspector.\nA tab of the Settings window.",
       "localizations" : {
@@ -16987,6 +16976,26 @@
         }
       }
     },
+    "black" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "noir"
+          }
+        }
+      }
+    },
+    "blue" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bleu"
+          }
+        }
+      }
+    },
     "branch %@" : {
       "comment" : "Said by VoiceOver on a request's card.\nWhat VoiceOver says of a repository's branch: its name.",
       "localizations" : {
@@ -16994,6 +17003,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "branche %@"
+          }
+        }
+      }
+    },
+    "brown" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "marron"
           }
         }
       }
@@ -17156,6 +17175,17 @@
         }
       }
     },
+    "dark %@" : {
+      "comment" : "A colour, darker: “dark blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ foncé"
+          }
+        }
+      }
+    },
     "default model" : {
       "comment" : "Stands for the model an agent uses when none is chosen.",
       "localizations" : {
@@ -17278,6 +17308,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "avec un résumé"
+          }
+        }
+      }
+    },
+    "gray" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gris"
+          }
+        }
+      }
+    },
+    "green" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vert"
           }
         }
       }
@@ -17535,6 +17585,17 @@
         }
       }
     },
+    "light %@" : {
+      "comment" : "A colour, paler: “light blue”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ clair"
+          }
+        }
+      }
+    },
     "live" : {
       "comment" : "Said of a Git list that follows the disk as it changes.",
       "localizations" : {
@@ -17735,6 +17796,36 @@
         }
       }
     },
+    "orange" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "orange"
+          }
+        }
+      }
+    },
+    "pink" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rose"
+          }
+        }
+      }
+    },
+    "purple" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "violet"
+          }
+        }
+      }
+    },
     "read %lld s ago" : {
       "comment" : "When the Git list was read: a number of seconds.",
       "localizations" : {
@@ -17764,6 +17855,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "lu à l’instant"
+          }
+        }
+      }
+    },
+    "red" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rouge"
           }
         }
       }
@@ -17896,6 +17997,16 @@
         }
       }
     },
+    "teal" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "turquoise"
+          }
+        }
+      }
+    },
     "the default application" : {
       "comment" : "The application a file opens with, named inside a sentence: “could not be opened in …”.",
       "localizations" : {
@@ -18008,6 +18119,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "en attente à l’invite"
+          }
+        }
+      }
+    },
+    "white" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blanc"
+          }
+        }
+      }
+    },
+    "yellow" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jaune"
           }
         }
       }
