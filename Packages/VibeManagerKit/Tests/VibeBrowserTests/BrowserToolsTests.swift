@@ -567,6 +567,73 @@ struct BrowserWorkspaceToolsTests {
     #expect(workspace.pendingRequests.isEmpty)
   }
 
+  @Test(
+    "A site's answer, allowed or refused, is taken back and the next read asks (#288)",
+    .timeLimit(.minutes(1)))
+  func answerTakenBack() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    for answer in [BrowserPermissionAnswer.allowOnce, .deny] {
+      // A session of its own for each answer: nothing the other one decided is left over.
+      let workspace = BrowserWorkspace()
+      let session = SessionID()
+      let browser = workspace.browser(for: session)
+      _ = await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(remoteURL(server).absoluteString)],
+        session: session)
+      let asked = Task { @MainActor in
+        await workspace.run(tool: "page_read", arguments: [:], session: session)
+      }
+      _ = try await answerNext(workspace, in: session, with: answer)
+      _ = await asked.value
+      let site = try #require((browser.readableSites.union(browser.refusedSites)).first)
+
+      workspace.forgetReading(site, in: session)
+      #expect(browser.readableSites.isEmpty && browser.refusedSites.isEmpty)
+      // Taken back: the next read asks again, whatever the answer was. Either a question comes,
+      // or the read ends without one: the second is the failure.
+      let ended = Flag()
+      let next = Task { @MainActor in
+        let result = await workspace.run(tool: "page_read", arguments: [:], session: session)
+        ended.isSet = true
+        return result
+      }
+      while workspace.requests(for: session).isEmpty, !ended.isSet { await Task.yield() }
+      #expect(!workspace.requests(for: session).isEmpty)
+      if let request = workspace.requests(for: session).first {
+        workspace.answer(request, with: .deny)
+      }
+      _ = await next.value
+      workspace.forgetReading(site, in: session)
+    }
+  }
+
+  @Test("A remote page the agent loads marks a session that is not on screen, by any route (#288)")
+  func remoteLoadMarksTheRow() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    workspace.selectedSessionID = { SessionID() }
+    let browser = workspace.browser(for: session)
+    let opened = try object(
+      await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+        session: session))
+    let id = try #require(opened["id"]?.stringValue)
+    workspace.sessionDidAppear(session)
+    #expect(!browser.hasUnseenAgentPage)
+
+    // Sent away by a script the agent ran: no tab_open, yet the row says so.
+    let script = "location.href = '\(remoteURL(server).absoluteString)'; 1"
+    _ = await workspace.run(
+      tool: "page_evaluate", arguments: ["tab": .string(id), "script": .string(script)],
+      session: session)
+    let tab = try #require(browser.allTabs.first { $0.id.description == id })
+    await tab.waitUntilSettled(timeout: .seconds(15))
+    #expect(browser.hasUnseenAgentPage)
+  }
+
   @Test("A capture asks for the sites of the frames it would show (#239)", .timeLimit(.minutes(1)))
   func framesAreAsked() async throws {
     let server = try TestPageServer(pages: ["/": Self.page])

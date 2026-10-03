@@ -25,11 +25,12 @@ public final class SessionBrowser {
   /// Whether what was kept has been read back yet.
   public internal(set) var isRestored = false
   /// The sites away from this Mac the user let this session's agent read (#239), by
-  /// `BrowserOrigin.grantKey`. Kept for this run only: a relaunch asks again.
-  @ObservationIgnored public private(set) var readableSites: Set<String> = []
+  /// `BrowserOrigin.grantKey`. Kept for this run only: a relaunch asks again. Shown in the trace,
+  /// where the user takes one back (#288).
+  public private(set) var readableSites: Set<String> = []
   /// The sites the user refused to let this session's agent read: not asked again this session,
-  /// so that an agent cannot ask until the user gives in.
-  @ObservationIgnored public private(set) var refusedSites: Set<String> = []
+  /// so that an agent cannot ask until the user gives in — unless the user takes it back (#288).
+  public private(set) var refusedSites: Set<String> = []
 
   @ObservationIgnored var stateDidChange: (@MainActor () -> Void)?
   @ObservationIgnored var logDidChange: (@MainActor () -> Void)?
@@ -192,6 +193,12 @@ public final class SessionBrowser {
 
   func refuseReading(_ site: String) {
     refusedSites.insert(site)
+  }
+
+  /// The user took back what they answered for a site: the next read asks again (#288).
+  func forgetReading(_ site: String) {
+    readableSites.remove(site)
+    refusedSites.remove(site)
   }
 
   func forgetReadableSites() {

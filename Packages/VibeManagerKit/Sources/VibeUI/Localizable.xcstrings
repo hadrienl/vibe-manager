@@ -5085,6 +5085,17 @@
         }
       }
     },
+    "Can read" : {
+      "comment" : "In the web view's trace, a site the user let this session's agent read (#288).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peut lire"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "fr" : {
@@ -11037,6 +11048,17 @@
         }
       }
     },
+    "Refused" : {
+      "comment" : "In the web view's trace, a site the user refused to let this session's agent read (#288).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refusé"
+          }
+        }
+      }
+    },
     "Refused · %@" : {
       "comment" : "Said once an agent's request was refused from the palette.",
       "localizations" : {
@@ -11106,6 +11128,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer"
+          }
+        }
+      }
+    },
+    "Remove %@" : {
+      "comment" : "VoiceOver label of the button that takes back what the user answered about reading a site (#288). %@ is the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer %@"
           }
         }
       }

@@ -295,6 +295,11 @@ public final class BrowserWorkspace {
     browsers[id]?.clearTrace()
   }
 
+  /// Takes back what the user answered about reading `site` in a session: its next read asks.
+  public func forgetReading(_ site: String, in id: SessionID) {
+    browsers[id]?.forgetReading(site)
+  }
+
   public func revokeGrant(_ key: String) {
     permissions.revoke(key)
     grants = permissions.grants
@@ -341,6 +346,9 @@ public final class BrowserWorkspace {
   func bringForward(_ tab: BrowserTabModel, in id: SessionID) {
     guard let browser = browsers[id], browser.tab(tab.id) != nil else { return }
     if browser.activeTab?.id != tab.id { browser.activate(tab.id) }
+    // In front of a session the user is not looking at is not on screen: its row says so,
+    // whatever route the page took — a tool, a redirection, a script (#288).
+    if selectedSessionID?() != id { browser.hasUnseenAgentPage = true }
     if !browser.isVisible, preferences.showsWebViewWhenAgentOpensPage {
       setVisible(true, for: id)
     }
