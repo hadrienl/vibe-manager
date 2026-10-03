@@ -70,4 +70,14 @@ struct FullScreenTitlebarRepairTests {
     repair.update(root: root, isFullScreen: false)
     #expect(stray.isHidden)
   }
+
+  @Test("Stopped, it shows what it hid")
+  func stopped() throws {
+    let (root, stray, _) = try hierarchy()
+    let repair = FullScreenTitlebarRepair()
+    repair.update(root: root, isFullScreen: true)
+    #expect(stray.isHidden)
+    repair.stop()
+    #expect(!stray.isHidden)
+  }
 }

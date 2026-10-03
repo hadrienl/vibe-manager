@@ -21,20 +21,21 @@ final class FullScreenTitlebarRepair {
 
   private weak var window: NSWindow?
   private var columns: WorkspaceColumns?
-  private var hidden: [Weak] = []
+  private var hidden: [Hidden] = []
   private var observers: [NSObjectProtocol] = []
   private var pendingCheck: Task<Void, Never>?
 
-  private struct Weak {
+  private struct Hidden {
     weak var view: NSView?
+    /// Its moves: AppKit taking it back to the toolbar's window says so in no other way.
+    let observer: NSObjectProtocol
   }
 
   /// Watches `window` from now on; another window replaces the one watched.
-  func watch(_ window: NSWindow?) {
+  func watch(_ window: NSWindow) {
     guard window !== self.window else { return }
-    stopWatching()
+    stop()
     self.window = window
-    guard let window else { return }
     let center = NotificationCenter.default
     // Not at each resize: entering full screen, AppKit takes the backgrounds through the split
     // view on their way to the toolbar's window, and they must not be hidden there.
@@ -48,10 +49,11 @@ final class FullScreenTitlebarRepair {
           MainActor.assumeIsolated { self?.check() }
         })
     }
-    // Shown again before AppKit takes it back to the split view, where it belongs in a window.
+    // Shown again once out of full screen, where the split view is its place: not before, since
+    // a window that fails to leave full screen would get the veil back.
     observers.append(
       center.addObserver(
-        forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main
+        forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main
       ) { [weak self] _ in
         MainActor.assumeIsolated { self?.showHidden() }
       })
@@ -87,14 +89,20 @@ final class FullScreenTitlebarRepair {
     }
     // Taken back by AppKit to the toolbar's window: its own place again, shown there.
     hidden.removeAll { entry in
-      guard let view = entry.view else { return true }
-      guard !(view.superview is NSSplitView) else { return false }
-      view.isHidden = false
+      if let view = entry.view, view.superview is NSSplitView { return false }
+      entry.view?.isHidden = false
+      NotificationCenter.default.removeObserver(entry.observer)
       return true
     }
     for view in Self.strayBackgrounds(in: root) where !view.isHidden {
       view.isHidden = true
-      hidden.append(Weak(view: view))
+      let observer = NotificationCenter.default.addObserver(
+        forName: NSView.frameDidChangeNotification, object: view, queue: .main
+      ) { [weak self] _ in
+        // After the move: from the notification, the view may still be on its way.
+        DispatchQueue.main.async { self?.check() }
+      }
+      hidden.append(Hidden(view: view, observer: observer))
     }
   }
 
@@ -118,11 +126,15 @@ final class FullScreenTitlebarRepair {
   }
 
   private func showHidden() {
-    for entry in hidden { entry.view?.isHidden = false }
+    for entry in hidden {
+      entry.view?.isHidden = false
+      NotificationCenter.default.removeObserver(entry.observer)
+    }
     hidden = []
   }
 
-  private func stopWatching() {
+  /// Shows what it hid and watches nothing more.
+  func stop() {
     showHidden()
     pendingCheck?.cancel()
     observers.forEach(NotificationCenter.default.removeObserver)
@@ -140,12 +152,19 @@ struct FullScreenTitlebarRepairReader: NSViewRepresentable {
   func makeNSView(context: Context) -> NSView {
     let view = NSView()
     let repair = context.coordinator
-    DispatchQueue.main.async { [weak view] in repair.watch(view?.window) }
+    DispatchQueue.main.async { [weak view] in
+      if let window = view?.window { repair.watch(window) }
+    }
     return view
   }
 
   func updateNSView(_ nsView: NSView, context: Context) {
-    context.coordinator.watch(nsView.window)
+    // Out of its window for a moment, it keeps watching the one it had.
+    if let window = nsView.window { context.coordinator.watch(window) }
     context.coordinator.columnsChanged(to: columns)
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: FullScreenTitlebarRepair) {
+    coordinator.stop()
   }
 }
