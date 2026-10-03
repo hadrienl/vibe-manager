@@ -429,9 +429,9 @@ final class SmokeTests: XCTestCase {
     AuditException(
       type: .contrast, elements: [.staticText],
       reason: """
-        Secondary text and the colours of states: #231 makes the states' colours legible. The \
-        system's secondary styles are measured by the audit without the vibrancy macOS gives \
-        them over the sidebar's and the settings' materials.
+        The system's secondary styles, measured by the audit without the vibrancy macOS gives \
+        them over the sidebar's and the settings' materials. The words of a session's state are \
+        in the label colour since #231, and StatusInkTests measures them.
         """),
     AuditException(
       type: .sufficientElementDescription, elements: [.group, .other], element: "",
