@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import VibeAgents
 import VibeApplication
@@ -454,7 +455,8 @@ public final class AppEnvironment {
       projectIcons: FileSystemProjectIconFinder(),
       iconStore: FileSessionIconStore(directory: data.icons),
       dropStore: FileSessionDropStore(directory: data.drops),
-      appearancePalette: UserDefaultsSessionAppearancePaletteStore(suiteName: data.defaultsSuite)
+      appearancePalette: UserDefaultsSessionAppearancePaletteStore(suiteName: data.defaultsSuite),
+      beep: { NSSound.beep() }
     )
     // The requests above the other applications, and the avatar that presents them (#41).
     appModel.floatingPanel = FloatingRequestPanelModel(

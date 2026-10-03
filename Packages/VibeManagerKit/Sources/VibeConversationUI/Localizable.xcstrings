@@ -279,6 +279,17 @@
         }
       }
     },
+    "%@ waits for an answer in its terminal" : {
+      "comment" : "A dialog of the agent's terminal, shown in the conversation in place of a prompt it would have taken: the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ attend une réponse dans son terminal"
+          }
+        }
+      }
+    },
     "%@, %@ now" : {
       "comment" : "VoiceOver: the card that follows the settings, and the theme they give now.",
       "localizations" : {
@@ -891,6 +902,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Interrompt aussi le tour de l’agent : il attend votre prochain message."
+          }
+        }
+      }
+    },
+    "Also sizes the terminals. ⌘+ and ⌘− in the View menu." : {
+      "comment" : "Under the text size setting: it also sizes the terminals, and the View menu's zoom changes it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’applique aussi aux terminaux. ⌘+ et ⌘− dans le menu Présentation."
           }
         }
       }

@@ -94,6 +94,7 @@ struct AttachmentTile: View {
   }
   @Environment(\.displayScale) private var displayScale
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
   @Environment(\.conversationLinks) private var links
 
   var body: some View {
@@ -198,10 +199,10 @@ struct AttachmentTile: View {
       } icon: {
         Image(systemName: "doc.text")
       }
-      .font(theme.interfaceFont(size: 11, weight: .semibold))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(11), weight: .semibold))
       .foregroundStyle(theme.secondaryText.color)
       Text(verbatim: preview?.lines ?? "")
-        .font(theme.codeFont(size: 11))
+        .font(theme.codeFont(size: appearance.textSize.scaled(11)))
         .foregroundStyle(theme.text.color)
         .lineLimit(AttachmentPreviews.textLineCount)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -226,7 +227,7 @@ struct AttachmentTile: View {
       .frame(width: 28, height: 28)
       VStack(alignment: .leading, spacing: 1) {
         Text(verbatim: name)
-          .font(theme.interfaceFont(size: 12, weight: .semibold))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12), weight: .semibold))
           .foregroundStyle(missing ? theme.secondaryText.color : theme.text.color)
           .lineLimit(1)
           .truncationMode(.middle)
@@ -238,7 +239,7 @@ struct AttachmentTile: View {
               verbatim: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
           }
         }
-        .font(theme.interfaceFont(size: 11))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
         .foregroundStyle(theme.secondaryText.color)
       }
     }
@@ -347,6 +348,7 @@ struct AttachmentAudioPlayer: View {
   let showPreview: () -> Void
   @State private var playback = AudioPlayback()
   @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     HStack(spacing: 10) {
@@ -368,7 +370,7 @@ struct AttachmentAudioPlayer: View {
         VStack(alignment: .leading, spacing: 4) {
           Text(verbatim: name)
             .accessibilityLabel(Text("Audio", bundle: .module) + Text(verbatim: ", \(name)"))
-            .font(theme.interfaceFont(size: 12, weight: .semibold))
+            .font(theme.interfaceFont(size: appearance.textSize.scaled(12), weight: .semibold))
             .foregroundStyle(theme.text.color)
             .lineLimit(1)
             .truncationMode(.middle)
@@ -379,7 +381,7 @@ struct AttachmentAudioPlayer: View {
       }
       .buttonStyle(.plain)
       Text(verbatim: duration.map(AttachmentTile.formatted) ?? "–:––")
-        .font(theme.interfaceFont(size: 11).monospacedDigit())
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(11)).monospacedDigit())
         .foregroundStyle(theme.secondaryText.color)
     }
     .padding(.horizontal, 8)

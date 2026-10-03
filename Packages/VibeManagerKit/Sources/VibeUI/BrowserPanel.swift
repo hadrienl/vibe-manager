@@ -175,7 +175,9 @@ private struct BrowserTabButton: View {
           Button(action: close) {
             Image(systemName: "xmark")
               .font(.system(size: 9, weight: .semibold))
-              .frame(width: 14, height: 14)
+              // At least 20 points to click (#229).
+              .frame(width: 20, height: 20)
+              .contentShape(Rectangle())
           }
           .buttonStyle(.borderless)
           .help(Text("Close Tab", bundle: .module))

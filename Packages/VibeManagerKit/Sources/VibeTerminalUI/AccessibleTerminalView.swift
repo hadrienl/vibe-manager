@@ -6,10 +6,8 @@ import VibeApplication
 ///
 /// SwiftTerm 1.20.0 exposes nothing to accessibility on the Mac: its service is a stub, and the
 /// terminal was a silent rectangle. This makes it one read-only text area whose value is the
-/// screen as it is now — the visible lines, not the scrollback — and whose label names the
-/// session and what its agent is doing. Output is never announced as it arrives: an agent writing
-/// fifty lines a second would make VoiceOver unusable. Read Last Output (⌃⌥⌘O) says the last lines
-/// on demand.
+/// history then the screen, read line by line, and whose label names the session and what its
+/// agent is doing. Read Last Output (⌃⌥⌘O) says the last lines on demand.
 public final class AccessibleTerminalView: TerminalView {
   /// "Terminal — <session> — <agent state>", set by the surface.
   public var accessibilityTitle = String(localized: "Terminal", bundle: .module)
@@ -94,6 +92,7 @@ public final class AccessibleTerminalView: TerminalView {
     settleTask?.cancel()
     settleTask = nil
     super.setFrameSize(newSize)
+    snapshot = nil
   }
 
   private func scheduleSettle() {
@@ -115,6 +114,7 @@ public final class AccessibleTerminalView: TerminalView {
     guard let size = deferredSize else { return }
     deferredSize = nil
     super.setFrameSize(size)
+    snapshot = nil
   }
 
   public override func viewDidEndLiveResize() {
@@ -269,8 +269,81 @@ public final class AccessibleTerminalView: TerminalView {
     showsHand = false
   }
 
-  public override func accessibilityValue() -> Any? {
-    TerminalText.visibleScreen(of: getTerminal())
+  // VoiceOver reads the terminal as a text area: history then screen, line by line, with the
+  // insertion point at the cursor (#226). SwiftTerm already tells VoiceOver of every redraw
+  // (`updateDisplay`, not something a subclass can change); what it costs here is reading the
+  // history again, so that is done at most once per interval while output keeps coming.
+
+  private struct Snapshot {
+    let text: TerminalAccessibleText
+    let builtAt: ContinuousClock.Instant
+    let columns: Int
+    let rows: Int
+  }
+
+  private var snapshot: Snapshot?
+  private var snapshotIsStale = false
+  /// How long a text read stays good enough while output keeps changing it.
+  var rebuildInterval: Duration = .seconds(1)
+  /// The clock the interval is measured on; the tests move it by hand.
+  var clock: () -> ContinuousClock.Instant = { .now }
+  /// How many times the text was read from the terminal, for the tests.
+  private(set) var textBuilds = 0
+
+  var accessibleText: TerminalAccessibleText {
+    let terminal = getTerminal()
+    let now = clock()
+    // A new size — a resize, a zoom — shows other lines: read again at once.
+    if let snapshot, snapshot.columns == terminal.cols, snapshot.rows == terminal.rows,
+      !snapshotIsStale || now < snapshot.builtAt + rebuildInterval
+    {
+      return snapshot.text
+    }
+    let text = TerminalAccessibleText(terminal: terminal)
+    textBuilds += 1
+    snapshot = Snapshot(text: text, builtAt: now, columns: terminal.cols, rows: terminal.rows)
+    snapshotIsStale = false
+    return text
+  }
+
+  /// Output was fed: the text is read again at the next question, once the interval is over.
+  func textDidChange() {
+    snapshotIsStale = true
+  }
+
+  public override func scrolled(source terminal: Terminal, yDisp: Int) {
+    super.scrolled(source: terminal, yDisp: yDisp)
+    snapshotIsStale = true
+  }
+
+  public override func accessibilityValue() -> Any? { accessibleText.string }
+
+  public override func accessibilityNumberOfCharacters() -> Int { accessibleText.length }
+
+  public override func accessibilityVisibleCharacterRange() -> NSRange {
+    accessibleText.visibleRange
+  }
+
+  public override func accessibilityLine(for index: Int) -> Int {
+    accessibleText.line(for: index)
+  }
+
+  public override func accessibilityRange(forLine line: Int) -> NSRange {
+    accessibleText.range(forLine: line)
+  }
+
+  public override func accessibilityString(for range: NSRange) -> String? {
+    accessibleText.string(for: range)
+  }
+
+  public override func accessibilitySelectedTextRange() -> NSRange {
+    NSRange(location: accessibleText.insertionPoint, length: 0)
+  }
+
+  public override func accessibilitySelectedText() -> String? { "" }
+
+  public override func accessibilityInsertionPointLineNumber() -> Int {
+    accessibleText.line(for: accessibleText.insertionPoint)
   }
 
   public override func isAccessibilityFocused() -> Bool {

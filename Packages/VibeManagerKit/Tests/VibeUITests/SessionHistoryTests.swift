@@ -310,7 +310,8 @@ struct SessionHistoryTests {
     // Archived from Waiting: an undo that went ahead anyway would move it back there.
     let done = WorkSession(name: "Done", status: .closed, taskStatus: .waiting)
     let repository = MutableRepository(sessions: [done])
-    let model = AppModel(repository: repository, agents: EmptyRegistry())
+    let beeps = BeepCounter()
+    let model = AppModel(repository: repository, agents: EmptyRegistry(), beep: beeps.beep)
     await model.load()
 
     await model.requestArchive(done.id)
@@ -318,6 +319,7 @@ struct SessionHistoryTests {
     await model.setTaskStatus(.todo, for: done.id)
     await model.undoSidebarChange()
 
+    #expect(beeps.count == 1)
     #expect(await repository.session(id: done.id)?.taskStatus == .todo)
     // Left alone, rather than tried and failed: no error to show.
     #expect(model.refreshFailure == nil)
@@ -1007,4 +1009,11 @@ private struct EmptyRegistry: AgentProviderResolving {
   func provider(id: AgentProviderID) async -> (any AgentProvider)? { nil }
 
   func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] { [:] }
+}
+
+/// Counts the beeps of a model, which the tests never let the Mac play.
+@MainActor
+private final class BeepCounter {
+  private(set) var count = 0
+  func beep() { count += 1 }
 }

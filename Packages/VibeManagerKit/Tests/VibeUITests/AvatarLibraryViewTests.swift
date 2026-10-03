@@ -365,6 +365,7 @@ struct AvatarLibraryViewTests {
 
   @Test("Return and ⌘⌫ typed in the description are the text's: nothing is renamed nor deleted")
   func typingInTheDescription() async throws {
+    HeldAlerts.install()
     let avatars = await library()
     let robot = try #require(avatars.entries.last)
     await avatars.select(.avatar(robot.id))
@@ -383,18 +384,21 @@ struct AvatarLibraryViewTests {
     text.setSelectedRange(NSRange(location: text.string.utf16.count, length: 0))
     Self.press("\r", code: 36, in: window)
     await settle(window, "the new line") { avatars.description.contains("\n") }
-    Self.press("\u{8}", code: 51, .command, in: window)
+    // ⌘⌫ as the keyboard types it: U+007F, the text's delete to the beginning of the line. U+0008
+    // is bound to nothing in a text, and the window beeped.
+    Self.press("\u{7F}", code: 51, .command, in: window)
     // Neither the alert that renames nor the question that deletes: the text had the keys.
     for _ in 0..<20 {
       window.contentView?.layoutSubtreeIfNeeded()
       await Task.yield()
     }
-    #expect(window.attachedSheet == nil)
+    #expect(HeldAlerts.alert(on: window) == nil)
     #expect(avatars.entry(robot.id) != nil)
   }
 
   @Test("In the list, Return renames the avatar selected, and ⌘⌫ asks before deleting it")
   func keysOfTheList() async throws {
+    HeldAlerts.install()
     let avatars = await library()
     let robot = try #require(avatars.entries.last)
     await avatars.select(.avatar(robot.id))
@@ -406,22 +410,24 @@ struct AvatarLibraryViewTests {
       window.firstResponder === table || window.makeFirstResponder(table)
     }
     Self.press("\r", code: 36, in: window)
-    await settle(window, "the alert that renames") { window.attachedSheet != nil }
-    let rename = try #require(window.attachedSheet)
-    let field = Self.descendants(of: rename.contentView ?? NSView()).lazy
+    await settle(window, "the alert that renames") { HeldAlerts.alert(on: window) != nil }
+    let rename = try #require(HeldAlerts.alert(on: window))
+    rename.layout()
+    let field = Self.descendants(of: rename.window.contentView ?? NSView()).lazy
       .compactMap { $0 as? NSTextField }.first { $0.isEditable }
     #expect(field?.stringValue == "Robot rétro menthe")
-    window.endSheet(rename)
-    await settle(window, "the alert closed") { window.attachedSheet == nil }
+    HeldAlerts.dismiss(on: window)
 
     await settle(window, "the keyboard in the list again") {
       window.firstResponder === table || window.makeFirstResponder(table)
     }
     Self.press("\u{8}", code: 51, .command, in: window)
-    await settle(window, "the question that deletes") { window.attachedSheet != nil }
+    await settle(window, "the question that deletes") {
+      HeldAlerts.alert(on: window).map { $0 !== rename } ?? false
+    }
     // Asked, not done.
     #expect(avatars.entry(robot.id) != nil)
-    if let sheet = window.attachedSheet { window.endSheet(sheet) }
+    HeldAlerts.dismiss(on: window)
   }
 
   @Test("What the list selects is selected at once, and shown once read")
