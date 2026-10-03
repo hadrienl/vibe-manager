@@ -95,6 +95,32 @@ struct DialogOnScreenTests {
     }
   }
 
+  @Test("The agent's last words naming Escape, above the prompt at rest: typed as before")
+  func agentWordsAreNoDialog() async {
+    let screen = Screen()
+    screen.text = "Then press Esc to exit the editor.\n" + Self.atRest
+    let model = model(screen: screen)
+    model.draft = "hello"
+    #expect(await model.send())
+    #expect(!screen.written.isEmpty)
+    #expect(model.terminalPanel == nil)
+  }
+
+  @Test("A request reported while the screen is read: nothing typed into its dialog")
+  func requestWhileReading() async {
+    let screen = Screen()
+    let model = model(screen: screen)
+    model.readScreen = { [weak model] in
+      await MainActor.run { model?.activity = .awaitingUser(.approval) }
+      return Self.atRest
+    }
+    model.draft = "hello"
+    #expect(await model.send() == false)
+    #expect(screen.written.isEmpty)
+    #expect(model.echoes.isEmpty)
+    #expect(model.draft == "hello")
+  }
+
   @Test("A panel open in the conversation holds the composer", .timeLimit(.minutes(1)))
   func panelHoldsTheComposer() async {
     let screen = Screen()

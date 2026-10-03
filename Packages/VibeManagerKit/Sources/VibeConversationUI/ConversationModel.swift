@@ -1229,10 +1229,16 @@ public final class ConversationModel {
     // A dialog of the CLI that no hook reports — a setup it offers, a panel — would take the
     // prompt's keys as its own and Return as its answer (#319): nothing is typed, the draft stays,
     // and the dialog is shown to be answered.
-    if let screen = await readScreen?(), AgentPanelRecognition.showsPanel(screen: screen) {
-      openTerminalPanel(TerminalPanel(echoID: nil, command: nil))
-      panelSeen = true
-      return false
+    if let readScreen {
+      let screen = await readScreen()
+      // Reading the screen takes a moment: a request reported, a panel opened meanwhile, and the
+      // prompt would be typed into it after all.
+      guard composerState == .ready, terminalPanel == nil else { return false }
+      if let screen, AgentPanelRecognition.showsPanel(screen: screen) {
+        openTerminalPanel(TerminalPanel(echoID: nil, command: nil))
+        panelSeen = true
+        return false
+      }
     }
     let shell = promptFormat.shellEntry
     let submission = PromptSubmission(text: draft, attachments: attachments)
