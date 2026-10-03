@@ -143,6 +143,13 @@ extension AppModel {
         bundle: .module,
         comment:
           "Said when the option an answer needs is not in the dialog the session's terminal shows.")
+    case .otherDialog:
+      return LocalizedStringResource(
+        "The dialog shown in \(sessionName) is not this request's: nothing was sent. Answer it in the session.",
+        bundle: .module,
+        comment:
+          "Said when the dialog a session's terminal shows cannot be told to be the one of the request answered from the palette."
+      )
     }
     switch answer {
     case .allowOnce, .allowAlways, .approvePlan:

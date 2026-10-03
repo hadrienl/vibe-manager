@@ -139,6 +139,28 @@ struct FileAgentActivityLogTests {
     )
   }
 
+  @Test("The end of a log is where a reading of all its lines stops (#283)")
+  func end() async throws {
+    let logs = FileAgentActivityLog(directory: try temporaryDirectory())
+    let id = SessionID()
+    #expect(await logs.end(for: id) == nil)
+    let url = try await logs.prepareLog(for: id)
+    #expect(await logs.end(for: id)?.offset == 0)
+    try append("A\t1\t\nB\t2\t\n", to: url)
+    let read = await take(2, from: await logs.events(for: id, from: nil))
+    #expect(read.last?.1 == (await logs.end(for: id)))
+
+    // Moved aside and not started again, the log ends where the one moved aside does. No reader
+    // follows this one: it would remove the file moved aside.
+    let other = SessionID()
+    let moved = try await logs.prepareLog(for: other)
+    try append("A\t1\t\n", to: moved)
+    let before = await logs.end(for: other)
+    try FileManager.default.moveItem(at: moved, to: FileAgentActivityLog.rotatedURL(of: moved))
+    #expect(before?.offset == 5)
+    #expect(await logs.end(for: other) == before)
+  }
+
   @Test("Reading resumes where it stopped, and starts over in a file that is not the same one")
   func resumes() async throws {
     let logs = FileAgentActivityLog(directory: try temporaryDirectory())

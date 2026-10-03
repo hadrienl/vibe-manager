@@ -45,20 +45,25 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
   private let catalog: any ClaudeCodeModelCatalogSource
   /// Lists the skills and commands a prompt may invoke (#219).
   let commandReader: any ClaudeCodeCommandReading
+  /// Where its transcripts were found, shared with the branch report (#276).
+  let transcriptLocations: TranscriptLocationCache
 
   public init(
     base: CommandLineAgentProvider, catalog: any ClaudeCodeModelCatalogSource,
-    commandReader: any ClaudeCodeCommandReading = ClaudeCodeCommandProcess()
+    commandReader: any ClaudeCodeCommandReading = ClaudeCodeCommandProcess(),
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
   ) {
     self.base = base
     self.catalog = catalog
     self.commandReader = commandReader
+    self.transcriptLocations = transcriptLocations
   }
 
   public static func make(
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
-    shellEnvironment: (any ShellEnvironmentSource)? = nil
+    shellEnvironment: (any ShellEnvironmentSource)? = nil,
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
   ) -> ClaudeCodeAgentProvider {
     // The CLI and the catalog reader must agree on where the configuration lives, so a value
     // that cannot be resolved into an absolute path is dropped rather than forwarded.
@@ -84,7 +89,8 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
         environment: environment,
         shellEnvironment: shellEnvironment
       ),
-      catalog: ClaudeCodeModelCatalog(environment: environment)
+      catalog: ClaudeCodeModelCatalog(environment: environment),
+      transcriptLocations: transcriptLocations
     )
   }
 
