@@ -439,23 +439,12 @@ final class SmokeTests: XCTestCase {
     AuditException(
       type: .sufficientElementDescription, issue: "Unknown role", elements: [.other],
       reason: """
-        The symbols and colours of the Badges settings are views without a button's role: #232 \
-        names them, #230 makes them reachable from the keyboard.
+        The symbols and colours of the Badges settings: named (#232), reachable from the keyboard \
+        and moved by their own actions (#230), but not buttons — clicking one only selects it.
         """),
     AuditException(
       type: .sufficientElementDescription, elements: [.touchBar],
       reason: "The Touch Bar macOS gives the window: none of its items is the application's."),
-    AuditException(
-      type: .sufficientElementDescription, elements: [.textField], element: "new-session-name",
-      reason: """
-        A new session's name has a placeholder and no label: found by this audit, given one by \
-        #328.
-        """),
-    AuditException(
-      type: .sufficientElementDescription, elements: [.outline], element: "avatar-library-list",
-      reason:
-        "The list of the avatars' library has no label: found by this audit, given one by #328."
-    ),
     AuditException(
       type: .sufficientElementDescription, elements: [.popUpButton], element: "emoji & symbols",
       reason: "The Emoji & Symbols button macOS puts in a text field: the system's, not ours."),
@@ -466,10 +455,11 @@ final class SmokeTests: XCTestCase {
         pop-up button does not need.
         """),
     AuditException(
-      type: .parentChild,
+      type: .parentChild, element: "",
       reason: """
-        Raised without an element on a new session's draft, so it cannot be pinned down here: \
-        looked into by #328.
+        Raised without an element on a new session's draft, so it cannot be pinned down here. It \
+        stays without the draft's own accessibility container (tried for #328): it comes from \
+        further down, likely an AppKit view hosted in SwiftUI. Left open in #328.
         """),
   ]
 
@@ -489,7 +479,9 @@ final class SmokeTests: XCTestCase {
     try app.performAccessibilityAudit(for: .all) { issue in
       let element =
         issue.element.map { "\($0.elementType) '\($0.identifier)' '\($0.label)'" } ?? "-"
-      let text = "\(Self.name(of: issue.auditType)) \(issue.compactDescription) — \(element)"
+      let text =
+        "\(Self.name(of: issue.auditType)) \(issue.compactDescription) — \(element)"
+        + " — \(issue.detailedDescription)"
       let exception = Self.auditExceptions.first { $0.covers(issue) }
       raised.append((exception == nil ? "FAIL " : "OK   ") + text)
       print("[accessibility-audit] \(screen): \(raised.last ?? "")")
