@@ -295,6 +295,11 @@ public final class BrowserWorkspace {
     browsers[id]?.clearTrace()
   }
 
+  /// Takes back what the user answered about reading `site` in a session: its next read asks.
+  public func forgetReading(_ site: String, in id: SessionID) {
+    browsers[id]?.forgetReading(site)
+  }
+
   public func revokeGrant(_ key: String) {
     permissions.revoke(key)
     grants = permissions.grants
@@ -341,6 +346,10 @@ public final class BrowserWorkspace {
   func bringForward(_ tab: BrowserTabModel, in id: SessionID) {
     guard let browser = browsers[id], browser.tab(tab.id) != nil else { return }
     if browser.activeTab?.id != tab.id { browser.activate(tab.id) }
+    // "In front" is not "on screen": whatever route the page took — a tool, a redirection, a
+    // script — the row of a session not shown says so, and the web view of the one shown comes
+    // in front of its terminal, as when the agent opens a page (#288).
+    noteAgentOpenedPage(in: id)
     if !browser.isVisible, preferences.showsWebViewWhenAgentOpensPage {
       setVisible(true, for: id)
     }

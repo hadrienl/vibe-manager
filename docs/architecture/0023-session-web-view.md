@@ -154,7 +154,9 @@ away from this Mac is treated alike. `page_read`, `page_screenshot` and `page_co
 time a session's agent reads a site — "Allow in This Session" or "Deny", no "Always Allow", which
 would also let it act — and the site stays readable until the session is archived or the
 application quits. A refusal holds as long: the agent is told the user refused, and cannot ask again
-until they give in. The question names the site it gives, which is the one decided on: a blank page
+until they give in. Both are listed at the top of the web view's trace ("Agent Actions"), each with
+"Remove": taken back, the site's next read asks again; a read already allowed finishes (#288). The
+latest answer wins: a site is never both readable and refused. The question names the site it gives, which is the one decided on: a blank page
 a site opened is that site. The same checks as for acting apply: decided on the document the page
 holds, nothing read while it loads (a console on this Mac excepted), the site checked again after
 the answer and, for a page's text, inside the page in the same turn as the read (`location.origin`,
@@ -174,8 +176,10 @@ Mac out of sight:
 it comes to the front before the request leaves — asked of the navigation's policy, redirections
 included, and checked again when the page commits — and the web view shows as when an agent opens a
 page. "In front" is the session's web view, not the screen: when the session is not the one shown,
-its row says so only for a page opened with `tab_open`; marking every such load, and showing and
-withdrawing a session's reads, is #288. A preview on this Mac may still wait behind.
+its row says so, and when it is the one shown its web view comes in front of its terminal, whatever
+route the page took — `tab_open`, `tab_navigate`, a script, a redirection (#288). A page of the
+agent's that reloads itself away from this Mac brings it forward too. A preview on this Mac may still
+wait behind.
 
 Once a site may be read in a session, an agent misled by a page can still carry what it read to
 another site by navigating there; the question says what it gives. The tools' descriptions say that

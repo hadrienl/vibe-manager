@@ -567,6 +567,115 @@ struct BrowserWorkspaceToolsTests {
     #expect(workspace.pendingRequests.isEmpty)
   }
 
+  @Test("A refusal after an allowance leaves the site refused only (#288)")
+  func latestAnswerWins() {
+    let browser = BrowserWorkspace().browser(for: SessionID())
+    browser.allowReading("example.com")
+    browser.refuseReading("example.com")
+    #expect(browser.readableSites.isEmpty)
+    #expect(browser.refusedSites == ["example.com"])
+  }
+
+  @Test("A remote load by tab_navigate or a redirection brings the web view forward (#288)")
+  func everyRouteBringsTheWebViewForward() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page, "/b": "<title>B</title>"])
+    defer { server.stop() }
+    server.setRedirect("/r", to: remoteURL(server).absoluteString)
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    workspace.selectedSessionID = { session }
+    var broughtForward = 0
+    workspace.agentDidOpenPage = { if $0 == session { broughtForward += 1 } }
+    let opened = try object(
+      await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(server.url("/b").absoluteString)],
+        session: session))
+    let id = try #require(opened["id"]?.stringValue)
+    broughtForward = 0
+
+    // tab_navigate to a site away from this Mac, in the session on screen: the web view comes
+    // in front of its terminal.
+    _ = await workspace.run(
+      tool: "tab_navigate",
+      arguments: ["tab": .string(id), "url": .string(remoteURL(server).absoluteString)],
+      session: session)
+    #expect(broughtForward > 0)
+
+    // A local address that redirects away from this Mac does too.
+    broughtForward = 0
+    _ = await workspace.run(
+      tool: "tab_navigate",
+      arguments: ["tab": .string(id), "url": .string(server.url("/r").absoluteString)],
+      session: session)
+    #expect(broughtForward > 0)
+  }
+
+  @Test(
+    "A site's answer, allowed or refused, is taken back and the next read asks (#288)",
+    .timeLimit(.minutes(1)))
+  func answerTakenBack() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    for answer in [BrowserPermissionAnswer.allowOnce, .deny] {
+      // A session of its own for each answer: nothing the other one decided is left over.
+      let workspace = BrowserWorkspace()
+      let session = SessionID()
+      let browser = workspace.browser(for: session)
+      _ = await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(remoteURL(server).absoluteString)],
+        session: session)
+      let asked = Task { @MainActor in
+        await workspace.run(tool: "page_read", arguments: [:], session: session)
+      }
+      _ = try await answerNext(workspace, in: session, with: answer)
+      _ = await asked.value
+      let site = try #require((browser.readableSites.union(browser.refusedSites)).first)
+
+      workspace.forgetReading(site, in: session)
+      #expect(browser.readableSites.isEmpty && browser.refusedSites.isEmpty)
+      // Taken back: the next read asks again, whatever the answer was. Either a question comes,
+      // or the read ends without one: the second is the failure.
+      let ended = Flag()
+      let next = Task { @MainActor in
+        let result = await workspace.run(tool: "page_read", arguments: [:], session: session)
+        ended.isSet = true
+        return result
+      }
+      while workspace.requests(for: session).isEmpty, !ended.isSet { await Task.yield() }
+      #expect(!workspace.requests(for: session).isEmpty)
+      if let request = workspace.requests(for: session).first {
+        workspace.answer(request, with: .deny)
+      }
+      _ = await next.value
+    }
+  }
+
+  @Test("A remote page the agent loads marks a session that is not on screen, by any route (#288)")
+  func remoteLoadMarksTheRow() async throws {
+    let server = try TestPageServer(pages: ["/": Self.page])
+    defer { server.stop() }
+    let workspace = BrowserWorkspace()
+    let session = SessionID()
+    workspace.selectedSessionID = { SessionID() }
+    let browser = workspace.browser(for: session)
+    let opened = try object(
+      await workspace.run(
+        tool: "tab_open", arguments: ["url": .string(server.url("/").absoluteString)],
+        session: session))
+    let id = try #require(opened["id"]?.stringValue)
+    workspace.sessionDidAppear(session)
+    #expect(!browser.hasUnseenAgentPage)
+
+    // Sent away by a script the agent ran: no tab_open, yet the row says so.
+    let script = "location.href = '\(remoteURL(server).absoluteString)'; 1"
+    _ = await workspace.run(
+      tool: "page_evaluate", arguments: ["tab": .string(id), "script": .string(script)],
+      session: session)
+    let tab = try #require(browser.allTabs.first { $0.id.description == id })
+    await tab.waitUntilSettled(timeout: .seconds(15))
+    #expect(browser.hasUnseenAgentPage)
+  }
+
   @Test("A capture asks for the sites of the frames it would show (#239)", .timeLimit(.minutes(1)))
   func framesAreAsked() async throws {
     let server = try TestPageServer(pages: ["/": Self.page])

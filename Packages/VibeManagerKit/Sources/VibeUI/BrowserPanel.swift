@@ -141,7 +141,10 @@ private struct BrowserTabStrip: View {
           comment: "How many agent actions were recorded since the trace was last opened.")
       )
       .popover(isPresented: $isShowingTrace, arrowEdge: .bottom) {
-        BrowserTracePopover(browser: browser) { workspace.clearTrace(of: browser.sessionID) }
+        BrowserTracePopover(
+          browser: browser,
+          clear: { workspace.clearTrace(of: browser.sessionID) },
+          forget: { workspace.forgetReading($0, in: browser.sessionID) })
       }
     }
     .frame(height: 36)
@@ -1077,6 +1080,35 @@ private struct BrowserPermissionBanner: View {
 private struct BrowserTracePopover: View {
   let browser: SessionBrowser
   let clear: () -> Void
+  let forget: (String) -> Void
+
+  /// What the user answered about reading sites in this session (#288): allowed, then refused.
+  private var answeredSites: [(site: String, isAllowed: Bool)] {
+    browser.readableSites.sorted().map { ($0, true) }
+      + browser.refusedSites.sorted().map { ($0, false) }
+  }
+
+  /// One row per site: a site is never both readable and refused, so the site is its identity.
+  private var answeredSiteRows: some View {
+    ForEach(answeredSites, id: \.site) { entry in
+      HStack(spacing: 8) {
+        Text(verbatim: entry.site)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        Spacer()
+        Text(entry.isAllowed ? "Can read" : "Refused", bundle: .module)
+          .foregroundStyle(.secondary)
+        Button {
+          forget(entry.site)
+        } label: {
+          Text("Remove", bundle: .module)
+        }
+        .accessibilityLabel(Text("Remove \(entry.site)", bundle: .module))
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
+    }
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -1084,6 +1116,15 @@ private struct BrowserTracePopover: View {
         .font(.headline)
         .padding(12)
       Divider()
+      if !answeredSites.isEmpty {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 0) {
+            answeredSiteRows
+          }
+        }
+        .frame(maxHeight: 160)
+        Divider()
+      }
       if browser.actionLog.records.isEmpty {
         Text("No agent has acted in this web view yet.", bundle: .module)
           .foregroundStyle(.secondary)
