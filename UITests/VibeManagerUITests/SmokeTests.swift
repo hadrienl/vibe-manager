@@ -346,6 +346,85 @@ final class SmokeTests: XCTestCase {
     app.terminate()
   }
 
+  /// The main screens audited by XCTest, so that a view added later cannot lose what the
+  /// application does for accessibility unnoticed (#233): the sidebar and a conversation, a new
+  /// session's draft, and the settings. An issue the audit raises fails the test unless it is one
+  /// of the exceptions below, each with the reason it stands — most of them the ticket that fixes
+  /// it.
+  func testTheMainScreensPassTheAccessibilityAudit() throws {
+    let app = launch()
+    createSession(named: "Audit", isFirst: true, in: app)
+    expectSessionRows(1, in: app)
+    // The mock agent's session opens as a conversation (#38): its picker says it can.
+    XCTAssertTrue(app.radioButtons["Terminal"].waitForExistence(timeout: 10))
+    try audit(app, "Sidebar and conversation")
+
+    app.typeKey("n", modifierFlags: .command)
+    XCTAssertTrue(app.textFields["new-session-name"].waitForExistence(timeout: 10))
+    try audit(app, "New session draft")
+    app.typeKey(.escape, modifierFlags: [])
+
+    app.typeKey(",", modifierFlags: .command)
+    let settingsOpen = expectation(
+      for: NSPredicate { _, _ in app.windows.count > 1 }, evaluatedWith: nil)
+    wait(for: [settingsOpen], timeout: 10)
+    try audit(app, "Settings")
+    // A tab of the toolbar, or a row of a sidebar: whatever carries the tab's title is clicked.
+    for tab in ["Badges", "Updates", "Requests"] {
+      let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", tab))
+        .firstMatch
+      guard item.waitForExistence(timeout: 5) else {
+        XCTFail("No \(tab) tab in the settings")
+        continue
+      }
+      item.click()
+      try audit(app, "Settings, \(tab)")
+    }
+    app.terminate()
+  }
+
+  /// An issue the audit may raise without failing the test, and why.
+  private struct AuditException {
+    let type: XCUIAccessibilityAuditType
+    /// A part of the issue's description or of its element's label or identifier.
+    let matching: String
+    let reason: String
+  }
+
+  private static let auditExceptions: [AuditException] = []
+
+  private static func name(of type: XCUIAccessibilityAuditType) -> String {
+    let names: [(XCUIAccessibilityAuditType, String)] = [
+      (.contrast, "contrast"), (.elementDetection, "elementDetection"),
+      (.hitRegion, "hitRegion"), (.sufficientElementDescription, "sufficientElementDescription"),
+      (.textClipped, "textClipped"), (.trait, "trait"), (.action, "action"),
+      (.parentChild, "parentChild"),
+    ]
+    return names.first { type.contains($0.0) }?.1 ?? "type \(type.rawValue)"
+  }
+
+  /// Audits what the application shows now. Every issue is written to the log, the ones let
+  /// through included, so that the list of exceptions can be read from a run.
+  private func audit(_ app: XCUIApplication, _ screen: String) throws {
+    var raised: [String] = []
+    try app.performAccessibilityAudit(for: .all) { issue in
+      let element =
+        issue.element.map { "\($0.elementType) '\($0.identifier)' '\($0.label)'" } ?? "-"
+      let text = "\(Self.name(of: issue.auditType)) \(issue.compactDescription) — \(element)"
+      let exception = Self.auditExceptions.first { exception in
+        issue.auditType == exception.type
+          && (text.localizedCaseInsensitiveContains(exception.matching))
+      }
+      raised.append((exception == nil ? "FAIL " : "OK   ") + text)
+      return exception != nil
+    }
+    let report = XCTAttachment(string: raised.joined(separator: "\n"))
+    report.name = "Accessibility audit: \(screen)"
+    report.lifetime = .keepAlways
+    add(report)
+    print("[accessibility-audit] \(screen):\n" + raised.map { "  " + $0 }.joined(separator: "\n"))
+  }
+
   func testExportDiagnosticsShowsTheWholeFileFirst() throws {
     let app = launch()
     app.menuBars.menuBarItems["Help"].click()
