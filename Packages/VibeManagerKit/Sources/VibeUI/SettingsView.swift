@@ -124,20 +124,12 @@ struct SettingsSplitView: View {
 
   /// The back button, only where it leads somewhere. Elsewhere an empty item holds its place: a
   /// window without one loses its toolbar, whose title bar is 20 points shorter, and the window's
-  /// buttons and title jumped from a page to the next.
+  /// buttons and title jumped from a page to the next. The empty item stands at the trailing end:
+  /// in the back button's place, it pushed the title of every other page aside.
   @ToolbarContentBuilder
   private func backItem(_ page: SettingsPage) -> some ToolbarContent {
-    if #available(macOS 26, *) {
-      // No capsule of glass around the empty item.
-      backItemContent(page).sharedBackgroundVisibility(page.parent == nil ? .hidden : .automatic)
-    } else {
-      backItemContent(page)
-    }
-  }
-
-  private func backItemContent(_ page: SettingsPage) -> some ToolbarContent {
-    ToolbarItem(placement: .navigation) {
-      if let parent = page.parent {
+    if let parent = page.parent {
+      ToolbarItem(placement: .navigation) {
         Button {
           model.settingsPage = parent
         } label: {
@@ -145,11 +137,20 @@ struct SettingsSplitView: View {
         }
         .help(Text("Back", bundle: .module))
         .accessibilityLabel(Text("Back", bundle: .module))
-      } else {
-        Color.clear
-          .frame(width: 1, height: 1)
-          .accessibilityHidden(true)
       }
+    } else if #available(macOS 26, *) {
+      // No capsule of glass around the empty item.
+      placeholderItem.sharedBackgroundVisibility(.hidden)
+    } else {
+      placeholderItem
+    }
+  }
+
+  private var placeholderItem: some ToolbarContent {
+    ToolbarItem(placement: .primaryAction) {
+      Color.clear
+        .frame(width: 1, height: 1)
+        .accessibilityHidden(true)
     }
   }
 }
