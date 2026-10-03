@@ -84,6 +84,8 @@ public struct TerminalSurface: NSViewRepresentable {
       (nsView as? AccessibleTerminalView)?.accessibilityTitle = accessibilityTitle
     }
     (nsView as? AccessibleTerminalView)?.onEscape = onEscape
+    // The zoom of the application (#229).
+    nsView.applyFontSize(context.environment.terminalFontSize)
     context.coordinator.onScreen = onScreen
     if let session {
       context.coordinator.attachIfNeeded(to: session)
@@ -101,6 +103,28 @@ public struct TerminalSurface: NSViewRepresentable {
     coordinator: TerminalSurfaceCoordinator
   ) {
     coordinator.unbind()
+  }
+}
+
+extension TerminalView {
+  /// Draws the text at `size` points, keeping the face: only when it changed, the font setter
+  /// clears the selection and resizes the terminal to its new cells.
+  func applyFontSize(_ size: Double) {
+    let points = CGFloat(size)
+    guard abs(font.pointSize - points) > 0.01 else { return }
+    font = font.withSize(points)
+  }
+}
+
+private struct TerminalFontSizeKey: EnvironmentKey {
+  static let defaultValue = Double(NSFont.systemFontSize)
+}
+
+extension EnvironmentValues {
+  /// The size of the terminals' text, in points: the application's zoom (#229).
+  public var terminalFontSize: Double {
+    get { self[TerminalFontSizeKey.self] }
+    set { self[TerminalFontSizeKey.self] = newValue }
   }
 }
 

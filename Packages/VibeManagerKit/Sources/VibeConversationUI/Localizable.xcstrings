@@ -906,6 +906,17 @@
         }
       }
     },
+    "Also sizes the terminals. ⌘+ and ⌘− in the View menu." : {
+      "comment" : "Under the text size setting: it also sizes the terminals, and the View menu's zoom changes it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’applique aussi aux terminaux. ⌘+ et ⌘− dans le menu Présentation."
+          }
+        }
+      }
+    },
     "Always" : {
       "comment" : "Allows what an agent asks, from now on.",
       "localizations" : {

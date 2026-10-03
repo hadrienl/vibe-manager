@@ -216,7 +216,7 @@ public struct ConversationView: View {
             } icon: {
               Image(systemName: "arrow.down")
             }
-            .font(theme.interfaceFont(size: 12.5, weight: .semibold))
+            .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5), weight: .semibold))
             .foregroundStyle(theme.text.color)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -272,7 +272,7 @@ public struct ConversationView: View {
           } icon: {
             Image(systemName: "exclamationmark.triangle")
           }
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           Spacer()
           stoppedActions
         }
@@ -285,7 +285,7 @@ public struct ConversationView: View {
           } icon: {
             Image(systemName: "exclamationmark.triangle")
           }
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.secondaryText.color)
           Spacer()
           stoppedActions
@@ -297,7 +297,7 @@ public struct ConversationView: View {
           } icon: {
             Image(systemName: "stop.circle")
           }
-          .font(theme.interfaceFont(size: 12.5))
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.secondaryText.color)
           Spacer()
           Button(action: restart) {
@@ -335,7 +335,7 @@ public struct ConversationView: View {
     switch echo.state {
     case .sending:
       Text("Sending…", bundle: .module)
-        .font(theme.interfaceFont(size: 11))
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
         .foregroundStyle(theme.secondaryText.color)
     case .unconfirmed:
       HStack(spacing: 8) {
@@ -354,14 +354,14 @@ public struct ConversationView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Dismiss", bundle: .module))
       }
-      .font(theme.interfaceFont(size: 11))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
       .foregroundStyle(theme.warning.color)
     }
   }
 
   private func placeholder<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
     VStack(spacing: 10, content: content)
-      .font(theme.interfaceFont(size: 13))
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(13)))
       .foregroundStyle(theme.secondaryText.color)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
   }

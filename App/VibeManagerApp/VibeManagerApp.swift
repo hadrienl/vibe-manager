@@ -133,6 +133,31 @@ struct VibeManagerApp: App {
       // In the menus rather than bound to the views: a shortcut that only works while a
       // particular view holds focus is a shortcut nobody can rely on, and the menu is also
       // where VoiceOver and the keyboard-only user find these actions at all.
+      // The size of the text of the conversations and the terminals (#229): macOS gives a
+      // third-party application no Dynamic Type. The size chosen in the Conversation settings,
+      // so it is kept between launches. ⌘+ also over the web view: it zooms no page.
+      CommandGroup(before: .toolbar) {
+        Button("Zoom In") {
+          environment.appModel.zoomIn()
+        }
+        .keyboardShortcut("+", modifiers: .command)
+        .disabled(!environment.appModel.canZoomIn)
+
+        Button("Zoom Out") {
+          environment.appModel.zoomOut()
+        }
+        .keyboardShortcut("-", modifiers: .command)
+        .disabled(!environment.appModel.canZoomOut)
+
+        Button("Actual Size") {
+          environment.appModel.resetZoom()
+        }
+        .keyboardShortcut("0", modifiers: .command)
+        .disabled(environment.appModel.isActualSize)
+
+        Divider()
+      }
+
       CommandGroup(after: .sidebar) {
         Button(
           environment.appModel.layout.columns.isInspectorVisible
