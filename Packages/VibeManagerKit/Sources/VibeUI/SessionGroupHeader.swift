@@ -145,7 +145,8 @@ struct SessionGroupHeader: View {
         .foregroundStyle(
           newSession.isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary)
         )
-        .frame(width: 16, height: 16)
+        // At least 20 points to click (#229).
+        .frame(width: 20, height: 20)
         .contentShape(Rectangle())
     }
     .buttonStyle(.borderless)

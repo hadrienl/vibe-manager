@@ -154,7 +154,8 @@ private struct DrawerTab: View {
       } label: {
         Image(systemName: "xmark")
           .font(.system(size: 9, weight: .semibold))
-          .frame(width: 18, height: 18)
+          // At least 20 points to click (#229).
+          .frame(width: 20, height: 20)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)

@@ -409,6 +409,9 @@ public struct ConversationSettingsView: View {
               .overlay(
                 Circle().stroke(Color.accentColor, lineWidth: appearance.accent == accent ? 2 : 0)
                   .padding(-3))
+              // At least 20 points to click (#229), the disc drawn at its own size.
+              .frame(width: 20, height: 20)
+              .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
           .help(Text(Self.accentName(accent)))

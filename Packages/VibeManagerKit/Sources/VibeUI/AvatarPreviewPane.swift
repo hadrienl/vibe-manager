@@ -604,7 +604,9 @@ struct ExpressionTile: View {
                   .fill(.background)
                   .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
               )
-              .contentShape(Circle())
+              // At least 20 points to click (#229), the badge drawn at its own size.
+              .frame(width: 20, height: 20)
+              .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
           .offset(x: 5, y: -5)
