@@ -457,8 +457,9 @@ final class SmokeTests: XCTestCase {
     AuditException(
       type: .parentChild,
       reason: """
-        Raised without an element on a new session's draft, so it cannot be pinned down here: \
-        looked into by #328.
+        Raised without an element on a new session's draft, so it cannot be pinned down here. It \
+        stays without the draft's own accessibility container (tried for #328): it comes from \
+        further down, likely an AppKit view hosted in SwiftUI. Left open in #328.
         """),
   ]
 
