@@ -283,7 +283,7 @@ extension AppModel {
   /// screen, or in the default browser when the session has no web view.
   public func openRequestLink(_ url: URL, for id: AgentRequestID) {
     openSession(for: id)
-    if !openInWebView(url, from: id.sessionID) { NSWorkspace.shared.open(url) }
+    if !openInWebView(url, from: id.sessionID) { ExternalOpening.open(url) }
   }
 
   // MARK: - Ticket
