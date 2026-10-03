@@ -88,6 +88,7 @@ struct ConversationPagingTests {
     let readable = scroll.contentView.bounds.height - top - scroll.contentInsets.bottom
     var origin: Double { scroll.contentView.bounds.origin.y }
     let end = origin
+    let endHeight = scroll.documentView!.frame.height
 
     model.scrollPage(.up)
     // Before the fix, nothing moves: the pager never found the messages' scroll view. A scroll
@@ -95,7 +96,7 @@ struct ConversationPagingTests {
     try await waitUntil { origin <= end - readable / 2 && !model.scroll.isFollowing }
     try await settledOrigin { origin }
     // A page is what was read, less the overlap: no line skipped under the toolbar.
-    #expect(end - origin <= readable, "moved \(end - origin) for \(readable) read")
+    #expect(end - origin <= readable, "moved \(end - origin) for \(readable) read; document \(endHeight) then \(scroll.documentView!.frame.height); insets \(scroll.contentInsets.top) \(scroll.contentInsets.bottom); page scroll \(scroll.verticalPageScroll)")
 
     // On to the start: the first message just below the toolbar, and no further.
     while origin > -top + 0.5 {
