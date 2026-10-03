@@ -183,13 +183,17 @@ private struct BrowserTabButton: View {
               .frame(maxWidth: 150, alignment: .leading)
           }
         }
+        // The whole tab answers the click, its margins included, as before it was a button.
+        .padding(.leading, 8)
+        .padding(.trailing, showsClose ? 0 : 8)
+        .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .focused($focus, equals: .tab)
       // Shown in front, under the pointer, and when the keyboard is on the tab: a tab behind is
       // closed without the mouse too.
-      if !tab.isPinnedTicket, isActive || isHovering || focus != nil {
+      if showsClose {
         Button(action: close) {
           Image(systemName: "xmark")
             .font(.system(size: 9, weight: .semibold))
@@ -203,7 +207,7 @@ private struct BrowserTabButton: View {
     }
     .font(.callout.weight(isActive ? .semibold : .regular))
     .foregroundStyle(isActive ? .primary : .secondary)
-    .padding(.horizontal, 8)
+    .padding(.trailing, showsClose ? 8 : 0)
     .frame(height: 26)
     .background(
       RoundedRectangle(cornerRadius: 7)
@@ -236,6 +240,10 @@ private struct BrowserTabButton: View {
         }
       }
     }
+  }
+
+  private var showsClose: Bool {
+    !tab.isPinnedTicket && (isActive || isHovering || focus != nil)
   }
 
   @ViewBuilder
