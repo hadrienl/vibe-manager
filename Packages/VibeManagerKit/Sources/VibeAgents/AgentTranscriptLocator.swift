@@ -51,9 +51,15 @@ public struct AgentTranscriptLocator: Sendable {
   public func codexRollouts(for identifier: String, since created: Date, until now: Date = Date())
     -> [URL]
   {
+    codexRollouts(for: identifier, fromDay: created.addingTimeInterval(-86_400), until: now)
+  }
+
+  /// The rollouts of the conversation in the day folders from `fromDay`'s through `now`'s: the
+  /// one walk through Codex's days, shared with `TranscriptLocationCache`.
+  public func codexRollouts(for identifier: String, fromDay first: Date, until now: Date) -> [URL] {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = .current
-    var day = calendar.startOfDay(for: created.addingTimeInterval(-86_400))
+    var day = calendar.startOfDay(for: first)
     let today = calendar.startOfDay(for: now)
     var found: [URL] = []
     while day <= today {
