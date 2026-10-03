@@ -42,7 +42,7 @@
           ]
         },
         "veil" : {
-          "description" : "How much of colors.background covers the picture, from 0 (the picture as it is) to 1 (hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable.",
+          "description" : "How much of colors.background covers the picture, from 0 (the picture as it is) to 1 (hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable, and the application never shows a picture under less than 0.6.",
           "maximum" : 1,
           "minimum" : 0,
           "type" : "number"

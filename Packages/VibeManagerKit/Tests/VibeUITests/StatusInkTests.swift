@@ -16,7 +16,9 @@ struct StatusInkTests {
       let background = NSColor.windowBackgroundColor.usingColorSpace(.sRGB)!
       let foreground = colour.usingColorSpace(.sRGB)!
       let alpha = foreground.alphaComponent
-      func blended(_ top: CGFloat, _ bottom: CGFloat) -> Double { Double(top * alpha + bottom * (1 - alpha)) }
+      func blended(_ top: CGFloat, _ bottom: CGFloat) -> Double {
+        Double(top * alpha + bottom * (1 - alpha))
+      }
       let text = ThemeColor(
         red: blended(foreground.redComponent, background.redComponent),
         green: blended(foreground.greenComponent, background.greenComponent),

@@ -971,12 +971,14 @@ struct ThemeBackdropAccessibilityTests {
   @Test("A session's own theme loses its picture too, not only the settings' one")
   @MainActor
   func sessionThemeHonours() async throws {
-    var own = pictured
-    own.personalName = "Forêt"
+    let library = InMemoryConversationThemeLibrary()
+    var own = await library.save(pictured, name: "Forêt")
+    own.backdrop.localImage = pictured.backdrop.localImage
     let themes = ConversationThemesModel(
       library: InMemoryConversationThemeLibrary(themes: [own]))
     await themes.load()
-    let id = try #require(themes.personal.first?.id)
+    let id = own.id
+    try #require(id != ConversationTheme.night.id)
     let shown = themes.displayed(
       ConversationAppearance(), session: id, isDark: true, increasedContrast: false)
     try #require(shown.backdrop.localImage != nil)
