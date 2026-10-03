@@ -20,9 +20,11 @@ final class ConversationPager {
     let distance = (y - clip.bounds.origin.y) * (document.isFlipped ? 1 : -1)
     if let event = CGEvent(
       scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
-      wheel1: Int32(-distance.rounded()), wheel2: 0, wheel3: 0),
-      let wheel = NSEvent(cgEvent: event)
+      wheel1: Int32(-distance.rounded()), wheel2: 0, wheel3: 0)
     {
+      // Continuous, as a trackpad's: the distance is taken as it is, never accelerated.
+      event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+      guard let wheel = NSEvent(cgEvent: event) else { return }
       scrollView.scrollWheel(with: wheel)
     }
   }

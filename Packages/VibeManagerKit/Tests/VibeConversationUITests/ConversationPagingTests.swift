@@ -95,7 +95,7 @@ struct ConversationPagingTests {
     try await waitUntil { origin <= end - readable / 2 && !model.scroll.isFollowing }
     try await settledOrigin { origin }
     // A page is what was read, less the overlap: no line skipped under the toolbar.
-    #expect(end - origin <= readable)
+    #expect(end - origin <= readable, "moved \(end - origin) for \(readable) read")
 
     // On to the start: the first message just below the toolbar, and no further.
     while origin > -top + 0.5 {
