@@ -975,6 +975,8 @@ private struct BrowserPermissionBanner: View {
       return Text(
         "The page opens \(address) in another application, which connects to another computer.",
         bundle: .module)
+    case .effect(.microphone(let site)):
+      return Text("The agent’s page on \(site) wants to use the microphone.", bundle: .module)
     }
   }
 

@@ -127,6 +127,24 @@
         }
       }
     },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Why the application asks for the microphone: a page of the web view wants it.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Vibe Manager uses the microphone when a page in the web view asks you for it, for example for dictation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager utilise le micro quand une page de la vue web vous le demande, par exemple pour une dictée."
+          }
+        }
+      }
+    },
     "NSNetworkVolumesUsageDescription" : {
       "comment" : "Why the application asks for access to a network volume.",
       "extractionState" : "extracted_with_value",

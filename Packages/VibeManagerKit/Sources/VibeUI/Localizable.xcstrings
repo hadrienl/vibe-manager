@@ -13757,6 +13757,17 @@
         }
       }
     },
+    "The agent’s page on %@ wants to use the microphone." : {
+      "comment" : "A page the agent drives asks for the microphone (#315). %@ is the page's site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page de l’agent sur %@ veut utiliser le micro."
+          }
+        }
+      }
+    },
     "The archive could not be added to the avatars. Try again." : {
       "comment" : "Writing an imported avatar failed.",
       "localizations" : {
