@@ -36,6 +36,10 @@ public struct AgentActivityState: Hashable, Sendable {
   /// report, read from another file, may come after what the terminal wrote. It stands until
   /// something says the dialog was answered — never for a length of time (#280).
   var drawnBeforeReport: AgentDrawnDialog?
+  /// The requests the dialog drawn last may be, when what the CLI said of it cannot tell which
+  /// (#283): the first of them is answered from the palette all the same, once the dialog read
+  /// off the screen names it.
+  public var drawnCandidates: Set<AgentRequestID> = []
 
   public init(
     activity: AgentActivity = .idle,
@@ -286,6 +290,7 @@ public enum AgentActivityMachine {
       next.drawnBeforeReport = nil
       guard dialog.quotesWhole, matching.count == 1 else {
         next.isFirstRequestUncertain = true
+        next.drawnCandidates = Set(matching.map { next.requests[$0].id })
         break
       }
       next.arm(at: matching[0])
@@ -335,6 +340,7 @@ extension AgentActivityState {
   public func showsTheSame(as other: AgentActivityState) -> Bool {
     activity == other.activity && unreadSince == other.unreadSince && source == other.source
       && requests == other.requests && isFirstRequestUncertain == other.isFirstRequestUncertain
+      && drawnCandidates == other.drawnCandidates
   }
 
   // MARK: - Requests (#40)
@@ -351,8 +357,10 @@ extension AgentActivityState {
     guard let dialog = drawnBeforeReport, !requests[index].isShown, dialog.matches(requests[index])
     else { return }
     drawnBeforeReport = nil
-    guard dialog.quotesWhole, undrawnRequests(matching: dialog) == [index] else {
+    let matching = undrawnRequests(matching: dialog)
+    guard dialog.quotesWhole, matching == [index] else {
       isFirstRequestUncertain = true
+      drawnCandidates = Set(matching.map { requests[$0].id })
       return
     }
     arm(at: index)
@@ -361,6 +369,7 @@ extension AgentActivityState {
   /// Marks drawn the one request a command quoted whole names. Alone in the queue, it is the
   /// dialog on screen whatever doubt came before: Codex settles its requests with no word of which.
   mutating func arm(at index: Int) {
+    drawnCandidates = []
     markDrawn(at: index)
     if requests.count == 1 {
       isFirstRequestUncertain = false
@@ -411,6 +420,7 @@ extension AgentActivityState {
   mutating func clearRequests() {
     requests = []
     drawnBeforeReport = nil
+    drawnCandidates = []
     isFirstRequestUncertain = false
     isTrackLost = false
   }
@@ -428,7 +438,10 @@ extension AgentActivityState {
       ?? AgentRequestNotice(
         content: kind == .approval ? .unreadable(tool: tool) : .elicitation,
         reference: AgentToolReference(tool: tool), isShown: false)
-    if let index = requests.firstIndex(where: {
+    // Only a report of a drawn dialog completes one announced before it (#283): two reports not
+    // drawn yet are two calls — Codex asking twice for the same tool, or two patches of the same
+    // files — and one taking the other's place would show a card what another dialog asks.
+    if notice.isShown, let index = requests.firstIndex(where: {
       !$0.isShown && $0.reference.match(notice.reference) == .same
     }) {
       // Drawn behind a dialog that was drawn before it: the queue's order is not the screen's.

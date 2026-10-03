@@ -56,6 +56,20 @@ public actor TrackAgentActivity {
     var adoptedAt: Date?
   }
 
+  /// An answer waiting for the session's log to be read up to `target` (#283).
+  private struct CatchUp {
+    let sessionID: SessionID
+    let target: AgentActivityLogPosition
+    /// Whether the reading reached the file `target` is in: past it, in a file started after a
+    /// rotation, it has read all of it.
+    var hasReachedFile: Bool
+    let continuation: CheckedContinuation<Bool, Never>
+  }
+
+  /// How long an answer waits at most for its session's log to be read to its end. Reached,
+  /// nothing is typed: never a reason to type.
+  public static let catchUpLimit: Duration = .seconds(2)
+
   private let logs: any AgentActivityLogStore
   private let store: any AgentActivityStateStore
   private let now: @Sendable () -> Date
@@ -71,6 +85,7 @@ public actor TrackAgentActivity {
   private var timer: Task<Void, Never>?
   private var pendingWrite: Task<Void, Never>?
   private var hasLoaded = false
+  private var catchUps: [UUID: CatchUp] = [:]
 
   public init(
     logs: any AgentActivityLogStore,
@@ -168,6 +183,7 @@ public actor TrackAgentActivity {
   public func processStarted(_ id: SessionID, decoder: (any AgentSignalDecoding)?) async {
     if decoder == nil { await logs.removeLog(for: id) }
     var tracked = sessions[id] ?? Tracked()
+    abandonCatchUps(id)
     cancelTasks(of: &tracked)
     let previous = tracked.state
     tracked.decoder = decoder
@@ -192,6 +208,7 @@ public actor TrackAgentActivity {
     // A process launched without hooks has no log, and one launched with them always has one.
     let hasLog = decoder != nil ? await logs.existingLog(for: id) != nil : false
     var tracked = sessions[id] ?? Tracked()
+    abandonCatchUps(id)
     cancelTasks(of: &tracked)
     let previous = tracked.state
     tracked.decoder = hasLog ? decoder : nil
@@ -221,6 +238,7 @@ public actor TrackAgentActivity {
 
   public func processEnded(_ id: SessionID) {
     guard var tracked = sessions[id] else { return }
+    abandonCatchUps(id)
     cancelTasks(of: &tracked)
     let previous = tracked.state
     tracked.state = reduce(tracked.state, .processEnded, for: id)
@@ -232,6 +250,7 @@ public actor TrackAgentActivity {
   /// The session is closed or archived: closing it was its reading.
   public func forget(_ id: SessionID) async {
     guard var tracked = sessions.removeValue(forKey: id) else { return }
+    abandonCatchUps(id)
     cancelTasks(of: &tracked)
     await logs.removeLog(for: id)
     publish(id, state: nil)
@@ -366,6 +385,99 @@ public actor TrackAgentActivity {
     sessions[id] = tracked
   }
 
+  // MARK: - Dialogs read off the screen (#283)
+
+  /// Whether every answer to the session's requests waits for its screen to name the request.
+  public func readsRequestsOnScreen(_ id: SessionID) -> Bool {
+    sessions[id]?.decoder?.answerKeymap?.readsRequestOnScreen ?? false
+  }
+
+  /// Returns once every line the session's log holds now has been read: every request whose
+  /// dialog is drawn is then known, its CLI reporting it before drawing it (Codex 0.159 runs its
+  /// `PermissionRequest` hooks first). `false` when the log is not read that far in time, or the
+  /// process went away meanwhile.
+  public func catchUp(_ id: SessionID) async -> Bool {
+    guard sessions[id] != nil else { return false }
+    // No log, or an empty one: nothing written that has not been read.
+    guard let end = await logs.end(for: id), end.offset > 0 else { return sessions[id] != nil }
+    guard sessions[id] != nil else { return false }
+    let position = sessions[id]?.logPosition
+    if let position, position.fileIdentifier == end.fileIdentifier, position.offset >= end.offset {
+      return true
+    }
+    return await waitForCatchUp(
+      id, to: end, hasReachedFile: position?.fileIdentifier == end.fileIdentifier)
+  }
+
+  private func waitForCatchUp(
+    _ id: SessionID, to target: AgentActivityLogPosition, hasReachedFile: Bool
+  ) async -> Bool {
+    let key = UUID()
+    let limit = Task { [sleep] in
+      do {
+        try await sleep(Self.catchUpLimit)
+      } catch {
+        return
+      }
+      self.endCatchUp(key, reached: false)
+    }
+    defer { limit.cancel() }
+    return await withCheckedContinuation { continuation in
+      catchUps[key] = CatchUp(
+        sessionID: id, target: target, hasReachedFile: hasReachedFile, continuation: continuation)
+    }
+  }
+
+  private func endCatchUp(_ key: UUID, reached: Bool) {
+    catchUps.removeValue(forKey: key)?.continuation.resume(returning: reached)
+  }
+
+  /// The session's log was read up to `position`.
+  private func caughtUp(_ id: SessionID, at position: AgentActivityLogPosition) {
+    for (key, catchUp) in catchUps where catchUp.sessionID == id {
+      if position.fileIdentifier == catchUp.target.fileIdentifier {
+        catchUps[key]?.hasReachedFile = true
+        if position.offset >= catchUp.target.offset { endCatchUp(key, reached: true) }
+      } else if catchUp.hasReachedFile {
+        endCatchUp(key, reached: true)
+      }
+    }
+  }
+
+  /// The session's process is gone or replaced: no answer waits on its log any more.
+  private func abandonCatchUps(_ id: SessionID) {
+    for (key, catchUp) in catchUps where catchUp.sessionID == id {
+      endCatchUp(key, reached: false)
+    }
+  }
+
+  /// Whether the dialog `text` shows is the request's, and no other's of the queue (#283). Named
+  /// behind requests reported before it and never drawn, it is now known drawn and those settled
+  /// with no dialog, as when Codex quotes a command whole.
+  public func dialogOnScreen(_ text: String, isFor id: AgentRequestID) -> Bool {
+    guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,
+      keymap.readsRequestOnScreen, let dialog = keymap.drawnDialog(onScreen: text)
+    else { return false }
+    // A request taken away on a guess may be the one drawn: only a command, shown whole, is the
+    // same as another request's when it reads the same. Two patches of the same files are not.
+    if tracked.state.isTrackLost {
+      guard case .shownCommand = dialog.subject else { return false }
+    }
+    let requests = tracked.state.requests
+    let matching = requests.indices.filter { dialog.matches(requests[$0]) }
+    guard matching.count == 1 else { return false }
+    let previous = tracked.state
+    let named = requests[matching[0]].id
+    tracked.state.arm(at: matching[0])
+    if tracked.state.requests.first?.id == named {
+      // On screen, and no other request can be: whatever doubt came before is lifted.
+      tracked.state.isFirstRequestUncertain = false
+    }
+    sessions[id.sessionID] = tracked
+    changed(id.sessionID, from: previous)
+    return named == id && tracked.state.requests.first?.id == id
+  }
+
   private func received(
     _ event: AgentActivityEvent,
     at position: AgentActivityLogPosition,
@@ -395,6 +507,7 @@ public actor TrackAgentActivity {
     // The position moved: written down even when the state did not.
     let isReplayed = tracked.adoptedAt.map { event.date < $0 } ?? false
     changed(id, from: previous, force: true, isReplayed: isReplayed)
+    caughtUp(id, at: position)
   }
 
   /// Opens what an event names beyond the hooks, in place of what an earlier one had opened.

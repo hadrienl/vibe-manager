@@ -151,11 +151,22 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
       // A host's access says nothing of commands: no "always" there, whatever the tool.
       return Self.alwaysKey(for: permission) == nil || permission.alwaysAllow == nil
         ? [.allowOnce, .deny] : [.allowOnce, .allowAlways, .deny]
-    case .unreadable:
-      return [.deny]
-    case .questions, .plan, .elicitation, .inTerminal:
+    // Every answer waits for the screen to name its request (#283): a report that cannot be read
+    // never matches what it shows — even a refusal, whose Escape would refuse another dialog.
+    case .unreadable, .questions, .plan, .elicitation, .inTerminal:
       return []
     }
+  }
+
+  /// Codex's dialog shows the command whole, every path a patch writes to, the host (#283):
+  /// before any key, the screen tells which request it is. An MCP tool's form is not read: its
+  /// requests are answered in the session.
+  public var readsRequestOnScreen: Bool {
+    true
+  }
+
+  public func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
+    CodexDrawnDialogReading.dialog(onScreen: text)
   }
 
   public func keystrokes(
