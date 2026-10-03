@@ -94,6 +94,7 @@ public final class AccessibleTerminalView: TerminalView {
     settleTask?.cancel()
     settleTask = nil
     super.setFrameSize(newSize)
+    accessibleTextCache = nil
   }
 
   private func scheduleSettle() {
@@ -115,6 +116,7 @@ public final class AccessibleTerminalView: TerminalView {
     guard let size = deferredSize else { return }
     deferredSize = nil
     super.setFrameSize(size)
+    accessibleTextCache = nil
   }
 
   public override func viewDidEndLiveResize() {
@@ -269,8 +271,96 @@ public final class AccessibleTerminalView: TerminalView {
     showsHand = false
   }
 
-  public override func accessibilityValue() -> Any? {
-    TerminalText.visibleScreen(of: getTerminal())
+  // VoiceOver reads the terminal as a text area: history then screen, line by line, with the
+  // insertion point at the cursor (#226). The text is read again only after it changed.
+
+  private var accessibleTextCache: TerminalAccessibleText?
+
+  var accessibleText: TerminalAccessibleText {
+    if let cached = accessibleTextCache { return cached }
+    let text = TerminalAccessibleText(terminal: getTerminal())
+    accessibleTextCache = text
+    return text
+  }
+
+  /// Output was fed: the text is read again at the next question, and VoiceOver is told when the
+  /// terminal has the focus.
+  func textDidChange() {
+    accessibleTextCache = nil
+    announceChange()
+  }
+
+  public override func scrolled(source terminal: Terminal, yDisp: Int) {
+    super.scrolled(source: terminal, yDisp: yDisp)
+    accessibleTextCache = nil
+  }
+
+  /// At most one change told per interval: a busy program would otherwise make VoiceOver start
+  /// over at every chunk of output. The last change of a burst is told once the interval is over.
+  var announcementInterval: Duration = .seconds(1)
+  /// Sees each notification posted; the tests count them.
+  var onAnnouncement: ((NSAccessibility.Notification) -> Void)?
+  private var lastAnnouncement: ContinuousClock.Instant?
+  private(set) var pendingAnnouncement: Task<Void, Never>?
+
+  private var hasVoiceOverFocus: Bool {
+    // A view put away, or suspended (#248), is not the one being read.
+    !isHidden && window?.firstResponder === self
+  }
+
+  private func announceChange() {
+    guard hasVoiceOverFocus, pendingAnnouncement == nil else { return }
+    let now = ContinuousClock.now
+    guard let last = lastAnnouncement, now < last + announcementInterval else {
+      announce(at: now)
+      return
+    }
+    let wait = last + announcementInterval - now
+    pendingAnnouncement = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: wait)
+      guard let self, !Task.isCancelled else { return }
+      self.pendingAnnouncement = nil
+      guard self.hasVoiceOverFocus else { return }
+      self.announce(at: .now)
+    }
+  }
+
+  private func announce(at instant: ContinuousClock.Instant) {
+    lastAnnouncement = instant
+    for notification in [NSAccessibility.Notification.valueChanged, .selectedTextChanged] {
+      NSAccessibility.post(element: self, notification: notification)
+      onAnnouncement?(notification)
+    }
+  }
+
+  public override func accessibilityValue() -> Any? { accessibleText.string }
+
+  public override func accessibilityNumberOfCharacters() -> Int { accessibleText.length }
+
+  public override func accessibilityVisibleCharacterRange() -> NSRange {
+    accessibleText.visibleRange
+  }
+
+  public override func accessibilityLine(for index: Int) -> Int {
+    accessibleText.line(for: index)
+  }
+
+  public override func accessibilityRange(forLine line: Int) -> NSRange {
+    accessibleText.range(forLine: line)
+  }
+
+  public override func accessibilityString(for range: NSRange) -> String? {
+    accessibleText.string(for: range)
+  }
+
+  public override func accessibilitySelectedTextRange() -> NSRange {
+    NSRange(location: accessibleText.insertionPoint, length: 0)
+  }
+
+  public override func accessibilitySelectedText() -> String? { "" }
+
+  public override func accessibilityInsertionPointLineNumber() -> Int {
+    accessibleText.line(for: accessibleText.insertionPoint)
   }
 
   public override func isAccessibilityFocused() -> Bool {
