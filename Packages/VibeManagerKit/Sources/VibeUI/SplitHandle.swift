@@ -99,9 +99,12 @@ struct SplitHandle: View {
     .focusable(interactions: axis == .vertical ? .automatic : .activate)
     .focused($isFocused)
     .focusEffectDisabled()
-    .onKeyPress(keys: [.upArrow, .downArrow]) { press in
-      guard axis == .vertical else { return .ignored }
-      adjust((press.key == .downArrow ? step : -step) * verticalDirection)
+    .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { press in
+      guard
+        let delta = Self.delta(
+          for: press.key, axis: axis, step: step, sizesPaneBelow: sizesPaneBelow)
+      else { return .ignored }
+      adjust(delta)
       return .handled
     }
     .onKeyPress(keys: [.return, KeyEquivalent("=")]) { press in
@@ -133,6 +136,21 @@ struct SplitHandle: View {
   }
 
   /// How the length follows a move down.
+  /// How much an arrow key changes the length, as dragging that way would (#230): up and down on
+  /// a divider between rows, left and right on one between columns, which sizes the pane on its
+  /// right. `nil` for an arrow across the divider.
+  static func delta(
+    for key: KeyEquivalent, axis: Axis, step: Double, sizesPaneBelow: Bool = false
+  ) -> Double? {
+    switch (axis, key) {
+    case (.vertical, .downArrow): step * (sizesPaneBelow ? -1 : 1)
+    case (.vertical, .upArrow): -step * (sizesPaneBelow ? -1 : 1)
+    case (.horizontal, .leftArrow): step
+    case (.horizontal, .rightArrow): -step
+    default: nil
+    }
+  }
+
   private var verticalDirection: Double {
     sizesPaneBelow ? -1 : 1
   }

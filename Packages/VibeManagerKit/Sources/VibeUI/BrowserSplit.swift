@@ -83,7 +83,7 @@ struct BrowserSplit<Leading: View, Trailing: View>: View {
                 onEnded: endDrag,
                 onDoubleClick: { center(from: width, in: container) },
                 help: Text(
-                  "Drag to resize. Double-click to give both sides the same width.",
+                  "Drag to resize, or use the arrow keys. Double-click or press Return to give both sides the same width.",
                   bundle: .module))
               trailing
                 .frame(width: width)

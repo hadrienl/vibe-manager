@@ -143,7 +143,6 @@ private struct DrawerTab: View {
       .foregroundStyle(isSelected ? .primary : .secondary)
       .accessibilityLabel(Text(verbatim: accessibilityLabel))
       .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-      .accessibilityHint(Text("Double-click to rename", bundle: .module))
       .simultaneousGesture(TapGesture(count: 2).onEnded { beginRenaming() })
 
       Button {

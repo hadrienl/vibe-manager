@@ -6654,16 +6654,6 @@
         }
       }
     },
-    "Double-click to rename" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Double-cliquez pour renommer"
-          }
-        }
-      }
-    },
     "Download and install updates automatically" : {
       "localizations" : {
         "fr" : {
@@ -6685,12 +6675,12 @@
         }
       }
     },
-    "Drag to resize. Double-click to give both sides the same width." : {
+    "Drag to resize, or use the arrow keys. Double-click or press Return to give both sides the same width." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faites glisser pour redimensionner. Double-cliquez pour donner la même largeur aux deux côtés."
+            "value" : "Faites glisser pour redimensionner, ou utilisez les flèches. Double-cliquez ou appuyez sur Retour pour donner la même largeur aux deux côtés."
           }
         }
       }
@@ -18432,6 +18422,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "↻ pour en redessiner une"
+          }
+        }
+      }
+    },
+    "⌃⌥⌘P answers the requests from any application." : {
+      "comment" : "VoiceOver's hint on the palette of requests: its global shortcut.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃⌥⌘P permet de répondre aux demandes depuis n’importe quelle application."
           }
         }
       }

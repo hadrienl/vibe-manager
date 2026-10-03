@@ -134,6 +134,20 @@ struct FloatingRequestPanel: View {
         "Pending requests: \(panel.requests.count)", bundle: .module,
         comment: "VoiceOver, on the palette of requests.")
     )
+    // The avatar is hidden from VoiceOver, and folded the palette shows nothing else: its tap is
+    // offered here, and the shortcut said (#230).
+    .accessibilityActions {
+      Button(
+        panel.isCollapsed
+          ? String(localized: "Show the requests", bundle: .module)
+          : String(localized: "Fold the requests", bundle: .module)
+      ) { panel.toggleCollapsed() }
+    }
+    .accessibilityHint(
+      Text(
+        "⌃⌥⌘P answers the requests from any application.", bundle: .module,
+        comment: "VoiceOver's hint on the palette of requests: its global shortcut.")
+    )
     .accessibilityIdentifier("floating-request-panel")
   }
 
