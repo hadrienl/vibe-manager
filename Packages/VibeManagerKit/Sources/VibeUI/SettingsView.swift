@@ -61,8 +61,6 @@ struct SettingsSplitView: View {
   /// The page on screen. It follows the model's, through a slide when one page is reached from
   /// the other, as System Settings does.
   @State private var shown: SettingsPage?
-  /// Where the page coming in slides from: the trailing edge going in, the leading edge back.
-  @State private var arrival: Edge = .trailing
   @Environment(\.locale) private var locale
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -96,7 +94,12 @@ struct SettingsSplitView: View {
               width: max(proxy.size.width, page.detailWidth), height: proxy.size.height,
               alignment: .topLeading)
             .id(page)
-            .transition(.push(from: arrival))
+            // Each page by its depth: a page reached from another comes in from the trailing edge
+            // and leaves to it, the page it was reached from goes to the leading edge and comes
+            // back from it. The edge is the page's own, not the move's: the page leaving keeps
+            // the transition of its last frame, so a direction set with the move came too late
+            // for it.
+            .transition(.move(edge: page.parent == nil ? .leading : .trailing))
         }
         .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
         .clipped()
@@ -110,7 +113,6 @@ struct SettingsSplitView: View {
         shown = new
         return
       }
-      arrival = isGoingIn ? .trailing : .leading
       withAnimation(.smooth(duration: 0.3)) { shown = new }
     }
     .modifier(SettingsToolbarVeil())
@@ -663,12 +665,28 @@ struct SettingsWindowSizer: NSViewRepresentable {
     var neededWidth: CGFloat = 0 {
       didSet {
         guard neededWidth != oldValue else { return }
-        resize(animated: window?.isVisible == true)
+        // After SwiftUI's update: an animated resize runs a loop of its own, which would lay
+        // the window out again in the middle of it.
+        DispatchQueue.main.async { [weak self] in
+          guard let self else { return }
+          self.resize(animated: self.window?.isVisible == true)
+        }
       }
     }
 
+    private var fullScreenExit: NSObjectProtocol?
+
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
+      if let fullScreenExit { NotificationCenter.default.removeObserver(fullScreenExit) }
+      // A page chosen in full screen is given its width when the window comes out of it.
+      fullScreenExit = window.map { window in
+        NotificationCenter.default.addObserver(
+          forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main
+        ) { [weak self] _ in
+          MainActor.assumeIsolated { self?.resize(animated: false) }
+        }
+      }
       // The title and the way back on one line, as System Settings. The settings scene gives
       // its window the preferences style, made for tabs, which centred the back button on a row
       // of its own, and ignores the scene's toolbar style.
