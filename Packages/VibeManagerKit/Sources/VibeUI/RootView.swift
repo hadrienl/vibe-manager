@@ -176,6 +176,7 @@ public struct RootView: View {
       model.mainWindowVisibilityChanged(window.occlusionState.contains(.visible))
     }
     .background(HostWindowReader(host: hostWindow))
+    .background(FullScreenTitlebarRepairReader(columns: model.layout.columns))
   }
 
   private func session(_ id: SessionID?) -> WorkSession? {
