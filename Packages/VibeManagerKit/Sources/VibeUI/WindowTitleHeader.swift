@@ -319,7 +319,7 @@ final class ToolbarRoomView: NSView {
     }
     if let view = own.view { observeFrame(of: view) }
     // All on the bar, they are measured as they sit. Some of them in the » menu, the last
-    // measurement may be older than a width that changed since — the status menu's label — and
+    // measurement may be older than a width that changed since, and
     // they would never come back: the larger of it and of their widths, spaced, is taken.
     let identifiers = trailing.map(\.identifier)
     let frames = trailing.compactMap(\.frame)
@@ -338,8 +338,8 @@ final class ToolbarRoomView: NSView {
         detailLeading: detailLeading, centredWidth: centredWidth, trailingExtent: extent))
   }
 
-  /// An item that moves or changes width — the task status menu's label, the title's own place
-  /// once the sidebar folds — changes the room too.
+  /// An item that moves or changes width — the title's own place once the sidebar folds —
+  /// changes the room too.
   private func observeFrame(of view: NSView) {
     guard observedItemViews.insert(ObjectIdentifier(view)).inserted else { return }
     view.postsFrameChangedNotifications = true
