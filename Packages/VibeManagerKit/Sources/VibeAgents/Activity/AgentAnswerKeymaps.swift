@@ -71,7 +71,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
             && !$0.localizedCaseInsensitiveContains("clear context")
         })
     case (.answers(let answers), .questions(let questions)):
-      guard answers.count == questions.count else { return nil }
+      // The question on screen must be this one, its options where its report puts them: past
+      // them come "Type something", then "Chat about this", which a digit one off would take.
+      guard answers.count == questions.count, let first = questions.first,
+        Self.isDrawn(first, on: screen)
+      else { return nil }
       var steps: [[UInt8]] = []
       for (answer, question) in zip(answers, questions) {
         guard let keys = Self.keystrokes(for: answer, to: question) else { return nil }
@@ -86,6 +90,25 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
     default:
       return nil
     }
+  }
+
+  /// Whether the dialog on screen draws `question`: each option at its number — words read on,
+  /// such as its description, and a box before it, left aside — then "Type something" when an
+  /// answer of one's own is offered.
+  static func isDrawn(_ question: AgentQuestion, on screen: AgentDialogScreen?) -> Bool {
+    guard let screen else { return false }
+    func reads(_ expected: String, at number: Int) -> Bool {
+      guard var label = screen.options.first(where: { $0.number == number })?.label else {
+        return false
+      }
+      if let box = label.range(of: #"^\[[^\]]*\] "#, options: .regularExpression) {
+        label.removeSubrange(box)
+      }
+      return label == expected || label.hasPrefix(expected + " ")
+        || label.hasPrefix(expected + ".")
+    }
+    let labels = question.options.map(\.label) + (question.allowsFreeText ? ["Type something"] : [])
+    return labels.enumerated().allSatisfy { reads($1, at: $0 + 1) }
   }
 
   /// The digit of an option read on screen.

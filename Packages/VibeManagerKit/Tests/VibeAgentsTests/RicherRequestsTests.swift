@@ -246,3 +246,121 @@ struct CodexPermissionsReadingTests {
     #expect(keymap.keystrokes(for: .deny, to: content, screen: screen) == [TerminalKeys.escape])
   }
 }
+
+/// Claude Code 2.1.288's question dialogs, drawn in a pty and replayed (#273, P3).
+enum QuestionScreens {
+  static let single = """
+    ⏺  Colour
+
+    Which colour?
+
+    ❯ 1. Red
+         Vibrant and energetic, evokes passion and warmth
+      2. Green
+         Calm and refreshing, associated with nature and growth
+      3. Blue
+         Cool and serene, inspires trust and tranquility
+      4. Type something.
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+      5. Chat about this
+
+    Enter to select · ↑/↓ to navigate · Esc to cancel
+    """
+  static let multiple = """
+    ⏺  ☐ Toppings  ✔ Submit  →
+
+    Which toppings?
+
+    ❯ 1. [ ] Cheese
+             Melted mozzarella cheese
+      2. [ ] Ham
+             Sliced ham
+      3. [ ] Olives
+             Black olives
+      4. [ ] Type something
+         Submit
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+      5. Chat about this
+
+    Enter to select · ↑/↓ to navigate · Esc to cancel
+    """
+  static let previews = """
+     ☐ Layout
+
+    Which layout?
+
+    ❯ 1. Grid                         ┌──────────────────────────────────────────┐
+      2. List                         │ [Item] [Item]                            │
+                                      │ [Item] [Item]                            │
+                                      │ [Item] [Item]                            │
+                                      └──────────────────────────────────────────┘
+
+                                      Notes: press n to add notes
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+      Chat about this
+
+    Enter to select · ↑/↓ to navigate · n to add notes · Esc to cancel
+    """
+}
+
+@Suite("Claude Code's questions answered by the digits on screen (#273, P3)")
+struct QuestionScreenKeymapTests {
+  let keymap = ClaudeCodeAnswerKeymap()
+
+  private func colours(_ labels: [String] = ["Red", "Green", "Blue"]) -> AgentRequestContent {
+    .questions([AgentQuestion(header: "Colour", text: "Which colour?", options: labels.map { .init(label: $0) })])
+  }
+
+  @Test("Options set apart by a rule are still one dialog")
+  func rule() throws {
+    let single = try #require(AgentDialogScreen(screen: QuestionScreens.single))
+    #expect(single.options.map(\.number) == [1, 2, 3, 4, 5])
+    #expect(single.options[4].label == "Chat about this")
+    let multiple = try #require(AgentDialogScreen(screen: QuestionScreens.multiple))
+    #expect(multiple.options.map(\.number) == [1, 2, 3, 4, 5])
+  }
+
+  @Test("The question on screen is answered by its digits, an answer of one's own included")
+  func drawn() {
+    let screen = AgentDialogScreen(screen: QuestionScreens.single)
+    #expect(keymap.keystrokes(for: .answers([.option(1)]), to: colours(), screen: screen) == [Array("2".utf8)])
+    #expect(
+      keymap.keystrokes(for: .answers([.text("Teal")]), to: colours(), screen: screen)
+        == [Array("4".utf8), TerminalKeys.bracketedPaste("Teal"), TerminalKeys.enter])
+  }
+
+  @Test("Another question on screen, its options moved, or none read: nothing is typed")
+  func notDrawn() {
+    let screen = AgentDialogScreen(screen: QuestionScreens.single)
+    #expect(keymap.keystrokes(for: .answers([.option(0)]), to: colours(["Green", "Red", "Blue"]), screen: screen) == nil)
+    #expect(keymap.keystrokes(for: .answers([.option(0)]), to: colours(["Red", "Green"]), screen: screen) == nil)
+    #expect(keymap.keystrokes(for: .answers([.option(0)]), to: colours(), screen: nil) == nil)
+  }
+
+  @Test("Boxes and previews drawn beside the options do not hide them")
+  func boxesAndPreviews() {
+    let toppings = AgentRequestContent.questions([
+      AgentQuestion(
+        header: nil, text: "Which toppings?",
+        options: [.init(label: "Cheese"), .init(label: "Ham"), .init(label: "Olives")],
+        allowsMultipleChoices: true)
+    ])
+    #expect(
+      keymap.keystrokes(
+        for: .answers([.options([0, 2])]), to: toppings,
+        screen: AgentDialogScreen(screen: QuestionScreens.multiple))
+        == [Array("1".utf8), Array("3".utf8), TerminalKeys.rightArrow, Array("1".utf8)])
+    let layout = AgentRequestContent.questions([
+      AgentQuestion(
+        header: nil, text: "Which layout?",
+        options: [.init(label: "Grid", preview: "[Item]"), .init(label: "List", preview: "[Item 1]")],
+        allowsFreeText: false)
+    ])
+    #expect(
+      keymap.keystrokes(
+        for: .answers([.option(1)]), to: layout,
+        screen: AgentDialogScreen(screen: QuestionScreens.previews))
+        == [Array("2".utf8), TerminalKeys.enter])
+  }
+}
