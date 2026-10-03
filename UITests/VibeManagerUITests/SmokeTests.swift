@@ -397,8 +397,7 @@ final class SmokeTests: XCTestCase {
     let names: [(XCUIAccessibilityAuditType, String)] = [
       (.contrast, "contrast"), (.elementDetection, "elementDetection"),
       (.hitRegion, "hitRegion"), (.sufficientElementDescription, "sufficientElementDescription"),
-      (.textClipped, "textClipped"), (.trait, "trait"), (.action, "action"),
-      (.parentChild, "parentChild"),
+      (.action, "action"), (.parentChild, "parentChild"),
     ]
     return names.first { type.contains($0.0) }?.1 ?? "type \(type.rawValue)"
   }
