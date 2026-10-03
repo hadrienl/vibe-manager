@@ -235,7 +235,8 @@ public struct ConversationView: View {
       }
       .accessibilityRotor(Text("Failures", bundle: .module)) {
         ForEach(model.failureBlocks) { block in
-          AccessibilityRotorEntry(Text(verbatim: block.id), id: block.id)
+          AccessibilityRotorEntry(
+            Text(verbatim: ToolBlockView.accessibilityTitle(of: block)), id: block.id)
         }
       }
       .accessibilityRotor(Text("Sub-agents", bundle: .module)) {

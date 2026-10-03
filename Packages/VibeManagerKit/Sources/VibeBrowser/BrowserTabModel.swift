@@ -470,13 +470,16 @@ private final class TitleReading {
   }
 }
 
-/// What an agent's action may cause that leaves the page: a file saved, another application opened.
+/// What an agent's action may cause that leaves the page: a file saved, another application opened,
+/// the microphone.
 public enum BrowserAgentEffect: Hashable, Sendable {
   case download(filename: String)
   case externalApplication(URL)
   /// Another application's address that reaches another computer — a share to mount, a remote
   /// screen or shell: asked whoever's the tab is, even after a click of the user's (#241).
   case networkAddress(URL)
+  /// A page wants the microphone (#315): `site` is the one that asks, which may be a frame's.
+  case microphone(site: String)
 
   /// The schemes macOS hands to an application that connects to another computer: Finder mounts
   /// `smb:`, `afp:`, `nfs:`, `cifs:` and `ftp:` shares, Screen Sharing opens `vnc:`, Terminal
@@ -667,6 +670,45 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
 
   public func webViewDidClose(_ webView: WKWebView) {
     didCloseWindow?()
+  }
+
+  public func webView(
+    _ webView: WKWebView, decideMediaCapturePermissionsFor origin: WKSecurityOrigin,
+    initiatedBy frame: WKFrameInfo, type: WKMediaCaptureType
+  ) async -> WKPermissionDecision {
+    let window = webView.window
+    // The site that asks, not the tab's: a frame of another site may ask.
+    let site = BrowserOrigin(
+      scheme: origin.protocol, host: origin.host, port: origin.port == 0 ? nil : origin.port)
+    return await decideMediaCapture(
+      type, site: site.description, isOnScreen: window != nil && !(window is ParkingWindow))
+  }
+
+  /// A refusal reaches the page as a `NotAllowedError` (#315).
+  func decideMediaCapture(_ type: WKMediaCaptureType, site: String? = nil, isOnScreen: Bool)
+    async -> WKPermissionDecision
+  {
+    switch BrowserMediaCapture.decide(
+      type, asksBeforeEffects: asksBeforeEffects, isOnScreen: isOnScreen)
+    {
+    case .prompt:
+      return .prompt
+    case .askUser:
+      // Answered in the session, not by WebKit: granted once, never asked twice.
+      let site = site ?? (committedOrigin ?? origin)?.description ?? url.absoluteString
+      guard !isClosed, let confirmAgentEffect,
+        await confirmAgentEffect(.microphone(site: site), self), !isClosed
+      else {
+        record(
+          console: BrowserConsoleEntry(
+            level: .warn, text: "Microphone refused: the user did not allow the agent's page."))
+        return .deny
+      }
+      return .grant
+    case .deny(let reason):
+      record(console: BrowserConsoleEntry(level: .warn, text: reason))
+      return .deny
+    }
   }
 }
 

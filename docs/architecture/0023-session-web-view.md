@@ -241,6 +241,32 @@ Every session's web view shares one `WKWebsiteDataStore`, kept on disk and apart
 named by an identifier in the data folder: an isolated copy has its own. Signing in once to GitHub
 or GitLab signs in every session's ticket tab. Settings › Web View clears it.
 
+### The microphone, never the camera
+
+A page may ask for the microphone, for dictation or a call (#315). The application declares
+`NSMicrophoneUsageDescription` — without it WebKit does not give pages `navigator.mediaDevices` at
+all — and the release carries the entitlement the hardened runtime wants for it (ADR 0021). It
+declares no use of the camera. `BrowserMediaCapture` decides:
+
+| The page asks for | Whose page | Decision |
+|---|---|---|
+| The camera, or the camera and the microphone | Anyone's | Refused |
+| The microphone | The agent's (`asksBeforeEffects`) | Asked like a download the agent caused (#241); allowed, granted without WebKit asking again |
+| The microphone | The user's, its tab on screen | WebKit asks, in a sheet of the window |
+| The microphone | The user's, its tab out of sight | Refused: WebKit's question would open where nobody sees it |
+
+A refusal reaches the page as a `NotAllowedError`, and a line of its console says why. WebKit
+keeps a grant for the document's life and does not ask again: a page the user gave the microphone,
+which the agent then drives — a click on its "Dictate" button — records without a question, and
+so does a page of the agent's once allowed, until it is reloaded or left. This adds nothing to what
+the agent's terminal can already do once the application has the microphone (below). macOS asks
+once, the first time, in the application's name; the grant follows the designated requirement, so
+it survives updates (#92). There is no "Always Allow" for the microphone, nor a mark on the tab:
+the system's indicator shows it is on.
+
+Once the user has given the application the microphone, the processes of its terminals have it
+too, since macOS holds the application responsible for them — as with any terminal application.
+
 ## Consequences
 
 - `VibeBrowser` is a module of its own: WebKit, the socket, the bridge and the MCP server, no view.

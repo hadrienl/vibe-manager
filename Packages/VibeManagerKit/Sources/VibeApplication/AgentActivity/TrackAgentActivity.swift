@@ -511,7 +511,9 @@ public actor TrackAgentActivity {
   public func tick() {
     for id in sessions.keys {
       guard var tracked = sessions[id] else { continue }
-      let next = reduce(tracked.state, .tick, for: id)
+      // A deadline may bring a request of its own: a start that holds the hooks back (#273).
+      let next = reduce(
+        tracked.state, .tick, for: id, requestID: AgentRequestID(sessionID: id, key: "tick"))
       guard !next.showsTheSame(as: tracked.state) else { continue }
       tracked.state = next
       sessions[id] = tracked

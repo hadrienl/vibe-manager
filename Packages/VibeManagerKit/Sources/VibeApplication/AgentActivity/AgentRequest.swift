@@ -29,6 +29,9 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
   /// dialog lands in the prompt — seen in the spike of #40, where the Return that followed then
   /// picked the highlighted option: the wrong one.
   public var isShown: Bool
+  /// Asked without stopping the agent, which goes on meanwhile — Codex's
+  /// `request_user_input_async` (#273): it never comes before a request that holds the agent.
+  public var isAsynchronous: Bool
 
   public init(
     id: AgentRequestID,
@@ -36,7 +39,8 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
     kind: AgentQuestionKind,
     content: AgentRequestContent,
     reference: AgentToolReference,
-    isShown: Bool
+    isShown: Bool,
+    isAsynchronous: Bool = false
   ) {
     self.id = id
     self.receivedAt = receivedAt
@@ -44,6 +48,43 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
     self.content = content
     self.reference = reference
     self.isShown = isShown
+    self.isAsynchronous = isAsynchronous
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id, receivedAt, kind, content, reference, isShown, isAsynchronous
+  }
+
+  /// Read as the version before #273 P3 wrote it too: no `isAsynchronous`, and a form with nothing
+  /// of its server's words. A request kept across an update is not asked again.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(AgentRequestID.self, forKey: .id)
+    receivedAt = try container.decode(Date.self, forKey: .receivedAt)
+    kind = try container.decode(AgentQuestionKind.self, forKey: .kind)
+    if let content = try? container.decode(AgentRequestContent.self, forKey: .content) {
+      self.content = content
+    } else {
+      _ = try container.decode(FormlessElicitation.self, forKey: .content)
+      content = .elicitation(AgentElicitation())
+    }
+    reference = try container.decode(AgentToolReference.self, forKey: .reference)
+    isShown = try container.decode(Bool.self, forKey: .isShown)
+    isAsynchronous = try container.decodeIfPresent(Bool.self, forKey: .isAsynchronous) ?? false
+  }
+
+  /// `{"elicitation":{}}`: a form, as written before it carried its server's words.
+  private struct FormlessElicitation: Decodable {
+    enum CodingKeys: CodingKey { case elicitation }
+
+    init(from decoder: any Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      guard container.contains(.elicitation) else {
+        throw DecodingError.keyNotFound(
+          CodingKeys.elicitation,
+          .init(codingPath: decoder.codingPath, debugDescription: "not a form"))
+      }
+    }
   }
 }
 
@@ -54,8 +95,9 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   case questions([AgentQuestion])
   /// A plan to accept before the agent starts. `excerpt` is its beginning.
   case plan(excerpt: String, isComplete: Bool)
-  /// A form an MCP server asks the user to fill in: only the terminal can.
-  case elicitation
+  /// A form an MCP server asks the user to fill in, or a page to open: only the terminal can
+  /// answer it.
+  case elicitation(AgentElicitation)
   /// The agent asked something its report does not let us read: cut short, or not JSON.
   case unreadable(tool: String?)
   /// A dialog the CLI only announces, in its own words, without saying what it asks for in a
@@ -74,6 +116,21 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   }
 }
 
+/// What an MCP server asks of the user, in its own words (#273): its form is filled in the
+/// terminal, its page opened by the user.
+public struct AgentElicitation: Hashable, Codable, Sendable {
+  public let server: String?
+  public let message: String?
+  /// The page the server asks to open, in URL mode: `http` or `https` only.
+  public let url: URL?
+
+  public init(server: String? = nil, message: String? = nil, url: URL? = nil) {
+    self.server = server
+    self.message = message
+    self.url = url.flatMap { ["http", "https"].contains($0.scheme?.lowercased()) ? $0 : nil }
+  }
+}
+
 /// A dialog known only by what the CLI says of it — a notification, not a report (#273).
 public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
   public enum Kind: String, Hashable, Codable, Sendable {
@@ -87,6 +144,11 @@ public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
     case question
     /// A plan to accept.
     case plan
+    /// The CLI's account needs the user: signed out, refused, unpaid (#273).
+    case account
+    /// The CLI started, and its hooks have not spoken: a dialog of its own start holds them back —
+    /// trusting the folder, approving servers or hooks, signing in (#273).
+    case startup
     /// Anything else the agent stopped for.
     case other
   }
@@ -110,6 +172,11 @@ public struct AgentToolPermission: Hashable, Codable, Sendable {
     case read
     case web
     case patch
+    /// More than the sandbox allows — the network, folders — for a turn or the session: Codex's
+    /// `request_permissions` (#273).
+    case grant
+    /// Keys typed into a terminal the agent left running: Codex's `write_stdin` (#273).
+    case terminalInput
     case mcp(server: String, tool: String)
     case other(String)
   }
@@ -278,17 +345,21 @@ public struct AgentRequestNotice: Hashable, Sendable {
   /// A key of the agent's own for the request, when its journal gives one. Otherwise the line of
   /// the log that carried it is the key.
   public let key: String?
+  /// Asked without stopping the agent (#273).
+  public let isAsynchronous: Bool
 
   public init(
     content: AgentRequestContent,
     reference: AgentToolReference,
     isShown: Bool,
-    key: String? = nil
+    key: String? = nil,
+    isAsynchronous: Bool = false
   ) {
     self.content = content
     self.reference = reference
     self.isShown = isShown
     self.key = key
+    self.isAsynchronous = isAsynchronous
   }
 }
 

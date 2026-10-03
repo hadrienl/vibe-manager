@@ -279,6 +279,13 @@ extension AppModel {
     return true
   }
 
+  /// The page an MCP server asks to open (#273): in the session's web view, the session on
+  /// screen, or in the default browser when the session has no web view.
+  public func openRequestLink(_ url: URL, for id: AgentRequestID) {
+    openSession(for: id)
+    if !openInWebView(url, from: id.sessionID) { ExternalOpening.open(url) }
+  }
+
   // MARK: - Ticket
 
   /// Reads the session's branch and forge again, and the ticket they give.
