@@ -44,10 +44,11 @@ final class SmokeTests: XCTestCase {
       "VIBE_DEFAULTS_SUITE": suite,
       "VIBE_ENABLE_MOCK_AGENT": "only",
     ]
-    // The launch step about Full Disk Access is not shown, whatever the build is signed as, and no
-    // window state is restored.
+    // The launch step about Full Disk Access is not shown, whatever the build is signed as, nor the
+    // first launch's tour (#338), and no window state is restored.
     app.launchArguments += [
       "-permissions.fullDiskAccess.stepSuppressed", "YES",
+      "-onboarding.tourSuppressed", "YES",
       "-ApplePersistenceIgnoreState", "YES",
       "-AppleLanguages", "(\(language))",
       "-AppleLocale", locale,

@@ -83,6 +83,10 @@ struct VibeManagerApp: App {
           if environment.appModel.updates == nil {
             environment.appModel.updates = appDelegate.startUpdates(in: environment)
           }
+          // Settings › Show Tutorial Again shows its first bubble here (#338).
+          environment.appModel.showWorkspaceWindow = { [windowFocus] in
+            windowFocus.showWorkspace()
+          }
         }
         .background(WorkspaceWindowReader(focus: windowFocus))
     }

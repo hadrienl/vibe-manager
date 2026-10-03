@@ -32,7 +32,10 @@ struct SessionSidebar: View {
   /// A drag over a row: taken or refused (#42).
   @State private var rowDropHover: [SessionID: DropHover] = [:]
   @State private var springLoading = SpringLoading()
+  /// The row the tour opened to show the swipe (#338), and how far, until it puts it back.
+  @State private var demoSwipe: (id: SessionID, translation: CGFloat)?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.controlActiveState) private var activeState
 
   var body: some View {
     let _ = BodyCounter.tick(.sessionSidebar)
@@ -105,6 +108,8 @@ struct SessionSidebar: View {
             interrupted: { closeSwipe(animated: true) }
           )
         )
+        // The tour's bubble on the new session's row shows the gesture it talks about (#338).
+        .task(id: demoSessionID) { await playSwipeDemo(on: demoSessionID, width: width) }
         // Over the foot of the list, never over the session on screen, and the list's last rows
         // stay reachable above it (#40).
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -378,7 +383,11 @@ struct SessionSidebar: View {
         model: model, sessionID: session.id, springLoading: springLoading,
         hovered: Binding(
           get: { rowDropHover[session.id] },
-          set: { rowDropHover[session.id] = $0 })))
+          set: { rowDropHover[session.id] = $0 })
+      )
+    )
+    // Beside the row, over the session: the tour's statuses and its last word (#338).
+    .tourPopover(model, on: .sessionRow(session.id), arrowEdge: .trailing)
   }
 
   // MARK: - Swipe
@@ -439,6 +448,45 @@ struct SessionSidebar: View {
   private func commit(_ status: SessionTaskStatus, for id: SessionID) {
     closeSwipe(animated: true)
     Task { await model.setTaskStatus(status, for: id) }
+  }
+
+  // MARK: - Tour
+
+  /// The row whose bubble explains the statuses, while it is on screen (#338).
+  private var demoSessionID: SessionID? {
+    guard activeState != .inactive, let id = model.onboarding.sessionID,
+      model.tourStep(on: .sessionRow(id)) == .statuses
+    else { return nil }
+    return id
+  }
+
+  /// Opens the row on the statuses after its own, as two fingers would, then puts it back. With
+  /// Reduce Motion it stays open while the bubble is there: the still picture of the gesture.
+  private func playSwipeDemo(on id: SessionID?, width: CGFloat) async {
+    guard let id else { return endSwipeDemo() }
+    // Once the bubble is there to say what the row does.
+    try? await Task.sleep(for: .milliseconds(700))
+    guard !Task.isCancelled, swipe == nil,
+      let session = model.visibleSessions.first(where: { $0.id == id })
+    else { return }
+    var opened = makeSwipe(for: session, width: width)
+    opened.open(towardsNext: true)
+    let translation = opened.translation
+    swipe = makeSwipe(for: session, width: width)
+    slidingSessionIDs.insert(id)
+    demoSwipe = (id, translation)
+    animateSwipe(reduceMotion ? nil : .smooth(duration: 0.6)) { swipe?.translation = translation }
+    guard !reduceMotion else { return }
+    try? await Task.sleep(for: .seconds(1.8))
+    endSwipeDemo()
+  }
+
+  /// Puts the row back, unless the user took it meanwhile.
+  private func endSwipeDemo() {
+    guard let demo = demoSwipe else { return }
+    demoSwipe = nil
+    guard swipe?.sessionID == demo.id, swipe?.translation == demo.translation else { return }
+    closeSwipe(animated: true)
   }
 
   // MARK: - Empty

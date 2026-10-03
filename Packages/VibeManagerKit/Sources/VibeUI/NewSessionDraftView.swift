@@ -66,6 +66,11 @@ public struct NewSessionDraftView: View {
   /// The themes the session's conversation can be given (#274). `nil`: the draft offers none.
   private let themes: ConversationThemesModel?
   private let conversationAppearance: ConversationAppearance
+  /// The first launch's tour (#338), told what the user does in the draft. `nil`: no tour here.
+  private let onboarding: OnboardingModel?
+  /// The step whose bubble the draft shows now, if any.
+  private let tourStep: OnboardingStep?
+  @Environment(\.controlActiveState) private var activeState
 
   public init(
     model: NewSessionModel,
@@ -75,8 +80,12 @@ public struct NewSessionDraftView: View {
     chooseFiles: @escaping () -> Void,
     manageTemplates: (() -> Void)? = nil,
     themes: ConversationThemesModel? = nil,
-    conversationAppearance: ConversationAppearance = ConversationAppearance()
+    conversationAppearance: ConversationAppearance = ConversationAppearance(),
+    onboarding: OnboardingModel? = nil,
+    tourStep: OnboardingStep? = nil
   ) {
+    self.onboarding = onboarding
+    self.tourStep = tourStep
     self.themes = themes
     self.conversationAppearance = conversationAppearance
     _model = Bindable(model)
@@ -172,6 +181,35 @@ public struct NewSessionDraftView: View {
           moveFocus(to: .draft(.initialPrompt))
         })
     }
+    // The tour's bubble, over everything in the draft, next to what it describes (#338).
+    .overlayPreferenceValue(TourAnchorKey.self) { anchors in
+      TourAnchoredBubble(
+        anchors: anchors,
+        target: shownTourStep?.draftTarget,
+        bubble: shownTourStep.map(tourBubble),
+        advance: { onboarding?.send(.next) },
+        skip: { onboarding?.send(.skip) })
+    }
+    .animation(.easeInOut(duration: 0.2), value: shownTourStep)
+    .onChange(of: focus) { previous, _ in
+      // Left with a name in it: the name is done. Left with a folder typed: the folder is.
+      if previous == .draft(.name), !model.draft.trimmedName.isEmpty {
+        onboarding?.send(.nameCommitted)
+      }
+      if previous == .draft(.workingDirectory), model.draft.resolvedWorkingDirectoryPath != nil {
+        onboarding?.send(.folderChosen)
+      }
+    }
+    .onChange(of: model.draft.workingDirectoryPath) {
+      // Typed in its field, the folder is only chosen once the field is left.
+      guard focus != .draft(.workingDirectory), model.draft.workingDirectoryPath != nil else {
+        return
+      }
+      onboarding?.send(.folderChosen)
+    }
+    .onChange(of: model.draft.initialPrompt) {
+      if !model.draft.trimmedPrompt.isEmpty { onboarding?.send(.promptTyped) }
+    }
     // Escape discards the draft, as its button does — only from inside it: a key equivalent would
     // take Escape from the whole window, Open Quickly and the sidebar included. The prompt, an
     // AppKit text view, hands it over itself.
@@ -227,6 +265,7 @@ public struct NewSessionDraftView: View {
             Text("Session name", bundle: .module, comment: "The name of a session, as the label or placeholder of the field that sets it."))
           .accessibilityIdentifier("new-session-name")
         }
+        .tourAnchor(.draftName)
         ForEach(model.issues(for: .name) + model.issues(for: .appearance)) { issue in
           IssueLabel(issue: issue)
         }
@@ -237,13 +276,20 @@ public struct NewSessionDraftView: View {
       templateFields
       Divider()
       folderField
-      agentField
-      modelField
-      moreOptions
+        .tourAnchor(.draftFolder)
+      VStack(alignment: .leading, spacing: 14) {
+        agentField
+        modelField
+        moreOptions
+      }
+      .tourAnchor(.draftOptions)
     }
     // Return creates from a one-line field too — the name, the folder, the ticket, a template's
     // short field — as it does from the prompt: left to itself, the field only selected its text.
-    .onSubmit(submit)
+    // During the tour, it goes to the next bubble instead (#338).
+    .onSubmit {
+      if !advanceTourOnReturn() { submit() }
+    }
     .padding(16)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
@@ -709,6 +755,7 @@ public struct NewSessionDraftView: View {
       .overlay {
         RoundedRectangle(cornerRadius: 16).strokeBorder(.separator)
       }
+      .tourAnchor(.draftComposer)
       // The agent's skills and commands, above the prompt, as in a conversation (#219).
       // The guide outside the condition, which would drop it (see `PromptComposer`).
       .overlay(alignment: .top) {
@@ -810,6 +857,8 @@ public struct NewSessionDraftView: View {
       }
       .keyboardShortcut(.return, modifiers: .option)
       .disabled(!model.canSubmit)
+      // The tour's way to start: put forward while its bubble points at the prompt (#338).
+      .tourProminent(shownTourStep == .prompt)
       .accessibilityIdentifier("new-session-add-to-do")
 
       Button(action: submit) {
@@ -865,13 +914,46 @@ public struct NewSessionDraftView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
+  // MARK: - Tour
+
+  /// The tour's step on screen: none while another window is in front.
+  private var shownTourStep: OnboardingStep? {
+    activeState == .inactive ? nil : tourStep
+  }
+
+  private func tourBubble(for step: OnboardingStep) -> OnboardingModel.Bubble {
+    OnboardingModel.bubble(for: step, hasFolder: model.draft.resolvedWorkingDirectoryPath != nil)
+  }
+
+  /// Return in a one-line field while a bubble waits on the name, the folder or the options: on to
+  /// the next bubble rather than creating a session the tour has not got to yet.
+  private func advanceTourOnReturn() -> Bool {
+    guard let onboarding, let step = tourStep else { return false }
+    switch step {
+    case .name:
+      onboarding.send(.next)
+    case .folder:
+      guard model.draft.resolvedWorkingDirectoryPath != nil else {
+        NSSound.beep()
+        return true
+      }
+      onboarding.send(.folderChosen)
+    case .options:
+      onboarding.send(.next)
+    case .newSession, .prompt, .statuses, .finale:
+      return false
+    }
+    return true
+  }
+
   // MARK: - Actions
 
   private func placeCaret() {
     // Back from a creation that was refused: the caret goes to what stopped it.
+    // The tour's name bubble has the caret in the name it talks about (#338).
     let target =
       firstIssueTarget ?? model.draft.templateFill.flatMap(firstEmptyField)
-      ?? .draft(.initialPrompt)
+      ?? (tourStep == .name ? .draft(.name) : .draft(.initialPrompt))
     // An AppKit prompt takes the caret when its request turns on: asked again for the same one,
     // the request is turned off first, and on at the next turn of the run loop.
     guard editorRequest == target else {

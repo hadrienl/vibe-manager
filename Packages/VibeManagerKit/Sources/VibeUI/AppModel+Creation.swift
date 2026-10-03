@@ -121,6 +121,7 @@ extension AppModel {
     guard newSessionModel != nil else { return }
     isPresentingNewSession = true
     newSessionFocusRequest += 1
+    onboarding.send(.draftOpened)
   }
 
   /// The user goes elsewhere: the draft stays for later, unless nothing of theirs is in it yet —
@@ -130,6 +131,8 @@ extension AppModel {
     isPresentingNewSession = false
     if let draft = newSessionModel, draft.isPristine, !draft.isSubmitting {
       newSessionModel = nil
+      // Nothing left to come back to: the tour goes back to New Session.
+      onboarding.send(.draftDiscarded)
     }
   }
 

@@ -409,8 +409,8 @@ struct SettingsPageView: View {
   }
 }
 
-/// Settings › General: the sessions, their summary, their side terminals, and where a changed
-/// file opens.
+/// Settings › General: the sessions, their summary, their side terminals, where a changed file
+/// opens, and the tutorial.
 struct GeneralSettingsPage: View {
   @Bindable var model: AppModel
 
@@ -442,8 +442,34 @@ struct GeneralSettingsPage: View {
       } header: {
         Text("Changed Files", bundle: .module, comment: "A section of the Settings window.")
       }
+      Section {
+        TutorialRow(model: model)
+      } header: {
+        Text("Tutorial", bundle: .module, comment: "A section of the Settings window.")
+      }
     }
     .formStyle(.grouped)
+  }
+}
+
+/// The first launch's tour, walked again (#338).
+private struct TutorialRow: View {
+  let model: AppModel
+
+  var body: some View {
+    LabeledContent {
+      Button {
+        model.replayTutorial()
+      } label: {
+        Text("Show Tutorial Again", bundle: .module, comment: "Settings: starts the tutorial over.")
+      }
+      .accessibilityIdentifier("settings-replay-tutorial")
+    } label: {
+      Text("First session", bundle: .module, comment: "Settings: the tutorial's row.")
+      Text(
+        "The bubbles that walk you from New Session to an agent at work.", bundle: .module,
+        comment: "Settings: what Show Tutorial Again shows.")
+    }
   }
 }
 
