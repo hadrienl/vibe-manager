@@ -27,29 +27,38 @@ public final class OnboardingModel {
   public var sessionID: SessionID? { tour.sessionID }
 
   public func send(_ event: OnboardingEvent) {
-    if case .created(_, let launched) = event {
+    let next = tour.applying(event)
+    guard next != tour else { return }
+    // Only for the session the tour takes: another one made meanwhile changes nothing.
+    if case .created(_, let launched) = event, next.step == .statuses {
       watchesForStart = !launched
       observedStatus = nil
     }
-    let next = tour.applying(event)
-    guard next != tour else { return }
     tour = next
     // A suppressed tour leaves the user's preferences as it found them.
     if !preferences.isTourSuppressed { preferences.tour = next }
   }
 
   /// Every list the workspace holds. The tour's session seen going from To Do to In Progress, by
-  /// whatever way — a swipe, its menu, Start Session — is the move the statuses bubble asks for.
+  /// whatever way — a swipe, its menu, Start Session — is the move the statuses bubble asks for;
+  /// seen archived or gone, it leaves the tour nothing to point at.
   func observe(_ sessions: [WorkSession]) {
-    guard step == .statuses, watchesForStart, let id = sessionID,
-      let status = sessions.first(where: { $0.id == id })?.taskStatus
+    guard step == .statuses || step == .finale, let id = sessionID else {
+      observedStatus = nil
+      return
+    }
+    guard let session = sessions.first(where: { $0.id == id }), session.status != .archived
     else {
+      observedStatus = nil
+      return send(.sessionRemoved(id))
+    }
+    guard step == .statuses, watchesForStart else {
       observedStatus = nil
       return
     }
     let previous = observedStatus
-    observedStatus = status
-    if previous == .todo, status == .doing { send(.taskStatusChanged(id, .doing)) }
+    observedStatus = session.taskStatus
+    if previous == .todo, session.taskStatus == .doing { send(.taskStatusChanged(id, .doing)) }
   }
 
   /// At launch, once the sessions are read.

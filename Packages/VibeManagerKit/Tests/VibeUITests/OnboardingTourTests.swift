@@ -117,6 +117,46 @@ struct OnboardingWorkspaceTests {
     #expect(model.onboarding.step == .finale)
   }
 
+  @Test("Another session launched meanwhile does not keep Start Session from ending the tour")
+  func anotherSessionMeanwhile() async throws {
+    let (model, _, _) = makeWorkspace()
+    await model.load()
+    try fillDraft(in: model)
+    model.submitNewSession(launching: false)
+    await waitUntil("the creation is over") {
+      model.onboarding.step == .statuses && model.sessionInCreation == nil
+    }
+    let id = try #require(model.onboarding.sessionID)
+    try fillDraft(in: model)
+    model.submitNewSession(launching: true)
+    await waitUntil("the second creation is over") {
+      model.sessionInCreation == nil && model.sessions.count == 2
+    }
+    #expect(model.onboarding.sessionID == id)
+
+    _ = try await ChangeTaskStatus(repository: model.repository).beginWork(id: id)
+    await model.reload()
+
+    #expect(model.onboarding.step == .finale)
+  }
+
+  @Test("The tour's session archived: the tour starts over at New Session")
+  func sessionArchived() async throws {
+    let (model, _, _) = makeWorkspace()
+    await model.load()
+    try fillDraft(in: model)
+    model.submitNewSession(launching: false)
+    await waitUntil("the creation is over") {
+      model.onboarding.step == .statuses && model.sessionInCreation == nil
+    }
+    let id = try #require(model.onboarding.sessionID)
+
+    try await ArchiveSession(repository: model.repository)(id: id)
+    await model.reload()
+
+    #expect(model.onboarding.step == .newSession)
+  }
+
   @Test("A draft opened before the list was read is where the tour starts")
   func draftBeforeLoad() async {
     let (model, _, _) = makeWorkspace()

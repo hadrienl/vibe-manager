@@ -103,6 +103,7 @@ struct SessionSidebar: View {
             // A click on the open row puts its buttons away, as a click anywhere else does. With
             // Reduce Motion the row stays under its buttons, and only they answer.
             clicked: { id in
+              if id != nil, id == demoSwipe?.id { demoSwipe = nil }
               if !reduceMotion, id != nil, id == swipe?.sessionID { closeSwipe(animated: true) }
             },
             interrupted: { closeSwipe(animated: true) }
@@ -407,6 +408,8 @@ struct SessionSidebar: View {
     let visible = model.visibleSessions
     guard let session = (id ?? hoveredSessionID).flatMap({ id in visible.first { $0.id == id } })
     else { return false }
+    // The tour's demo gives the row up to the fingers: it is theirs now (#338).
+    if demoSwipe?.id == session.id { demoSwipe = nil }
     // A swipe on the row already open takes it from where it is.
     if swipe?.sessionID != session.id {
       swipe = makeSwipe(for: session, width: width)

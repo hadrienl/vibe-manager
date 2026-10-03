@@ -56,6 +56,19 @@ struct OnboardingTourTests {
     }
   }
 
+  @Test("The session archived or deleted: back to the start, or over after the last word")
+  func sessionRemoved() {
+    #expect(
+      OnboardingTour.step(.statuses, session: session).applying(.sessionRemoved(session))
+        == .step(.newSession, session: nil))
+    #expect(
+      OnboardingTour.step(.finale, session: session).applying(.sessionRemoved(session))
+        == .finished)
+    #expect(
+      OnboardingTour.step(.statuses, session: session).applying(.sessionRemoved(SessionID()))
+        == .step(.statuses, session: session))
+  }
+
   @Test("Skip ends the tour from every step")
   func skipFromEverywhere() {
     for step in OnboardingStep.allCases {

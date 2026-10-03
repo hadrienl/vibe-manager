@@ -51,6 +51,8 @@ public enum OnboardingEvent: Equatable, Sendable {
   /// A session was made; `launched` when its agent was started at once rather than left in To Do.
   case created(SessionID, launched: Bool)
   case taskStatusChanged(SessionID, SessionTaskStatus)
+  /// The session was archived or deleted.
+  case sessionRemoved(SessionID)
   /// Next, or Done on the closing bubble.
   case next
   case skip
@@ -113,6 +115,11 @@ public enum OnboardingTour: Equatable, Codable, Sendable {
     case (.statuses, .next):
       return .step(.finale, session: session)
     case (.finale, .next):
+      return .finished
+    // Nothing left to point at: back to the start, as a relaunch would, or over once all was said.
+    case (.statuses, .sessionRemoved(let id)) where id == session:
+      return .step(.newSession, session: nil)
+    case (.finale, .sessionRemoved(let id)) where id == session:
       return .finished
     default:
       return self
