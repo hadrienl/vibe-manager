@@ -166,7 +166,10 @@ public final class EndpointsSettingsModel {
     }
   }
 
-  /// What the empty tab offers to start from: the URL, the protocol and the kind of key filled in.
+  /// The preset of a server none of the others is: its address and its protocol are the user's.
+  public static let otherPresetID = "other"
+
+  /// What a new endpoint starts from: the URL, the protocol and the kind of key filled in.
   public static let presets: [Preset] = [
     Preset(
       id: "ollama", name: "Ollama", baseURL: "http://localhost:11434", wireProtocol: .messages,
@@ -178,10 +181,7 @@ public final class EndpointsSettingsModel {
       id: "openrouter", name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1",
       wireProtocol: .chatCompletions, authentication: .bearer),
     Preset(
-      id: "openai", name: "OpenAI-compatible", baseURL: "https://", wireProtocol: .chatCompletions,
+      id: otherPresetID, name: "", baseURL: "https://", wireProtocol: .chatCompletions,
       authentication: .bearer),
-    Preset(
-      id: "anthropic", name: "Anthropic-compatible", baseURL: "https://", wireProtocol: .messages,
-      authentication: .header(name: "x-api-key")),
   ]
 }
