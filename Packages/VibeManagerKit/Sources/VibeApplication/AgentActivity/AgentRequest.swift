@@ -29,6 +29,9 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
   /// dialog lands in the prompt — seen in the spike of #40, where the Return that followed then
   /// picked the highlighted option: the wrong one.
   public var isShown: Bool
+  /// Asked without stopping the agent, which goes on meanwhile — Codex's
+  /// `request_user_input_async` (#273): it never comes before a request that holds the agent.
+  public var isAsynchronous: Bool
 
   public init(
     id: AgentRequestID,
@@ -36,7 +39,8 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
     kind: AgentQuestionKind,
     content: AgentRequestContent,
     reference: AgentToolReference,
-    isShown: Bool
+    isShown: Bool,
+    isAsynchronous: Bool = false
   ) {
     self.id = id
     self.receivedAt = receivedAt
@@ -44,6 +48,7 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
     self.content = content
     self.reference = reference
     self.isShown = isShown
+    self.isAsynchronous = isAsynchronous
   }
 }
 
@@ -189,8 +194,6 @@ public struct AgentAlwaysAllow: Hashable, Codable, Sendable {
     case commandPrefix
     /// These files, for the rest of the session.
     case files
-    /// The permissions asked for, for the rest of the session.
-    case permissions
   }
 
   /// Where the CLI keeps what is allowed.
@@ -306,17 +309,21 @@ public struct AgentRequestNotice: Hashable, Sendable {
   /// A key of the agent's own for the request, when its journal gives one. Otherwise the line of
   /// the log that carried it is the key.
   public let key: String?
+  /// Asked without stopping the agent (#273).
+  public let isAsynchronous: Bool
 
   public init(
     content: AgentRequestContent,
     reference: AgentToolReference,
     isShown: Bool,
-    key: String? = nil
+    key: String? = nil,
+    isAsynchronous: Bool = false
   ) {
     self.content = content
     self.reference = reference
     self.isShown = isShown
     self.key = key
+    self.isAsynchronous = isAsynchronous
   }
 }
 

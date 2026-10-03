@@ -165,11 +165,17 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
 /// first, then — only when the server allows it — `Allow for this session` and `Always allow`,
 /// then `Cancel`. It ignores `y`, which left the agent waiting on a request the card said was
 /// answered: a digit picks its option and submits the form, and `1` is always `Allow`.
+///
+/// `request_permissions` and `write_stdin` are answered in the terminal (#273): Codex says
+/// nothing when it draws the first, and quotes the second cut too short to tell one from another,
+/// so neither is ever known on screen. Escape would not refuse the first anyway: `d` does.
 public struct CodexAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
   public func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
     switch content {
+    case .permission(let permission) where [.grant, .terminalInput].contains(permission.tool):
+      return []
     case .permission(let permission):
       // A host's access says nothing of commands: no "always" there, whatever the tool.
       return Self.alwaysKey(for: permission) == nil || permission.alwaysAllow == nil
@@ -185,6 +191,8 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
     for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
   ) -> [[UInt8]]? {
     switch (answer, content) {
+    case (_, .permission(let permission)) where [.grant, .terminalInput].contains(permission.tool):
+      return nil
     case (.allowOnce, .permission(let permission)):
       if case .mcp = permission.tool {
         return ClaudeCodeAnswerKeymap.digit(of: screen?.option { $0 == "Allow" })
@@ -198,9 +206,6 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
         !option.label.localizedCaseInsensitiveContains("in the future")
       else { return nil }
       return [key]
-    case (.deny, .permission(let permission)) where permission.tool == .grant:
-      // Escape is no refusal in this dialog (0.159.2, `approval_overlay.rs`): `d` is.
-      return Self.shortcut("d", in: screen)
     case (.deny, .permission), (.deny, .unreadable):
       return [TerminalKeys.escape]
     default:
@@ -217,7 +222,7 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
   static func alwaysKey(for permission: AgentToolPermission) -> [UInt8]? {
     switch permission.tool {
     case .shell: return Array("p".utf8)
-    case .patch, .grant: return Array("a".utf8)
+    case .patch: return Array("a".utf8)
     default: return nil
     }
   }
@@ -229,8 +234,6 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
       return AgentAlwaysAllow(rules: [.commandPrefix], scope: .session)
     case "apply_patch":
       return AgentAlwaysAllow(rules: [.files], scope: .session)
-    case "request_permissions":
-      return AgentAlwaysAllow(rules: [.permissions], scope: .session)
     default:
       return nil
     }

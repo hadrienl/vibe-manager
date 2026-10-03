@@ -144,7 +144,8 @@ public struct CodexQuestionWatch: Sendable {
         content: questions.isEmpty ? .unreadable(tool: name) : .questions(questions),
         reference: AgentToolReference(tool: name, subject: callID),
         isShown: false,
-        key: "codex:\(callID)"
+        key: "codex:\(callID)",
+        isAsynchronous: isAsync
       )
       return [.questionAsked(.question, tool: name, notice: notice)]
     case "function_call_output":

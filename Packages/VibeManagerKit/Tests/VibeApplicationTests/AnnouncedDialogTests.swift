@@ -431,6 +431,23 @@ struct SettledRequestsTests {
     #expect(late.activity == .awaitingUser(.approval))
     // The dialog answered, the hooks speak: it is gone.
     #expect(feed(.channelConfirmed, to: late).requests.isEmpty)
+    // Hooks that never speak — turned off, or failing: the terminal is all there is. What it
+    // draws leaves the dialog waiting; a letter does not answer it, Return or Escape does.
+    func reduce(_ event: AgentActivityInput, _ state: AgentActivityState) -> AgentActivityState {
+      AgentActivityMachine.reduce(
+        state, event,
+        context: AgentActivityContext(
+          now: start.addingTimeInterval(20), isVisible: false,
+          requestID: AgentRequestID(sessionID: session, key: "key")))
+    }
+    let drawn = reduce(.output, late)
+    #expect(drawn.activity == .awaitingUser(.approval))
+    #expect(reduce(.userInput(Array("y".utf8)), drawn).requests.count == 1)
+    for key in [[0x0D], [0x1B]] as [[UInt8]] {
+      let answered = reduce(.userInput(key), drawn)
+      #expect(answered.requests.isEmpty)
+      #expect(answered.activity == .working)
+    }
     // Without hooks, nothing is waited for.
     let bare = AgentActivityMachine.reduce(
       AgentActivityState(activity: .idle, source: .inferred), .tick,
@@ -473,5 +490,42 @@ struct TerminalNotificationScannerTests {
     var scanner = TerminalNotificationScanner()
     #expect(scanner.scan(bytes("\u{1B}]9;" + String(repeating: "a", count: 5000))).isEmpty)
     #expect(scanner.scan(bytes("\u{07}")).isEmpty)
+  }
+}
+
+@Suite("A question asked without stopping the agent (#273, P3)")
+struct AsynchronousQuestionTests {
+  private let asked = AgentSignal.questionAsked(
+    .question, tool: "request_user_input_async",
+    notice: AgentRequestNotice(
+      content: .questions([AgentQuestion(header: nil, text: "Which port?", options: [])]),
+      reference: AgentToolReference(tool: "request_user_input_async", subject: "call_a"),
+      isShown: false, key: "codex:call_a", isAsynchronous: true))
+
+  private func play(_ steps: (TimeInterval, AgentSignal)...) -> AgentActivityState {
+    var state = AgentActivityState(activity: .working, source: .structured)
+    for (seconds, signal) in steps {
+      state = AgentActivityMachine.reduce(
+        state, .signal(signal), context: context("t\(seconds)", at: seconds))
+    }
+    return state
+  }
+
+  @Test("A permission asked meanwhile goes before it, and is answered as if it were alone")
+  func permissionFirst() {
+    let state = play((0, asked), (60, permission(shown: true)))
+    #expect(state.requests.map(\.isAsynchronous) == [false, true])
+    #expect(state.activity == .awaitingUser(.approval))
+    #expect(!state.isFirstRequestUncertain)
+  }
+
+  @Test("Codex's word of it adds nothing; a form it announces still waits")
+  func announcements() {
+    let question = AgentSignal.dialogAnnounced(
+      AgentTerminalPrompt(kind: .question, message: "Question: Which port?"))
+    let form = AgentSignal.dialogAnnounced(
+      AgentTerminalPrompt(kind: .form, message: "Approval requested by github"))
+    #expect(play((0, asked), (60, question)).requests.count == 1)
+    #expect(play((0, asked), (60, form)).requests.map(\.content.isAnnouncedOnly) == [true, false])
   }
 }

@@ -25,10 +25,11 @@ public enum ClaudeCodeActivityHooks {
     Hook(event: "PreToolUse", matcher: questionTools, payload: .keep),
     Hook(event: "PermissionRequest", matcher: nil, payload: .keep),
     Hook(event: "Notification", matcher: nil, payload: .keep),
-    // What the server asks, and the page it asks to open: never what its form is filled with.
+    // What the server asks, and the page it asks to open — never what its form is filled with —
+    // and which agent waits on it.
     Hook(
       event: "Elicitation", matcher: nil,
-      payload: .fields(["mcp_server_name", "message", "mode", "url"])),
+      payload: .fields(["agent_id", "mcp_server_name", "message", "mode", "url"])),
     Hook(event: "ElicitationResult", matcher: nil, payload: .drop),
     // Which agent ran which tool on what: the request of #40 it settles, among several waiting.
     Hook(
@@ -152,7 +153,9 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
         .question,
         notice: AgentRequestNotice(
           content: .elicitation(Self.elicitation(in: event)),
-          reference: AgentToolReference(tool: nil), isShown: true))
+          // A sub-agent's: the end of the main agent's batch does not settle it.
+          reference: AgentToolReference(tool: nil, agentID: event.string("agent_id")),
+          isShown: true))
     case "ElicitationResult":
       return .questionResolved
     case "PostToolUse", "PostToolUseFailure", "PermissionDenied":

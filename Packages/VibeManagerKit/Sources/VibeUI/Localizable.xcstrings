@@ -18025,17 +18025,6 @@
         }
       }
     },
-    "these permissions" : {
-      "comment" : "What always allowing grants: the permissions the agent asked for.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ces permissions"
-          }
-        }
-      }
-    },
     "too old: update it" : {
       "comment" : "Why an agent cannot draw an avatar: after its name.",
       "localizations" : {

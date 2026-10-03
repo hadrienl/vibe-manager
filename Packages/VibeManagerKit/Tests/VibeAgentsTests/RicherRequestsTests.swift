@@ -50,6 +50,12 @@ struct ElicitationReadingTests {
     #expect(read.url == URL(string: "https://example.org/a?b=1"))
   }
 
+  @Test("A sub-agent's form is known as its own")
+  func subAgent() throws {
+    let event = event("Elicitation", #"{"agent_id":"a1","mcp_server_name":"memory","mode":"form"}"#)
+    #expect(notice(of: ClaudeCodeSignalDecoder().signal(for: event))?.reference.agentID == "a1")
+  }
+
   @Test("A form gives no page, even when an address comes with it")
   func form() throws {
     let read = try #require(elicitation(try reported(mode: "form", url: "https://example.org")))
@@ -208,7 +214,6 @@ struct CodexPermissionsReadingTests {
     #expect(legacy.tool == .grant)
     #expect(legacy.subject == "network; read /tmp/readme.txt; write /tmp/out.txt")
     #expect(legacy.purpose == "need workspace access")
-    #expect(legacy.alwaysAllow == AgentAlwaysAllow(rules: [.permissions], scope: .session))
     let entries = try permission(
       #"{"tool_name":"request_permissions","tool_input":{"reason":null,"permissions":{"file_system":{"entries":[{"path":{"type":"path","path":"/a"},"access":"write"},{"path":{"type":"glob_pattern","pattern":"**/.env"},"access":"deny"}]}}}}"#
     )
@@ -226,33 +231,23 @@ struct CodexPermissionsReadingTests {
     #expect(input.alwaysAllow == nil)
   }
 
-  @Test("Granted for the turn by y, the session by a, refused by d — never by Escape")
-  func grantKeys() throws {
+  @Test("Both are answered in the terminal: Codex never says when they are on screen")
+  func inTerminal() throws {
     let keymap = CodexAnswerKeymap()
-    let content = AgentRequestContent.permission(
+    let grant = AgentRequestContent.permission(
       try permission(
         #"{"tool_name":"request_permissions","tool_input":{"permissions":{"network":{"enabled":true}}}}"#
       ))
-    let screen = AgentDialogScreen(screen: Self.grantDialog)
-    #expect(keymap.answers(for: content) == [.allowOnce, .allowAlways, .deny])
-    #expect(keymap.keystrokes(for: .allowOnce, to: content, screen: screen) == [Array("y".utf8)])
-    #expect(keymap.keystrokes(for: .allowAlways, to: content, screen: screen) == [Array("a".utf8)])
-    #expect(keymap.keystrokes(for: .deny, to: content, screen: screen) == [Array("d".utf8)])
-    // Some other dialog on screen: nothing is typed.
-    let other = AgentDialogScreen(screen: Self.inputDialog)
-    #expect(keymap.keystrokes(for: .deny, to: content, screen: other) == nil)
-    #expect(keymap.keystrokes(for: .deny, to: content, screen: nil) == nil)
-  }
-
-  @Test("Input for a terminal is sent once or refused, never always")
-  func inputKeys() throws {
-    let keymap = CodexAnswerKeymap()
-    let content = AgentRequestContent.permission(
+    let input = AgentRequestContent.permission(
       try permission(#"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"y"}}"#))
-    let screen = AgentDialogScreen(screen: Self.inputDialog)
-    #expect(keymap.answers(for: content) == [.allowOnce, .deny])
-    #expect(keymap.keystrokes(for: .allowOnce, to: content, screen: screen) == [Array("y".utf8)])
-    #expect(keymap.keystrokes(for: .deny, to: content, screen: screen) == [TerminalKeys.escape])
+    for (content, dialog) in [(grant, Self.grantDialog), (input, Self.inputDialog)] {
+      #expect(keymap.answers(for: content).isEmpty)
+      for answer in [AgentAnswer.allowOnce, .allowAlways, .deny] {
+        #expect(
+          keymap.keystrokes(for: answer, to: content, screen: AgentDialogScreen(screen: dialog))
+            == nil)
+      }
+    }
   }
 }
 

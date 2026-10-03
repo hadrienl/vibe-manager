@@ -137,11 +137,21 @@ public enum AgentActivityMachine {
         break
       }
       next.lastOutputAt = context.now
-      next.activity = .working
+      // A dialog of the start waits until it is answered, whatever the terminal draws.
+      if next.requests.isEmpty { next.activity = .working }
 
     case .userInput(let bytes):
       next.lastUserInputAt = context.now
-      guard next.isStructured else { break }
+      // The dialog of a start the hooks never spoke after (#273): only Return or Escape leaves it,
+      // and no hook will say so.
+      if !next.isStructured {
+        if case .inTerminal(let prompt) = next.requests.first?.content, prompt.kind == .startup,
+          bytes == [0x0D] || interruptKeys.contains(bytes)
+        {
+          next.settleFirstRequest(isKnownAnswered: true)
+        }
+        break
+      }
       // A key that answers or leaves a dialog: the one drawn is gone, its report or not.
       if context.approvalAnswerKeys.contains(bytes) || interruptKeys.contains(bytes)
         || bytes == [0x0D]
@@ -275,8 +285,13 @@ public enum AgentActivityMachine {
     case .dialogAnnounced(let prompt):
       // Claude Code's notification repeats a dialog its `PermissionRequest` already reported, and
       // may come once it is answered: it only stands for one when nothing drawn waits (#273). A
-      // question read from Codex's rollout is never known drawn, and Codex announces it too.
-      guard !next.requests.contains(where: { $0.isShown || $0.kind == .question }) else { break }
+      // question read from Codex's rollout is never known drawn, and Codex announces it too; one
+      // asked without stopping the agent says nothing of its other dialogs.
+      guard
+        !next.requests.contains(where: {
+          $0.isShown || ($0.kind == .question && (!$0.isAsynchronous || prompt.kind == .question))
+        })
+      else { break }
       let kind: AgentQuestionKind = prompt.kind == .question ? .question : .approval
       next.enqueue(
         AgentRequestNotice(
@@ -483,13 +498,22 @@ extension AgentActivityState {
     // same second may be on screen in the other order, and neither is answered from outside
     // until one is settled. The lines are stamped to the whole second, so two stamps one apart
     // may be a moment apart.
-    if let last = requests.last, abs(context.now.timeIntervalSince(last.receivedAt)) <= 1 {
+    if let last = requests.last(where: { !$0.isAsynchronous }),
+      abs(context.now.timeIntervalSince(last.receivedAt)) <= 1
+    {
       isFirstRequestUncertain = true
     }
-    requests.append(
-      AgentRequest(
-        id: id, receivedAt: context.now, kind: kind, content: notice.content,
-        reference: notice.reference, isShown: notice.isShown))
+    let request = AgentRequest(
+      id: id, receivedAt: context.now, kind: kind, content: notice.content,
+      reference: notice.reference, isShown: notice.isShown,
+      isAsynchronous: notice.isAsynchronous)
+    // A question asked without stopping waits behind whatever holds the agent: the dialog on
+    // screen is that one's (#273).
+    if !request.isAsynchronous, let index = requests.firstIndex(where: \.isAsynchronous) {
+      requests.insert(request, at: index)
+    } else {
+      requests.append(request)
+    }
   }
 
   /// The first request was taken as answered: the next one's dialog takes its place.

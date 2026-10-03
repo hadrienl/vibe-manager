@@ -258,11 +258,6 @@ public enum RequestPresentation {
         localized: LocalizedStringResource(
           "changes to these files", bundle: .module,
           comment: "What always allowing grants: further changes to the same files."))
-    case .permissions:
-      return String(
-        localized: LocalizedStringResource(
-          "these permissions", bundle: .module,
-          comment: "What always allowing grants: the permissions the agent asked for."))
     }
   }
 
