@@ -29,8 +29,12 @@ public struct ConversationView: View {
     )?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
+  @State private var pager = ConversationPager()
+  /// Where a page leads, in the messages: a mark that SwiftUI scrolls to (#227).
+  @State private var pageTarget = 0.0
 
   private static let bottomID = "conversation.bottom"
+  private static let pageTargetID = "conversation.page"
 
   public init(
     model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance,
@@ -184,6 +188,16 @@ public struct ConversationView: View {
         // to the scroll view's top inset, which macOS 26 covers with the toolbar's edge effect
         // (#228).
         .frame(minHeight: viewportHeight, alignment: .bottom)
+        // Inside the scroll view of the messages: the pager finds it from here (#227).
+        .background(ConversationPagerProbe(pager: pager).accessibilityHidden(true))
+        .overlay(alignment: .topLeading) {
+          // Laid out there, not drawn there: an offset would leave it where SwiftUI scrolls to.
+          Color.clear
+            .frame(width: 1, height: 1)
+            .id(Self.pageTargetID)
+            .padding(.top, max(pageTarget, 0))
+            .accessibilityHidden(true)
+        }
         .onGeometryChange(for: CGRect.self) {
           $0.frame(in: .scrollView)
         } action: { frame in
@@ -201,6 +215,12 @@ public struct ConversationView: View {
       .modifier(ToolbarVeil())
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
+      }
+      .onChange(of: model.pageRequest) {
+        guard let top = pager.readableTop(after: model.pageRequest.page) else { return }
+        pageTarget = top
+        // Once the mark has moved there.
+        DispatchQueue.main.async { proxy.scrollTo(Self.pageTargetID, anchor: .top) }
       }
       .onChange(of: model.revealRequest) {
         guard let id = model.revealedBlockID else { return }

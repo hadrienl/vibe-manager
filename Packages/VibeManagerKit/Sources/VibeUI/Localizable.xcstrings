@@ -13513,6 +13513,17 @@
         }
       }
     },
+    "The agent has said nothing yet." : {
+      "comment" : "Read Last Output, in a conversation where the agent has not answered yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent n’a encore rien dit."
+          }
+        }
+      }
+    },
     "The agent is asking for your approval in the web view." : {
       "localizations" : {
         "fr" : {

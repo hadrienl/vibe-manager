@@ -986,6 +986,33 @@ public final class ConversationModel {
     scrollToBottomRequest += 1
   }
 
+  /// A page of the conversation to scroll, from the keyboard (#227): Page Up and Page Down in the
+  /// composer, which has the keyboard while the messages are read.
+  enum Page: Hashable, Sendable { case up, down }
+
+  /// The page asked for, and a counter: twice the same page in a row still moves.
+  struct PageRequest: Hashable, Sendable {
+    var page: Page
+    var count: Int
+  }
+
+  private(set) var pageRequest = PageRequest(page: .down, count: 0)
+
+  func scrollPage(_ page: Page) {
+    pageRequest = PageRequest(page: page, count: pageRequest.count + 1)
+  }
+
+  /// What the agent last said, as plain text: what Read Last Output (⌃⌥⌘O) reads in a
+  /// conversation (#227). `nil` before the agent has said anything.
+  public var lastAgentMessage: String? {
+    for entry in latestSnapshot.entries.reversed() {
+      guard case .agentText(let text) = entry.content else { continue }
+      let plain = MarkdownDocument.plainText(from: text)
+      if !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return plain }
+    }
+    return nil
+  }
+
   // MARK: - Composer
 
   public enum ComposerState: Hashable, Sendable {

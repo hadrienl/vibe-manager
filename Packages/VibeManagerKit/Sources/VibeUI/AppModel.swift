@@ -3288,9 +3288,23 @@ extension AppModel {
     }
   }
 
-  /// Read Last Output, ⌃⌥⌘O: VoiceOver says the last lines the selected session's terminal
-  /// showed. On demand only — never as output arrives.
+  /// Read Last Output, ⌃⌥⌘O: VoiceOver says the agent's last message when the session is shown as
+  /// a conversation (#227), the last lines its terminal showed otherwise. On demand only — never
+  /// as output arrives.
   public func readLastOutput() async {
+    if isSessionOnScreen, let id = selectedSessionID,
+      let shown = sessions.first(where: { $0.id == id }),
+      presentation(of: shown) == .conversation,
+      let conversation = conversations.existingModel(for: id)
+    {
+      if let message = conversation.lastAgentMessage {
+        Announcer.announce(message)
+      } else {
+        Announcer.announce(
+          LocalizedStringResource("The agent has said nothing yet.", bundle: .module))
+      }
+      return
+    }
     guard isSessionOnScreen, let id = selectedSessionID, let session = pane(for: id)?.session
     else {
       Announcer.announce(LocalizedStringResource("No terminal is selected.", bundle: .module))

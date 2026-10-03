@@ -31,7 +31,12 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌃⌘G | Group Sessions by Folder | View |
 | ⌃⌥⌘← / ⌃⌥⌘→ | Collapse / Expand the group of the selected session | View |
 | ⌥⌘I | Show / Hide Context | View |
-| ⌃⌥⌘O | Read Last Output: VoiceOver says the last five lines the terminal showed | View |
+| ⌃⌥⌘O | Read Last Output: VoiceOver says the agent's last message when the session is shown as a conversation, the last five lines the terminal showed otherwise | View |
+
+In the composer of a conversation, Page Up and Page Down (fn↑ and fn↓ on a laptop) scroll the
+messages by a page, and End (fn→) goes back to the last one (#227): the conversation is read
+without leaving the composer, whose ↑ and ↓ keep recalling the messages sent. A draft taller
+than its field keeps the three keys, to scroll itself, as any text does.
 
 An agent running in the terminal loses ⌥⌘1, ⌥⌘2 and ⌥⌘3, which full-screen programs rarely use; the
 menus already took the others before #19.
