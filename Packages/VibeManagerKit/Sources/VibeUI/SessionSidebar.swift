@@ -460,25 +460,43 @@ struct SessionSidebar: View {
     return id
   }
 
-  /// Opens the row on the statuses after its own, as two fingers would, then puts it back. With
-  /// Reduce Motion it stays open while the bubble is there: the still picture of the gesture.
+  /// Opens the row as two fingers would, on the statuses after its own, then on those before it,
+  /// putting it back each time, for as long as the bubble is there. A side without statuses only
+  /// gives a little, as it does under the fingers. With Reduce Motion the row stays open on the
+  /// statuses after its own while the bubble is there: the still picture of the gesture.
   private func playSwipeDemo(on id: SessionID?, width: CGFloat) async {
     guard let id else { return endSwipeDemo() }
     // Once the bubble is there to say what the row does.
-    try? await Task.sleep(for: .milliseconds(700))
+    try? await Task.sleep(for: .milliseconds(800))
+    while !Task.isCancelled {
+      for towardsNext in [true, false] {
+        guard showSwipeDemo(on: id, towardsNext: towardsNext, width: width) else { return }
+        if reduceMotion { return }
+        try? await Task.sleep(for: .seconds(2.2))
+        endSwipeDemo()
+        guard !Task.isCancelled else { return }
+        try? await Task.sleep(for: .seconds(1))
+      }
+      try? await Task.sleep(for: .seconds(2))
+    }
+  }
+
+  /// One side of the demo. `false` when the row is not there to show it, or is the user's.
+  private func showSwipeDemo(on id: SessionID, towardsNext: Bool, width: CGFloat) -> Bool {
     guard !Task.isCancelled, swipe == nil,
       let session = model.visibleSessions.first(where: { $0.id == id })
-    else { return }
+    else { return false }
     var opened = makeSwipe(for: session, width: width)
-    opened.open(towardsNext: true)
-    let translation = opened.translation
+    opened.open(towardsNext: towardsNext)
+    // A side with nothing to offer: as far as the fingers would pull it before it resists.
+    let translation =
+      opened.translation != 0
+      ? opened.translation : (towardsNext ? -1 : 1) * SessionSwipe.bareSideLimit * 4
     swipe = makeSwipe(for: session, width: width)
     slidingSessionIDs.insert(id)
     demoSwipe = (id, translation)
-    animateSwipe(reduceMotion ? nil : .smooth(duration: 0.6)) { swipe?.translation = translation }
-    guard !reduceMotion else { return }
-    try? await Task.sleep(for: .seconds(1.8))
-    endSwipeDemo()
+    animateSwipe(reduceMotion ? nil : .smooth(duration: 1)) { swipe?.translation = translation }
+    return true
   }
 
   /// Puts the row back, unless the user took it meanwhile.
@@ -486,7 +504,8 @@ struct SessionSidebar: View {
     guard let demo = demoSwipe else { return }
     demoSwipe = nil
     guard swipe?.sessionID == demo.id, swipe?.translation == demo.translation else { return }
-    closeSwipe(animated: true)
+    // As slowly as it opened: the demo is to be watched.
+    animateSwipe(reduceMotion ? nil : .smooth(duration: 0.8)) { swipe = nil }
   }
 
   // MARK: - Empty

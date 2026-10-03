@@ -243,6 +243,19 @@ struct TourBubblePlacementTests {
       placement.origin.y + bubble.height == target.minY - TourBubblePlacement.arrowLength)
   }
 
+  @Test("Over its target when asked to, under it when there is no room above")
+  func prefersAbove() {
+    let target = CGRect(x: 100, y: 300, width: 600, height: 100)
+    let above = TourBubblePlacement(
+      bubble: bubble, target: target, container: container, prefersAbove: true)
+    #expect(!above.isBelow)
+
+    let atTheTop = CGRect(x: 100, y: 40, width: 600, height: 100)
+    let below = TourBubblePlacement(
+      bubble: bubble, target: atTheTop, container: container, prefersAbove: true)
+    #expect(below.isBelow)
+  }
+
   @Test("Never out of the container, its arrow still on the bubble")
   func clamped() {
     let target = CGRect(x: 760, y: 50, width: 30, height: 20)

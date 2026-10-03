@@ -191,11 +191,16 @@ struct TourBubblePlacement: Equatable {
   /// Where the arrow's tip is along the bubble's width.
   let arrowX: CGFloat
 
-  init(bubble: CGSize, target: CGRect, container: CGSize) {
+  /// - Parameter prefersAbove: over the target when it fits, for a target whose foot holds what
+  ///   the bubble asks the user to use next.
+  init(bubble: CGSize, target: CGRect, container: CGSize, prefersAbove: Bool = false) {
     let room = Self.arrowLength + Self.margin
     let below = container.height - target.maxY - room
     let above = target.minY - room
-    isBelow = below >= bubble.height || below >= above
+    isBelow =
+      prefersAbove
+      ? above < bubble.height && below > above
+      : below >= bubble.height || below >= above
     let y =
       isBelow ? target.maxY + Self.arrowLength : target.minY - Self.arrowLength - bubble.height
     let maxX = max(Self.margin, container.width - Self.margin - bubble.width)
@@ -247,7 +252,9 @@ struct TourAnchoredBubble: View {
     GeometryReader { proxy in
       if let target, let bubble, let anchor = anchors[target] {
         let placement = TourBubblePlacement(
-          bubble: size, target: proxy[anchor], container: proxy.size)
+          bubble: size, target: proxy[anchor], container: proxy.size,
+          // The options' bubble sends the user to the prompt under them: it keeps off it.
+          prefersAbove: target == .draftOptions)
         let shape = TourBubbleShape(isArrowOnTop: placement.isBelow, arrowX: placement.arrowX)
         TourBubble(bubble: bubble, advance: advance, skip: skip)
           .background(.regularMaterial, in: shape)
