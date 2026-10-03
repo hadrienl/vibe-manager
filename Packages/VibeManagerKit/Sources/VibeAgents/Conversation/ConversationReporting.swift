@@ -13,7 +13,7 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
     var files: [URL] = []
     if let identifier = conversation.resumeIdentifier?.trimmingCharacters(in: .whitespaces),
       !identifier.isEmpty,
-      let found = TranscriptLocationCache.shared.claudeTranscript(
+      let found = transcriptLocations.claudeTranscript(
         for: identifier, workingDirectory: RestartSession.workingDirectoryPath(of: session))
     {
       files = [found]
@@ -74,7 +74,7 @@ extension CodexAgentProvider: AgentConversationReporting {
     guard let identifier = conversation.resumeIdentifier?.trimmingCharacters(in: .whitespaces),
       !identifier.isEmpty
     else { return [] }
-    return TranscriptLocationCache.shared.codexRollouts(for: identifier, since: session.createdAt)
+    return transcriptLocations.codexRollouts(for: identifier, since: session.createdAt)
       .sorted { $0.lastPathComponent < $1.lastPathComponent }
   }
 

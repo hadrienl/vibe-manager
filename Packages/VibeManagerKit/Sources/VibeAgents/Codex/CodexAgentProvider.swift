@@ -58,17 +58,21 @@ public struct CodexAgentProvider: AgentProvider {
   private let discovery: any CodexSessionDiscovering
   /// Asks the CLI for its skills (#219).
   let appServer: any CodexAppServerConnecting
+  /// Where its rollouts were found, shared with the branch report (#276).
+  let transcriptLocations: TranscriptLocationCache
 
   public init(
     base: CommandLineAgentProvider,
     catalog: any CodexModelCatalogSource,
     discovery: any CodexSessionDiscovering,
-    appServer: any CodexAppServerConnecting = CodexAppServerProcess()
+    appServer: any CodexAppServerConnecting = CodexAppServerProcess(),
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
   ) {
     self.base = base
     self.catalog = catalog
     self.discovery = discovery
     self.appServer = appServer
+    self.transcriptLocations = transcriptLocations
   }
 
   /// Wires the provider to the real file system, the real process probe and the user's
@@ -76,7 +80,8 @@ public struct CodexAgentProvider: AgentProvider {
   public static func make(
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
-    shellEnvironment: (any ShellEnvironmentSource)? = nil
+    shellEnvironment: (any ShellEnvironmentSource)? = nil,
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
   ) -> CodexAgentProvider {
     // A `CODEX_HOME` this application cannot resolve is dropped rather than forwarded: the
     // CLI would then write its sessions where nothing watches for them.
@@ -105,7 +110,8 @@ public struct CodexAgentProvider: AgentProvider {
         shellEnvironment: shellEnvironment
       ),
       catalog: CodexModelCatalog(environment: environment),
-      discovery: CodexRolloutSessionDiscovery(environment: environment)
+      discovery: CodexRolloutSessionDiscovery(environment: environment),
+      transcriptLocations: transcriptLocations
     )
   }
 

@@ -246,6 +246,7 @@ struct AvatarLibraryView: View {
           return .handled
         }
       }
+      .accessibilityLabel(Text("Avatars", bundle: .module))
       .accessibilityIdentifier("avatar-library-list")
       Text(
         "A zip archive dropped on the list is imported: one image per expression (neutral.png, pleased.png…).",
