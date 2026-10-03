@@ -101,6 +101,19 @@ struct PromptComposer: View {
             Task { @MainActor in Self.placeCursorAtEnd(of: model.draft) }
             return .handled
           }
+          // Page Up and Page Down scroll the messages, End goes back to the last one: the
+          // conversation is read from the keyboard without leaving the composer (#227).
+          .onKeyPress(keys: [.pageUp, .pageDown, .end], phases: [.down, .repeat]) { press in
+            guard press.modifiers.isDisjoint(with: [.shift, .command, .option, .control]),
+              !Self.isComposingText
+            else { return .ignored }
+            switch press.key {
+            case .pageUp: model.scrollPage(.up)
+            case .pageDown: model.scrollPage(.down)
+            default: model.jumpToBottom()
+            }
+            return .handled
+          }
           .onKeyPress(.escape) {
             // The list of commands closes first (#219).
             if !Self.isComposingText, model.dismissCommandSuggestions() { return .handled }

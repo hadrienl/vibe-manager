@@ -29,6 +29,7 @@ public struct ConversationView: View {
     )?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
+  @State private var pager = ConversationPager()
 
   private static let bottomID = "conversation.bottom"
 
@@ -83,6 +84,7 @@ public struct ConversationView: View {
             { model.terminalScreenChanged($0) })
         )
         .frame(maxWidth: layout.contentWidth)
+        .background(ConversationPagerProbe(pager: pager).accessibilityHidden(true))
         .padding(.horizontal, layout.sideMargin)
         .padding(.bottom, showsComposer ? 8 : 16)
         .frame(maxWidth: .infinity)
@@ -201,6 +203,9 @@ public struct ConversationView: View {
       .modifier(ToolbarVeil())
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
+      }
+      .onChange(of: model.pageRequest) {
+        pager.scroll(model.pageRequest.page)
       }
       .onChange(of: model.revealRequest) {
         guard let id = model.revealedBlockID else { return }

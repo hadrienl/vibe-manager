@@ -183,6 +183,32 @@ public enum MarkdownDocument {
   static func plainText(_ runs: [InlineRun]) -> String {
     runs.map(\.text).joined()
   }
+
+  /// A whole message as plain text, one block a line, for VoiceOver to read aloud (#227).
+  public static func plainText(from text: String) -> String {
+    plainText(blocks(from: text))
+  }
+
+  static func plainText(_ blocks: [MarkdownBlock]) -> String {
+    blocks.compactMap { block -> String? in
+      switch block {
+      case .heading(_, let runs), .paragraph(let runs):
+        return plainText(runs)
+      case .list(_, _, let items):
+        return items.map { plainText($0.blocks) }.joined(separator: "\n")
+      case .quote(let blocks):
+        return plainText(blocks)
+      case .code(_, let code):
+        return code
+      case .table(let header, let rows):
+        return ([header] + rows).map { $0.map(plainText).joined(separator: ", ") }
+          .joined(separator: "\n")
+      case .rule:
+        return nil
+      }
+    }
+    .joined(separator: "\n")
+  }
 }
 
 /// Parsed messages, kept so that scrolling back up does not parse them again.
