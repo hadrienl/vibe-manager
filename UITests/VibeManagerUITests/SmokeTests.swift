@@ -455,7 +455,7 @@ final class SmokeTests: XCTestCase {
         pop-up button does not need.
         """),
     AuditException(
-      type: .parentChild,
+      type: .parentChild, element: "",
       reason: """
         Raised without an element on a new session's draft, so it cannot be pinned down here. It \
         stays without the draft's own accessibility container (tried for #328): it comes from \

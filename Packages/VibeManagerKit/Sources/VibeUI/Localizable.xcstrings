@@ -12163,7 +12163,7 @@
       }
     },
     "Session name" : {
-      "comment" : "The field that renames a session.",
+      "comment" : "The name of a session, as the label or placeholder of the field that sets it.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
