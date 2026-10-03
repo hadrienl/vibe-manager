@@ -137,11 +137,21 @@ public enum AgentActivityMachine {
         break
       }
       next.lastOutputAt = context.now
-      next.activity = .working
+      // A dialog of the start waits until it is answered, whatever the terminal draws.
+      if next.requests.isEmpty { next.activity = .working }
 
     case .userInput(let bytes):
       next.lastUserInputAt = context.now
-      guard next.isStructured else { break }
+      // The dialog of a start the hooks never spoke after (#273): only Return or Escape leaves it,
+      // and no hook will say so.
+      if !next.isStructured {
+        if case .inTerminal(let prompt) = next.requests.first?.content, prompt.kind == .startup,
+          bytes == [0x0D] || interruptKeys.contains(bytes)
+        {
+          next.settleFirstRequest(isKnownAnswered: true)
+        }
+        break
+      }
       // A key that answers or leaves a dialog: the one drawn is gone, its report or not.
       if context.approvalAnswerKeys.contains(bytes) || interruptKeys.contains(bytes)
         || bytes == [0x0D]
@@ -153,7 +163,7 @@ public enum AgentActivityMachine {
       // whose letters answer nothing: only Return or Escape ends it.
       if case .inTerminal(let prompt) = next.requests.first?.content {
         let ends =
-          [.form, .question, .plan].contains(prompt.kind)
+          [.form, .question, .plan, .account, .startup].contains(prompt.kind)
           ? bytes == [0x0D] : context.approvalAnswerKeys.contains(bytes)
         if ends || interruptKeys.contains(bytes) {
           next.settleFirstRequest(isKnownAnswered: true)
@@ -185,6 +195,16 @@ public enum AgentActivityMachine {
         context.now.timeIntervalSince(since) >= confirmationTimeout.seconds
       {
         next.source = .inferred
+        // Hooks that stay silent are held back by a dialog of the CLI's start, most likely: the
+        // user is told there is one to answer (#273). The first word of the hooks takes it away.
+        if next.requests.isEmpty {
+          next.enqueue(
+            AgentRequestNotice(
+              content: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil)),
+              reference: AgentToolReference(tool: nil), isShown: true, key: "startup"),
+            kind: .approval, tool: nil, context: context)
+          if !next.requests.isEmpty { next.activity = .awaitingUser(.approval) }
+        }
       }
       if !next.isStructured, next.activity == .working,
         let last = next.lastOutputAt ?? next.lastUserInputAt,
@@ -203,13 +223,14 @@ public enum AgentActivityMachine {
   ) -> AgentActivityState {
     var next = state
     // Anything the hooks say proves they are wired, even when their `SessionStart` came late —
-    // after the fallback already took over.
+    // after the fallback already took over. Whatever start held them back is behind the agent.
     next.source = .structured
+    next.dropAnnouncedRequests { $0.kind == .startup }
     next.lastOutputAt = nil
     // A tool that ran, a new turn, its end: the dialog drawn before its report, if any, is gone.
     switch signal {
-    case .promptSubmitted, .questionResolved, .toolFinished, .turnEnded, .interrupted,
-      .agentEnded:
+    case .promptSubmitted, .questionResolved, .toolFinished, .batchResolved, .turnEnded,
+      .turnFailed, .interrupted, .agentEnded:
       next.drawnBeforeReport = nil
     case .channelConfirmed, .questionAsked, .dialogAnnounced, .dialogDrawn, .waitingForInput:
       break
@@ -234,17 +255,20 @@ public enum AgentActivityMachine {
       // nothing of it.
       if notice?.reference.agentID == nil { next.dropAnnouncedRequests() }
       next.pendingTool = tool
-      let count = next.requests.count
+      let known = Set(next.requests.map(\.id))
       next.enqueue(notice, kind: kind, tool: tool, context: context)
-      if next.requests.count > count, let last = next.requests.indices.last {
-        next.reportFollows(drawnDialogAt: last)
+      // Not always the last: an asynchronous question waits behind it.
+      if let added = next.requests.firstIndex(where: { !known.contains($0.id) }) {
+        next.reportFollows(drawnDialogAt: added)
       }
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
     case .questionResolved:
       // Nothing says which request was answered. Alone, it was; behind others, the first is taken
       // as the one, and the dialog on screen is no longer known for sure.
-      if next.requests.count > 1 {
+      if next.heldRequestCount > 1 {
         next.settleFirstRequest(isKnownAnswered: false)
+      } else if next.requests.count > 1 {
+        next.settleFirstRequest(isKnownAnswered: true)
       } else {
         next.clearRequests()
         next.activity = .working
@@ -264,8 +288,13 @@ public enum AgentActivityMachine {
     case .dialogAnnounced(let prompt):
       // Claude Code's notification repeats a dialog its `PermissionRequest` already reported, and
       // may come once it is answered: it only stands for one when nothing drawn waits (#273). A
-      // question read from Codex's rollout is never known drawn, and Codex announces it too.
-      guard !next.requests.contains(where: { $0.isShown || $0.kind == .question }) else { break }
+      // question read from Codex's rollout is never known drawn, and Codex announces it too; one
+      // asked without stopping the agent says nothing of its other dialogs.
+      guard
+        !next.requests.contains(where: {
+          $0.isShown || ($0.kind == .question && (!$0.isAsynchronous || prompt.kind == .question))
+        })
+      else { break }
       let kind: AgentQuestionKind = prompt.kind == .question ? .question : .approval
       next.enqueue(
         AgentRequestNotice(
@@ -289,6 +318,30 @@ public enum AgentActivityMachine {
         break
       }
       next.arm(at: matching[0])
+    case .batchResolved(let agentID):
+      // What this agent asked is answered, one way or another. Another agent's request waits on.
+      let isOthers = { (request: AgentRequest) in
+        request.content.isAnnouncedOnly ? agentID != nil : request.reference.agentID != agentID
+      }
+      guard next.requests.contains(where: { !isOthers($0) }) else { break }
+      let wasFirst = next.requests.first.map { !isOthers($0) } == true
+      next.requests.removeAll { !isOthers($0) }
+      if next.requests.isEmpty {
+        next.clearRequests()
+        next.activity = .working
+      } else if wasFirst {
+        // Which of the others is on screen is not known from this.
+        next.isFirstRequestUncertain = next.heldRequestCount > 1 || next.isTrackLost
+        next.activity = .awaitingUser(next.requests[0].kind)
+      }
+    case .turnFailed(let prompt):
+      next = apply(.turnEnded, to: next, context: context)
+      // Said whatever else waits: nothing goes on until the account is sorted out.
+      next.enqueue(
+        AgentRequestNotice(
+          content: .inTerminal(prompt), reference: AgentToolReference(tool: nil), isShown: true),
+        kind: .approval, tool: nil, context: context)
+      next.activity = .awaitingUser(next.requests.first?.kind ?? .approval)
     case .turnEnded:
       // A sub-agent in the background can still be waiting on the user once the main turn ends —
       // on a dialog it drew. One announced by its tool and never drawn may never be: a hook of
@@ -362,7 +415,7 @@ extension AgentActivityState {
   /// dialog on screen whatever doubt came before: Codex settles its requests with no word of which.
   mutating func arm(at index: Int) {
     markDrawn(at: index)
-    if requests.count == 1 {
+    if heldRequestCount == 1 {
       isFirstRequestUncertain = false
       isTrackLost = false
     }
@@ -382,7 +435,7 @@ extension AgentActivityState {
     if let first = requests.first, first.id != id, !first.content.isAnnouncedOnly {
       // Another request drawn before it still waits: which dialog is on screen is not known.
       isFirstRequestUncertain = true
-    } else if !settled.isEmpty, requests.count == 1, !isTrackLost {
+    } else if !settled.isEmpty, heldRequestCount == 1, !isTrackLost {
       // Alone once the settled ones are gone, it is the dialog on screen.
       isFirstRequestUncertain = false
     }
@@ -426,7 +479,7 @@ extension AgentActivityState {
     let notice =
       notice
       ?? AgentRequestNotice(
-        content: kind == .approval ? .unreadable(tool: tool) : .elicitation,
+        content: kind == .approval ? .unreadable(tool: tool) : .elicitation(AgentElicitation()),
         reference: AgentToolReference(tool: tool), isShown: false)
     if let index = requests.firstIndex(where: {
       !$0.isShown && $0.reference.match(notice.reference) == .same
@@ -448,13 +501,28 @@ extension AgentActivityState {
     // same second may be on screen in the other order, and neither is answered from outside
     // until one is settled. The lines are stamped to the whole second, so two stamps one apart
     // may be a moment apart.
-    if let last = requests.last, abs(context.now.timeIntervalSince(last.receivedAt)) <= 1 {
+    if let last = requests.last(where: { !$0.isAsynchronous }),
+      abs(context.now.timeIntervalSince(last.receivedAt)) <= 1
+    {
       isFirstRequestUncertain = true
     }
-    requests.append(
-      AgentRequest(
-        id: id, receivedAt: context.now, kind: kind, content: notice.content,
-        reference: notice.reference, isShown: notice.isShown))
+    let request = AgentRequest(
+      id: id, receivedAt: context.now, kind: kind, content: notice.content,
+      reference: notice.reference, isShown: notice.isShown,
+      isAsynchronous: notice.isAsynchronous)
+    // A question asked without stopping waits behind whatever holds the agent: the dialog on
+    // screen is that one's (#273).
+    if !request.isAsynchronous, let index = requests.firstIndex(where: \.isAsynchronous) {
+      requests.insert(request, at: index)
+    } else {
+      requests.append(request)
+    }
+  }
+
+  /// The requests that hold the agent: an asynchronous question waits behind them, and says
+  /// nothing of which dialog is on screen (#273).
+  var heldRequestCount: Int {
+    requests.count { !$0.isAsynchronous }
   }
 
   /// The first request was taken as answered: the next one's dialog takes its place.
@@ -467,7 +535,7 @@ extension AgentActivityState {
     } else if !isKnownAnswered {
       isFirstRequestUncertain = true
       isTrackLost = true
-    } else if requests.count == 1, !isTrackLost {
+    } else if heldRequestCount == 1, !isTrackLost {
       // Alone, the one left is the dialog on screen.
       isFirstRequestUncertain = false
     }
@@ -490,7 +558,7 @@ extension AgentActivityState {
         clearRequests()
       } else {
         // Alone, the one left is the dialog on screen — unless a guess already lost track.
-        isFirstRequestUncertain = requests.count > 1 || isTrackLost
+        isFirstRequestUncertain = heldRequestCount > 1 || isTrackLost
       }
     } else if let first = requests.first, first.reference.match(reference) == .likely {
       settleFirstRequest(isKnownAnswered: false)

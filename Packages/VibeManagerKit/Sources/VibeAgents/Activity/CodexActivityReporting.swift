@@ -10,7 +10,13 @@ public enum CodexActivityHooks {
   struct Hook {
     let event: String
     let payload: AgentActivityHookCommand.Payload
+    var timeout = AgentActivityHookCommand.timeoutSeconds
   }
+
+  /// The most Codex gives the hooks of `Interrupt` and `SessionEnd`, which run as it stops: a
+  /// longer timeout is cut to it with a warning on screen (0.159.2, `hooks/src/engine/discovery.rs`).
+  /// Its approval is kept by the cut timeout, so asking for this one changes nothing to it.
+  static let stoppingTimeoutSeconds = 3
 
   /// Checked against `codex-cli 0.156.1`, which also knows `Interrupt` — the one signal Claude
   /// Code does not give.
@@ -23,10 +29,11 @@ public enum CodexActivityHooks {
     Hook(event: "SessionStart", payload: .fields(["session_id"])),
     Hook(event: "UserPromptSubmit", payload: .drop),
     Hook(event: "PermissionRequest", payload: .keep),
-    Hook(event: "PostToolUse", payload: .drop),
+    // Which agent ran which tool on what (#273): the request it settles, among several waiting.
+    Hook(event: "PostToolUse", payload: .fields(AgentRequestReading.resolutionFields)),
     Hook(event: "Stop", payload: .drop),
-    Hook(event: "Interrupt", payload: .drop),
-    Hook(event: "SessionEnd", payload: .drop),
+    Hook(event: "Interrupt", payload: .drop, timeout: stoppingTimeoutSeconds),
+    Hook(event: "SessionEnd", payload: .drop, timeout: stoppingTimeoutSeconds),
   ]
 
   /// Every command the hooks run, as Codex lists them back.
@@ -51,7 +58,7 @@ public enum CodexActivityHooks {
       let command = AgentActivityHookCommand.command(event: hook.event, payload: hook.payload)
       return [
         "-c",
-        #"hooks.\#(hook.event)=[{hooks=[{type="command",timeout=\#(AgentActivityHookCommand.timeoutSeconds),command=\#(tomlString(command))}]}]"#,
+        #"hooks.\#(hook.event)=[{hooks=[{type="command",timeout=\#(hook.timeout),command=\#(tomlString(command))}]}]"#,
       ]
     }
   }
@@ -118,7 +125,13 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
         .approval,
         notice: Self.withoutAlwaysForHosts(
           event.requestNotice(isShown: false, alwaysAllow: CodexAnswerKeymap.alwaysAllow)))
-    case "PostToolUse": return .questionResolved
+    case "PostToolUse":
+      let reference = AgentRequestReading.reference(of: event)
+      // An asynchronous question's tool ends at once, its question still waiting: the rollout
+      // says when Codex takes it away (#273).
+      guard reference.tool != CodexQuestionWatch.asyncTool else { return nil }
+      guard let tool = reference.tool else { return .questionResolved }
+      return .toolFinished(tool, agentID: reference.agentID, subject: reference.subject)
     case "Stop": return .turnEnded
     case "Interrupt": return .interrupted
     case "SessionEnd": return .agentEnded
@@ -159,7 +172,11 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
   static func quotedCommand(_ quoted: String) -> (text: String, isCut: Bool) {
     var text = Substring(quoted)
     let isCut = text.hasSuffix("...") || text.hasSuffix("…")
-    if text.hasSuffix("...") { text = text.dropLast(3) } else if text.hasSuffix("…") { text = text.dropLast() }
+    if text.hasSuffix("...") {
+      text = text.dropLast(3)
+    } else if text.hasSuffix("…") {
+      text = text.dropLast()
+    }
     // The shell Codex wraps the model's command in, and the quote around it.
     if let wrapper = text.range(of: #"^\S*sh -l?c ['"]?"#, options: .regularExpression) {
       let quote = text[wrapper].last.flatMap { "'\"".contains($0) ? $0 : nil }

@@ -59,13 +59,20 @@ public struct AgentDialogScreen: Hashable, Sendable {
       }
       return words
     }
-    // The last run of options numbered 1, 2, 3… one right under the other's words.
+    // A rule drawn between two options: Claude Code sets "Chat about this" apart from a
+    // question's options (2.1.288).
+    func isRule(_ line: String) -> Bool {
+      let rest = line.trimmingCharacters(in: .whitespaces)
+      return !rest.isEmpty && rest.allSatisfy { "─━".contains($0) }
+    }
+    // The last run of options numbered 1, 2, 3… one right under the other's words, or a rule.
     var run: [Parsed] = []
     for option in parsed {
       if option.number == 1 {
         run = [option]
       } else if let last = run.last, option.number == last.number + 1,
-        option.line == last.line + 1 + continuation(of: last).count
+        case let next = last.line + 1 + continuation(of: last).count,
+        option.line == next || (option.line == next + 1 && isRule(lines[next]))
       {
         run.append(option)
       } else {

@@ -179,4 +179,31 @@ struct CodexHookTrustIntegrationTests {
     #expect(written.hasPrefix("# kept as it is\nmodel = \"gpt-5\""))
     #expect(written.contains("/<session-flags>/config.toml:stop:0:0"))
   }
+
+  /// #273: the hooks of `Interrupt` and `SessionEnd` asked for five seconds, which Codex cut to
+  /// three. Asking for three now must leave them approved: Codex keeps the approval by the cut one.
+  @Test(.enabled(if: codex != nil), .timeLimit(.minutes(1)))
+  func stoppingTimeoutKeepsApproval() async throws {
+    let home = FileManager.default.temporaryDirectory
+      .appendingPathComponent("vibe-codex-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: home) }
+    func plan(_ options: [String]) throws -> AgentLaunchPlan {
+      AgentLaunchPlan(
+        providerID: CodexAgentProvider.id, executablePath: try #require(Self.codex),
+        arguments: options + ["-C", home.path],
+        environment: [
+          "CODEX_HOME": home.path, "HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin",
+        ],
+        workingDirectoryPath: home.path, promptDelivery: .none)
+    }
+    let before = CodexActivityHooks.options().map {
+      $0.replacingOccurrences(
+        of: "timeout=\(CodexActivityHooks.stoppingTimeoutSeconds),", with: "timeout=5,")
+    }
+    #expect(before != CodexActivityHooks.options())
+    let trust = CodexHookTrust(connection: CodexAppServerProcess(timeout: .seconds(20)))
+    try await trust.trustHooks(of: try plan(before))
+    #expect(await trust.hookTrust(for: try plan(CodexActivityHooks.options())) == .trusted)
+  }
 }
