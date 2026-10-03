@@ -352,6 +352,8 @@ final class SmokeTests: XCTestCase {
   /// of the exceptions below, each with the reason it stands — most of them the ticket that fixes
   /// it.
   func testTheMainScreensPassTheAccessibilityAudit() throws {
+    // Every issue of every screen is reported, not only the first.
+    continueAfterFailure = true
     let app = launch()
     createSession(named: "Audit", isFirst: true, in: app)
     expectSessionRows(1, in: app)
@@ -415,13 +417,13 @@ final class SmokeTests: XCTestCase {
           && (text.localizedCaseInsensitiveContains(exception.matching))
       }
       raised.append((exception == nil ? "FAIL " : "OK   ") + text)
+      print("[accessibility-audit] \(screen): \(raised.last ?? "")")
       return exception != nil
     }
     let report = XCTAttachment(string: raised.joined(separator: "\n"))
     report.name = "Accessibility audit: \(screen)"
     report.lifetime = .keepAlways
     add(report)
-    print("[accessibility-audit] \(screen):\n" + raised.map { "  " + $0 }.joined(separator: "\n"))
   }
 
   func testExportDiagnosticsShowsTheWholeFileFirst() throws {
