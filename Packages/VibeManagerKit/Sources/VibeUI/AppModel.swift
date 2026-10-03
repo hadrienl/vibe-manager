@@ -1471,7 +1471,7 @@ public final class AppModel {
     session.taskStatus == .archived ? [] : session.taskStatus.next
   }
 
-  /// Moves a session to another status (#80): a swipe button, the Status menu, ⌃⌘← and ⌃⌘→.
+  /// Moves a session to another status (#80): a swipe button, the Status submenus, ⌃⌘← and ⌃⌘→.
   ///
   /// Archiving keeps its confirmation and goes through `ArchiveSession`, and unarchiving through
   /// `RestoreSession`: they stop or release a process.

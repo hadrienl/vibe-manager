@@ -11,6 +11,8 @@ actor ScriptedActivityLogs: AgentActivityLogStore {
   private(set) var requestedPositions: [SessionID: AgentActivityLogPosition?] = [:]
   private(set) var removed: [SessionID] = []
   private var offsets: [SessionID: UInt64] = [:]
+  /// Lines written to the file but not read yet, oldest first.
+  private var unread: [SessionID: [(AgentActivityEvent, AgentActivityLogPosition)]] = [:]
 
   func prepareLog(for id: SessionID) -> URL {
     URL(fileURLWithPath: "/tmp/\(id).log")
@@ -31,19 +33,39 @@ actor ScriptedActivityLogs: AgentActivityLogStore {
     return stream
   }
 
+  func end(for id: SessionID) -> AgentActivityLogPosition? {
+    endsAsked[id, default: 0] += 1
+    return offsets[id].map { AgentActivityLogPosition(fileIdentifier: 7, offset: $0) }
+  }
+
+  /// How many times the end of the session's log was asked for.
+  private(set) var endsAsked: [SessionID: Int] = [:]
+
   func removeLog(for id: SessionID) {
     removed.append(id)
   }
 
   func write(_ name: String, at date: Date, for id: SessionID, payload: String? = nil) {
+    writeUnread(name, at: date, for: id, payload: payload)
+    read(id)
+  }
+
+  /// A line the hook wrote that the follower has not read yet: the file ends after it.
+  func writeUnread(_ name: String, at date: Date, for id: SessionID, payload: String? = nil) {
     let offset = (offsets[id] ?? 0) + 10
     offsets[id] = offset
-    continuations[id]?.yield(
+    unread[id, default: []].append(
       (
         AgentActivityEvent(name: name, date: date, payload: payload.map { Data($0.utf8) }),
         AgentActivityLogPosition(fileIdentifier: 7, offset: offset)
       ))
   }
+
+  /// The follower reads every line written so far.
+  func read(_ id: SessionID) {
+    for line in unread.removeValue(forKey: id) ?? [] { continuations[id]?.yield(line) }
+  }
+
 
   func isFollowing(_ id: SessionID) -> Bool {
     continuations[id] != nil

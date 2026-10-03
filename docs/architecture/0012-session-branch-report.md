@@ -73,7 +73,12 @@ went into is said by the transcript.
   - uncommitted work comes from the status the monitor of ADR 0013 already keeps for the
     repositories it watches: one `git status` for both. A repository only visited, which the
     monitor does not watch, gets a status of its own at most every 30 seconds;
-  - the transcript files, once found, are not searched for again in every project folder.
+  - the transcript files, once found, are not searched for again in every project folder: the
+    reader asks the conversation view's memory of where they are (`TranscriptLocationCache`, #276).
+    It keeps one main transcript per Claude Code conversation, as the conversation view does: a
+    second transcript the conversation got when resumed from another folder outside the
+    application no longer counts in the report — accepted, the folders are not listed again each
+    minute for it.
 
   A reading asked for by a gesture — the refresh button, coming back to the application, the agent
   stopping — trusts none of it and reads everything again.

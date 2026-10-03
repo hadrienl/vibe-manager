@@ -143,9 +143,14 @@ public final class AppEnvironment {
     }
     let repository = FileSessionRepository(storeURL: data.store, diagnostics: diagnostics.log)
     let notes = FileSessionNotesStore(directory: data.notes, diagnostics: diagnostics)
+    // Where the transcripts are, remembered once for the conversation view and the branch
+    // report (#276).
+    let transcriptLocations = TranscriptLocationCache()
     let providers =
       configuration.providers?(diagnostics.log)
-      ?? Self.providers(environment: configuration.environment, diagnostics: diagnostics.log)
+      ?? Self.providers(
+        environment: configuration.environment, diagnostics: diagnostics.log,
+        transcriptLocations: transcriptLocations)
     // The endpoints (#107): registered beside the command line agents from the start — a session
     // the terminal host kept is adopted as soon as the workspace loads, and must find its agent —
     // their secrets in the keychain, their sessions reaching them through the gateway.
@@ -342,7 +347,7 @@ public final class AppEnvironment {
         return RestartSession.workingDirectoryPath(of: session)
       })
     self.terminals = terminals
-    let transcripts = AgentTranscriptReader()
+    let transcripts = AgentTranscriptReader(locations: transcriptLocations)
     // Read only, and only when the disk says something moved: no timer reads a repository. One
     // transcript reader for it and the branch report, so each file is read once, incrementally.
     let repositoryStatus = RepositoryStatusMonitor(
@@ -801,7 +806,8 @@ public final class AppEnvironment {
   /// `VIBE_ENABLE_MOCK_AGENT=only` offers the mock alone, the way the interface smoke test runs:
   /// on a Mac with Claude Code or Codex installed, they would otherwise come first.
   private static func providers(
-    environment: [String: String], diagnostics: any DiagnosticLog
+    environment: [String: String], diagnostics: any DiagnosticLog,
+    transcriptLocations: TranscriptLocationCache
   ) -> [any AgentProvider] {
     if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
       return [MockAgentProvider(environment: environment)]
@@ -812,9 +818,11 @@ public final class AppEnvironment {
     shell.warmUp()
     var providers: [any AgentProvider] = [
       ClaudeCodeAgentProvider.make(
-        environment: environment, diagnostics: diagnostics, shellEnvironment: shell),
+        environment: environment, diagnostics: diagnostics, shellEnvironment: shell,
+        transcriptLocations: transcriptLocations),
       CodexAgentProvider.make(
-        environment: environment, diagnostics: diagnostics, shellEnvironment: shell),
+        environment: environment, diagnostics: diagnostics, shellEnvironment: shell,
+        transcriptLocations: transcriptLocations),
     ]
     if MockAgentProvider.isEnabled(environment: environment) {
       providers.append(MockAgentProvider(environment: environment))

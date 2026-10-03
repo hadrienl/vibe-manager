@@ -24,7 +24,7 @@ struct SessionNameField: View {
         font: font,
         placeholder: String(
           localized: "Session name", bundle: .module,
-          comment: "The field that renames a session."),
+          comment: "The name of a session, as the label or placeholder of the field that sets it."),
         submit: { commit(leaving: false) },
         cancel: { model.cancelRename() },
         leave: { commit(leaving: true) }

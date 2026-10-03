@@ -60,6 +60,28 @@ lines. In doubt, the session is answered in its terminal until a single request 
 is the dialog on screen. A sub-agent's dialog outlives the end of the main turn, and the prompt a
 background task sends.
 
+### Codex's dialog is read off the screen before any key (#283)
+
+Codex reports a permission before its automatic review, which may settle it with no dialog; its
+notification then quotes the start of a command, a file's name or a server's, which two requests
+can share. Its dialog, though, shows all of what it asks — the command whole however long, one
+`Destination:` per path a patch writes to, the host (`approval_overlay.rs`, captured from 0.159.2)
+— and a request that a dialog drawn may be is offered in the palette. Every answer to Codex, a
+refusal included, is typed only once the screen names its request and no other of the queue. A
+command is read line for line; between two lines, only blanks may differ — a wrapped line may break
+inside a word. Two reports of dialogs not drawn yet are two requests, never one: Codex reports each
+call once. An MCP tool's form is not read: it shows the tool's arguments shortened and cut, and two
+calls of the same tool look alike. A request taken away on a guess may be the dialog drawn: a patch
+of the same files is then not told from it, and is answered in the terminal.
+
+The queue must hold every request whose dialog may be drawn. Codex waits for its
+`PermissionRequest` hook before drawing, and the hook has written its line by then: an answer reads
+the screen, then waits until the log is read up to its end — up to a limit past which nothing is
+typed — and only then compares the two. Two requests for the same command both waiting, the screen
+cannot tell them apart; the folder a command runs in is neither shown nor reported. They are
+answered in the terminal. When Codex leaves out the top of a dialog too tall for its terminal,
+nothing is read either.
+
 ### What would be allowed is what is shown
 
 A permission whose payload was cut at the hook's limit can only be refused from outside. Text an
