@@ -45,8 +45,9 @@ struct ColorNamingTests {
 
   @Test("Every name a colour can get is translated into French")
   func everyNameTranslated() throws {
-    let catalog = try JSONSerialization.jsonObject(
-      with: Data(contentsOf: Self.sourceCatalog)) as? [String: Any]
+    let catalog =
+      try JSONSerialization.jsonObject(
+        with: Data(contentsOf: Self.sourceCatalog)) as? [String: Any]
     let strings = try #require(catalog?["strings"] as? [String: [String: Any]])
     func french(_ key: String) -> String? {
       let localizations = strings[key]?["localizations"] as? [String: Any]
