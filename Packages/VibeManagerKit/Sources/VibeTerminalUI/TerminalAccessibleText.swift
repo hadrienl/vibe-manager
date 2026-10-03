@@ -3,7 +3,7 @@ import SwiftTerm
 
 /// What VoiceOver reads of a terminal: its history, then its screen, one line per row, with the
 /// insertion point at the cursor. Ranges count UTF-16 units, as the accessibility API does.
-struct TerminalAccessibleText: Equatable {
+struct TerminalAccessibleText {
   let string: String
   /// The first character of each line; a line runs to the next one, its newline included.
   private let lineStarts: [Int]
@@ -37,15 +37,12 @@ struct TerminalAccessibleText: Equatable {
     var cursorColumn = 0
     let top = buffer.totalLinesTrimmed
     while let line = terminal.getScrollInvariantLine(row: top + rows.count) {
-      rows.append(
-        line.translateToString(trimRight: true).replacingOccurrences(of: "\u{0}", with: " "))
+      rows.append(Self.text(of: line, in: terminal, trimRight: true))
     }
     let history = max(0, rows.count - terminal.rows)
     let cursorLine = history + buffer.y
     if let line = terminal.getScrollInvariantLine(row: top + cursorLine) {
-      let before = line.translateToString(
-        trimRight: false, startCol: 0, endCol: buffer.x, skipNullCellsFollowingWide: true)
-      cursorColumn = before.replacingOccurrences(of: "\u{0}", with: " ").utf16.count
+      cursorColumn = Self.text(of: line, in: terminal, trimRight: false, upTo: buffer.x).utf16.count
     }
     let lastWritten = rows.lastIndex { !$0.isEmpty } ?? 0
     let kept = max(lastWritten, cursorLine) + 1
@@ -54,6 +51,19 @@ struct TerminalAccessibleText: Equatable {
     self.init(
       lines: rows, visibleLines: firstShown..<(firstShown + terminal.rows),
       cursor: (cursorLine, cursorColumn))
+  }
+
+  /// One reading of a row for both the line and the cursor: the empty cell a wide character
+  /// leaves behind is skipped, so an emoji or a CJK character counts as itself, not as two. The
+  /// terminal names the characters a cell only refers to, an emoji among them.
+  private static func text(
+    of line: BufferLine, in terminal: Terminal, trimRight: Bool, upTo column: Int = -1
+  ) -> String {
+    line.translateToString(
+      trimRight: trimRight, startCol: 0, endCol: column, skipNullCellsFollowingWide: true,
+      characterProvider: { terminal.getCharacter(for: $0) }
+    )
+    .replacingOccurrences(of: "\u{0}", with: " ")
   }
 
   var length: Int { string.utf16.count }

@@ -38,9 +38,24 @@ struct TerminalAccessibleTextTests {
     #expect(text.insertionPoint == 27)
   }
 
+  @Test("A cursor after wide characters stands where the line's text puts it")
+  func wideCharacters() {
+    let terminal = Terminal(
+      delegate: Delegate(), options: TerminalOptions(cols: 20, rows: 4, scrollback: 100))
+    terminal.feed(text: "a😀中b")
+
+    let text = TerminalAccessibleText(terminal: terminal)
+
+    #expect(text.string == "a😀中b")
+    #expect(text.insertionPoint == text.length)
+    #expect(text.string(for: NSRange(location: 0, length: text.insertionPoint)) == "a😀中b")
+  }
+
   @Test("The view answers VoiceOver from the whole buffer, insertion point at the cursor")
   func viewAnswers() {
     let view = AccessibleTerminalView()
+    var now = ContinuousClock.now
+    view.clock = { now }
     view.getTerminal().feed(text: "first\r\nsecond")
     view.textDidChange()
 
@@ -53,51 +68,46 @@ struct TerminalAccessibleTextTests {
 
     view.getTerminal().feed(text: " line")
     view.textDidChange()
+    now += .seconds(2)
     #expect(view.accessibilityValue() as? String == "first\nsecond line")
   }
 
-  private func focusedView() -> (AccessibleTerminalView, NSWindow) {
-    // Never put on screen: the tests do not show windows.
-    let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 400, height: 200), styleMask: [.titled],
-      backing: .buffered, defer: true)
-    let view = AccessibleTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
-    window.contentView = view
-    window.makeFirstResponder(view)
-    return (view, window)
-  }
+  @Test("Output pouring in reads the history again at most once per interval")
+  func rebuildsAtMostOncePerInterval() {
+    let view = AccessibleTerminalView()
+    var now = ContinuousClock.now
+    view.clock = { now }
+    _ = view.accessibilityValue()
+    #expect(view.textBuilds == 1)
 
-  @Test("A burst of output is told once, the rest waiting for the interval")
-  func burstToldOnce() {
-    let (view, window) = focusedView()
-    view.announcementInterval = .seconds(3600)
-    var told: [NSAccessibility.Notification] = []
-    view.onAnnouncement = { told.append($0) }
-
-    for chunk in 0..<10 {
+    for chunk in 0..<20 {
       view.getTerminal().feed(text: "chunk \(chunk)\r\n")
       view.textDidChange()
+      _ = view.accessibilityValue()
+      _ = view.accessibilityNumberOfCharacters()
+      now += .milliseconds(40)
     }
+    #expect(view.textBuilds == 1)
 
-    #expect(told == [.valueChanged, .selectedTextChanged])
-    #expect(view.pendingAnnouncement != nil)
-    view.pendingAnnouncement?.cancel()
-    withExtendedLifetime(window) {}
+    now += .seconds(1)
+    #expect((view.accessibilityValue() as? String)?.contains("chunk 19") == true)
+    #expect(view.textBuilds == 2)
+
+    _ = view.accessibilityValue()
+    #expect(view.textBuilds == 2)
   }
 
-  @Test("Nothing is told for a terminal without the focus, or put away")
-  func silentWhenNotRead() {
-    let (view, window) = focusedView()
-    var told: [NSAccessibility.Notification] = []
-    view.onAnnouncement = { told.append($0) }
+  @Test("A new size is read again at once, whatever changed it")
+  func newSizeReadAtOnce() {
+    let view = AccessibleTerminalView()
+    let now = ContinuousClock.now
+    view.clock = { now }
+    view.getTerminal().feed(text: "hello")
+    _ = view.accessibilityValue()
 
-    view.isHidden = true
-    view.textDidChange()
-    view.isHidden = false
-    window.makeFirstResponder(nil)
-    view.textDidChange()
+    view.getTerminal().resize(cols: 40, rows: 10)
+    _ = view.accessibilityValue()
 
-    #expect(told.isEmpty)
-    withExtendedLifetime(window) {}
+    #expect(view.textBuilds == 2)
   }
 }

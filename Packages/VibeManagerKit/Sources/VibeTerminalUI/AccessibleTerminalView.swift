@@ -6,10 +6,8 @@ import VibeApplication
 ///
 /// SwiftTerm 1.20.0 exposes nothing to accessibility on the Mac: its service is a stub, and the
 /// terminal was a silent rectangle. This makes it one read-only text area whose value is the
-/// screen as it is now — the visible lines, not the scrollback — and whose label names the
-/// session and what its agent is doing. Output is never announced as it arrives: an agent writing
-/// fifty lines a second would make VoiceOver unusable. Read Last Output (⌃⌥⌘O) says the last lines
-/// on demand.
+/// history then the screen, read line by line, and whose label names the session and what its
+/// agent is doing. Read Last Output (⌃⌥⌘O) says the last lines on demand.
 public final class AccessibleTerminalView: TerminalView {
   /// "Terminal — <session> — <agent state>", set by the surface.
   public var accessibilityTitle = String(localized: "Terminal", bundle: .module)
@@ -94,7 +92,7 @@ public final class AccessibleTerminalView: TerminalView {
     settleTask?.cancel()
     settleTask = nil
     super.setFrameSize(newSize)
-    accessibleTextCache = nil
+    snapshot = nil
   }
 
   private func scheduleSettle() {
@@ -116,7 +114,7 @@ public final class AccessibleTerminalView: TerminalView {
     guard let size = deferredSize else { return }
     deferredSize = nil
     super.setFrameSize(size)
-    accessibleTextCache = nil
+    snapshot = nil
   }
 
   public override func viewDidEndLiveResize() {
@@ -272,65 +270,50 @@ public final class AccessibleTerminalView: TerminalView {
   }
 
   // VoiceOver reads the terminal as a text area: history then screen, line by line, with the
-  // insertion point at the cursor (#226). The text is read again only after it changed.
+  // insertion point at the cursor (#226). SwiftTerm already tells VoiceOver of every redraw
+  // (`updateDisplay`, not something a subclass can change); what it costs here is reading the
+  // history again, so that is done at most once per interval while output keeps coming.
 
-  private var accessibleTextCache: TerminalAccessibleText?
+  private struct Snapshot {
+    let text: TerminalAccessibleText
+    let builtAt: ContinuousClock.Instant
+    let columns: Int
+    let rows: Int
+  }
+
+  private var snapshot: Snapshot?
+  private var snapshotIsStale = false
+  /// How long a text read stays good enough while output keeps changing it.
+  var rebuildInterval: Duration = .seconds(1)
+  /// The clock the interval is measured on; the tests move it by hand.
+  var clock: () -> ContinuousClock.Instant = { .now }
+  /// How many times the text was read from the terminal, for the tests.
+  private(set) var textBuilds = 0
 
   var accessibleText: TerminalAccessibleText {
-    if let cached = accessibleTextCache { return cached }
-    let text = TerminalAccessibleText(terminal: getTerminal())
-    accessibleTextCache = text
+    let terminal = getTerminal()
+    let now = clock()
+    // A new size — a resize, a zoom — shows other lines: read again at once.
+    if let snapshot, snapshot.columns == terminal.cols, snapshot.rows == terminal.rows,
+      !snapshotIsStale || now < snapshot.builtAt + rebuildInterval
+    {
+      return snapshot.text
+    }
+    let text = TerminalAccessibleText(terminal: terminal)
+    textBuilds += 1
+    snapshot = Snapshot(text: text, builtAt: now, columns: terminal.cols, rows: terminal.rows)
+    snapshotIsStale = false
     return text
   }
 
-  /// Output was fed: the text is read again at the next question, and VoiceOver is told when the
-  /// terminal has the focus.
+  /// Output was fed: the text is read again at the next question, once the interval is over.
   func textDidChange() {
-    accessibleTextCache = nil
-    announceChange()
+    snapshotIsStale = true
   }
 
   public override func scrolled(source terminal: Terminal, yDisp: Int) {
     super.scrolled(source: terminal, yDisp: yDisp)
-    accessibleTextCache = nil
-  }
-
-  /// At most one change told per interval: a busy program would otherwise make VoiceOver start
-  /// over at every chunk of output. The last change of a burst is told once the interval is over.
-  var announcementInterval: Duration = .seconds(1)
-  /// Sees each notification posted; the tests count them.
-  var onAnnouncement: ((NSAccessibility.Notification) -> Void)?
-  private var lastAnnouncement: ContinuousClock.Instant?
-  private(set) var pendingAnnouncement: Task<Void, Never>?
-
-  private var hasVoiceOverFocus: Bool {
-    // A view put away, or suspended (#248), is not the one being read.
-    !isHidden && window?.firstResponder === self
-  }
-
-  private func announceChange() {
-    guard hasVoiceOverFocus, pendingAnnouncement == nil else { return }
-    let now = ContinuousClock.now
-    guard let last = lastAnnouncement, now < last + announcementInterval else {
-      announce(at: now)
-      return
-    }
-    let wait = last + announcementInterval - now
-    pendingAnnouncement = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: wait)
-      guard let self, !Task.isCancelled else { return }
-      self.pendingAnnouncement = nil
-      guard self.hasVoiceOverFocus else { return }
-      self.announce(at: .now)
-    }
-  }
-
-  private func announce(at instant: ContinuousClock.Instant) {
-    lastAnnouncement = instant
-    for notification in [NSAccessibility.Notification.valueChanged, .selectedTextChanged] {
-      NSAccessibility.post(element: self, notification: notification)
-      onAnnouncement?(notification)
-    }
+    snapshotIsStale = true
   }
 
   public override func accessibilityValue() -> Any? { accessibleText.string }
