@@ -8,6 +8,7 @@ struct SessionIdentityHeader: View {
   let model: AppModel
   let session: WorkSession
   @State private var isHovering = false
+  @FocusState private var isRenameFocused: Bool
 
   private var isRenaming: Bool {
     model.renaming == SessionIdentityEditing(sessionID: session.id, place: .inspector)
@@ -39,12 +40,14 @@ struct SessionIdentityHeader: View {
               .font(.headline)
               .lineLimit(2)
               .onTapGesture(count: 2) { rename() }
-            // On hover for the pointer; always there for VoiceOver and the keyboard.
+            // On hover for the pointer; always there for VoiceOver and the keyboard, and seen
+            // when the keyboard is on it (#230).
             Button(action: rename) {
               Image(systemName: "pencil")
             }
             .buttonStyle(.borderless)
-            .opacity(isHovering ? 1 : 0)
+            .focused($isRenameFocused)
+            .opacity(isHovering || isRenameFocused ? 1 : 0)
             .help(Text("Rename", bundle: .module, comment: "Renames a session."))
             .accessibilityLabel(Text("Rename", bundle: .module, comment: "Renames a session."))
             .accessibilityIdentifier("inspector-session-rename")
