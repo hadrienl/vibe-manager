@@ -363,6 +363,18 @@ final class SmokeTests: XCTestCase {
 
     app.typeKey("n", modifierFlags: .command)
     XCTAssertTrue(app.textFields["new-session-name"].waitForExistence(timeout: 10))
+    // More Options is read as one triangle, title and what it unfolds, with no child (#328).
+    let moreOptions = app.disclosureTriangles["new-session-more-options"]
+    XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
+    XCTAssertTrue(moreOptions.label.hasPrefix("More Options"), moreOptions.label)
+    XCTAssertEqual(moreOptions.children(matching: .any).count, 0)
+    // Its label stays its own: the fields it unfolds keep theirs.
+    moreOptions.click()
+    let unfolded = app.textFields.matching(identifier: "new-session-more-options")
+    for field in unfolded.allElementsBoundByIndex {
+      XCTAssertFalse(field.label.hasPrefix("More Options"), field.label)
+    }
+    moreOptions.click()
     try audit(app, "New session draft")
     app.typeKey(.escape, modifierFlags: [])
 
@@ -453,14 +465,6 @@ final class SmokeTests: XCTestCase {
       reason: """
         SwiftUI's pickers and menus open with AXShowMenu; the audit looks for AXPress, which a \
         pop-up button does not need.
-        """),
-    AuditException(
-      type: .parentChild, element: "",
-      reason: """
-        Raised without an element on a new session's draft, so the audit cannot name it. Ruled \
-        out for #328: the draft's own accessibility container, the keyboard focus (raised at every \
-        step of Tab), and the prompt editor's scroller. The runner is not trusted for the AX API, \
-        so the tree cannot be walked here: Accessibility Inspector on a build is what is left.
         """),
   ]
 

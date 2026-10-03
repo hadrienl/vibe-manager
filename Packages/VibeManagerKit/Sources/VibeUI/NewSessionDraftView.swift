@@ -278,8 +278,24 @@ public struct NewSessionDraftView: View {
         }
       }
       .font(.callout)
+      // Read once by the disclosure triangle below: left as two texts, they were children of
+      // the triangle, an element without children for the accessibility audit (#328).
+      .accessibilityHidden(true)
     }
+    .accessibilityLabel(moreOptionsLabel)
     .accessibilityIdentifier("new-session-more-options")
+  }
+
+  /// What the More Options triangle is read as: its title, then what it unfolds.
+  private var moreOptionsLabel: Text {
+    let title = Text("More Options", bundle: .module, comment: "Unfolds the ticket.")
+    let unfolds =
+      themes != nil
+      ? Text(
+        "Ticket, Theme", bundle: .module,
+        comment: "What More Options unfolds: the ticket and the conversation theme.")
+      : Text("Ticket", bundle: .module, comment: "The ticket the new session works on.")
+    return title + Text(verbatim: ", ") + unfolds
   }
 
   @ViewBuilder
