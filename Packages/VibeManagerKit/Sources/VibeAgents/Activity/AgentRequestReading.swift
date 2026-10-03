@@ -42,6 +42,32 @@ enum AgentRequestReading {
       as? String
   }
 
+  /// The beginning of the first string value of `key` in a JSON text cut inside that value:
+  /// whatever the cut left of it, escapes resolved. `nil` when the text holds no such value.
+  static func leadingString(_ key: String, in text: String) -> String? {
+    let pattern = "\"" + NSRegularExpression.escapedPattern(for: key) + #"": ?"((?:[^"\\]|\\.)*)"#
+    guard let expression = try? NSRegularExpression(pattern: pattern),
+      let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+      let range = Range(match.range(at: 1), in: text)
+    else { return nil }
+    var value = Substring(text[range])
+    // What the cut split: an escape short of its end — an odd run of backslashes, `\u` short of
+    // its digits — or the first half of a character written as two escapes.
+    let unfinished = [
+      #"(?<!\\)(?:\\\\)*\\(?:u[0-9A-Fa-f]{0,3})?$"#,
+      #"(?<!\\)(?:\\\\)*\\u[dD][89abAB][0-9A-Fa-f]{2}$"#,
+    ]
+    for pattern in unfinished {
+      guard let tail = value.range(of: pattern, options: .regularExpression) else { continue }
+      // The pairs of backslashes before the escape are whole: they stay.
+      let pairs = value[tail].prefix { $0 == "\\" }.count / 2 * 2
+      value = value[..<value.index(tail.lowerBound, offsetBy: pairs)]
+    }
+    let literal = "\"" + value + "\""
+    return (try? JSONSerialization.jsonObject(with: Data(literal.utf8), options: .fragmentsAllowed))
+      as? String
+  }
+
   // MARK: - Content
 
   /// What the report asks, or `unreadable` when it cannot be read whole. `alwaysAllow` says what
@@ -51,7 +77,15 @@ enum AgentRequestReading {
     alwaysAllow fallback: (String) -> AgentAlwaysAllow? = { _ in nil }
   ) -> AgentRequestContent {
     guard let object = event.jsonObject, let toolName = object["tool_name"] as? String else {
-      return .unreadable(tool: reference(of: event).tool)
+      let tool = reference(of: event).tool
+      // A plan past the byte limit: the cut holds its beginning, more than a card shows. Its file
+      // is named after it, and lost with the rest (checked against 2.1.288).
+      if tool == "ExitPlanMode", let text = event.payload.map({ String(decoding: $0, as: UTF8.self) }),
+        let beginning = leadingString("plan", in: text)
+      {
+        return plan(beginning, isCut: true)
+      }
+      return .unreadable(tool: tool)
     }
     let input = object["tool_input"] as? [String: Any] ?? [:]
     switch toolName {
@@ -206,10 +240,14 @@ enum AgentRequestReading {
   }
 
   static func plan(in input: [String: Any]) -> AgentRequestContent {
-    let plan = input["plan"] as? String ?? ""
+    plan(input["plan"] as? String ?? "", isCut: false)
+  }
+
+  /// The plan's first lines; never complete when the report was cut inside it.
+  static func plan(_ plan: String, isCut: Bool) -> AgentRequestContent {
     let lines = plan.split(separator: "\n", omittingEmptySubsequences: false)
     let excerpt = lines.prefix(planExcerptLineLimit).joined(separator: "\n")
-    return .plan(excerpt: excerpt, isComplete: lines.count <= planExcerptLineLimit)
+    return .plan(excerpt: excerpt, isComplete: !isCut && lines.count <= planExcerptLineLimit)
   }
 }
 

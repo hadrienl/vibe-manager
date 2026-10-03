@@ -62,3 +62,48 @@ struct ElicitationReadingTests {
     #expect(AgentElicitation(url: URL(string: "HTTP://example.org")).url != nil)
   }
 }
+
+@Suite("A plan past the hook's byte limit (#273, P3)")
+struct LongPlanReadingTests {
+  @Test("Its beginning is read from the cut report, never as complete")
+  func cut() throws {
+    let steps = (1...2000).map { "- Step \($0): do \"this\" then that" }
+    // In Claude Code's order (2.1.288): the tool's name first, the plan, then its file.
+    let plan = try JSONSerialization.data(
+      withJSONObject: steps.joined(separator: "\n"), options: .fragmentsAllowed)
+    let input =
+      #"{"session_id":"s","permission_mode":"plan","hook_event_name":"PermissionRequest","#
+      + #""tool_name":"ExitPlanMode","tool_input":{"plan":"# + String(decoding: plan, as: UTF8.self)
+      + #","planFilePath":"/Users/a/.claude/plans/p.md"}}"#
+    let log = try temporaryLog()
+    _ = try runHook(
+      AgentActivityHookCommand.command(event: "PermissionRequest", payload: .keep),
+      input: input, log: log)
+    let line = try #require(lines(of: log).first)
+    let signal = ClaudeCodeSignalDecoder().signal(for: event(line[0], line[2]))
+    guard case .plan(let excerpt, let isComplete) = notice(of: signal)?.content else {
+      Issue.record("not read as a plan: \(String(describing: signal))")
+      return
+    }
+    #expect(!isComplete)
+    #expect(
+      excerpt
+        == steps.prefix(AgentRequestReading.planExcerptLineLimit).joined(separator: "\n"))
+  }
+
+  @Test("An escape the cut split is left out; whole ones are kept")
+  func splitEscapes() {
+    func read(_ cut: String) -> String? {
+      AgentRequestReading.leadingString("plan", in: #"{"tool_input":{"plan":""# + cut)
+    }
+    #expect(read(#"a\"b\"#) == #"a"b"#)
+    #expect(read(#"a\\"#) == #"a\"#)
+    #expect(read(#"a\\\"#) == #"a\"#)
+    #expect(read(#"a\u00"#) == "a")
+    #expect(read(#"a\u00e9"#) == "aé")
+    #expect(read(#"a\ud83d"#) == "a")
+    #expect(read(#"a\ud83d\ude00"#) == "a😀")
+    #expect(read(#"a\ud83d\ude"#) == "a")
+    #expect(AgentRequestReading.leadingString("plan", in: #"{"permission_mode":"plan"}"#) == nil)
+  }
+}
