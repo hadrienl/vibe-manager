@@ -457,9 +457,10 @@ final class SmokeTests: XCTestCase {
     AuditException(
       type: .parentChild, element: "",
       reason: """
-        Raised without an element on a new session's draft, so it cannot be pinned down here. It \
-        stays without the draft's own accessibility container (tried for #328): it comes from \
-        further down, likely an AppKit view hosted in SwiftUI. Left open in #328.
+        Raised without an element on a new session's draft, so the audit cannot name it. Ruled \
+        out for #328: the draft's own accessibility container, the keyboard focus (raised at every \
+        step of Tab), and the prompt editor's scroller. The runner is not trusted for the AX API, \
+        so the tree cannot be walked here: Accessibility Inspector on a build is what is left.
         """),
   ]
 
