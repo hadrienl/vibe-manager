@@ -150,6 +150,12 @@ final class SessionWebView: WKWebView {
     return BrowserLinkGesture.mayOpen(link, from: url) ? link : nil
   }
 
+  /// Forgets the last press: what it allowed — one question to open another application — is
+  /// spent, so that a page cannot turn a single click into a string of questions (#289).
+  func spendPress() {
+    lastPress = nil
+  }
+
   /// Whether a gesture read on a navigation follows a press of the user's, with the same keys.
   func followsPress(with modifiers: NSEvent.ModifierFlags, now: TimeInterval) -> Bool {
     guard let lastPress, now - lastPress.time < 1 else { return false }

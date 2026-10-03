@@ -313,6 +313,127 @@ struct BrowserAgentEffectsTests {
     #expect(opened.isEmpty)
   }
 
+  /// The application address the pages below send.
+  private static let application = URL(string: "vibetest://open")!
+
+  /// A page of the user's, loaded, whose openings are noted instead of done.
+  @MainActor
+  private struct UserPage {
+    let server: TestPageServer
+    let workspace: BrowserWorkspace
+    let session = SessionID()
+    let tab: BrowserTabModel
+    let view: SessionWebView
+    let opened: () -> [URL]
+
+    init(_ html: String) async throws {
+      server = try TestPageServer(pages: ["/": html])
+      workspace = BrowserWorkspace()
+      tab = workspace.open(server.url("/"), in: session, openedBy: .user, activate: false)
+      var opened: [URL] = []
+      tab.openApplicationAddress = { opened.append($0) }
+      self.opened = { opened }
+      let tab = tab
+      await waitUntil("the page is loaded") { tab.committedURL != nil && !tab.isLoading }
+      view = try #require(tab.webView as? SessionWebView)
+    }
+
+    /// A press of the user's, then a click on `element`.
+    func pressThenClick(_ element: String) async {
+      view.notePress(at: ProcessInfo.processInfo.systemUptime, modifiers: [])
+      _ = try? await view.evaluateJavaScript("document.getElementById('\(element)').click()")
+    }
+
+    var applicationsAsked: [URL] {
+      workspace.requests(for: session).compactMap {
+        if case .effect(.pageApplication(let url, _)) = $0.kind { return url }
+        return nil
+      }
+    }
+  }
+
+  @Test("After a click of the user's, an application address the page's script sends is asked")
+  func pageScriptAfterClickAsked() async throws {
+    // The user clicks a button; the page's handler sends an address they never saw (#289).
+    let page = try await UserPage(
+      #"""
+      <!doctype html><title>Page</title><a id="hidden" href="vibetest://open"></a>
+      <a id="other" href="vibetest2://open"></a>
+      <button id="b" onclick="document.getElementById('hidden').click()">Play</button>
+      <button id="c" onclick="document.getElementById('other').click()">Again</button>
+      """#)
+    defer { page.server.stop() }
+    await page.pressThenClick("b")
+    await waitUntil("the application is asked") { page.applicationsAsked == [Self.application] }
+    page.workspace.answer(
+      try #require(page.workspace.requests(for: page.session).first), with: .deny)
+    // The refusal is settled once a later question, on another scheme, is answered: tasks resume
+    // in order on the main actor, so the first would have opened before the second.
+    await page.pressThenClick("c")
+    await waitUntil("the second application is asked") { page.applicationsAsked.count == 1 }
+    page.workspace.answer(
+      try #require(page.workspace.requests(for: page.session).first), with: .allowOnce)
+    await waitUntil("the second address is opened") { !page.opened().isEmpty }
+    #expect(page.opened() == [URL(string: "vibetest2://open")!])
+  }
+
+  @Test("One click of the user's is one question, and a refused scheme is not asked again")
+  func onePressOneQuestion() async throws {
+    let page = try await UserPage(
+      #"""
+      <!doctype html><title>Page</title><a id="l1" href="vibetest://one"></a>
+      <a id="l2" href="vibetest://two"></a>
+      <button id="b" onclick="for (const id of ['l1', 'l2']) document.getElementById(id).click()">
+      Play</button>
+      <a id="again" href="vibetest://three">Again</a>
+      """#)
+    defer { page.server.stop() }
+    await page.pressThenClick("b")
+    await waitUntil("a question is asked") { !page.applicationsAsked.isEmpty }
+    // The page's two clicks after one press of the user's: only the first is asked.
+    let flushed = try? await page.view.evaluateJavaScript("1")
+    #expect(flushed != nil)
+    #expect(page.applicationsAsked == [URL(string: "vibetest://one")!])
+    page.workspace.answer(
+      try #require(page.workspace.requests(for: page.session).first), with: .deny)
+    await waitUntil("the question is gone") { page.workspace.pendingRequests.isEmpty }
+    // The same scheme again, after another press: refused on this page, not asked.
+    await page.pressThenClick("again")
+    await waitUntil("the page is told it was blocked") {
+      page.tab.console.entries.contains { $0.text.contains("refused it on this page") }
+    }
+    #expect(page.workspace.pendingRequests.isEmpty)
+    #expect(page.opened().isEmpty)
+  }
+
+  @Test("The question names the site of the frame that sends the address")
+  func questionNamesTheFrame() async throws {
+    let page = try await UserPage(
+      #"<!doctype html><title>Page</title><a id="link" href="vibetest://open">x</a>"#)
+    defer { page.server.stop() }
+    await page.pressThenClick("link")
+    await waitUntil("the application is asked") { page.applicationsAsked == [Self.application] }
+    let request = try #require(page.workspace.requests(for: page.session).first)
+    guard case .effect(.pageApplication(_, let site)) = request.kind else {
+      Issue.record("Not a page's question: \(request.kind)")
+      return
+    }
+    #expect(site == "127.0.0.1:\(page.server.port)")
+  }
+
+  @Test("An application address the user clicks is asked too, and opens once allowed")
+  func userClickedApplicationAsked() async throws {
+    let page = try await UserPage(
+      #"<!doctype html><title>Page</title><a id="link" href="vibetest://open">x</a>"#)
+    defer { page.server.stop() }
+    await page.pressThenClick("link")
+    await waitUntil("the application is asked") { page.applicationsAsked == [Self.application] }
+    #expect(page.opened().isEmpty)
+    page.workspace.answer(
+      try #require(page.workspace.requests(for: page.session).first), with: .allowOnce)
+    await waitUntil("the address is opened") { page.opened() == [Self.application] }
+  }
+
   @Test("A window the agent's page opened stays asked after the user clicks in it")
   func windowOfTheAgentsPage() async throws {
     let folder = try DownloadFolder()
