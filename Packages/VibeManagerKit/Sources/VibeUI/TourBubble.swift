@@ -73,6 +73,11 @@ struct TourBubble: View {
 ///
 /// Closed by the user — Escape, a click elsewhere — it stays closed until its target comes back on
 /// screen or the tour moves on, and the tour goes on underneath.
+///
+/// Shown only once its target has stayed where it is for a moment: presented during the window's
+/// first layout, the popover kept the frame the target had before the split view placed it, and
+/// pointed at the window's edge. A target that moves takes it down, and it comes back on the new
+/// frame.
 struct TourPopover: ViewModifier {
   let model: AppModel
   let target: TourTarget
@@ -80,6 +85,9 @@ struct TourPopover: ViewModifier {
   /// Whether this target is the one the step points at: New Session lives in two places.
   var isEligible = true
   @State private var isClosed = false
+  /// Where the target is in the window, and whether it has stayed there long enough.
+  @State private var frame = CGRect.zero
+  @State private var isSettled = false
   @Environment(\.controlActiveState) private var activeState
 
   private var step: OnboardingStep? {
@@ -92,7 +100,7 @@ struct TourPopover: ViewModifier {
     content
       .popover(
         isPresented: Binding(
-          get: { step != nil && !isClosed },
+          get: { step != nil && !isClosed && isSettled },
           set: { isShown in
             if !isShown, step != nil { isClosed = true }
           }),
@@ -105,9 +113,26 @@ struct TourPopover: ViewModifier {
             skip: { model.onboarding.send(.skip) })
         }
       }
+      .onGeometryChange(for: CGRect.self) {
+        $0.frame(in: .global)
+      } action: {
+        frame = $0
+      }
+      .task(id: Settling(isWanted: step != nil, frame: frame)) {
+        isSettled = false
+        guard step != nil, !frame.isEmpty else { return }
+        try? await Task.sleep(for: .milliseconds(300))
+        if !Task.isCancelled { isSettled = true }
+      }
       .onChange(of: step) { isClosed = false }
       .onAppear { isClosed = false }
   }
+}
+
+/// What the popover waits on before it shows: wanted, on a target that stopped moving.
+private struct Settling: Equatable {
+  let isWanted: Bool
+  let frame: CGRect
 }
 
 extension View {
