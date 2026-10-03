@@ -168,6 +168,7 @@ private struct NoAgents: AgentProviderResolving {
 private actor NoActivityLogs: AgentActivityLogStore {
   func prepareLog(for id: SessionID) -> URL { URL(fileURLWithPath: "/tmp/\(id).log") }
   func existingLog(for id: SessionID) -> URL? { nil }
+  func end(for id: SessionID) -> AgentActivityLogPosition? { nil }
   func events(for id: SessionID, from position: AgentActivityLogPosition?)
     -> AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>
   { AsyncStream { $0.finish() } }

@@ -82,6 +82,9 @@ public protocol AgentActivityLogStore: Sendable {
   /// stopped at; one that no longer fits the file starts over from its beginning.
   func events(for id: SessionID, from position: AgentActivityLogPosition?) async
     -> AsyncStream<(AgentActivityEvent, AgentActivityLogPosition)>
+  /// Where the log ends now: the position a reading reaches once it has read every line written
+  /// so far (#283). `nil` when there is no log.
+  func end(for id: SessionID) async -> AgentActivityLogPosition?
   func removeLog(for id: SessionID) async
 }
 
