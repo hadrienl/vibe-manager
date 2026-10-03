@@ -438,14 +438,6 @@ public struct RootView: View {
         if WindowTitleToolbarItem.isDrawn {
           WindowTitleToolbarItem(title: model.windowTitle, room: titleRoom)
         }
-        // Where the work on the session on screen stands, and a way to change it (#80).
-        ToolbarItem(placement: .primaryAction) {
-          if !model.isPresentingNewSession, let session = model.selectedSession,
-            session.taskStatus != .archived
-          {
-            TaskStatusMenu(commands: SessionCommands(model: model, session: session))
-          }
-        }
         ToolbarItem(placement: .principal) {
           if !model.isPresentingNewSession, let session = model.selectedSession,
             model.conversations.canShowConversation(session)
@@ -1057,43 +1049,6 @@ public struct RootView: View {
 private struct DrawerPreparationKey: Hashable {
   let session: SessionID
   let isActive: Bool
-}
-
-/// The status of the session on screen, in the toolbar, as a menu of the four columns.
-private struct TaskStatusMenu: View {
-  let commands: SessionCommands
-
-  var body: some View {
-    let current = commands.taskStatus
-    Menu {
-      ForEach(commands.movableStatuses, id: \.self) { status in
-        Toggle(
-          status.label,
-          isOn: Binding(
-            get: { current == status },
-            set: { isOn in if isOn { commands.setTaskStatus(status) } }
-          )
-        )
-      }
-    } label: {
-      Label {
-        Text(current.label)
-      } icon: {
-        Image(systemName: current.symbolName)
-          .foregroundStyle(current.tint)
-      }
-      .labelStyle(.titleAndIcon)
-    }
-    .help(
-      Text("Status", bundle: .module, comment: "The submenu that moves a session between columns.")
-    )
-    .accessibilityLabel(
-      Text(
-        "Status: \(String(localized: current.label))", bundle: .module,
-        comment: "The toolbar menu of a session's task status.")
-    )
-    .accessibilityIdentifier("task-status-menu")
-  }
 }
 
 /// What a closed session offers above its terminal: the way back to work.

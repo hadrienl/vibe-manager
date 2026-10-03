@@ -13014,17 +13014,6 @@
         }
       }
     },
-    "Status: %@" : {
-      "comment" : "The toolbar menu of a session's task status.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Statut : %@"
-          }
-        }
-      }
-    },
     "Steps the agent ran on the server: %lld." : {
       "localizations" : {
         "fr" : {
