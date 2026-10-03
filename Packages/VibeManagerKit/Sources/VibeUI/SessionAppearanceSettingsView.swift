@@ -140,8 +140,6 @@ struct SessionAppearanceSettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: SettingsView.formWidth)
-    .frame(minHeight: 560)
     .confirmationDialog(
       resetTitle, isPresented: isResetting, titleVisibility: .visible, presenting: pendingReset
     ) { target in

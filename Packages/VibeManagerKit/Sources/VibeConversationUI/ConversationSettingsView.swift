@@ -62,8 +62,8 @@ public enum ConversationFonts {
   }
 }
 
-/// Settings › Conversation (#38): every preference of the conversation view, in a tab of its own,
-/// with a preview that follows each change. The user's own themes (#118) sit in the grid beside
+/// Settings › Conversation (#38): every preference of the conversation view, with a preview that
+/// follows each change. Whether sessions open on it is in General (#313). The user's own themes (#118) sit in the grid beside
 /// the built-in ones, and the card at its end unfolds the panel that makes one.
 public struct ConversationSettingsView: View {
   @Binding var appearance: ConversationAppearance
@@ -82,20 +82,6 @@ public struct ConversationSettingsView: View {
   public var body: some View {
     HStack(alignment: .top, spacing: 0) {
       Form {
-        Section {
-          Picker(selection: $appearance.defaultPresentation) {
-            Text("Conversation", bundle: .module).tag(SessionPresentation.conversation)
-            Text("Terminal", bundle: .module).tag(SessionPresentation.terminal)
-          } label: {
-            Text("Open sessions in", bundle: .module)
-          }
-          .pickerStyle(.segmented)
-          Text(
-            "Each session can then be switched with ⌥⌘T, and keeps its choice.", bundle: .module
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        }
         Section {
           Toggle(isOn: $appearance.followsSystemAppearance) {
             Text("Follow light and dark mode", bundle: .module)

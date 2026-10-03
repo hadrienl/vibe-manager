@@ -395,7 +395,7 @@ public struct RootView: View {
                 discarded: { model.discardNewSessionDraft(undoManager: undoManager) },
                 chooseFiles: { model.beginAttachingFiles() },
                 manageTemplates: {
-                  model.settingsTab = .templates
+                  model.settingsPage = .templates
                   openSettings()
                 },
                 themes: model.conversations.themes,
@@ -1026,7 +1026,7 @@ public struct RootView: View {
           notice: notice,
           allowFullDiskAccess: {
             model.dismissDropNotice()
-            model.settingsTab = .privacy
+            model.settingsPage = .privacy
             openSettings()
           },
           dismiss: { model.dismissDropNotice() }
