@@ -27,8 +27,10 @@ runtime and a secure timestamp, notarized by Apple and stapled. The designated r
 names the bundle identifier and the team: it is the same from one version to the next, so the host
 of version N accepts the application of version N+1, and an ad hoc impostor is refused.
 
-No entitlement is needed and none is granted. `release.sh` fails if the signed application carries
-any.
+One entitlement is granted, and only it: `com.apple.security.device.audio-input`, without which the
+hardened runtime refuses the microphone a page of the web view asks for (#315, ADR 0023). It needs
+no provisioning profile. `release.sh` fails if the signed application carries any other, or lacks
+it. *(Until #315, no entitlement at all.)*
 
 ### A disk image on GitHub Releases, no automatic update
 
@@ -64,10 +66,10 @@ unavailable.
 The script refuses to go on at the first step that fails: a clean tree; in the workflow, a tag
 naming the commit being built, and that commit on `main`; by hand, `main` equal to `origin/main`
 and no tag yet; CI green on the commit, the certificate present; then the archive,
-the export, the checks of the signature (strict verification, no entitlement, hardened runtime, a
-requirement naming the team, the bundle's identifier and version, `mock-agent.sh` sealed, no
-`Local.xcconfig`), notarization, the disk image and its own notarization, the checksum and the
-draft. `--dry-run` stops before notarizing and drafting.
+the export, the checks of the signature (strict verification, the microphone's entitlement alone,
+hardened runtime, a requirement naming the team, the bundle's identifier and version,
+`mock-agent.sh` sealed, no `Local.xcconfig`), notarization, the disk image and its own
+notarization, the checksum and the draft. `--dry-run` stops before notarizing and drafting.
 
 ### The version is given to the build
 
