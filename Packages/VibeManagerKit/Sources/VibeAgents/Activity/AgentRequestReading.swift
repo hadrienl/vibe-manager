@@ -42,6 +42,32 @@ enum AgentRequestReading {
       as? String
   }
 
+  /// The beginning of the first string value of `key` in a JSON text cut inside that value:
+  /// whatever the cut left of it, escapes resolved. `nil` when the text holds no such value.
+  static func leadingString(_ key: String, in text: String) -> String? {
+    let pattern = "\"" + NSRegularExpression.escapedPattern(for: key) + #"": ?"((?:[^"\\]|\\.)*)"#
+    guard let expression = try? NSRegularExpression(pattern: pattern),
+      let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+      let range = Range(match.range(at: 1), in: text)
+    else { return nil }
+    var value = Substring(text[range])
+    // What the cut split: an escape short of its end — an odd run of backslashes, `\u` short of
+    // its digits — or the first half of a character written as two escapes.
+    let unfinished = [
+      #"(?<!\\)(?:\\\\)*\\(?:u[0-9A-Fa-f]{0,3})?$"#,
+      #"(?<!\\)(?:\\\\)*\\u[dD][89abAB][0-9A-Fa-f]{2}$"#,
+    ]
+    for pattern in unfinished {
+      guard let tail = value.range(of: pattern, options: .regularExpression) else { continue }
+      // The pairs of backslashes before the escape are whole: they stay.
+      let pairs = value[tail].prefix { $0 == "\\" }.count / 2 * 2
+      value = value[..<value.index(tail.lowerBound, offsetBy: pairs)]
+    }
+    let literal = "\"" + value + "\""
+    return (try? JSONSerialization.jsonObject(with: Data(literal.utf8), options: .fragmentsAllowed))
+      as? String
+  }
+
   // MARK: - Content
 
   /// What the report asks, or `unreadable` when it cannot be read whole. `alwaysAllow` says what
@@ -51,7 +77,16 @@ enum AgentRequestReading {
     alwaysAllow fallback: (String) -> AgentAlwaysAllow? = { _ in nil }
   ) -> AgentRequestContent {
     guard let object = event.jsonObject, let toolName = object["tool_name"] as? String else {
-      return .unreadable(tool: reference(of: event).tool)
+      let tool = reference(of: event).tool
+      // A plan past the byte limit: the cut holds its beginning, more than a card shows. Its file
+      // is named after it, and lost with the rest (checked against 2.1.288).
+      if tool == "ExitPlanMode",
+        let text = event.payload.map({ String(decoding: $0, as: UTF8.self) }),
+        let beginning = leadingString("plan", in: text)
+      {
+        return plan(beginning, isCut: true)
+      }
+      return .unreadable(tool: tool)
     }
     let input = object["tool_input"] as? [String: Any] ?? [:]
     switch toolName {
@@ -78,6 +113,7 @@ enum AgentRequestReading {
     let string = { (key: String) in input[key] as? String }
     let tool: AgentToolPermission.Tool
     var subject: String?
+    var purpose = string("description")
     switch toolName {
     case "Bash", "shell", "exec_command":
       tool = .shell
@@ -103,6 +139,13 @@ enum AgentRequestReading {
     case "apply_patch":
       tool = .patch
       subject = string("command").map(patchedFiles)
+    case "request_permissions":
+      tool = .grant
+      subject = requestedPermissions(input["permissions"])
+      purpose = string("reason")
+    case "write_stdin":
+      tool = .terminalInput
+      subject = string("chars")
     default:
       if toolName.hasPrefix("mcp__") {
         let parts = toolName.dropFirst(5).components(separatedBy: "__")
@@ -115,7 +158,7 @@ enum AgentRequestReading {
       tool: tool,
       toolName: toolName,
       subject: subject,
-      purpose: string("description"),
+      purpose: purpose,
       details: details(of: input, toolName: toolName),
       workingDirectory: workingDirectory,
       alwaysAllow: alwaysAllow
@@ -140,6 +183,41 @@ enum AgentRequestReading {
       return String(line.dropFirst(prefix.count))
     }
     return files.isEmpty ? patch : files.joined(separator: "\n")
+  }
+
+  /// What Codex's `request_permissions` asks for, in the words its dialog uses: `network; read
+  /// a, b; write c; deny read d`. Its folders come as two lists, or as entries each with an access.
+  static func requestedPermissions(_ permissions: Any?) -> String? {
+    guard let permissions = permissions as? [String: Any] else { return nil }
+    var parts: [String] = []
+    if (permissions["network"] as? [String: Any])?["enabled"] as? Bool == true {
+      parts.append("network")
+    }
+    let fileSystem = permissions["file_system"] as? [String: Any] ?? [:]
+    var paths: [String: [String]] = [
+      "read": fileSystem["read"] as? [String] ?? [],
+      "write": fileSystem["write"] as? [String] ?? [],
+    ]
+    for entry in fileSystem["entries"] as? [[String: Any]] ?? [] {
+      guard let access = entry["access"] as? String, let path = entry["path"] as? [String: Any]
+      else { continue }
+      let name: String?
+      switch path["type"] as? String {
+      case "path": name = path["path"] as? String
+      case "glob_pattern": name = (path["pattern"] as? String).map { "glob \($0)" }
+      case "special":
+        let value = path["value"]
+        name = (value as? String ?? (value as? [String: Any])?["kind"] as? String).map { ":\($0)" }
+      default: name = nil
+      }
+      if let name { paths[access == "none" ? "deny" : access, default: []].append(name) }
+    }
+    for (access, label) in [("read", "read"), ("write", "write"), ("deny", "deny read")] {
+      if let names = paths[access], !names.isEmpty {
+        parts.append("\(label) \(names.joined(separator: ", "))")
+      }
+    }
+    return parts.isEmpty ? nil : parts.joined(separator: "; ")
   }
 
   /// What Claude Code's "Yes, and always allow…" would allow: its `permission_suggestions`.
@@ -206,10 +284,14 @@ enum AgentRequestReading {
   }
 
   static func plan(in input: [String: Any]) -> AgentRequestContent {
-    let plan = input["plan"] as? String ?? ""
+    plan(input["plan"] as? String ?? "", isCut: false)
+  }
+
+  /// The plan's first lines; never complete when the report was cut inside it.
+  static func plan(_ plan: String, isCut: Bool) -> AgentRequestContent {
     let lines = plan.split(separator: "\n", omittingEmptySubsequences: false)
     let excerpt = lines.prefix(planExcerptLineLimit).joined(separator: "\n")
-    return .plan(excerpt: excerpt, isComplete: lines.count <= planExcerptLineLimit)
+    return .plan(excerpt: excerpt, isComplete: !isCut && lines.count <= planExcerptLineLimit)
   }
 }
 

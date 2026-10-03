@@ -14,8 +14,15 @@ import VibeApplication
 /// The rollout is the one created for this working directory once the session started, the oldest
 /// of them, as `CodexRolloutSessionDiscovery` picks. Two Codex sessions started in the same folder
 /// in the same seconds could see each other's question; it would only be shown, never answered.
+///
+/// `request_user_input_async` (#273) asks without waiting: its output, `accepted`, comes at once,
+/// and the agent goes on. Codex keeps the question until the user answers it or the turn ends,
+/// when it takes it away — so does the watch, at the turn's end the rollout writes.
 public struct CodexQuestionWatch: Sendable {
   static let tool = "request_user_input"
+  static let asyncTool = "request_user_input_async"
+  /// What the set of pending calls holds for an asynchronous question: no output settles it.
+  static let asyncMark = "async:"
 
   private let sessionsDirectory: URL
   private let workingDirectoryPath: String
@@ -64,7 +71,11 @@ public struct CodexQuestionWatch: Sendable {
   }
 
   /// The words a line must hold to matter here, looked for before any JSON is decoded.
-  static let needles = [Data(tool.utf8), Data("function_call_output".utf8)]
+  /// The name of either tool holds `tool`.
+  static let needles = [
+    Data(tool.utf8), Data("function_call_output".utf8), Data("task_complete".utf8),
+    Data("turn_aborted".utf8),
+  ]
 
   /// The questions the rollout holds that no output has answered yet, and where its last whole
   /// line ends: what follows is followed as it comes. Read by blocks, never whole.
@@ -89,40 +100,70 @@ public struct CodexQuestionWatch: Sendable {
         }
       }
     }
-    let waiting = order.filter(pending.contains).compactMap { asked[$0] }
+    let waiting = order.filter { pending.contains($0) || pending.contains(asyncMark + $0) }
+      .compactMap { asked[$0] }
     return (pending, waiting, UInt64(read - splitter.pendingCount))
   }
 
-  /// What one line of a rollout says about questions: one asked, or one of those answered.
+  /// What one line of a rollout says about questions: one asked, or some of those answered.
   static func signals(in line: Data, pending: inout Set<String>) -> [AgentSignal] {
     // Most lines are messages and tool output, some large: the words are looked for first.
     let isCall = line.range(of: Data(tool.utf8)) != nil
-    guard isCall || (!pending.isEmpty && line.range(of: Data("function_call_output".utf8)) != nil),
+    guard isCall || (!pending.isEmpty && LineSplitter.contains(line, anyOf: needles)),
       let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
-      object["type"] as? String == "response_item",
-      let payload = object["payload"] as? [String: Any],
+      let payload = object["payload"] as? [String: Any]
+    else { return [] }
+    if object["type"] as? String == "event_msg" {
+      // The turn is over: Codex takes its asynchronous questions away.
+      guard ["task_complete", "turn_aborted"].contains(payload["type"] as? String) else {
+        return []
+      }
+      let ended = pending.filter { $0.hasPrefix(asyncMark) }
+      pending.subtract(ended)
+      return ended.sorted().map {
+        .toolFinished(asyncTool, subject: String($0.dropFirst(asyncMark.count)))
+      }
+    }
+    guard object["type"] as? String == "response_item",
       let callID = payload["call_id"] as? String
     else { return [] }
     switch payload["type"] as? String {
-    case "function_call" where payload["name"] as? String == tool:
-      guard pending.insert(callID).inserted else { return [] }
+    case "function_call" where [tool, asyncTool].contains(payload["name"] as? String):
+      let name = payload["name"] as? String ?? tool
+      let isAsync = name == asyncTool
+      guard pending.insert(isAsync ? asyncMark + callID : callID).inserted else { return [] }
       let arguments = (payload["arguments"] as? String).flatMap {
         (text: String) -> [String: Any]? in
         (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any]
       }
-      let questions = AgentRequestReading.questions(in: arguments ?? [:])
+      let questions =
+        isAsync
+        ? asyncQuestions(in: arguments ?? [:])
+        : AgentRequestReading.questions(in: arguments ?? [:])
       let notice = AgentRequestNotice(
-        content: questions.isEmpty ? .unreadable(tool: tool) : .questions(questions),
-        reference: AgentToolReference(tool: tool, subject: callID),
+        content: questions.isEmpty ? .unreadable(tool: name) : .questions(questions),
+        reference: AgentToolReference(tool: name, subject: callID),
         isShown: false,
-        key: "codex:\(callID)"
+        key: "codex:\(callID)",
+        isAsynchronous: isAsync
       )
-      return [.questionAsked(.question, tool: tool, notice: notice)]
+      return [.questionAsked(.question, tool: name, notice: notice)]
     case "function_call_output":
+      // An asynchronous question's output only says it was taken.
       guard pending.remove(callID) != nil else { return [] }
       return [.toolFinished(tool, subject: callID)]
     default:
       return []
+    }
+  }
+
+  /// The questions of `request_user_input_async`: a title each, and answers to suggest — plain
+  /// words, the first preselected. An answer of one's own is always possible.
+  static func asyncQuestions(in arguments: [String: Any]) -> [AgentQuestion] {
+    (arguments["questions"] as? [[String: Any]] ?? []).compactMap { question in
+      guard let title = question["title"] as? String else { return nil }
+      let options = (question["options"] as? [String] ?? []).map { AgentQuestion.Option(label: $0) }
+      return AgentQuestion(header: nil, text: title, options: options)
     }
   }
 

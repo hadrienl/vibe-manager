@@ -69,9 +69,11 @@ struct AnnouncedDialogTests {
     #expect(state.requests.count == 1)
   }
 
-  @Test("The main agent's turn or prompt takes the announced dialog away", arguments: [
-    AgentSignal.promptSubmitted(byUser: true), .turnEnded, .interrupted, .questionResolved,
-  ])
+  @Test(
+    "The main agent's turn or prompt takes the announced dialog away",
+    arguments: [
+      AgentSignal.promptSubmitted(byUser: true), .turnEnded, .interrupted, .questionResolved,
+    ])
   func settledBy(_ signal: AgentSignal) {
     let state = feed(network, signal)
     #expect(state.requests.isEmpty)
@@ -369,6 +371,93 @@ struct PartlyQuotedDialogTests {
   }
 }
 
+@Suite("Requests settled by what nothing else reports (#273, P2)")
+struct SettledRequestsTests {
+  private func request(_ command: String, agent: String? = nil) -> AgentSignal {
+    .questionAsked(
+      .approval, tool: "Bash",
+      notice: AgentRequestNotice(
+        content: .permission(
+          AgentToolPermission(tool: .shell, toolName: "Bash", subject: command)),
+        reference: AgentToolReference(tool: "Bash", agentID: agent, subject: command),
+        isShown: true))
+  }
+
+  @Test("A batch resolved takes its agent's requests away — a refusal with a comment is one")
+  func batchResolved() {
+    let state = feed(request("rm a"), request("ls", agent: "a1"), .batchResolved(agentID: nil))
+    #expect(state.requests.map(\.reference.agentID) == ["a1"])
+    #expect(state.activity == .awaitingUser(.approval))
+    // A sub-agent's dialog refused with Escape: its own batch is resolved.
+    let sub = feed(.batchResolved(agentID: "a1"), to: state)
+    #expect(sub.requests.isEmpty)
+    #expect(sub.activity == .working)
+  }
+
+  @Test("A sub-agent's batch leaves the main agent's requests, announced ones too")
+  func otherAgentsBatch() {
+    let state = feed(network, request("rm a"), .batchResolved(agentID: "a1"))
+    #expect(state.requests.count == 1)
+    let main = feed(network, .batchResolved(agentID: nil))
+    #expect(main.requests.isEmpty)
+  }
+
+  @Test("A turn failed on the account ends the turn and asks for the user")
+  func turnFailed() {
+    let prompt = AgentTerminalPrompt(kind: .account, message: "API Error: OAuth token has expired")
+    let state = feed(.turnFailed(prompt))
+    #expect(state.requests.map(\.content) == [.inTerminal(prompt)])
+    // Said even behind a sub-agent's dialog still up.
+    #expect(feed(request("ls", agent: "a1"), .turnFailed(prompt)).requests.count == 2)
+    #expect(state.activity == .awaitingUser(.approval))
+    #expect(feed(.promptSubmitted(byUser: true), to: state).requests.isEmpty)
+  }
+
+  @Test("Hooks silent past their delay: a startup dialog is most likely waiting, until they speak")
+  func startup() {
+    let started = AgentActivityState(
+      activity: .idle, source: .unconfirmed(since: start))
+    let late = AgentActivityMachine.reduce(
+      started, .tick,
+      context: AgentActivityContext(
+        now: start.addingTimeInterval(11), isVisible: false,
+        requestID: AgentRequestID(sessionID: session, key: "tick")))
+    #expect(late.source == .inferred)
+    guard case .inTerminal(let prompt) = late.requests.first?.content else {
+      Issue.record("no startup request")
+      return
+    }
+    #expect(prompt.kind == .startup)
+    #expect(late.activity == .awaitingUser(.approval))
+    // The dialog answered, the hooks speak: it is gone.
+    #expect(feed(.channelConfirmed, to: late).requests.isEmpty)
+    // Hooks that never speak — turned off, or failing: the terminal is all there is. What it
+    // draws leaves the dialog waiting; a letter does not answer it, Return or Escape does.
+    func reduce(_ event: AgentActivityInput, _ state: AgentActivityState) -> AgentActivityState {
+      AgentActivityMachine.reduce(
+        state, event,
+        context: AgentActivityContext(
+          now: start.addingTimeInterval(20), isVisible: false,
+          requestID: AgentRequestID(sessionID: session, key: "key")))
+    }
+    let drawn = reduce(.output, late)
+    #expect(drawn.activity == .awaitingUser(.approval))
+    #expect(reduce(.userInput(Array("y".utf8)), drawn).requests.count == 1)
+    for key in [[0x0D], [0x1B]] as [[UInt8]] {
+      let answered = reduce(.userInput(key), drawn)
+      #expect(answered.requests.isEmpty)
+      #expect(answered.activity == .working)
+    }
+    // Without hooks, nothing is waited for.
+    let bare = AgentActivityMachine.reduce(
+      AgentActivityState(activity: .idle, source: .inferred), .tick,
+      context: AgentActivityContext(
+        now: start.addingTimeInterval(11), isVisible: false,
+        requestID: AgentRequestID(sessionID: session, key: "tick")))
+    #expect(bare.requests.isEmpty)
+  }
+}
+
 @Suite("OSC 9 notifications in a terminal's output (#273)")
 struct TerminalNotificationScannerTests {
   private func bytes(_ text: String) -> [UInt8] { Array(text.utf8) }
@@ -401,5 +490,58 @@ struct TerminalNotificationScannerTests {
     var scanner = TerminalNotificationScanner()
     #expect(scanner.scan(bytes("\u{1B}]9;" + String(repeating: "a", count: 5000))).isEmpty)
     #expect(scanner.scan(bytes("\u{07}")).isEmpty)
+  }
+}
+
+@Suite("A question asked without stopping the agent (#273, P3)")
+struct AsynchronousQuestionTests {
+  private let asked = AgentSignal.questionAsked(
+    .question, tool: "request_user_input_async",
+    notice: AgentRequestNotice(
+      content: .questions([AgentQuestion(header: nil, text: "Which port?", options: [])]),
+      reference: AgentToolReference(tool: "request_user_input_async", subject: "call_a"),
+      isShown: false, key: "codex:call_a", isAsynchronous: true))
+
+  private func play(_ steps: (TimeInterval, AgentSignal)...) -> AgentActivityState {
+    var state = AgentActivityState(activity: .working, source: .structured)
+    for (seconds, signal) in steps {
+      state = AgentActivityMachine.reduce(
+        state, .signal(signal), context: context("t\(seconds)", at: seconds))
+    }
+    return state
+  }
+
+  @Test("A permission asked meanwhile goes before it, and is answered as if it were alone")
+  func permissionFirst() {
+    let state = play((0, asked), (60, permission(shown: true)))
+    #expect(state.requests.map(\.isAsynchronous) == [false, true])
+    #expect(state.activity == .awaitingUser(.approval))
+    #expect(!state.isFirstRequestUncertain)
+  }
+
+  @Test("Behind it, a permission alone is the dialog on screen: settled, drawn, or drawn first")
+  func aloneBehind() {
+    // Two in the same second: in doubt until one is settled, then the other is alone.
+    let two = play(
+      (0, asked), (60, permission(shown: true, command: "a")),
+      (60.5, permission(shown: true, command: "b")), (120, .toolFinished("Bash", subject: "a")))
+    #expect(two.requests.map(\.reference.subject) == ["b", "call_a"])
+    #expect(!two.isFirstRequestUncertain)
+    // Its dialog drawn before its report: the report finds it, not the question.
+    let early = play(
+      (0, asked), (60, .dialogDrawn(AgentDrawnDialog(.command("ls")))),
+      (61, permission(shown: false, command: "ls")))
+    #expect(early.requests.map(\.isShown) == [true, false])
+    #expect(early.drawnBeforeReport == nil)
+  }
+
+  @Test("Codex's word of it adds nothing; a form it announces still waits")
+  func announcements() {
+    let question = AgentSignal.dialogAnnounced(
+      AgentTerminalPrompt(kind: .question, message: "Question: Which port?"))
+    let form = AgentSignal.dialogAnnounced(
+      AgentTerminalPrompt(kind: .form, message: "Approval requested by github"))
+    #expect(play((0, asked), (60, question)).requests.count == 1)
+    #expect(play((0, asked), (60, form)).requests.map(\.content.isAnnouncedOnly) == [true, false])
   }
 }
