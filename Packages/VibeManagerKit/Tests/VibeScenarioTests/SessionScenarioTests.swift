@@ -203,6 +203,10 @@ struct SessionScenarioTests {
     var runtimeDocument = try #require(
       try JSONSerialization.jsonObject(with: Data(contentsOf: runtime)) as? [String: Any])
     await first.shutdown(keepingAgentsRunning: false)
+    // Its agent is gone before the next launch, as after any quit: the check at the end is of
+    // what that launch starts, not of an agent still on its way out (#310). On a busy machine it
+    // was looked for at once and found still ending.
+    #expect(await eventually { ProcessTree.snapshot(under: scenario.root).isEmpty })
     // The process that wrote it is gone: a pid no process has any more.
     var state = try #require(runtimeDocument["state"] as? [String: Any])
     #expect(state["phase"] as? String == "running")
@@ -217,7 +221,11 @@ struct SessionScenarioTests {
     #expect(second.appModel.previousShutdownVerdict == "unexpected")
     #expect(second.appModel.restoreOffer?.sessionCount == 1)
     #expect(scenario.stored(id, in: second)?.status == .closed)
-    #expect(ProcessTree.snapshot(under: scenario.root).isEmpty)
+    // Nothing relaunched: an agent started here would hold, where what the launch runs itself in
+    // the folder — `git` reading the repository's state — ends. Waited for rather than looked at
+    // once: on a busy machine a `git` of the launch was still there (#310).
+    #expect(await eventually { ProcessTree.snapshot(under: scenario.root).isEmpty })
+    #expect(!second.launcher.isRunning(id))
     await scenario.tearDown()
   }
 

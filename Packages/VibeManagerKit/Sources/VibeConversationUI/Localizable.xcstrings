@@ -1150,16 +1150,6 @@
         }
       }
     },
-    "Conversation" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conversation"
-          }
-        }
-      }
-    },
     "Conversation Theme" : {
       "localizations" : {
         "fr" : {
@@ -1366,16 +1356,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fait"
-          }
-        }
-      }
-    },
-    "Each session can then be switched with ⌥⌘T, and keeps its choice." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chaque session peut ensuite basculer avec ⌥⌘T, et garde son choix."
           }
         }
       }
@@ -2098,16 +2078,6 @@
         }
       }
     },
-    "Open sessions in" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir les sessions en"
-          }
-        }
-      }
-    },
     "Opens a preview" : {
       "localizations" : {
         "fr" : {
@@ -2814,16 +2784,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Détails techniques"
-          }
-        }
-      }
-    },
-    "Terminal" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Terminal"
           }
         }
       }

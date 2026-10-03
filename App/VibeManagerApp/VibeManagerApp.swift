@@ -350,6 +350,9 @@ struct VibeManagerApp: App {
     Settings {
       SettingsView(permissions: environment.permissions, model: environment.appModel)
     }
+    // The user's to size, down to what a page needs: a page that needs more widens it (#313).
+    .windowResizability(.contentMinSize)
+    .defaultSize(width: 835, height: 700)
 
     // One window, reopened rather than duplicated. SwiftUI lists it in the Window menu itself,
     // so the shortcut goes on the scene rather than on a second menu item.
@@ -388,7 +391,7 @@ private struct TemplateCommands: View {
     Divider()
 
     Button("Manage Prompt Templates…") {
-      model.settingsTab = .templates
+      model.settingsPage = .templates
       openSettings()
     }
   }
@@ -447,7 +450,7 @@ private struct UpdateCommands: View {
         }
       } else if !updates.isAvailable {
         Button("Check for Updates…") {
-          model.settingsTab = .updates
+          model.settingsPage = .updates
           openSettings()
         }
       } else if let waiting = updates.waitingVersion {
