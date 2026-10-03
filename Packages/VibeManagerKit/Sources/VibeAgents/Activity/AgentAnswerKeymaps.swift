@@ -173,6 +173,9 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
         !option.label.localizedCaseInsensitiveContains("in the future")
       else { return nil }
       return [key]
+    case (.deny, .permission(let permission)) where permission.tool == .grant:
+      // Escape is no refusal in this dialog (0.159.2, `approval_overlay.rs`): `d` is.
+      return Self.shortcut("d", in: screen)
     case (.deny, .permission), (.deny, .unreadable):
       return [TerminalKeys.escape]
     default:
@@ -189,7 +192,7 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
   static func alwaysKey(for permission: AgentToolPermission) -> [UInt8]? {
     switch permission.tool {
     case .shell: return Array("p".utf8)
-    case .patch: return Array("a".utf8)
+    case .patch, .grant: return Array("a".utf8)
     default: return nil
     }
   }
@@ -201,6 +204,8 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
       return AgentAlwaysAllow(rules: [.commandPrefix], scope: .session)
     case "apply_patch":
       return AgentAlwaysAllow(rules: [.files], scope: .session)
+    case "request_permissions":
+      return AgentAlwaysAllow(rules: [.permissions], scope: .session)
     default:
       return nil
     }

@@ -131,6 +131,11 @@ public struct AgentToolPermission: Hashable, Codable, Sendable {
     case read
     case web
     case patch
+    /// More than the sandbox allows — the network, folders — for a turn or the session: Codex's
+    /// `request_permissions` (#273).
+    case grant
+    /// Keys typed into a terminal the agent left running: Codex's `write_stdin` (#273).
+    case terminalInput
     case mcp(server: String, tool: String)
     case other(String)
   }
@@ -184,6 +189,8 @@ public struct AgentAlwaysAllow: Hashable, Codable, Sendable {
     case commandPrefix
     /// These files, for the rest of the session.
     case files
+    /// The permissions asked for, for the rest of the session.
+    case permissions
   }
 
   /// Where the CLI keeps what is allowed.

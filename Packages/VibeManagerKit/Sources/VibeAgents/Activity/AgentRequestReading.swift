@@ -112,6 +112,7 @@ enum AgentRequestReading {
     let string = { (key: String) in input[key] as? String }
     let tool: AgentToolPermission.Tool
     var subject: String?
+    var purpose = string("description")
     switch toolName {
     case "Bash", "shell", "exec_command":
       tool = .shell
@@ -137,6 +138,13 @@ enum AgentRequestReading {
     case "apply_patch":
       tool = .patch
       subject = string("command").map(patchedFiles)
+    case "request_permissions":
+      tool = .grant
+      subject = requestedPermissions(input["permissions"])
+      purpose = string("reason")
+    case "write_stdin":
+      tool = .terminalInput
+      subject = string("chars")
     default:
       if toolName.hasPrefix("mcp__") {
         let parts = toolName.dropFirst(5).components(separatedBy: "__")
@@ -149,7 +157,7 @@ enum AgentRequestReading {
       tool: tool,
       toolName: toolName,
       subject: subject,
-      purpose: string("description"),
+      purpose: purpose,
       details: details(of: input, toolName: toolName),
       workingDirectory: workingDirectory,
       alwaysAllow: alwaysAllow
@@ -174,6 +182,40 @@ enum AgentRequestReading {
       return String(line.dropFirst(prefix.count))
     }
     return files.isEmpty ? patch : files.joined(separator: "\n")
+  }
+
+  /// What Codex's `request_permissions` asks for, in the words its dialog uses: `network; read
+  /// a, b; write c; deny read d`. Its folders come as two lists, or as entries each with an access.
+  static func requestedPermissions(_ permissions: Any?) -> String? {
+    guard let permissions = permissions as? [String: Any] else { return nil }
+    var parts: [String] = []
+    if (permissions["network"] as? [String: Any])?["enabled"] as? Bool == true {
+      parts.append("network")
+    }
+    let fileSystem = permissions["file_system"] as? [String: Any] ?? [:]
+    var paths: [String: [String]] = [
+      "read": fileSystem["read"] as? [String] ?? [], "write": fileSystem["write"] as? [String] ?? [],
+    ]
+    for entry in fileSystem["entries"] as? [[String: Any]] ?? [] {
+      guard let access = entry["access"] as? String, let path = entry["path"] as? [String: Any]
+      else { continue }
+      let name: String?
+      switch path["type"] as? String {
+      case "path": name = path["path"] as? String
+      case "glob_pattern": name = (path["pattern"] as? String).map { "glob \($0)" }
+      case "special":
+        let value = path["value"]
+        name = (value as? String ?? (value as? [String: Any])?["kind"] as? String).map { ":\($0)" }
+      default: name = nil
+      }
+      if let name { paths[access == "none" ? "deny" : access, default: []].append(name) }
+    }
+    for (access, label) in [("read", "read"), ("write", "write"), ("deny", "deny read")] {
+      if let names = paths[access], !names.isEmpty {
+        parts.append("\(label) \(names.joined(separator: ", "))")
+      }
+    }
+    return parts.isEmpty ? nil : parts.joined(separator: "; ")
   }
 
   /// What Claude Code's "Yes, and always allow…" would allow: its `permission_suggestions`.

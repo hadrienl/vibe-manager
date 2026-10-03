@@ -8695,6 +8695,17 @@
         }
       }
     },
+    "More permissions" : {
+      "comment" : "A permission an agent asks for: more than its sandbox allows, the network or folders.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permissions supplémentaires"
+          }
+        }
+      }
+    },
     "Mouth half open" : {
       "comment" : "An avatar expression.",
       "localizations" : {
@@ -13366,6 +13377,17 @@
         }
       }
     },
+    "Terminal input" : {
+      "comment" : "A permission an agent asks for: to type into a terminal it left running.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisie dans un terminal"
+          }
+        }
+      }
+    },
     "Terminal tabs" : {
       "localizations" : {
         "fr" : {
@@ -17999,6 +18021,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "l’application par défaut"
+          }
+        }
+      }
+    },
+    "these permissions" : {
+      "comment" : "What always allowing grants: the permissions the agent asked for.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ces permissions"
           }
         }
       }

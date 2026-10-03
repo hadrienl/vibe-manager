@@ -158,3 +158,91 @@ struct AsyncQuestionWatchTests {
     #expect(waiting.compactMap { notice(of: $0)?.key } == ["codex:call_b"])
   }
 }
+
+@Suite("Codex's request_permissions and write_stdin (#273, P3)")
+struct CodexPermissionsReadingTests {
+  /// From `tui/src/bottom_pane/snapshots` in 0.159.2: the dialog of `request_permissions`.
+  static let grantDialog = """
+      Would you like to grant these permissions?
+
+      Reason: need workspace access
+
+      Permission rule: network; read `/tmp/readme.txt`; write `/tmp/out.txt`
+
+    › 1. Yes, grant these permissions for this turn (y)
+      2. Yes, grant for this turn with strict auto review (r)
+      3. Yes, grant these permissions for this session (a)
+      4. No, continue without permissions (d)
+
+      Press enter to confirm or esc to cancel
+    """
+  /// The dialog of `write_stdin`: `Approved` and `Abort` only.
+  static let inputDialog = """
+      Would you like to send input to terminal 42?
+      Input: "confirm\\n"
+    › 1. Yes, proceed (y)
+      2. No, and tell Codex what to do differently (esc)
+      Press enter to confirm or esc to cancel
+    """
+
+  private func permission(_ payload: String) throws -> AgentToolPermission {
+    let signal = CodexSignalDecoder().signal(for: event("PermissionRequest", payload))
+    guard case .permission(let permission) = notice(of: signal)?.content else {
+      throw CancellationError()
+    }
+    return permission
+  }
+
+  @Test("The permissions asked for read as Codex words them, two lists or entries")
+  func grant() throws {
+    let legacy = try permission(
+      #"{"tool_name":"request_permissions","tool_input":{"reason":"need workspace access","permissions":{"network":{"enabled":true},"file_system":{"read":["/tmp/readme.txt"],"write":["/tmp/out.txt"]}}}}"#
+    )
+    #expect(legacy.tool == .grant)
+    #expect(legacy.subject == "network; read /tmp/readme.txt; write /tmp/out.txt")
+    #expect(legacy.purpose == "need workspace access")
+    #expect(legacy.alwaysAllow == AgentAlwaysAllow(rules: [.permissions], scope: .session))
+    let entries = try permission(
+      #"{"tool_name":"request_permissions","tool_input":{"reason":null,"permissions":{"file_system":{"entries":[{"path":{"type":"path","path":"/a"},"access":"write"},{"path":{"type":"glob_pattern","pattern":"**/.env"},"access":"deny"}]}}}}"#
+    )
+    #expect(entries.subject == "write /a; deny read glob **/.env")
+    #expect(entries.purpose == nil)
+  }
+
+  @Test("Input for a terminal shows what would be typed")
+  func input() throws {
+    let input = try permission(
+      #"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"confirm\n","cwd":"/tmp"}}"#)
+    #expect(input.tool == .terminalInput)
+    #expect(input.subject == "confirm\n")
+    #expect(input.alwaysAllow == nil)
+  }
+
+  @Test("Granted for the turn by y, the session by a, refused by d — never by Escape")
+  func grantKeys() throws {
+    let keymap = CodexAnswerKeymap()
+    let content = AgentRequestContent.permission(
+      try permission(
+        #"{"tool_name":"request_permissions","tool_input":{"permissions":{"network":{"enabled":true}}}}"#))
+    let screen = AgentDialogScreen(screen: Self.grantDialog)
+    #expect(keymap.answers(for: content) == [.allowOnce, .allowAlways, .deny])
+    #expect(keymap.keystrokes(for: .allowOnce, to: content, screen: screen) == [Array("y".utf8)])
+    #expect(keymap.keystrokes(for: .allowAlways, to: content, screen: screen) == [Array("a".utf8)])
+    #expect(keymap.keystrokes(for: .deny, to: content, screen: screen) == [Array("d".utf8)])
+    // Some other dialog on screen: nothing is typed.
+    let other = AgentDialogScreen(screen: Self.inputDialog)
+    #expect(keymap.keystrokes(for: .deny, to: content, screen: other) == nil)
+    #expect(keymap.keystrokes(for: .deny, to: content, screen: nil) == nil)
+  }
+
+  @Test("Input for a terminal is sent once or refused, never always")
+  func inputKeys() throws {
+    let keymap = CodexAnswerKeymap()
+    let content = AgentRequestContent.permission(
+      try permission(#"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"y"}}"#))
+    let screen = AgentDialogScreen(screen: Self.inputDialog)
+    #expect(keymap.answers(for: content) == [.allowOnce, .deny])
+    #expect(keymap.keystrokes(for: .allowOnce, to: content, screen: screen) == [Array("y".utf8)])
+    #expect(keymap.keystrokes(for: .deny, to: content, screen: screen) == [TerminalKeys.escape])
+  }
+}

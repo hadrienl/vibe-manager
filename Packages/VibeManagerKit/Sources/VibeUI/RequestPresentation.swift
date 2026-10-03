@@ -130,6 +130,15 @@ public enum RequestPresentation {
       return LocalizedStringResource(
         "File changes", bundle: .module,
         comment: "A permission an agent asks for: a patch to apply to files.")
+    case .grant:
+      return LocalizedStringResource(
+        "More permissions", bundle: .module,
+        comment:
+          "A permission an agent asks for: more than its sandbox allows, the network or folders.")
+    case .terminalInput:
+      return LocalizedStringResource(
+        "Terminal input", bundle: .module,
+        comment: "A permission an agent asks for: to type into a terminal it left running.")
     case .mcp:
       return LocalizedStringResource(
         "MCP tool", bundle: .module, comment: "A permission an agent asks for: its tool.")
@@ -149,6 +158,8 @@ public enum RequestPresentation {
       case .read: return "doc.text"
       case .web: return "globe"
       case .patch: return "doc.on.doc"
+      case .grant: return "lock.open"
+      case .terminalInput: return "keyboard"
       case .mcp: return "puzzlepiece.extension"
       case .other: return "wrench.and.screwdriver"
       }
@@ -245,6 +256,11 @@ public enum RequestPresentation {
         localized: LocalizedStringResource(
           "changes to these files", bundle: .module,
           comment: "What always allowing grants: further changes to the same files."))
+    case .permissions:
+      return String(
+        localized: LocalizedStringResource(
+          "these permissions", bundle: .module,
+          comment: "What always allowing grants: the permissions the agent asked for."))
     }
   }
 
