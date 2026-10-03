@@ -62,7 +62,8 @@ struct ConversationReadingTests {
         entries: [
           ConversationEntry(id: "1", content: .agentText("An older answer.")),
           ConversationEntry(id: "2", content: .userPrompt("And now?", attachments: [])),
-          ConversationEntry(id: "3", content: .agentText("**Done**: the tests pass.\n\n- one\n- two")),
+          ConversationEntry(
+            id: "3", content: .agentText("**Done**: the tests pass.\n\n- one\n- two")),
           ConversationEntry(id: "4", content: .reasoning("thinking")),
         ],
         availability: .available))
