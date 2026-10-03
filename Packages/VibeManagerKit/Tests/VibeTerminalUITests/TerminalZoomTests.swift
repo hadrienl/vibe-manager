@@ -36,6 +36,20 @@ struct TerminalZoomTests {
     #expect(view.getTerminal().cols < columns)
   }
 
+  @Test("A zoom reads the terminal's text again for VoiceOver, its cells being others (#226)")
+  func zoomRefreshesTheAccessibleText() {
+    let view = AccessibleTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+    _ = view.accessibleText
+    let builds = view.textBuilds
+
+    _ = view.accessibleText
+    #expect(view.textBuilds == builds)
+
+    view.applyFontSize(18)
+    _ = view.accessibleText
+    #expect(view.textBuilds == builds + 1)
+  }
+
   private func pane() -> TerminalPaneModel {
     TerminalPaneModel(
       terminalID: TerminalID(),

@@ -88,7 +88,8 @@ public enum ConversationThemeSchema {
         + "16:10, no text. null for no picture, or when imageURL is given."
     case .veil:
       "How much of colors.background covers the picture, from 0 (the picture as it is) to 1 "
-        + "(hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable."
+        + "(hidden). The text is read on colors.background: 0.6 to 0.9 keeps it readable, and "
+        + "the application never shows a picture under less than 0.6."
     case .blur:
       "How blurred the picture is, in points, from 0 to 40."
     case .area:

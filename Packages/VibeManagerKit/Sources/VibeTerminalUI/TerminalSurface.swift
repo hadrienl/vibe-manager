@@ -704,6 +704,7 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
     Signposts.interval("terminal.feed") {
       view?.feed(byteArray: bytes[...])
     }
+    (view as? AccessibleTerminalView)?.textDidChange()
     reportScreen()
   }
 

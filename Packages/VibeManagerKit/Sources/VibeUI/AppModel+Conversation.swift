@@ -115,6 +115,9 @@ extension AppModel {
       model.write = { [weak self] bytes in
         await self?.pane(for: id)?.write(bytes)
       }
+      model.readScreen = { [weak self] in
+        await self?.launcher?.screen(of: id)
+      }
       model.processRunning = { [weak self] in
         guard let status = self?.pane(for: id)?.status else { return false }
         return status == .running || status == .starting

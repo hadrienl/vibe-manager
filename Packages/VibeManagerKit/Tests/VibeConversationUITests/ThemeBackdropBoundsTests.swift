@@ -33,7 +33,8 @@ struct ThemeBackdropBoundsTests {
     return url
   }
 
-  /// The card of a theme whose picture is shown as it is, drawn off screen at one pixel a point.
+  /// The card of a theme whose picture is shown as bare as it can be, drawn off screen at one
+  /// pixel a point.
   private func card(picture url: URL) throws -> NSBitmapImageRep {
     var theme = ConversationTheme.night
     theme.backdrop.localImage = url
@@ -51,8 +52,10 @@ struct ThemeBackdropBoundsTests {
     guard let color = rep.colorAt(x: Int(x), y: Int(y))?.usingColorSpace(.sRGB) else {
       return false
     }
-    return color.alphaComponent > 0.9 && color.redComponent > 0.8 && color.greenComponent < 0.2
-      && color.blueComponent < 0.2
+    // Under the least veil a picture is shown with (#231), red shows through as a clear red cast
+    // on the theme's dark background.
+    return color.alphaComponent > 0.9
+      && color.redComponent - max(color.greenComponent, color.blueComponent) > 0.25
   }
 
   @Test("A tall picture covers the thumbnail, not the name under it nor the card above it")

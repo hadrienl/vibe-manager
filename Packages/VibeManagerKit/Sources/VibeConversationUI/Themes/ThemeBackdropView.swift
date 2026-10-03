@@ -19,7 +19,7 @@ struct ThemeBackdropView: View {
           Image(nsImage: image)
             .resizable()
             .scaledToFill()
-            .overlay(theme.background.color.opacity(theme.backdrop.veil))
+            .overlay(theme.background.color.opacity(theme.backdrop.shownVeil))
         }
       }
       .clipped()
